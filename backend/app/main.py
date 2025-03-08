@@ -1,13 +1,15 @@
 from fastapi import FastAPI
-from app.routes import chat, twitter, memory
+from app.routes import chat, twitter
+from app.core.scheduler import start_scheduler
 
-app = FastAPI(title="Aika - UGM AICare")
+app = FastAPI(title="Aika - Mental Health AI Agent")
 
-# Include routes
-app.include_router(chat.router)
-app.include_router(twitter.router)
-app.include_router(memory.router)
+app.include_router(chat.router, prefix="/chat", tags=["Chat"])
+app.include_router(twitter.router, prefix="/twitter", tags=["Twitter"])
+
+# Start task scheduler
+start_scheduler()
 
 @app.get("/")
-def read_root():
-    return {"message": "Welcome to Aika API"}
+async def root():
+    return {"message": "Aika Backend is Running!"}
