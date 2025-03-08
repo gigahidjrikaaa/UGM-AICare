@@ -1,15 +1,34 @@
+import logging
 from fastapi import FastAPI
-from app.routes import chat, twitter
-from app.core.scheduler import start_scheduler
+from pydantic import BaseModel
+from datetime import datetime
 
-app = FastAPI(title="Aika - Mental Health AI Agent")
+# Set up logging
+logging.basicConfig(
+    filename="logs/chat.log",  # Log file
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+)
 
-app.include_router(chat.router, prefix="/chat", tags=["Chat"])
-app.include_router(twitter.router, prefix="/twitter", tags=["Twitter"])
+app = FastAPI()
 
-# Start task scheduler
-start_scheduler()
+class ChatRequest(BaseModel):
+    user_id: str
+    message: str
 
 @app.get("/")
 async def root():
-    return {"message": "Aika Backend is Running!"}
+    return {"message": "Welcome to Aika Chatbot API"}
+
+@app.post("/chat/")
+async def chat(request: ChatRequest):
+    user_id = request.user_id
+    message = request.message
+
+    # Simulated AI response (replace with your AI logic)
+    response = f"Hello {user_id}, I see that you said: '{message}'. How can I help you?"
+
+    # Log request and response
+    logging.info(f"User: {user_id} | Message: {message} | Response: {response}")
+
+    return {"response": response}
