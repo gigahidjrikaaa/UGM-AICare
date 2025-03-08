@@ -3,8 +3,12 @@ from datetime import datetime, timedelta
 from database import SessionLocal
 from models import User
 from services.llm import get_ai_response
+import os
+import dotenv
 
-celery_app = Celery("tasks", broker="redis://localhost:6379/0")
+dotenv.load_dotenv()
+
+celery_app = Celery("tasks", broker=os.getenv("REDIS_URL"), backend=os.getenv("REDIS_URL"))
 
 @celery_app.task
 def check_in_users():
