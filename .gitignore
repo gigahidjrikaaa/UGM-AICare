@@ -3,7 +3,7 @@
 Thumbs.db
 
 # Python (Backend)
-venv/
+.venv/
 __pycache__/
 *.pyc
 *.pyo
