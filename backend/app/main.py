@@ -25,24 +25,28 @@ async def root():
 
 @app.post("/chat/")
 async def chat(request: ChatRequest):
-    user_id = request.user_id
-    message = request.message
+    try:
+        user_id = request.user_id
+        message = request.message
 
-    # Get conversation history from memory
-    history = AikaMemory.get_memory(user_id)
-    
-    # Get response from OpenAI
-    response = llm.chat(message, history)
-    
-    # Save the interaction to memory
-    AikaMemory.save_memory(user_id, message)
-    
-    # Also save the AI's response to memory
-    history = AikaMemory.get_memory(user_id)
-    history.append({"role": "assistant", "content": response})
-    AikaMemory.save_memory_direct(user_id, history)
+        # Get conversation history from memory
+        history = AikaMemory.get_memory(user_id)
+        
+        # Get response from LLM
+        response = llm.chat(message, history)
+        
+        # Save the interaction to memory
+        AikaMemory.save_memory(user_id, message)
+        
+        # Also save the AI's response to memory
+        history = AikaMemory.get_memory(user_id)
+        history.append({"role": "assistant", "content": response})
+        AikaMemory.save_memory_direct(user_id, history)
 
-    # Log request and response
-    logging.info(f"User: {user_id} | Message: {message} | Response: {response}")
+        # Log request and response
+        logging.info(f"User: {user_id} | Message: {message} | Response: {response}")
 
-    return {"response": response}
+        return {"response": response}
+    except Exception as e:
+        logging.error(f"Error in chat endpoint: {str(e)}", exc_info=True)
+        return {"error": str(e)}, 500

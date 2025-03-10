@@ -7,11 +7,15 @@ payload = {
     "message": "Tell me about yourself, Aika."
 }
 
-response = requests.post(url, json=payload)
-
-print(f"Status Code: {response.status_code}")
-if response.status_code == 200:
-    print("Success!")
-    print(f"Response: {json.dumps(response.json(), indent=2)}")
-else:
-    print("Failed!")
+try:
+    response = requests.post(url, json=payload)
+    print(f"Status Code: {response.status_code}")
+    
+    if response.status_code == 200:
+        print("Success!")
+        print(f"Response: {json.dumps(response.json(), indent=2)}")
+    else:
+        print("Failed!")
+        print(f"Error: {response.text}")
+except Exception as e:
+    print(f"Request failed with error: {str(e)}")
