@@ -4,6 +4,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from app.core.llm import AikaLLM
 from app.core.memory import AikaMemory
+from fastapi.middleware.cors import CORSMiddleware
 
 # Set up logging
 logging.basicConfig(
@@ -14,6 +15,15 @@ logging.basicConfig(
 
 app = FastAPI()
 llm = AikaLLM()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000"],  # Your frontend URL
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 class ChatRequest(BaseModel):
     user_id: str
