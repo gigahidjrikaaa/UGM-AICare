@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from app.core.llm import AikaLLM
 from app.core.memory import AikaMemory
+from app.routes import email
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import dotenv 
@@ -30,6 +31,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Register the email router
+app.include_router(email.router)
 
 class ChatRequest(BaseModel):
     user_id: str
