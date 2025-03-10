@@ -26,12 +26,14 @@ UGM-AICare delivers accessible mental health support through:
 ## Tech Stack
 
 ### Frontend
+
 - **Framework**: Next.js with TypeScript
 - **Styling**: TailwindCSS
 - **State Management**: React Hooks
 - **API Integration**: Fetch API
 
 ### Backend
+
 - **Framework**: FastAPI (Python)
 - **Database**: PostgreSQL (via SQLAlchemy)
 - **Memory Storage**: Redis
@@ -41,6 +43,7 @@ UGM-AICare delivers accessible mental health support through:
 ## Getting Started
 
 ### Prerequisites
+
 - Python 3.9+
 - Node.js 18+
 - Redis
@@ -50,12 +53,14 @@ UGM-AICare delivers accessible mental health support through:
 ### Installation
 
 1. **Clone the repository**
+
 ```bash
 git clone https://github.com/your-username/UGM-AICare.git
 cd UGM-AICare
 ```
 
 2. **Set up the backend**
+
 ```bash
 cd backend
 python -m venv venv
@@ -67,6 +72,7 @@ pip install -r requirements.txt
 ```
 
 3. **Configure environment variables**
+
 ```bash
 # Create .env file in backend directory with:
 DATABASE_URL=postgresql://username:password@localhost:5432/aicare_db
@@ -76,12 +82,14 @@ REDIS_PORT=6379
 ```
 
 4. **Set up the frontend**
+
 ```bash
 cd ../frontend
 npm install
 ```
 
 5. **Create frontend environment variables**
+
 ```bash
 # Create .env.local in frontend directory with:
 NEXT_PUBLIC_API_URL=http://localhost:8000
@@ -99,20 +107,23 @@ python start_aicare.py
 Or start each component separately:
 
 **Backend**
+
 ```bash
 cd backend
 uvicorn app.main:app --reload --port 8000
 ```
 
 **Frontend**
+
 ```bash
 cd frontend
 npm run dev
 ```
 
 Then access:
-- Frontend: http://localhost:3000
-- API documentation: http://localhost:8000/docs
+
+- Frontend: <http://localhost:3000>
+- API documentation: <http://localhost:8000/docs>
 
 ## Project Structure
 
