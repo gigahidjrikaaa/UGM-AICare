@@ -1,5 +1,6 @@
 import requests
 import json
+import logging
 from app.config import TOGETHER_API_KEY
 
 class AikaLLM:
@@ -26,13 +27,25 @@ class AikaLLM:
         }
         
         try:
+            logging.info(f"Sending request to Together API: {json.dumps(payload)[:200]}...")
             response = requests.post(self.base_url, headers=self.headers, json=payload)
-            response.raise_for_status()  # Raise exception for non-200 status codes
+            
+            if response.status_code != 200:
+                logging.error(f"Together API error: Status {response.status_code}, Response: {response.text}")
+                return f"Sorry, I encountered an error (HTTP {response.status_code})."
             
             result = response.json()
-            return result["choices"][0]["text"]
+            logging.info(f"Together API response structure: {json.dumps(result.keys())}")
+            
+            # Extract text from response (adjust this based on actual response structure)
+            if "choices" in result and result["choices"] and "text" in result["choices"][0]:
+                return result["choices"][0]["text"].strip()
+            else:
+                logging.error(f"Unexpected response structure: {json.dumps(result)[:200]}...")
+                return "I'm sorry, I received an unexpected response format."
+                
         except Exception as e:
-            print(f"Error calling Together API: {str(e)}")
+            logging.error(f"Error calling Together API: {str(e)}", exc_info=True)
             return "I'm sorry, I'm having trouble responding right now. Please try again later."
     
     def _format_messages_for_llama(self, history: list, user_input: str) -> str:
