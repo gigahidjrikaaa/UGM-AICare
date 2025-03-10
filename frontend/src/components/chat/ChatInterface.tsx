@@ -111,7 +111,7 @@ export default function ChatInterface() {
               if (e.key === 'Enter') handleSendMessage();
             }}
             placeholder="Type your message..."
-            className="flex-1 px-4 py-2 border rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="flex-1 px-4 py-2 border rounded-full font-black focus:outline-none focus:ring-2 focus:ring-blue-500"
             disabled={isLoading}
           />
           <button
