@@ -99,18 +99,18 @@ class AikaLLM:
         
         return formatted_prompt
     
-def _clean_response(self, text: str) -> str:
-    """Clean up formatting tags from the response"""
-    # Remove the closing assistant tag
-    text = text.replace("<|/assistant|>", "").strip()
-    
-    # Remove any other formatting tags that might appear
-    tags_to_remove = [
-        "<|assistant|>", "<|user|>", "<|/user|>", 
-        "<|system|>", "<|/system|>"
-    ]
-    
-    for tag in tags_to_remove:
-        text = text.replace(tag, "").strip()
-    
-    return text
+    def _clean_response(self, text: str) -> str:
+        """Clean up formatting tags from the response"""
+        # Remove the closing assistant tag
+        text = text.replace("<|/assistant|>", "").strip()
+        
+        # Remove any other formatting tags that might appear
+        tags_to_remove = [
+            "<|assistant|>", "<|user|>", "<|/user|>", 
+            "<|system|>", "<|/system|>"
+        ]
+        
+        for tag in tags_to_remove:
+            text = text.replace(tag, "").strip()
+        
+        return text
