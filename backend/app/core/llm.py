@@ -42,16 +42,27 @@ class AikaLLM:
                 return f"Sorry, I encountered an error (HTTP {response.status_code}): {error_text[:100]}..."
             
             result = response.json()
-            print(f"Response JSON keys: {result.keys()}")
-            logging.info(f"Together API response structure: {json.dumps(result.keys())}")
+        
+            # Print the entire response for debugging (first 1000 chars)
+            print(f"Raw response: {json.dumps(result)[:1000]}...")
+            logging.info(f"Together API response keys: {list(result.keys())}")
             
-            # Extract text from response (adjust this based on actual response structure)
-            if "choices" in result and result["choices"] and "text" in result["choices"][0]:
-                return result["choices"][0]["text"].strip()
+            # Check different possible response formats
+            if "choices" in result and result["choices"]:
+                choice = result["choices"][0]
+                print(f"First choice keys: {list(choice.keys())}")
+                
+                if "text" in choice:
+                    # Clean up the response
+                    return self._clean_response(choice["text"])
+                elif "message" in choice and "content" in choice["message"]:
+                    # Clean up the response
+                    return self._clean_response(choice["message"]["content"])
+                else:
+                    return f"Received response but couldn't extract text. Choice keys: {list(choice.keys())}"
             else:
-                print(f"Unexpected response structure: {json.dumps(result)}")
                 logging.error(f"Unexpected response structure: {json.dumps(result)[:200]}...")
-                return "I'm sorry, I received an unexpected response format."
+                return f"Unexpected API response format. Keys: {list(result.keys())}"
                 
         except Exception as e:
             print(f"Exception occurred: {str(e)}")
@@ -63,9 +74,12 @@ class AikaLLM:
     def _format_messages_for_llama(self, history: list, user_input: str) -> str:
         """Format the conversation history for Llama 3.3 Instruct format"""
         system_prompt = """
-        You are Aika, a supportive mental health AI. Be empathetic, understanding, and helpful.
-        Provide support and resources to help the user feel better. Remember to be positive and reassuring.
-        Answer in casual Indonesian language. Use some Yogyakarta/Indonesian slang to make it more friendly."""
+        You are Aika, a supportive mental health AI made by Universitas Gadjah Mada. Be empathetic, understanding, and helpful.
+        Your goal is to provide emotional support and resources to users who reach out to you.
+        Remember to respect user privacy and avoid sharing personal information.
+        Answer in casual Indonesian with a friendly and supportive tone.
+        Occasionally use English/Javanese slangs if needed to connect with the user. 
+        """
         
         formatted_prompt = f"<|system|>\n{system_prompt}\n<|/system|>\n"
         
@@ -84,3 +98,19 @@ class AikaLLM:
         formatted_prompt += "<|assistant|>\n"
         
         return formatted_prompt
+    
+def _clean_response(self, text: str) -> str:
+    """Clean up formatting tags from the response"""
+    # Remove the closing assistant tag
+    text = text.replace("<|/assistant|>", "").strip()
+    
+    # Remove any other formatting tags that might appear
+    tags_to_remove = [
+        "<|assistant|>", "<|user|>", "<|/user|>", 
+        "<|system|>", "<|/system|>"
+    ]
+    
+    for tag in tags_to_remove:
+        text = text.replace(tag, "").strip()
+    
+    return text
