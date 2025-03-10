@@ -27,26 +27,38 @@ class AikaLLM:
         }
         
         try:
-            logging.info(f"Sending request to Together API: {json.dumps(payload)[:200]}...")
+            logging.info(f"Sending request to Together API with payload: {json.dumps(payload)[:500]}...")
+            print(f"API Key (first 5 chars): {self.api_key[:5]}...") # Only print first few chars for security
+            
             response = requests.post(self.base_url, headers=self.headers, json=payload)
             
+            print(f"Response status code: {response.status_code}")
+            print(f"Response headers: {response.headers}")
+            
             if response.status_code != 200:
-                logging.error(f"Together API error: Status {response.status_code}, Response: {response.text}")
-                return f"Sorry, I encountered an error (HTTP {response.status_code})."
+                error_text = response.text
+                print(f"Error response: {error_text}")
+                logging.error(f"Together API error: Status {response.status_code}, Response: {error_text}")
+                return f"Sorry, I encountered an error (HTTP {response.status_code}): {error_text[:100]}..."
             
             result = response.json()
+            print(f"Response JSON keys: {result.keys()}")
             logging.info(f"Together API response structure: {json.dumps(result.keys())}")
             
             # Extract text from response (adjust this based on actual response structure)
             if "choices" in result and result["choices"] and "text" in result["choices"][0]:
                 return result["choices"][0]["text"].strip()
             else:
+                print(f"Unexpected response structure: {json.dumps(result)}")
                 logging.error(f"Unexpected response structure: {json.dumps(result)[:200]}...")
                 return "I'm sorry, I received an unexpected response format."
                 
         except Exception as e:
+            print(f"Exception occurred: {str(e)}")
+            import traceback
+            traceback.print_exc()
             logging.error(f"Error calling Together API: {str(e)}", exc_info=True)
-            return "I'm sorry, I'm having trouble responding right now. Please try again later."
+            return f"I'm sorry, I'm having trouble responding right now. Error: {str(e)}"
     
     def _format_messages_for_llama(self, history: list, user_input: str) -> str:
         """Format the conversation history for Llama 3.3 Instruct format"""
