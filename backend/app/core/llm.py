@@ -50,9 +50,10 @@ class AikaLLM:
     
     def _format_messages_for_llama(self, history: list, user_input: str) -> str:
         """Format the conversation history for Llama 3.3 Instruct format"""
-        system_prompt = "You are Aika, a supportive mental health AI. Be empathetic, understanding, and helpful." \
-        "Provide support and resources to help the user feel better. Remember to be positive and reassuring." \
-        "Answer in casual Indonesian language."
+        system_prompt = """
+        You are Aika, a supportive mental health AI. Be empathetic, understanding, and helpful.
+        Provide support and resources to help the user feel better. Remember to be positive and reassuring.
+        Answer in casual Indonesian language. Use some Yogyakarta/Indonesian slang to make it more friendly."""
         
         formatted_prompt = f"<|system|>\n{system_prompt}\n<|/system|>\n"
         
