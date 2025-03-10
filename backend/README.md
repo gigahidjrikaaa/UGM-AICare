@@ -60,12 +60,14 @@ backend/
 ## Installation
 
 1. Clone the repository:
+
    ```bash
    git clone https://github.com/YourUsername/UGM-AICare.git
    cd UGM-AICare/backend
    ```
 
 2. Create and activate a virtual environment:
+
    ```bash
    python -m venv venv
    # On Windows
@@ -75,12 +77,14 @@ backend/
    ```
 
 3. Install dependencies:
+
    ```bash
    pip install -r requirements.txt
    ```
 
 4. Create a `.env` file in the root directory with the following variables:
-   ```
+
+   ```env
    # Database configuration
    DB_HOST=localhost
    DB_PORT=5432
@@ -100,6 +104,7 @@ backend/
    ```
 
 5. Set up the database:
+
    ```bash
    # Create the database
    createdb aicare_db
@@ -111,6 +116,7 @@ backend/
 ## Running the Application
 
 1. Start the FastAPI server:
+
    ```bash
    uvicorn app.main:app --reload
    ```
@@ -132,13 +138,16 @@ python test/test_chat_1.py
 
 - **POST** `/chat/` - Send a message to the AI assistant
   - Request Body:
+
     ```json
     {
       "user_id": "string",
       "message": "string"
     }
     ```
+
   - Response:
+
     ```json
     {
       "response": "string"
@@ -161,6 +170,7 @@ python test/test_chat_1.py
 ### Redis Connection Issues
 
 If you encounter Redis connection errors:
+
 1. Ensure Redis server is running (`redis-server`)
 2. Check if Redis is accessible (`redis-cli ping`)
 3. The application will fall back to in-memory storage if Redis is unavailable
@@ -168,6 +178,7 @@ If you encounter Redis connection errors:
 ### API Key Issues
 
 If Together.ai API requests fail:
+
 1. Verify your API key in the `.env` file
 2. Ensure you have sufficient quota for API calls
 3. Check the format of the API key (should be a long string without quotes)
