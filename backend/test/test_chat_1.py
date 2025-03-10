@@ -4,7 +4,7 @@ import json
 url = "http://127.0.0.1:8000/chat/"
 payload = {
     "user_id": "test_user",
-    "message": "Tell me about yourself, Aika."
+    "message": "Kamu siapa, Aika?"
 }
 
 try:
