@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from datetime import datetime
 from app.core.llm import AikaLLM
 from app.core.memory import AikaMemory
+from app.database import init_db
 from app.routes import email
 from fastapi.middleware.cors import CORSMiddleware
 import os
@@ -12,6 +13,9 @@ import dotenv
 
 # Load environment variables from .env file
 dotenv.load_dotenv()
+
+# Initialize database
+init_db()
 
 # Set up logging
 logging.basicConfig(
