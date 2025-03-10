@@ -1,3 +1,4 @@
+import json
 import logging
 from fastapi import FastAPI
 from pydantic import BaseModel
@@ -55,6 +56,8 @@ async def chat(request: ChatRequest):
         
         # Also save the AI's response to memory
         history = AikaMemory.get_memory(user_id)
+        # print(f"History: {json.dumps(history)}")
+        
         history.append({"role": "assistant", "content": response})
         AikaMemory.save_memory_direct(user_id, history)
 
