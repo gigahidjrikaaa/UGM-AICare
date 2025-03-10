@@ -44,9 +44,18 @@ async def chat(request: ChatRequest):
     try:
         user_id = request.user_id
         message = request.message
+        
+        # Add detailed logging for debugging
+        print(f"\n=== New Request from {user_id} ===")
+        print(f"Message: {message}")
 
         # Get conversation history from memory
         history = AikaMemory.get_memory(user_id)
+        
+        # Debug history content
+        print(f"Retrieved history length: {len(history)}")
+        for idx, entry in enumerate(history):
+            print(f"History entry {idx}: role={entry.get('role')}, content={entry.get('content')[:50]}...")
         
         # Get response from LLM
         response = llm.chat(message, history)

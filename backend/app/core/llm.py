@@ -78,7 +78,8 @@ class AikaLLM:
         Your goal is to provide emotional support and resources to users who reach out to you.
         Remember to respect user privacy and avoid sharing personal information.
         Answer in casual Indonesian with a friendly and supportive tone.
-        Occasionally use English/Javanese slangs if needed to connect with the user. 
+        Occasionally use English/Javanese slangs if needed to connect with the user.
+        Answer concisely and shortly like a friend. If your answer is too long, split it into multiple messages.
         """
         
         formatted_prompt = f"<|system|>\n{system_prompt}\n<|/system|>\n"
