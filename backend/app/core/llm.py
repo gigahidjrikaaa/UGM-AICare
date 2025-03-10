@@ -101,11 +101,10 @@ class AikaLLM:
         return formatted_prompt
     
     def _clean_response(self, text: str) -> str:
-        """Clean up formatting tags from the response"""
-        # Remove the closing assistant tag
+        """Clean up formatting tags and remove repeated content from the response"""
+        # Remove formatting tags
         text = text.replace("<|/assistant|>", "").strip()
         
-        # Remove any other formatting tags that might appear
         tags_to_remove = [
             "<|assistant|>", "<|user|>", "<|/user|>", 
             "<|system|>", "<|/system|>"
@@ -113,5 +112,25 @@ class AikaLLM:
         
         for tag in tags_to_remove:
             text = text.replace(tag, "").strip()
+        
+        # Check for common patterns of repeated conversations
+        repeated_patterns = [
+            "Halo! Senang sekali kamu menghubungi saya.",
+            "Siapa kamu?",
+            "Halo! Saya Aika",
+            "Bagaimana hari mu hari ini?",
+            "Apakah ada sesuatu yang ingin kamu bicarakan"
+        ]
+        
+        # Find the position of the last question/statement that appears in the response
+        last_position = 0
+        for pattern in repeated_patterns:
+            last_occur = text.rfind(pattern)
+            if last_occur > last_position:
+                last_position = last_occur
+        
+        # If we found a repeated pattern, only keep text from that position
+        if last_position > 0:
+            text = text[last_position:]
         
         return text
