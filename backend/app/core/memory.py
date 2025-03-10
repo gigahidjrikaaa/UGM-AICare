@@ -17,6 +17,11 @@ class AikaMemory:
         redis_client.set(user_id, json.dumps(history))
 
     @staticmethod
+    def save_memory_direct(user_id: str, history: list):
+        """ Store complete conversation history """
+        redis_client.set(user_id, json.dumps(history))
+
+    @staticmethod
     def get_memory(user_id: str):
         """ Retrieve past messages for context """
         history = redis_client.get(user_id)
