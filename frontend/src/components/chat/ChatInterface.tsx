@@ -17,7 +17,7 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: 'Halo! Aku Aika, temen ngobrol kamu dari UGM. Apa yang bisa saya bantu hari ini?',
+      content: 'Halo! Aku Aika, temen ngobrol kamu dari UGM. Apa yang bisa aku bantu hari ini?',
       role: 'assistant',
       timestamp: new Date(),
     },
