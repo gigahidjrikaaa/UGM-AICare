@@ -17,7 +17,7 @@ export default function ChatInterface() {
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '1',
-      content: 'Halo! Saya Aika, asisten kesehatan mental kamu dari UGM. Apa yang bisa saya bantu hari ini?',
+      content: 'Halo! Aku Aika, temen ngobrol kamu dari UGM. Apa yang bisa saya bantu hari ini?',
       role: 'assistant',
       timestamp: new Date(),
     },
@@ -44,6 +44,7 @@ export default function ChatInterface() {
     };
     
     setMessages((prev) => [...prev, userMessage]);
+    console.log('User message:', input);
     setInput('');
     setIsLoading(true);
     
