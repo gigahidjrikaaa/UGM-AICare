@@ -1,4 +1,5 @@
 import { Message } from './ChatInterface';
+import { useMemo } from 'react';
 
 interface MessageBubbleProps {
   message: Message;
@@ -6,10 +7,14 @@ interface MessageBubbleProps {
 
 export default function MessageBubble({ message }: MessageBubbleProps) {
   const isUser = message.role === 'user';
-  const formattedTime = new Date(message.timestamp).toLocaleTimeString([], { 
-    hour: '2-digit', 
-    minute: '2-digit' 
-  });
+  
+  // Use a consistent time format that doesn't rely on locale-specific formatting
+  const formattedTime = useMemo(() => {
+    const date = new Date(message.timestamp);
+    const hours = date.getHours().toString().padStart(2, '0');
+    const minutes = date.getMinutes().toString().padStart(2, '0');
+    return `${hours}:${minutes}`;
+  }, [message.timestamp]);
 
   return (
     <div className={`flex w-full mb-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
