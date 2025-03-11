@@ -21,9 +21,6 @@ export default function Home() {
               </p>
             </div>
           </div>
-          <p className="text-lg text-gray-200 mt-2 max-w-2xl mx-auto">
-            Developed by Department of Electrical and Information Engineering (DEIE) of Universitas Gadjah Mada
-          </p>
         </div>
         
         <div className="bg-white bg-opacity-10 backdrop-blur-sm p-4 rounded-lg shadow-lg border border-white border-opacity-20 mb-8">
@@ -31,6 +28,11 @@ export default function Home() {
         </div>
         
         <div className="mt-8 text-center text-gray-200 text-sm flex flex-col items-center">
+          <div className='mb-2'>
+            <p className="text-lg text-gray-200 max-w-2xl mx-auto">
+              Developed by Department of Electrical and Information Engineering (DEIE) of Universitas Gadjah Mada
+            </p>
+          </div>
           <div className="flex items-center mb-2">
             <span className="mr-2">Built with ❤️ by</span>
             <Image 

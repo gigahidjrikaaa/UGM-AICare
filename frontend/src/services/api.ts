@@ -2,6 +2,7 @@
 // Update the return type to include the possibility of an array response
 type ChatResponse = {
   response: string | string[];
+  error?: string;
 };
 
 export const sendMessage = async (userId: string, message: string): Promise<ChatResponse> => {
