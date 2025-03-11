@@ -7,6 +7,7 @@ from app.core.llm import AikaLLM
 from app.core.memory import AikaMemory
 from app.database import init_db
 from app.routes import email
+from app.routes import docs
 from fastapi.middleware.cors import CORSMiddleware
 import os
 import dotenv 
@@ -38,6 +39,9 @@ app.add_middleware(
 
 # Register the email router
 app.include_router(email.router)
+
+# Register the docs router
+app.include_router(docs.router)
 
 class ChatRequest(BaseModel):
     user_id: str
