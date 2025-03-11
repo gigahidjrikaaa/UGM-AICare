@@ -23,7 +23,10 @@ class AikaLLM:
             "max_tokens": 1024,
             "temperature": 0.7,
             "top_p": 0.9,
-            "stream": False
+            "top_k": 40,
+            "stream": False,
+            "stop": ["<|user|>", "<|assistant|>", "<|system|>"],  # Add explicit stop sequences
+            "repetition_penalty": 1.2,  # Help prevent repeating patterns
         }
         
         try:
