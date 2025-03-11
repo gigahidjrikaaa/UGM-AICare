@@ -106,14 +106,14 @@ python start_aicare.py
 
 Or start each component separately:
 
-**Backend**
+#### Backend
 
 ```bash
 cd backend
 uvicorn app.main:app --reload --port 8000
 ```
 
-**Frontend**
+#### Frontend
 
 ```bash
 cd frontend
@@ -127,7 +127,7 @@ Then access:
 
 ## Project Structure
 
-```
+```bash
 UGM-AICare/
 ├── backend/               # FastAPI application
 │   ├── app/               # Application code
