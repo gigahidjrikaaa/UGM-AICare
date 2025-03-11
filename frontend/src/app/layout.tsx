@@ -18,6 +18,10 @@ const inter = Inter({ subsets: ['latin'] })
 export const metadata: Metadata = {
   title: 'UGM-AICare: Aika - Mental Health Assistant',
   description: "A supportive mental health AI assistant developed by UGM-AICare team.",
+  icons: {
+    icon: '/favicon.ico',
+    apple: '/apple-icon.png',
+  }
 };
 
 export default function RootLayout({
