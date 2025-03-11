@@ -48,7 +48,9 @@ export default function ChatInterface() {
     setInput('');
     setIsLoading(true);
     
-    try {
+    // Update the try block in handleSendMessage:
+
+try {
       const userId = localStorage.getItem('userId') || `guest-${uuidv4()}`;
       if (!localStorage.getItem('userId')) {
         localStorage.setItem('userId', userId);
@@ -56,14 +58,39 @@ export default function ChatInterface() {
       
       const response = await sendMessage(userId, input);
       
-      const aiMessage: Message = {
-        id: uuidv4(),
-        content: response.response,
-        role: 'assistant',
-        timestamp: new Date(),
-      };
+      // Check if the response contains multiple messages
+      const responseContent = response.response;
       
-      setMessages((prev) => [...prev, aiMessage]);
+      if (Array.isArray(responseContent)) {
+        // Add each message with a small delay between them
+        for (let i = 0; i < responseContent.length; i++) {
+          const content = responseContent[i];
+          
+          const aiMessage: Message = {
+            id: uuidv4(),
+            content,
+            role: 'assistant',
+            timestamp: new Date(Date.now() + i * 500), // Stagger timestamps slightly
+          };
+          
+          // Add small delay between messages to create a more natural conversation flow
+          if (i > 0) {
+            await new Promise(resolve => setTimeout(resolve, 1000));
+          }
+          
+          setMessages((prev) => [...prev, aiMessage]);
+        }
+      } else {
+        // Single message response
+        const aiMessage: Message = {
+          id: uuidv4(),
+          content: responseContent,
+          role: 'assistant',
+          timestamp: new Date(),
+        };
+        
+        setMessages((prev) => [...prev, aiMessage]);
+      }
     } catch (error) {
       console.error('Error getting AI response:', error);
       

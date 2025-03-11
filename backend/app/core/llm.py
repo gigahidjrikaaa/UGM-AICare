@@ -53,8 +53,16 @@ class AikaLLM:
                 print(f"First choice keys: {list(choice.keys())}")
                 
                 if "text" in choice:
-                    # Clean up the response
-                    return self._clean_response(choice["text"])
+                    # Clean up the response - might return a string or list
+                    cleaned_response = self._clean_response(choice["text"])
+                    
+                    # If it's a list of messages, return the first one and save the rest for future retrieval
+                    if isinstance(cleaned_response, list) and cleaned_response:
+                        # For now, just return the first message
+                        # In a more advanced implementation, you could store these additional messages
+                        return cleaned_response[0] if len(cleaned_response) == 1 else cleaned_response
+                    else:
+                        return cleaned_response
                 elif "message" in choice and "content" in choice["message"]:
                     # Clean up the response
                     return self._clean_response(choice["message"]["content"])
@@ -104,8 +112,11 @@ class AikaLLM:
         
         return formatted_prompt
     
-    def _clean_response(self, text: str) -> str:
-        """Clean up formatting tags and remove repeated content from the response"""
+    def _clean_response(self, text: str) -> str or list: # type: ignore
+        """
+        Clean up formatting tags and remove repeated content from the response.
+        If triple newlines are detected, splits into multiple messages.
+        """
         # Remove formatting tags
         text = text.replace("<|/assistant|>", "").strip()
         
@@ -116,6 +127,17 @@ class AikaLLM:
         
         for tag in tags_to_remove:
             text = text.replace(tag, "").strip()
+        
+        # Check for common patterns of user message simulation
+        user_patterns = [
+            "\n\nUser: ", 
+            "\n\nPengguna: ",
+        ]
+        
+        for pattern in user_patterns:
+            if pattern in text:
+                # Split and keep only the first part (before simulated user input)
+                text = text.split(pattern)[0]
         
         # Check for common patterns of repeated conversations
         repeated_patterns = [
@@ -137,4 +159,10 @@ class AikaLLM:
         if last_position > 0:
             text = text[last_position:]
         
-        return text
+        # Check if the message contains triple newlines, which indicates multiple messages
+        if '\n\n\n' in text:
+            # Split by triple newlines and filter out empty messages
+            messages = [msg.strip() for msg in text.split('\n\n\n') if msg.strip()]
+            return messages
+        
+        return text.strip()
