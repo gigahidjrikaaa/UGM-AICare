@@ -8,7 +8,7 @@ export default function Home() {
         <div className="text-center mb-8">
           <div className="flex justify-center mb-4">
             <Image 
-              src="/ugm-logo.png" 
+              src="/UGM_Lambang.png" 
               alt="UGM Logo" 
               width={80} 
               height={80} 
@@ -22,7 +22,7 @@ export default function Home() {
             </div>
           </div>
           <p className="text-lg text-gray-200 mt-2 max-w-2xl mx-auto">
-            Developed by the Faculty of Psychology and Computer Science at Universitas Gadjah Mada
+            Developed by Department of Electrical and Information Engineering (DEIE) of Universitas Gadjah Mada
           </p>
         </div>
         
@@ -34,11 +34,11 @@ export default function Home() {
           <div className="flex items-center mb-2">
             <span className="mr-2">Built with ❤️ by</span>
             <Image 
-              src="/ugm-text-logo.png" 
+              src="/UGM_Tipografi.png" 
               alt="UGM" 
-              width={60} 
+              width={100} 
               height={20} 
-              className="opacity-80"
+              className="opacity-80 bg-white p-1 rounded-sm"
             />
             <span className="ml-2">AICare Team</span>
           </div>

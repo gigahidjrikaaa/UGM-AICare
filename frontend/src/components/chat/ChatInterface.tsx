@@ -84,7 +84,7 @@ export default function ChatInterface() {
     <div className="flex flex-col h-[80vh] md:h-[70vh] max-w-2xl mx-auto rounded-lg shadow-md bg-white bg-opacity-95">
       <div className="bg-[#001D58] text-white p-3 rounded-t-lg flex items-center">
         <Image 
-          src="/aika-avatar.png" 
+          src="/Aika.png" 
           alt="Aika Avatar" 
           width={40} 
           height={40} 
@@ -126,7 +126,7 @@ export default function ChatInterface() {
               if (e.key === 'Enter') handleSendMessage();
             }}
             placeholder="Ketik pesan Anda di sini..."
-            className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[#001D58]"
+            className="flex-1 px-4 py-2 text-black border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-[#001D58]"
             disabled={isLoading}
           />
           <button
