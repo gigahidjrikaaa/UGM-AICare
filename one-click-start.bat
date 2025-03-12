@@ -40,11 +40,31 @@ if %ERRORLEVEL% neq 0 (
 echo Checking if Redis server is running in WSL2...
 wsl -d Ubuntu -e redis-cli ping > nul 2>&1
 if %ERRORLEVEL% neq 0 (
-    echo Redis is not running in WSL2 Ubuntu. Please start Redis server before running this script.
-    echo You can start Redis by running: wsl -d Ubuntu -e redis-server
-    timeout /t 5 /nobreak > nul
-    exit /b 1
+    echo Redis is not running in WSL2 Ubuntu. Starting Redis server automatically...
+    
+    :: Check if Windows Terminal is available for the tab approach
+    where wt >nul 2>nul
+    if %ERRORLEVEL% equ 0 (
+        :: Start Redis in a new Windows Terminal tab
+        wt --title "Redis Server" --tabColor "#A41E11" wsl -d Ubuntu -e redis-server
+    ) else (
+        :: Fallback to separate window if Windows Terminal is not available
+        start cmd /k "wsl -d Ubuntu -e redis-server"
+    )
+    
+    :: Wait for Redis to start
+    echo Waiting for Redis to initialize...
+    timeout /t 3 /nobreak > nul
+    
+    :: Verify Redis is now running
+    wsl -d Ubuntu -e redis-cli ping > nul 2>&1
+    if %ERRORLEVEL% neq 0 (
+        echo Failed to start Redis server. Please start it manually.
+        timeout /t 5 /nobreak > nul
+        exit /b 1
+    )
 )
+echo Redis server is running in WSL2! Connection successful.
 echo Redis server is running in WSL2! Connection successful.
 
 :: Create logs directory if it doesn't exist
