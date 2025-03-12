@@ -55,7 +55,7 @@ export default function ChatInterface() {
   
     try {
       // Connect to FastAPI backend
-      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || '';
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || '';
       const response = await fetch(`${backendUrl}/chat`, {
         method: 'POST',
         headers: { 
