@@ -126,65 +126,79 @@ export default function AikaChat() {
       {/* Sidebar - Fixed position, animated */}
       <AnimatePresence>
         {sidebarOpen && (
-          <motion.div
-            initial={{ x: -300, opacity: 0 }}
-            animate={{ x: 0, opacity: 1 }}
-            exit={{ x: -300, opacity: 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="fixed top-16 left-0 bottom-0 z-20 w-64 bg-[#001a4f]/90 backdrop-blur-lg border-r border-white/10 shadow-xl"
-          >
-            {/* User Profile Section */}
-            <div className="p-5 border-b border-white/10">
-              <div className="flex items-center justify-center mb-4">
-                <div className="w-20 h-20 rounded-full bg-gradient-to-br from-[#FFCA40] to-[#ffb700] flex items-center justify-center text-[#001D58] text-3xl font-bold shadow-lg">
-                  {user.name?.charAt(0) || "G"}
+          <>
+            {/* Backdrop overlay for mobile - closes sidebar when clicked */}
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSidebarOpen(false)}
+              className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-10"
+            />
+            
+            {/* Improved responsive sidebar */}
+            <motion.div
+              initial={{ x: '-100%' }}
+              animate={{ x: 0 }}
+              exit={{ x: '-100%' }}
+              transition={{ type: "spring", stiffness: 300, damping: 30 }}
+              className="fixed top-16 left-0 bottom-0 z-20 w-[85%] max-w-[280px] bg-[#001a4f]/90 backdrop-blur-lg border-r border-white/10 shadow-xl"
+            >
+              {/* User Profile Section - more compact on mobile */}
+              <div className="p-4 border-b border-white/10">
+                <div className="flex items-center">
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-[#FFCA40] to-[#ffb700] flex items-center justify-center text-[#001D58] text-xl sm:text-2xl font-bold shadow-lg">
+                    {user.name?.charAt(0) || "G"}
+                  </div>
+                  <div className="ml-3">
+                    <h3 className="font-medium text-base sm:text-lg">{user.name}</h3>
+                    <p className="text-xs sm:text-sm text-gray-300 truncate max-w-[180px]">{user.email}</p>
+                  </div>
+                </div>
+                <div className="mt-3 flex justify-end">
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    className="text-xs sm:text-sm px-3 py-1 bg-white/10 hover:bg-white/20 rounded-full"
+                  >
+                    Edit Profile
+                  </motion.button>
                 </div>
               </div>
-              <h3 className="text-center font-medium text-lg">{user.name}</h3>
-              <p className="text-center text-sm text-gray-300">{user.email}</p>
-              <div className="mt-3 text-center">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="text-sm px-3 py-1 bg-white/10 hover:bg-white/20 rounded-full"
-                >
-                  Edit Profile
-                </motion.button>
+              
+              {/* Navigation Section - better spacing for touch */}
+              <nav className="p-2 overflow-y-auto" style={{ maxHeight: 'calc(100% - 180px)' }}>
+                <ul className="space-y-1">
+                  {[
+                    { icon: <BsChatDots size={18} />, label: "New Chat", active: true },
+                    { icon: <BsClockHistory size={18} />, label: "Chat History" },
+                    { icon: <BsCalendar size={18} />, label: "Appointments" },
+                    { icon: <FaRobot size={18} />, label: "About Aika" },
+                    { icon: <BsQuestionCircle size={18} />, label: "Help & Support" }
+                  ].map((item, index) => (
+                    <li key={index}>
+                      <motion.a
+                        whileHover={{ x: 5 }}
+                        className={`flex items-center px-4 py-3 rounded-lg ${
+                          item.active ? "bg-[#FFCA40]/20 text-[#FFCA40]" : "hover:bg-white/10"
+                        } transition-colors`}
+                        href="#"
+                      >
+                        <span className="mr-3 flex-shrink-0">{item.icon}</span>
+                        <span className="truncate">{item.label}</span>
+                      </motion.a>
+                    </li>
+                  ))}
+                </ul>
+              </nav>
+              
+              {/* Footer Section - responsive padding */}
+              <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 text-center text-xs text-gray-400 border-t border-white/10 bg-[#001a4f]/80 backdrop-blur-sm">
+                <p>© 2025 UGM-AICare</p>
+                <p className="hidden sm:block">Department of Electrical and Information Engineering</p>
               </div>
-            </div>
-            
-            {/* Navigation Section */}
-            <nav className="p-3">
-              <ul className="space-y-1">
-                {[
-                  { icon: <BsChatDots />, label: "New Chat", active: true },
-                  { icon: <BsClockHistory />, label: "Chat History" },
-                  { icon: <BsCalendar />, label: "Appointments" },
-                  { icon: <FaRobot />, label: "About Aika" },
-                  { icon: <BsQuestionCircle />, label: "Help & Support" }
-                ].map((item, index) => (
-                  <li key={index}>
-                    <motion.a
-                      whileHover={{ x: 5 }}
-                      className={`flex items-center px-4 py-3 rounded-lg ${
-                        item.active ? "bg-[#FFCA40]/20 text-[#FFCA40]" : "hover:bg-white/10"
-                      }`}
-                      href="#"
-                    >
-                      <span className="mr-3">{item.icon}</span>
-                      {item.label}
-                    </motion.a>
-                  </li>
-                ))}
-              </ul>
-            </nav>
-            
-            {/* Footer Section */}
-            <div className="absolute bottom-0 left-0 right-0 p-4 text-center text-xs text-gray-400 border-t border-white/10">
-              <p>© 2025 UGM-AICare</p>
-              <p>Department of Electrical and Information Engineering</p>
-            </div>
-          </motion.div>
+            </motion.div>
+          </>
         )}
       </AnimatePresence>
 
