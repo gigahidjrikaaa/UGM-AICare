@@ -70,3 +70,16 @@ body {
 .markdown-content a {
   text-decoration: underline;
 }
+
+/* Extra small screens */
+@media (min-width: 480px) {
+  .xs\:block {
+    display: block;
+  }
+}
+
+@media (max-width: 479px) {
+  .hidden.xs\:block {
+    display: none;
+  }
+}
