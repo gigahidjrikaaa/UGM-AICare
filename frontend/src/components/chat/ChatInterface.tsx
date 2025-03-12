@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import MessageBubble from './MessageBubble';
+import axios from 'axios';
 import { FiSend } from 'react-icons/fi';
 import { BiMicrophone } from 'react-icons/bi';
 
@@ -50,13 +51,14 @@ export default function ChatInterface() {
     };
     
     setMessages(prev => [...prev, userMessage]);
+    // console.log('User message:', input);
     setInput('');
     setIsLoading(true);
   
     try {
       // Connect to FastAPI backend
       const backendUrl = process.env.NEXT_PUBLIC_API_URL || '';
-      const response = await fetch(`${backendUrl}/chat`, {
+      const response = await fetch(`${backendUrl}/chat/`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
@@ -65,7 +67,8 @@ export default function ChatInterface() {
         body: JSON.stringify({ 
           message: input,
           user_id: 'guest-user',  // Using a default user ID for guests
-          conversation_id: localStorage.getItem('conversation_id') || undefined
+          ...(localStorage.getItem('conversation_id') ? 
+            { "conversation_id": localStorage.getItem('conversation_id') } : {})
         })
       });
       
