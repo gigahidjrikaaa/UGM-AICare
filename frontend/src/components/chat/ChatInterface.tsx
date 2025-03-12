@@ -7,6 +7,10 @@ import axios from 'axios';
 import { FiSend } from 'react-icons/fi';
 import { BiMicrophone } from 'react-icons/bi';
 
+interface ChatInterfaceProps {
+  userId?: string; // Make it optional for backward compatibility
+}
+
 // Message type definition
 export interface Message {
   id: string;
@@ -51,15 +55,13 @@ export default function ChatInterface() {
     };
     
     setMessages(prev => [...prev, userMessage]);
-    // console.log('User message:', input);
     setInput('');
     setIsLoading(true);
   
     try {
-      // Connect to FastAPI backend
-      const backendUrl = process.env.NEXT_PUBLIC_API_URL || '';
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
       const payload = { 
-        user_id: "guest-user", 
+        user_id: userId, // Now using the passed userId
         message: input 
       };
 
@@ -68,9 +70,9 @@ export default function ChatInterface() {
         payload['conversation_id'] = conversationId;
       }
 
-      // API Call using Axios
+      // API Call
       const response = await axios.post(
-        `${backendUrl}/chat/`, // Note the trailing slash
+        `${backendUrl}/chat/`,
         payload,
         {
           headers: {

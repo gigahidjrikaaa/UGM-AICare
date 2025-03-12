@@ -13,7 +13,6 @@ const handler = NextAuth({
           prompt: "consent",
           access_type: "offline",
           response_type: "code",
-          // Restrict to UGM domain
           hd: allowedDomains,
         }
       }
@@ -21,18 +20,24 @@ const handler = NextAuth({
   ],
   callbacks: {
     async signIn({ account, profile }) {
-    // Allow only UGM email domains
-    if (account?.provider === "google") {;
-      return allowedDomains.some(domain => profile?.email?.endsWith(`@${domain}`)) ?? false;
-    }
+      if (account?.provider === "google") {
+        return allowedDomains.some(domain => profile.email?.endsWith(domain));
+      }
       return true;
     },
     async session({ session, token }) {
       // Add user ID to session
-      if (session.user) {
-        session.user.id = token.sub as string;
+      if (session.user && token.sub) {
+        session.user.id = token.sub;
       }
       return session;
+    },
+    async jwt({ token, user }) {
+      // If user object exists (during sign in), add its ID to the JWT token
+      if (user) {
+        token.id = user.id;
+      }
+      return token;
     }
   },
   pages: {
