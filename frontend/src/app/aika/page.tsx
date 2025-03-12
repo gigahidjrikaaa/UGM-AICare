@@ -2,6 +2,7 @@
 
 import { useState, useEffect, ReactNode } from 'react';
 import ChatInterface from '@/components/chat/ChatInterface';
+import ParticleBackground from '@/components/ui/ParticleBackground';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
@@ -87,8 +88,13 @@ export default function AikaChat() {
 
   return (
     <main className="h-screen w-screen overflow-hidden bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white">
+      {/* Particle Background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-10">
+        <ParticleBackground count={50} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={1} />
+      </div>
+      
       {/* Background decorative elements */}
-      <div className="fixed inset-0 overflow-hidden -z-10">
+      <div className="fixed inset-0 overflow-hidden z-20 pointer-events-none">
         <div className="absolute inset-0 bg-[url('/wave-pattern.svg')] opacity-10"></div>
         
         <FloatingElement delay={0} duration={15} y={30} x={10}>
