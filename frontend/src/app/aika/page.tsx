@@ -76,16 +76,16 @@ export default function AikaChat() {
         </FloatingElement>
       </div>
 
-      {/* Header - Fixed at top */}
+      {/* Header - Fixed at top with improved responsive design */}
       <header className="fixed top-0 left-0 right-0 z-10 bg-[#001D58]/80 backdrop-blur-md border-b border-white/10 shadow-md">
-        <div className="flex items-center justify-between px-4 py-2">
+        <div className="flex items-center justify-between px-3 sm:px-4 py-2">
           <div className="flex items-center">
             <button 
               onClick={() => setSidebarOpen(!sidebarOpen)}
-              className="mr-3 p-2 rounded-full hover:bg-white/10 transition-all"
+              className="mr-2 sm:mr-3 p-2 rounded-full hover:bg-white/10 transition-all"
               aria-label="Toggle sidebar"
             >
-              {sidebarOpen ? <HiX size={24} /> : <HiMenu size={24} />}
+              {sidebarOpen ? <HiX size={20} /> : <HiMenu size={20} />}
             </button>
             
             <Link href="/" className="flex items-center group">
@@ -97,14 +97,14 @@ export default function AikaChat() {
                 <Image 
                   src="/UGM_Lambang.png" 
                   alt="UGM Logo" 
-                  width={40} 
-                  height={40} 
-                  className="mr-3" 
+                  width={32} 
+                  height={32} 
+                  className="mr-2 sm:mr-3 hidden xs:block" 
                 />
               </motion.div>
               <div>
-                <h1 className="font-bold text-lg md:text-xl">UGM-AICare</h1>
-                <p className="text-[#FFCA40] text-xs md:text-sm font-medium">Aika - Your Mental Health Companion</p>
+                <h1 className="font-bold text-base sm:text-lg md:text-xl">UGM-AICare</h1>
+                <p className="text-[#FFCA40] text-xs md:text-sm font-medium truncate max-w-[150px] sm:max-w-none">Aika - Your Mental Health Companion</p>
               </div>
             </Link>
           </div>
@@ -113,11 +113,11 @@ export default function AikaChat() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
           >
-            <div className="flex items-center bg-white/10 rounded-full px-3 py-1 hover:bg-white/20 transition cursor-pointer">
-              <div className="w-7 h-7 bg-[#FFCA40]/20 rounded-full flex items-center justify-center mr-2">
-                <FaUserCircle className="text-[#FFCA40]" size={20} />
+            <div className="flex items-center bg-white/10 rounded-full px-2 sm:px-3 py-1 hover:bg-white/20 transition cursor-pointer">
+              <div className="w-6 h-6 sm:w-7 sm:h-7 bg-[#FFCA40]/20 rounded-full flex items-center justify-center mr-1 sm:mr-2">
+                <FaUserCircle className="text-[#FFCA40]" size={18} />
               </div>
-              <span className="text-sm">{user.name}</span>
+              <span className="text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">{user.name}</span>
             </div>
           </motion.div>
         </div>
