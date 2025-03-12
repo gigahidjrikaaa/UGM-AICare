@@ -5,16 +5,11 @@ import ChatInterface from '@/components/chat/ChatInterface';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { HiMenu, HiX, HiChevronLeft } from 'react-icons/hi';
+import { HiMenu, HiX, HiChevronLeft, HiLogout } from 'react-icons/hi';
 import { BsChatDots, BsCalendar, BsQuestionCircle, BsClockHistory } from 'react-icons/bs';
 import { FaRobot, FaUserCircle } from 'react-icons/fa';
-
-// Dummy user data (replace with actual auth data)
-const user = {
-  name: "Guest User",
-  image: null,
-  email: "guest@example.com"
-};
+import { useSession, signOut } from 'next-auth/react';
+import { useRouter } from 'next/navigation';
 
 // Floating animation for background elements
 const FloatingElement = ({ children, delay = 0, duration = 10, x = 20, y = 20 }: {
@@ -46,10 +41,47 @@ const FloatingElement = ({ children, delay = 0, duration = 10, x = 20, y = 20 }:
 export default function AikaChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
+  const { data: session, status } = useSession();
+  const router = useRouter();
+
+  // Get user from session or use guest fallback
+  const user = session?.user || {
+    name: "Guest User",
+    image: null,
+    email: "guest@example.com",
+    id: "guest-user"
+  };
   
   useEffect(() => {
     setMounted(true);
-  }, []);
+    
+    // Redirect if not authenticated and not loading
+    if (status === "unauthenticated") {
+      router.push('/signin');
+    }
+  }, [status, router]);
+
+  // While checking authentication status
+  if (!mounted || status === "loading") {
+    return (
+      <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white">
+        <div className="text-center">
+          <div className="inline-block w-16 h-16 relative">
+            <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#FFCA40]"></div>
+            <div className="absolute top-0 left-0 w-full h-full flex items-center justify-center">
+              <Image src="/UGM_Lambang.png" alt="UGM" width={32} height={32} />
+            </div>
+          </div>
+          <p className="mt-4 text-lg">Loading Aika...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Handle sign out
+  const handleSignOut = async () => {
+    await signOut({ callbackUrl: '/' });
+  };
 
   if (!mounted) return null; // Prevents hydration errors
 
@@ -109,15 +141,48 @@ export default function AikaChat() {
             </Link>
           </div>
           
+          {/* User profile dropdown - Now shows actual user data */}
           <motion.div 
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
+            className="relative group"
           >
             <div className="flex items-center bg-white/10 rounded-full px-2 sm:px-3 py-1 hover:bg-white/20 transition cursor-pointer">
-              <div className="w-6 h-6 sm:w-7 sm:h-7 bg-[#FFCA40]/20 rounded-full flex items-center justify-center mr-1 sm:mr-2">
-                <FaUserCircle className="text-[#FFCA40]" size={18} />
+              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center mr-1 sm:mr-2 overflow-hidden">
+                {user.image ? (
+                  <Image 
+                    src={user.image} 
+                    alt={user.name || "User"} 
+                    width={28} 
+                    height={28}
+                    className="object-cover"
+                  />
+                ) : (
+                  <div className="w-full h-full bg-[#FFCA40]/20 flex items-center justify-center">
+                    <FaUserCircle className="text-[#FFCA40]" size={18} />
+                  </div>
+                )}
               </div>
-              <span className="text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">{user.name}</span>
+              <span className="text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">
+                {user.name?.split(' ')[0] || "User"}
+              </span>
+            </div>
+            
+            {/* Dropdown menu */}
+            <div className="absolute right-0 top-full mt-2 w-48 bg-[#001a4f] rounded-lg shadow-lg border border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right">
+              <div className="p-3 border-b border-white/10">
+                <p className="text-sm font-medium">{user.name}</p>
+                <p className="text-xs text-gray-300 truncate">{user.email}</p>
+              </div>
+              <div className="p-2">
+                <button 
+                  onClick={handleSignOut}
+                  className="w-full text-left px-3 py-2 text-sm flex items-center rounded-md hover:bg-white/10 transition"
+                >
+                  <HiLogout className="mr-2" />
+                  Sign Out
+                </button>
+              </div>
             </div>
           </motion.div>
         </div>
