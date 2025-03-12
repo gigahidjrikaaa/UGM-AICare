@@ -14,12 +14,7 @@ interface MessageBubbleProps {
 }
 
 export default function MessageBubble({ message }: MessageBubbleProps) {
-  // Add safety check to prevent the error
-  if (!message) {
-    return null; // Don't render anything if message is undefined
-  }
-
-  const isUser = message.role === 'user';
+  const isUser = message?.role === 'user';
   
   const preprocessMarkdown = (content: string) => {
     // Ensure bullet points have proper line breaks before them
@@ -33,11 +28,18 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
   
   // Use a consistent time format that doesn't rely on locale-specific formatting
   const formattedTime = useMemo(() => {
+    if (!message?.timestamp) return '';
+    
     const date = new Date(message.timestamp);
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
     return `${hours}:${minutes}`;
-  }, [message.timestamp]);
+  }, [message?.timestamp]);
+  
+  // Add safety check to prevent the error after all hooks are called
+  if (!message) {
+    return null; // Don't render anything if message is undefined
+  }
 
   // Animation variants
   const containerVariants = {

@@ -58,27 +58,30 @@ export default function ChatInterface() {
     try {
       // Connect to FastAPI backend
       const backendUrl = process.env.NEXT_PUBLIC_API_URL || '';
-      const response = await fetch(`${backendUrl}/chat/`, {
-        method: 'POST',
-        headers: { 
-          'Content-Type': 'application/json',
-          'Accept': 'application/json'
-        },
-        body: JSON.stringify({ 
-          message: input,
-          user_id: 'guest-user',  // Using a default user ID for guests
-          ...(localStorage.getItem('conversation_id') ? 
-            { "conversation_id": localStorage.getItem('conversation_id') } : {})
-        })
-      });
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error(`Backend error (${response.status}):`, errorText);
-        throw new Error(`API error: ${response.status}`);
+      const payload = { 
+        user_id: "guest-user", 
+        message: input 
+      };
+
+      const conversationId = localStorage.getItem('conversation_id');
+      if (conversationId) {
+        payload['conversation_id'] = conversationId;
       }
+
+      // API Call using Axios
+      const response = await axios.post(
+        `${backendUrl}/chat/`, // Note the trailing slash
+        payload,
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
       
-      const data = await response.json();
+      // Axios automatically throws errors for non-200 responses
+      // and parses JSON responses, so no need for response.json()
+      const data = response.data;
       
       // Store conversation ID if returned by backend
       if (data.conversation_id) {
@@ -97,6 +100,15 @@ export default function ChatInterface() {
     } catch (error) {
       console.error('Error sending message:', error);
       
+      // More detailed error logging with axios
+      if (axios.isAxiosError(error)) {
+        console.error('Axios error details:', {
+          status: error.response?.status,
+          data: error.response?.data,
+          headers: error.response?.headers
+        });
+      }
+
       // Add error message
       const errorMessage: Message = {
         id: `error-${Date.now()}`,
