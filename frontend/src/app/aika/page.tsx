@@ -76,8 +76,8 @@ export default function AikaChat() {
         </FloatingElement>
       </div>
 
-      {/* Header - Fixed at top with improved responsive design */}
-      <header className="fixed top-0 left-0 right-0 z-10 bg-[#001D58]/80 backdrop-blur-md border-b border-white/10 shadow-md">
+      {/* Header - Fixed at top with conditional blur effect */}
+      <header className={`fixed top-0 left-0 right-0 z-20 bg-[#001D58]${sidebarOpen ? '' : '/80 backdrop-blur-md'} border-b border-white/10 shadow-md transition-all duration-300`}>
         <div className="flex items-center justify-between px-3 sm:px-4 py-2">
           <div className="flex items-center">
             <button 
