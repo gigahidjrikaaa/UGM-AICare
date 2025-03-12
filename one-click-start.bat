@@ -9,6 +9,15 @@ echo ===================================
 :: Change to the script's directory
 cd /d "%~dp0"
 
+:: Check if Windows Terminal is installed
+where wt >nul 2>nul
+if %ERRORLEVEL% neq 0 (
+    echo Windows Terminal is not installed.
+    echo Please install Windows Terminal from the Microsoft Store and try again.
+    echo Falling back to separate command prompt windows...
+    goto :fallback_terminal
+)
+
 :: Check if Python is available
 where python >nul 2>nul
 if %ERRORLEVEL% neq 0 (
@@ -41,8 +50,33 @@ echo Redis server is running in WSL2! Connection successful.
 :: Create logs directory if it doesn't exist
 if not exist "%~dp0backend\logs" (
     mkdir "%~dp0backend\logs"
-    touch "%~dp0backend\logs\chat.log"
+    echo. > "%~dp0backend\logs\chat.log"
 )
+
+:: Open browser windows for both services
+echo Opening browser tabs...
+start http://localhost:8000/docs
+start http://localhost:3000
+
+:: Start both servers in Windows Terminal tabs
+echo Starting servers in Windows Terminal...
+wt --title "UGM-AICare Dev" ^
+   new-tab --title "Backend" --tabColor "#0078D4" cmd /k "cd /d %~dp0backend && echo Activating virtual environment... && call .venv\Scripts\activate && echo Installing dependencies... && pip install -r requirements.txt && echo Starting FastAPI server... && uvicorn app.main:app --reload --port 8000" ^
+   new-tab --title "Frontend" --tabColor "#F7DF1E" cmd /k "cd /d %~dp0frontend && echo Installing dependencies... && npm install && echo Starting Next.js dev server... && npm run dev" ^
+   new-tab --title "Redis Monitor" --tabColor "#A41E11" wsl -d Ubuntu -e bash -c "redis-cli monitor"
+
+echo ===================================
+echo Both servers are now starting in Windows Terminal!
+echo - Backend: http://localhost:8000
+echo - Frontend: http://localhost:3000
+echo - API Docs: http://localhost:8000/docs
+echo ===================================
+echo The services are running in Windows Terminal. To stop the servers, close the terminal window.
+echo ===================================
+exit /b 0
+
+:fallback_terminal
+:: Use this if Windows Terminal is not available
 
 :: Start the backend server in one terminal
 echo Starting FastAPI backend server...
