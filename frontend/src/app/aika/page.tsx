@@ -188,7 +188,7 @@ export default function AikaChat() {
         </div>
       </header>
 
-      {/* Sidebar - Fixed position, animated */}
+      {/* Sidebar - Updated with user information from session */}
       <AnimatePresence>
         {sidebarOpen && (
           <>
@@ -209,18 +209,28 @@ export default function AikaChat() {
               transition={{ type: "spring", stiffness: 300, damping: 30 }}
               className="fixed top-16 left-0 bottom-0 z-20 w-[85%] max-w-[280px] bg-[#001a4f]/90 backdrop-blur-lg border-r border-white/10 shadow-xl"
             >
-              {/* User Profile Section - more compact on mobile */}
+              {/* User Profile Section - Now using session data */}
               <div className="p-4 border-b border-white/10">
                 <div className="flex items-center">
-                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full bg-gradient-to-br from-[#FFCA40] to-[#ffb700] flex items-center justify-center text-[#001D58] text-xl sm:text-2xl font-bold shadow-lg">
-                    {user.name?.charAt(0) || "G"}
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-full overflow-hidden bg-gradient-to-br from-[#FFCA40] to-[#ffb700] flex items-center justify-center text-[#001D58] text-xl sm:text-2xl font-bold shadow-lg">
+                    {user.image ? (
+                      <Image 
+                        src={user.image} 
+                        alt={user.name || "User"} 
+                        width={64} 
+                        height={64} 
+                        className="object-cover w-full h-full"
+                      />
+                    ) : (
+                      user.name?.charAt(0) || "G"
+                    )}
                   </div>
                   <div className="ml-3">
                     <h3 className="font-medium text-base sm:text-lg">{user.name}</h3>
                     <p className="text-xs sm:text-sm text-gray-300 truncate max-w-[180px]">{user.email}</p>
                   </div>
                 </div>
-                <div className="mt-3 flex justify-end">
+                <div className="mt-3 flex justify-between">
                   <motion.button
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}
@@ -228,10 +238,20 @@ export default function AikaChat() {
                   >
                     Edit Profile
                   </motion.button>
+                  
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={handleSignOut}
+                    className="text-xs sm:text-sm px-3 py-1 bg-red-500/20 hover:bg-red-500/30 text-red-200 rounded-full flex items-center"
+                  >
+                    <HiLogout size={14} className="mr-1" />
+                    Sign Out
+                  </motion.button>
                 </div>
               </div>
               
-              {/* Navigation Section - better spacing for touch */}
+              {/* Navigation Section - Same as before */}
               <nav className="p-2 overflow-y-auto" style={{ maxHeight: 'calc(100% - 180px)' }}>
                 <ul className="space-y-1">
                   {[
@@ -257,7 +277,7 @@ export default function AikaChat() {
                 </ul>
               </nav>
               
-              {/* Footer Section - responsive padding */}
+              {/* Footer Section - Same as before */}
               <div className="absolute bottom-0 left-0 right-0 p-3 sm:p-4 text-center text-xs text-gray-400 border-t border-white/10 bg-[#001a4f]/80 backdrop-blur-sm">
                 <p>© 2025 UGM-AICare</p>
                 <p className="hidden sm:block">Department of Electrical and Information Engineering</p>
@@ -267,7 +287,7 @@ export default function AikaChat() {
         )}
       </AnimatePresence>
 
-      {/* Content area with Chat Interface - Adjusts based on sidebar state */}
+      {/* Content area - Now passing user ID to chat interface */}
       <motion.div 
         className="pt-16 h-screen flex flex-col"
         animate={{
@@ -275,7 +295,7 @@ export default function AikaChat() {
         }}
         transition={{ type: "spring", stiffness: 300, damping: 30 }}
       >
-        {/* Chat container with backdrop blur and glass effect */}
+        {/* Chat container */}
         <div className="flex-1 mx-auto w-full max-w-5xl px-4 flex flex-col">
           {/* Mobile sidebar toggle for small screens */}
           {sidebarOpen && (
@@ -290,7 +310,7 @@ export default function AikaChat() {
             </motion.button>
           )}
 
-          {/* Welcome elements that appear at the top of the chat */}
+          {/* Welcome elements */}
           <motion.div 
             initial={{ y: -20, opacity: 0 }}
             animate={{ y: 0, opacity: 1 }}
@@ -301,9 +321,9 @@ export default function AikaChat() {
             
           </motion.div>
 
-          {/* Main chat component */}
+          {/* Main chat component - Now with user ID */}
           <div className="flex-1 overflow-hidden bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 shadow-lg mb-4 mt-2">
-            <ChatInterface />
+            <ChatInterface userId={user.id || user.email} />
           </div>
 
           {/* Footer credit */}
