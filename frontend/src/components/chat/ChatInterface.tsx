@@ -131,12 +131,14 @@ export default function ChatInterface() {
     }
   };
 
-  return (
-    <div className="flex flex-col h-full">
-      {/* Messages container with smooth scrolling */}
-      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-200 scrollbar-track-transparent py-4 px-2 md:px-4">
+  // Only replacing the return part - rest of component stays the same
+
+return (
+    <div className="flex flex-col h-full max-h-[calc(100vh-120px)]">
+      {/* Messages container with fixed height and scrolling */}
+      <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-200 scrollbar-track-transparent py-4 px-2 md:px-4 relative">
         {messages.length === 0 ? (
-          <div className="h-full flex flex-col items-center justify-center text-center px-4">
+          <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -172,11 +174,13 @@ export default function ChatInterface() {
             </motion.div>
           </div>
         ) : (
-          <>
-            {messages.map((message) => (
-              <MessageBubble key={message.id} message={message} />
-            ))}
-          </>
+          <div className="flex flex-col min-h-full">
+            <div className="flex-1">
+              {messages.map((message) => (
+                <MessageBubble key={message.id} message={message} />
+              ))}
+            </div>
+          </div>
         )}
         
         {/* Loading indicator */}
@@ -207,12 +211,12 @@ export default function ChatInterface() {
         <div ref={messagesEndRef} />
       </div>
       
-      {/* Message input */}
+      {/* Message input - fixed at bottom */}
       <motion.div
         initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="p-3 border-t border-white/10"
+        className="p-3 border-t border-white/10 bg-[#001D58]/80 backdrop-blur-sm"
       >
         <form onSubmit={handleSubmit} className="flex items-end gap-2">
           <div className="flex-1 bg-white/10 rounded-2xl px-4 py-3 focus-within:bg-white/15 transition">
