@@ -39,9 +39,10 @@ if %ERRORLEVEL% neq 0 (
 echo Redis server is running in WSL2! Connection successful.
 
 :: Create logs directory if it doesn't exist
-@REM if not exist "%~dp0backend\logs" (
-@REM     mkdir "%~dp0backend\logs"
-@REM )
+if not exist "%~dp0backend\logs" (
+    mkdir "%~dp0backend\logs"
+    touch "%~dp0backend\logs\chat.log"
+)
 
 :: Start the backend server in one terminal
 echo Starting FastAPI backend server...
