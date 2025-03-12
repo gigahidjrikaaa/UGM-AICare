@@ -130,8 +130,19 @@ class AikaLLM:
             "<|system|>", "<|/system|>"
         ]
         
+        # Add removal of special tokens
+        import re
+        # Remove </s> tokens
+        text = text.replace("</s>", "")
+        # Remove reserved special tokens
+        text = re.sub(r"<\|reserved_special_token_\d+\|>", "", text)
+
         for tag in tags_to_remove:
             text = text.replace(tag, "").strip()
+
+        # Take only the first response if multiple are generated (split by |)
+        if "|" in text:
+            text = text.split("|")[0].strip()
         
         # Check for common patterns of user message simulation
         user_patterns = [
