@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, ReactNode } from 'react';
 import ChatInterface from '@/components/chat/ChatInterface';
 import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -17,7 +17,13 @@ const user = {
 };
 
 // Floating animation for background elements
-const FloatingElement = ({ children, delay = 0, duration = 10, x = 20, y = 20 }) => (
+const FloatingElement = ({ children, delay = 0, duration = 10, x = 20, y = 20 }: {
+  children: ReactNode;
+  delay?: number;
+  duration?: number;
+  x?: number;
+  y?: number;
+}) => (
   <motion.div
     animate={{
       y: [0, y, 0],
@@ -213,16 +219,7 @@ export default function AikaChat() {
             className="relative mb-4 flex justify-center"
           >
             <div className="absolute top-8 w-24 h-24 bg-[#FFCA40]/20 rounded-full blur-3xl"></div>
-            <Image
-              src="/aika-avatar.png" 
-              alt="Aika" 
-              width={100}
-              height={100}
-              className="object-contain z-10"
-              onError={(e) => {
-                e.currentTarget.src = "https://via.placeholder.com/100?text=Aika";
-              }}
-            />
+            
           </motion.div>
 
           {/* Main chat component */}
