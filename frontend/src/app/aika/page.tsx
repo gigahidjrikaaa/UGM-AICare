@@ -90,7 +90,7 @@ export default function AikaChat() {
     <main className="h-screen w-screen overflow-hidden bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white">
       {/* Particle Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-10">
-        <ParticleBackground count={50} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={1} />
+        <ParticleBackground count={70} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={1} />
       </div>
       
       {/* Background decorative elements */}
