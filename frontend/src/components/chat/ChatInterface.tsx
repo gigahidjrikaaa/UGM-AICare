@@ -218,7 +218,7 @@ return (
         initial={{ y: 50, opacity: 0 }}
         animate={{ y: 0, opacity: 1 }}
         transition={{ delay: 0.3 }}
-        className="p-3 border-t border-white/10 bg-[#001D58]/80 backdrop-blur-sm"
+        className="p-3 border-t border-white/10 bg-[#001D58]/80 backdrop-blur-x"
       >
         <form onSubmit={handleSubmit} className="flex items-end gap-2">
           <div className="flex-1 bg-white/10 rounded-2xl px-4 py-3 focus-within:bg-white/15 transition">
