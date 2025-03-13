@@ -60,7 +60,16 @@ export default function AikaChat() {
     if (status === "unauthenticated") {
       router.push('/signin');
     }
+    
   }, [status, router]);
+
+  // Log user ID and full user object
+  // useEffect(() => {
+  //   if (session?.user) {
+  //     console.log("User ID:", session.user.id);
+  //     console.log("Full user object:", session.user);
+  //   }
+  // }, [session]);
 
   // While checking authentication status
   if (!mounted || status === "loading") {
@@ -328,7 +337,7 @@ export default function AikaChat() {
           </motion.div>
 
           {/* Main chat component - Now with user ID */}
-          <div className="flex-1 overflow-hidden bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 shadow-lg mb-4 mt-2">
+          <div className="flex-1 overflow-hidden bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 shadow-lg mb-4 mt-2 z-10">
             <ChatInterface userId={user.id || user.email} />
           </div>
 
