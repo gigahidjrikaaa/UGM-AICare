@@ -19,7 +19,7 @@ export interface Message {
   timestamp: string;
 }
 
-export default function ChatInterface() {
+export default function ChatInterface({ userId = "guest-user" }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
