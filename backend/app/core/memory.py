@@ -15,10 +15,14 @@ class AikaMemory:
     def check_connection():
         """ Check if Redis connection is working """
         try:
+            print("Checking Redis connection...")
             redis_client.ping()
-        except redis.exceptions.ConnectionError:
-            print("Cannot connect to Redis. Please check the connection settings.")
-            raise
+            print("Redis connection successful")
+            return True
+        except redis.exceptions.ConnectionError as e:
+            print(f"Cannot connect to Redis. Error: {e}")
+            print("Please check the connection settings.")
+            return False
 
     @staticmethod
     def save_memory(user_id: str, message: str):
