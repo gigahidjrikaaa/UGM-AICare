@@ -60,14 +60,20 @@ export default function ChatInterface({ userId = "guest-user" }: ChatInterfacePr
   
     try {
       const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-      const payload = { 
+      interface ChatPayload {
+        user_id: string;
+        message: string;
+        conversation_id?: string;
+      }
+      
+      const payload: ChatPayload = { 
         user_id: userId, // Now using the passed userId
         message: input 
       };
 
       const conversationId = localStorage.getItem('conversation_id');
       if (conversationId) {
-        payload['conversation_id'] = conversationId;
+        payload.conversation_id = conversationId;
       }
 
       // API Call
