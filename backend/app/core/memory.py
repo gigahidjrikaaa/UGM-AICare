@@ -2,9 +2,13 @@ import redis
 import json
 import os
 
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
+
 # Connect to Redis (or replace with a database)
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = os.getenv("REDIS_PORT", 6379)
+REDIS_HOST = os.getenv("REDIS_URL")
+REDIS_PORT = os.getenv("REDIS_PORT")
 REDIS_USERNAME = os.getenv("REDIS_USERNAME", None)
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
 
