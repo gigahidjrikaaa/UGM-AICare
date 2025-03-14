@@ -47,7 +47,8 @@ if %ERRORLEVEL% equ 1 (
     )
     
     :: Check for REDIS_URL in the .env file
-    findstr /i "REDIS_URL" "%~dp0backend\.env" > nul
+    echo Checking for REDIS_URL in .env file...
+    type "%~dp0backend\.env" | findstr /i "REDIS_URL" > nul
     if %ERRORLEVEL% neq 0 (
         echo REDIS_URL not found in .env file.
         echo Adding REDIS_URL to your .env file...
@@ -55,10 +56,9 @@ if %ERRORLEVEL% equ 1 (
         notepad "%~dp0backend\.env"
         echo Press any key when you have updated the .env file...
         pause > nul
+    ) else (
+        echo Found REDIS_URL in .env file.
     )
-    
-    echo Found REDIS_URL in .env file.
-    echo The application will use the online Redis server.
 ) else (
     echo You selected Local Redis in WSL2 Ubuntu.
     
