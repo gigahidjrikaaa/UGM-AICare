@@ -61,6 +61,9 @@ async def chat(request: ChatRequest):
         print(f"\n=== New Request from {user_id} ===")
         print(f"Message: {message}")
 
+        # Check connection to Redis
+        AikaMemory.check_connection()
+
         # Get conversation history from memory
         history = AikaMemory.get_memory(user_id)
         
