@@ -20,7 +20,7 @@ const handler = NextAuth({
   ],
   callbacks: {
     async signIn({ account, profile }) {
-      if (account?.provider === "google") {
+      if (account?.provider === "google" && profile) {
         return allowedDomains.some(domain => profile.email?.endsWith(domain));
       }
       return true;

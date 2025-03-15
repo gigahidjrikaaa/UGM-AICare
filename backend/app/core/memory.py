@@ -2,13 +2,32 @@ import redis
 import json
 import os
 
-# Connect to Redis (or replace with a database)
-REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
-REDIS_PORT = os.getenv("REDIS_PORT", 6379)
+# Load environment variables from .env file
+from dotenv import load_dotenv
+load_dotenv()
 
-redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True)
+# Connect to Redis (or replace with a database)
+REDIS_HOST = os.getenv("REDIS_URL")
+REDIS_PORT = os.getenv("REDIS_PORT")
+REDIS_USERNAME = os.getenv("REDIS_USERNAME", None)
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
+
+redis_client = redis.Redis(host=REDIS_HOST, port=REDIS_PORT, decode_responses=True, username=REDIS_USERNAME, password=REDIS_PASSWORD)
 
 class AikaMemory:
+    @staticmethod
+    def check_connection():
+        """ Check if Redis connection is working """
+        try:
+            print("Checking Redis connection...")
+            redis_client.ping()
+            print("Redis connection successful")
+            return True
+        except redis.exceptions.ConnectionError as e:
+            print(f"Cannot connect to Redis. Error: {e}")
+            print("Please check the connection settings.")
+            return False
+
     @staticmethod
     def save_memory(user_id: str, message: str):
         """ Store messages in Redis for conversation history """

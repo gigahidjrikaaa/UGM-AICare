@@ -27,28 +27,64 @@ if %ERRORLEVEL% neq 0 (
     exit /b 1
 )
 
-:: Check if Redis is running in WSL2 Ubuntu
-echo Checking if Redis server is running in WSL2...
-wsl -d Ubuntu -e redis-cli ping > nul 2>&1
-if %ERRORLEVEL% neq 0 (
-    echo Redis is not running in WSL2 Ubuntu. Starting Redis server automatically...
+:: Ask the user for Redis connection preference
+echo Choose Redis connection mode:
+echo 1: Online Redis (check REDIS_URL in .env)
+echo 2: Local Redis in WSL2 Ubuntu
+choice /c 12 /n /m "Enter your choice (1 or 2): "
+
+if %ERRORLEVEL% equ 1 (
+    echo You selected Online Redis.
     
-    :: Start Redis in a separate window
-    start "Redis Server" wsl -d Ubuntu -e redis-server
+    :: Check if .env file exists
+    if not exist "%~dp0backend\.env" (
+        echo Creating .env file with default settings...
+        echo REDIS_URL=your_redis_connection_string> "%~dp0backend\.env"
+        echo Created .env file. Please edit it to set your REDIS_URL.
+        notepad "%~dp0backend\.env"
+        echo Press any key when you have updated the .env file...
+        pause > nul
+    )
     
-    :: Wait for Redis to start
-    echo Waiting for Redis to initialize...
-    timeout /t 3 /nobreak > nul
+    :: Check for REDIS_URL in the .env file
+    echo Checking for REDIS_URL in .env file...
+    type "%~dp0backend\.env" | findstr /i "REDIS_URL" > nul
+    if %ERRORLEVEL% neq 0 (
+        echo REDIS_URL not found in .env file.
+        echo Adding REDIS_URL to your .env file...
+        echo REDIS_URL=your_redis_connection_string>> "%~dp0backend\.env"
+        notepad "%~dp0backend\.env"
+        echo Press any key when you have updated the .env file...
+        pause > nul
+    ) else (
+        echo Found REDIS_URL in .env file.
+    )
+) else (
+    echo You selected Local Redis in WSL2 Ubuntu.
     
-    :: Verify Redis is now running
+    :: Check if Redis is running in WSL2 Ubuntu
+    echo Checking if Redis server is running in WSL2...
     wsl -d Ubuntu -e redis-cli ping > nul 2>&1
     if %ERRORLEVEL% neq 0 (
-        echo Failed to start Redis server. Please start it manually.
-        timeout /t 5 /nobreak > nul
-        exit /b 1
+        echo Redis is not running in WSL2 Ubuntu. Starting Redis server automatically...
+        
+        :: Start Redis in a separate window
+        start "Redis Server" wsl -d Ubuntu -e redis-server
+        
+        :: Wait for Redis to start
+        echo Waiting for Redis to initialize...
+        timeout /t 3 /nobreak > nul
+        
+        :: Verify Redis is now running
+        wsl -d Ubuntu -e redis-cli ping > nul 2>&1
+        if %ERRORLEVEL% neq 0 (
+            echo Failed to start Redis server. Please start it manually.
+            timeout /t 5 /nobreak > nul
+            exit /b 1
+        )
     )
+    echo Redis server is running in WSL2! Connection successful.
 )
-echo Redis server is running in WSL2! Connection successful.
 
 :: Create logs directory if it doesn't exist
 if not exist "%~dp0backend\logs" (

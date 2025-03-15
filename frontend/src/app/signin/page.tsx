@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { signIn, useSession } from "next-auth/react";
+import { useSession } from "next-auth/react";
 import GoogleSignInButton from "@/components/ui/GoogleSignInButton";
 import Image from "next/image";
 import Link from "next/link";
@@ -10,7 +10,7 @@ import { motion } from "framer-motion";
 
 export default function SignIn() {
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const [error, setError] = useState<string | null>(null);
   const searchParams = useSearchParams();
   

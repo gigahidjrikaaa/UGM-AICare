@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, ReactNode } from 'react';
+import { useState, useEffect } from 'react';
 import ChatInterface from '@/components/chat/ChatInterface';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import Image from 'next/image';
@@ -11,33 +11,6 @@ import { BsChatDots, BsCalendar, BsQuestionCircle, BsClockHistory } from 'react-
 import { FaRobot, FaUserCircle } from 'react-icons/fa';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-
-// Floating animation for background elements
-const FloatingElement = ({ children, delay = 0, duration = 10, x = 20, y = 20 }: {
-  children: ReactNode;
-  delay?: number;
-  duration?: number;
-  x?: number;
-  y?: number;
-}) => (
-  <motion.div
-    animate={{
-      y: [0, y, 0],
-      x: [0, x, 0],
-      opacity: [0.5, 0.8, 0.5],
-    }}
-    transition={{
-      duration,
-      repeat: Infinity,
-      repeatType: "reverse",
-      ease: "easeInOut",
-      delay,
-    }}
-    className="absolute pointer-events-none"
-  >
-    {children}
-  </motion.div>
-);
 
 export default function AikaChat() {
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -100,27 +73,6 @@ export default function AikaChat() {
       {/* Particle Background */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-10">
         <ParticleBackground count={70} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={1} />
-      </div>
-      
-      {/* Background decorative elements */}
-      <div className="fixed inset-0 overflow-hidden z-20 pointer-events-none">
-        <div className="absolute inset-0 bg-[url('/wave-pattern.svg')] opacity-10"></div>
-        
-        <FloatingElement delay={0} duration={15} y={30} x={10}>
-          <div className="w-40 h-40 rounded-full bg-[#FFCA40]/10 blur-3xl"></div>
-        </FloatingElement>
-        
-        <FloatingElement delay={2} duration={18} y={-40} x={-20}>
-          <div className="w-64 h-64 rounded-full bg-[#6A98F0]/10 blur-3xl"></div>
-        </FloatingElement>
-        
-        <FloatingElement delay={4} duration={20} x={-30}>
-          <div className="w-52 h-52 rounded-full bg-[#FFCA40]/5 blur-3xl"></div>
-        </FloatingElement>
-        
-        <FloatingElement delay={5} duration={25} y={50}>
-          <div className="w-72 h-72 rounded-full bg-[#4B6CB7]/10 blur-3xl"></div>
-        </FloatingElement>
       </div>
 
       {/* Header - Fixed at top with conditional blur effect */}
@@ -338,7 +290,7 @@ export default function AikaChat() {
 
           {/* Main chat component - Now with user ID */}
           <div className="flex-1 overflow-hidden bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 shadow-lg mb-4 mt-2 z-10">
-            <ChatInterface userId={user.id || user.email} />
+            <ChatInterface userId={user.id ?? user.email ?? undefined} />
           </div>
 
           {/* Footer credit */}
