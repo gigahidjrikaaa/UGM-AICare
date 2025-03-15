@@ -1,7 +1,13 @@
 import requests
 import json
 import logging
-from app.config import TOGETHER_API_KEY
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+
+TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
 
 class AikaLLM:
     def __init__(self):

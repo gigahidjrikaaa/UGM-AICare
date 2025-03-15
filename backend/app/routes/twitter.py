@@ -1,6 +1,11 @@
 from fastapi import APIRouter
 import requests
-from app.config import TWITTER_BEARER_TOKEN
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+TWITTER_BEARER_TOKEN = os.getenv("TWITTER_BEARER_TOKEN")
 
 router = APIRouter()
 

@@ -10,15 +10,18 @@ import logging
 import time
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
-
-from app.config import (
-    EMAIL_USERNAME, 
-    EMAIL_PASSWORD, 
-    EMAIL_SMTP_SERVER, 
-    EMAIL_SMTP_PORT
-)
 from app.database import get_db
 from app.models import EmailTemplate, EmailLog, EmailGroup
+import os
+from dotenv import load_dotenv
+
+load_dotenv()
+
+# Load environment variables
+EMAIL_USERNAME = os.getenv("EMAIL_USERNAME")
+EMAIL_PASSWORD = os.getenv("EMAIL_PASSWORD")
+EMAIL_SMTP_SERVER = os.getenv("EMAIL_SMTP_SERVER")
+EMAIL_SMTP_PORT = os.getenv("EMAIL_SMTP_PORT")
 
 # Configure router
 router = APIRouter(prefix="/email", tags=["email"])
