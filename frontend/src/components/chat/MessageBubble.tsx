@@ -1,14 +1,21 @@
-import { Message } from './ChatInterface';
 import { useMemo } from 'react';
+import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
+import { motion } from 'framer-motion';
+
+export interface Message {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string | number | Date;
+}
 
 interface MessageBubbleProps {
   message: Message;
 }
 
 export default function MessageBubble({ message }: MessageBubbleProps) {
-  const isUser = message.role === 'user';
-
+  const isUser = message?.role === 'user';
+  
   const preprocessMarkdown = (content: string) => {
     // Ensure bullet points have proper line breaks before them
     let processed = content.replace(/([^\n])\n\* /g, '$1\n\n* ');
@@ -21,14 +28,58 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
   
   // Use a consistent time format that doesn't rely on locale-specific formatting
   const formattedTime = useMemo(() => {
+    if (!message?.timestamp) return '';
+    
     const date = new Date(message.timestamp);
     const hours = date.getHours().toString().padStart(2, '0');
     const minutes = date.getMinutes().toString().padStart(2, '0');
     return `${hours}:${minutes}`;
-  }, [message.timestamp]);
+  }, [message?.timestamp]);
+  
+  // Add safety check to prevent the error after all hooks are called
+  if (!message) {
+    return null; // Don't render anything if message is undefined
+  }
+
+  // Animation variants
+  const containerVariants = {
+    hidden: { opacity: 0, y: 20 },
+    visible: { opacity: 1, y: 0 }
+  };
 
   return (
-    <div className={`flex w-full mb-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
+    <motion.div 
+      className={`flex w-full mb-4 items-end ${isUser ? 'justify-end' : 'justify-start'}`}
+      variants={containerVariants}
+      initial="hidden"
+      animate="visible"
+      transition={{ duration: 0.3 }}
+    >
+      {/* Aika Avatar - Only shown for assistant messages */}
+      {!isUser && (
+        <motion.div 
+          initial={{ scale: 0.8, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          className="flex-shrink-0 mr-2"
+        >
+          <div className="relative w-8 h-8 rounded-full overflow-hidden border-2 border-[#FFCA40]/40">
+            <Image 
+              src="/aika-avatar.png" 
+              alt="Aika" 
+              fill
+              className="object-cover"
+              onError={(e) => {
+                // Fallback if image doesn't exist
+                const target = e.target as HTMLImageElement;
+                target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%23FFCA40'/%3E%3Ctext x='20' y='25' font-family='Arial' font-size='20' text-anchor='middle' fill='%23001D58'%3EA%3C/text%3E%3C/svg%3E";
+              }}
+            />
+            <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white"></div>
+          </div>
+        </motion.div>
+      )}
+      
+      {/* Message Bubble */}
       <div
         className={`max-w-[80%] rounded-lg px-4 py-2 ${
           isUser 
@@ -68,6 +119,13 @@ export default function MessageBubble({ message }: MessageBubbleProps) {
           {formattedTime}
         </div>
       </div>
-    </div>
+      
+      {/* User Avatar - Optional: add user avatar on the right side */}
+      {isUser && (
+        <div className="flex-shrink-0 ml-2 w-8 h-8 bg-[#001D58] rounded-full flex items-center justify-center text-white text-xs font-bold">
+          U
+        </div>
+      )}
+    </motion.div>
   );
 }

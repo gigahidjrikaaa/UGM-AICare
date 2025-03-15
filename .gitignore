@@ -1,6 +1,7 @@
 # General
 .DS_Store
 Thumbs.db
+dump.rdb
 
 # Python (Backend)
 .venv/

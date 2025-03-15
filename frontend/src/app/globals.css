@@ -71,16 +71,15 @@ body {
   text-decoration: underline;
 }
 
-@keyframes fade-in {
-  0% { opacity: 0; transform: translateY(10px); }
-  100% { opacity: 1; transform: translateY(0); }
+/* Extra small screens */
+@media (min-width: 480px) {
+  .xs\:block {
+    display: block;=
+  }
 }
 
-.animate-fade-in {
-  animation: fade-in 0.8s ease-out forwards;
-}
-
-:root {
-  --mouse-x: 0;
-  --mouse-y: 0;
+@media (max-width: 479px) {
+  .hidden.xs\:block {
+    display: none;
+  }
 }
