@@ -8,7 +8,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { HiMenu, HiX, HiChevronLeft, HiLogout } from 'react-icons/hi';
 import { BsChatDots, BsCalendar, BsQuestionCircle, BsClockHistory } from 'react-icons/bs';
-import { FaRobot, FaUserCircle } from 'react-icons/fa';
+import { FaRobot } from 'react-icons/fa';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 
