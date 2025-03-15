@@ -51,7 +51,7 @@ export default function Home() {
           <div className="lg:w-1/2 flex justify-center lg:justify-end">
             <div className="relative w-[300px] h-[300px] lg:w-[400px] lg:h-[400px]">
               <Image 
-                src="/Aika.png" 
+                src="/aika-avatar.png" 
                 alt="Aika Character" 
                 fill
                 className="object-contain"
