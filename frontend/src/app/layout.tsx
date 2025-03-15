@@ -3,7 +3,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Inter } from 'next/font/google'
 import ClientProvider from "@/components/auth/ClientProvider";
-import Header from "@/components/ui/Header";
+import HeaderWrapper from "@/components/ui/HeaderWrapper";
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -26,7 +26,7 @@ export const metadata: Metadata = {
   }
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
@@ -37,7 +37,7 @@ export default function RootLayout({
         className={inter.className}
       >
         <ClientProvider>
-          <Header />
+          <HeaderWrapper />
           {children}
         </ClientProvider>
       </body>
