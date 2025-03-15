@@ -8,36 +8,40 @@ from app.core.memory import AikaMemory
 from app.database import init_db
 from app.routes import email
 from app.routes import docs
+from app.routes import router as chat_router
 from fastapi.middleware.cors import CORSMiddleware
 import os
-import dotenv 
+from dotenv import load_dotenv
 
-# Load environment variables from .env file
-dotenv.load_dotenv()
+load_dotenv()
 
 # Initialize database
 init_db()
 
 # Set up logging
 # Ensure logs directory exists
-os.makedirs("logs", exist_ok=True)
-if not os.path.exists("logs/chat.log"):
-    with open("logs/chat.log", "w") as f:
+log_dir = "logs" if os.getenv("APP_ENV") != "production" else "/tmp/logs"
+os.makedirs(log_dir, exist_ok=True)
+log_file = os.path.join(log_dir, "chat.log")
+
+if not os.path.exists(log_file) and os.getenv("APP_ENV") != "production":
+    with open(log_file, "w") as f:
         f.write(f"Log file created at {datetime.now()}\n")
 
 logging.basicConfig(
-    filename="logs/chat.log",  # Log file
+    filename=log_file if os.getenv("APP_ENV") != "production" else None,
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
 )
 
-app = FastAPI()
+app = FastAPI(title="Aika Chatbot API", version="0.1")
 llm = AikaLLM()
 
 # Add CORS middleware
+origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],   # Allow all origins. Change to FRONTEND_URL in production
+    allow_origins=origins,   # Allow all origins. Change to FRONTEND_URL in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -49,13 +53,22 @@ app.include_router(email.router)
 # Register the docs router
 app.include_router(docs.router)
 
+# Register the chat router
+app.include_router(chat_router)
+
 class ChatRequest(BaseModel):
     user_id: str
     message: str
+    conversation_id: str = None
 
 @app.get("/")
 async def root():
     return {"message": "Welcome to Aika Chatbot API"}
+
+@app.get("/health")
+async def health_check():
+    """Health check endpoint for monitoring"""
+    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 @app.post("/chat/")
 async def chat(request: ChatRequest):
@@ -98,3 +111,9 @@ async def chat(request: ChatRequest):
     except Exception as e:
         logging.error(f"Error in chat endpoint: {str(e)}", exc_info=True)
         return {"error": str(e)}, 500
+    
+# For Render deployment
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.getenv("PORT", 8000))
+    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False)
