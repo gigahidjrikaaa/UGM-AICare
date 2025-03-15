@@ -1,39 +1,29 @@
+import { NextResponse } from 'next/server';
+import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import { NextRequest, NextResponse } from 'next/server';
 
-export async function middleware(req: NextRequest) {
-  const path = req.nextUrl.pathname;
-  
-  // Paths that don't require authentication
-  const publicPaths = ['/', '/signin', '/api/auth'];
-  const isPublicPath = publicPaths.some(pp => 
-    path === pp || path.startsWith(`${pp}/`)
-  );
-
-  if (isPublicPath) {
-    return NextResponse.next();
-  }
-
+export async function middleware(request: NextRequest) {
   const session = await getToken({ 
-    req, 
+    req: request, 
     secret: process.env.NEXTAUTH_SECRET 
   });
 
-  // If user is not signed in and trying to access a protected route
-  if (!session && path !== '/signin') {
-    return NextResponse.redirect(new URL('/signin', req.url));
+  const pathname = request.nextUrl.pathname;
+
+  // Redirect authenticated users away from login page
+  if (pathname.startsWith('/signin') && session) {
+    return NextResponse.redirect(new URL('/aika', request.url));
   }
 
-  // If user is signed in and trying to access sign-in page
-  if (session && path === '/signin') {
-    return NextResponse.redirect(new URL('/aika', req.url));
+  // Protect routes that require authentication
+  if (pathname.startsWith('/aika') && !session) {
+    return NextResponse.redirect(new URL('/signin', request.url));
   }
 
   return NextResponse.next();
 }
 
+// See: https://nextjs.org/docs/app/building-your-application/routing/middleware#matcher
 export const config = {
-  matcher: [
-    '/((?!api|_next/static|_next/image|favicon.ico).*)'
-  ],
+  matcher: ['/signin', '/aika/:path*'],
 };

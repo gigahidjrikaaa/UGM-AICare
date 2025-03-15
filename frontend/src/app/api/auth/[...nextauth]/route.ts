@@ -1,49 +1,53 @@
-import NextAuth from "next-auth";
+import { NextAuthOptions } from "next-auth";
+import NextAuth from "next-auth/next";
 import GoogleProvider from "next-auth/providers/google";
 
-const allowedDomains = ["ugm.ac.id", "mail.ugm.ac.id", "ugm.id", "365.ugm.ac.id", "ugm.ac.id.mail.onmicrosoft.com"];
-
-const handler = NextAuth({
+const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          prompt: "consent",
-          access_type: "offline",
-          response_type: "code",
-          hd: allowedDomains,
-        }
-      }
+      clientId: process.env.GOOGLE_CLIENT_ID as string,
+      clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
     }),
   ],
+  pages: {
+    signIn: "/signin",
+    // Don't specify a signOut page unless you have a custom one
+    // error: '/auth/error', // Error code passed in query string as ?error=
+  },
   callbacks: {
-    async signIn({ account, profile }) {
-      if (account?.provider === "google" && profile) {
-        return allowedDomains.some(domain => profile.email?.endsWith(domain));
+    async redirect({ url, baseUrl }) {
+      // After sign in, redirect to /aika instead of the default behavior
+      if (url.startsWith(baseUrl)) {
+        return `${baseUrl}/aika`;
+      } 
+      // Handle relative URLs
+      else if (url.startsWith("/")) {
+        return `${baseUrl}/aika`;
       }
-      return true;
+      return url;
+    },
+    async jwt({ token, user, account }) {
+      // Initial sign in
+      if (account && user) {
+        return {
+          ...token,
+          accessToken: account.access_token,
+          id: user.id,
+        };
+      }
+      return token;
     },
     async session({ session, token }) {
-      // Add user ID to session
-      if (session.user && token.sub) {
-        session.user.id = token.sub;
+      if (session.user) {
+        session.user.id = token.id as string;
       }
       return session;
     },
-    async jwt({ token, user }) {
-      // If user object exists (during sign in), add its ID to the JWT token
-      if (user) {
-        token.id = user.id;
-      }
-      return token;
-    }
   },
-  pages: {
-    signIn: "/signin",
-    error: "/signin",
-  }
-});
+  session: {
+    strategy: "jwt",
+  },
+};
 
+const handler = NextAuth(authOptions);
 export { handler as GET, handler as POST };
