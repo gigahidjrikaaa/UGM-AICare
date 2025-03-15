@@ -107,51 +107,6 @@ export default function AikaChat() {
               </div>
             </Link>
           </div>
-          
-          {/* User profile dropdown - Now shows actual user data */}
-          <motion.div 
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            className="relative group"
-          >
-            <div className="flex items-center bg-white/10 rounded-full px-2 sm:px-3 py-1 hover:bg-white/20 transition cursor-pointer">
-              <div className="w-6 h-6 sm:w-7 sm:h-7 rounded-full flex items-center justify-center mr-1 sm:mr-2 overflow-hidden">
-                {user.image ? (
-                  <Image 
-                    src={user.image} 
-                    alt={user.name || "User"} 
-                    width={28} 
-                    height={28}
-                    className="object-cover"
-                  />
-                ) : (
-                  <div className="w-full h-full bg-[#FFCA40]/20 flex items-center justify-center">
-                    <FaUserCircle className="text-[#FFCA40]" size={18} />
-                  </div>
-                )}
-              </div>
-              <span className="text-xs sm:text-sm truncate max-w-[80px] sm:max-w-none">
-                {user.name?.split(' ')[0] || "User"}
-              </span>
-            </div>
-            
-            {/* Dropdown menu */}
-            <div className="absolute right-0 top-full mt-2 w-48 bg-[#001a4f] rounded-lg shadow-lg border border-white/10 opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 transform origin-top-right">
-              <div className="p-3 border-b border-white/10">
-                <p className="text-sm font-medium">{user.name}</p>
-                <p className="text-xs text-gray-300 truncate">{user.email}</p>
-              </div>
-              <div className="p-2">
-                <button 
-                  onClick={handleSignOut}
-                  className="w-full text-left px-3 py-2 text-sm flex items-center rounded-md hover:bg-white/10 transition"
-                >
-                  <HiLogout className="mr-2" />
-                  Sign Out
-                </button>
-              </div>
-            </div>
-          </motion.div>
         </div>
       </header>
 
