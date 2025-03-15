@@ -1,35 +1,25 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useEffect, useState, Suspense } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import GoogleSignInButton from "@/components/ui/GoogleSignInButton";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
+import ErrorMessage from "../../components/ErrorMessage";
 
 export default function SignIn() {
   const router = useRouter();
   const { status } = useSession();
   const [error, setError] = useState<string | null>(null);
-  const searchParams = useSearchParams();
   
   useEffect(() => {
-    // Check for error in URL
-    const errorParam = searchParams.get("error");
-    if (errorParam) {
-      if (errorParam === "AccessDenied") {
-        setError("You must use a UGM email address to sign in.");
-      } else {
-        setError("An error occurred during sign in. Please try again.");
-      }
-    }
-    
     // Redirect if already authenticated
     if (status === "authenticated") {
       router.push("/aika");
     }
-  }, [status, router, searchParams]);
+  }, [status, router]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col">
@@ -68,6 +58,11 @@ export default function SignIn() {
           <p className="text-gray-300 text-center mb-8">
             Sign in with your UGM email account to get started
           </p>
+          
+          {/* Wrap useSearchParams in a Suspense boundary */}
+          <Suspense fallback={<div className="h-12"></div>}>
+            <ErrorMessage setError={setError} />
+          </Suspense>
           
           {error && (
             <div className="bg-red-500/20 border border-red-500/50 text-white p-3 rounded-lg mb-6 text-sm text-center">
