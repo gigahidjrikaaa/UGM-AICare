@@ -39,7 +39,6 @@ export default function ParticleBackground({
         width: window.innerWidth,
         height: window.innerHeight,
       });
-      console.log("Dimensions:" + dimensions);
     };
 
     updateDimensions();
@@ -62,7 +61,9 @@ export default function ParticleBackground({
     setParticles(newParticles);
 
     return () => window.removeEventListener("resize", updateDimensions);
-  }, [count, colors, minSize, maxSize, speed, dimensions]);
+  }, [count, colors, minSize, maxSize, speed]);
+
+    console.log(dimensions);
 
   return (
     <div className="fixed inset-0 overflow-hidden pointer-events-none z-[-5]">
