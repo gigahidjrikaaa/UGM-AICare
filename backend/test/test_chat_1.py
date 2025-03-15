@@ -2,7 +2,12 @@ import requests
 import json
 import time
 
-url = "http://127.0.0.1:8000/chat/"
+environment = "production"  # Set to "production" or "development" to test different environments
+if environment == "production":
+    url = "https://ugm-aicare.onrender.com/chat/"
+else:
+    url = "http://127.0.0.1:8000/chat/"
+
 payload = {
     "user_id": "test_user",
     "message": "Kamu siapa, Aika?"
