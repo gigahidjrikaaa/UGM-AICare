@@ -19,6 +19,12 @@ dotenv.load_dotenv()
 init_db()
 
 # Set up logging
+# Ensure logs directory exists
+os.makedirs("logs", exist_ok=True)
+if not os.path.exists("logs/chat.log"):
+    with open("logs/chat.log", "w") as f:
+        f.write(f"Log file created at {datetime.now()}\n")
+
 logging.basicConfig(
     filename="logs/chat.log",  # Log file
     level=logging.INFO,
