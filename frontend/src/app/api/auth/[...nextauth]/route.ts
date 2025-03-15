@@ -2,50 +2,53 @@ import { NextAuthOptions } from "next-auth";
 import NextAuth from "next-auth/next";
 import GoogleProvider from "next-auth/providers/google";
 
-const authOptions: NextAuthOptions = {
+export const authOptions: NextAuthOptions = {
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
     }),
   ],
-  pages: {
-    signIn: "/signin",
-    // Don't specify a signOut page unless you have a custom one
-    // error: '/auth/error', // Error code passed in query string as ?error=
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
   },
   callbacks: {
     async redirect({ url, baseUrl }) {
-      // After sign in, redirect to /aika instead of the default behavior
+      // Customize the redirect logic
       if (url.startsWith(baseUrl)) {
-        return `${baseUrl}/aika`;
-      } 
-      // Handle relative URLs
-      else if (url.startsWith("/")) {
-        return `${baseUrl}/aika`;
+        // For absolute URLs within our app
+        if (url.includes("/signin") && url.includes("callbackUrl")) {
+          // Extract the callbackUrl from the URL if present
+          const callbackUrl = new URL(url).searchParams.get("callbackUrl");
+          if (callbackUrl) return callbackUrl;
+          return `${baseUrl}/aika`;
+        }
+        return url;
+      } else if (url.startsWith("/")) {
+        // For relative URLs
+        return `${baseUrl}${url}`;
       }
       return url;
     },
-    async jwt({ token, user, account }) {
-      // Initial sign in
-      if (account && user) {
-        return {
-          ...token,
-          accessToken: account.access_token,
-          id: user.id,
-        };
-      }
-      return token;
-    },
     async session({ session, token }) {
-      if (session.user) {
-        session.user.id = token.id as string;
+      // Add user ID to session from token
+      if (session?.user) {
+        session.user.id = token.sub as string;
       }
       return session;
     },
+    async jwt({ token, account, user }) {
+      // Add user info to token
+      if (account && user) {
+        token.accessToken = account.access_token;
+        token.id = user.id;
+      }
+      return token;
+    },
   },
-  session: {
-    strategy: "jwt",
+  pages: {
+    signIn: '/signin',
   },
 };
 
