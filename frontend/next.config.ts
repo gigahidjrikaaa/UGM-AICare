@@ -3,7 +3,14 @@ const nextConfig = {
   /* config options here */
   reactStrictMode: true,
   images: {
-    domains: ["res.cloudinary.com", "lh3.googleusercontent.com"],
+    // Optimize all images, including remote ones
+    domains: [],
+    // Add any remote hostnames if needed
+    remotePatterns: [],
+    // Disable unoptimized images
+    unoptimized: false,
+    // Increase image format options
+    formats: ['image/webp']
   },
 };
 
