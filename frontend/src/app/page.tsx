@@ -6,28 +6,6 @@ import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 export default function Home() {
   return (
     <main className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F]">
-      {/* Navigation */}
-      <nav className="py-4 px-6 flex justify-between items-center">
-        <div className="flex items-center">
-          <Image 
-            src="/UGM_Lambang.png" 
-            alt="UGM Logo" 
-            width={50} 
-            height={50} 
-            className="mr-3"
-          />
-          <span className="text-white text-xl font-bold">UGM-AICare</span>
-        </div>
-        <div className="flex items-center space-x-4">
-          <Link href="/about" className="text-white hover:text-[#FFCA40] transition">
-            About
-          </Link>
-          <Link href="/contact" className="text-white hover:text-[#FFCA40] transition">
-            Contact
-          </Link>
-        </div>
-      </nav>
-
       {/* Hero Section */}
       <div className="max-w-7xl mx-auto px-4 py-20">
         <div className="flex flex-col lg:flex-row items-center">
