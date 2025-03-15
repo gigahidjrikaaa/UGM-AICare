@@ -7,9 +7,15 @@ const nextConfig = {
     domains: [],
     // Add any remote hostnames if needed
     remotePatterns: [
-      'lh3.googleusercontent.com',
-      'cdn.sanity.io',
-      'res.cloudinary.com'
+      {
+        hostname: 'lh3.googleusercontent.com',
+      },
+      {
+        hostname: 'cdn.sanity.io',
+      },
+      {
+        hostname: 'res.cloudinary.com',
+      },
     ],
     // Disable unoptimized images
     unoptimized: false,
