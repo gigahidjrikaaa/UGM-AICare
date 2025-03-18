@@ -21,6 +21,7 @@ export interface Message {
 
 export default function ChatInterface({ userId = "guest-user" }: ChatInterfaceProps) {
   const [messages, setMessages] = useState<Message[]>([]);
+  const [selectedModel, setSelectedModel] = useState("together");
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
@@ -64,11 +65,13 @@ export default function ChatInterface({ userId = "guest-user" }: ChatInterfacePr
         user_id: string;
         message: string;
         conversation_id?: string;
+        model?: string;
       }
       
       const payload: ChatPayload = { 
         user_id: userId, // Now using the passed userId
-        message: input 
+        message: input,
+        model: selectedModel
       };
 
       const conversationId = localStorage.getItem('conversation_id');
@@ -143,6 +146,17 @@ export default function ChatInterface({ userId = "guest-user" }: ChatInterfacePr
 
 return (
     <div className="flex flex-col h-full max-h-[calc(100vh-120px)]">
+      <div className="mb-4 p-4">
+        <label className="block text-sm font-medium mb-1">AI Model</label>
+        <select 
+          value={selectedModel}
+          onChange={(e) => setSelectedModel(e.target.value)}
+          className="w-full p-2 bg-white/10 rounded border border-white/20"
+        >
+          <option value="together">Llama 3.3 (Together AI)</option>
+          <option value="gemini">Gemini 1.5 Pro (Google)</option>
+        </select>
+      </div>
       {/* Messages container with fixed height and scrolling */}
       <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-200 scrollbar-track-transparent py-4 px-2 md:px-4 relative">
         {messages.length === 0 ? (
