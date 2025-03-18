@@ -51,7 +51,7 @@ class TogetherLLM(BaseLLM):
     
     @property
     def model_name(self):
-        return self._model
+        return self.model
 
     def chat(self, user_input: str, history: list):
         # Format conversation history for Llama format

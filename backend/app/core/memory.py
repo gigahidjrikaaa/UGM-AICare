@@ -50,3 +50,6 @@ class AikaMemory:
     def clear_memory(user_id: str):
         """ Clear user conversation history """
         redis_client.delete(user_id)
+
+    def __init__(self):
+        self.check_connection()
