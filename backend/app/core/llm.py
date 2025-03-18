@@ -3,13 +3,39 @@ import json
 import logging
 import os
 from dotenv import load_dotenv
+from abc import ABC, abstractmethod
+from google import genai
 
 # Load environment variables from .env file
 load_dotenv()
 
 TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
+GOOGLE_GENAI_API_KEY = os.getenv("GOOGLE_GENAI_API_KEY")
 
-class AikaLLM:
+class BaseLLM(ABC):
+    """Abstract base class for LLM implementations"""
+    
+    @abstractmethod
+    def chat(self, user_input: str, history: list):
+        """Process a chat message with history and return a response"""
+        pass
+    
+    @property
+    @abstractmethod
+    def provider_name(self):
+        """Return the name of the LLM provider"""
+        pass
+    
+    @property
+    @abstractmethod
+    def model_name(self):
+        """Return the name of the specific model being used"""
+        pass
+
+
+class TogetherLLM(BaseLLM):
+    """LLM implementation using the Together AI's API"""
+
     def __init__(self):
         self.api_key = TOGETHER_API_KEY
         self.base_url = "https://api.together.xyz/v1/completions"
@@ -19,6 +45,14 @@ class AikaLLM:
         }
         self.model = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
     
+    @property
+    def provider_name(self):
+        return "Together AI"
+    
+    @property
+    def model_name(self):
+        return self._model
+
     def chat(self, user_input: str, history: list):
         # Format conversation history for Llama format
         formatted_messages = self._format_messages_for_llama(history, user_input)
@@ -90,6 +124,7 @@ class AikaLLM:
     
     def _format_messages_for_llama(self, history: list, user_input: str) -> str:
         """Format the conversation history for Llama 3.3 Instruct format"""
+
         system_prompt = """
         You are Aika, a supportive mental health AI made by Universitas Gadjah Mada. Be empathetic, understanding, and helpful.
         You can think for yourself and have opinions. Never say you are a bot or AI, always say you are Aika, a friend.
@@ -124,6 +159,7 @@ class AikaLLM:
         Clean up formatting tags and remove repeated content from the response.
         If triple newlines are detected, splits into multiple messages.
         """
+
         # Remove formatting tags
         text = text.replace("<|/assistant|>", "").strip()
         
@@ -184,3 +220,69 @@ class AikaLLM:
             return messages
         
         return text.strip()
+    
+#! Add the GeminiLLM class below. Experimental, not yet tested.
+class GeminiLLM(BaseLLM):
+    """LLM implementation using the Google Cloud GenAI API"""
+
+    def __init__(self):
+        self.api_key = GOOGLE_GENAI_API_KEY
+        if not self.api_key:
+            raise ValueError("GOOGLE_GENAI_API_KEY environment variable not set")
+        self.client = genai.Client(api_key=self.api_key)
+        
+    def chat(self, user_input: str, history: list):
+        response = self.client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=user_input
+        )
+        return response.text
+        
+
+class LLMFactory:
+    """Factory class to get the appropriate LLM implementation"""
+    
+    @staticmethod
+    def get_llm(provider: str = "together"):
+        """
+        Get an LLM implementation based on provider name
+        
+        Args:
+            provider: String identifying which LLM provider to use
+                     Options: "together", "gemini"
+        
+        Returns:
+            An instance of a BaseLLM implementation
+        """
+        provider = provider.lower()
+        
+        if provider == "together":
+            return TogetherLLM()
+        elif provider in ["gemini", "google"]:
+            return GeminiLLM()
+        else:
+            logging.warning(f"Unknown provider '{provider}', falling back to Together AI")
+            return TogetherLLM()
+
+# For backwards compatibility, keep the AikaLLM class
+class AikaLLM:
+    """
+    Main LLM interface for Aika
+    Defaults to Together AI but can be configured to use other providers
+    """
+    
+    def __init__(self, provider: str = None):
+        """
+        Initialize Aika LLM with specified provider
+        
+        Args:
+            provider: LLM provider to use (defaults to environment variable or "together")
+        """
+        # Get provider from environment variable or parameter
+        self.provider = provider or os.getenv("AIKA_LLM_PROVIDER", "together")
+        self.llm = LLMFactory.get_llm(self.provider)
+        logging.info(f"Initialized AikaLLM with provider: {self.llm.provider_name} ({self.llm.model_name})")
+    
+    def chat(self, user_input: str, history: list):
+        """Process chat request using the selected LLM"""
+        return self.llm.chat(user_input, history)
