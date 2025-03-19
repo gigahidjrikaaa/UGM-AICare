@@ -25,7 +25,8 @@ export default function AikaChat() {
     name: "Guest User",
     image: null,
     email: "guest@example.com",
-    id: "guest-user"
+    id: "guest-user",
+    role: "user"
   };
   
   useEffect(() => {
