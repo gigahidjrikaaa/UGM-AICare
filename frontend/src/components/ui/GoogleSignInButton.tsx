@@ -1,6 +1,6 @@
 "use client";
 
-import { signIn } from "next-auth/react";
+import { signIn, signOut } from "next-auth/react";
 import { useState } from "react";
 import { FaGoogle } from "react-icons/fa";
 import { FiChevronDown, FiUserPlus } from "react-icons/fi";
@@ -31,9 +31,13 @@ export default function GoogleSignInButton({ className = "" }: GoogleSignInButto
     setIsLoading(true);
     setShowOptions(false);
     try {
+      // Clear any existing authentication state before proceeding
+      await signOut({ redirect: false });
       await signIn("google", { 
         callbackUrl: "/aika",
-        prompt: "select_account" // This is the key parameter that forces account selection
+        authorizationParams: {
+          prompt: "select_account"
+        }
       });
     } catch (error) {
       console.error("Error switching accounts:", error);

@@ -133,6 +133,16 @@ export default function AppointmentsPage() {
     today.setHours(0, 0, 0, 0);
     return date >= today;
   };
+
+  const handleBookAnotherAppointment = () => {
+    setStep(1);
+    setSelectedDate(null);
+    setSelectedTime(null);
+    setSelectedCounselor(null);
+    setSelectedType(null);
+    setNotes("");
+    setSuccess(false);
+  }
   
   const handleSubmit = async () => {
     if (!selectedDate || !selectedTime || !selectedCounselor || !selectedType) {
@@ -151,15 +161,15 @@ export default function AppointmentsPage() {
       setLoading(false);
       
       // Reset form after success
-      setTimeout(() => {
-        setStep(1);
-        setSelectedDate(null);
-        setSelectedTime(null);
-        setSelectedCounselor(null);
-        setSelectedType(null);
-        setNotes("");
-        setSuccess(false);
-      }, 5000);
+    //   setTimeout(() => {
+    //     setStep(1);
+    //     setSelectedDate(null);
+    //     setSelectedTime(null);
+    //     setSelectedCounselor(null);
+    //     setSelectedType(null);
+    //     setNotes("");
+    //     setSuccess(false);
+    //   }, 5000);
       
     } catch (error) {
       console.error("Error booking appointment:", error);
@@ -207,7 +217,7 @@ export default function AppointmentsPage() {
               </button>
             </Link>
             <Link href="/appointments">
-              <button className="px-6 py-3 bg-white/20 text-white rounded-lg font-medium">
+              <button className="px-6 py-3 bg-white/20 text-white rounded-lg font-medium" onClick={handleBookAnotherAppointment}>
                 Book Another Appointment
               </button>
             </Link>

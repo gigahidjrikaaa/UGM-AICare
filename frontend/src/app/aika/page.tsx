@@ -252,7 +252,7 @@ export default function AikaChat() {
                         className={`flex items-center px-4 py-3 rounded-lg ${
                           item.active ? "bg-[#FFCA40]/20 text-[#FFCA40]" : "hover:bg-white/10"
                         } transition-colors`}
-                        href="#"
+                        href={`/${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                       >
                         <span className="mr-3 flex-shrink-0">{item.icon}</span>
                         <span className="truncate">{item.label}</span>
