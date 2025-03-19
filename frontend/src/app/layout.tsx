@@ -38,11 +38,11 @@ export default async function RootLayout({
         className={inter.className}
       >
         <ClientProvider>
+          <div className="flex flex-col min-h-screen">
           <HeaderWrapper />
-          <main className="flex-grow">
             {children}
-          </main>
           <FooterWrapper />
+          </div>
         </ClientProvider>
       </body>
     </html>
