@@ -18,6 +18,23 @@ export default function Home() {
   useEffect(() => {
     setMounted(true);
   }, []);
+
+  // Scrolls so that the animation loads (quick fix)
+  useEffect(() => {
+    if (mounted) {
+      // Scroll to a specific position on page load
+      window.scrollTo({
+        top: 10, // Change this value to scroll to different positions (in pixels)
+        behavior: 'smooth' 
+      });
+      
+      // Alternative: Scroll to a specific element
+      // const targetSection = document.getElementById('section-id');
+      // if (targetSection) {
+      //   targetSection.scrollIntoView({ behavior: 'smooth' });
+      // }
+    }
+  }, [mounted]);
   
   if (!mounted) return null;
 
