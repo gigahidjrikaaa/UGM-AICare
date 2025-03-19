@@ -52,9 +52,8 @@ if %ERRORLEVEL% equ 1 (
     if %ERRORLEVEL% neq 0 (
         echo REDIS_URL not found in .env file.
         echo Adding REDIS_URL to your .env file...
-        echo REDIS_URL=your_redis_connection_string>> "%~dp0backend\.env"
         notepad "%~dp0backend\.env"
-        echo Press any key when you have updated the .env file...
+        echo Press any key when REDIS_URL is in the .env file...
         pause > nul
     ) else (
         echo Found REDIS_URL in .env file.
@@ -92,10 +91,6 @@ if not exist "%~dp0backend\logs" (
     echo. > "%~dp0backend\logs\chat.log"
 )
 
-:: Start the Redis Monitor in its own window
-echo Starting Redis monitor...
-start "Redis Monitor" wsl -d Ubuntu -e bash -c "redis-cli monitor"
-
 :: Start the backend server in one terminal
 echo Starting FastAPI backend server...
 start "UGM-AICare Backend" cmd /k "cd /d "%~dp0backend" && echo Activating virtual environment... && call .venv\Scripts\activate && echo Installing dependencies... && pip install -r requirements.txt && echo Starting FastAPI server... && uvicorn app.main:app --reload --port 8000 && pause"
@@ -113,7 +108,6 @@ timeout /t 2 /nobreak > nul
 
 :: Open browser windows for both services
 echo Opening browser tabs...
-start http://localhost:8000/docs
 start http://localhost:3000
 
 echo ===================================
