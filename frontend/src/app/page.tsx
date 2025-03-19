@@ -95,35 +95,6 @@ export default function Home() {
         </blockquote>
         <p className="text-[#FFCA40] mt-4 font-medium">— UGM Counseling Center</p>
       </div>
-
-      {/* Footer */}
-      <footer className="bg-[#001545] py-12 text-center">
-        <div className="max-w-7xl mx-auto px-4">
-          <div className="flex justify-center mb-6">
-            <Image 
-              src="/UGM_Lambang.png" 
-              alt="UGM Logo" 
-              width={60} 
-              height={60} 
-            />
-          </div>
-          <p className="text-lg text-gray-300 max-w-2xl mx-auto mb-6">
-            Developed by Department of Electrical and Information Engineering (DEIE) of Universitas Gadjah Mada
-          </p>
-          <div className="flex items-center justify-center mb-6">
-            <span className="text-gray-400 mr-2">Built with ❤️ by</span>
-            <Image 
-              src="/UGM_Tipografi.png" 
-              alt="UGM" 
-              width={80} 
-              height={20} 
-              className="opacity-80 bg-white p-1 rounded-sm"
-            />
-            <span className="text-gray-400 ml-2">AICare Team</span>
-          </div>
-          <p className="text-sm text-gray-400">© 2025 Universitas Gadjah Mada. All rights reserved.</p>
-        </div>
-      </footer>
     </main>
   );
 }

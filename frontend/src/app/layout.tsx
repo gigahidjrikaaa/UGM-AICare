@@ -4,6 +4,7 @@ import "./globals.css";
 import { Inter } from 'next/font/google'
 import ClientProvider from "@/components/auth/ClientProvider";
 import HeaderWrapper from "@/components/ui/HeaderWrapper";
+import FooterWrapper from "@/components/ui/FooterWrapper";
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -38,7 +39,10 @@ export default async function RootLayout({
       >
         <ClientProvider>
           <HeaderWrapper />
-          {children}
+          <main className="flex-grow">
+            {children}
+          </main>
+          <FooterWrapper />
         </ClientProvider>
       </body>
     </html>
