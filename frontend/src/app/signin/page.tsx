@@ -32,7 +32,7 @@ export default function SignIn() {
         >
           <div className="flex justify-center mb-6">
             <Image 
-              src="/Aika.png" 
+              src="/aika-avatar.png" 
               alt="Aika" 
               width={100} 
               height={100}
