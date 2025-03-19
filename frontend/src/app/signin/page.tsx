@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import GoogleSignInButton from "@/components/ui/GoogleSignInButton";
 import Image from "next/image";
-import Link from "next/link";
 import { motion } from "framer-motion";
 import ErrorMessage from "../../components/ErrorMessage";
 
@@ -23,20 +22,6 @@ export default function SignIn() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col">
-      {/* Header */}
-      <header className="py-4 px-6 border-b border-white/10">
-        <Link href="/" className="flex items-center">
-          <Image 
-            src="/UGM_Lambang.png" 
-            alt="UGM Logo" 
-            width={40} 
-            height={40} 
-            className="mr-3"
-          />
-          <span className="text-white text-xl font-bold">UGM-AICare</span>
-        </Link>
-      </header>
-
       {/* Content */}
       <div className="flex-1 flex items-center justify-center p-6">
         <motion.div 
