@@ -5,9 +5,11 @@ import Header from "./Header";
 
 export default function HeaderWrapper() {
   const pathname = usePathname();
+
+  const listOfPaths = ['/aika', '/admin/*'];
   
-  // Don't render the header on the Aika chat page
-  if (pathname?.startsWith('/aika')) {
+  // Don't render the header on the listed pages
+  if (listOfPaths.some((path) => pathname?.startsWith(path))) {
     return null;
   }
   

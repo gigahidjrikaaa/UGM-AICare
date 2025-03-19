@@ -1,5 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
+import Credentials from "next-auth/providers/credentials";
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -7,13 +8,63 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
     }),
+
+    // Add a credentials provider for admin login
+    Credentials({
+      id: "admin-login",
+      name: "Admin Credentials",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" }
+      },
+      async authorize(credentials) {
+        if (!credentials?.email || !credentials?.password) {
+          return null;
+        }
+
+        // This is where you'd validate against your admin database
+        // For now, we'll use a simple check with environment variables
+        if (
+          credentials.email === "admin@ugm.ac.id" &&
+          credentials.password === "admin"
+        ) {
+          return {
+            id: "admin",
+            email: credentials.email,
+            name: "Admin User",
+            role: "admin"
+          };
+        }
+
+        // In a real implementation, you'd check your database:
+        // const admin = await db.admin.findUnique({
+        //   where: { email: credentials.email }
+        // });
+        // 
+        // if (admin && await comparePasswords(credentials.password, admin.password)) {
+        //   return {
+        //     id: admin.id,
+        //     email: admin.email,
+        //     name: admin.name,
+        //     role: "admin"
+        //   };
+        // }
+
+        return null;
+      }
+    }),
   ],
   session: {
     strategy: "jwt",
-    maxAge: 30 * 24 * 60 * 60, // 30 days
+    maxAge: 3 * 24 * 60 * 60, // 1 days
   },
   callbacks: {
     async redirect({ url, baseUrl }) {
+      // For admin login, redirect to admin dashboard
+      if (url.startsWith("/api/auth/callback/admin-login")) {
+        return `${baseUrl}/admin/dashboard`;
+      }
+
       // Customize the redirect logic
       if (url.startsWith(baseUrl)) {
         // For absolute URLs within our app
@@ -42,11 +93,16 @@ export const authOptions: NextAuthOptions = {
       if (account && user) {
         token.accessToken = account.access_token;
         token.id = user.id;
+        // Check if role property exists before assigning
+        if ('role' in user) {
+          token.role = (user as { role: string }).role;
+        }
       }
       return token;
     },
   },
   pages: {
     signIn: '/signin',
+    error: '/signin',
   },
 };

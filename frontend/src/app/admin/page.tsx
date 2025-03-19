@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import { FiLock, FiMail, FiAlertCircle } from "react-icons/fi";
+import { signIn } from "next-auth/react";
 
 export default function AdminLogin() {
   const [email, setEmail] = useState("");
@@ -19,32 +20,29 @@ export default function AdminLogin() {
     setError("");
 
     try {
-      // This would be replaced with your actual authentication API
-      const response = await fetch("/api/admin/login", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.message || "Login failed");
+        // Use NextAuth's signIn method with the admin-login provider
+        const result = await signIn("admin-login", {
+          redirect: false,
+          email,
+          password,
+        });
+  
+        if (result?.error) {
+          throw new Error(result.error);
+        }
+  
+        if (result?.url) {
+          router.push("/admin/dashboard");
+        }
+      } catch (error: unknown) {
+        let errorMessage = "Login failed. Please check your credentials.";
+        if (error instanceof Error) {
+          errorMessage = error.message;
+        }
+        setError(errorMessage);
+      } finally {
+        setIsLoading(false);
       }
-
-      // If login successful, redirect to dashboard
-      router.push("/admin/dashboard");
-    } catch (error: unknown) {
-      let errorMessage = "Login failed. Please check your credentials.";
-      if (error instanceof Error) {
-        errorMessage = error.message;
-      }
-      setError(errorMessage);
-    } finally {
-      setIsLoading(false);
-    }
   };
 
   return (

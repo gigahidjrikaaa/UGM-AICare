@@ -10,6 +10,13 @@ export async function middleware(request: NextRequest) {
 
   const pathname = request.nextUrl.pathname;
 
+  // Admin routes protection - require admin role
+  if (pathname.startsWith('/admin/dashboard')) {
+    if (!session || session.role !== "admin") {
+      return NextResponse.redirect(new URL('/admin', request.url));
+    }
+  }
+
   // Redirect authenticated users away from login page
   if (pathname.startsWith('/signin') && session) {
     return NextResponse.redirect(new URL('/aika', request.url));
@@ -25,5 +32,5 @@ export async function middleware(request: NextRequest) {
 
 // See: https://nextjs.org/docs/app/building-your-application/routing/middleware#matcher
 export const config = {
-  matcher: ['/signin', '/aika/:path*'],
+  matcher: ['/admin/dashboard/:path*', '/signin', '/aika/:path*'],
 };
