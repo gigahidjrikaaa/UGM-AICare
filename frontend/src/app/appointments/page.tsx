@@ -3,15 +3,23 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import Image from 'next/image';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { format, addDays, startOfWeek, addWeeks, parseISO } from 'date-fns';
+import { format, addDays, startOfWeek, addWeeks } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { FiCalendar, FiClock, FiUser, FiMapPin, FiChevronLeft, FiChevronRight, FiInfo, FiCheck } from 'react-icons/fi';
 
+// Define type for counselor
+type Counselor = {
+  id: number;
+  name: string;
+  specialization: string;
+  image: string;
+  available: boolean;
+};
+
 // Mock data for counselors
-const counselors = [
+const counselors: Counselor[] = [
   {
     id: 1, 
     name: "Dr. Putri Handayani", 
@@ -51,7 +59,7 @@ const appointmentTypes = [
 ];
 
 // Mock data for available time slots
-const generateTimeSlots = (date) => {
+const generateTimeSlots = (date: string | number | Date) => {
   // Generate different availability based on the day
   const day = new Date(date).getDay();
   
@@ -74,20 +82,21 @@ const generateTimeSlots = (date) => {
     { time: "16:00", available: day !== 5 } // Friday afternoon off
   ];
 };
+  
 
 export default function AppointmentsPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
   const [step, setStep] = useState(1);
-  const [selectedDate, setSelectedDate] = useState(null);
-  const [selectedTime, setSelectedTime] = useState(null);
-  const [selectedCounselor, setSelectedCounselor] = useState(null);
-  const [selectedType, setSelectedType] = useState(null);
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const [selectedTime, setSelectedTime] = useState<{time: string, available: boolean} | null>(null);
+  const [selectedCounselor, setSelectedCounselor] = useState<Counselor | null>(null);
+  const [selectedType, setSelectedType] = useState<{id: number, name: string, duration: number, description: string} | null>(null);
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
-  const [timeSlots, setTimeSlots] = useState([]);
+  const [timeSlots, setTimeSlots] = useState<{ time: string; available: boolean }[]>([]);
   
   // Redirect if not authenticated
   useEffect(() => {
@@ -119,7 +128,7 @@ export default function AppointmentsPage() {
     }
   };
   
-  const isDateSelectable = (date) => {
+  const isDateSelectable = (date: number | Date) => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     return date >= today;
@@ -184,7 +193,7 @@ export default function AppointmentsPage() {
           </div>
           <h2 className="text-2xl font-bold text-white mb-4">Appointment Scheduled!</h2>
           <p className="text-gray-200 mb-6">
-            Your appointment has been successfully booked with {selectedCounselor?.name} on {format(new Date(selectedDate), 'EEEE, d MMMM yyyy', { locale: id })} at {selectedTime?.time}.
+            Your appointment has been successfully booked with {selectedCounselor?.name} on {format(new Date(selectedDate!), 'EEEE, d MMMM yyyy', { locale: id })} at {selectedTime?.time}.
           </p>
           <div className="bg-white/5 border border-white/10 rounded-lg p-4 mb-6 text-left">
             <p className="text-sm text-gray-300 mb-1"><strong>Appointment Type:</strong> {selectedType?.name}</p>
@@ -218,7 +227,7 @@ export default function AppointmentsPage() {
         <div className="text-center mb-10">
           <h1 className="text-3xl font-bold text-white">Schedule an Appointment</h1>
           <p className="text-gray-300 mt-2 max-w-xl mx-auto">
-            Book a session with Gadjah Mada Medical Center's psychological services team
+            Book a session with Gadjah Mada Medical Center&apos;s psychological services team
           </p>
         </div>
         
@@ -487,7 +496,7 @@ export default function AppointmentsPage() {
                     <FiCalendar className="text-[#FFCA40] mr-3 mt-1 flex-shrink-0" />
                     <div>
                       <p className="text-white">
-                        {format(new Date(selectedDate), 'EEEE, d MMMM yyyy', { locale: id })}
+                        {selectedDate && format(new Date(selectedDate), 'EEEE, d MMMM yyyy', { locale: id })}
                       </p>
                       <p className="text-sm text-gray-300">
                         {selectedTime?.time} WIB
