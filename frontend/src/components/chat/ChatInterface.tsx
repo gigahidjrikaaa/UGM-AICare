@@ -151,7 +151,7 @@ return (
         <select 
           value={selectedModel}
           onChange={(e) => setSelectedModel(e.target.value)}
-          className="w-full p-2 bg-white/10 rounded border border-white/20 text-black"
+          className="w-full p-2 bg-white/10 rounded border border-white/20 focus:border-white/40 focus:outline-none"
         >
           <option value="together">Llama 3.3 (Together AI)</option>
           <option value="gemini">Gemini 1.5 Pro (Google)</option>
