@@ -22,20 +22,20 @@ async def chat_with_aika(request: ChatRequest):
     response = llm.chat(request.message, history, request.model)
 
     # Save the user message to memory
-    # AikaMemory.save_memory(request.user_id, request.message)
+    AikaMemory.save_memory(request.user_id, request.message)
 
     # Save the conversation (both user message and system response)
-    AikaMemory.save_memory(
-        request.user_id, 
-        {"role": "user", "content": request.message},
-        request.conversation_id
-    )
+    # AikaMemory.save_memory(
+    #     request.user_id, 
+    #     {"role": "user", "content": request.message},
+    #     request.conversation_id
+    # )
     
-    # Also save assistant response
-    AikaMemory.save_memory(
-        request.user_id, 
-        {"role": "assistant", "content": response},
-        request.conversation_id
-    )
+    # # Also save assistant response
+    # AikaMemory.save_memory(
+    #     request.user_id, 
+    #     {"role": "assistant", "content": response},
+    #     request.conversation_id
+    # )
 
     return {"response": response}
