@@ -6,7 +6,7 @@ import re
 from typing import Union, List, Dict, Any, Optional
 from abc import ABC, abstractmethod
 from dotenv import load_dotenv
-from google import genai
+from google.generativeai import genai
 
 # Load environment variables from .env file
 load_dotenv()
@@ -234,7 +234,8 @@ class GeminiLLM(BaseLLM):
         self.api_key = GOOGLE_GENAI_API_KEY
         if not self.api_key:
             raise ValueError("GOOGLE_GENAI_API_KEY environment variable not set")
-        self.client = genai.Client(api_key=self.api_key)
+        # self.client = genai.Client(api_key=self.api_key)
+        genai.set_api_key(api_key=self.api_key)
         self.default_model = "gemini-2.0-flash"
     
     @property
