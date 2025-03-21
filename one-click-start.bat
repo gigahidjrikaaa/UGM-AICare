@@ -52,7 +52,6 @@ if %ERRORLEVEL% equ 1 (
     if %ERRORLEVEL% neq 0 (
         echo REDIS_URL not found in .env file.
         echo Adding REDIS_URL to your .env file...
-        notepad "%~dp0backend\.env"
         echo Press any key when REDIS_URL is in the .env file...
         pause > nul
     ) else (
