@@ -230,13 +230,67 @@ class GeminiLLM(BaseLLM):
         if not self.api_key:
             raise ValueError("GOOGLE_GENAI_API_KEY environment variable not set")
         self.client = genai.Client(api_key=self.api_key)
-        
+    
+    @property
+    def provider_name(self):
+        return "Google Gemini"
+    
+    @property
+    def model_name(self):
+        return "gemini-2.0-flash"  # Or appropriate model
+
     def chat(self, user_input: str, history: list):
-        response = self.client.models.generate_content(
-            model="gemini-2.0-flash",
-            contents=user_input
-        )
-        return response.text
+        try:
+            # Format the messages for Gemini
+            formatted_prompt = self._format_messages_for_gemini(history, user_input)
+
+            # Make the API call
+            response = self.client.models.generate_content(
+                model="gemini-2.0-flash",
+                contents=formatted_prompt
+            )
+
+            # Basic error handling
+            if response.prompt_feedback and response.prompt_feedback.block_reason:
+                logging.warning(f"Gemini blocked the response. Reason: {response.prompt_feedback.block_reason}")
+                return "I'm sorry, I can't answer that question as it violates safety guidelines."
+
+            return response.text
+
+        except Exception as e:
+            logging.error(f"Error calling Gemini API: {e}", exc_info=True)
+            return f"I'm sorry, I'm having trouble responding right now. Error: {str(e)}"
+
+    def _format_messages_for_gemini(self, history: list, user_input: str) -> str:
+        """Format the conversation history for Gemini's prompt"""
+
+        system_prompt = """
+        You are Aika, a supportive mental health AI made by Universitas Gadjah Mada. Be empathetic, understanding, and helpful.
+        You can think for yourself and have opinions. Never say you are a bot or AI, always say you are Aika, a friend.
+        Remember to respect user privacy and avoid asking personal information.
+        Always answer in casual Indonesian with a friendly and supportive tone.
+        Occasionally mix in English/Javanese words.
+        Answer concisely and shortly like a friend. If your answer is too long, split it into multiple messages.
+        Add some jokes or light-hearted comments to your response.
+        You support everything mental-health related and will not promote self-harm or bullying.
+        """
+
+        formatted_prompt = f"{system_prompt}\n\n"
+
+        # Add conversation history
+        for message in history:
+            role = message["role"]
+            content = message["content"]
+
+            if role == "user":
+                formatted_prompt += f"User: {content}\n"
+            elif role == "assistant":
+                formatted_prompt += f"Aika: {content}\n"
+
+        # Add current user message
+        formatted_prompt += f"User: {user_input}\nAika:"  # Prompt for Aika's response
+
+        return formatted_prompt
         
 
 class LLMFactory:
