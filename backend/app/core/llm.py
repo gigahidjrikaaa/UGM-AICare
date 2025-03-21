@@ -53,12 +53,19 @@ class TogetherLLM(BaseLLM):
     def model_name(self):
         return self.model
 
-    def chat(self, user_input: str, history: list):
+    def chat(self, user_input: str, history: list, model_override: str = None):
+        """
+        Process a chat message with history and return a response using Together AI (Llama 3.3)
+        Optionally override the model used for the request
+        """
+        # Use model override if provided
+        used_model = model_override if model_override else self.model
+
         # Format conversation history for Llama format
         formatted_messages = self._format_messages_for_llama(history, user_input)
         
         payload = {
-            "model": self.model,
+            "model": used_model,
             "prompt": formatted_messages,
             "max_tokens": 1024,
             "temperature": 0.7,
@@ -239,14 +246,21 @@ class GeminiLLM(BaseLLM):
     def model_name(self):
         return "gemini-2.0-flash"  # Or appropriate model
 
-    def chat(self, user_input: str, history: list):
+    def chat(self, user_input: str, history: list, model_override: str = None):
+        """
+        Process a chat message with history and return a response using Gemini
+        Optionally override the model used for the request
+        """
+
         try:
+            used_model = model_override if model_override else "gemini-2.0-flash"
+
             # Format the messages for Gemini
             formatted_prompt = self._format_messages_for_gemini(history, user_input)
 
             # Make the API call
             response = self.client.models.generate_content(
-                model="gemini-2.0-flash",
+                model=used_model,
                 contents=formatted_prompt
             )
 
@@ -318,7 +332,8 @@ class LLMFactory:
             logging.warning(f"Unknown provider '{provider}', falling back to Together AI")
             return TogetherLLM()
 
-# For backwards compatibility, keep the AikaLLM class
+# Add to the end of the file, replacing the current AikaLLM class:
+
 class AikaLLM:
     """
     Main LLM interface for Aika
@@ -337,6 +352,31 @@ class AikaLLM:
         self.llm = LLMFactory.get_llm(self.provider)
         logging.info(f"Initialized AikaLLM with provider: {self.llm.provider_name} ({self.llm.model_name})")
     
-    def chat(self, user_input: str, history: list):
-        """Process chat request using the selected LLM"""
+    def chat(self, user_input: str, history: list, model: str = None):
+        """Process chat request using the selected LLM with optional model override
+        
+        Args:
+            user_input: The user's message
+            history: Conversation history
+            model: Optional model parameter to override default
+            
+        Returns:
+            String response from the LLM
+        """
+        # If model is specified, get the appropriate LLM
+        if model:
+            # Model string can be either a full provider name or a shorthand
+            if model.lower() in ["gemini", "google"]:
+                temp_llm = GeminiLLM()
+            elif model.lower() in ["together", "llama"]:
+                temp_llm = TogetherLLM()
+            else:
+                # Use the default LLM but log a warning
+                logging.warning(f"Unknown model '{model}', using default {self.llm.provider_name}")
+                temp_llm = self.llm
+                
+            # Use the temporary LLM for this request
+            return temp_llm.chat(user_input, history)
+        
+        # Use the default LLM
         return self.llm.chat(user_input, history)
