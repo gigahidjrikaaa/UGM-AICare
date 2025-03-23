@@ -1,9 +1,13 @@
+import logging
 from fastapi import APIRouter, Depends
 from app.core.llm import AikaLLM
 from app.core.memory import AikaMemory
 from pydantic import BaseModel
 
 router = APIRouter()
+
+logger = logging.getLogger(__name__)
+
 # Initialize LLM without a specific provider - it will use the default or env var
 llm = AikaLLM()
 
@@ -15,11 +19,13 @@ class ChatRequest(BaseModel):
 
 @router.post("/")
 async def chat_with_aika(request: ChatRequest):
+    logger.info(f"Received chat request with model: {request.model}")
+    
     # Get conversation history from memory
     history = AikaMemory.get_memory(request.user_id)
 
     # Request a response from the LLM
-    response = llm.chat(request.message, history, request.model)
+    response = llm.chat(request.message, history, model=request.model)
 
     # Save the user message to memory
     AikaMemory.save_memory(request.user_id, request.message)

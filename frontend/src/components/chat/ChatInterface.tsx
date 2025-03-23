@@ -156,7 +156,6 @@ return (
           <option value="together">Llama 3.3 (Together AI)</option>
           <option value="gemini">Gemini 1.5 Pro (Google)</option>
         </select>
-        <label className="block text-sm font-medium mt-4 mb-1">Current Model: {selectedModel} </label>
       </div>
       {/* Messages container with fixed height and scrolling */}
       <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-200 scrollbar-track-transparent py-4 px-2 md:px-4 relative">

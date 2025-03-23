@@ -6,7 +6,7 @@ import re
 from typing import Union, List, Dict, Any, Optional
 from abc import ABC, abstractmethod
 from dotenv import load_dotenv
-from google.generativeai import genai
+import google.generativeai as genai
 
 # Load environment variables from .env file
 load_dotenv()
@@ -66,6 +66,7 @@ class TogetherLLM(BaseLLM):
             "Content-Type": "application/json"
         }
         self.default_model = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
+        logging.info(f"Initialized Together AI with model: {self.default_model}")
     
     @property
     def provider_name(self) -> str:
@@ -235,8 +236,10 @@ class GeminiLLM(BaseLLM):
         if not self.api_key:
             raise ValueError("GOOGLE_GENAI_API_KEY environment variable not set")
         # self.client = genai.Client(api_key=self.api_key)
-        genai.set_api_key(api_key=self.api_key)
+        genai.configure(api_key=self.api_key)
         self.default_model = "gemini-2.0-flash"
+        self.model = genai.GenerativeModel(self.default_model)  # Initialize the default model
+        logging.info(f"Initialized Gemini with model: {self.default_model}")
     
     @property
     def provider_name(self) -> str:
@@ -262,18 +265,23 @@ class GeminiLLM(BaseLLM):
             used_model = model_override if model_override else self.default_model
             logging.info(f"Using Gemini model: {used_model}")
 
-            # Format the messages for Gemini
-            formatted_prompt = self._format_messages_for_gemini(history, user_input)
+            if used_model != self.default_model:
+                #  Handle model override.  Crucially, we create a *new* model object.
+                self.model = genai.GenerativeModel(used_model)
 
-            # Make the API call
-            response = self.client.models.generate_content(
-                model=used_model,
-                contents=formatted_prompt
-            )
+            logging.info(f"Using Gemini model: {used_model}")
 
-            # Check for safety blocks
-            if response.prompt_feedback and response.prompt_feedback.block_reason:
-                logging.warning(f"Gemini blocked the response. Reason: {response.prompt_feedback.block_reason}")
+            # Format the conversation history correctly for the chat interface
+            chat_history = self._format_messages_for_gemini(history)
+
+            # Start a chat session
+            chat_session = self.model.start_chat(history=chat_history)
+
+            # Send the user's message and get the response
+            response = chat_session.send_message(user_input)
+
+            if chat_session.last and chat_session.last.prompt_feedback.block_reason:
+                logging.warning(f"Gemini blocked the response. Reason: {chat_session.last.prompt_feedback.block_reason}")
                 return "I'm sorry, I can't answer that question as it violates safety guidelines."
 
             return response.text
@@ -282,24 +290,24 @@ class GeminiLLM(BaseLLM):
             logging.error(f"Error calling Gemini API: {e}", exc_info=True)
             return "I'm sorry, I'm having trouble responding right now. Please try again later."
 
-    def _format_messages_for_gemini(self, history: List[MessageType], user_input: str) -> str:
-        """Format the conversation history for Gemini's prompt"""
-        formatted_prompt = f"{AIKA_SYSTEM_PROMPT}\n\n"
+    def _format_messages_for_gemini(self, history: List[MessageType]) -> List[Dict[str, str]]:
+        """
+        Formats the conversation history for Gemini's chat interface.  The
+        google.generativeai library expects a list of dictionaries with 'role'
+        and 'parts' keys.  'parts' should contain a list of strings (even
+        if there's only one string).  The system prompt goes *outside* the
+        history.
+        """
 
-        # Add conversation history
+        formatted_history = []
         for message in history:
-            role = message["role"]
-            content = message["content"]
-
+            role = message['role']
+            #  Crucially, Gemini's roles are 'user' and 'model', *not* 'assistant'.
             if role == "user":
-                formatted_prompt += f"User: {content}\n"
+                formatted_history.append({"role": "user", "parts": [message['content']]})
             elif role == "assistant":
-                formatted_prompt += f"Aika: {content}\n"
-
-        # Add current user message
-        formatted_prompt += f"User: {user_input}\nAika:"
-
-        return formatted_prompt
+                formatted_history.append({"role": "model", "parts": [message['content']]})
+        return formatted_history
 
 
 class LLMFactory:
@@ -346,7 +354,7 @@ class AikaLLM:
         self.llm = LLMFactory.get_llm(self.provider)
         logging.info(f"Initialized AikaLLM with provider: {self.llm.provider_name} ({self.llm.model_name})")
     
-    def chat(self, user_input: str, history: List[MessageType], model: Optional[str] = None) -> str:
+    def chat(self, user_input: str, history: list, model: str = None) -> str:
         """
         Process chat request using the selected LLM with optional model override
         
@@ -358,16 +366,21 @@ class AikaLLM:
         Returns:
             String response from the LLM
         """
-        if not model:
+        # If no model specified or it matches the current provider, use the default
+        if not model or (model.lower() in ["together", "llama"] and self.provider == "together") or \
+                        (model.lower() in ["gemini", "google"] and self.provider == "gemini"):
             return self.llm.chat(user_input, history)
-            
-        # If model is specified, select the appropriate provider
+        
+        # If model specifies a different provider, create a new instance for this request
+        logging.info(f"Switching providers based on model parameter: {model}")
+        
         if model.lower() in ["gemini", "google"]:
-            llm = GeminiLLM()
+            temp_llm = GeminiLLM()
+            return temp_llm.chat(user_input, history)
         elif model.lower() in ["together", "llama"]:
-            llm = TogetherLLM()
+            temp_llm = TogetherLLM()
+            return temp_llm.chat(user_input, history)
         else:
+            # Unknown model - use the default provider but log a warning
             logging.warning(f"Unknown model '{model}', using default {self.llm.provider_name}")
-            llm = self.llm
-            
-        return llm.chat(user_input, history)
+            return self.llm.chat(user_input, history)
