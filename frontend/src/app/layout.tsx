@@ -5,6 +5,8 @@ import { Inter } from 'next/font/google'
 import ClientProvider from "@/components/auth/ClientProvider";
 import HeaderWrapper from "@/components/ui/HeaderWrapper";
 import FooterWrapper from "@/components/ui/FooterWrapper";
+import { Suspense } from "react";
+import GlobalSkeleton from "@/components/ui/GlobalSkeleton";
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -40,7 +42,9 @@ export default async function RootLayout({
         <ClientProvider>
           <div className="flex flex-col min-h-screen">
           <HeaderWrapper />
+            <Suspense fallback={<GlobalSkeleton />}>
             {children}
+            </Suspense>
           <FooterWrapper />
           </div>
         </ClientProvider>
