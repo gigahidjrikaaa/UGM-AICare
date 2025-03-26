@@ -16,22 +16,7 @@ export default function NotFound() {
   if (!mounted) return null;
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] flex flex-col">
-      {/* Header */}
-      <header className="py-4 px-6 border-b border-white/10">
-        <Link href="/" className="flex items-center">
-          <Image 
-            src="/UGM_Lambang.png" 
-            alt="UGM Logo" 
-            width={40} 
-            height={40} 
-            className="mr-3"
-            priority
-          />
-          <span className="text-white text-xl font-bold">UGM-AICare</span>
-        </Link>
-      </header>
-      
+    <main className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] flex flex-col">      
       {/* Content */}
       <div className="flex-1 flex items-center justify-center p-4">
         <div className="max-w-md w-full">
