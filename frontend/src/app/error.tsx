@@ -80,11 +80,6 @@ export default function NotFound() {
           </p>
         </div>
       </div>
-      
-      {/* Footer */}
-      <footer className="py-4 px-6 text-center border-t border-white/10">
-        <p className="text-sm text-gray-400">© 2025 Universitas Gadjah Mada. All rights reserved.</p>
-      </footer>
     </main>
   );
 }
