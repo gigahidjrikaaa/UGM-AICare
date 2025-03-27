@@ -23,6 +23,7 @@ type LLMProviderOption = 'togetherai' | 'gemini';
 interface ChatRequestPayload {
   history: Array<{ role: string; content: string }>;
   provider: LLMProviderOption;
+  system_prompt?: string; // Add system_prompt if needed
   // Optional params can be added if needed (model, max_tokens, etc.)
   // model?: string;
 }
@@ -39,6 +40,12 @@ interface ChatInterfaceProps {
   userId?: string; // Keep prop if needed elsewhere, but not used in API call now
 }
 
+const AIKA_SYSTEM_PROMPT = `You are Aika, a compassionate and supportive AI assistant from UGM-AICare. 
+Your personality is warm, empathetic, and understanding. 
+Your primary goal is to provide a safe space for users to express their feelings and concerns related to mental well-being. 
+Listen attentively, validate their emotions, and offer supportive and encouraging responses. 
+Avoid giving direct medical advice, diagnoses, or prescribing treatments. Instead, gently guide users towards seeking professional help when appropriate. 
+Keep responses concise but meaningful. Use supportive language. Respond in the language the user uses (detect if possible, otherwise default to Indonesian or English based on context).`;
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 export default function ChatInterface({ userId: _userId = "guest-user" }: ChatInterfaceProps) {
@@ -87,11 +94,14 @@ export default function ChatInterface({ userId: _userId = "guest-user" }: ChatIn
       timestamp: new Date()
     };
 
-    // 2. Create the history to be sent, including the new user message
-    const currentHistory = [...messages, userMessage];
+    // 2. Create history *without* system prompt messages for display state
+    const currentDisplayHistory = [...messages, userMessage];
+    setMessages(currentDisplayHistory);
+    
+    // Prepare history for backend (strip timestamps if needed, backend ignores them)
+    const historyForBackend = currentDisplayHistory.map(({ role, content }) => ({ role, content }));
 
     // 3. Update UI immediately with the user's message for responsiveness
-    setMessages(currentHistory);
     setInput(''); // Clear input field
     setIsLoading(true);
     setError(null); // Clear previous errors
@@ -103,8 +113,9 @@ export default function ChatInterface({ userId: _userId = "guest-user" }: ChatIn
 
       // 5. Create the payload matching the new backend API
       const payload: ChatRequestPayload = {
-        history: currentHistory, // Send the full history ending with user message
-        provider: selectedProvider // Send selected provider
+        history: historyForBackend, // Send the full history ending with user message
+        provider: selectedProvider, // Send selected provider
+        system_prompt: AIKA_SYSTEM_PROMPT, // Add system_prompt if needed
         // user_id and conversation_id are no longer sent
       };
 
@@ -125,7 +136,6 @@ export default function ChatInterface({ userId: _userId = "guest-user" }: ChatIn
         timestamp: msg.timestamp || new Date() // Use existing timestamp or create new one
       }));
       setMessages(historyWithTimestamps);
-      setMessages(response.data.history);
 
     } catch (error) {
       console.error('Error sending message:', error);
@@ -174,8 +184,9 @@ export default function ChatInterface({ userId: _userId = "guest-user" }: ChatIn
   const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedProvider(e.target.value as LLMProviderOption);
     // Optional: Clear chat or notify user when provider changes
-    // setMessages([{ role: 'assistant', content: `Switched provider. How can I help?` }]);
-    // inputRef.current?.focus();
+    setMessages([{ role: 'assistant', content: `Switched provider. How can I help?`, timestamp: new Date() }]);
+    // Focus input after provider change for quick follow-up 
+    inputRef.current?.focus();
   };
 
 
