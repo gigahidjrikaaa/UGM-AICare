@@ -7,13 +7,15 @@ export const authOptions: NextAuthOptions = {
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
-      authorization: {
-        params: {
-          // This prevents NextAuth from using a cached token
-          // prompt: "consent",
-          // access_type: "offline",
-          // response_type: "code"
-        }
+      profile(profile) {
+        return {
+          id: profile.sub,
+          email: profile.email,
+          name: profile.name,
+          image: profile.picture,
+          sub: profile.sub,
+          role: "user" // Default role for Google users
+        };
       }
     }),
 
@@ -91,7 +93,7 @@ export const authOptions: NextAuthOptions = {
     },
     async session({ session, token }) {
       // Add user ID to session from token
-      if (session?.user) {
+      if (session?.user && token.id) {
         session.user.id = token.sub as string;
       }
       return session;

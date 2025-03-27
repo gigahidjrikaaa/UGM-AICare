@@ -6,6 +6,8 @@ import MessageBubble from './MessageBubble'; // Ensure this component now expect
 import axios from 'axios';
 import { FiSend } from 'react-icons/fi';
 import { BiMicrophone } from 'react-icons/bi';
+import { useSession } from 'next-auth/react';
+import { v4 as uuidv4 } from 'uuid';
 
 // --- Type Definitions ---
 
@@ -38,8 +40,14 @@ interface ChatResponsePayload {
   history: Message[]; // The full updated history
 }
 
-interface ChatInterfaceProps {
-  userId?: string; // Keep prop if needed elsewhere, but not used in API call now
+// Helper function for hashing (as provided before)
+async function hashIdentifier(identifier: string): Promise<string> {
+  const encoder = new TextEncoder();
+  const data = encoder.encode(identifier);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  const hashArray = Array.from(new Uint8Array(hashBuffer)); 
+  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  return hashHex;
 }
 
 const AIKA_SYSTEM_PROMPT = `You are Aika, a compassionate and supportive AI assistant from UGM-AICare. 
@@ -49,8 +57,9 @@ Listen attentively, validate their emotions, and offer supportive and encouragin
 Avoid giving direct medical advice, diagnoses, or prescribing treatments. Instead, gently guide users towards seeking professional help when appropriate. 
 Keep responses concise but meaningful. Use supportive language. Respond in the language the user uses (detect if possible, otherwise default to Indonesian or English based on context).`;
 
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export default function ChatInterface({ userId: _userId = "guest-user" }: ChatInterfaceProps) {
+export default function ChatInterface() {
+const { data: session, status } = useSession(); // Use session from next-auth
+
   // Use the simplified Message type for state
   const [messages, setMessages] = useState<Message[]>([]);
   // State for provider selection - use backend expected values
@@ -58,6 +67,8 @@ export default function ChatInterface({ userId: _userId = "guest-user" }: ChatIn
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null); // Add error state for display
+  const [sessionId, setSessionId] = useState<string | null>(null); // Session ID 
+  const [hashedUserId, setHashedUserId] = useState<string | null>(null); // Hashed user ID
 
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
   const inputRef = useRef<null | HTMLTextAreaElement>(null);
@@ -71,6 +82,46 @@ export default function ChatInterface({ userId: _userId = "guest-user" }: ChatIn
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Generate session ID
+  useEffect(() => {
+    // Generate session ID once on mount
+    setSessionId(uuidv4()); 
+    inputRef.current?.focus();
+  }, []);
+
+  // --- Hashing User ID ---
+  // Hash the user ID when the session is available and authenticated
+  useEffect(() => {
+    // Hash the user ID when the session is available and authenticated
+    const processSession = async () => {
+       // Ensure session exists, user object exists, and potentially the 'sub' or 'id' field
+      if (status === "authenticated" && session?.user) {
+        // --- IMPORTANT: Check where next-auth stores the Google 'sub' ---
+        // Option 1: Often stored in session.user.id by default configuration
+        // Option 2: Sometimes available directly as session.sub (if customized)
+        // Option 3: Might be in session.user.providerAccountId (less common for Google sub)
+        
+        const googleSub = session.user.id; // TRY THIS FIRST - Adjust if your config is different
+
+        if (googleSub) {
+          const hash = await hashIdentifier(googleSub);
+          setHashedUserId(hash);
+          console.log("Hashed User ID:", hash); // For debugging
+        } else {
+          console.error("Could not find Google 'sub' identifier in session:", session);
+          // Handle error - maybe user didn't log in with Google?
+          setError("Could not identify user account."); 
+        }
+      } else if (status === "unauthenticated") {
+         // Handle case where user is not logged in - maybe redirect or disable chat?
+         console.log("User is not authenticated.");
+         // setHashedUserId("guest-hash"); // Or handle guest users differently
+      }
+    };
+
+    processSession();
+  }, [session, status]); // Re-run when session or status changes
 
   //! Enable if using welcome message from Aika. Further UX is needed
   // Add welcome message on mount
@@ -87,7 +138,13 @@ export default function ChatInterface({ userId: _userId = "guest-user" }: ChatIn
   const handleSubmit = useCallback(async (e?: React.FormEvent) => { // Make event optional for direct calls
     if (e) e.preventDefault(); // Prevent default form submission if event exists
     const trimmedInput = input.trim();
-    if (!trimmedInput || isLoading) return;
+    // --- Add checks for sessionID and hashedUserId ---
+    if (!trimmedInput || isLoading || !sessionId || !hashedUserId) {
+      if (!sessionId || !hashedUserId) {
+          setError("Cannot send message: User session not fully initialized.");
+      }
+      return; 
+   }
 
     // 1. Create the user message in the new format
     const userMessage: Message = {
@@ -115,8 +172,8 @@ export default function ChatInterface({ userId: _userId = "guest-user" }: ChatIn
 
       // 5. Create the payload matching the new backend API
       const payload: ChatRequestPayload = {
-        user_identifier: _userId, // Optional user ID if needed
-        session_id: undefined, // Optional session ID if needed
+        user_identifier: hashedUserId, // Optional user ID if needed
+        session_id: sessionId, // Optional session ID if needed
         history: historyForBackend, // Send the full history ending with user message
         provider: selectedProvider, // Send selected provider
         system_prompt: AIKA_SYSTEM_PROMPT, // Add system_prompt if needed
@@ -165,7 +222,7 @@ export default function ChatInterface({ userId: _userId = "guest-user" }: ChatIn
       // Ensure input is focused after response/error for quick follow-up
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [input, isLoading, messages, selectedProvider]); // Added dependencies for useCallback
+  }, [input, isLoading, messages, selectedProvider, sessionId, hashedUserId]); // Added dependencies for useCallback
 
 
   // --- Input Handling ---
@@ -192,6 +249,11 @@ export default function ChatInterface({ userId: _userId = "guest-user" }: ChatIn
     // Focus input after provider change for quick follow-up 
     inputRef.current?.focus();
   };
+
+  // --- Render Loading State for Authentication ---
+  if (status === "loading") {
+    return <div className="flex justify-center items-center h-full">Loading session...</div>; 
+  }
 
 
 // --- UI Rendering (Your Existing JSX) ---
