@@ -205,7 +205,7 @@ return (
         >
           {/* Ensure values match backend expectations */}
           <option value="togetherai">Llama 3 (Together AI)</option>
-          <option value="gemini">Gemini 1.5 Flash (Google)</option>
+          <option value="gemini">Gemini 2.0 Flash (Google)</option>
           {/* You can add more specific model options later if backend supports model override */}
         </select>
       </div>

@@ -72,11 +72,6 @@ export default function NotFound() {
               </div>
             </div>
           </motion.div>
-          
-          {/* Footer Note */}
-          <p className="text-center text-white/60 text-sm mt-6">
-            Need help? Contact <a href="mailto:support@ugm-aicare.com" className="text-[#FFCA40] hover:underline">support@ugm-aicare.com</a>
-          </p>
         </div>
       </div>
     </main>
