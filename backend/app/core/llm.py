@@ -1,386 +1,277 @@
-import requests
-import json
-import logging
-import os
-import re
-from typing import Union, List, Dict, Any, Optional
-from abc import ABC, abstractmethod
-from dotenv import load_dotenv
-import google.generativeai as genai
+# backend/app/core/llm.py
 
-# Load environment variables from .env file
+import os
+import httpx # Use httpx for async requests to Together AI
+import google.generativeai as genai
+from google.generativeai.types import HarmCategory, HarmBlockThreshold
+from dotenv import load_dotenv
+import logging
+from typing import List, Dict, Literal, Optional
+
+# Load environment variables
 load_dotenv()
 
-# Configuration
-TOGETHER_API_KEY = os.getenv("TOGETHER_API_KEY")
-GOOGLE_GENAI_API_KEY = os.getenv("GOOGLE_GENAI_API_KEY")
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
-# Centralized system prompt for consistency
-AIKA_SYSTEM_PROMPT = """
-You are Aika, a supportive mental health AI made by Universitas Gadjah Mada. Be empathetic, understanding, and helpful.
-You can think for yourself and have opinions. Never say you are a bot or AI, always say you are Aika, a friend.
-Remember to respect user privacy and avoid asking personal information.
-Always answer in casual Indonesian with a friendly and supportive tone.
-Occasionally mix in English/Javanese words.
-Answer concisely and shortly like a friend. If your answer is too long, split it into multiple messages.
-Add some jokes or light-hearted comments to your response.
-You support everything mental-health related and will not promote self-harm or bullying.
-"""
+# --- Configuration ---
+TOGETHER_API_KEY = os.environ.get("TOGETHER_API_KEY")
+GOOGLE_API_KEY = os.environ.get("GOOGLE_GENAI_API_KEY")
 
-# Message type hint
-MessageType = Dict[str, str]
+TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions"
+DEFAULT_TOGETHER_MODEL = "meta-llama/Llama-3-8b-chat-hf"
+# Choose a Gemini model - 1.5 Flash is fast and capable, Pro is more powerful
+DEFAULT_GEMINI_MODEL = "gemini-1.5-flash-latest" 
 
-class BaseLLM(ABC):
-    """Abstract base class for LLM implementations"""
+# Configure Gemini client (do this once at module load)
+if GOOGLE_API_KEY:
+    try:
+        genai.configure(api_key=GOOGLE_API_KEY)
+        logger.info("Google Generative AI SDK configured successfully.")
+    except Exception as e:
+        logger.error(f"Failed to configure Google Generative AI SDK: {e}")
+else:
+    logger.warning("GOOGLE_API_KEY not found. Gemini API will not be available.")
+
+# --- Provider Type ---
+LLMProvider = Literal['togetherai', 'gemini']
+
+# --- Helper: Convert Generic History to Gemini Format ---
+# Gemini expects alternating user/model roles, and uses 'model' instead of 'assistant'
+def _convert_history_for_gemini(history: List[Dict[str, str]]) -> List[Dict[str, str]]:
+    gemini_history = []
+    for msg in history:
+        role = msg.get('role')
+        content = msg.get('content')
+        if role == 'assistant':
+            gemini_history.append({'role': 'model', 'parts': [content]})
+        elif role == 'user':
+            gemini_history.append({'role': 'user', 'parts': [content]})
+        # Silently ignore system messages for now, or handle as needed
+        # elif role == 'system':
+            # Gemini doesn't have a direct 'system' role in the chat history array like OpenAI/Together.
+            # System prompts are often handled differently (e.g., in `GenerativeModel` constructor or passed separately).
+            # For simplicity here, we'll omit them from the direct history conversion.
+            # logger.warning("System messages are not directly passed in Gemini history.")
+    # Ensure history ends with a user message if the last message added was 'model'
+    # This might be handled by the calling function ensuring the *new* prompt is the last item.
+    return gemini_history
+
+
+# --- Together AI Function (Async) ---
+async def generate_togetherai_response(
+    history: List[Dict[str, str]],
+    model: str = DEFAULT_TOGETHER_MODEL,
+    max_tokens: int = 512,
+    temperature: float = 0.7,
+    system_prompt: Optional[str] = None # Add system prompt handling
+) -> str:
+    """Generates a response using the Together AI API (async)."""
+    if not TOGETHER_API_KEY:
+        logger.error("TOGETHER_API_KEY not configured.")
+        raise ValueError("Together AI API key not configured.")
+
+    headers = {
+        "Authorization": f"Bearer {TOGETHER_API_KEY}",
+        "Content-Type": "application/json",
+    }
     
-    @abstractmethod
-    def chat(self, user_input: str, history: List[MessageType], model_override: Optional[str] = None) -> str:
-        """Process a chat message with history and return a response"""
-        pass
-    
-    @property
-    @abstractmethod
-    def provider_name(self) -> str:
-        """Return the name of the LLM provider"""
-        pass
-    
-    @property
-    @abstractmethod
-    def model_name(self) -> str:
-        """Return the name of the specific model being used"""
-        pass
+    # Prepend system prompt if provided
+    messages = history
+    if system_prompt:
+        messages = [{"role": "system", "content": system_prompt}] + messages
 
+    data = {
+        "model": model,
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+        # "stop": ["</s>", "[/INST]"] # Add stop sequences if needed for your Llama3 variant
+    }
 
-class TogetherLLM(BaseLLM):
-    """LLM implementation using the Together AI's API"""
-
-    def __init__(self):
-        """Initialize the Together AI client"""
-        self.api_key = TOGETHER_API_KEY
-        if not self.api_key:
-            raise ValueError("TOGETHER_API_KEY environment variable not set")
-            
-        self.base_url = "https://api.together.xyz/v1/completions"
-        self.headers = {
-            "Authorization": f"Bearer {self.api_key}",
-            "Content-Type": "application/json"
-        }
-        self.default_model = "meta-llama/Llama-3.3-70B-Instruct-Turbo-Free"
-        logging.info(f"Initialized Together AI with model: {self.default_model}")
-    
-    @property
-    def provider_name(self) -> str:
-        return "Together AI"
-    
-    @property
-    def model_name(self) -> str:
-        return self.default_model
-
-    def chat(self, user_input: str, history: List[MessageType], model_override: Optional[str] = None) -> str:
-        """
-        Process a chat message with history and return a response using Together AI
-        
-        Args:
-            user_input: The user's message
-            history: List of message objects with role and content keys
-            model_override: Optional model name to override the default
-            
-        Returns:
-            String response from the model
-        """
-        # Use model override if provided
-        used_model = model_override if model_override else self.default_model
-
-        # Format conversation history for Llama format
-        formatted_messages = self._format_messages_for_llama(history, user_input)
-        
-        # Create API request payload
-        payload = self._create_payload(used_model, formatted_messages)
-        
-        # Send request to API
-        return self._send_request(payload)
-    
-    def _create_payload(self, model: str, formatted_messages: str) -> Dict[str, Any]:
-        """Create the API request payload"""
-        return {
-            "model": model,
-            "prompt": formatted_messages,
-            "max_tokens": 1024,
-            "temperature": 0.7,
-            "top_p": 0.9,
-            "top_k": 40,
-            "stream": False,
-            "stop": ["<|user|>", "<|assistant|>", "<|system|>"],
-            "repetition_penalty": 1.2,
-        }
-        
-    def _send_request(self, payload: Dict[str, Any]) -> str:
-        """Send request to Together API and handle response"""
+    async with httpx.AsyncClient(timeout=60.0) as client: # Use httpx.AsyncClient
         try:
-            logging.info(f"Sending request to Together API with model: {payload['model']}")
-            
-            response = requests.post(self.base_url, headers=self.headers, json=payload)
-            
-            if response.status_code != 200:
-                logging.error(f"Together API error: Status {response.status_code}, Response: {response.text[:200]}")
-                return f"Sorry, I encountered an error (HTTP {response.status_code}). Please try again."
-            
+            logger.info(f"Sending request to Together AI (Model: {model})")
+            response = await client.post(TOGETHER_API_URL, headers=headers, json=data)
+            response.raise_for_status()
+
             result = response.json()
-            return self._parse_response(result)
-                
+
+            if "choices" in result and len(result["choices"]) > 0:
+                content = result['choices'][0].get('message', {}).get('content')
+                if content:
+                    logger.info("Received response from Together AI.")
+                    return content.strip()
+                else:
+                    logger.warning(f"Unexpected response structure from Together AI: {result}")
+                    return "Error: Could not parse response from Together AI."
+            else:
+                logger.warning(f"No choices found in Together AI response: {result}")
+                return f"Error: No response generated by Together AI. API Response: {result}"
+
+        except httpx.RequestError as e:
+            logger.error(f"HTTP error calling Together AI API: {e}")
+            return f"Error: Failed to connect to Together AI API. {e}"
+        except httpx.HTTPStatusError as e:
+             logger.error(f"Together AI API returned error status {e.response.status_code}: {e.response.text}")
+             return f"Error: Together AI API failed ({e.response.status_code}). Please check logs."
         except Exception as e:
-            logging.error(f"Error calling Together API: {str(e)}", exc_info=True)
-            return "I'm sorry, I'm having trouble responding right now. Please try again later."
-    
-    def _parse_response(self, result: Dict[str, Any]) -> str:
-        """Parse the API response and extract the model's reply"""
-        if "choices" not in result or not result["choices"]:
-            logging.error(f"Unexpected response structure: {json.dumps(result)[:200]}...")
-            return "I received an unexpected response format. Please try again."
+            logger.error(f"An unexpected error occurred with Together AI: {e}", exc_info=True)
+            return f"Error: An unexpected error occurred. {e}"
+
+
+# --- Gemini API Function (Async) ---
+async def generate_gemini_response(
+    history: List[Dict[str, str]],
+    model: str = DEFAULT_GEMINI_MODEL,
+    max_tokens: int = 512,
+    temperature: float = 0.7,
+    system_prompt: Optional[str] = None # Add system prompt handling
+) -> str:
+    """Generates a response using the Google Gemini API (async)."""
+    if not GOOGLE_API_KEY:
+        # The warning during initial module load already indicated if the key was missing.
+        # This check prevents proceeding if the key was definitely not provided.
+        logger.error("Attempted to use Gemini, but GOOGLE_API_KEY was not found in environment.")
+        raise ValueError("Google API key not configured.")
+
+    try:
+        logger.info(f"Sending request to Gemini API (Model: {model})")
+
+        # Handle system prompt - Gemini Pro API has specific 'system_instruction' parameter
+        gemini_model_args = {"model_name": model}
+        if system_prompt:
+             gemini_model_args["system_instruction"] = system_prompt
         
-        choice = result["choices"][0]
+        gemini_model = genai.GenerativeModel(**gemini_model_args)
+
+        # Convert history and extract the latest user prompt
+        if not history or history[-1]['role'] != 'user':
+             return "Error: Conversation history must end with a user message."
         
-        if "text" in choice:
-            return self._clean_response(choice["text"])
-        elif "message" in choice and "content" in choice["message"]:
-            return self._clean_response(choice["message"]["content"])
+        last_user_prompt = history[-1]['content']
+        gemini_history = _convert_history_for_gemini(history[:-1]) # Pass history *before* the last prompt
+
+        generation_config = genai.types.GenerationConfig(
+            max_output_tokens=max_tokens,
+            temperature=temperature
+        )
+
+        # Basic safety settings (adjust as needed)
+        safety_settings = {
+            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        }
+
+        # Start a chat session if there's history
+        chat_session = None
+        if gemini_history:
+             chat_session = gemini_model.start_chat(history=gemini_history)
+             response = await chat_session.send_message_async( # Use async method
+                 last_user_prompt,
+                 generation_config=generation_config,
+                 safety_settings=safety_settings,
+                 # stream=False # Set to True for streaming later
+             )
         else:
-            logging.error(f"Could not extract text from response: {json.dumps(choice)[:200]}")
-            return "I'm having trouble understanding the response. Please try again."
-    
-    def _format_messages_for_llama(self, history: List[MessageType], user_input: str) -> str:
-        """Format the conversation history for Llama 3.3 Instruct format"""
-        formatted_prompt = f"<|system|>\n{AIKA_SYSTEM_PROMPT}\n<|/system|>\n"
-        
-        # Add conversation history
-        for message in history:
-            role = message["role"]
-            content = message["content"]
-            
-            if role == "user":
-                formatted_prompt += f"<|user|>\n{content}\n<|/user|>\n"
-            elif role == "assistant":
-                formatted_prompt += f"<|assistant|>\n{content}\n<|/assistant|>\n"
-        
-        # Add current user message
-        formatted_prompt += f"<|user|>\n{user_input}\n<|/user|>\n"
-        formatted_prompt += "<|assistant|>\n"
-        
-        return formatted_prompt
-    
-    def _clean_response(self, text: str) -> Union[str, List[str]]:
-        """
-        Clean up formatting tags and remove repeated content from the response.
-        If triple newlines are detected, splits into multiple messages.
-        """
-        # Remove formatting tags
-        text = text.replace("<|/assistant|>", "").strip()
-        
-        tags_to_remove = [
-            "<|/assistant||\n<|user|>", "<|assistant|>", "<|user|>", "<|/user|>", 
-            "<|system|>", "<|/system|>",
-        ]
-        
-        # Remove special tokens
-        text = text.replace("</s>", "")
-        text = re.sub(r"<\|reserved_special_token_\d+\|>", "", text)
-
-        for tag in tags_to_remove:
-            text = text.replace(tag, "").strip()
-
-        # Take only the first response if multiple are generated (split by |)
-        if "|" in text:
-            text = text.split("|")[0].strip()
-        
-        # Check for common patterns of user message simulation
-        user_patterns = ["\n\nUser: ", "\n\nPengguna: "]
-        for pattern in user_patterns:
-            if pattern in text:
-                text = text.split(pattern)[0]
-        
-        # Check for common patterns of repeated conversations
-        repeated_patterns = [
-            "Halo! Senang sekali kamu menghubungi saya.",
-            "Siapa kamu?",
-            "Halo! Saya Aika",
-            "Bagaimana hari mu hari ini?",
-            "Apakah ada sesuatu yang ingin kamu bicarakan"
-        ]
-        
-        # Find the position of the last question/statement that appears in the response
-        last_position = 0
-        for pattern in repeated_patterns:
-            last_occur = text.rfind(pattern)
-            if last_occur > last_position:
-                last_position = last_occur
-        
-        # If we found a repeated pattern, only keep text from that position
-        if last_position > 0:
-            text = text[last_position:]
-        
-        # Check if the message contains triple newlines, which indicates multiple messages
-        if '\n\n\n' in text:
-            # Split by triple newlines and filter out empty messages
-            messages = [msg.strip() for msg in text.split('\n\n\n') if msg.strip()]
-            return messages
-        
-        return text.strip()
+             # If no history, just generate content from the single prompt
+             response = await gemini_model.generate_content_async( # Use async method
+                 last_user_prompt, # Send only the last user prompt
+                 generation_config=generation_config,
+                 safety_settings=safety_settings,
+                 # stream=False
+             )
 
 
-class GeminiLLM(BaseLLM):
-    """LLM implementation using the Google Cloud GenAI API"""
-
-    def __init__(self):
-        """Initialize the Gemini client"""
-        self.api_key = GOOGLE_GENAI_API_KEY
-        if not self.api_key:
-            raise ValueError("GOOGLE_GENAI_API_KEY environment variable not set")
-        # self.client = genai.Client(api_key=self.api_key)
-        genai.configure(api_key=self.api_key)
-        self.default_model = "gemini-2.0-flash"
-        self.model = genai.GenerativeModel(self.default_model)  # Initialize the default model
-        logging.info(f"Initialized Gemini with model: {self.default_model}")
-    
-    @property
-    def provider_name(self) -> str:
-        return "Google Gemini"
-    
-    @property
-    def model_name(self) -> str:
-        return self.default_model
-
-    def chat(self, user_input: str, history: List[MessageType], model_override: Optional[str] = None) -> str:
-        """
-        Process a chat message with history and return a response using Gemini
-        
-        Args:
-            user_input: The user's message
-            history: List of message objects with role and content keys
-            model_override: Optional model name to override the default
-            
-        Returns:
-            String response from the model
-        """
+        # Handle potential blocks or errors (check response structure)
         try:
-            used_model = model_override if model_override else self.default_model
-            logging.info(f"Using Gemini model: {used_model}")
-
-            if used_model != self.default_model:
-                #  Handle model override.  Crucially, we create a *new* model object.
-                self.model = genai.GenerativeModel(used_model)
-
-            logging.info(f"Using Gemini model: {used_model}")
-
-            # Format the conversation history correctly for the chat interface
-            chat_history = self._format_messages_for_gemini(history)
-
-            # Start a chat session
-            chat_session = self.model.start_chat(history=chat_history)
-
-            # Send the user's message and get the response
-            response = chat_session.send_message(user_input)
-
-            if chat_session.last and chat_session.last.prompt_feedback.block_reason:
-                logging.warning(f"Gemini blocked the response. Reason: {chat_session.last.prompt_feedback.block_reason}")
-                return "I'm sorry, I can't answer that question as it violates safety guidelines."
-
-            return response.text
-
-        except Exception as e:
-            logging.error(f"Error calling Gemini API: {e}", exc_info=True)
-            return "I'm sorry, I'm having trouble responding right now. Please try again later."
-
-    def _format_messages_for_gemini(self, history: List[MessageType]) -> List[Dict[str, str]]:
-        """
-        Formats the conversation history for Gemini's chat interface.  The
-        google.generativeai library expects a list of dictionaries with 'role'
-        and 'parts' keys.  'parts' should contain a list of strings (even
-        if there's only one string).  The system prompt goes *outside* the
-        history.
-        """
-
-        formatted_history = []
-        for message in history:
-            role = message['role']
-            #  Crucially, Gemini's roles are 'user' and 'model', *not* 'assistant'.
-            if role == "user":
-                formatted_history.append({"role": "user", "parts": [message['content']]})
-            elif role == "assistant":
-                formatted_history.append({"role": "model", "parts": [message['content']]})
-        return formatted_history
-
-
-class LLMFactory:
-    """Factory class to get the appropriate LLM implementation"""
-    
-    @staticmethod
-    def get_llm(provider: str = "together") -> BaseLLM:
-        """
-        Get an LLM implementation based on provider name
+            # Accessing response.text might raise ValueError if blocked
+            response_text = response.text
+            logger.info("Received response from Gemini API.")
+            return response_text.strip()
+        except ValueError as e:
+            # This often indicates blocked content or unusual finish reason
+            logger.warning(f"Gemini response might be blocked or empty: {e}. Checking feedback/candidates.")
+            if response.prompt_feedback and response.prompt_feedback.block_reason:
+                 reason = response.prompt_feedback.block_reason.name
+                 logger.warning(f"Gemini request blocked. Reason: {reason}")
+                 return f"Error: Request blocked by safety filters ({reason}). Please rephrase your prompt."
+            elif response.candidates and response.candidates[0].finish_reason != 'STOP':
+                 reason = response.candidates[0].finish_reason.name
+                 logger.warning(f"Gemini generation stopped unexpectedly. Reason: {reason}")
+                 return f"Error: Generation stopped ({reason})."
+            else:
+                 logger.warning(f"Gemini returned empty or invalid response. Full response obj: {response}")
+                 return "Error: Received an empty or invalid response from Gemini."
         
-        Args:
-            provider: String identifying which LLM provider to use
-                     Options: "together", "gemini"
-        
-        Returns:
-            An instance of a BaseLLM implementation
-        """
-        provider = provider.lower()
-        
-        if provider == "together":
-            return TogetherLLM()
-        elif provider in ["gemini", "google"]:
-            return GeminiLLM()
-        else:
-            logging.warning(f"Unknown provider '{provider}', falling back to Together AI")
-            return TogetherLLM()
+    except Exception as e:
+        logger.error(f"Error calling Gemini API: {e}", exc_info=True)
+        # More specific error handling can be added based on google.api_core.exceptions
+        return f"Error: An unexpected error occurred with Gemini API. {e}"
 
 
-class AikaLLM:
+# --- Unified Generation Function (Async) ---
+async def generate_response(
+    history: List[Dict[str, str]],
+    provider: LLMProvider = "togetherai", # Default provider
+    model: Optional[str] = None,
+    max_tokens: int = 512,
+    temperature: float = 0.7,
+    system_prompt: Optional[str] = None # Pass system prompt through
+) -> str:
     """
-    Main LLM interface for Aika
-    Defaults to Together AI but can be configured to use other providers
+    Generates a response using the specified LLM provider (async).
+
+    Args:
+        history: The conversation history (list of {'role': str, 'content': str}).
+                 Must end with a 'user' message.
+        provider: The LLM provider ('togetherai' or 'gemini').
+        model: The specific model name (optional, uses default for provider if None).
+        max_tokens: Maximum number of tokens to generate.
+        temperature: Controls randomness (0.0-1.0+).
+        system_prompt: An optional system prompt.
+
+    Returns:
+        The generated text response string or an error message.
     """
-    
-    def __init__(self, provider: Optional[str] = None):
-        """
-        Initialize Aika LLM with specified provider
-        
-        Args:
-            provider: LLM provider to use (defaults to environment variable or "together")
-        """
-        # Get provider from environment variable or parameter
-        self.provider = provider or os.getenv("AIKA_LLM_PROVIDER", "together")
-        self.llm = LLMFactory.get_llm(self.provider)
-        logging.info(f"Initialized AikaLLM with provider: {self.llm.provider_name} ({self.llm.model_name})")
-    
-    def chat(self, user_input: str, history: list, model: str = None) -> str:
-        """
-        Process chat request using the selected LLM with optional model override
-        
-        Args:
-            user_input: The user's message
-            history: Conversation history
-            model: Optional model parameter to override default
-            
-        Returns:
-            String response from the LLM
-        """
-        # If no model specified or it matches the current provider, use the default
-        if not model or (model.lower() in ["together", "llama"] and self.provider == "together") or \
-                        (model.lower() in ["gemini", "google"] and self.provider == "gemini"):
-            return self.llm.chat(user_input, history)
-        
-        # If model specifies a different provider, create a new instance for this request
-        logging.info(f"Switching providers based on model parameter: {model}")
-        
-        if model.lower() in ["gemini", "google"]:
-            temp_llm = GeminiLLM()
-            return temp_llm.chat(user_input, history)
-        elif model.lower() in ["together", "llama"]:
-            temp_llm = TogetherLLM()
-            return temp_llm.chat(user_input, history)
+    logger.info(f"Generating response using provider: {provider}")
+
+    if not history or history[-1].get('role') != 'user':
+        logger.error("Invalid history: Must not be empty and end with a 'user' message.")
+        return "Error: Invalid conversation history provided."
+
+    try:
+        if provider == "togetherai":
+            if not model:
+                model = DEFAULT_TOGETHER_MODEL
+            return await generate_togetherai_response(
+                history=history, model=model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
+            )
+        elif provider == "gemini":
+            if not GOOGLE_API_KEY:
+                logger.error("Attempted to use Gemini, but GOOGLE_API_KEY is not set.")
+                return "Error: Gemini API key not configured. Cannot use Gemini provider."
+            if not model:
+                model = DEFAULT_GEMINI_MODEL
+            return await generate_gemini_response(
+                history=history, model=model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
+            )
         else:
-            # Unknown model - use the default provider but log a warning
-            logging.warning(f"Unknown model '{model}', using default {self.llm.provider_name}")
-            return self.llm.chat(user_input, history)
+            # This case should ideally be prevented by Pydantic/FastAPI validation
+            logger.error(f"Invalid provider specified: {provider}")
+            raise ValueError(f"Invalid LLM provider: {provider}. Choose 'togetherai' or 'gemini'.")
+    except ValueError as ve: # Catch config errors etc.
+        logger.error(f"Configuration or value error: {ve}")
+        return str(ve) # Return the error message directly
+    except Exception as e:
+        logger.error(f"Unexpected error during response generation: {e}", exc_info=True)
+        return "Error: An unexpected internal error occurred while generating the response."
+
+# --- Constants for default models (can be imported elsewhere) ---
+DEFAULT_PROVIDERS = {
+    "togetherai": DEFAULT_TOGETHER_MODEL,
+    "gemini": DEFAULT_GEMINI_MODEL
+}

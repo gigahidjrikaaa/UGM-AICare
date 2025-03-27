@@ -306,9 +306,9 @@ export default function AikaChat() {
             
           </motion.div>
 
-          {/* Main chat component - Now with user ID */}
+          {/* Main chat component */}
           <div className="flex-1 overflow-hidden bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 shadow-lg mb-4 mt-2 z-10">
-            <ChatInterface userId={user.id ?? user.email ?? undefined} />
+            <ChatInterface />
           </div>
 
           {/* Footer credit */}

@@ -1,13 +1,9 @@
 import json
 import logging
 from fastapi import FastAPI
-from pydantic import BaseModel
 from datetime import datetime
-from app.core.llm import AikaLLM
-from app.core.memory import AikaMemory
 from app.database import init_db
 from app.routes import email, docs, chat
-from typing import List, Optional, Union
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
@@ -23,24 +19,37 @@ log_dir = "logs" if os.getenv("APP_ENV") != "production" else "/tmp/logs"
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, "chat.log")
 
-if not os.path.exists(log_file) and os.getenv("APP_ENV") != "production":
-    with open(log_file, "w") as f:
-        f.write(f"Log file created at {datetime.now()}\n")
-    
+# Simplified log file existence check for clarity
+if os.getenv("APP_ENV") != "production" and not os.path.exists(log_file):
+    try:
+        with open(log_file, "w") as f:
+            f.write(f"Log file created at {datetime.now()}\n")
+    except IOError as e:
+        print(f"Warning: Could not create log file {log_file}: {e}") # Use print/stderr for early errors
+
+log_config = {
+    "level": logging.INFO,
+    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+}
+
+# Configure file logging only if not in production OR if specifically needed
 if os.getenv("APP_ENV") != "production":
-    # Add a console handler in development
-    console_handler = logging.StreamHandler()
-    console_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-    logging.getLogger().addHandler(console_handler)
+     log_config["filename"] = log_file
+     log_config["filemode"] = "a" # Append mode
 
-logging.basicConfig(
-    filename=log_file if os.getenv("APP_ENV") != "production" else None,
-    level=logging.INFO,
-    format="%(asctime)s - %(levelname)s - %(message)s",
+logging.basicConfig(**log_config)
+logger = logging.getLogger(__name__) # Get a logger for main.py itself
+
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+logging.getLogger().addHandler(console_handler) # Add to root logger
+logging.getLogger().setLevel(logging.INFO) # Ensure root logger level is set
+
+app = FastAPI(
+    title="Aika Chatbot API", 
+    description="API for the UGM-AICare application, supporting multiple LLM providers.",
+    version="0.1"
 )
-
-app = FastAPI(title="Aika Chatbot API", version="0.1")
-llm = AikaLLM()
 
 # Add CORS middleware
 origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
@@ -52,25 +61,12 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Register the email router
-app.include_router(email.router)
+logger.info("Including API routers...")
 
-# Register the docs router
-app.include_router(docs.router)
-
-# Register the chat router
-app.include_router(chat.router, prefix="/chat", tags=["chat"])
-
-# Data Models
-class ChatRequest(BaseModel):
-    user_id: str
-    message: str
-    conversation_id: Optional[str] = None
-    model: Optional[str] = None  # Add optional model parameter
-
-class ChatResponse(BaseModel):
-    response: Union[str, List[str]]
-    error: Optional[str] = None
+app.include_router(email.router, prefix="/api/v1", tags=["Email"]) # Added prefix/tag consistency
+app.include_router(docs.router, prefix="/api/v1", tags=["Documents"]) # Added prefix/tag consistency
+app.include_router(chat.router, prefix="/api/v1", tags=["Chat"]) # Use /api/v1 prefix
+logger.info(f"Chat router included at prefix: /api/v1")
 
 @app.get("/")
 async def root():
