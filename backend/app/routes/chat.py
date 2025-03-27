@@ -220,21 +220,27 @@ async def summarize_and_save(db: Session, user_id: int, session_id_to_summarize:
     """Fetches history, calls LLM to summarize, and saves to UserSummary table."""
     llm.logger.info(f"Background Task: Starting summarization for user {user_id}, session {session_id_to_summarize}")
     try:
-        # 1. Retrieve conversation history for the session to summarize
+        # 1. Retrieve conversation history (same as before)
         conversation_history = db.query(Conversation)\
             .filter(Conversation.session_id == session_id_to_summarize, Conversation.user_id == user_id)\
             .order_by(Conversation.timestamp.asc())\
             .all()
 
-        if not conversation_history or len(conversation_history) < 2: # Don't summarize very short/empty chats
+        if not conversation_history or len(conversation_history) < 2: 
              llm.logger.info(f"Background Task: Skipping summarization for session {session_id_to_summarize} (too short/no history).")
              return
 
-        # 2. Format history for LLM
-        # Consider filtering out previous summaries if they were injected as system messages
-        formatted_history = "\n".join([f"{msg.role}: {msg.message if msg.role == 'user' else msg.response}" for msg in conversation_history])
+        # 2. Format history for LLM - CORRECTED LOGIC
+        history_lines = []
+        for turn in conversation_history:
+            # Add the user message associated with this turn
+            history_lines.append(f"user: {turn.message}") 
+            # Add the assistant response associated with this turn
+            history_lines.append(f"assistant: {turn.response}") 
+            
+        formatted_history = "\n".join(history_lines)
 
-        # 3. Create the summarization prompt
+        # 3. Create the summarization prompt (same as before)
         summarization_prompt = f"""Please summarize the key points, user's expressed feelings, and main topics discussed in the following conversation history. Focus on aspects relevant to mental well-being for UGM-AICare users. Be concise.
 
 Conversation:
@@ -242,11 +248,11 @@ Conversation:
 
 Summary:"""
 
-        # 4. Call the LLM
+        # 4. Call the LLM (same as before)
         summary_llm_history = [{"role": "user", "content": summarization_prompt}]
         summary_text = await llm.generate_response(
              history=summary_llm_history, 
-             provider="gemini", # Or your preferred model
+             provider="gemini", 
              max_tokens=250, 
              temperature=0.5 
         )
@@ -254,24 +260,26 @@ Summary:"""
         if summary_text.startswith("Error:"):
              raise Exception(f"LLM Error: {summary_text}")
 
-        # 5. Save the summary
-        # Check if a summary for this exact user/session already exists to prevent duplicates (optional)
-        existing_summary = db.query(UserSummary).filter(UserSummary.user_id == user_id, UserSummary.summary_text.like(f"%Session {session_id_to_summarize}%")).first() # Example check
-        if existing_summary:
-             llm.logger.info(f"Background Task: Summary already likely exists for session {session_id_to_summarize}. Skipping save.")
-             return
-
+        # 5. Save the summary (same as before, maybe adjust the text slightly)
         new_summary = UserSummary(
             user_id=user_id,
-            # Add session ID to summary text for context? Optional.
-            summary_text=f"(Summary for session {session_id_to_summarize}): {summary_text.strip()}" 
+            summary_text=summary_text.strip() # Removed the session ID prefix for clarity, but you can add it back if desired
         )
         db.add(new_summary)
-        db.commit() # Commit within the background task requires careful session management or a separate session
-        llm.logger.info(f"Background Task: Saved summary for user {user_id}, session {session_id_to_summarize}")
+        # Careful with commit/session management in background tasks - see previous note
+        try:
+             db.commit()
+             llm.logger.info(f"Background Task: Saved summary for user {user_id} from session {session_id_to_summarize}")
+        except Exception as commit_exc:
+             db.rollback()
+             llm.logger.error(f"Background Task: DB Commit Error saving summary: {commit_exc}", exc_info=True)
+             raise # Re-raise the commit error
+
 
     except Exception as e:
-        db.rollback() # Rollback on error
+        # db.rollback() # Rollback might happen automatically depending on session scope
         llm.logger.error(f"Background Task: Failed to summarize session {session_id_to_summarize} for user {user_id}: {e}", exc_info=True)
     finally:
-        db.close() # Ensure the session used by the background task is closed
+        # Ensure session is closed if this task manages its own session
+        # db.close() # Uncomment if needed based on your session management strategy
+        pass 
