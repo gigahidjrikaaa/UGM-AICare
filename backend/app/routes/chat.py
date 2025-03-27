@@ -1,6 +1,8 @@
 # backend/app/routes/chat.py
 
-from fastapi import APIRouter, HTTPException, Body, Depends # type: ignore # Added Depends
+from sqlalchemy.orm import Session # Import Session
+import hashlib # Import hashlib
+from fastapi import APIRouter, HTTPException, Body, Depends, status # type: ignore # Added Depends
 from pydantic import BaseModel, Field, validator
 from typing import List, Dict, Optional, Literal
 
@@ -61,6 +63,29 @@ class ChatResponse(BaseModel):
     model_used: str = Field(..., description="The specific model that generated the response")
     history: List[Dict[str, str]] = Field(..., description="The updated conversation history")
 
+# --- Helper Function for User Lookup/Creation ---
+def get_or_create_user(db: Session, identifier: str) -> User:
+    """Finds a user by hashed identifier or creates a new one."""
+    hashed_id = hashlib.sha256(identifier.encode()).hexdigest()
+    user = db.query(User).filter(User.hashed_identifier == hashed_id).first()
+    if not user:
+        # User not found, create a new one
+        llm.logger.info(f"Creating new user record for identifier hash: {hashed_id[:8]}...") # Log first 8 chars of hash for privacy
+        user = User()
+        user.set_hashed_identifier(identifier) # Use the method to hash and set
+        # You might want to populate other fields like email if identifier is email
+        # if "@" in identifier: # Basic check
+        #    user.email = identifier
+        db.add(user)
+        try:
+            db.commit()
+            db.refresh(user)
+            llm.logger.info(f"Successfully created user with DB ID: {user.id}")
+        except Exception as e:
+            db.rollback()
+            llm.logger.error(f"Database error creating user: {e}", exc_info=True)
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create user record.")
+    return user
 
 # --- API Endpoint (Async) ---
 # Add dependencies=[Depends(get_current_user)] if you have authentication
