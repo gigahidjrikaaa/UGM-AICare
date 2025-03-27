@@ -2,8 +2,8 @@
 
 import os
 import httpx # Use httpx for async requests to Together AI
-import google.generativeai as genai
-from google.generativeai.types import HarmCategory, HarmBlockThreshold
+import google.generativeai as genai # type: ignore
+from google.generativeai.types import HarmCategory, HarmBlockThreshold # type: ignore
 from dotenv import load_dotenv
 import logging
 from typing import List, Dict, Literal, Optional
@@ -21,7 +21,7 @@ GOOGLE_API_KEY = os.environ.get("GOOGLE_GENAI_API_KEY")
 
 TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions"
 DEFAULT_TOGETHER_MODEL = "meta-llama/Llama-3-8b-chat-hf"
-# Choose a Gemini model - 1.5 Flash is fast and capable, Pro is more powerful
+# Choose a Gemini model - 2.0 Flash is fast and capable, Pro is more powerful
 DEFAULT_GEMINI_MODEL = "gemini-2.0-flash" 
 
 # Configure Gemini client (do this once at module load)
