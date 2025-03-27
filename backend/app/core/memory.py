@@ -1,4 +1,4 @@
-import redis
+import redis # type: ignore
 import json
 import os
 

@@ -21,6 +21,8 @@ type LLMProviderOption = 'togetherai' | 'gemini';
 
 // Type for the backend request payload
 interface ChatRequestPayload {
+  user_identifier?: string; // Optional user ID if needed
+  session_id?: string; // Optional session ID if needed
   history: Array<{ role: string; content: string }>;
   provider: LLMProviderOption;
   system_prompt?: string; // Add system_prompt if needed
@@ -113,6 +115,8 @@ export default function ChatInterface({ userId: _userId = "guest-user" }: ChatIn
 
       // 5. Create the payload matching the new backend API
       const payload: ChatRequestPayload = {
+        user_identifier: _userId, // Optional user ID if needed
+        session_id: undefined, // Optional session ID if needed
         history: historyForBackend, // Send the full history ending with user message
         provider: selectedProvider, // Send selected provider
         system_prompt: AIKA_SYSTEM_PROMPT, // Add system_prompt if needed
