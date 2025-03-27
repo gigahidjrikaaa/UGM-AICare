@@ -184,7 +184,7 @@ export default function ChatInterface({ userId: _userId = "guest-user" }: ChatIn
   const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     setSelectedProvider(e.target.value as LLMProviderOption);
     // Optional: Clear chat or notify user when provider changes
-    setMessages([{ role: 'assistant', content: `Switched provider. How can I help?`, timestamp: new Date() }]);
+    // setMessages([{ role: 'assistant', content: `Switched provider. How can I help?`, timestamp: new Date() }]);
     // Focus input after provider change for quick follow-up 
     inputRef.current?.focus();
   };

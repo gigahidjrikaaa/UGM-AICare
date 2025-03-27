@@ -22,7 +22,7 @@ GOOGLE_API_KEY = os.environ.get("GOOGLE_GENAI_API_KEY")
 TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions"
 DEFAULT_TOGETHER_MODEL = "meta-llama/Llama-3-8b-chat-hf"
 # Choose a Gemini model - 1.5 Flash is fast and capable, Pro is more powerful
-DEFAULT_GEMINI_MODEL = "gemini-1.5-flash-latest" 
+DEFAULT_GEMINI_MODEL = "gemini-2.0-flash" 
 
 # Configure Gemini client (do this once at module load)
 if GOOGLE_API_KEY:
