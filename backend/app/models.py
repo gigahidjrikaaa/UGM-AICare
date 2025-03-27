@@ -110,3 +110,26 @@ class Tweet(Base):
     sentiment_score = Column(Float, default=0.0)
     created_at = Column(DateTime, default=datetime.now)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+class Feedback(Base):
+    __tablename__ = "feedback"
+
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Optional: Link feedback to a user for context
+    # If provided, allows analyzing feedback based on user history (use with care for privacy)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True) 
+    
+    # Optional: Link feedback to a specific chat session for context
+    session_id = Column(String, nullable=True, index=True) 
+    
+    # --- Feedback Data ---
+    rating = Column(Integer, nullable=True) # e.g., 1-5 stars
+    comment = Column(Text, nullable=False)   # The main feedback text (make it mandatory)
+    category = Column(String, nullable=True) # e.g., 'bug_report', 'suggestion', 'positive_feedback', 'ui_ux'
+    page_context = Column(String, nullable=True) # Optional: Which page/feature the feedback relates to
+    
+    timestamp = Column(DateTime, default=datetime.now, nullable=False)
+
+    # Optional relationship back to User
+    user = relationship("User") 
