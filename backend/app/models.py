@@ -42,6 +42,16 @@ class Conversation(Base):
 # Removed incorrect relationship assignment outside the class definition
 # User.conversations = relationship("Conversation", back_populates="user") # This should be inside User or handled by back_populates
 
+class UserSummary(Base):
+    __tablename__ = "user_summaries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True) # Link to the User
+    summary_text = Column(Text, nullable=False) # The actual summary content
+    timestamp = Column(DateTime, default=datetime.now, nullable=False) # When the summary was created
+
+    user = relationship("User") # Relationship to User (optional but good practice)
+
 # Email
 class EmailTemplate(Base):
     __tablename__ = "email_templates"
