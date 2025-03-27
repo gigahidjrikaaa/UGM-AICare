@@ -64,19 +64,16 @@ class ChatResponse(BaseModel):
     model_used: str = Field(..., description="The specific model that generated the response")
     history: List[Dict[str, str]] = Field(..., description="The updated conversation history")
 
-# --- Helper Function for User Lookup/Creation ---
-def get_or_create_user(db: Session, identifier: str) -> User:
+# Simplified backend get_or_create_user - now receives the already-hashed ID
+def get_or_create_user(db: Session, received_hashed_identifier: str) -> User:
     """Finds a user by hashed identifier or creates a new one."""
-    hashed_id = hashlib.sha256(identifier.encode()).hexdigest()
-    user = db.query(User).filter(User.hashed_identifier == hashed_id).first()
+    user = db.query(User).filter(User.hashed_identifier == received_hashed_identifier).first()
     if not user:
         # User not found, create a new one
-        llm.logger.info(f"Creating new user record for identifier hash: {hashed_id[:8]}...") # Log first 8 chars of hash for privacy
-        user = User()
-        user.set_hashed_identifier(identifier) # Use the method to hash and set
-        # You might want to populate other fields like email if identifier is email
-        # if "@" in identifier: # Basic check
-        #    user.email = identifier
+        llm.logger.info(f"Creating new user record for identifier hash: {received_hashed_identifier[:8]}...") 
+        user = User(hashed_identifier=received_hashed_identifier) # Store the hash directly
+        # Potentially fetch email/name from Google token *if* frontend sends it securely, 
+        # but avoid storing if not necessary for functionality.
         db.add(user)
         try:
             db.commit()
