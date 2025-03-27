@@ -9,7 +9,7 @@ from datetime import datetime # Import datetime
 
 # Adjust import based on your project structure
 from app.database import get_db
-from app.models import User, Conversation # Import User and Conversation models
+from app.models import User, Conversation, UserSummary # Import User and Conversation models
 from app.core import llm
 from app.core.llm import LLMProvider # Import the type hint
 
@@ -107,13 +107,35 @@ async def handle_chat_request(
         except Exception as e:
             llm.logger.error(f"Failed during user lookup/creation: {e}", exc_info=True)
             raise HTTPException(status_code=500, detail="Error processing user information.")
+        
+        history_for_llm = request.history # Start with history from request
+
+        # Check if it's the start of the conversation (history has only 1 user message)
+        is_first_message_in_session = len(request.history) == 1 
+
+        if is_first_message_in_session:
+            latest_summary = db.query(UserSummary)\
+                .filter(UserSummary.user_id == db_user.id)\
+                .order_by(UserSummary.timestamp.desc())\
+                .first()
+
+            if latest_summary:
+                summary_injection = {
+                    "role": "system", # Use 'system' or 'assistant' role
+                    "content": f"Reminder of previous key points: {latest_summary.summary_text}"
+                }
+                # Prepend summary context AND the main system prompt
+                history_for_llm = [summary_injection] + request.history 
+                # Make sure your system prompt logic still applies if needed
+                # You might need to adjust how system_prompt is passed to generate_response
+                # if you are manually injecting context here.
 
         # Extract the user message from the history
         user_message_content = request.history[-1]['content']
 
         # 2. Call the LLM to get a response
         generated_text = await llm.generate_response(
-            history=request.history,
+            history=history_for_llm,
             provider=request.provider,
             model=request.model,
             max_tokens=request.max_tokens,
@@ -178,3 +200,67 @@ async def handle_chat_request(
     except Exception as e:
         llm.logger.error(f"Unhandled exception in /chat endpoint: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
+    
+class SummarizeRequest(BaseModel):
+    session_id: str 
+    user_identifier: str # To find the user_id
+
+@router.post("/summarize_session", status_code=status.HTTP_201_CREATED)
+async def summarize_session_endpoint(
+    request: SummarizeRequest,
+    db: Session = Depends(get_db)
+):
+    # 1. Find the user
+    db_user = get_or_create_user(db, request.user_identifier) # Use the existing helper
+
+    # 2. Retrieve conversation history for the session
+    conversation_history = db.query(Conversation)\
+        .filter(Conversation.session_id == request.session_id, Conversation.user_id == db_user.id)\
+        .order_by(Conversation.timestamp.asc())\
+        .all()
+
+    if not conversation_history:
+        raise HTTPException(status_code=404, detail="No conversation found for this session.")
+
+    # 3. Format history for LLM summarization
+    # Combine messages into a single string or keep the list structure
+    formatted_history = "\n".join([f"{msg.get('role')}: {msg.get('content')}" for msg in conversation_history]) 
+    # Or keep as list: history_list = [{"role": msg.role, "content": msg.content} for msg in conversation_history]
+
+    # 4. Create the summarization prompt
+    summarization_prompt = f"""Please summarize the key points, user's expressed feelings, and main topics discussed in the following conversation history. Focus on aspects relevant to mental well-being. Be concise. Conversation:{formatted_history} Summary:"""
+    # 5. Call the LLM (use your existing llm.generate_response)
+    # You might want a dedicated function or adjust generate_response for different tasks
+    try:
+            # Prepare a minimal history for the summarization call itself
+            summary_llm_history = [{"role": "user", "content": summarization_prompt}]
+            summary_text = await llm.generate_response(
+                history=summary_llm_history, 
+                provider="gemini", # Or choose your preferred provider for summarization
+                model=llm.DEFAULT_GEMINI_MODEL, # Or a specific model good at summarizing
+                max_tokens=250, # Adjust token limit for summary length
+                temperature=0.5 # Lower temp for more factual summary
+                # No system prompt needed here usually, the user prompt is specific
+            )
+            if summary_text.startswith("Error:"):
+                raise Exception(summary_text) # Handle LLM errors
+    except Exception as e:
+            llm.logger.error(f"LLM Summarization failed: {e}")
+            raise HTTPException(status_code=500, detail="Failed to generate summary.")
+
+
+    # 6. Save the summary to the database
+    new_summary = UserSummary(
+        user_id=db_user.id,
+        summary_text=summary_text.strip() 
+    )
+    db.add(new_summary)
+    try:
+        db.commit()
+        db.refresh(new_summary)
+        llm.logger.info(f"Saved summary for user DB ID {db_user.id}")
+        return {"message": "Summary saved successfully.", "summary_id": new_summary.id}
+    except Exception as e:
+        db.rollback()
+        llm.logger.error(f"Database error saving summary: {e}")
+        raise HTTPException(status_code=500, detail="Failed to save summary to database.")
