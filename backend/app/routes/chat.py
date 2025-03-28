@@ -241,7 +241,7 @@ async def summarize_and_save(db: Session, user_id: int, session_id_to_summarize:
         formatted_history = "\n".join(history_lines)
 
         # 3. Create the summarization prompt (same as before)
-        summarization_prompt = f"""Please summarize the key points, user's expressed feelings, and main topics discussed in the following conversation history. Focus on aspects relevant to mental well-being for UGM-AICare users. Be concise. Write the response in Indonesian/Bahasa Indonesia.
+        summarization_prompt = f"""Please summarize the key points, user's expressed feelings, and main topics discussed in the following conversation history. Focus on aspects relevant to mental well-being for UGM-AICare users. Be concise. Write the response in Indonesian/Bahasa Indonesia. Do not use markdown format because the value is stored in a SQL cell.
 
 Conversation:
 {formatted_history}
