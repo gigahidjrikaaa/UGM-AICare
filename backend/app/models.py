@@ -116,18 +116,25 @@ class Feedback(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     
-    # Optional: Link feedback to a user for context
-    # If provided, allows analyzing feedback based on user history (use with care for privacy)
+    # Optional links for context
     user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True) 
+    session_id = Column(String, nullable=True, index=True) # Can be omitted if not sending from frontend
     
-    # Optional: Link feedback to a specific chat session for context
-    session_id = Column(String, nullable=True, index=True) 
+    # --- Specific Feedback Fields ---
+    # Scale Questions (Storing the numerical value)
+    ease_of_use_rating = Column(Integer, nullable=True)         # Q1: 1-5 (Very Difficult to Very Easy)
+    chatbot_understanding_rating = Column(Integer, nullable=True) # Q2: 1-5 (Not at all to Very Well)
+    felt_understood_rating = Column(Integer, nullable=True)     # Q3: 1-5 (Not at all to Very Much)
+    nps_rating = Column(Integer, nullable=True)                 # Q5: 0-10 (Likelihood to Recommend)
     
-    # --- Feedback Data ---
-    rating = Column(Integer, nullable=True) # e.g., 1-5 stars
-    comment = Column(Text, nullable=False)   # The main feedback text (make it mandatory)
-    category = Column(String, nullable=True) # e.g., 'bug_report', 'suggestion', 'positive_feedback', 'ui_ux'
-    page_context = Column(String, nullable=True) # Optional: Which page/feature the feedback relates to
+    # MCQ/Yes/No Question (Storing the selected option as string)
+    goal_achieved = Column(String, nullable=True)               # Q4: 'Yes', 'No', 'Partially'
+    
+    # Open-Ended Question (Mandatory)
+    improvement_suggestion = Column(Text, nullable=False)       # Q6: What to improve?
+    
+    # Optional General Category (from previous iteration, can keep or remove)
+    category = Column(String, nullable=True) 
     
     timestamp = Column(DateTime, default=datetime.now, nullable=False)
 

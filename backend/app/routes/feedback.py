@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status, Body
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
-from typing import Optional
+from typing import Literal, Optional
 from datetime import datetime
 
 from app.database import get_db
@@ -17,25 +17,38 @@ logger = logging.getLogger(__name__)
 # --- Pydantic Schemas ---
 
 class FeedbackCreate(BaseModel):
-    # Match fields you want the frontend to send
-    user_identifier: Optional[str] = None # Hashed ID from frontend (optional)
-    session_id: Optional[str] = None      # Session ID from frontend (optional)
+    # Optional context fields from frontend
+    user_identifier: Optional[str] = None # Hashed ID 
+    session_id: Optional[str] = None      # Set to null/omit if general feedback
     
-    rating: Optional[int] = Field(None, ge=1, le=5) # Optional rating 1-5
-    comment: str = Field(..., min_length=10)       # Mandatory comment, min 10 chars
-    category: Optional[str] = None
-    page_context: Optional[str] = None
+    # --- Fields corresponding to the specific questions ---
+    # Scales (Allow null if not answered)
+    ease_of_use_rating: Optional[int] = Field(None, ge=1, le=5, description="Q1: 1=Very Difficult, 5=Very Easy")
+    chatbot_understanding_rating: Optional[int] = Field(None, ge=1, le=5, description="Q2: 1=Not at all, 5=Very Well")
+    felt_understood_rating: Optional[int] = Field(None, ge=1, le=5, description="Q3: 1=Not at all, 5=Very Much")
+    nps_rating: Optional[int] = Field(None, ge=0, le=10, description="Q5: 0-10 Likelihood to Recommend")
 
-    class Config:
-        orm_mode = True # Or from_attributes = True for Pydantic V2
+    # MCQ (Allow null if not answered)
+    goal_achieved: Optional[Literal['Yes', 'No', 'Partially']] = Field(None, description="Q4: Did you accomplish goal?")
+
+    # Open-Ended (Make this mandatory as requested)
+    improvement_suggestion: str = Field(..., min_length=5, description="Q6: What one thing can we improve?") # Set a min_length
+
+    # Optional category (can keep or remove)
+    category: Optional[str] = None 
+
+    # Ensure Pydantic V2 compatibility if needed
+    # class Config:
+    #    from_attributes = True
 
 class FeedbackResponse(BaseModel):
     id: int
     message: str = "Feedback submitted successfully."
     timestamp: datetime
-    
-    class Config:
-        orm_mode = True # Or from_attributes = True for Pydantic V2
+
+# Ensure Pydantic V2 compatibility if needed
+# class Config:
+#    from_attributes = True
 
 # --- Router Setup ---
 router = APIRouter(
@@ -53,28 +66,31 @@ async def submit_feedback(
     Receives feedback submission from the frontend and saves it to the database.
     Optionally links feedback to a user based on the provided user_identifier hash.
     """
-    logger.info(f"Received feedback submission: rating={feedback_data.rating}, category='{feedback_data.category}'")
+    logger.info(f"Received feedback: ease={feedback_data.ease_of_use_rating}, understand={feedback_data.chatbot_understanding_rating}, felt_heard={feedback_data.felt_understood_rating}, nps={feedback_data.nps_rating}, goal='{feedback_data.goal_achieved}', improvement='{feedback_data.improvement_suggestion[:50]}...'")
     
     db_user = None
-    # Optionally find the user if identifier is provided
-    if feedback_data.user_identifier:
+    # Link to user if identifier provided and function is available
+    if feedback_data.user_identifier and get_or_create_user:
         try:
-            # Use the same lookup logic as your chat endpoint
             db_user = get_or_create_user(db, feedback_data.user_identifier) 
         except Exception as e:
-            # Log the error but don't necessarily fail the feedback submission
-            logger.warning(f"Could not link feedback to user for identifier {feedback_data.user_identifier[:8]}...: {e}")
-            # You could choose to raise HTTPException here if linking is mandatory
+            logger.warning(f"Could not link feedback to user: {e}")
+            # Decide if this should be a fatal error (HTTPException) or just a warning
 
     try:
         new_feedback = Feedback(
-            user_id=db_user.id if db_user else None, # Link user ID if found
-            session_id=feedback_data.session_id,
-            rating=feedback_data.rating,
-            comment=feedback_data.comment,
-            category=feedback_data.category,
-            page_context=feedback_data.page_context
-            # timestamp is handled by default in the model
+            user_id=db_user.id if db_user else None, 
+            session_id=feedback_data.session_id, # Will be null if frontend sends null
+            
+            # Map data from request to model columns
+            ease_of_use_rating=feedback_data.ease_of_use_rating,
+            chatbot_understanding_rating=feedback_data.chatbot_understanding_rating,
+            felt_understood_rating=feedback_data.felt_understood_rating,
+            nps_rating=feedback_data.nps_rating,
+            goal_achieved=feedback_data.goal_achieved,
+            improvement_suggestion=feedback_data.improvement_suggestion, # Mandatory field
+            category=feedback_data.category 
+            # timestamp handled by default
         )
         db.add(new_feedback)
         db.commit()
@@ -89,5 +105,5 @@ async def submit_feedback(
         logger.error(f"Database error saving feedback: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="An error occurred while saving feedback."
+            detail="An error occurred while saving your feedback. Please try again later."
         )

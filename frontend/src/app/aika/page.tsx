@@ -12,8 +12,10 @@ import { FaRobot } from 'react-icons/fa';
 import { FiUser, FiSettings } from "react-icons/fi";
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
+import FeedbackForm from '@/components/FeedbackForm';
 
 export default function AikaChat() {
+  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [mounted, setMounted] = useState(false);
@@ -24,10 +26,14 @@ export default function AikaChat() {
   const user = session?.user || {
     name: "Guest User",
     image: null,
-    email: "guest@example.com",
-    id: "guest-user",
-    role: "user"
-  };
+    email: "guest@example.com"
+  };  
+
+  const handleFeedbackSuccess = () => {
+    alert("Feedback submitted successfully!");
+    setShowFeedbackModal(false);
+
+  }
   
   useEffect(() => {
     setMounted(true);
@@ -38,14 +44,6 @@ export default function AikaChat() {
     }
     
   }, [status, router]);
-
-  // Log user ID and full user object
-  // useEffect(() => {
-  //   if (session?.user) {
-  //     console.log("User ID:", session.user.id);
-  //     console.log("Full user object:", session.user);
-  //   }
-  // }, [session]);
 
   // While checking authentication status
   if (!mounted || status === "loading") {
@@ -259,6 +257,7 @@ export default function AikaChat() {
                       </motion.a>
                     </li>
                   ))}
+                  
                 </ul>
               </nav>
               
@@ -310,6 +309,41 @@ export default function AikaChat() {
           <div className="flex-1 overflow-hidden bg-white/5 backdrop-blur-md rounded-2xl border border-white/10 shadow-lg mb-4 mt-2 z-10">
             <ChatInterface />
           </div>
+
+          {/* Feedback button */}
+          <motion.button
+            onClick={() => {
+              setShowFeedbackModal(true);
+            }}
+            className="fixed bottom-4 right-4 bg-[#FFCA40] text-[#001D58] p-3 rounded-full shadow-lg hover:bg-[#FFCA40]/80 transition-colors"
+            aria-label="Give Feedback"
+          >
+            <BsChatDots size={24} />
+          </motion.button>
+
+            
+          {/* Feedback Modal */}
+          <AnimatePresence>
+                  {showFeedbackModal && (
+                       // Render the modal overlay and the form
+                       <motion.div 
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4" 
+                          onClick={() => setShowFeedbackModal(false)} // Close on backdrop click
+                       >
+                           {/* Stop propagation prevents closing modal when clicking inside form */}
+                           <div onClick={(e) => e.stopPropagation()}> 
+                               <FeedbackForm 
+                                  // No sessionId prop needed for general feedback
+                                  onClose={() => setShowFeedbackModal(false)} 
+                                  onSubmitSuccess={handleFeedbackSuccess}
+                               />
+                           </div>
+                       </motion.div>
+                  )}
+              </AnimatePresence>
 
           {/* Footer credit */}
           <motion.div 
