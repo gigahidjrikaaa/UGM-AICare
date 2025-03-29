@@ -63,7 +63,7 @@ const { data: session, status } = useSession(); // Use session from next-auth
   // Use the simplified Message type for state
   const [messages, setMessages] = useState<Message[]>([]);
   // State for provider selection - use backend expected values
-  const [selectedProvider, setSelectedProvider] = useState<LLMProviderOption>('togetherai');
+  const [selectedProvider, setSelectedProvider] = useState<LLMProviderOption>('gemini');
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null); // Add error state for display
@@ -270,9 +270,8 @@ return (
           disabled={isLoading} // Disable while loading
         >
           {/* Ensure values match backend expectations */}
-          <option value="togetherai">Llama 3 (Together AI)</option>
           <option value="gemini">Gemini 2.0 Flash (Google)</option>
-          {/* You can add more specific model options later if backend supports model override */}
+          <option value="togetherai">Llama 3 (Together AI)</option>
         </select>
       </div>
 
@@ -288,9 +287,9 @@ return (
               transition={{ delay: 0.3 }}
               className="mb-6"
             >
-              <h2 className="text-xl font-bold mb-2">Welcome to Aika</h2>
-              <p className="text-gray-300 max-w-md">
-                I&apos;m here to listen, support, and help you navigate your emotions and mental health journey.
+              <h2 className="text-xl font-bold mb-2">Halo, aku Aika!</h2>
+              <p className="text-gray-300 max-w-lg">
+                Kamu bisa berbagi cerita atau perasaanmu, dan aku akan mendengarkan. Percakapan kita akan direkam, tapi identitas dirimu akan kami rahasiakan! [<a href="https://ugm.ac.id/en/privacy-policy" target='_blank' className="text-blue-400 underline">Kebijakan Privasi</a>]
               </p>
             </motion.div>
 
