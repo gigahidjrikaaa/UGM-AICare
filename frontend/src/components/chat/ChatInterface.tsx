@@ -289,7 +289,9 @@ return (
             >
               <h2 className="text-xl font-bold mb-2">Halo, aku Aika!</h2>
               <p className="text-gray-300 max-w-lg">
-                Kamu bisa berbagi cerita atau perasaanmu, dan aku akan mendengarkan. Percakapan kita akan direkam, tapi identitas dirimu akan kami rahasiakan! [<a href="https://ugm.ac.id/en/privacy-policy" target='_blank' className="text-blue-400 underline">Kebijakan Privasi</a>]
+                Kamu bisa berbagi apapun denganku. Percakapan kita akan direkam, tapi identitas dirimu akan kami rahasiakan! 
+                <br />
+                <a href="https://ugm.ac.id/en/privacy-policy" target='_blank' className="text-blue-400 underline">Kebijakan Privasi</a> || <a href="https://blog.getadmiral.com/hashed-emails-what-publishers-should-know-about-this-identity-solution" target='_blank' className="text-blue-400 underline">Apa itu Hashing?</a>
               </p>
             </motion.div>
 
@@ -403,6 +405,8 @@ return (
             className="p-3 text-white rounded-full hover:bg-white/10 transition disabled:opacity-50"
             title="Voice input (coming soon)"
             disabled={isLoading} // Disable during loading
+            onClick={() => alert("Voice input feature coming soon!")}
+            // onClick={handleVoiceInput} // Placeholder for voice input function
           >
             <BiMicrophone size={20} />
           </button>
