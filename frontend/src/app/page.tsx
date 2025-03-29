@@ -88,12 +88,11 @@ export default function Home() {
                 transition={{ duration: 0.8, delay: 0.6 }}
                 className="mt-10 flex flex-col sm:flex-row gap-5 justify-center lg:justify-start"
               >
-                <GoogleSignInButton />
                 <Link href="/aika">
                   <motion.button
-                    whileHover={{ scale: 1.05, backgroundColor: "rgba(255,255,255,0.25)" }}
+                    whileHover={{ scale: 1.05, backgroundColor: "#FFCA40FF", color: "#001D58" }}
                     whileTap={{ scale: 0.98 }}
-                    className="px-8 py-3 bg-white/20 text-white rounded-full font-medium text-lg flex items-center justify-center backdrop-blur-md border border-white/10 shadow-lg shadow-[#001D58]/30 w-full sm:w-auto"
+                    className="px-40 py-3 bg-white/20 text-white rounded-full font-medium text-lg flex items-center justify-center backdrop-blur-md border border-white/10 shadow-lg shadow-[#001D58]/30 w-full sm:w-auto transition-all"
                   >
                     Try Demo
                     <HiChevronRight className="ml-2 text-xl" />
