@@ -315,10 +315,10 @@ export default function AikaChat() {
             onClick={() => {
               setShowFeedbackModal(true);
             }}
-            className="fixed bottom-4 right-4 bg-[#FFCA40] text-[#001D58] p-3 rounded-full shadow-lg hover:bg-[#FFCA40]/80 transition-colors"
+            className="fixed bottom-4 right-4 bg-[#FFCA40] text-[#001D58] p-4 rounded-full shadow-lg hover:bg-[#FFCA40]/80 transition-colors"
             aria-label="Give Feedback"
           >
-            <BsChatDots size={24} />
+            <p className="text-sm font-semibold text-[#001D58]">Give Feedback</p>
           </motion.button>
 
             
@@ -330,11 +330,11 @@ export default function AikaChat() {
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
-                          className="fixed inset-0 bg-black bg-opacity-60 backdrop-blur-sm flex items-center justify-center z-50 p-4" 
+                          className="fixed inset-0 backdrop-blur-sm flex items-center justify-center z-50 p-4" 
                           onClick={() => setShowFeedbackModal(false)} // Close on backdrop click
                        >
                            {/* Stop propagation prevents closing modal when clicking inside form */}
-                           <div onClick={(e) => e.stopPropagation()}> 
+                           <div onClick={(e) => e.stopPropagation()} className='w-full max-w-5xl rounded-lg'> 
                                <FeedbackForm 
                                   // No sessionId prop needed for general feedback
                                   onClose={() => setShowFeedbackModal(false)} 
