@@ -52,7 +52,7 @@ class FeedbackResponse(BaseModel):
 
 # --- Router Setup ---
 router = APIRouter(
-    prefix="/api/v1/feedback", # Define a prefix for feedback routes
+    prefix="/feedback", # Define a prefix for feedback routes
     tags=["Feedback"]           # Tag for API documentation
 )
 

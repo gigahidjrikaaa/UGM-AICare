@@ -134,7 +134,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmitSuccess })
 
         try {
             const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-            const backendUrl = `${baseUrl}/api/v1/feedback/`;
+            const backendUrl = `${baseUrl}/api/v1/feedback`;
 
             const payload = {
                 user_identifier: hashedUserId,
@@ -157,7 +157,15 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmitSuccess })
              // Keep existing detailed error handling logic...
             console.error("Feedback submission error:", err);
             let message = "Failed to submit feedback. Please try again later.";
-            if (axios.isAxiosError(err)) { /* ... existing detailed error extraction ... */ }
+            if (axios.isAxiosError(err)) { 
+                if (err.response) {
+                    message = `Error: ${err.response.data.detail || err.response.statusText}`;
+                } else if (err.request) {
+                    message = "No response received from the server.";
+                } else {
+                    message = `Error: ${err.message}`;
+                }
+            }
             else if (err instanceof Error) { message = `Error: ${err.message}`; }
             setError(message);
         } finally {
