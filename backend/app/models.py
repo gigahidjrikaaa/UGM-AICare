@@ -15,6 +15,7 @@ class User(Base):
     twitter_id = Column(String, unique=True, index=True, nullable=True)
     email = Column(String, unique=True, index=True, nullable=True) # Could be hashed too if used as identifier
     sentiment_score = Column(Float, default=0.0)
+    wallet_address = Column(String, unique=True, index=True, nullable=True) # Optional EDU Chain wallet address
 
     conversations = relationship("Conversation", back_populates="user") # Relationship name corrected
 
