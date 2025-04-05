@@ -50,8 +50,9 @@ async function hashIdentifier(identifier: string): Promise<string> {
   return hashHex;
 }
 
-const AIKA_SYSTEM_PROMPT = `Kamu adalah Aika, AI pendamping kesehatan mental dari UGM-AICare. Anggap dirimu sebagai teman dekat bagi mahasiswa UGM yang sedang butuh teman cerita. Gunakan bahasa Indonesia yang santai dan kasual (gaya obrolan sehari-hari), jangan terlalu formal, kaku, atau seperti robot. Buat suasana ngobrol jadi nyaman dan nggak canggung (awkward). Sebisa mungkin, sesuaikan juga gaya bahasamu dengan yang dipakai pengguna.
+const AIKA_SYSTEM_PROMPT = `Kamu adalah Aika, AI pendamping kesehatan mental dari UGM-AICare. Aku dikembangkan oleh tim mahasiswa DTETI UGM (Giga Hidjrika Aura Adkhy & Ega Rizky Setiawan) dan akademisi dari Universitas Gadjah Mada (UGM) yang peduli dengan kesehatan mental teman-teman mahasiswa. Anggap dirimu sebagai teman dekat bagi mahasiswa UGM yang sedang butuh teman cerita. Gunakan bahasa Indonesia yang santai dan kasual (gaya obrolan sehari-hari), jangan terlalu formal, kaku, atau seperti robot. Buat suasana ngobrol jadi nyaman dan nggak canggung (awkward). Sebisa mungkin, sesuaikan juga gaya bahasamu dengan yang dipakai pengguna.
 
+                Tentang diriku: Aku dirancang untuk menjadi teman ngobrol yang suportif, membantu kamu mengeksplorasi perasaan dan tantangan terkait kehidupan kuliah di UGM. Aku ada di sini untuk mendengarkan tanpa menghakimi.
                 Tujuan utamamu adalah menjadi pendengar yang baik, suportif, hangat, dan tidak menghakimi. Bantu pengguna mengeksplorasi perasaan mereka terkait kehidupan kuliah, stres, pertemanan, atau apapun yang ada di pikiran mereka. Validasi emosi mereka, tunjukkan kalau kamu paham dan peduli.
 
                 PENTING: Jangan hanya bertanya "Gimana perasaanmu?" atau "Ada yang bisa dibantu?". Jadilah teman yang aktif berpikir. Ajukan pertanyaan terbuka yang menggali lebih dalam untuk membantu pengguna merefleksikan situasinya. Dorong mereka untuk memikirkan **mengapa** mereka merasa begitu, **apa** pemicunya, **pola** apa yang mungkin ada, atau **langkah kecil** apa yang mungkin bisa diambil. Contoh pertanyaan reflektif:
@@ -80,7 +81,7 @@ const { data: session, status } = useSession(); // Use session from next-auth
   // Use the simplified Message type for state
   const [messages, setMessages] = useState<Message[]>([]);
   // State for provider selection - use backend expected values
-  const [selectedProvider, setSelectedProvider] = useState<LLMProviderOption>('gemini');
+  const [selectedProvider] = useState<LLMProviderOption>('gemini');
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null); // Add error state for display
@@ -259,13 +260,13 @@ const { data: session, status } = useSession(); // Use session from next-auth
   };
 
   // --- Provider Selection Handling ---
-  const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setSelectedProvider(e.target.value as LLMProviderOption);
-    // Optional: Clear chat or notify user when provider changes
-    // setMessages([{ role: 'assistant', content: `Switched provider. How can I help?`, timestamp: new Date() }]);
-    // Focus input after provider change for quick follow-up 
-    inputRef.current?.focus();
-  };
+  // const handleProviderChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+  //   setSelectedProvider(e.target.value as LLMProviderOption);
+  //   // Optional: Clear chat or notify user when provider changes
+  //   // setMessages([{ role: 'assistant', content: `Switched provider. How can I help?`, timestamp: new Date() }]);
+  //   // Focus input after provider change for quick follow-up 
+  //   inputRef.current?.focus();
+  // };
 
   // --- Render Loading State for Authentication ---
   if (status === "loading") {
@@ -276,169 +277,151 @@ const { data: session, status } = useSession(); // Use session from next-auth
 // --- UI Rendering (Your Existing JSX) ---
 return (
     <div className="flex flex-col h-full max-h-[calc(100vh-120px)]">
-      {/* Provider Selection Dropdown */}
-      <div className="mb-4 p-4">
-        <label htmlFor="model-select" className="block text-sm font-medium mb-1">AI Provider</label>
-        <select
-          id="model-select" // Added id for label association
-          value={selectedProvider}
-          onChange={handleProviderChange} // Use the new handler
-          className="w-full p-2 bg-white/10 rounded border border-white/20 focus:border-white/40 focus:outline-none text-white" // Added text-white
-          disabled={isLoading} // Disable while loading
-        >
-          {/* Ensure values match backend expectations */}
-          <option value="gemini">Gemini 2.0 Flash (Google)</option>
-          <option value="togetherai">Llama 3 (Together AI)</option>
-        </select>
-      </div>
+      {/* Provider Selection removed - default provider is "gemini" from useState */}
 
       {/* Messages container */}
       <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-blue-200 scrollbar-track-transparent py-4 px-2 md:px-4 relative">
-        {/* Welcome/Empty State */}
-        {messages.length <= 1 && !isLoading && ( // Show welcome if only initial message exists
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
-            {/* ... (Your welcome message JSX) ... */}
-             <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.3 }}
-              className="mb-6"
-            >
-              <h2 className="text-xl font-bold mb-2">Halo, aku Aika!</h2>
-              <p className="text-gray-300 max-w-lg">
-                Kamu bisa berbagi apapun denganku. Percakapan kita akan direkam, tapi identitas dirimu akan kami rahasiakan! 
-                <br />
-                <a href="https://ugm.ac.id/en/privacy-policy" target='_blank' className="text-blue-400 underline">Kebijakan Privasi</a> || <a href="https://blog.getadmiral.com/hashed-emails-what-publishers-should-know-about-this-identity-solution" target='_blank' className="text-blue-400 underline">Apa itu Hashing?</a>
-              </p>
-            </motion.div>
+      {/* Welcome/Empty State */}
+      {messages.length <= 1 && !isLoading && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4">
+         <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mb-6"
+        >
+          <h2 className="text-xl font-bold mb-2">Halo, aku Aika!</h2>
+          <p className="text-gray-300 max-w-lg">
+          Kamu bisa berbagi apapun denganku. Percakapan kita akan direkam, tapi identitas dirimu akan kami rahasiakan! 
+          <br />
+          <a href="https://ugm.ac.id/en/privacy-policy" target='_blank' className="text-blue-400 underline">Kebijakan Privasi</a> || <a href="https://blog.getadmiral.com/hashed-emails-what-publishers-should-know-about-this-identity-solution" target='_blank' className="text-blue-400 underline">Apa itu Hashing?</a>
+          </p>
+        </motion.div>
 
-            <motion.div
-              className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-xl"
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-            >
-              {["Aku tidak punya teman cerita.", "Aku merasa gelisah.", "Aku berusaha mengatasi traumaku.", "Aku mencoba untuk menjadi lebih produktif."].map((suggestion, i) => (
-                <motion.button
-                  key={i}
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 text-left text-sm text-white" // Added text-white
-                  onClick={() => {
-                    setInput(suggestion);
-                    setTimeout(() => {
-                        inputRef.current?.focus();
-                        // Trigger auto-resize after setting input
-                        if(inputRef.current) {
-                            inputRef.current.style.height = "auto";
-                            inputRef.current.style.height = `${inputRef.current.scrollHeight}px`;
-                        }
-                    }, 100);
-                  }}
-                >
-                  {suggestion}
-                </motion.button>
-              ))}
-            </motion.div>
-          </div>
-        )}
+        <motion.div
+          className="grid grid-cols-1 md:grid-cols-2 gap-3 max-w-xl"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+        >
+          {["Aku tidak punya teman cerita.", "Aku merasa gelisah.", "Aku berusaha mengatasi traumaku.", "Aku mencoba untuk menjadi lebih produktif."].map((suggestion, i) => (
+          <motion.button
+            key={i}
+            whileHover={{ scale: 1.03 }}
+            whileTap={{ scale: 0.98 }}
+            className="bg-white/10 hover:bg-white/20 rounded-xl px-4 py-3 text-left text-sm text-white"
+            onClick={() => {
+            setInput(suggestion);
+            setTimeout(() => {
+              inputRef.current?.focus();
+              // Trigger auto-resize after setting input
+              if(inputRef.current) {
+                inputRef.current.style.height = "auto";
+                inputRef.current.style.height = `${inputRef.current.scrollHeight}px`;
+              }
+            }, 100);
+            }}
+          >
+            {suggestion}
+          </motion.button>
+          ))}
+        </motion.div>
+        </div>
+      )}
 
-        {/* Render Messages */}
-        {messages.length > 0 && (
-             <div className="flex flex-col min-h-full">
-                 <div className="flex-1">
-                   {/* Map over messages - ensure MessageBubble expects {role, content} */}
-                   {messages.map((message, index) => (
-                     <MessageBubble key={`${message.role}-${index}`} message={message} /> // Use index for key if no stable ID
-                   ))}
-                 </div>
-             </div>
-         )}
+      {/* Render Messages */}
+      {messages.length > 0 && (
+         <div className="flex flex-col min-h-full">
+           <div className="flex-1">
+             {messages.map((message, index) => (
+             <MessageBubble key={`${message.role}-${index}`} message={message} />
+             ))}
+           </div>
+         </div>
+       )}
 
-        {/* Loading indicator */}
-        {isLoading && (
-          <div className="flex items-center space-x-2 px-4 py-2 rounded-lg max-w-[80%]">
-            {/* ... (Your loading indicator JSX) ... */}
-            <div className="flex space-x-1">
-              <motion.div
-                animate={{ y: [0, -10, 0] }}
-                transition={{ repeat: Infinity, duration: 1, delay: 0 }}
-                className="w-2 h-2 bg-[#FFCA40] rounded-full"
-              />
-              <motion.div
-                animate={{ y: [0, -10, 0] }}
-                transition={{ repeat: Infinity, duration: 1, delay: 0.2 }}
-                className="w-2 h-2 bg-[#FFCA40] rounded-full"
-              />
-              <motion.div
-                animate={{ y: [0, -10, 0] }}
-                transition={{ repeat: Infinity, duration: 1, delay: 0.4 }}
-                className="w-2 h-2 bg-[#FFCA40] rounded-full"
-              />
-            </div>
-            <span className="text-sm text-gray-300">Aika is thinking...</span>
-          </div>
-        )}
+      {/* Loading indicator */}
+      {isLoading && (
+        <div className="flex items-center space-x-2 px-4 py-2 rounded-lg max-w-[80%]">
+        <div className="flex space-x-1">
+          <motion.div
+          animate={{ y: [0, -10, 0] }}
+          transition={{ repeat: Infinity, duration: 1, delay: 0 }}
+          className="w-2 h-2 bg-[#FFCA40] rounded-full"
+          />
+          <motion.div
+          animate={{ y: [0, -10, 0] }}
+          transition={{ repeat: Infinity, duration: 1, delay: 0.2 }}
+          className="w-2 h-2 bg-[#FFCA40] rounded-full"
+          />
+          <motion.div
+          animate={{ y: [0, -10, 0] }}
+          transition={{ repeat: Infinity, duration: 1, delay: 0.4 }}
+          className="w-2 h-2 bg-[#FFCA40] rounded-full"
+          />
+        </div>
+        <span className="text-sm text-gray-300">Aika is thinking...</span>
+        </div>
+      )}
 
-        {/* Error Display */}
-        {error && !isLoading && (
-            <div className="px-4 py-2">
-                 <div className="bg-red-500/20 border border-red-500 text-red-300 px-4 py-2 rounded-lg text-sm">
-                     {error}
-                 </div>
-             </div>
-         )}
+      {/* Error Display */}
+      {error && !isLoading && (
+        <div className="px-4 py-2">
+           <div className="bg-red-500/20 border border-red-500 text-red-300 px-4 py-2 rounded-lg text-sm">
+             {error}
+           </div>
+         </div>
+       )}
 
-        {/* Invisible element for auto-scrolling */}
-        <div ref={messagesEndRef} />
+      {/* Invisible element for auto-scrolling */}
+      <div ref={messagesEndRef} />
       </div>
 
       {/* Message input */}
       <motion.div
-        initial={{ y: 50, opacity: 0 }}
-        animate={{ y: 0, opacity: 1 }}
-        transition={{ delay: 0.3 }}
-        className="p-3 border-t border-white/10 bg-[#001D58]/80 backdrop-blur-sm" // Added backdrop-blur-sm
+      initial={{ y: 50, opacity: 0 }}
+      animate={{ y: 0, opacity: 1 }}
+      transition={{ delay: 0.3 }}
+      className="p-3 border-t border-white/10 bg-[#001D58]/80 backdrop-blur-sm"
       >
-        {/* Use form element for better accessibility and Enter key handling */}
-        <form onSubmit={handleSubmit} className="flex items-end gap-2">
-            <div className="flex-1 bg-white/10 rounded-2xl px-4 py-3 focus-within:bg-white/15 transition">
-             <textarea
-               ref={inputRef}
-               value={input}
-               onChange={handleInputChange} // Use the combined handler
-               onKeyDown={handleKeyDown} // Use the specific handler for Enter
-               placeholder="Type a message..."
-               className="w-full bg-transparent focus:outline-none resize-none text-white scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-transparent" // Added scrollbar styling
-               rows={1}
-               style={{ minHeight: "24px", maxHeight: "120px" }} // Ensure these are set
-               disabled={isLoading}
-             />
-            </div>
+      {/* Use form element for better accessibility and Enter key handling */}
+      <form onSubmit={handleSubmit} className="flex items-end gap-2">
+        <div className="flex-1 bg-white/10 rounded-2xl px-4 py-3 focus-within:bg-white/15 transition">
+         <textarea
+           ref={inputRef}
+           value={input}
+           onChange={handleInputChange}
+           onKeyDown={handleKeyDown}
+           placeholder="Type a message..."
+           className="w-full bg-transparent focus:outline-none resize-none text-white scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-transparent"
+           rows={1}
+           style={{ minHeight: "24px", maxHeight: "120px" }}
+           disabled={isLoading}
+         />
+        </div>
 
-          {/* Voice Input Button (from your original code) */}
-          <button
-            type="button"
-            className="p-3 text-white rounded-full hover:bg-white/10 transition disabled:opacity-50"
-            title="Voice input (coming soon)"
-            disabled={isLoading} // Disable during loading
-            onClick={() => alert("Voice input feature coming soon!")}
-            // onClick={handleVoiceInput} // Placeholder for voice input function
-          >
-            <BiMicrophone size={20} />
-          </button>
+        {/* Voice Input Button (from your original code) */}
+        <button
+        type="button"
+        className="p-3 text-white rounded-full hover:bg-white/10 transition disabled:opacity-50"
+        title="Voice input (coming soon)"
+        disabled={isLoading}
+        onClick={() => alert("Voice input feature coming soon!")}
+        >
+        <BiMicrophone size={20} />
+        </button>
 
-          {/* Send Button */}
-          <motion.button
-            type="submit"
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            disabled={!input.trim() || isLoading}
-            className="bg-[#FFCA40] text-[#001D58] p-3 rounded-full disabled:opacity-50 transition" // Added transition
-          >
-            <FiSend size={20} />
-          </motion.button>
-        </form>
+        {/* Send Button */}
+        <motion.button
+        type="submit"
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
+        disabled={!input.trim() || isLoading}
+        className="bg-[#FFCA40] text-[#001D58] p-3 rounded-full disabled:opacity-50 transition"
+        >
+        <FiSend size={20} />
+        </motion.button>
+      </form>
       </motion.div>
     </div>
   );

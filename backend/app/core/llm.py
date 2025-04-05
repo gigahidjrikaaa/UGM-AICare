@@ -190,9 +190,10 @@ async def generate_gemini_response(
         try:
             # Accessing response.text might raise ValueError if blocked
             response_text = response.text
-            logger.info("Received response from Gemini API.")
-            logger.info("System Prompt: " + system_prompt)
-            logger.info("User Prompt: " + last_user_prompt)
+            # logger.info("Received response from Gemini API.")
+            # logger.info("System Prompt: " + system_prompt)
+            # logger.info("User Prompt: " + last_user_prompt)
+            # logger.info("Response: " + response_text.strip())
             return response_text.strip()
         except ValueError as e:
             # This often indicates blocked content or unusual finish reason
