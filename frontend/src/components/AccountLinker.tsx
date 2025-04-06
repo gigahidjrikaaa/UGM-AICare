@@ -25,17 +25,17 @@ export default function AccountLinker() {
       // Optional: sign a message to prove ownership
       const signature = await signer.signMessage("Linking DID to UGM-AICare")
 
-      const token = session?.user?.token as string | undefined
-      if (!token) {
+      const jwtToken = session?.jwt as string | undefined
+      if (!jwtToken) {
         setLinkStatus("❌ No session token found. Please re-login.")
         return
       }
-
+      
       const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/link-did`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`,
+          Authorization: `Bearer ${jwtToken}`,
         },
         body: JSON.stringify({
           wallet_address: address,

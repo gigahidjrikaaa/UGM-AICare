@@ -11,9 +11,10 @@ declare module "next-auth" {
       name?: string;
       email?: string;
       image?: string;
-      token?: string;
-    }
-    accessToken?: string;
+      accessToken?: string;
+      role?: string;
+    };
+    jwt?: string; // Optional JWT property
   }
 }
 
@@ -29,6 +30,7 @@ export const authOptions: NextAuthOptions = {
           name: profile.name,
           image: profile.picture,
           sub: profile.sub,
+          accessToken: profile.access_token,
           role: "user" // Default role for Google users
         };
       }
@@ -57,9 +59,9 @@ export const authOptions: NextAuthOptions = {
             id: "admin",
             email: credentials.email,
             name: "Admin User",
+            image: undefined,
             role: "admin"
           };
-        }
 
         // In a real implementation, you'd check your database:
         // const admin = await db.admin.findUnique({
@@ -74,7 +76,7 @@ export const authOptions: NextAuthOptions = {
         //     role: "admin"
         //   };
         // }
-
+        }
         return null;
       }
     }),
@@ -110,9 +112,10 @@ export const authOptions: NextAuthOptions = {
       // Add user ID to session from token
       if (session?.user && token.id) {
         session.user.id = token.sub as string;
-        session.user.token = token.accessToken as string;
+        session.user.accessToken = token.accessToken as string;
+        session.user.role = token.role as string; // Add role to session
+        session.jwt = JSON.stringify(token); // Convert token object to string
       }
-      session.accessToken = token.accessToken as string;
       return session;
     },
     async jwt({ token, account, user }) {
