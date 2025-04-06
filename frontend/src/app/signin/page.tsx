@@ -7,6 +7,7 @@ import GoogleSignInButton from "@/components/ui/GoogleSignInButton";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import ErrorMessage from "../../components/ErrorMessage";
+// import AccountLinker from "@/components/AccountLinker";
 
 export default function SignIn() {
   const router = useRouter();
@@ -57,6 +58,7 @@ export default function SignIn() {
           
           <div className="flex justify-center">
             <GoogleSignInButton />
+            {/* <AccountLinker /> */}
           </div>
           
           <p className="text-xs text-center text-gray-400 mt-8">

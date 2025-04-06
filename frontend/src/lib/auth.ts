@@ -1,6 +1,20 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
+// import { Session } from "next-auth";
+
+// Extend the Session type to include custom properties
+declare module "next-auth" {
+  interface Session {
+    user: {
+      id?: string;
+      name?: string;
+      email?: string;
+      image?: string;
+      token?: string;
+    }
+  }
+}
 
 export const authOptions: NextAuthOptions = {
   providers: [
@@ -95,6 +109,7 @@ export const authOptions: NextAuthOptions = {
       // Add user ID to session from token
       if (session?.user && token.id) {
         session.user.id = token.sub as string;
+        session.user.token = token.accessToken as string;
       }
       return session;
     },

@@ -13,6 +13,7 @@ import { FiUser, FiSettings } from "react-icons/fi";
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import FeedbackForm from '@/components/FeedbackForm';
+import AccountLinker from '@/components/AccountLinker';
 
 export default function AikaChat() {
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
@@ -257,6 +258,7 @@ export default function AikaChat() {
                       </motion.a>
                     </li>
                   ))}
+                  <AccountLinker /> {/* Wallet linking component */}
                   
                 </ul>
               </nav>
