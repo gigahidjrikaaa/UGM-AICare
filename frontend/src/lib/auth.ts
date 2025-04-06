@@ -13,6 +13,7 @@ declare module "next-auth" {
       image?: string;
       token?: string;
     }
+    accessToken?: string;
   }
 }
 
@@ -111,6 +112,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.sub as string;
         session.user.token = token.accessToken as string;
       }
+      session.accessToken = token.accessToken as string;
       return session;
     },
     async jwt({ token, account, user }) {

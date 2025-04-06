@@ -10,7 +10,7 @@ router = APIRouter()
 class LinkDIDRequest(BaseModel):
     wallet_address: str
 
-@router.post("/api/link-did")
+@router.post("/link-did")
 def link_did(payload: LinkDIDRequest, db: Session = Depends(get_db), user: User = Depends(get_current_google_user)):
     if not payload.wallet_address:
         raise HTTPException(status_code=400, detail="Missing wallet address")

@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI
 from datetime import datetime
 from app.database import init_db
-from app.routes import email, docs, chat, feedback
+from app.routes import email, docs, chat, feedback, link_did
 from fastapi.middleware.cors import CORSMiddleware
 import os
 from dotenv import load_dotenv
@@ -67,6 +67,7 @@ app.include_router(email.router, prefix="/api/v1", tags=["Email"]) # Added prefi
 app.include_router(docs.router, prefix="/api/v1", tags=["Documents"]) # Added prefix/tag consistency
 app.include_router(chat.router, prefix="/api/v1", tags=["Chat"]) # Use /api/v1 prefix
 app.include_router(feedback.router, prefix="/api/v1", tags=["Feedback"]) # Added prefix/tag consistency
+app.include_router(link_did.router, prefix="/api/v1", tags=["Link DID"]) # Added prefix/tag consistency
 logger.info(f"List of routers (/api/v1): {app.routes}")
 logger.info(f"Allowed origins: {origins}")
 

@@ -31,7 +31,7 @@ export default function AccountLinker() {
         return
       }
 
-      const res = await fetch(`${process.env.NEXT_PUBLIC_BACKEND_URL}/api/link-did`, {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/v1/link-did`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
