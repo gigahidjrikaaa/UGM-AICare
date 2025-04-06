@@ -67,7 +67,7 @@ if %ERRORLEVEL% equ 1 (
         echo Redis is not running in WSL2 Ubuntu. Starting Redis server automatically...
         
         :: Start Redis in a separate window
-        start "Redis Server" wsl -d Ubuntu -e redis-server
+        start /b wsl -d Ubuntu -e redis-server
         
         :: Wait for Redis to start
         echo Waiting for Redis to initialize...
@@ -90,34 +90,9 @@ if not exist "%~dp0backend\logs" (
     echo. > "%~dp0backend\logs\chat.log"
 )
 
-:: Start the backend server in one terminal
-echo Starting FastAPI backend server...
-start "UGM-AICare Backend" cmd /k "cd /d "%~dp0backend" && echo Activating virtual environment... && call .venv\Scripts\activate && echo Installing dependencies... && pip install -r requirements.txt && echo Starting FastAPI server... && uvicorn app.main:app --reload --port 8000 && pause"
+:: Ensure all started terminals remain open by adding 'pause' to each terminal command
+start cmd /k "title Backend Server && cd /d "%~dp0backend" && call .venv\Scripts\activate && uvicorn app.main:app --reload --port 8000 && pause"
+start cmd /k "title Frontend Server && cd /d "%~dp0frontend" && npm run dev && pause"
 
-:: Wait a moment for backend to initialize
-echo Waiting for backend to initialize...
-timeout /t 5 /nobreak > nul
-
-:: Start the frontend server in another terminal
-echo Starting Next.js frontend server...
-start "UGM-AICare Frontend" cmd /k "cd /d "%~dp0frontend" && echo Installing dependencies... && npm install && echo Starting Next.js dev server... && npm run dev && pause"
-
-:: Wait a moment for services to start
-timeout /t 2 /nobreak > nul
-
-:: Open browser windows for both services
-echo Opening browser tabs...
-start http://localhost:3000
-
-echo ===================================
-echo All services are now starting!
-echo - Backend: http://localhost:8000
-echo - Frontend: http://localhost:3000
-echo - API Docs: http://localhost:8000/docs
-echo - Redis Monitor: See separate window
-echo ===================================
-echo To stop the servers, close the terminal windows.
-echo ===================================
-
+:: Ensure the terminal pauses at the end of the script
 pause
-exit /b 0
