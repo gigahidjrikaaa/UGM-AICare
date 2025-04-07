@@ -1,49 +1,51 @@
-# backend/app/dependencies.py
+# backend/app/dependencies.py (Modified)
 import logging
-from fastapi import Depends, HTTPException, Header # type: ignore
+from fastapi import Depends, HTTPException, Header, status # type: ignore
 from sqlalchemy.orm import Session
-from jose import JWTError, jwt # type: ignore
-
 from app.models import User
-import os
-from dotenv import load_dotenv
-import time
-from app.database import get_db  # make sure this is your DB dependency
+from app.database import get_db
+from app.auth_utils import decode_jwt_token # Import the new helper
 
-# Load environment variables
-load_dotenv()
-
-# Set up logging
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
 
-# Get JWT settings from environment
-JWT_SECRET = os.environ.get("JWT_SECRET_KEY", "sigmasigmaboysigmaboy")
-ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS512")
+def get_token_from_header(authorization: str = Header(...)) -> str:
+    """Extracts the token from the Authorization header."""
+    if not authorization.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization scheme",
+            headers={"WWW-Authenticate": "Bearer error=\"invalid_request\""},
+        )
+    token = authorization.split(" ")[1]
+    if not token:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization token missing",
+            headers={"WWW-Authenticate": "Bearer error=\"invalid_token\""},
+        )
+    return token
 
-def get_current_google_user(
-    Authorization: str = Header(...),
+def get_current_active_user(
+    token: str = Depends(get_token_from_header), # Use the extracted token
     db: Session = Depends(get_db),
-):
-    if not Authorization.startswith("Bearer "):
-        raise HTTPException(status_code=403, detail="Invalid authorization header")
+) -> User:
+    """Dependency to get the current authenticated and active user from JWT."""
+    logger.info("Attempting to authenticate user...")
+    payload = decode_jwt_token(token) # Use the helper function
 
-    logger.info(f"Authorization header: {Authorization}")
-    logger.info(f"Token: {Authorization.split(' ')[1]}")
-    token = Authorization.split(" ")[1]
-    try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
-        logger.info(f"Decoded payload: {payload}")
-        user_id = payload.get("sub")
-        if not user_id:
-            raise HTTPException(status_code=403, detail="Invalid token")
+    user_id = payload.sub # Pydantic model ensures 'sub' exists
 
-        user = db.query(User).filter(User.id == user_id).first()
-        if not user:
-            raise HTTPException(status_code=404, detail="User not found")
+    user = db.query(User).filter(User.id == user_id).first()
+    if not user:
+        logger.warning(f"User with id {user_id} not found in database.")
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="User not found",
+        )
 
-        return user
+    # Optional: Add checks for user status (e.g., is_active) if needed
+    # if not user.is_active:
+    #     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
 
-    except JWTError:
-        # logger.error(jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM]))
-        raise HTTPException(status_code=403, detail="Invalid token")
+    logger.info(f"Successfully authenticated user: {user.id}")
+    return user

@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException # type: ignore
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.models import User
-from app.dependencies import get_current_google_user, get_db
+from app.dependencies import get_current_active_user, get_db
 
 router = APIRouter()
 
@@ -11,7 +11,7 @@ class LinkDIDRequest(BaseModel):
     wallet_address: str
 
 @router.post("/link-did")
-def link_did(payload: LinkDIDRequest, db: Session = Depends(get_db), user: User = Depends(get_current_google_user)):
+def link_did(payload: LinkDIDRequest, db: Session = Depends(get_db), user: User = Depends(get_current_active_user)):
     if not payload.wallet_address:
         raise HTTPException(status_code=400, detail="Missing wallet address")
 
