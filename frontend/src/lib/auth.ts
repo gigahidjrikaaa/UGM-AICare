@@ -79,14 +79,17 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     // The jwt callback is invoked when a JWT is created or updated.
-    async jwt({ token, user, account }) {
-      console.log("JWT Callback - Token:", token, "User:", user, "Account:", account); // Debug log
+    async jwt({ token, user, account, trigger }) {
+      console.log("JWT Callback Trigger:", trigger); // Log trigger type
+      console.log("JWT Callback - Initial Token:", token); // Log token received
       // Persist the OAuth access_token and user role to the token right after sign-in
       if (account && user) {
+        console.log("JWT Callback: Sign-in/Update - Adding info to token");
         token.accessToken = account.access_token; // Store access token from provider
         token.id = user.id;                  // Store user ID (consistent with session)
         token.role = user.role;              // Store user role
       }
+      console.log("JWT Callback - Final Token Object:", token);
       return token; // The token object will be encrypted and stored in a cookie
     },
 
@@ -116,19 +119,17 @@ export const authOptions: NextAuthOptions = {
 
     // The session callback is invoked when a session is checked.
     async session({ session, token }) {
-      console.log("Session Callback - Session:", session, "Token:", token); // Debug log
-     // Send properties to the client, like user ID, role, and the raw token for backend calls
-     if (session.user && token.sub) { // Use token.sub for user ID consistency
-       session.user.id = token.sub;
-       session.user.role = token.role; // Add role from token to session.user
-       // Optionally add accessToken if needed client-side (use with caution)
-       // session.user.accessToken = token.accessToken;
-     }
-      // Add the raw JWT to the session object (useful for backend API calls)
-      if (token) {
-        session.jwt = token as unknown as string; // Add the raw JWT here
+      console.log("Session Callback - Received Token Object:", token);
+     
+      // Assign user info from the token object to the session object
+      if (session.user && token.sub) { // Use token.sub for ID consistency
+        session.user.id = token.sub;
+        session.user.role = token.role;
+        session.user.accessToken = token.accessToken; // Pass if needed client-side
       }
-     return session; // The session object is returned to the client
+      
+      console.log("Session Callback - Final Session Object:", session);
+      return session; // The session object is returned to the client
    },
   },
   pages: {

@@ -1,10 +1,9 @@
 // frontend/src/services/api.ts
 
 import axios from 'axios';
-import { getSession } from 'next-auth/react'; // Use getSession client-side
 
 // Define the base URL for your backend API
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000//api/v1/chat'; // Adjust if needed
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL + "/api/v1" || 'http://localhost:8000/api/v1'; // Adjust if needed
 
 // Define interfaces for type safety
 
@@ -41,24 +40,40 @@ const apiClient = axios.create({
   },
 });
 
-// Add a request interceptor to automatically attach the JWT
-apiClient.interceptors.request.use(
-  async (config) => {
-    const session = await getSession(); // Fetch the current session
-    // --- Access the raw JWT from the session ---
-    const token = session?.jwt; // Assuming 'jwt' holds the raw token
-
-    if (token && config.headers) {
-       console.log("Attaching JWT to request:", String(token).substring(0, 15) + "..."); // Log trimmed token
-      config.headers.Authorization = `Bearer ${token}`;
-    } else {
-        console.log("No session token found, request sent without Authorization header.");
-    }
-    return config;
-  },
-  (error) => {
-    return Promise.reject(error);
+/// Function to get the JWT from our new API route
+async function getRawToken(): Promise<string | null> {
+  try {
+      // Make a request to your own API route
+      const response = await fetch('/api/auth/getToken');
+      if (!response.ok) {
+           console.error("Failed to fetch raw token:", response.statusText);
+           return null;
+      }
+      const data = await response.json();
+      return data.jwt || null;
+  } catch (error) {
+      console.error("Error fetching raw token:", error);
+      return null;
   }
+}
+
+// Add request interceptor to attach JWT token to every request
+// This will be called before every request to the backend
+apiClient.interceptors.request.use(
+async (config) => {
+  const token = await getRawToken(); // Fetch the raw token string
+
+  if (token && config.headers) {
+     console.log("Attaching RAW JWT to request:", String(token).substring(0, 15) + "...");
+     config.headers.Authorization = `Bearer ${token}`;
+  } else {
+     console.log("No raw token found, request sent without Authorization header.");
+  }
+  return config;
+},
+(error) => {
+  return Promise.reject(error);
+}
 );
 
 // Optional: Add response interceptor for global error handling (e.g., 401 redirect)

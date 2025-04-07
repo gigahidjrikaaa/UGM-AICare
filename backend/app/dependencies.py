@@ -4,7 +4,7 @@ from fastapi import Depends, HTTPException, Header, status # type: ignore
 from sqlalchemy.orm import Session
 from app.models import User
 from app.database import get_db
-from app.auth_utils import decode_jwt_token # Import the new helper
+from app.auth_utils import decrypt_and_validate_token
 
 logger = logging.getLogger(__name__)
 
@@ -31,7 +31,7 @@ def get_current_active_user(
 ) -> User:
     """Dependency to get the current authenticated and active user from JWT."""
     logger.info("Attempting to authenticate user...")
-    payload = decode_jwt_token(token) # Use the helper function
+    payload = decrypt_and_validate_token(token) # Use the helper function
 
     user_id = payload.sub # Pydantic model ensures 'sub' exists
 

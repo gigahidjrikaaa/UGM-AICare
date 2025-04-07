@@ -1,10 +1,10 @@
 import json
 import logging
-from fastapi import FastAPI
+from fastapi import FastAPI # type: ignore
 from datetime import datetime
 from app.database import init_db
 from app.routes import email, docs, chat, feedback, link_did
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware # type: ignore
 import os
 from dotenv import load_dotenv
 
