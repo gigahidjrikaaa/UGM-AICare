@@ -33,6 +33,7 @@ def get_current_google_user(
     token = Authorization.split(" ")[1]
     try:
         payload = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
+        logger.info(f"Decoded payload: {payload}")
         user_id = payload.get("sub")
         if not user_id:
             raise HTTPException(status_code=403, detail="Invalid token")
@@ -44,5 +45,5 @@ def get_current_google_user(
         return user
 
     except JWTError:
-        logger.error(jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM]))
+        # logger.error(jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM]))
         raise HTTPException(status_code=403, detail="Invalid token")

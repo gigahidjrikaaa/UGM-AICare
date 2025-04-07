@@ -3,6 +3,29 @@ import GoogleProvider from "next-auth/providers/google";
 import Credentials from "next-auth/providers/credentials";
 // import { Session } from "next-auth";
 
+// Environment variables type checking
+const checkEnvVariables = () => {
+  const requiredEnvVars = [
+    'NEXTAUTH_SECRET',
+    'GOOGLE_CLIENT_ID',
+    'GOOGLE_CLIENT_SECRET',
+    'NEXTAUTH_URL'
+  ];
+  
+  const missingEnvVars = requiredEnvVars.filter(
+    varName => !process.env[varName]
+  );
+  
+  if (missingEnvVars.length > 0) {
+    throw new Error(
+      `Missing required environment variables: ${missingEnvVars.join(', ')}. Please check your .env file.`
+    );
+  }
+};
+
+// Execute environment variable check
+checkEnvVariables();
+
 // Extend the Session type to include custom properties
 declare module "next-auth" {
   interface Session {
@@ -14,11 +37,12 @@ declare module "next-auth" {
       accessToken?: string;
       role?: string;
     };
-    jwt?: string; // Optional JWT property
+    jwt?: string; // Add jwt property to session
   }
 }
 
 export const authOptions: NextAuthOptions = {
+  secret: process.env.NEXTAUTH_SECRET,
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID as string,
@@ -114,7 +138,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.sub as string;
         session.user.accessToken = token.accessToken as string;
         session.user.role = token.role as string; // Add role to session
-        session.jwt = JSON.stringify(token); // Convert token object to string
+        session.jwt = token as unknown as string; // Add JWT to session
       }
       return session;
     },
