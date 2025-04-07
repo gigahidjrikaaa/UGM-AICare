@@ -1,6 +1,6 @@
 import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
-import Credentials from "next-auth/providers/credentials";
+import CredentialsProvider from "next-auth/providers/credentials";
 // import { Session } from "next-auth";
 
 // Environment variables type checking
@@ -26,21 +26,6 @@ const checkEnvVariables = () => {
 // Execute environment variable check
 checkEnvVariables();
 
-// Extend the Session type to include custom properties
-declare module "next-auth" {
-  interface Session {
-    user: {
-      id?: string;
-      name?: string;
-      email?: string;
-      image?: string;
-      accessToken?: string;
-      role?: string;
-    };
-    jwt?: string; // Add jwt property to session
-  }
-}
-
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   providers: [
@@ -48,6 +33,7 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
       profile(profile) {
+        console.log("Google Profile received:", profile); // Debug log
         return {
           id: profile.sub,
           email: profile.email,
@@ -55,13 +41,13 @@ export const authOptions: NextAuthOptions = {
           image: profile.picture,
           sub: profile.sub,
           accessToken: profile.access_token,
-          role: "user" // Default role for Google users
+          role: profile.email?.endsWith("@ugm.ac.id") ? "user" : "guest", // Example: Assign role based on emai
         };
       }
     }),
 
     // Add a credentials provider for admin login
-    Credentials({
+    CredentialsProvider({
       id: "admin-login",
       name: "Admin Credentials",
       credentials: {
@@ -69,47 +55,42 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        if (!credentials?.email || !credentials?.password) {
-          return null;
-        }
-
-        // This is where you'd validate against your admin database
-        // For now, we'll use a simple check with environment variables
-        if (
-          credentials.email === "admin@ugm.ac.id" &&
-          credentials.password === "admin"
-        ) {
-          return {
-            id: "admin",
-            email: credentials.email,
-            name: "Admin User",
-            image: undefined,
-            role: "admin"
-          };
-
-        // In a real implementation, you'd check your database:
-        // const admin = await db.admin.findUnique({
-        //   where: { email: credentials.email }
-        // });
-        // 
-        // if (admin && await comparePasswords(credentials.password, admin.password)) {
-        //   return {
-        //     id: admin.id,
-        //     email: admin.email,
-        //     name: admin.name,
-        //     role: "admin"
-        //   };
-        // }
-        }
-        return null;
+        console.log("Attempting Admin Login:", credentials?.email); // Log attempt, but not password
+            if (
+              credentials?.email === process.env.ADMIN_EMAIL && // Use env vars for admin credentials
+              credentials?.password === process.env.ADMIN_PASSWORD
+            ) {
+              console.log("Admin Login Successful:", credentials?.email);
+              return { // Return the Admin User object
+                id: "admin-user", // Use a distinct ID for admin
+                email: credentials?.email,
+                name: "Administrator",
+                role: "admin" // Assign the 'admin' role
+              };
+            }
+            console.warn("Admin Login Failed:", credentials?.email);
+            return null; // Login failed
       }
     }),
   ],
   session: {
     strategy: "jwt",
-    maxAge: 3 * 24 * 60 * 60, // 1 days
+    maxAge: 1 * 24 * 60 * 60, // 1 days
   },
   callbacks: {
+    // The jwt callback is invoked when a JWT is created or updated.
+    async jwt({ token, user, account }) {
+      console.log("JWT Callback - Token:", token, "User:", user, "Account:", account); // Debug log
+      // Persist the OAuth access_token and user role to the token right after sign-in
+      if (account && user) {
+        token.accessToken = account.access_token; // Store access token from provider
+        token.id = user.id;                  // Store user ID (consistent with session)
+        token.role = user.role;              // Store user role
+      }
+      return token; // The token object will be encrypted and stored in a cookie
+    },
+
+    // The redirect callback is invoked whenever a redirect is triggered.
     async redirect({ url, baseUrl }) {
       // For admin login, redirect to admin dashboard
       if (url.startsWith("/api/auth/callback/admin-login")) {
@@ -132,28 +113,23 @@ export const authOptions: NextAuthOptions = {
       }
       return url;
     },
+
+    // The session callback is invoked when a session is checked.
     async session({ session, token }) {
-      // Add user ID to session from token
-      if (session?.user && token.id) {
-        session.user.id = token.sub as string;
-        session.user.accessToken = token.accessToken as string;
-        session.user.role = token.role as string; // Add role to session
-        session.jwt = token as unknown as string; // Add JWT to session
+      console.log("Session Callback - Session:", session, "Token:", token); // Debug log
+     // Send properties to the client, like user ID, role, and the raw token for backend calls
+     if (session.user && token.sub) { // Use token.sub for user ID consistency
+       session.user.id = token.sub;
+       session.user.role = token.role; // Add role from token to session.user
+       // Optionally add accessToken if needed client-side (use with caution)
+       // session.user.accessToken = token.accessToken;
+     }
+      // Add the raw JWT to the session object (useful for backend API calls)
+      if (token) {
+        session.jwt = token as unknown as string; // Add the raw JWT here
       }
-      return session;
-    },
-    async jwt({ token, account, user }) {
-      // Add user info to token
-      if (account && user) {
-        token.accessToken = account.access_token;
-        token.id = user.id;
-        // Check if role property exists before assigning
-        if ('role' in user) {
-          token.role = (user as { role: string }).role;
-        }
-      }
-      return token;
-    },
+     return session; // The session object is returned to the client
+   },
   },
   pages: {
     signIn: '/signin',

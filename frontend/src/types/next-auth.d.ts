@@ -1,32 +1,31 @@
-import { DefaultSession } from "next-auth";
+import { DefaultSession, DefaultUser } from "next-auth";
+import { DefaultJWT } from "next-auth/jwt";
 
 declare module "next-auth" {
   /**
    * Extend the built-in session types
    */
-  interface Session {
+  interface Session extends DefaultSession {
     user: {
-      id?: string;
-      name?: string;
-      email?: string;
-      image?: string;
-    } & DefaultSession["user"];
+      id: string; // Ensure ID is always present after authentication
+      role?: string; // Role assigned during authentication
+      accessToken?: string; // Google access token (optional, for specific API calls)
+    } & DefaultSession["user"]; // Inherit name, email, image
+    jwt?: string; // The raw JWT for backend calls
   }
-  
-  /**
-   * Extend the built-in user types
-   */
-  interface User {
-    id: string;
-    name: string;
-    email: string;
-    image?: string;
-    role?: string; // Add role field
+
+  // Extend the User object returned by providers (e.g., Google)
+  interface User extends DefaultUser {
+    role?: string;
+    // Potentially add other fields from the Google profile if needed
   }
 }
 
 declare module "next-auth/jwt" {
-  interface JWT {
-    role?: string; // Add role field
+  // Extend the token payload
+  interface JWT extends DefaultJWT {
+    id?: string;
+    role?: string;
+    accessToken?: string;
   }
 }

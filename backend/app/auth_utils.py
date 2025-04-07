@@ -3,7 +3,7 @@ import os
 import logging
 from typing import Optional
 from jose import JWTError, jwt # type: ignore
-from fastapi import HTTPException, status
+from fastapi import HTTPException, status # type: ignore
 from pydantic import BaseModel, ValidationError
 
 # Load environment variables
