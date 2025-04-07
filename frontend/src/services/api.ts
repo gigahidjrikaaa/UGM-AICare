@@ -1,6 +1,7 @@
 // frontend/src/services/api.ts
 
 import axios from 'axios';
+import { getSession } from 'next-auth/react'; // Use getSession client-side
 
 // Define the base URL for your backend API
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000//api/v1/chat'; // Adjust if needed
@@ -34,13 +35,52 @@ export interface ChatResponsePayload {
 
 
 const apiClient = axios.create({
-  baseURL: API_BASE_URL,
+  baseURL: API_BASE_URL || 'http://127.0.0.1:8000/api/v1', // Point to backend base
   headers: {
     'Content-Type': 'application/json',
-    // Add Authorization header if your backend requires authentication
-    // 'Authorization': `Bearer ${your_auth_token}`
   },
 });
+
+// Add a request interceptor to automatically attach the JWT
+apiClient.interceptors.request.use(
+  async (config) => {
+    const session = await getSession(); // Fetch the current session
+    // --- Access the raw JWT from the session ---
+    const token = session?.jwt; // Assuming 'jwt' holds the raw token
+
+    if (token && config.headers) {
+       console.log("Attaching JWT to request:", String(token).substring(0, 15) + "..."); // Log trimmed token
+      config.headers.Authorization = `Bearer ${token}`;
+    } else {
+        console.log("No session token found, request sent without Authorization header.");
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
+  }
+);
+
+// Optional: Add response interceptor for global error handling (e.g., 401 redirect)
+apiClient.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error.response?.status === 401) {
+      // Handle unauthorized access, e.g., redirect to login
+      console.error("API request Unauthorized (401):", error.response.data?.detail);
+      // Optionally: signOut({ callbackUrl: '/signin' });
+    }
+     // Log other errors
+     if (axios.isAxiosError(error)) {
+       console.error(`API Error (${error.response?.status}):`, error.response?.data || error.message);
+     } else {
+       console.error("API Error:", error);
+     }
+    return Promise.reject(error); // Propagate the error
+  }
+);
+
+export default apiClient; // Export the configured client if needed elsewhere
 
 /**
  * Sends conversation history to the backend chat endpoint and retrieves the AI response.
@@ -70,5 +110,3 @@ export const sendMessage = async (payload: ChatRequestPayload): Promise<ChatResp
 };
 
 // You can add other API service functions here (e.g., for login, profile, etc.)
-
-export default apiClient; // Export the configured client if needed elsewhere
