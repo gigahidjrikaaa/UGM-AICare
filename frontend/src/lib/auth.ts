@@ -26,6 +26,14 @@ const checkEnvVariables = () => {
 // Execute environment variable check
 checkEnvVariables();
 
+interface InternalUserResponse {
+  id: number; // DB Primary Key
+  google_sub: string;
+  email?: string | null;
+  wallet_address?: string | null;
+  role?: string | null; // If backend provides role
+}
+
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   providers: [
@@ -42,7 +50,7 @@ export const authOptions: NextAuthOptions = {
           sub: profile.sub,
           accessToken: profile.access_token,
           role: profile.email?.endsWith("@ugm.ac.id") ? "user" : "guest", // Example: Assign role based on emai
-          wallet_address: null // Initialize wallet_address as null
+          wallet_address: null,
         };
       }
     }),
@@ -81,24 +89,63 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     // The jwt callback is invoked when a JWT is created or updated.
     async jwt({ token, user, account, trigger }) {
-      console.log("JWT Callback Trigger:", trigger); // Log trigger type
-      console.log("JWT Callback - Initial Token:", token); // Log token received
-      // Persist the OAuth access_token and user role to the token right after sign-in
-      if (account && user) {
-        console.log("JWT Callback: Sign-in/Update - Adding info to token");
-        token.accessToken = account.access_token; // Store access token from provider
-        token.id = user.id;                  // Store user ID (consistent with session)
-        token.role = user.role;              // Store user role
-        if (user.wallet_address) {
-          token.wallet_address = user.wallet_address;
-          console.log("JWT: Added wallet_address from user object:", user.wallet_address);
-        } else {
-          console.log("JWT: No wallet_address found in user object.");
-          token.wallet_address = null; // Ensure it's null if not present
-        }
+      const isSignIn = account && user; // Check if this is a sign-in event
+      const needsUpdate = trigger === 'signIn' || trigger === 'update' || !token.wallet_address; // Fetch on sign-in, update, or if wallet address is missing
+
+      if (isSignIn) {
+        // On initial sign-in, populate from user/account object first
+        token.accessToken = account.access_token;
+        token.id = user.id; // Google 'sub'
+        token.role = user.role; // Role from GoogleProvider profile or Credentials
+        console.log(`JWT: Initial sign-in for user ${user.id}. Role: ${user.role}`);
       }
-      console.log("JWT Callback - Final Token Object:", token);
-      return token; // The token object will be encrypted and stored in a cookie
+
+      console.log("JWT Callback - Initial Token:", token); // Log token received
+      // Fetch/Refresh DB data if necessary (on sign-in or if data missing)
+      // Use token.sub (which should be same as token.id after sign-in)
+      if (token.sub && needsUpdate) {
+          console.log(`JWT: Fetching/Refreshing user data from internal API for sub: ${token.sub}`);
+          try {
+              const internalApiUrl = `${process.env.BACKEND_URL || 'http://127.0.0.1:8000'}/api/v1/internal/user-by-sub/${token.sub}`;
+              const internalApiKey = process.env.INTERNAL_API_KEY; // Get key from Next.js env
+
+              if (!internalApiKey) {
+                 console.error("JWT Error: INTERNAL_API_KEY is not configured in Next.js environment.");
+                 throw new Error("Internal API Key missing");
+              }
+
+              const response = await fetch(internalApiUrl, {
+                  headers: {
+                      'X-Internal-API-Key': internalApiKey,
+                  },
+              });
+
+              if (!response.ok) {
+                  if (response.status === 404) {
+                      console.warn(`JWT: User sub ${token.sub} not found in backend DB.`);
+                      token.wallet_address = null; // User might exist in Auth but not DB yet
+                  } else {
+                      throw new Error(`Internal API request failed: ${response.status} ${response.statusText}`);
+                  }
+              } else {
+                  const dbUserData: InternalUserResponse = await response.json();
+                  console.log("JWT: Received data from internal API:", dbUserData);
+                  token.wallet_address = dbUserData.wallet_address ?? null;
+                  // Optionally update role if fetched from DB:
+                  // if (dbUserData.role) token.role = dbUserData.role;
+              }
+          } catch (error) {
+              console.error("JWT: Error fetching user data from internal API:", error);
+              // Decide if this is critical - maybe keep existing token data?
+              // Setting to null might be safer if fetch fails consistently
+              if (!token.wallet_address) token.wallet_address = null;
+          }
+      } else if (!token.sub) {
+          console.warn("JWT: No token.sub found, cannot fetch DB data.");
+      }
+
+      console.log("JWT Callback - Returning Token:", JSON.stringify(token, null, 2));
+      return token;
     },
 
     // The redirect callback is invoked whenever a redirect is triggered.
@@ -127,8 +174,8 @@ export const authOptions: NextAuthOptions = {
 
     // The session callback is invoked when a session is checked.
     async session({ session, token }) {
-      console.log("Session Callback - Received Token Object:", token);
-     
+      console.log("Session Callback - Received Token Object:", JSON.stringify(token, null, 2));
+              
       // Assign user info from the token object to the session object
       if (session.user && token.sub) { // Use token.sub for ID consistency
         session.user.id = token.sub;
