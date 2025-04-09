@@ -68,9 +68,9 @@ app.include_router(docs.router, prefix="/api/v1", tags=["Documents"]) # Added pr
 app.include_router(chat.router, prefix="/api/v1", tags=["Chat"]) # Use /api/v1 prefix
 app.include_router(feedback.router, prefix="/api/v1", tags=["Feedback"]) # Added prefix/tag consistency
 app.include_router(link_did.router, prefix="/api/v1", tags=["Link DID"]) # Added prefix/tag consistency
-app.include_router(journal.router, prefix="/api/v1", tags=["Journal"]) # Added prefix/tag consistency
 
-app.include_router(internal.router)
+app.include_router(journal.router) # Prefix set in journal.py
+app.include_router(internal.router) # Prefix set in internal.py
 logger.info(f"List of routers (/api/v1): {app.routes}")
 logger.info(f"Allowed origins: {origins}")
 

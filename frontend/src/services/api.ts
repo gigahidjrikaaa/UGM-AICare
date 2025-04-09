@@ -66,6 +66,8 @@ async (config) => {
   if (token && config.headers) {
      console.log("Attaching RAW JWT to request:", String(token).substring(0, 15) + "...");
      config.headers.Authorization = `Bearer ${token}`;
+     console.log("Authorization header set:", config.headers.Authorization);
+     
   } else {
      console.log("No raw token found, request sent without Authorization header.");
   }

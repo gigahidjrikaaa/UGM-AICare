@@ -25,7 +25,8 @@ export default function ChatHistoryViewer() {
             try {
                 const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
                 // Assuming apiClient handles auth headers automatically now
-                const response = await axios.get<HistoryItem[]>(`${baseUrl}/api/v1/chat/history`); // Use your API client
+                const response = await axios.get<HistoryItem[]>(`${baseUrl}/api/v1/history`); // Use your API client
+                console.log("Chat history response:", response.data);
                 // Group messages by session or date for better display (optional enhancement)
                 setHistory(response.data);
             } catch (err) {

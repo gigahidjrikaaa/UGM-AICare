@@ -321,10 +321,16 @@ async def get_chat_history(
     current_user: User = Depends(get_current_active_user) # Get authenticated user
 ):
     """Fetches conversation history for the authenticated user."""
-    history = db.query(Conversation)\
-        .filter(Conversation.user_id == current_user.id)\
-        .order_by(Conversation.timestamp.desc())\
-        .offset(skip)\
-        .limit(limit)\
-        .all()
-    return history
+    try:
+        llm.logger.info(f"Fetching chat history for user {current_user.id}, limit: {limit}, skip: {skip}")
+        history = db.query(Conversation)\
+            .filter(Conversation.user_id == current_user.id)\
+            .order_by(Conversation.timestamp.desc())\
+            .offset(skip)\
+            .limit(limit)\
+            .all()
+        llm.logger.info(f"Retrieved {len(history)} history items for user {current_user.id}")
+        return history
+    except Exception as e:
+        llm.logger.error(f"Error fetching chat history for user {current_user.id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve chat history")

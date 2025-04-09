@@ -47,7 +47,7 @@ export default function DailyJournal() {
         } finally {
             setIsLoading(false);
         }
-    }, [baseUrl]);
+    }, []);
 
     // Fetch entry when component mounts or date changes
     useEffect(() => {
@@ -67,6 +67,7 @@ export default function DailyJournal() {
                 entry_date: selectedDate,
                 content: entryContent.trim(),
             };
+            console.log("Saving journal payload:", JSON.stringify(payload, null, 2));
              // POST endpoint handles both create and update
             const response = await axios.post<JournalEntryData>(`${baseUrl}/api/v1/journal/`, payload);
             setCurrentEntry(response.data); // Update current entry state
