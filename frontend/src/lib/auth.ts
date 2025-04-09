@@ -42,6 +42,7 @@ export const authOptions: NextAuthOptions = {
           sub: profile.sub,
           accessToken: profile.access_token,
           role: profile.email?.endsWith("@ugm.ac.id") ? "user" : "guest", // Example: Assign role based on emai
+          wallet_address: null // Initialize wallet_address as null
         };
       }
     }),
