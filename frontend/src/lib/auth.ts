@@ -88,6 +88,13 @@ export const authOptions: NextAuthOptions = {
         token.accessToken = account.access_token; // Store access token from provider
         token.id = user.id;                  // Store user ID (consistent with session)
         token.role = user.role;              // Store user role
+        if (user.wallet_address) {
+          token.wallet_address = user.wallet_address;
+          console.log("JWT: Added wallet_address from user object:", user.wallet_address);
+        } else {
+          console.log("JWT: No wallet_address found in user object.");
+          token.wallet_address = null; // Ensure it's null if not present
+        }
       }
       console.log("JWT Callback - Final Token Object:", token);
       return token; // The token object will be encrypted and stored in a cookie
@@ -126,6 +133,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.sub;
         session.user.role = token.role;
         session.user.accessToken = token.accessToken; // Pass if needed client-side
+        session.user.wallet_address = token.wallet_address ?? null;
       }
       
       console.log("Session Callback - Final Session Object:", session);

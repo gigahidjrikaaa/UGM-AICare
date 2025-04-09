@@ -10,6 +10,7 @@ declare module "next-auth" {
       id: string; // Ensure ID is always present after authentication
       role?: string; // Role assigned during authentication
       accessToken?: string; // Google access token (optional, for specific API calls)
+      wallet_address?: string | null;
     } & DefaultSession["user"]; // Inherit name, email, image
     jwt?: string; // The raw JWT for backend calls
   }
@@ -17,6 +18,7 @@ declare module "next-auth" {
   // Extend the User object returned by providers (e.g., Google)
   interface User extends DefaultUser {
     role?: string;
+    wallet_address?: string | null;
   }
 }
 
@@ -26,5 +28,6 @@ declare module "next-auth/jwt" {
     id?: string;
     role?: string;
     accessToken?: string;
+    wallet_address?: string | null;
   }
 }
