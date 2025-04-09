@@ -1,7 +1,7 @@
 # Multi-stage build for a more efficient and secure container
 
 # ---- Build Stage ----
-    FROM python:3.11-slim as builder
+    FROM alpine:3.13-slim-bookworm as builder
 
     # Set work directory
     WORKDIR /app
@@ -18,7 +18,7 @@
     RUN pip wheel --no-cache-dir --no-deps --wheel-dir /app/wheels -r requirements.txt
     
     # ---- Final Stage ----
-    FROM python:3.11-slim
+    FROM alpine:3.13-slim-bookworm
     
     # Create a non-root user
     RUN useradd -m -s /bin/bash appuser
