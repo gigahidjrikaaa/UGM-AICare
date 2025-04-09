@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI # type: ignore
 from datetime import datetime
 from app.database import init_db
-from app.routes import email, docs, chat, feedback, link_did, internal, journal
+from app.routes import email, docs, chat, feedback, link_did, internal, journal, summary
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
 import os
 from dotenv import load_dotenv
@@ -71,6 +71,7 @@ app.include_router(link_did.router, prefix="/api/v1", tags=["Link DID"]) # Added
 
 app.include_router(journal.router) # Prefix set in journal.py
 app.include_router(internal.router) # Prefix set in internal.py
+app.include_router(summary.router) # Prefix set in summary.py
 logger.info(f"List of routers (/api/v1): {app.routes}")
 logger.info(f"Allowed origins: {origins}")
 
