@@ -1,5 +1,5 @@
 # app/models.py
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean, Date, UniqueConstraint
 from sqlalchemy.orm import relationship
 from app.database import Base
 # from app.database.base import BaseModel # Assuming BaseModel provides created_at, updated_at if needed
@@ -132,3 +132,18 @@ class Feedback(Base):
 
     # Optional relationship back to User
     user = relationship("User") 
+
+class JournalEntry(Base):
+    __tablename__ = "journal_entries"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    entry_date = Column(Date, nullable=False, index=True) # Date of the journal entry
+    content = Column(Text, nullable=False) # The journal text
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    user = relationship("User") # Relationship to User
+
+    # Add a unique constraint for user_id and entry_date to ensure one entry per user per day
+    __table_args__ = (UniqueConstraint('user_id', 'entry_date', name='_user_entry_date_uc'),)

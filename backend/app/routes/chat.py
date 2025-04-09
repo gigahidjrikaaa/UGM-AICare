@@ -13,9 +13,7 @@ from app.database import get_db
 from app.models import User, Conversation, UserSummary # Import User and Conversation models
 from app.core import llm
 from app.core.llm import LLMProvider # Import the type hint
-
-# Import your authentication dependency if you have one
-# from app.dependencies import get_current_user # Example
+from app.dependencies import get_current_active_user
 
 router = APIRouter()
 
@@ -107,6 +105,15 @@ def get_or_create_user(db: Session, received_google_sub: str) -> User:
             llm.logger.error(f"Database error creating user: {e}", exc_info=True)
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create user record.")
     return user
+
+class ConversationHistoryItem(BaseModel):
+    role: str
+    content: str
+    timestamp: datetime
+    session_id: str # Include session ID for grouping
+
+    class Config:
+         orm_mode = True # Or from_attributes = True
 
 # --- API Endpoint (Async) ---
 # Add dependencies=[Depends(get_current_user)] if you have authentication
@@ -264,10 +271,10 @@ async def summarize_and_save(db: Session, user_id: int, session_id_to_summarize:
         # 3. Create the summarization prompt (same as before)
         summarization_prompt = f"""Please summarize the key points, user's expressed feelings, and main topics discussed in the following conversation history. Focus on aspects relevant to mental well-being for UGM-AICare users. Be concise. Write the response in Indonesian/Bahasa Indonesia. Do not use markdown format because the value is stored in a SQL cell.
 
-Conversation:
-{formatted_history}
+        Conversation:
+        {formatted_history}
 
-Summary:"""
+        Summary:"""
 
         # 4. Call the LLM (same as before)
         summary_llm_history = [{"role": "user", "content": summarization_prompt}]
@@ -304,3 +311,20 @@ Summary:"""
         # Ensure session is closed if this task manages its own session
         # db.close() # Uncomment if needed based on your session management strategy
         pass 
+
+# --- New Endpoint for Chat History ---
+@router.get("/history", response_model=List[ConversationHistoryItem])
+async def get_chat_history(
+    limit: int = 100, # Optional limit
+    skip: int = 0,   # Optional offset for pagination
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user) # Get authenticated user
+):
+    """Fetches conversation history for the authenticated user."""
+    history = db.query(Conversation)\
+        .filter(Conversation.user_id == current_user.id)\
+        .order_by(Conversation.timestamp.desc())\
+        .offset(skip)\
+        .limit(limit)\
+        .all()
+    return history
