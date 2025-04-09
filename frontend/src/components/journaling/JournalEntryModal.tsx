@@ -40,6 +40,7 @@ export default function JournalEntryModal({ isOpen, onClose, onSaveSuccess }: Jo
             const response = await apiClient.get<JournalEntryData>(`/journal/${todayDateStr}`);
             setEntryContent(response.data.content); // Set content if entry exists
             console.log("Fetched today's entry:", response.data);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         } catch (err: any) {
             if (err.response?.status === 404) {
                 // No entry for today yet, fine to start blank
@@ -51,7 +52,6 @@ export default function JournalEntryModal({ isOpen, onClose, onSaveSuccess }: Jo
         } finally {
             setIsFetching(false);
         }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isOpen, todayDateStr]); // Dependency: isOpen, todayDateStr
 
     useEffect(() => {
