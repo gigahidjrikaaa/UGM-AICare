@@ -2,6 +2,7 @@ import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 // import { Session } from "next-auth";
+import crypto from "crypto";
 
 // Environment variables type checking
 const checkEnvVariables = () => {
@@ -25,6 +26,10 @@ const checkEnvVariables = () => {
 
 // Execute environment variable check
 checkEnvVariables();
+
+function hashIdentifier(identifier: string): string {
+  return crypto.createHash("sha256").update(identifier).digest("hex")
+}
 
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
@@ -88,6 +93,7 @@ export const authOptions: NextAuthOptions = {
         token.accessToken = account.access_token; // Store access token from provider
         token.id = user.id;                  // Store user ID (consistent with session)
         token.role = user.role;              // Store user role
+        token.hashed_identifier = hashIdentifier(token.id); // Store hashed identifier
       }
       console.log("JWT Callback - Final Token Object:", token);
       return token; // The token object will be encrypted and stored in a cookie
@@ -126,6 +132,7 @@ export const authOptions: NextAuthOptions = {
         session.user.id = token.sub;
         session.user.role = token.role;
         session.user.accessToken = token.accessToken; // Pass if needed client-side
+        session.user.hashed_identifier = token.hashed_identifier; // Pass hashed identifier to session
       }
       
       console.log("Session Callback - Final Session Object:", session);

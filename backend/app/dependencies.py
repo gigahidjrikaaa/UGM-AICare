@@ -37,7 +37,7 @@ def get_current_active_user(
 
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        logger.warning(f"User with id {user_id} not found in database.")
+        logger.warning(f"User with hashed_id {user_id} not found in database.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
