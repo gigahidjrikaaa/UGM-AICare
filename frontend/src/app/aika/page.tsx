@@ -240,7 +240,7 @@ export default function AikaChat() {
                 <ul className="space-y-1">
                   {[
                     { icon: <BsChatDots size={18} />, label: "New Chat", active: true },
-                    { icon: <BsClockHistory size={18} />, label: "Chat History" },
+                    { icon: <BsClockHistory size={18} />, label: "Journaling" },
                     { icon: <BsCalendar size={18} />, label: "Appointments" },
                     { icon: <FaRobot size={18} />, label: "About Aika" },
                     { icon: <BsQuestionCircle size={18} />, label: "Help & Support" }
