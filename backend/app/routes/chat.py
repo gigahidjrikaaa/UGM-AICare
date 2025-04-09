@@ -3,7 +3,7 @@
 from sqlalchemy.orm import Session # Import Session
 from sqlalchemy import desc
 import hashlib # Import hashlib
-from fastapi import APIRouter, HTTPException, Body, Depends, status, BackgroundTasks # type: ignore # Added Depends
+from fastapi import APIRouter, HTTPException, Body, Depends, status, BackgroundTasks, Query # type: ignore # Added Depends
 from pydantic import BaseModel, Field, validator
 from typing import List, Dict, Optional, Literal
 from datetime import datetime # Import datetime
@@ -315,22 +315,51 @@ async def summarize_and_save(db: Session, user_id: int, session_id_to_summarize:
 # --- New Endpoint for Chat History ---
 @router.get("/history", response_model=List[ConversationHistoryItem])
 async def get_chat_history(
-    limit: int = 100, # Optional limit
-    skip: int = 0,   # Optional offset for pagination
+    limit: int = Query(100, ge=1, le=500), # Limit for pagination
+    skip: int = Query(0, ge=0), # Optional pagination
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user) # Get authenticated user
 ):
     """Fetches conversation history for the authenticated user."""
     try:
-        llm.logger.info(f"Fetching chat history for user {current_user.id}, limit: {limit}, skip: {skip}")
-        history = db.query(Conversation)\
+        llm.logger.info(f"Fetching conversation turns for user {current_user.id}")
+
+        # 1. Fetch conversation turns from DB in chronological order
+        conversation_turns = db.query(Conversation)\
             .filter(Conversation.user_id == current_user.id)\
-            .order_by(Conversation.timestamp.desc())\
-            .offset(skip)\
-            .limit(limit)\
+            .order_by(Conversation.timestamp.asc()) \
             .all()
-        llm.logger.info(f"Retrieved {len(history)} history items for user {current_user.id}")
-        return history
+        llm.logger.info(f"Retrieved {len(conversation_turns)} conversation turns for user {current_user.id}")
+
+        # 2. Transform the data into individual history items
+        history_items: List[Dict] = []
+        for turn in conversation_turns:
+            # Add user message
+            history_items.append({
+                "role": "user",
+                "content": turn.message, # Map DB 'message' to 'content'
+                "timestamp": turn.timestamp,
+                "session_id": turn.session_id
+            })
+            # Add assistant response
+            history_items.append({
+                "role": "assistant",
+                "content": turn.response, # Map DB 'response' to 'content'
+                "timestamp": turn.timestamp, # Using same timestamp for simplicity
+                "session_id": turn.session_id
+            })
+
+        # 3. Sort the combined list of messages (user + assistant) by timestamp descending
+        history_items.sort(key=lambda x: x["timestamp"], reverse=True)
+
+        # 4. Apply pagination (limit/skip) to the final transformed list
+        paginated_history = history_items[skip : skip + limit]
+        llm.logger.info(f"Returning {len(paginated_history)} transformed history items for user {current_user.id} (skip={skip}, limit={limit})")
+
+        # 5. Return the transformed list (FastAPI will validate against response_model)
+        return paginated_history
+
     except Exception as e:
-        llm.logger.error(f"Error fetching chat history for user {current_user.id}: {e}", exc_info=True)
+        llm.logger.error(f"Error fetching/transforming chat history for user {current_user.id}: {e}", exc_info=True)
+        # Ensure a generic error is raised to avoid leaking details
         raise HTTPException(status_code=500, detail="Failed to retrieve chat history")

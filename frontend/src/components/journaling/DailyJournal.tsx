@@ -1,150 +1,111 @@
-// frontend/src/components/journaling/DailyJournal.tsx
+// frontend/src/components/journaling/DailyJournal.tsx (Updated)
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import apiClient from '@/services/api';
-import { format, parseISO, isValid } from 'date-fns';
-import { FiSave, FiEdit2, FiTrash2, FiLoader } from 'react-icons/fi';
+import apiClient from '@/services/api'; // Use your configured client
+import { format, parseISO } from 'date-fns';
+import { id } from 'date-fns/locale';
+import { FiPlusSquare, FiBookOpen, FiLoader } from 'react-icons/fi';
+import JournalEntryModal from './JournalEntryModal'; // Import the new modal component
+import ReactMarkdown from 'react-markdown'; // For rendering content
 
 interface JournalEntryData {
-    id?: number;
-    entry_date: string; // YYYY-MM-DD
+    id: number; // Now expect ID from the list endpoint
+    entry_date: string; // yyyy-MM-dd
     content: string;
-    created_at?: string;
-    updated_at?: string;
+    created_at: string; // Expect timestamps from list
+    updated_at: string;
 }
 
 export default function DailyJournal() {
-    const [selectedDate, setSelectedDate] = useState<string>(format(new Date(), 'yyyy-MM-dd'));
-    const [entryContent, setEntryContent] = useState<string>('');
-    const [currentEntry, setCurrentEntry] = useState<JournalEntryData | null>(null);
-    const [isLoading, setIsLoading] = useState(false);
-    const [isEditing, setIsEditing] = useState(false); // Start in view mode if entry exists
+    const [allEntries, setAllEntries] = useState<JournalEntryData[]>([]);
+    const [isLoading, setIsLoading] = useState(true); // Loading state for the list
     const [error, setError] = useState<string | null>(null);
+    const [isModalOpen, setIsModalOpen] = useState(false);
 
-    const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-
-    // Fetch entry for the selected date
-    const fetchEntry = useCallback(async (dateStr: string) => {
+    // Fetch all entries for the user
+    const fetchAllEntries = useCallback(async () => {
         setIsLoading(true);
         setError(null);
-        setCurrentEntry(null); // Reset
-        setEntryContent('');    // Reset
-        setIsEditing(false);   // Reset
         try {
-            // Use GET /journal/{entry_date_str}
-            const response = await apiClient.get<JournalEntryData>(`<span class="math-inline">\{baseUrl\}/api/v1/journal/</span>{dateStr}`);
-            setCurrentEntry(response.data);
-            setEntryContent(response.data.content);
-        } catch (err: any) {
-            if (err.response?.status === 404) {
-                // No entry for this date, allow creation
-                setIsEditing(true); // Start editing mode for new entry
-            } else {
-                console.error("Error fetching journal entry:", err);
-                setError("Failed to load journal entry for this date.");
-            }
+            // Use GET /journal/ to fetch all entries
+            const response = await apiClient.get<JournalEntryData[]>('/journal/'); // Relative path
+            // Sort entries by date, newest first
+            response.data.sort((a, b) => new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime());
+            setAllEntries(response.data);
+            console.log("Fetched all journal entries:", response.data);
+        } catch (err) {
+            console.error("Error fetching all journal entries:", err);
+            setError("Failed to load journal entries.");
         } finally {
             setIsLoading(false);
         }
-    }, []);
+    }, []); // No dependencies needed if it runs once on mount
 
-    // Fetch entry when component mounts or date changes
+    // Fetch entries when component mounts
     useEffect(() => {
-        fetchEntry(selectedDate);
-    }, [selectedDate, fetchEntry]);
+        fetchAllEntries();
+    }, [fetchAllEntries]);
 
-    // Handle saving (Create or Update)
-    const handleSave = async () => {
-         if (!entryContent.trim()) {
-             setError("Journal entry cannot be empty.");
-             return;
-         }
-        setIsLoading(true);
-        setError(null);
-        try {
-            const payload = {
-                entry_date: selectedDate,
-                content: entryContent.trim(),
-            };
-            console.log("Saving journal payload:", JSON.stringify(payload, null, 2));
-             // POST endpoint handles both create and update
-            const response = await apiClient.post<JournalEntryData>(`${baseUrl}/api/v1/journal/`, payload);
-            setCurrentEntry(response.data); // Update current entry state
-            setEntryContent(response.data.content);
-            setIsEditing(false); // Exit editing mode
-        } catch (err) {
-             console.error("Error saving journal entry:", err);
-             setError("Failed to save journal entry.");
-        } finally {
-             setIsLoading(false);
-        }
-    };
-
-    // Allow editing
-    const handleEdit = () => {
-        setIsEditing(true);
+    // Callback function for when the modal successfully saves
+    const handleModalSaveSuccess = () => {
+        setIsModalOpen(false); // Close the modal
+        fetchAllEntries();    // Refresh the list
     };
 
     return (
-        <div className="bg-white/5 p-4 sm:p-6 rounded-lg border border-white/10">
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-                <h2 className="text-lg font-semibold text-white">Daily Journal</h2>
-                <input
-                    type="date"
-                    value={selectedDate}
-                    onChange={(e) => setSelectedDate(e.target.value)}
-                    max={format(new Date(), 'yyyy-MM-dd')} // Prevent future dates
-                    className="bg-gray-700 border border-gray-600 rounded px-3 py-1.5 text-sm text-white focus:outline-none focus:border-blue-500"
-                />
+        <div className="space-y-6">
+            {/* Header and Add Button */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <h2 className="text-xl font-semibold text-white flex items-center">
+                    <FiBookOpen className="mr-3 text-[#FFCA40]" /> Your Journal Entries
+                </h2>
+                <button
+                    onClick={() => setIsModalOpen(true)}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-medium flex items-center transition"
+                >
+                    <FiPlusSquare className="mr-2" /> Add/Edit Today&apos;s Entry
+                </button>
             </div>
 
-            {isLoading ? (
-                 <div className="text-center py-10"><FiLoader className="animate-spin inline-block mr-2"/>Loading entry...</div>
-            ) : error ? (
+            {/* Loading/Error State */}
+            {isLoading && (
+                 <div className="text-center py-10"><FiLoader className="animate-spin inline-block mr-2"/>Loading entries...</div>
+            )}
+            {error && !isLoading && (
                  <div className="text-center py-10 text-red-400">{error}</div>
-            ) : (
-                <div>
-                    {isEditing ? (
-                        // Editing Mode
-                        <textarea
-                            value={entryContent}
-                            onChange={(e) => setEntryContent(e.target.value)}
-                            placeholder={`What's on your mind today, ${format(parseISO(selectedDate), 'MMMM d') }?`}
-                            className="w-full h-64 p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-[#FFCA40] focus:ring-1 focus:ring-[#FFCA40] transition text-white mb-4"
-                            disabled={isLoading}
-                        />
-                    ) : (
-                        // Viewing Mode
-                        <div className="prose prose-invert prose-sm max-w-none bg-gray-700/50 p-4 rounded-lg min-h-[16rem] whitespace-pre-wrap border border-gray-600 mb-4">
-                            {entryContent || <p className="italic text-gray-400">No entry for this date.</p>}
-                        </div>
-                    )}
+            )}
 
-                    <div className="flex justify-end space-x-3">
-                        {isEditing ? (
-                            <button
-                                onClick={handleSave}
-                                disabled={isLoading || !entryContent.trim()}
-                                className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-white font-medium flex items-center disabled:opacity-50"
-                            >
-                                <FiSave className="mr-1.5"/> {isLoading ? "Saving..." : "Save Entry"}
-                            </button>
-                        ) : (
-                            <button
-                                onClick={handleEdit}
-                                className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-medium flex items-center"
-                            >
-                                <FiEdit2 className="mr-1.5"/> {entryContent ? "Edit Entry" : "Create Entry"}
-                            </button>
-                        )}
-                         {/* Optional Delete Button */}
-                         {/* {!isEditing && currentEntry && (
-                             <button className="px-4 py-2 bg-red-600 hover:bg-red-500 rounded-lg text-white font-medium flex items-center"><FiTrash2 className="mr-1.5"/> Delete</button>
-                         )} */}
-                    </div>
+            {/* List of Journal Entries */}
+            {!isLoading && !error && allEntries.length === 0 && (
+                 <div className="text-center py-10 text-gray-400 italic">No journal entries found yet. Click the button above to add one for today!</div>
+            )}
+            {!isLoading && !error && allEntries.length > 0 && (
+                <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
+                    {allEntries.map((entry) => (
+                        <div key={entry.id} className="bg-white/5 p-4 rounded-lg border border-white/10">
+                            <h3 className="font-semibold text-[#FFCA40] mb-1">
+                                {format(parseISO(entry.entry_date), 'EEEE, MMMM d, yyyy', { locale: id })}
+                            </h3>
+                            {/* Render content safely using ReactMarkdown or similar */}
+                            <div className="prose prose-invert prose-sm max-w-none text-gray-300 line-clamp-3"> {/* Limit lines displayed */}
+                                <ReactMarkdown components={{ p: 'span' }}>{entry.content}</ReactMarkdown>
+                            </div>
+                             <p className="text-xs text-gray-500 mt-2">
+                                Last updated: {format(parseISO(entry.updated_at), 'Pp', { locale: id })}
+                            </p>
+                             {/* Optional: Add a button/link to view full entry */}
+                        </div>
+                    ))}
                 </div>
             )}
+
+            {/* Render the Modal */}
+            <JournalEntryModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSaveSuccess={handleModalSaveSuccess}
+            />
         </div>
     );
 }
