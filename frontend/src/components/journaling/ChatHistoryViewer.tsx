@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import axios from 'axios'; // Or your API client
+import apiClient from '@/services/api';
 import MessageBubble from '@/components/chat/MessageBubble'; // Reuse bubble
 import { Message } from '@/components/chat/MessageBubble'; // Reuse type
 import { format } from 'date-fns';
@@ -25,7 +25,7 @@ export default function ChatHistoryViewer() {
             try {
                 const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
                 // Assuming apiClient handles auth headers automatically now
-                const response = await axios.get<HistoryItem[]>(`${baseUrl}/api/v1/history`); // Use your API client
+                const response = await apiClient.get<HistoryItem[]>(`${baseUrl}/api/v1/history`); // Use your API client
                 console.log("Chat history response:", response.data);
                 // Group messages by session or date for better display (optional enhancement)
                 setHistory(response.data);

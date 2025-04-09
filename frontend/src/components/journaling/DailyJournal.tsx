@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import axios from 'axios'; // Or your API client
+import apiClient from '@/services/api';
 import { format, parseISO, isValid } from 'date-fns';
 import { FiSave, FiEdit2, FiTrash2, FiLoader } from 'react-icons/fi';
 
@@ -33,11 +33,11 @@ export default function DailyJournal() {
         setIsEditing(false);   // Reset
         try {
             // Use GET /journal/{entry_date_str}
-            const response = await axios.get<JournalEntryData>(`<span class="math-inline">\{baseUrl\}/api/v1/journal/</span>{dateStr}`);
+            const response = await apiClient.get<JournalEntryData>(`<span class="math-inline">\{baseUrl\}/api/v1/journal/</span>{dateStr}`);
             setCurrentEntry(response.data);
             setEntryContent(response.data.content);
         } catch (err: any) {
-            if (axios.isAxiosError(err) && err.response?.status === 404) {
+            if (err.response?.status === 404) {
                 // No entry for this date, allow creation
                 setIsEditing(true); // Start editing mode for new entry
             } else {
@@ -69,7 +69,7 @@ export default function DailyJournal() {
             };
             console.log("Saving journal payload:", JSON.stringify(payload, null, 2));
              // POST endpoint handles both create and update
-            const response = await axios.post<JournalEntryData>(`${baseUrl}/api/v1/journal/`, payload);
+            const response = await apiClient.post<JournalEntryData>(`${baseUrl}/api/v1/journal/`, payload);
             setCurrentEntry(response.data); // Update current entry state
             setEntryContent(response.data.content);
             setIsEditing(false); // Exit editing mode
