@@ -16,7 +16,13 @@ class User(Base):
     sentiment_score = Column(Float, default=0.0)
     wallet_address = Column(String, unique=True, index=True, nullable=True) # Optional EDU Chain wallet address
 
+    # Streaks and activity tracking
+    current_streak = Column(Integer, default=0, nullable=False)
+    longest_streak = Column(Integer, default=0, nullable=False)
+    last_activity_date = Column(Date, nullable=True) # Last date user had journal/chat activity
+
     conversations = relationship("Conversation", back_populates="user") # Relationship name corrected
+    journal_entries = relationship("JournalEntry", back_populates="user")
 
 
 class Conversation(Base):
