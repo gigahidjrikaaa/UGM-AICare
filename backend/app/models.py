@@ -10,22 +10,13 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    # Add a field to store the hash of the identifier provided by the frontend
-    hashed_identifier = Column(String, unique=True, index=True, nullable=False) # Hashed version
+    google_sub = Column(String, unique=True, index=True, nullable=False) # Hashed version
     twitter_id = Column(String, unique=True, index=True, nullable=True)
     email = Column(String, unique=True, index=True, nullable=True) # Could be hashed too if used as identifier
     sentiment_score = Column(Float, default=0.0)
     wallet_address = Column(String, unique=True, index=True, nullable=True) # Optional EDU Chain wallet address
 
     conversations = relationship("Conversation", back_populates="user") # Relationship name corrected
-
-    # Add a helper to set the hashed identifier
-    def set_hashed_identifier(self, identifier: str):
-        self.hashed_identifier = hashlib.sha256(identifier.encode()).hexdigest()
-
-    # Optional: Helper to verify (cannot get original back, but can check if a new one matches)
-    def check_identifier(self, identifier: str) -> bool:
-        return self.hashed_identifier == hashlib.sha256(identifier.encode()).hexdigest()
 
 
 class Conversation(Base):

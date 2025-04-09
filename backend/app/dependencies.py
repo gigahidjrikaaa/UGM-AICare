@@ -33,11 +33,11 @@ def get_current_active_user(
     logger.info("Attempting to authenticate user...")
     payload = decrypt_and_validate_token(token) # Use the helper function
 
-    user_id = payload.sub # Pydantic model ensures 'sub' exists
+    google_sub_id = payload.sub # Pydantic model ensures 'sub' exists
 
-    user = db.query(User).filter(User.id == user_id).first()
+    user = db.query(User).filter(User.google_sub == google_sub_id).first()
     if not user:
-        logger.warning(f"User with hashed_id {user_id} not found in database.")
+        logger.warning(f"User with hashed_id {google_sub_id} not found in database.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
@@ -47,5 +47,5 @@ def get_current_active_user(
     # if not user.is_active:
     #     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
 
-    logger.info(f"Successfully authenticated user: {user.id}")
+    logger.info(f"Successfully authenticated user: {google_sub_id}")
     return user

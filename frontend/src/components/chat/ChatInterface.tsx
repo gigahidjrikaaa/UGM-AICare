@@ -23,7 +23,7 @@ type LLMProviderOption = 'togetherai' | 'gemini';
 
 // Type for the backend request payload
 interface ChatRequestPayload {
-  user_identifier?: string; // Optional user ID if needed
+  google_sub?: string; // Optional user ID if needed
   session_id?: string; // Optional session ID if needed
   history: Array<{ role: string; content: string }>;
   provider: LLMProviderOption;
@@ -38,16 +38,6 @@ interface ChatResponsePayload {
   provider_used: string;
   model_used: string;
   history: Message[]; // The full updated history
-}
-
-// Helper function for hashing (as provided before)
-async function hashIdentifier(identifier: string): Promise<string> {
-  const encoder = new TextEncoder();
-  const data = encoder.encode(identifier);
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  const hashArray = Array.from(new Uint8Array(hashBuffer)); 
-  const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
-  return hashHex;
 }
 
 const AIKA_SYSTEM_PROMPT = `Kamu adalah Aika, AI pendamping kesehatan mental dari UGM-AICare. Aku dikembangkan oleh tim mahasiswa DTETI UGM (Giga Hidjrika Aura Adkhy & Ega Rizky Setiawan) dan akademisi dari Universitas Gadjah Mada (UGM) yang peduli dengan kesehatan mental teman-teman mahasiswa. Anggap dirimu sebagai teman dekat bagi mahasiswa UGM yang sedang butuh teman cerita. Gunakan bahasa Indonesia yang santai dan kasual (gaya obrolan sehari-hari), jangan terlalu formal, kaku, atau seperti robot. Buat suasana ngobrol jadi nyaman dan nggak canggung (awkward). Sebisa mungkin, sesuaikan juga gaya bahasamu dengan yang dipakai pengguna.
@@ -76,17 +66,14 @@ const AIKA_SYSTEM_PROMPT = `Kamu adalah Aika, AI pendamping kesehatan mental dar
                 Ingat, kamu BUKAN psikolog atau dokter. Jangan pernah memberi diagnosis medis, saran pengobatan, atau terapi. Tips di atas adalah saran umum, bukan solusi pasti. Jika percakapan mengarah ke masalah serius atau pengguna tampak sangat kesulitan, **prioritaskan** untuk mengarahkan mereka secara halus agar mencari bantuan profesional (misal: konselor UGM, psikolog). Fokusmu adalah sebagai teman ngobrol yang suportif dan membantu refleksi diri. Jaga respons tetap ringkas namun bermakna.`;
 
 export default function ChatInterface() {
-const { data: session, status } = useSession(); // Use session from next-auth
-
-  // Use the simplified Message type for state
+  const { data: session, status } = useSession(); // Use session from next-auth
   const [messages, setMessages] = useState<Message[]>([]);
-  // State for provider selection - use backend expected values
   const [selectedProvider] = useState<LLMProviderOption>('gemini');
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null); // Add error state for display
   const [sessionId, setSessionId] = useState<string | null>(null); // Session ID 
-  const [hashedUserId, setHashedUserId] = useState<string | null>(null); // Hashed user ID
+  const [googleSub, setGoogleSub] = useState<string | null>(null); // Google sub ID
 
   const messagesEndRef = useRef<null | HTMLDivElement>(null);
   const inputRef = useRef<null | HTMLTextAreaElement>(null);
@@ -108,38 +95,16 @@ const { data: session, status } = useSession(); // Use session from next-auth
     inputRef.current?.focus();
   }, []);
 
-  // --- Hashing User ID ---
-  // Hash the user ID when the session is available and authenticated
   useEffect(() => {
-    // Hash the user ID when the session is available and authenticated
-    const processSession = async () => {
-       // Ensure session exists, user object exists, and potentially the 'sub' or 'id' field
-      if (status === "authenticated" && session?.user) {
-        // --- IMPORTANT: Check where next-auth stores the Google 'sub' ---
-        // Option 1: Often stored in session.user.id by default configuration
-        // Option 2: Sometimes available directly as session.sub (if customized)
-        // Option 3: Might be in session.user.providerAccountId (less common for Google sub)
-        
-        const googleSub = session.user.id; // TRY THIS FIRST - Adjust if your config is different
-
-        if (googleSub) {
-          const hash = await hashIdentifier(googleSub);
-          setHashedUserId(hash);
-          console.log("Hashed User ID:", hash); // For debugging
-        } else {
-          console.error("Could not find Google 'sub' identifier in session:", session);
-          // Handle error - maybe user didn't log in with Google?
-          setError("Could not identify user account."); 
-        }
-      } else if (status === "unauthenticated") {
-         // Handle case where user is not logged in - maybe redirect or disable chat?
-         console.log("User is not authenticated.");
-         // setHashedUserId("guest-hash"); // Or handle guest users differently
-      }
-    };
-
-    processSession();
-  }, [session, status]); // Re-run when session or status changes
+    if (status === "authenticated" && session?.user?.id) {
+      setGoogleSub(session.user.id); // Store the google sub
+      console.log("Using Google Sub ID:", session.user.id);
+    } else if (status === "unauthenticated") {
+      console.log("User not authenticated for chat.");
+      // Handle guest or redirect
+      setError("You need to be logged in to chat.");
+    }
+  }, [session, status]);
 
   //! Enable if using welcome message from Aika. Further UX is needed
   // Add welcome message on mount
@@ -153,16 +118,16 @@ const { data: session, status } = useSession(); // Use session from next-auth
   };
 
   // --- Modified handleSubmit Function ---
-  const handleSubmit = useCallback(async (e?: React.FormEvent) => { // Make event optional for direct calls
-    if (e) e.preventDefault(); // Prevent default form submission if event exists
+  const handleSubmit = useCallback(async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     const trimmedInput = input.trim();
-    // --- Add checks for sessionID and hashedUserId ---
-    if (!trimmedInput || isLoading || !sessionId || !hashedUserId) {
-      if (!sessionId || !hashedUserId) {
-          setError("Cannot send message: User session not fully initialized.");
-      }
-      return; 
-   }
+    // CHANGE: Check for googleSub instead of hashedUserId
+    if (!trimmedInput || isLoading || !sessionId || !googleSub) {
+        if (!sessionId || !googleSub) {
+            setError("Cannot send message: User session not fully initialized.");
+        }
+        return;
+    }
 
     // 1. Create the user message in the new format
     const userMessage: Message = {
@@ -190,7 +155,7 @@ const { data: session, status } = useSession(); // Use session from next-auth
 
       // 5. Create the payload matching the new backend API
       const payload: ChatRequestPayload = {
-        user_identifier: hashedUserId, // Optional user ID if needed
+        google_sub: googleSub, // Optional user ID if needed
         session_id: sessionId, // Optional session ID if needed
         history: historyForBackend, // Send the full history ending with user message
         provider: selectedProvider, // Use selected provider
@@ -240,7 +205,7 @@ const { data: session, status } = useSession(); // Use session from next-auth
       // Ensure input is focused after response/error for quick follow-up
       setTimeout(() => inputRef.current?.focus(), 100);
     }
-  }, [input, isLoading, messages, selectedProvider, sessionId, hashedUserId]); // Added dependencies for useCallback
+  }, [input, isLoading, messages, selectedProvider, sessionId, googleSub]); // Added dependencies for useCallback
 
 
   // --- Input Handling ---
