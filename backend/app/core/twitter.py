@@ -1,4 +1,4 @@
-import tweepy
+import tweepy # type: ignore
 import logging
 import os
 from dotenv import load_dotenv

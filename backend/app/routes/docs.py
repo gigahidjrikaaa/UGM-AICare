@@ -1,6 +1,6 @@
-from fastapi import APIRouter, Request, Depends, HTTPException, status
-from fastapi.responses import HTMLResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
+from fastapi import APIRouter, Request, Depends, HTTPException, status  # type: ignore
+from fastapi.responses import HTMLResponse, JSONResponse    # type: ignore
+from fastapi.templating import Jinja2Templates  # type: ignore
 import os
 import json
 from pathlib import Path

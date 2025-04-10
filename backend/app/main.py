@@ -67,17 +67,17 @@ app.include_router(email.router, prefix="/api/v1", tags=["Email"]) # Added prefi
 app.include_router(docs.router, prefix="/api/v1", tags=["Documents"]) # Added prefix/tag consistency
 app.include_router(chat.router, prefix="/api/v1", tags=["Chat"]) # Use /api/v1 prefix
 app.include_router(feedback.router, prefix="/api/v1", tags=["Feedback"]) # Added prefix/tag consistency
-app.include_router(link_did.router, prefix="/api/v1", tags=["Link DID"]) # Added prefix/tag consistency
+app.include_router(link_did.router, prefix="/api/v1", tags=["Link DID"]) # Added prefix/tag consistency)
 
 app.include_router(journal.router) # Prefix set in journal.py
 app.include_router(internal.router) # Prefix set in internal.py
 app.include_router(summary.router) # Prefix set in summary.py
-logger.info(f"List of routers (/api/v1): {app.routes}")
+# logger.info(f"List of routers (/api/v1): {app.routes}")
 logger.info(f"Allowed origins: {origins}")
 
 @app.get("/")
 async def root():
-    return {"message": "Welcome to Aika Chatbot API"}
+    return {"message": "Welcome to the Aika Chatbot API!"}
 
 @app.get("/health")
 async def health_check():

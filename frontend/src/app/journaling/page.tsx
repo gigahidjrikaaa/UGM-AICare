@@ -7,6 +7,7 @@ import ChatHistoryViewer from '@/components/journaling/ChatHistoryViewer'; // Cr
 import DailyJournal from '@/components/journaling/DailyJournal';       // Create this component
 import AikaPageSkeleton from '@/components/ui/GlobalSkeleton'; // Or a specific skeleton
 import ActivityCalendar from '@/components/journaling/ActivityCalendar'; // <<< Import Calendar
+import StreakDisplay from '@/components/journaling/StreakDisplay';
 import apiClient from '@/services/api'; // Import API client
 import { startOfMonth, format } from 'date-fns';
 
@@ -17,10 +18,16 @@ interface ActivityData {
     hasJournal: boolean;
     hasConversation: boolean;
 }
+
 interface ActivitySummary {
     [dateStr: string]: ActivityData;
 }
 
+interface ActivitySummaryResponse {
+    summary: ActivitySummary;
+    currentStreak: number;
+    longestStreak: number;
+}
 
 export default function JournalingPage() {
     const [activeTab, setActiveTab] = useState<JournalTab>('daily');
@@ -28,23 +35,30 @@ export default function JournalingPage() {
     const [activityData, setActivityData] = useState<ActivitySummary>({}); // State for calendar data
     const [isCalendarLoading, setIsCalendarLoading] = useState(false);
     const [calendarError, setCalendarError] = useState<string | null>(null);
+    const [currentStreak, setCurrentStreak] = useState<number>(0);
+    const [longestStreak, setLongestStreak] = useState<number>(0);
 
     // Function to fetch activity data
     const fetchActivityData = useCallback(async (monthDate: Date) => {
-        setIsCalendarLoading(true);
+        setIsCalendarLoading(true); // Set loading true when fetch starts
         setCalendarError(null);
         const monthStr = format(monthDate, 'yyyy-MM');
         try {
-            const response = await apiClient.get<{ summary: ActivitySummary }>(
-                `/activity-summary/?month=${monthStr}` // Use relative path and query param
+            // Fetch data using the updated response structure
+            const response = await apiClient.get<ActivitySummaryResponse>(
+                `/activity-summary/?month=${monthStr}` // Relative path
             );
             setActivityData(response.data.summary || {});
+            setCurrentStreak(response.data.currentStreak || 0);   // Set current streak
+            setLongestStreak(response.data.longestStreak || 0); // Set longest streak
         } catch (err) {
             console.error("Error fetching activity summary:", err);
             setCalendarError("Failed to load activity data.");
-            setActivityData({}); // Clear data on error
+            setActivityData({});
+            setCurrentStreak(0); // Reset streak on error
+            setLongestStreak(0); // Reset streak on error
         } finally {
-            setIsCalendarLoading(false);
+            setIsCalendarLoading(false); // Set loading false when fetch ends
         }
     }, []);
 
@@ -61,6 +75,14 @@ export default function JournalingPage() {
 
             <div className="flex-1 flex overflow-hidden">
                 <main className="flex-1 overflow-y-auto p-4 md:p-6">
+                    {/* --- Streak Display Component --- */}
+                    {/* Pass loading state to show skeleton */}
+                    <StreakDisplay
+                        currentStreak={currentStreak}
+                        longestStreak={longestStreak}
+                        isLoading={isCalendarLoading}
+                    />
+
                     <div className="max-h-1/2 overflow-y-scroll mb-6">
                         {/* Calendar Component */}
                         <ActivityCalendar

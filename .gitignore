@@ -56,6 +56,6 @@ docker-compose.override.yml
 backend/aika.db
 
 # Alembic
-backend/migrations/versions/
+backend/alembic/versions/
 alembic.ini
 alembic/*.ini
