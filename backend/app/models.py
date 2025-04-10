@@ -23,6 +23,7 @@ class User(Base):
 
     conversations = relationship("Conversation", back_populates="user") # Relationship name corrected
     journal_entries = relationship("JournalEntry", back_populates="user")
+    awarded_badges = relationship("UserBadge", back_populates="user")
 
 
 class Conversation(Base):
@@ -49,6 +50,21 @@ class UserSummary(Base):
     timestamp = Column(DateTime, default=datetime.now, nullable=False) # When the summary was created
 
     user = relationship("User") # Relationship to User (optional but good practice)
+
+class UserBadge(Base):
+    __tablename__ = "user_badges"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    badge_id = Column(Integer, nullable=False, index=True) # Your internal ID for the badge type (e.g., 1 for first entry, 3 for 7-day streak)
+    contract_address = Column(String, nullable=False, index=True) # Store contract address for context
+    transaction_hash = Column(String, unique=True, nullable=False) # Hash of the mint transaction
+    awarded_at = Column(DateTime, default=datetime.now, nullable=False)
+
+    user = relationship("User") # Relationship back to User
+
+    # Optional: Ensure a user can only receive each specific badge ID once
+    __table_args__ = (UniqueConstraint('user_id', 'badge_id', name='_user_badge_uc'),)
 
 # Email
 class EmailTemplate(Base):
