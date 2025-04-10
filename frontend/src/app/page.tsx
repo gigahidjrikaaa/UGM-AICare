@@ -132,7 +132,7 @@ export default function Home() {
                   className="relative z-10 h-full w-full"
                 >
                   <Image 
-                    src="/aika-avatar.png" 
+                    src="/aika-human.jpeg" 
                     alt="Aika Character" 
                     fill
                     className="object-contain drop-shadow-2xl"
