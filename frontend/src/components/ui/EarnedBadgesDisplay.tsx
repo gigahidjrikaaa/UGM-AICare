@@ -2,13 +2,16 @@
 import React, { useState, useEffect } from 'react';
 import apiClient from '@/services/api';
 import Image from 'next/image';
-// import { FiLoader, FiAlertCircle } from 'react-icons/fi';
+import { FiExternalLink } from 'react-icons/fi';
 import { Tooltip } from '@mui/material';
 // import { format } from 'date-fns';
 // import { id } from 'date-fns/locale';
 
 // Import from the new constants file
 import { getBadgeMeta, getIpfsUrl } from '@/lib/badgeConstants';
+
+// --- Define EDUChain Testnet Explorer ---
+const EDUCHAIN_TESTNET_EXPLORER_BASE_URL = "https://edu-chain-testnet.blockscout.com";
 
 interface EarnedBadge {
     badge_id: number;
@@ -64,22 +67,35 @@ export default function EarnedBadgesDisplay() {
                     const imageUrl = getIpfsUrl(meta.image);
                     const awardedDate = new Date(badge.awarded_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' });
                     const tooltipTitle = `${meta.name} - ${meta.description} (Awarded: ${awardedDate})`;
+                    const explorerUrl = `${EDUCHAIN_TESTNET_EXPLORER_BASE_URL}/token/${badge.contract_address}`;
 
                     return (
                         <Tooltip title={tooltipTitle} arrow placement="top" key={badge.transaction_hash}>
                             <div className="flex flex-col items-center text-center p-2 rounded-lg bg-white/5 hover:bg-white/10 transition group cursor-help">
-                                <Image
-                                    src={imageUrl} // Use URL from helper
-                                    alt={meta.name}
-                                    width={80}
-                                    height={80}
-                                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full mb-1 group-hover:scale-110 transition-transform duration-200 bg-gray-700" // Added bg for loading state
-                                    onError={(e) => { e.currentTarget.src = '/badges/badge-placeholder.png'; }} // Fallback
-                                />
-                                <span className="text-xs text-gray-300 group-hover:text-[#FFCA40] truncate w-full px-1">{meta.name}</span>
-                                {/* Optional: Link to transaction hash on explorer */}
-                                {/* <a href={`EXPLORER_URL/${badge.transaction_hash}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline">Verify</a> */}
-                                </div>
+                                <a
+                                    href={explorerUrl}
+                                    target="_blank" // Open in new tab
+                                    rel="noopener noreferrer" // Security best practice
+                                    className="flex flex-col items-center text-center p-2 rounded-lg bg-white/5 hover:bg-white/10 transition group cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/50"
+                                    aria-label={`View transaction for ${meta.name} badge`}
+                                >
+                                    <Image
+                                        src={imageUrl} // Use URL from helper
+                                        alt={meta.name}
+                                        width={80}
+                                        height={80}
+                                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-full mb-1 group-hover:scale-110 transition-transform duration-200 bg-gray-700" // Added bg for loading state
+                                        onError={(e) => { e.currentTarget.src = '/badges/badge-placeholder.png'; }} // Fallback
+                                    />
+                                    <span className="text-xs text-gray-300 group-hover:text-[#FFCA40] w-full px-1">
+                                        {meta.name} 
+                                        <FiExternalLink size={10} className="ml-1 opacity-60 group-hover:opacity-100 inline-block"/>
+                                    </span>
+                                    {/* Optional: Link to transaction hash on explorer */}
+                                    {/* <a href={`EXPLORER_URL/${badge.transaction_hash}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline">Verify</a> */}
+                                    <span className="text-[10px] text-gray-400">{awardedDate}</span>
+                                </a>
+                            </div>
                         </Tooltip>
                     );
                  })}
