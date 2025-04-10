@@ -57,5 +57,6 @@ backend/aika.db
 
 # Alembic
 backend/alembic/versions/
+backend/migrations/versions/
 alembic.ini
 alembic/*.ini
