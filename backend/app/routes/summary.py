@@ -32,6 +32,19 @@ class ActivitySummaryResponse(BaseModel):
     currentStreak: int = 0 # Streak count. At least 1 day of activity is needed to count as a streak.
     longestStreak: int = 0 # Longest streak count. At least 1 day of activity is needed to count as a streak.
 
+# --- NEW: Pydantic Model for Earned Badge Response ---
+class EarnedBadgeInfo(BaseModel):
+    badge_id: int
+    awarded_at: datetime
+    transaction_hash: str
+    contract_address: str
+    # You can add more fields here later if needed, e.g., fetching metadata from DB/IPFS
+    # name: Optional[str] = None
+    # image_url: Optional[str] = None
+
+    class Config:
+        orm_mode = True # Or from_attributes = True for Pydantic v2
+
 # Badge ID Constants -- Might be possible to relocate this later
 LET_THERE_BE_BADGE_BADGE_ID = 1
 TRIPLE_THREAT_OF_THOUGHTS_BADGE_ID = 2
@@ -242,3 +255,24 @@ async def get_activity_summary(
     except Exception as e:
         logger.error(f"Unexpected error generating activity summary for user {current_user.id}, month {month}: {e}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to generate activity summary")
+
+# --- NEW: Endpoint to Fetch Earned Badges ---
+@router.get("/my-badges", response_model=List[EarnedBadgeInfo])
+async def get_my_earned_badges(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user) # Use dependency to get user
+):
+    """Fetches the list of badges earned by the current authenticated user."""
+    logger.info(f"Fetching earned badges for user {current_user.id}")
+    try:
+        earned_badges = db.query(UserBadge)\
+            .filter(UserBadge.user_id == current_user.id)\
+            .order_by(UserBadge.awarded_at.desc())\
+            .all() # Show newest badges first
+        logger.info(f"Found {len(earned_badges)} earned badges for user {current_user.id}")
+        # FastAPI will automatically serialize the list of UserBadge objects
+        # into a list of EarnedBadgeInfo objects based on the response_model
+        return earned_badges
+    except Exception as e:
+        logger.error(f"Error fetching earned badges for user {current_user.id}: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to retrieve earned badges")
