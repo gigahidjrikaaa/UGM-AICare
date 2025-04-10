@@ -4,15 +4,32 @@
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { useEffect } from 'react';
-import EarnedBadgesDisplay from '@/components/ui/EarnedBadgesDisplay'; // Import the component
+import { useEffect, useState, useCallback } from 'react'; // Added useState, useEffect, useCallback
+import EarnedBadgesDisplay from '@/components/ui/EarnedBadgesDisplay';
+import StreakDisplay from '@/components/journaling/StreakDisplay';
 import GlobalSkeleton from '@/components/ui/GlobalSkeleton'; // Use a skeleton for loading
-import { FiMail, FiCreditCard, FiAward } from 'react-icons/fi'; // Example icons
+import { FiMail, FiCreditCard, FiAward, FiActivity  } from 'react-icons/fi'; // Example icons
 import ParticleBackground from '@/components/ui/ParticleBackground';
+import apiClient from '@/services/api'; // Import apiClient
+import { format } from 'date-fns'; // Import format for current month
+
+// Define the expected response structure from the backend endpoint
+interface ActivitySummaryResponse {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    summary: any; // We don't need the summary detail here, but the API returns it
+    currentStreak: number;
+    longestStreak: number;
+}
 
 export default function ProfilePage() {
     const { data: session, status } = useSession();
     const router = useRouter();
+
+    // State for streak data
+    const [currentStreak, setCurrentStreak] = useState<number>(0);
+    const [longestStreak, setLongestStreak] = useState<number>(0);
+    const [isStreakLoading, setIsStreakLoading] = useState(true); // Loading state for streak
+    const [streakError, setStreakError] = useState<string | null>(null);
 
     // Redirect if not authenticated
     useEffect(() => {
@@ -20,6 +37,34 @@ export default function ProfilePage() {
             router.push('/signin?callbackUrl=/profile');
         }
     }, [status, router]);
+
+    // Fetch streak data when session is available
+    const fetchStreakData = useCallback(async () => {
+        if (status === 'authenticated') {
+            setIsStreakLoading(true);
+            setStreakError(null);
+            const currentMonthStr = format(new Date(), 'yyyy-MM'); // Fetch for current month to get streaks
+            try {
+                const response = await apiClient.get<ActivitySummaryResponse>(
+                    `/activity-summary/?month=${currentMonthStr}`
+                );
+                setCurrentStreak(response.data.currentStreak || 0);
+                setLongestStreak(response.data.longestStreak || 0);
+            } catch (err) {
+                console.error("Error fetching streak data:", err);
+                setStreakError("Could not load activity streak.");
+                // Reset streaks on error
+                setCurrentStreak(0);
+                setLongestStreak(0);
+            } finally {
+                setIsStreakLoading(false);
+            }
+        }
+    }, [status]); // Depend on session status
+    
+    useEffect(() => {
+        fetchStreakData();
+    }, [fetchStreakData]); // Run fetch on mount and when status changes
 
     // Loading state
     if (status === 'loading') {
@@ -40,7 +85,7 @@ export default function ProfilePage() {
             <div className="absolute inset-0 z-0 opacity-40">
                 <ParticleBackground count={70} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={1} />
             </div>
-            
+
             <main className="max-w-4xl mx-auto p-4 md:p-8">
                 {/* Profile Header */}
                 <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 mb-8 p-6 bg-white/5 rounded-lg border border-white/10">
@@ -72,6 +117,19 @@ export default function ProfilePage() {
                          {/* Optional: Add Role display if needed */}
                          {/* <div className="text-xs text-gray-400 mt-1 capitalize">Role: {user.role || 'user'}</div> */}
                     </div>
+                </div>
+
+                {/* --- Streaks Section --- */}
+                <div>
+                    <h2 className="text-xl font-semibold mb-3 flex items-center"><FiActivity className="mr-2 text-[#FFCA40]"/> Activity Streak</h2>
+                    {streakError && !isStreakLoading && (
+                        <p className="text-red-400 text-sm">{streakError}</p>
+                    )}
+                    <StreakDisplay
+                        currentStreak={currentStreak}
+                        longestStreak={longestStreak}
+                        isLoading={isStreakLoading}
+                    />
                 </div>
 
                  {/* Section for Badges */}
