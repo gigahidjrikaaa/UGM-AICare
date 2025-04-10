@@ -1,7 +1,14 @@
 "use client";
 import React, { useState, useEffect } from 'react';
 import apiClient from '@/services/api';
-import Image from 'next/image'; // For displaying images
+import Image from 'next/image';
+// import { FiLoader, FiAlertCircle } from 'react-icons/fi';
+import { Tooltip } from '@mui/material';
+// import { format } from 'date-fns';
+// import { id } from 'date-fns/locale';
+
+// Import from the new constants file
+import { getBadgeMeta, getIpfsUrl } from '@/lib/badgeConstants';
 
 interface EarnedBadge {
     badge_id: number;
@@ -9,21 +16,15 @@ interface EarnedBadge {
     transaction_hash: string;
     contract_address: string;
     // Add metadata fields if your backend endpoint includes them
-    name?: string; // Example: Add name/description later
+    name?: string;
     description?: string;
-    image_url?: string; // Example: Local placeholder URL
+    image_url?: string;
+    attributes?: {
+        trait_type: string;
+        value: string | number;
+        display_type?: string;
+    }[];
 }
-
-// Map badge IDs to names and placeholder images (adjust paths)
-const badgeMetadata: { [key: number]: { name: string; image: string; description: string } } = {
-    1: { name: "Let there be badge", image: "/badges/badge-1-placeholder.png", description:"Your first activity!" },
-    2: { name: "Triple Threat (of Thoughts!)", image: "/badges/badge-2-placeholder.png", description:"3 days of activity" },
-    3: { name: "Seven Days a Week", image: "/badges/badge-3-placeholder.png", description:"7-day streak" },
-    4: { name: "Two Weeks Notice (...)", image: "/badges/badge-4-placeholder.png", description:"14-day streak" },
-    5: { name: "Full Moon Positivity", image: "/badges/badge-5-placeholder.png", description:"30-day streak" },
-    6: { name: "Quarter Century (...)", image: "/badges/badge-6-placeholder.png", description:"25 journal entries" },
-    // Add placeholders for 7 & 8 if needed
-};
 
 
 export default function EarnedBadgesDisplay() {
@@ -57,20 +58,29 @@ export default function EarnedBadgesDisplay() {
             <h3 className="font-semibold mb-3 text-lg text-white">Your Badges</h3>
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4">
                 {badges.map((badge) => {
-                    const meta = badgeMetadata[badge.badge_id] || { name: `Badge #${badge.badge_id}`, image: '/badges/badge-placeholder.png', description:'Unknown badge'};
+                    // Use the imported helper to get metadata
+                    const meta = getBadgeMeta(badge.badge_id);
+                    // Use the imported helper to get the image URL
+                    const imageUrl = getIpfsUrl(meta.image);
+                    const awardedDate = new Date(badge.awarded_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' });
+                    const tooltipTitle = `${meta.name} - ${meta.description} (Awarded: ${awardedDate})`;
+
                     return (
-                        <div key={badge.transaction_hash} className="flex flex-col items-center text-center p-2 rounded-lg bg-white/5 hover:bg-white/10 transition group" title={`${meta.name} - ${meta.description}`}>
-                            <Image
-                                src={meta.image}
-                                alt={meta.name}
-                                width={64} // Adjust size
-                                height={64}
-                                className="w-12 h-12 sm:w-16 sm:h-16 rounded-full mb-1 group-hover:scale-110 transition-transform"
-                            />
-                            <span className="text-xs text-gray-300 group-hover:text-[#FFCA40] truncate w-full">{meta.name}</span>
-                            {/* Optional: Link to transaction hash on explorer */}
-                            {/* <a href={`EXPLORER_URL/${badge.transaction_hash}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline">Verify</a> */}
-                        </div>
+                        <Tooltip title={tooltipTitle} arrow placement="top" key={badge.transaction_hash}>
+                            <div className="flex flex-col items-center text-center p-2 rounded-lg bg-white/5 hover:bg-white/10 transition group cursor-help">
+                                <Image
+                                    src={imageUrl} // Use URL from helper
+                                    alt={meta.name}
+                                    width={80}
+                                    height={80}
+                                    className="w-16 h-16 sm:w-20 sm:h-20 rounded-full mb-1 group-hover:scale-110 transition-transform duration-200 bg-gray-700" // Added bg for loading state
+                                    onError={(e) => { e.currentTarget.src = '/badges/badge-placeholder.png'; }} // Fallback
+                                />
+                                <span className="text-xs text-gray-300 group-hover:text-[#FFCA40] truncate w-full px-1">{meta.name}</span>
+                                {/* Optional: Link to transaction hash on explorer */}
+                                {/* <a href={`EXPLORER_URL/${badge.transaction_hash}`} target="_blank" rel="noopener noreferrer" className="text-[10px] text-blue-400 hover:underline">Verify</a> */}
+                                </div>
+                        </Tooltip>
                     );
                  })}
             </div>

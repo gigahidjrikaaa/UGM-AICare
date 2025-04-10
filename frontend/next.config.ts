@@ -16,6 +16,15 @@ const nextConfig = {
       {
         hostname: 'res.cloudinary.com',
       },
+      {
+        hostname: 'ipfs.io', // IPFS gateway
+      },
+      {
+        hostname: 'cyan-certain-crane-60.mypinata.cloud', // Pinata IPFS gateway
+      },
+      {
+        hostname: 'gateway.pinata.cloud', // Pinata IPFS gateway (generic)
+      },
     ],
     // Disable unoptimized images
     unoptimized: false,
