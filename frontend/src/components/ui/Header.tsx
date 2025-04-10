@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion, AnimatePresence } from "framer-motion";
 import { HiMenu, HiX, HiChevronDown } from "react-icons/hi";
-import { FiLogOut, FiUser, FiHelpCircle } from "react-icons/fi";
+import { FiLogOut, FiUser, FiHelpCircle, FiActivity } from "react-icons/fi";
 import { BsChatDots, BsCalendar } from "react-icons/bs";
 
 export default function Header() {
@@ -153,6 +153,10 @@ export default function Header() {
                       <Link href="/aika" className="flex items-center px-4 py-2 text-white/90 hover:bg-[#FFCA40]/10 hover:text-[#FFCA40] transition-colors">
                         <BsChatDots className="mr-2" />
                         Chat with Aika
+                      </Link>
+                      <Link href="/journaling" className="flex items-center px-4 py-2 text-white/90 hover:bg-[#FFCA40]/10 hover:text-[#FFCA40] transition-colors">
+                        <FiActivity className="mr-2" />
+                        Journaling
                       </Link>
                       <Link href="/appointments" className="flex items-center px-4 py-2 text-white/90 hover:bg-[#FFCA40]/10 hover:text-[#FFCA40] transition-colors">
                         <BsCalendar className="mr-2" />
