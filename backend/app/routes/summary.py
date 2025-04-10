@@ -72,6 +72,8 @@ async def get_activity_summary(
         }
         logger.debug(f"Journal Dates Set for {month}: {journal_dates}")
 
+        conversation_dates: Set[date] = set() # Initialize empty set for conversation dates
+
         all_activity_dates = journal_dates.union(conversation_dates)
         logger.debug(f"All Activity Dates Set (Union): {all_activity_dates}")
 
