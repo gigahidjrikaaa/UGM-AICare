@@ -1,13 +1,18 @@
 // frontend/src/app/resources/page.tsx
 "use client";
 
+import ParticleBackground from '@/components/ui/ParticleBackground';
 import React from 'react';
 import { FiPhone, FiMapPin, FiAlertTriangle, FiUsers, FiGlobe, FiMessageSquare, FiMail } from 'react-icons/fi'; // Example icons
 
 export default function ResourcesPage() {
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white pt-16"> {/* Adjust pt-16 if header height differs */}
-            <main className="max-w-4xl mx-auto p-4 md:p-8">
+        <div className="min-h-screen bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white pt-16 relative"> {/* Adjust pt-16 if header height differs */}
+            <div className="absolute inset-0 z-0 opacity-40">
+                <ParticleBackground count={70} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={1} />
+            </div>
+
+            <main className="max-w-4xl mx-auto p-4 md:p-8 relative z-10">
                 <h1 className="text-3xl font-bold text-center mb-8 text-[#FFCA40]">Mental Health Resources</h1>
 
                 {/* Disclaimer */}

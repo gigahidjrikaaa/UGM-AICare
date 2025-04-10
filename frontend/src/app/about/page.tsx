@@ -4,10 +4,14 @@ import { motion } from 'framer-motion';
 import { FiInfo, FiMessageCircle, FiCalendar, FiBookOpen, FiFileText, FiHelpCircle } from 'react-icons/fi';
 import Link from 'next/link';
 import Image from 'next/image';
+import ParticleBackground from '@/components/ui/ParticleBackground';
 
 export default function AboutPage() {
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] py-10 px-4 sm:px-6">
+        <div className="absolute inset-0 z-0 opacity-40">
+            <ParticleBackground count={70} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={1} />
+        </div>
       <div className="max-w-4xl mx-auto">
         {/* Page Header */}
         <motion.div
