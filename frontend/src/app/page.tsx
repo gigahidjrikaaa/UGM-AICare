@@ -181,8 +181,6 @@ export default function Home() {
       
       {/* Features Section with Glass Morphism */}
       <section className="relative py-24 bg-gradient-to-b from-[#001D58] to-[#00308F]">
-        <div className="absolute inset-0 bg-[url('/pattern-grid.png')] opacity-5 z-0"></div>
-        
         <motion.div 
           style={{ scale: featureScale }}
           className="max-w-7xl mx-auto px-4 relative z-10"

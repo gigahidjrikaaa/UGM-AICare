@@ -1,4 +1,4 @@
-from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException, status # type: ignore
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
 from sqlalchemy.orm import Session
@@ -8,10 +8,11 @@ from email.mime.text import MIMEText
 import smtplib
 import logging
 import time
-from apscheduler.schedulers.background import BackgroundScheduler
-from apscheduler.triggers.cron import CronTrigger
+from apscheduler.schedulers.background import BackgroundScheduler # type: ignore
+from apscheduler.triggers.cron import CronTrigger # type: ignore
 from app.database import get_db
 from app.models import EmailTemplate, EmailLog, EmailGroup
+from app.schemas import EmailRecipient, CreateEmailTemplate, EmailRequest, EmailGroupCreate, ScheduleEmailRequest
 import os
 from dotenv import load_dotenv
 
@@ -29,34 +30,6 @@ router = APIRouter(prefix="/email", tags=["email"])
 # Initialize scheduler
 scheduler = BackgroundScheduler()
 scheduler.start()
-
-# Pydantic models
-class EmailRecipient(BaseModel):
-    email: EmailStr
-    name: Optional[str] = None
-
-class CreateEmailTemplate(BaseModel):
-    name: str
-    subject: str
-    body: str
-    description: Optional[str] = None
-
-class EmailRequest(BaseModel):
-    template_id: int
-    recipients: List[EmailRecipient]
-    schedule_time: Optional[datetime] = None
-    template_variables: Optional[dict] = {}
-
-class EmailGroupCreate(BaseModel):
-    name: str
-    description: Optional[str] = None
-    recipients: List[EmailRecipient]
-
-class ScheduleEmailRequest(BaseModel):
-    template_id: int
-    group_id: int
-    schedule: str  # Cron expression (e.g., "0 9 * * 1" for every Monday at 9 AM)
-    template_variables: Optional[dict] = {}
 
 # Helper function to send email
 def send_email(recipients: List[EmailRecipient], subject: str, body: str):

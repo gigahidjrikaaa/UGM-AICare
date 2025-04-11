@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Security, status # type: 
 from fastapi.security import APIKeyHeader # type: ignore
 from sqlalchemy.orm import Session
 from app.database import get_db
+from app.schemas import UserInternalResponse
 from app.models import User
 import os
 
@@ -28,14 +29,6 @@ async def get_api_key(api_key: str = Security(api_key_header)):
             status_code=status.HTTP_403_FORBIDDEN, detail="Invalid or missing Internal API Key"
         )
 # --- End Security Setup ---
-
-# Define a Pydantic model for the response (optional but good practice)
-class UserInternalResponse(BaseModel):
-    id: int
-    google_sub: str
-    email: str | None = None
-    wallet_address: str | None = None
-    role: str | None = None # Assuming role is determined elsewhere or stored
 
 @router.get("/user-by-sub/{google_sub}", response_model=UserInternalResponse, dependencies=[Security(get_api_key)])
 async def get_user_by_google_sub(google_sub: str, db: Session = Depends(get_db)):

@@ -4,11 +4,9 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.models import User
 from app.dependencies import get_current_active_user, get_db
+from app.schemas import LinkDIDRequest
 
 router = APIRouter()
-
-class LinkDIDRequest(BaseModel):
-    wallet_address: str
 
 @router.post("/link-did")
 def link_did(payload: LinkDIDRequest, db: Session = Depends(get_db), user: User = Depends(get_current_active_user)):

@@ -7,9 +7,10 @@ from datetime import date, timedelta, datetime, time
 from typing import Dict, List, Set
 
 from app.database import get_db
-from app.models import User, JournalEntry, Conversation, UserBadge # Import needed models
-from app.dependencies import get_current_active_user # Your auth dependency
+from app.models import User, JournalEntry, Conversation, UserBadge
+from app.dependencies import get_current_active_user
 from app.core.blockchain_utils import mint_nft_badge
+from app.schemas import ActivitySummaryResponse, ActivityData, EarnedBadgeInfo
 import logging
 import os
 
@@ -20,30 +21,6 @@ router = APIRouter(
     tags=["Activity Summary"],
     dependencies=[Depends(get_current_active_user)] # Protect this route
 )
-
-# Response Model
-class ActivityData(BaseModel):
-    hasJournal: bool = False
-    hasConversation: bool = False
-
-class ActivitySummaryResponse(BaseModel):
-    # Dictionary where key is "YYYY-MM-DD" string
-    summary: Dict[str, ActivityData]
-    currentStreak: int = 0 # Streak count. At least 1 day of activity is needed to count as a streak.
-    longestStreak: int = 0 # Longest streak count. At least 1 day of activity is needed to count as a streak.
-
-# --- NEW: Pydantic Model for Earned Badge Response ---
-class EarnedBadgeInfo(BaseModel):
-    badge_id: int
-    awarded_at: datetime
-    transaction_hash: str
-    contract_address: str
-    # You can add more fields here later if needed, e.g., fetching metadata from DB/IPFS
-    # name: Optional[str] = None
-    # image_url: Optional[str] = None
-
-    class Config:
-        orm_mode = True # Or from_attributes = True for Pydantic v2
 
 # Badge ID Constants -- Might be possible to relocate this later
 LET_THERE_BE_BADGE_BADGE_ID = 1

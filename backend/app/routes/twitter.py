@@ -1,4 +1,4 @@
-from fastapi import APIRouter
+from fastapi import APIRouter # type: ignore
 import requests
 import os
 from dotenv import load_dotenv

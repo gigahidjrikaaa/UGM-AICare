@@ -8,6 +8,7 @@ from typing import List, Optional
 
 from app.database import get_db
 from app.models import User, JournalEntry
+from app.schemas import JournalEntryCreate, JournalEntryResponse
 from app.dependencies import get_current_active_user # Use your auth dependency
 
 router = APIRouter(
@@ -15,26 +16,6 @@ router = APIRouter(
     tags=["Journal"],
     dependencies=[Depends(get_current_active_user)] # Protect all journal routes
 )
-
-# --- Pydantic Schemas ---
-class JournalEntryBase(BaseModel):
-    entry_date: date
-    content: str
-
-class JournalEntryCreate(JournalEntryBase):
-    pass
-
-class JournalEntryUpdate(BaseModel):
-    content: str # Allow updating only content for a specific date
-
-class JournalEntryResponse(JournalEntryBase):
-    id: int
-    user_id: int
-    created_at: datetime
-    updated_at: datetime
-
-    class Config:
-        orm_mode = True # or from_attributes = True for Pydantic v2
 
 # --- API Endpoints ---
 
