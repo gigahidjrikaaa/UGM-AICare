@@ -8,6 +8,8 @@ import logging
 
 from app.utils.email_utils import send_email
 from app.database import get_db
+from app.models import User
+from app.schemas import TestEmailPayload #
 
 logger = logging.getLogger(__name__)
 
@@ -19,11 +21,6 @@ router = APIRouter(prefix="/api/v1/email", tags=["Email Utility"])
 # This can be useful during development to test if your SMTP settings in .env
 # and the send_email utility function are working correctly, without needing
 # the scheduler or other complex logic to run. Remove if not needed.
-
-class TestEmailPayload(BaseModel):
-    recipient_email: EmailStr
-    subject: str = "UGM-AICare Test Email"
-    message: str = "This is a test message from the UGM-AICare email utility."
 
 @router.post("/test-send", status_code=status.HTTP_200_OK)
 async def send_test_email(

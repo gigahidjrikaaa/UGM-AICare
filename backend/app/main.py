@@ -3,7 +3,9 @@ import logging
 from fastapi import FastAPI # type: ignore
 from datetime import datetime
 from app.database import init_db
-from app.routes import email, docs, chat, feedback, link_did, internal, journal, summary
+from app.routes import email, docs, chat, feedback, link_did, internal, journal, summary, profile
+from contextlib import asynccontextmanager
+from app.core.scheduler import start_scheduler, shutdown_scheduler
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
 import os
 from dotenv import load_dotenv
@@ -45,10 +47,22 @@ console_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(level
 logging.getLogger().addHandler(console_handler) # Add to root logger
 logging.getLogger().setLevel(logging.INFO) # Ensure root logger level is set
 
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Code to run on startup
+    logger.info("Application startup...")
+    start_scheduler() # Start the scheduler
+    yield
+    # Code to run on shutdown
+    logger.info("Application shutdown...")
+    shutdown_scheduler() # Shut down the scheduler
+
+# FastAPI app instance with lifespan context manager
 app = FastAPI(
     title="Aika Chatbot API", 
-    description="API for the UGM-AICare application, supporting multiple LLM providers.",
-    version="0.1"
+    description="API for Aika Chatbot - UGM AI Care. Uses FastAPI.",
+    version="0.1",
+    lifespan=lifespan, # Use the async context manager for startup/shutdown
 )
 
 # Add CORS middleware
@@ -72,6 +86,7 @@ app.include_router(email.router)
 app.include_router(journal.router)
 app.include_router(internal.router) 
 app.include_router(summary.router)
+app.include_router(profile.router)
 # logger.info(f"List of routers (/api/v1): {app.routes}")
 logger.info(f"Allowed origins: {origins}")
 
