@@ -12,7 +12,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     google_sub = Column(String, unique=True, index=True, nullable=False) # Hashed version
     twitter_id = Column(String, unique=True, index=True, nullable=True)
-    email = Column(String, unique=True, index=True, nullable=True) # Could be hashed too if used as identifier
+    email = Column(Text, unique=True, index=True, nullable=True)
     sentiment_score = Column(Float, default=0.0)
     wallet_address = Column(String, unique=True, index=True, nullable=True) # Optional EDU Chain wallet address
 
@@ -20,6 +20,7 @@ class User(Base):
     current_streak = Column(Integer, default=0, nullable=False)
     longest_streak = Column(Integer, default=0, nullable=False)
     last_activity_date = Column(Date, nullable=True) # Last date user had journal/chat activity
+    allow_email_checkins = Column(Boolean, default=True, nullable=False) # Whether user wants email check-ins
 
     conversations = relationship("Conversation", back_populates="user") # Relationship name corrected
     journal_entries = relationship("JournalEntry", back_populates="user")
