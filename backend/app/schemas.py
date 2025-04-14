@@ -175,9 +175,23 @@ class FeedbackResponse(BaseModel):
 class UserInternalResponse(BaseModel):
     id: int
     google_sub: str
-    email: str | None = None
+    email: Optional[str] = None # Encrypted email, can be decrypted if needed
     wallet_address: str | None = None
-    role: str | None = None # Assuming role is determined elsewhere or stored
+    role: Optional[str] = None
+
+    class Config:
+         orm_mode = True
+        
+#? --- Schemas for POST /internal/sync-user ---
+class UserSyncPayload(BaseModel):
+    google_sub: str
+    email: Optional[EmailStr] = None # Validate email format from frontend
+
+class UserSyncResponse(BaseModel):
+    message: str
+    user_id: int # Return the internal DB user ID
+    google_sub: str
+    email_stored: bool # Indicate if encrypted email is now stored
 
 #? --- Journal Schemas ---
 class JournalEntryBase(BaseModel):
