@@ -37,9 +37,9 @@ async def send_test_email(
     # Construct simple HTML body
     html_body = f"""
     <html><body>
-    <p>Hello,</p>
+    <p>Halo, kawan!</p>
     <p>{payload.message}</p>
-    <p>Sincerely,<br/>The UGM-AICare System</p>
+    <p>With love,<br/>Aika <3</p>
     </body></html>
     """
 
