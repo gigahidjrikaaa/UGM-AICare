@@ -26,7 +26,7 @@ def send_email(recipient_email: str, subject: str, html_content: str) -> bool:
     message = MIMEMultipart("alternative")
     # Consider setting a friendly sender name
     message["Subject"] = subject
-    message["From"] = f"Aika (UGM-AICare) <{EMAIL_USERNAME}>" # Example friendly name
+    message["From"] = f"Aika from UGM AI-Care  <{EMAIL_USERNAME}>" # Example friendly name
     message["To"] = recipient_email
 
     # Attach HTML content
