@@ -1,6 +1,6 @@
 # backend/app/routes/internal.py
 
-from fastapi import APIRouter, Depends, HTTPException, Security, status. Body # type: ignore
+from fastapi import APIRouter, Depends, HTTPException, Security, status, Body # type: ignore
 from fastapi.security import APIKeyHeader # type: ignore
 from sqlalchemy.orm import Session
 from typing import Optional, List
