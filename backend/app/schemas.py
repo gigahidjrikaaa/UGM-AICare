@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field, EmailStr, validator
 from typing import Any, List, Dict, Optional, Literal
 from datetime import datetime, date
 
-from backend.app.core.llm import LLMProvider
+from app.core.llm import LLMProvider
 
 #? --- Request Body Model ---
 class ChatRequest(BaseModel):
