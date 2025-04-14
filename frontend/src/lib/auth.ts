@@ -36,6 +36,7 @@ interface InternalUserResponse {
   email?: string | null;
   wallet_address?: string | null;
   role?: string | null; // If backend provides role
+  allow_email_checkins?: boolean; // For email check-in feature
 }
 
 export const authOptions: NextAuthOptions = {
@@ -101,7 +102,7 @@ export const authOptions: NextAuthOptions = {
         token.id = user.id; // Google 'sub'
         token.role = user.role; // Role from GoogleProvider profile or Credentials
         token.email = user.email; // Email from user object
-
+        
         console.log(`JWT: Initial sign-in for user ${token.id?.substring(0, 10)}... Role: ${token.role}, Email: ${token.email}`);
 
         // --- !! Call Backend to Sync User !! ---
@@ -172,8 +173,7 @@ export const authOptions: NextAuthOptions = {
               const dbUserData: InternalUserResponse = await response.json();
               console.log("JWT: Received wallet data from internal API:", dbUserData);
               token.wallet_address = dbUserData.wallet_address ?? null;
-              // Optionally refresh role from DB if needed
-              // if (dbUserData.role) token.role = dbUserData.role;
+              token.allow_email_checkins = dbUserData.allow_email_checkins ?? null; // Optional field
             }
           }
         } catch (error) {

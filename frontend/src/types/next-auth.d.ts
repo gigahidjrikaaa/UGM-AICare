@@ -11,6 +11,7 @@ declare module "next-auth" {
       role?: string; // Role assigned during authentication
       accessToken?: string; // Google access token (optional, for specific API calls)
       wallet_address?: string | null;
+      allow_email_checkins?: boolean; // For email check-in feature
     } & DefaultSession["user"]; // Inherit name, email, image
     jwt?: string; // The raw JWT for backend calls
   }
