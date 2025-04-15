@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+// import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Inter } from 'next/font/google'
 import ClientProvider from "@/components/auth/ClientProvider";
@@ -9,6 +10,16 @@ import GlobalSkeleton from "@/components/ui/GlobalSkeleton";
 import { Toaster } from "react-hot-toast";
 
 const inter = Inter({ subsets: ['latin'] })
+
+// const geistSans = Geist({
+//   variable: "--font-geist-sans",
+//   subsets: ["latin"],
+// });
+
+// const geistMono = Geist_Mono({
+//   variable: "--font-geist-mono",
+//   subsets: ["latin"],
+// });
 
 export const metadata: Metadata = {
   title: 'UGM-AICare: Aika - Mental Health Assistant',
@@ -27,20 +38,14 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${inter.className} bg-gray-900`}
+        className={inter.className}
       >
         <ClientProvider>
           <div className="flex flex-col min-h-screen">
           <HeaderWrapper />
-            <main className="flex-grow"> {/* Added flex-grow */}
-                 <Suspense fallback={<GlobalSkeleton />}>
-                     {children}
-                 </Suspense>
-             </main>
-            
-          <FooterWrapper />
-          </div>
-          <Toaster
+            <Suspense fallback={<GlobalSkeleton />}>
+            {children}
+            <Toaster
               position="top-right"
               reverseOrder={false}
               toastOptions={{
@@ -66,6 +71,9 @@ export default async function RootLayout({
                 },
               }}
             />
+            </Suspense>
+          <FooterWrapper />
+          </div>
         </ClientProvider>
       </body>
     </html>
