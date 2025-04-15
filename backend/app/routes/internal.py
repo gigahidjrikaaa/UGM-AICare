@@ -59,7 +59,8 @@ async def get_user_by_google_sub(google_sub: str, db: Session = Depends(get_db))
         google_sub=db_user.google_sub,
         email=db_user.email, # Return encrypted email stored in DB
         wallet_address=db_user.wallet_address,
-        role=None
+        role=None,
+        allow_email_checkins=db_user.allow_email_checkins,
     )
 
 # --- NEW POST Endpoint for User Sync ---

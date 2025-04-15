@@ -178,6 +178,7 @@ class UserInternalResponse(BaseModel):
     email: Optional[str] = None # Encrypted email, can be decrypted if needed
     wallet_address: str | None = None
     role: Optional[str] = None
+    allow_email_checkins: bool = True # Whether user wants email check-ins
 
     class Config:
          orm_mode = True

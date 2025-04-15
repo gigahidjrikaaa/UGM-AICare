@@ -30,5 +30,6 @@ declare module "next-auth/jwt" {
     role?: string;
     accessToken?: string;
     wallet_address?: string | null;
+    allow_email_checkins?: boolean;
   }
 }

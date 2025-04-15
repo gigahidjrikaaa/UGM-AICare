@@ -4,14 +4,15 @@
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { useEffect, useState, useCallback } from 'react'; // Added useState, useEffect, useCallback
+import { useEffect, useState, useCallback } from 'react';
 import EarnedBadgesDisplay from '@/components/ui/EarnedBadgesDisplay';
 import StreakDisplay from '@/components/journaling/StreakDisplay';
 import GlobalSkeleton from '@/components/ui/GlobalSkeleton'; // Use a skeleton for loading
-import { FiMail, FiCreditCard, FiAward, FiActivity  } from 'react-icons/fi'; // Example icons
+import { FiMail, FiCreditCard, FiAward, FiActivity, FiBell, FiBellOff, FiLoader  } from 'react-icons/fi'; // Icons
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import apiClient from '@/services/api'; // Import apiClient
 import { format } from 'date-fns'; // Import format for current month
+import { Switch } from '@headlessui/react'; // Import Switch for toggle
 
 // Define the expected response structure from the backend endpoint
 interface ActivitySummaryResponse {
@@ -30,6 +31,18 @@ export default function ProfilePage() {
     const [longestStreak, setLongestStreak] = useState<number>(0);
     const [isStreakLoading, setIsStreakLoading] = useState(true); // Loading state for streak
     const [streakError, setStreakError] = useState<string | null>(null);
+
+    const [allowCheckins, setAllowCheckins] = useState<boolean>(false); // Default to false until session loads
+    const [isSavingCheckinSetting, setIsSavingCheckinSetting] = useState<boolean>(false);
+    const [checkinSettingError, setCheckinSettingError] = useState<string | null>(null);
+
+    // --- Fetch/Set Initial Check-in State ---
+    useEffect(() => {
+        if (session?.user) {
+            // Set initial state from session data (ensure it exists!)
+            setAllowCheckins(session.user.allow_email_checkins ?? true); // Default to true if undefined in session? Or false?
+        }
+    }, [session]);
 
     // Redirect if not authenticated
     useEffect(() => {
@@ -65,6 +78,30 @@ export default function ProfilePage() {
     useEffect(() => {
         fetchStreakData();
     }, [fetchStreakData]); // Run fetch on mount and when status changes
+
+    // --- NEW Handler to Update Check-in Preference ---
+    const handleCheckinToggle = async (enabled: boolean) => {
+        setAllowCheckins(enabled); // Optimistically update UI
+        setIsSavingCheckinSetting(true);
+        setCheckinSettingError(null);
+        try {
+            const payload = { allow_email_checkins: enabled };
+            // Call the backend endpoint
+            await apiClient.put('/profile/settings/checkins', payload);
+             // Optional: Show success message briefly
+             // You might need to call the `update()` function from `useSession`
+             // if you want the session object itself to immediately reflect the change
+             // await update({ allow_email_checkins: enabled });
+             console.log("Check-in preference updated successfully");
+        } catch (error) {
+             console.error("Failed to update check-in preference:", error);
+             setCheckinSettingError("Failed to save preference.");
+             // Revert optimistic UI update on error
+             setAllowCheckins(!enabled);
+        } finally {
+            setIsSavingCheckinSetting(false);
+        }
+    };
 
     // Loading state
     if (status === 'loading') {
@@ -119,6 +156,39 @@ export default function ProfilePage() {
                     </div>
                 </div>
 
+                {/* --- Settings Section --- */}
+                <div>
+                    <h2 className="text-xl font-semibold mb-3">Settings</h2>
+                    <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                        <div className="flex items-center justify-between">
+                            <div>
+                                <h4 className="font-medium text-white">Proactive Email Check-ins</h4>
+                                <p className="text-xs text-gray-400">Receive occasional encouraging check-in emails from Aika if you haven&apos;t chatted or journaled in a few days.</p>
+                                 {checkinSettingError && <p className="text-xs text-red-400 mt-1">{checkinSettingError}</p>}
+                            </div>
+                            <div className="flex items-center">
+                                 {isSavingCheckinSetting && <FiLoader className="animate-spin text-sm text-gray-400 mr-2"/>}
+                                <Switch
+                                    checked={allowCheckins}
+                                    onChange={handleCheckinToggle}
+                                    disabled={isSavingCheckinSetting}
+                                    className={`${
+                                    allowCheckins ? 'bg-[#FFCA40]' : 'bg-gray-600'
+                                    } relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/80 focus:ring-offset-2 focus:ring-offset-gray-900 disabled:opacity-50`}
+                                >
+                                    <span className="sr-only">Toggle email check-ins</span>
+                                    <span
+                                    className={`${
+                                        allowCheckins ? 'translate-x-6' : 'translate-x-1'
+                                    } inline-block h-4 w-4 transform rounded-full bg-white transition-transform`}
+                                    />
+                                </Switch>
+                                 {allowCheckins ? <FiBell className="ml-2 text-green-400"/> : <FiBellOff className="ml-2 text-gray-500"/>}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
                 {/* --- Streaks Section --- */}
                 <div>
                     <h2 className="text-xl font-semibold mb-3 flex items-center"><FiActivity className="mr-2 text-[#FFCA40]"/> Activity Streak</h2>
@@ -138,16 +208,6 @@ export default function ProfilePage() {
                      {/* Render the Badge Display Component */}
                      <EarnedBadgesDisplay />
                  </div>
-
-                {/* Optional: Section for Streaks (Requires fetching streak data again here) */}
-                {/*
-                <div className="mb-8">
-                    <h2 className="text-xl font-semibold mb-4">Activity Streaks</h2>
-                    <StreakDisplay currentStreak={currentStreakState} longestStreak={longestStreakState} isLoading={isStreakLoading} />
-                </div>
-                */}
-
-                {/* Add other profile sections as needed (e.g., settings link, stats) */}
 
             </main>
         </div>

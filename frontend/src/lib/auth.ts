@@ -173,7 +173,7 @@ export const authOptions: NextAuthOptions = {
               const dbUserData: InternalUserResponse = await response.json();
               console.log("JWT: Received wallet data from internal API:", dbUserData);
               token.wallet_address = dbUserData.wallet_address ?? null;
-              token.allow_email_checkins = dbUserData.allow_email_checkins ?? null; // Optional field
+              token.allow_email_checkins = dbUserData.allow_email_checkins ?? true;
             }
           }
         } catch (error) {

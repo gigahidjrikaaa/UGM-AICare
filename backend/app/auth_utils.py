@@ -26,6 +26,7 @@ class TokenPayload(BaseModel):
     email: Optional[str] = None
     picture: Optional[str] = None
     role: Optional[str] = None
+    allow_email_checkins: Optional[bool] = None
     iat: Optional[int] = None # Issued at timestamp
     exp: Optional[int] = None # Expiration timestamp
     accessToken: Optional[str] = None
