@@ -62,42 +62,20 @@ export default function Footer() {
           {/* Contact */}
           <div>
             <h3 className="text-lg font-semibold mb-4 text-[#FFCA40]">Contact</h3>
-            <address className="not-italic text-sm text-gray-300 space-y-3">
-              <p>Department of Electrical and Information Engineering</p>
-              <p>Universitas Gadjah Mada</p>
-              <p>Yogyakarta, Indonesia</p>
-              <p className="pt-2">
-                <a href="mailto:aicare@ugm.ac.id" className="hover:text-[#FFCA40] transition-colors">
-                  aicare@ugm.ac.id
-                </a>
-              </p>
-            </address>
-          </div>
-        </div>
-
-        {/* Newsletter Signup - Modern Glass Card */}
-        <div className="mt-12 mb-8 bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6 max-w-3xl mx-auto">
-          <div className="grid md:grid-cols-5 gap-4 items-center">
-            <div className="md:col-span-3">
-              <h3 className="text-lg font-semibold mb-1">Stay Updated</h3>
-              <p className="text-sm text-gray-300">Subscribe to receive mental health tips and resources</p>
-            </div>
-            <div className="md:col-span-2">
-              <form className="flex">
-                <input
-                  type="email"
-                  placeholder="Your email"
-                  className="bg-white/10 border border-white/20 rounded-l-md px-4 py-2 flex-1 text-sm focus:outline-none focus:ring-1 focus:ring-[#FFCA40]"
-                  required
-                />
-                <button
-                  type="submit"
-                  className="bg-[#FFCA40] hover:bg-[#ffb700] text-[#001D58] font-medium px-4 rounded-r-md transition-colors"
-                >
-                  Subscribe
-                </button>
-              </form>
-            </div>
+            <ul className="space-y-3">
+              <FooterLink href="https://linkedin.com/in/gigahidjrikaaa" className='text-gray-200 text-sm'>
+                <p className='text-md font-bold'>Giga Hidjrika Aura Adkhy</p>
+                <p>(Lead Developer)</p>
+              </FooterLink>
+              <FooterLink href="https://linkedin.com/in/" className='text-gray-200 text-sm'>
+                <p className='text-md font-bold'>Ega Rizky Setiawan</p>
+                <p>(Developer)</p>
+              </FooterLink>
+              <FooterLink href="https://linkedin.com/in/" className='text-gray-200 text-sm'>
+                <p className='text-md font-bold'>Bimo Sunarfri Hartono</p>
+                <p>(Advisor/Lecturer)</p>
+              </FooterLink>
+            </ul>
           </div>
         </div>
       </div>
@@ -162,14 +140,14 @@ function SocialLink({ href, icon, label }: SocialLinkProps) {
 interface FooterLinkProps {
   href: string;
   children: React.ReactNode;
+  className?: string;
 }
-
-function FooterLink({ href, children }: FooterLinkProps) {
+function FooterLink({ href, children, className }: FooterLinkProps) {
   return (
     <li>
       <Link 
         href={href} 
-        className="text-sm text-gray-300 hover:text-[#FFCA40] transition-colors relative group"
+        className={className || "text-sm text-gray-300 hover:text-[#FFCA40] transition-colors relative group"}
       >
         <span className="inline-block">
           {children}
