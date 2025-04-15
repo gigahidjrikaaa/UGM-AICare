@@ -1,22 +1,20 @@
 "use client";
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '@/services/api';
 import Image from 'next/image';
-import { FiExternalLink, FiAward, FiHelpCircle } from 'react-icons/fi';
+import { FiLoader, FiAward, FiHelpCircle, FiExternalLink, FiRefreshCw } from 'react-icons/fi';
 import { Tooltip } from '@mui/material';
-// import { format } from 'date-fns';
-// import { id } from 'date-fns/locale';
-
+import toast from 'react-hot-toast';
 
 // Import from the new constants file
-import { getIpfsUrl, badgeMetadataMap } from '@/lib/badgeConstants';
+import { getIpfsUrl, badgeMetadataMap, getBadgeMeta } from '@/lib/badgeConstants';
 
 // --- Define EDUChain Testnet Explorer ---
 const EDUCHAIN_TESTNET_EXPLORER_BASE_URL = "https://edu-chain-testnet.blockscout.com";
 
 interface EarnedBadge {
     badge_id: number;
-    awarded_at: string; // Dates usually come as strings
+    awarded_at: string;
     transaction_hash: string;
     contract_address: string;
     name?: string;
@@ -29,6 +27,17 @@ interface EarnedBadge {
     }[];
 }
 
+interface EarnedBadgeInfo { 
+    badge_id: number; 
+    awarded_at: string; 
+    transaction_hash: string; 
+    contract_address: string;
+}
+
+interface SyncAchievementsResponse { 
+    message: string; 
+    newly_awarded_badges: EarnedBadgeInfo[]; 
+}
 
 export default function EarnedBadgesDisplay() {
     const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([]);    // State to hold the badges
@@ -36,24 +45,71 @@ export default function EarnedBadgesDisplay() {
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        const fetchBadges = async () => {
-            setIsLoading(true);
-            setError(null);
-            try {
-                const response = await apiClient.get<EarnedBadge[]>('/activity-summary/my-badges');
-                setEarnedBadges(response.data);
-                // Create a Set of earned IDs for efficient checking
-                setEarnedBadgeIds(new Set(response.data.map(badge => badge.badge_id)));
-            } catch (err) {
-                console.error("Error fetching earned badges:", err);
-                setError("Could not load earned badges.");
-            } finally {
-                setIsLoading(false);
-            }
-        };
-        fetchBadges();
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [syncError, setSyncError] = useState<string | null>(null);
+
+    // Function to fetch badges - now callable manually for refresh
+    const fetchBadges = useCallback(async () => {
+        setIsLoading(true);
+        setError(null);
+        try {
+            const response = await apiClient.get<EarnedBadge[]>('/activity-summary/my-badges');
+            setEarnedBadges(response.data);
+            setEarnedBadgeIds(new Set(response.data.map(badge => badge.badge_id)));
+        } catch (err) {
+            console.error("Error fetching earned badges:", err);
+            setError("Could not load earned badges.");
+             // Clear badges on error
+            setEarnedBadges([]);
+            setEarnedBadgeIds(new Set());
+        } finally {
+            setIsLoading(false);
+        }
     }, []);
+
+    // Initial fetch/sync on component mount
+    useEffect(() => {
+        fetchBadges();
+    }, [fetchBadges]);
+
+    // --- Sync Achievements function moved from ProfilePage ---
+    const handleSyncAchievements = useCallback(async () => {
+        if (isSyncing) return;
+        setIsSyncing(true);
+        setSyncError(null);
+        const toastId = toast.loading("Checking for new badges...");
+
+        try {
+            const response = await apiClient.post<SyncAchievementsResponse>('/profile/sync-achievements'); // Use correct endpoint
+            toast.dismiss(toastId);
+
+            const newBadges = response.data.newly_awarded_badges || [];
+            if (newBadges.length > 0) {
+                toast.success(`Unlocked ${newBadges.length} new badge(s)!`, { duration: 4000 });
+                newBadges.forEach((badge, index) => {
+                    const meta = getBadgeMeta(badge.badge_id);
+                    setTimeout(() => {
+                         toast.success(<span>Badge Unlocked: <strong>{meta.name}</strong></span>, { icon: '🎉', duration: 5000 });
+                    }, index * 500);
+                });
+                // --- Trigger a refresh of the displayed badges ---
+                await fetchBadges(); // Re-fetch the badge list
+                // ----------------------------------------------
+            } else {
+                toast.success("Achievements up to date!", { icon: '👍' });
+            }
+
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        } catch (err: any) {
+            toast.dismiss(toastId);
+            const errorMsg = err.response?.data?.detail || "Failed to sync achievements.";
+            console.error("Error syncing achievements:", err);
+            setSyncError(errorMsg); // Store error to display if needed
+            toast.error(errorMsg);
+        } finally {
+            setIsSyncing(false);
+        }
+    }, [isSyncing, fetchBadges]); // Include fetchBadges in dependencies
 
     // --- Loading and Error states ---
     if (isLoading) {
@@ -81,6 +137,18 @@ export default function EarnedBadgesDisplay() {
             <h3 className="font-semibold mb-3 text-lg text-white flex items-center">
                 <FiAward className="mr-2 text-[#FFCA40]" /> Your Badges
             </h3>
+            {/* Manual Sync Button */}
+            <Tooltip title="Check for newly earned badges">
+                <button
+                    onClick={handleSyncAchievements}
+                    disabled={isSyncing || isLoading} // Disable if loading badges or syncing
+                    className="text-sm p-1.5 rounded text-gray-400 hover:bg-white/10 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                    {isSyncing ? <FiLoader className="animate-spin"/> : <FiRefreshCw />}
+                </button>
+            </Tooltip>
+            {/* Display sync error if it occurred */}
+            {syncError && <p className="text-red-400 text-xs mb-2 text-center sm:text-left">{syncError}</p>}
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4">
                 {/* Iterate over ALL defined badges in the metadata map */}
                 {Object.entries(badgeMetadataMap).map(([idStr, meta]) => {

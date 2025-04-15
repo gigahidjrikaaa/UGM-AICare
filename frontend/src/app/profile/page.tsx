@@ -8,13 +8,11 @@ import { useEffect, useState, useCallback } from 'react';
 import EarnedBadgesDisplay from '@/components/ui/EarnedBadgesDisplay';
 import StreakDisplay from '@/components/journaling/StreakDisplay';
 import GlobalSkeleton from '@/components/ui/GlobalSkeleton'; // Use a skeleton for loading
-import { FiMail, FiCreditCard, FiAward, FiActivity, FiBell, FiBellOff, FiLoader, FiSettings, FiRefreshCw  } from 'react-icons/fi'; // Icons
+import { FiMail, FiCreditCard, FiActivity, FiBell, FiBellOff, FiLoader, FiSettings  } from 'react-icons/fi'; // Icons
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import apiClient from '@/services/api'; // Import apiClient
 import { format } from 'date-fns'; // Import format for current month
 import { Switch } from '@headlessui/react'; // Import Switch for toggle
-import { getBadgeMeta } from '@/lib/badgeConstants';
-import toast from 'react-hot-toast'; // Import toast for notifications
 
 // Define the expected response structure from the backend endpoint
 interface ActivitySummaryResponse {
@@ -22,18 +20,6 @@ interface ActivitySummaryResponse {
     summary: any; // We don't need the summary detail here, but the API returns it
     currentStreak: number;
     longestStreak: number;
-}
-
-interface EarnedBadgeInfo { 
-    badge_id: number; 
-    awarded_at: string; 
-    transaction_hash: string; 
-    contract_address: string;
-}
-
-interface SyncAchievementsResponse { 
-    message: string; 
-    newly_awarded_badges: EarnedBadgeInfo[]; 
 }
 
 export default function ProfilePage() {
@@ -45,12 +31,6 @@ export default function ProfilePage() {
     const [longestStreak, setLongestStreak] = useState<number>(0);
     const [isStreakLoading, setIsStreakLoading] = useState(true); // Loading state for streak
     const [streakError, setStreakError] = useState<string | null>(null);
-
-    // State for badge syncing
-    const [isSyncing, setIsSyncing] = useState(false);
-    const [syncError, setSyncError] = useState<string | null>(null);
-    // State to trigger re-fetch of EarnedBadgesDisplay
-    const [badgeFetchKey, setBadgeFetchKey] = useState(0);
 
     const [allowCheckins, setAllowCheckins] = useState<boolean>(false); // Default to false until session loads
     const [isSavingCheckinSetting, setIsSavingCheckinSetting] = useState<boolean>(false);
@@ -99,54 +79,6 @@ export default function ProfilePage() {
         fetchStreakData();
     }, [fetchStreakData]); // Run fetch on mount and when status changes
 
-    // --- Function to manually sync achievements ---
-    const handleSyncAchievements = useCallback(async () => {
-        if (isSyncing) return;
-        setIsSyncing(true);
-        setSyncError(null);
-        const toastId = toast.loading("Checking for new badges..."); // Loading toast
-
-        try {
-            const response = await apiClient.post<SyncAchievementsResponse>('/profile/sync-achievements');
-            toast.dismiss(toastId); // Dismiss loading toast
-
-            const newBadges = response.data.newly_awarded_badges || [];
-            if (newBadges.length > 0) {
-                toast.success(`Unlocked ${newBadges.length} new badge(s)!`, { duration: 4000 });
-                newBadges.forEach((badge, index) => {
-                    const meta = getBadgeMeta(badge.badge_id);
-                    // Optional: Show individual toasts with delay
-                    setTimeout(() => {
-                         toast.success(<span>Badge Unlocked: <strong>{meta.name}</strong></span>, { icon: '🎉', duration: 5000 });
-                    }, index * 500); // Stagger notifications slightly
-                });
-                // Increment key to force EarnedBadgesDisplay to re-fetch
-                setBadgeFetchKey(prev => prev + 1);
-            } else {
-                toast.success("Achievements up to date!", { icon: '👍' });
-            }
-
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (err: any) {
-            toast.dismiss(toastId);
-            const errorMsg = err.response?.data?.detail || "Failed to sync achievements.";
-            console.error("Error syncing achievements:", err);
-            setSyncError(errorMsg);
-            toast.error(errorMsg);
-        } finally {
-            setIsSyncing(false);
-        }
-    }, [isSyncing]);
-
-    useEffect(() => {
-        if (status === 'authenticated') {
-           // Run once on load after authentication
-           handleSyncAchievements();
-        }
-   // Run only once when authenticated status is reached
-   // eslint-disable-next-line react-hooks/exhaustive-deps
-   }, [status]);
-
     // --- NEW Handler to Update Check-in Preference ---
     const handleCheckinToggle = async (enabled: boolean) => {
         setAllowCheckins(enabled); // Optimistically update UI
@@ -186,8 +118,12 @@ export default function ProfilePage() {
 
     return (
         // Using a similar gradient background as other pages
-        <div className="min-h-screen bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white pt-16"> {/* Added pt-16 assuming standard header height */}
-            <main className="max-w-4xl mx-auto p-4 md:p-8">
+        <div className="min-h-screen bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white pt-8">
+            <div className="absolute inset-0 z-0 opacity-100">
+                <ParticleBackground count={70} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={1} />
+            </div>
+            <main className="max-w-4xl mx-auto p-4 md:p-8 bg-white/5 rounded-lg shadow-lg relative z-10 mb-10">
+                <h1 className="text-3xl font-bold mb-6 text-center">Profile</h1>
                 {/* Profile Header */}
                 <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 mb-8 p-6 bg-white/5 rounded-lg border border-white/10">
                     <div className="relative h-20 w-20 sm:h-24 sm:w-24 rounded-full overflow-hidden border-2 border-[#FFCA40]/60 flex-shrink-0">
@@ -268,27 +204,8 @@ export default function ProfilePage() {
 
                  {/* --- Badges Section --- */}
                  <div>
-                     <div className="flex justify-between items-center mb-3">
-                         <h2 className="text-xl font-semibold flex items-center"><FiAward className="mr-2 text-[#FFCA40]"/> Earned Badges</h2>
-                          {/* Manual Sync Button */}
-                         <button
-                            onClick={handleSyncAchievements}
-                            disabled={isSyncing}
-                            className="text-sm p-1.5 rounded text-gray-400 hover:bg-white/10 hover:text-white disabled:opacity-50"
-                            title="Check for new badges"
-                         >
-                             {isSyncing ? <FiLoader className="animate-spin"/> : <FiRefreshCw />}
-                         </button>
-                     </div>
-                     {syncError && <p className="text-red-400 text-xs mb-2">{syncError}</p>}
-                     {/* Pass key to force re-render/re-fetch when new badges are awarded */}
-                     <EarnedBadgesDisplay key={badgeFetchKey} />
+                     <EarnedBadgesDisplay />
                  </div>
-
-                <div className="absolute inset-0 z-0 opacity-100">
-                    <ParticleBackground count={70} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={1} />
-                </div>
-
             </main>
         </div>
     );
