@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '@/services/api';
 import Image from 'next/image';
-import { FiLoader, FiAward, FiHelpCircle, FiExternalLink, FiRefreshCw } from 'react-icons/fi';
+import { FiLoader, FiAward, FiHelpCircle, FiRefreshCw } from 'react-icons/fi';
 import { Tooltip } from '@mui/material';
 import toast from 'react-hot-toast';
 
@@ -134,19 +134,27 @@ export default function EarnedBadgesDisplay() {
     // --- Render All Badge Slots ---
     return (
         <div className="mt-6 p-4 bg-white/5 rounded-lg border border-white/10">
-            <h3 className="font-semibold mb-3 text-lg text-white flex items-center">
-                <FiAward className="mr-2 text-[#FFCA40]" /> Your Badges
-            </h3>
-            {/* Manual Sync Button */}
-            <Tooltip title="Check for newly earned badges">
-                <button
-                    onClick={handleSyncAchievements}
-                    disabled={isSyncing || isLoading} // Disable if loading badges or syncing
-                    className="text-sm p-1.5 rounded text-gray-400 hover:bg-white/10 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                    {isSyncing ? <FiLoader className="animate-spin"/> : <FiRefreshCw />}
-                </button>
-            </Tooltip>
+            <div className='flex items-center justify-between mb-2'>
+                <h2 className="font-semibold text-xl text-white flex items-center">
+                    <FiAward className="mr-2 text-[#FFCA40]" /> My Badges
+                </h2>
+                <div className="text-sm text-gray-400 flex items-center">
+                    {/* Manual Sync Button */}
+                    <Tooltip title="Check for newly earned badges">
+                        <button
+                            onClick={handleSyncAchievements}
+                            disabled={isSyncing || isLoading} // Disable if loading badges or syncing
+                            className="text-sm p-1.5 rounded text-gray-400 hover:bg-white/10 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
+                            aria-label="Sync Achievements"
+                        >
+                            {isSyncing ? <FiLoader className="animate-spin"/> : <FiRefreshCw />}
+                            Sync Now
+                        </button>
+                    </Tooltip>
+                    <span className="text-sm text-gray-400 ml-1">{earnedBadges.length} / {Object.keys(badgeMetadataMap).length}</span>
+                </div>
+            </div>
+        
             {/* Display sync error if it occurred */}
             {syncError && <p className="text-red-400 text-xs mb-2 text-center sm:text-left">{syncError}</p>}
             <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4">
@@ -191,10 +199,10 @@ export default function EarnedBadgesDisplay() {
                                         className="w-16 h-16 sm:w-20 sm:h-20 rounded-full mb-1 group-hover:scale-110 transition-transform duration-200 bg-gray-700" // Added bg
                                         onError={(e) => { e.currentTarget.src = '/badges/badge-placeholder.png'; }}
                                     />
-                                    <span className="text-xs text-gray-200 group-hover:text-[#FFCA40] truncate w-full px-1 flex items-center justify-center">
-                                         {meta.name}
-                                         <FiExternalLink size={10} className="ml-1 opacity-60 group-hover:opacity-100 inline-block"/>
+                                    <span className="text-xs text-gray-200 group-hover:text-[#FFCA40] w-full px-1 flex items-center justify-center gap-1">
+                                        {meta.name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                                      </span>
+                                    <span className="text-xs text-gray-400">{awardedDate}</span>
                                 </a>
                             ) : (
                                 <div
