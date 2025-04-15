@@ -271,3 +271,8 @@ class TestEmailPayload(BaseModel):
     recipient_email: EmailStr
     subject: str = "UGM-AICare Test Email"
     message: str = "This is a test message from the UGM-AICare email utility."
+
+#? --- Pydantic Model for Sync Achievements Response in profile.py ---
+class SyncAchievementsResponse(BaseModel):
+    message: str
+    newly_awarded_badges: List[EarnedBadgeInfo] = [] # Return info about newly minted badges

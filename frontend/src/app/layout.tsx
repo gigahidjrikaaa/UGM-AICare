@@ -7,6 +7,7 @@ import HeaderWrapper from "@/components/ui/HeaderWrapper";
 import FooterWrapper from "@/components/ui/FooterWrapper";
 import { Suspense } from "react";
 import GlobalSkeleton from "@/components/ui/GlobalSkeleton";
+import { Toaster } from "react-hot-toast";
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -44,6 +45,32 @@ export default async function RootLayout({
           <HeaderWrapper />
             <Suspense fallback={<GlobalSkeleton />}>
             {children}
+            <Toaster
+              position="top-right"
+              reverseOrder={false}
+              toastOptions={{
+                className: 'bg-white text-black dark:bg-gray-800 dark:text-white',
+                duration: 5000,
+                style: {
+                  background: '#363636',
+                  color: '#fff',
+                },
+                error: {
+                  duration: 5000,
+                  style: {
+                    background: '#f44336',
+                    color: '#fff',
+                  },
+                },
+                success: {
+                  duration: 5000,
+                  style: {
+                    background: '#4caf50',
+                    color: '#fff',
+                  },
+                },
+              }}
+            />
             </Suspense>
           <FooterWrapper />
           </div>
