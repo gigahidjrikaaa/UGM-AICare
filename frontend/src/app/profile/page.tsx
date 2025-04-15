@@ -8,7 +8,7 @@ import { useEffect, useState, useCallback } from 'react';
 import EarnedBadgesDisplay from '@/components/ui/EarnedBadgesDisplay';
 import StreakDisplay from '@/components/journaling/StreakDisplay';
 import GlobalSkeleton from '@/components/ui/GlobalSkeleton'; // Use a skeleton for loading
-import { FiMail, FiCreditCard, FiAward, FiActivity, FiBell, FiBellOff, FiLoader  } from 'react-icons/fi'; // Icons
+import { FiMail, FiCreditCard, FiAward, FiActivity, FiBell, FiBellOff, FiLoader, FiSettings  } from 'react-icons/fi'; // Icons
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import apiClient from '@/services/api'; // Import apiClient
 import { format } from 'date-fns'; // Import format for current month
@@ -119,10 +119,6 @@ export default function ProfilePage() {
     return (
         // Using a similar gradient background as other pages
         <div className="min-h-screen bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white pt-16"> {/* Added pt-16 assuming standard header height */}
-            <div className="absolute inset-0 z-0 opacity-40">
-                <ParticleBackground count={70} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={1} />
-            </div>
-
             <main className="max-w-4xl mx-auto p-4 md:p-8">
                 {/* Profile Header */}
                 <div className="flex flex-col sm:flex-row items-center gap-4 sm:gap-6 mb-8 p-6 bg-white/5 rounded-lg border border-white/10">
@@ -157,8 +153,8 @@ export default function ProfilePage() {
                 </div>
 
                 {/* --- Settings Section --- */}
-                <div>
-                    <h2 className="text-xl font-semibold mb-3">Settings</h2>
+                <div className='mb-8'>
+                    <h2 className="text-xl font-semibold mb-3 flex items-center"><FiSettings className="mr-2 text-[#FFCA40]" /> Settings</h2>
                     <div className="p-4 bg-white/5 rounded-lg border border-white/10">
                         <div className="flex items-center justify-between">
                             <div>
@@ -190,7 +186,7 @@ export default function ProfilePage() {
                 </div>
 
                 {/* --- Streaks Section --- */}
-                <div>
+                <div className="mb-8">
                     <h2 className="text-xl font-semibold mb-3 flex items-center"><FiActivity className="mr-2 text-[#FFCA40]"/> Activity Streak</h2>
                     {streakError && !isStreakLoading && (
                         <p className="text-red-400 text-sm">{streakError}</p>
@@ -208,6 +204,10 @@ export default function ProfilePage() {
                      {/* Render the Badge Display Component */}
                      <EarnedBadgesDisplay />
                  </div>
+
+                <div className="absolute inset-0 z-0 opacity-100">
+                    <ParticleBackground count={70} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={1} />
+                </div>
 
             </main>
         </div>
