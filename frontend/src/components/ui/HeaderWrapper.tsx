@@ -12,5 +12,5 @@ export default function HeaderWrapper() {
     return null;
   }
   
-  return <Header />;
+  return <Header onToggleSidebar={() => {}} />;
 }
