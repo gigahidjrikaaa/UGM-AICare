@@ -134,8 +134,7 @@ async def handle_chat_request(
         logger.error(f"Unhandled exception in /chat endpoint for user {current_user.id if current_user else 'unknown'}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
     finally:
-        # Ensure the request-scoped session is closed if using `next(get_db())` pattern manually
-        
+        db.close() # Close the session to avoid leaks
         pass
 
 
