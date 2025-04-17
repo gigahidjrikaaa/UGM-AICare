@@ -1,42 +1,32 @@
 # backend/app/routes/chat.py
-
-from sqlalchemy.orm import Session # Import Session
+import json
+from sqlalchemy.orm import Session as DBSession # DBSession is a common alias for SQLAlchemy session
 from sqlalchemy import desc
-import hashlib # Import hashlib
-from fastapi import APIRouter, HTTPException, Body, Depends, status, BackgroundTasks, Query # type: ignore # Added Depends
+from fastapi import APIRouter, HTTPException, Body, Depends, status, BackgroundTasks, Query # type: ignore
 from typing import List, Dict, Optional, Literal
-from datetime import datetime # Import datetime
+from datetime import datetime, timedelta # Import datetime
+import logging
 
 # Adjust import based on your project structure
-from app.database import get_db
-from app.models import User, Conversation, UserSummary # Import User and Conversation models
+from app.database import get_db, SessionLocal
+from app.models import User, Conversation, UserSummary
 from app.core import llm
-from app.core.llm import LLMProvider # Import the type hint
 from app.dependencies import get_current_active_user
 from app.schemas import ChatRequest, ChatResponse, ConversationHistoryItem, SummarizeRequest
 
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__) # Create a logger for this module
+
 router = APIRouter()
 
-# Simplified backend get_or_create_user - now receives the already-hashed ID
-def get_or_create_user(db: Session, received_google_sub: str) -> User:
-    """Finds a user by hashed identifier or creates a new one."""
-    user = db.query(User).filter(User.google_sub == received_google_sub).first()
-    if not user:
-        # User not found, create a new one
-        llm.logger.info(f"Creating new user record for identifier hash: {received_google_sub[:10]}...") 
-        user = User(google_sub=received_google_sub) # Store the hash directly
-        # Potentially fetch email/name from Google token *if* frontend sends it securely, 
-        # but avoid storing if not necessary for functionality.
-        db.add(user)
-        try:
-            db.commit()
-            db.refresh(user)
-            llm.logger.info(f"Successfully created user with DB ID: {user.id}")
-        except Exception as e:
-            db.rollback()
-            llm.logger.error(f"Database error creating user: {e}", exc_info=True)
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not create user record.")
-    return user
+# --- Helper Function for Background Task Session ---
+def get_background_db():
+    """Dependency to get a DB session specifically for background tasks."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
 
 # --- API Endpoint (Async) ---
 # Add dependencies=[Depends(get_current_user)] if you have authentication
@@ -44,200 +34,180 @@ def get_or_create_user(db: Session, received_google_sub: str) -> User:
 async def handle_chat_request(
     request: ChatRequest = Body(...),
     background_tasks: BackgroundTasks = BackgroundTasks(), # For background tasks
-    db: Session = Depends(get_db) # Use the database session dependency
+    current_user: User = Depends(get_current_active_user) # Get authenticated user
     ):
     """
     Handles chat, detects session changes to trigger summarization of the *previous* session,
     and injects the *latest available* summary into the context for the *current* session.
     """
+    db: DBSession = next(get_db()) # Get the session for this request
     try:
-        # 1. Get or Create User (using the hashed identifier)
-        try:
-            db_user = get_or_create_user(db, request.google_sub) 
-        except Exception as e:
-             llm.logger.error(f"Failed during user lookup/creation: {e}", exc_info=True)
-             raise HTTPException(status_code=500, detail="Error processing user information.")
-
         user_message_content = request.history[-1]['content']
         current_session_id = request.session_id
+        user_id = current_user.id # Use ID from the authenticated user object
 
-        # 2. Detect Session Change and Trigger Previous Summary (if applicable)
+        # --- 2. Detect Session Change and Trigger Previous Summary ---
         previous_session_id_to_summarize = None
         latest_message_from_user = db.query(Conversation)\
-            .filter(Conversation.user_id == db_user.id)\
+            .filter(Conversation.user_id == user_id)\
             .order_by(Conversation.timestamp.desc())\
             .first()
 
+        is_new_session = False # Flag to track if it's a new session
         if latest_message_from_user and latest_message_from_user.session_id != current_session_id:
-            # This is a new session (or the very first message ever for the user)
-            # We need to summarize the *previous* session
             previous_session_id_to_summarize = latest_message_from_user.session_id
-            llm.logger.info(f"New session detected ({current_session_id}) for user {db_user.id}. Previous session was {previous_session_id_to_summarize}.")
-            # Run summarization in the background to avoid delaying the current chat response
-            background_tasks.add_task(summarize_and_save, db, db_user.id, previous_session_id_to_summarize)
+            is_new_session = True
+            logger.info(f"New session detected ({current_session_id}) for user {user_id}. Previous session was {previous_session_id_to_summarize}.")
+            # --- Trigger background task ---
+            # Pass IDs, not the full DB session object
+            background_tasks.add_task(summarize_and_save, user_id, previous_session_id_to_summarize)
         elif not latest_message_from_user:
-             llm.logger.info(f"First ever message for user {db_user.id} in session {current_session_id}.")
-             # No previous session to summarize
-        # else: it's the same session, do nothing regarding summarization trigger
+            is_new_session = True # First message ever is technically a new session start
+            logger.info(f"First ever message for user {user_id} in session {current_session_id}.")
+        # else: same session
 
 
-        # 3. Prepare History for LLM - Inject *Latest Available* Summary
-        history_for_llm = request.history # Start with history from current request
+        # --- 3. Prepare History for LLM - Inject Summary on New Session Start ---
+        history_for_llm = request.history
 
-        # Fetch the most recent summary for this user, regardless of which session it's from
-        latest_summary = db.query(UserSummary)\
-            .filter(UserSummary.user_id == db_user.id)\
-            .order_by(UserSummary.timestamp.desc())\
-            .first()
+        # Fetch latest summary only if it's a new session starting
+        if is_new_session:
+            latest_summary = db.query(UserSummary)\
+                .filter(UserSummary.user_id == user_id)\
+                .order_by(UserSummary.timestamp.desc())\
+                .first()
 
-        if latest_summary:
-            summary_injection = {
-                "role": "system", 
-                "content": f"Reminder of key points from a previous conversation (summarized on {latest_summary.timestamp.strftime('%Y-%m-%d')}): {latest_summary.summary_text}"
-            }
-            # Prepend the summary. Consider if this should only happen on the *first* message of a new session.
-            # For simplicity now, let's prepend it always if a summary exists.
-            history_for_llm = [summary_injection] + history_for_llm
-            llm.logger.info(f"Injected previous summary for user {db_user.id} into LLM context.")
+            if latest_summary:
+                summary_injection = {
+                    "role": "system",
+                    "content": f"Reminder of key points from a previous conversation (summarized on {latest_summary.timestamp.strftime('%Y-%m-%d')}): {latest_summary.summary_text}"
+                }
+                history_for_llm = [summary_injection] + history_for_llm
+                logger.info(f"Injected previous summary for user {user_id} into LLM context for new session.")
 
-        # 4. Call the LLM to get a response for the CURRENT message
+        # --- 4. Call the LLM ---
         generated_text = await llm.generate_response(
-            history=history_for_llm, # Use history potentially including the summary
+            history=history_for_llm,
             provider=request.provider,
             model=request.model,
             max_tokens=request.max_tokens,
             temperature=request.temperature,
-            system_prompt=request.system_prompt # The main system prompt still applies
+            system_prompt=request.system_prompt
         )
 
-        # Check for errors from LLM generation
         if generated_text.startswith("Error:"):
-            llm.logger.error(f"LLM generation failed for provider {request.provider}: {generated_text}")
+            logger.error(f"LLM generation failed for user {user_id}, provider {request.provider}: {generated_text}")
             status_code = 400 if "API key" in generated_text or "Invalid history" in generated_text else 503
             raise HTTPException(status_code=status_code, detail=generated_text)
 
-        # 5. Save the CURRENT conversation turn to the database
+        # --- 5. Save the CURRENT conversation turn ---
         try:
             conversation_entry = Conversation(
-                user_id=db_user.id, 
-                session_id=current_session_id, # Use the current session ID
+                user_id=user_id,
+                session_id=current_session_id,
                 message=user_message_content,
                 response=generated_text,
-                timestamp=datetime.now() 
+                timestamp=datetime.now()
             )
             db.add(conversation_entry)
-            db.commit()
+            db.commit() # Commit within the request scope
         except Exception as e:
-            # ... (handle DB save error, rollback) ...
-            raise HTTPException(status_code=500, detail="Could not save current conversation turn.")
+            db.rollback()
+            logger.error(f"DB error saving conversation turn for user {user_id}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Could not save conversation turn.")
 
-        # 6. Prepare and return the response
+        # --- 6. Prepare and return the response ---
         actual_model_used = request.model or llm.DEFAULT_PROVIDERS.get(request.provider, "unknown")
-        # The history returned to frontend should ideally NOT include the injected summary, just the actual chat turns
         updated_history_for_frontend = request.history + [{"role": "assistant", "content": generated_text}]
-
 
         return ChatResponse(
             response=generated_text,
             provider_used=request.provider,
             model_used=actual_model_used,
-            history=updated_history_for_frontend 
+            history=updated_history_for_frontend
         )
 
-    # Handle potential validation errors from Pydantic
-    except ValueError as e:
-        llm.logger.warning(f"Value error in /chat endpoint: {e}")
+    except ValueError as e: # Handle Pydantic validation errors if they reach here
+        logger.warning(f"Value error in /chat endpoint for user {current_user.id if current_user else 'unknown'}: {e}")
         raise HTTPException(status_code=400, detail=str(e))
-    # Catch-all for other unexpected errors
-    except Exception as e:
-        llm.logger.error(f"Unhandled exception in /chat endpoint: {e}", exc_info=True)
+    except Exception as e: # Catch-all for other unexpected errors
+        logger.error(f"Unhandled exception in /chat endpoint for user {current_user.id if current_user else 'unknown'}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
-
-    # Handle potential validation errors from Pydantic (though FastAPI usually does this)
-    except ValueError as e:
-        llm.logger.warning(f"Value error in /chat endpoint: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    # Catch-all for other unexpected errors during the request handling
-    except Exception as e:
-        llm.logger.error(f"Unhandled exception in /chat endpoint: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail="An internal server error occurred.")
+    finally:
+        # Ensure the request-scoped session is closed if using `next(get_db())` pattern manually
+        
+        pass
 
 
-# --- Define the Summarization Function (can be in this file or a helper module) ---
-async def summarize_and_save(db: Session, user_id: int, session_id_to_summarize: str):
+# --- Define the Summarization Function ---
+async def summarize_and_save(user_id: int, session_id_to_summarize: str):
     """Fetches history, calls LLM to summarize, and saves to UserSummary table."""
-    llm.logger.info(f"Background Task: Starting summarization for user {user_id}, session {session_id_to_summarize}")
+    logger.info(f"Background Task: Starting summarization for user {user_id}, session {session_id_to_summarize}")
+    # --- Use a dedicated DB session for the background task ---
+    db: DBSession = next(get_background_db())
     try:
-        # 1. Retrieve conversation history (same as before)
+        # 1. Retrieve conversation history
         conversation_history = db.query(Conversation)\
             .filter(Conversation.session_id == session_id_to_summarize, Conversation.user_id == user_id)\
             .order_by(Conversation.timestamp.asc())\
             .all()
 
-        if not conversation_history or len(conversation_history) < 2: 
-             llm.logger.info(f"Background Task: Skipping summarization for session {session_id_to_summarize} (too short/no history).")
+        if not conversation_history or len(conversation_history) < 2:
+             logger.info(f"Background Task: Skipping summarization for session {session_id_to_summarize} (too short/no history).")
              return
 
-        # 2. Format history for LLM - CORRECTED LOGIC
+        # 2. Format history for LLM
         history_lines = []
         for turn in conversation_history:
-            # Add the user message associated with this turn
-            history_lines.append(f"user: {turn.message}") 
-            # Add the assistant response associated with this turn
-            history_lines.append(f"assistant: {turn.response}") 
-            
+            history_lines.append(f"user: {turn.message}")
+            history_lines.append(f"assistant: {turn.response}")
         formatted_history = "\n".join(history_lines)
 
-        # 3. Create the summarization prompt (same as before)
+        # 3. Create the summarization prompt
+        # --- Using your improved prompt ---
         summarization_prompt = f"""Please summarize the key points, user's expressed feelings, and main topics discussed in the following conversation history. Focus on aspects relevant to mental well-being for UGM-AICare users. Be concise. Write the response in Indonesian/Bahasa Indonesia. Do not use markdown format because the value is stored in a SQL cell.
 
-        Conversation:
-        {formatted_history}
+Conversation:
+{formatted_history}
 
-        Summary:"""
+Summary:"""
 
-        # 4. Call the LLM (same as before)
+        # 4. Call the LLM
         summary_llm_history = [{"role": "user", "content": summarization_prompt}]
         summary_text = await llm.generate_response(
-             history=summary_llm_history, 
-             provider="gemini", 
-             max_tokens=250, 
-             temperature=0.5 
+             history=summary_llm_history,
+             # Explicitly define provider/model for summarization if different
+             provider="gemini", # Or fetch default from config
+             model= llm.DEFAULT_PROVIDERS.get("gemini", "gemini-pro"), # Fetch default model
+             max_tokens=250, # Adjust as needed
+             temperature=0.5 # Lower temp often better for summaries
         )
 
         if summary_text.startswith("Error:"):
-             raise Exception(f"LLM Error: {summary_text}")
+             raise Exception(f"LLM Error during summarization: {summary_text}")
 
-        # 5. Save the summary (same as before, maybe adjust the text slightly)
+        # 5. Save the summary
         new_summary = UserSummary(
-            user_id=user_id,
-            summary_text=summary_text.strip() # Removed the session ID prefix for clarity, but you can add it back if desired
+             user_id=user_id,
+             session_id=session_id_to_summarize, # Store the summarized session ID
+             summary_text=summary_text.strip()
         )
         db.add(new_summary)
-        # Careful with commit/session management in background tasks - see previous note
-        try:
-             db.commit()
-             llm.logger.info(f"Background Task: Saved summary for user {user_id} from session {session_id_to_summarize}")
-        except Exception as commit_exc:
-             db.rollback()
-             llm.logger.error(f"Background Task: DB Commit Error saving summary: {commit_exc}", exc_info=True)
-             raise # Re-raise the commit error
-
+        db.commit() # Commit within this background task's session
+        logger.info(f"Background Task: Saved summary for user {user_id} from session {session_id_to_summarize}")
 
     except Exception as e:
-        # db.rollback() # Rollback might happen automatically depending on session scope
-        llm.logger.error(f"Background Task: Failed to summarize session {session_id_to_summarize} for user {user_id}: {e}", exc_info=True)
+        db.rollback() # Rollback this background task's session on error
+        logger.error(f"Background Task: Failed to summarize session {session_id_to_summarize} for user {user_id}: {e}", exc_info=True)
     finally:
-        # Ensure session is closed if this task manages its own session
-        # db.close() # Uncomment if needed based on your session management strategy
-        pass 
+        db.close() # Explicitly close the background task's session
 
 # --- New Endpoint for Chat History ---
 @router.get("/history", response_model=List[ConversationHistoryItem])
 async def get_chat_history(
     limit: int = Query(100, ge=1, le=500), # Limit for pagination
     skip: int = Query(0, ge=0), # Optional pagination
-    db: Session = Depends(get_db),
+    db: DBSession = Depends(get_db),
     current_user: User = Depends(get_current_active_user) # Get authenticated user
 ):
     """Fetches conversation history for the authenticated user."""
