@@ -10,8 +10,7 @@ from app.core.llm import LLMProvider
 #? --- ChatEvent Model ---
 class ChatEvent(BaseModel):
     type: Literal['start_module'] # Start with one type, can expand later
-    module_id: str
-    # Add other event-specific data if needed in the future
+    module_id: str = Field(..., description="Identifier for the module to start")
 
 class ChatRequest(BaseModel):
     google_sub: str = Field(..., description="Google 'sub' identifier for the user.")
@@ -23,7 +22,10 @@ class ChatRequest(BaseModel):
     # --- Allow message/history OR event ---
     message: Optional[str] = Field(None, description="User's text message (if not an event)")
     history: Optional[List[Dict[str, str]]] = Field(None, description="Conversation history. Required if 'message' is present, optional if 'event' is present.")
-    event: Optional[ChatEvent] = Field(None, description="Structured event from UI (if not a message)")
+    event: Optional[ChatEvent] = Field(
+        default=None, 
+        description="Structured event from UI (if not a message)"
+    )
     # --- Optional fields ---
     model: Optional[str] = Field(
         default=None,
@@ -72,26 +74,51 @@ class ChatRequest(BaseModel):
     def check_message_or_event(cls, values):
         has_message = bool(values.get('message'))
         has_event = bool(values.get('event'))
+        has_history = values.get('history') is not None # Check if history key exists and is not None
 
-        if has_message == has_event: # XOR logic: Must have one, not both or none
+        if has_message == has_event: # XOR logic
              raise ValueError("Either 'message'/'history' or 'event' must be provided, but not both.")
 
-        if has_message and not values.get('history'):
-             raise ValueError("'history' is required when 'message' is provided.")
-        # Allow history to be None or empty if event is provided
+        # If message is present, history MUST also be present (and not None)
+        if has_message and not has_history:
+             raise ValueError("'history' is required and cannot be null when 'message' is provided.")
+
+        # If event is present, message MUST NOT be present
+        if has_event and has_message:
+             raise ValueError("'message' must not be provided when 'event' is present.")
+
+        # Allow history to be None or potentially empty list when event is present
+        # No specific check needed here based on previous logic
 
         return values
     
     # Add validation if needed
-    @validator('history')
-    def check_history_format(cls, v):
-        if v is None: # Allow None if event is present
-             return v
-        if not v:
-            raise ValueError("History cannot be empty")
-        if v[-1].get('role') != 'user':
-            raise ValueError("History must end with a 'user' message")
-        # Add more checks if necessary (e.g., alternating roles)
+    @validator('history', pre=True, always=True) # 'always=True' ensures it runs even if field is missing initially, 'pre=True' runs before default value assignment if any
+    def check_history_format_if_present(cls, v, values):
+        # This validator depends on the model_validator running first implicitly
+        # We only need to validate the *content* of history if it's actually provided.
+        # The model_validator already ensures history is present when message is present.
+
+        if v is None:
+             # History is allowed to be None if 'event' is driving the request
+             # Or if the frontend explicitly sends null/omits it (though our frontend doesn't currently do that for events)
+            return v # Pass None through
+
+        if not isinstance(v, list):
+            raise ValueError("'history' must be a list if provided.")
+
+        # Check content only if history is a list (i.e., not None)
+        # Check if history list is empty ONLY if a message is also present (logic handled by model_validator)
+        # Here, just check the format if the list isn't empty
+        if v: # If the list is not empty
+             if not all(isinstance(item, dict) and 'role' in item and 'content' in item for item in v):
+                  raise ValueError("Each item in 'history' must be a dict with 'role' and 'content'.")
+             # Check if the last message is from the user, ONLY if driven by a user message (inferred from model_validator)
+             # The original validator checked v[-1]['role'] != 'user'. Let's keep that logic if v is not empty.
+             if values.get('message') and v[-1].get('role') != 'user':
+                  raise ValueError("History must end with a 'user' message when a 'message' is provided.")
+
+        # If it's an event request, an empty history list `[]` is acceptable if sent by frontend.
         return v
 
 #? --- Response Body Model ---
