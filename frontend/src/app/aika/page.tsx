@@ -61,7 +61,7 @@ export default function AikaChat() {
 
       {/* Content area - Now passing user ID to chat interface */}
       <motion.div 
-        className="pt-16 h-screen flex flex-col"
+        className="pt-0 h-screen flex flex-col"
         animate={{
           marginLeft: sidebarOpen ? "64px" : "0",
         }}

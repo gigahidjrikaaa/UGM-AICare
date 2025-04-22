@@ -5,13 +5,11 @@ import { motion } from 'framer-motion';
 import MessageBubble from './MessageBubble'; // Ensure this component now expects { role, content }
 import axios from 'axios';
 import { FiSend } from 'react-icons/fi';
-import { BiMicrophone } from 'react-icons/bi';
+import { BiBrain, BiCommentDetail, BiHelpCircle, BiListUl, BiMicrophone } from 'react-icons/bi';
 import { useSession } from 'next-auth/react';
 import { v4 as uuidv4 } from 'uuid';
 
 // --- Type Definitions ---
-
-// Simplified Message type aligning with backend history format
 export interface Message {
   role: 'user' | 'assistant';
   content: string;
@@ -21,11 +19,18 @@ export interface Message {
 // Type for the provider selection
 type LLMProviderOption = 'togetherai' | 'gemini';
 
+interface ChatEventPayload {
+  type: 'start_module';
+  module_id: string;
+}
+
 // Type for the backend request payload
 interface ChatRequestPayload {
   google_sub?: string; // Optional user ID if needed
   session_id?: string; // Optional session ID if needed
-  history: Array<{ role: string; content: string }>;
+  history?: Array<{ role: string; content: string }>;
+  message?: string; // The user message to send
+  event?: ChatEventPayload; // Optional event payload for guided modules
   provider: LLMProviderOption;
   system_prompt?: string; // Add system_prompt if needed
   // Optional params can be added if needed (model, max_tokens, etc.)
@@ -63,7 +68,14 @@ const AIKA_SYSTEM_PROMPT = `Kamu adalah Aika, AI pendamping kesehatan mental dar
                     * *(Jika bahas overthinking):* "Pas lagi overthinking, kadang nulisin apa yang dipikirin di jurnal atau coba alihin fokus ke hobi bentar bisa ngebantu mecah pikiran yang muter-muter itu."
                     * *(Jika bahas kesepian):* "Ngerasa kesepian itu berat ya.. Kadang coba reach out ke temen lama atau ikut kegiatan UKM/komunitas bisa nambah koneksi sosial lho."
 
-                Ingat, kamu BUKAN psikolog atau dokter. Jangan pernah memberi diagnosis medis, saran pengobatan, atau terapi. Tips di atas adalah saran umum, bukan solusi pasti. Jika percakapan mengarah ke masalah serius atau pengguna tampak sangat kesulitan, **prioritaskan** untuk mengarahkan mereka secara halus agar mencari bantuan profesional (misal: konselor UGM, psikolog). Fokusmu adalah sebagai teman ngobrol yang suportif dan membantu refleksi diri. Jaga respons tetap ringkas namun bermakna.`;
+                Jika percakapan mengarah ke masalah serius atau pengguna tampak sangat kesulitan, **prioritaskan** untuk mengarahkan mereka secara halus agar mencari bantuan profesional (misal: konselor UGM, psikolog). Fokusmu adalah sebagai teman ngobrol yang suportif dan membantu refleksi diri. Jaga respons tetap ringkas namun bermakna.`;
+
+const guidedModules = [
+  { id: 'thought_record', label: 'Explore My Thoughts', icon: BiBrain },
+  { id: 'problem_breakdown', label: 'Break Down a Problem', icon: BiListUl },
+  { id: 'activity_scheduling', label: 'Plan a Small Step', icon: BiCommentDetail }, // Changed icon
+  { id: 'help_me_start', label: 'Not Sure Where to Start?', icon: BiHelpCircle },
+];
 
 export default function ChatInterface() {
   const { data: session, status } = useSession(); // Use session from next-auth
@@ -80,7 +92,7 @@ export default function ChatInterface() {
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    scrollToBottom();
+    // scrollToBottom();
   }, [messages]);
 
   // Auto-focus input on component mount
@@ -113,9 +125,64 @@ export default function ChatInterface() {
   // }, []);
 
 
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
+  // const scrollToBottom = () => {
+  //   messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  // };
+
+   // --- Central API Call Function ---
+   const sendMessageToBackend = useCallback(async (payload: ChatRequestPayload) => {
+    if (!googleSub || !sessionId) {
+        setError("User session not fully initialized.");
+        return;
+    }
+
+    // Ensure required fields are always present
+    payload.google_sub = googleSub;
+    payload.session_id = sessionId;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+      const backendUrl = baseUrl.endsWith('/api/v1') ? baseUrl : `${baseUrl}/api/v1`;
+
+      const response = await axios.post<ChatResponsePayload>(
+        `${backendUrl}/chat`,
+        payload,
+        {
+          headers: { 'Content-Type': 'application/json' }
+          // Add Auth header if needed by backend endpoint
+        }
+      );
+
+      // Add timestamps if missing from backend history
+      const historyWithTimestamps = response.data.history.map(msg => ({
+        ...msg,
+        timestamp: msg.timestamp || new Date()
+      }));
+      setMessages(historyWithTimestamps); // Update with full history from backend
+
+    } catch (error) {
+      console.error('Error sending message:', error);
+      let errorMessageText = "I'm sorry, an error occurred while connecting to the service.";
+      if (axios.isAxiosError(error) && error.response?.data?.detail) {
+        errorMessageText = `Error: ${error.response.data.detail}`;
+      } else if (error instanceof Error) {
+        errorMessageText = `Error: ${error.message}`;
+      }
+      const errorMessage: Message = {
+        role: 'assistant',
+        content: errorMessageText,
+        timestamp: new Date()
+      };
+      // Add error message *without* replacing the entire history
+      setMessages(prev => [...prev, errorMessage]);
+    } finally {
+      setIsLoading(false);
+      setTimeout(() => inputRef.current?.focus(), 100);
+    }
+  }, [googleSub, sessionId]); // Dependencies for the API call
 
   // --- Modified handleSubmit Function ---
   const handleSubmit = useCallback(async (e?: React.FormEvent) => {
@@ -139,74 +206,60 @@ export default function ChatInterface() {
     // 2. Create history *without* system prompt messages for display state
     const currentDisplayHistory = [...messages, userMessage];
     setMessages(currentDisplayHistory);
+    setInput(''); // Clear input field
     
     // Prepare history for backend (strip timestamps if needed, backend ignores them)
     const historyForBackend = currentDisplayHistory.map(({ role, content }) => ({ role, content }));
 
-    // 3. Update UI immediately with the user's message for responsiveness
-    setInput(''); // Clear input field
-    setIsLoading(true);
-    setError(null); // Clear previous errors
-
-    try {
-      // 4. Construct the correct backend URL (using NEXT_PUBLIC_ prefix for client-side env vars)
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-      const backendUrl = baseUrl.endsWith('/api/v1') ? baseUrl : `${baseUrl}/api/v1`;
-
-      // 5. Create the payload matching the new backend API
-      const payload: ChatRequestPayload = {
-        google_sub: googleSub, // Optional user ID if needed
-        session_id: sessionId, // Optional session ID if needed
-        history: historyForBackend, // Send the full history ending with user message
-        provider: selectedProvider, // Use selected provider
-        system_prompt: AIKA_SYSTEM_PROMPT || undefined, // Only included if AIKA_SYSTEM_PROMPT has a value
-        // user_id and conversation_id are no longer sent
-      };
-
-      // 6. Make the API Call
-      const response = await axios.post<ChatResponsePayload>(
-        `${backendUrl}/chat`, // Endpoint is now /api/v1/chat
-        payload,
-        {
-          headers: { 'Content-Type': 'application/json' }
-          // Add Authorization header here if needed:
-          // headers: { 'Authorization': `Bearer ${token}` }
-        }
-      );
-      // 7. Update the messages state with the *full history* returned by the backend
-      // Add timestamps to the history if they don't exist
-      const historyWithTimestamps = response.data.history.map(msg => ({
-        ...msg,
-        timestamp: msg.timestamp || new Date() // Use existing timestamp or create new one
-      }));
-      setMessages(historyWithTimestamps);
-
-    } catch (error) {
-      console.error('Error sending message:', error);
-      let errorMessageText = "I'm sorry, an error occurred while connecting to the service.";
-
-      // Extract backend error message if available (FastAPI HTTPException detail)
-      if (axios.isAxiosError(error) && error.response?.data?.detail) {
-        errorMessageText = `Error: ${error.response.data.detail}`;
-      } else if (error instanceof Error) {
-        errorMessageText = `Error: ${error.message}`;
-      }
-      // Optionally add an error message bubble to the chat
-      const errorMessage: Message = {
-        role: 'assistant',
-        content: errorMessageText,
-        timestamp: new Date()
-      };
-      // Add to messages AFTER the user's message that triggered the error
-      setMessages(prev => [...prev, errorMessage]);
-
-    } finally {
-      setIsLoading(false);
-      // Ensure input is focused after response/error for quick follow-up
-      setTimeout(() => inputRef.current?.focus(), 100);
+    const payload: ChatRequestPayload = {
+      google_sub: googleSub,
+      session_id: sessionId,
+      history: historyForBackend,
+      provider: selectedProvider,
+      message: trimmedInput,
+      system_prompt: AIKA_SYSTEM_PROMPT, // Optional: Include if needed
     }
-  }, [input, isLoading, messages, selectedProvider, sessionId, googleSub]); // Added dependencies for useCallback
 
+    await sendMessageToBackend(payload); // Call central function
+
+  }, [input, isLoading, messages, selectedProvider, sessionId, googleSub, sendMessageToBackend]);
+
+const handleStartModule = useCallback((moduleId: string) => {
+    if (isLoading || !sessionId || !googleSub) {
+      setError("Cannot start exercise: User session not fully initialized or busy.");
+      return;
+    }
+    console.log(`Starting guided module: ${moduleId}`);
+
+    // OPTIONAL: Add an immediate visual cue to the chat?
+    const startingMessage: Message = {
+      role: 'assistant', // Or 'system'?
+      content: `Starting '${guidedModules.find(m => m.id === moduleId)?.label}' exercise...`,
+      timestamp: new Date()
+    };
+    setMessages(prev => [...prev, startingMessage]);
+
+    // Prepare history for backend (send current history before module starts)
+    // We send history so backend knows the context *before* the module starts,
+    // and can return it correctly in its response.
+    const historyForBackend = messages.map(({ role, content }) => ({ role, content }));
+
+    const payload: ChatRequestPayload = {
+      google_sub: googleSub, // Provided by useCallback dependency
+      session_id: sessionId, // Provided by useCallback dependency
+      history: historyForBackend, // Send history context
+      event: { // Use the distinct 'event' structure
+        type: 'start_module',
+        module_id: moduleId,
+      },
+
+      provider: selectedProvider, // Still needed for backend routing/config potentially
+      system_prompt: AIKA_SYSTEM_PROMPT || undefined, // May not be needed for events, but send for consistency
+    };
+
+    sendMessageToBackend(payload); // Call central function
+
+  }, [isLoading, messages, selectedProvider, sessionId, googleSub, sendMessageToBackend]); // Added sendMessageToBackend
 
   // --- Input Handling ---
   const handleInputChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
@@ -341,6 +394,30 @@ return (
       {/* Invisible element for auto-scrolling */}
       <div ref={messagesEndRef} />
       </div>
+
+      {/* --- NEW: Guided Module Buttons Area --- */}
+      <motion.div
+        initial={{ y: 20, opacity: 0 }}
+        animate={{ y: 0, opacity: 1 }}
+        transition={{ delay: 0.1 }} // Slightly faster entry
+        className="px-3 pt-2 pb-1 border-t border-white/10 bg-[#001D58]/60" // Adjusted padding/bg
+      >
+        <div className="flex flex-wrap justify-center gap-2">
+          {guidedModules.map((module) => (
+            <motion.button
+              key={module.id}
+              whileHover={{ scale: 1.05, backgroundColor: "rgba(255, 255, 255, 0.2)" }}
+              whileTap={{ scale: 0.95 }}
+              className="flex items-center gap-2 bg-white/10 hover:bg-white/15 text-white text-xs px-3 py-2 rounded-full transition disabled:opacity-50"
+              onClick={() => handleStartModule(module.id)}
+              disabled={isLoading || !googleSub || !sessionId} // Disable if loading or session not ready
+            >
+              <module.icon size={16} /> {/* Display Icon */}
+              {module.label}
+            </motion.button>
+          ))}
+        </div>
+      </motion.div>
 
       {/* Message input */}
       <motion.div

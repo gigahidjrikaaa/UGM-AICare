@@ -11,8 +11,9 @@ import logging
 from app.database import get_db, SessionLocal
 from app.models import User, Conversation, UserSummary
 from app.core import llm
+from app.core.memory import get_module_state, set_module_state, clear_module_state
 from app.dependencies import get_current_active_user
-from app.schemas import ChatRequest, ChatResponse, ConversationHistoryItem, SummarizeRequest
+from app.schemas import ChatRequest, ChatResponse, ConversationHistoryItem, SummarizeRequest, ChatEvent
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__) # Create a logger for this module
@@ -28,6 +29,26 @@ def get_background_db():
     finally:
         db.close()
 
+# --- Placeholder for getting module starting prompts ---
+async def get_module_start_prompt(module_id: str, step: int) -> str:
+    """
+    Placeholder function to get the initial prompt for a guided module.
+    Replace with actual logic (e.g., database lookup, LLM call, hardcoded strings).
+    """
+    logger.info(f"Getting start prompt for module: {module_id}, step: {step}")
+    start_prompts = {
+        "thought_record": "Okay, let's try exploring those thoughts. First, could you briefly describe the situation or event that triggered the difficult feeling? Just a few words is fine.",
+        "problem_breakdown": "Got it. Sometimes breaking things down helps. What's the main problem or task that feels overwhelming right now?",
+        "activity_scheduling": "Planning something positive, even small, can make a difference. What's one simple, enjoyable, or useful activity you could realistically do in the next day or so?",
+        "help_me_start": "No problem! Sometimes it's hard to know where to begin. I have a few exercises we can try: 'Explore My Thoughts' helps look at difficult thinking patterns, 'Break Down a Problem' helps with feeling overwhelmed, and 'Plan a Small Step' helps schedule positive activities. Which one sounds most useful right now? (You can also just tell me what's on your mind!)"
+    }
+    # Basic step handling example (expand later)
+    if step == 1:
+        return start_prompts.get(module_id, "Let's try this exercise. What's the first thing on your mind?")
+    else:
+        # Handle subsequent steps later
+        return f"Continuing {module_id}... (Step {step} prompt placeholder)"
+
 # --- API Endpoint (Async) ---
 # Add dependencies=[Depends(get_current_user)] if you have authentication
 @router.post("/chat", response_model=ChatResponse)
@@ -40,102 +61,208 @@ async def handle_chat_request(
     Handles chat, detects session changes to trigger summarization of the *previous* session,
     and injects the *latest available* summary into the context for the *current* session.
     """
-    db: DBSession = next(get_db()) # Get the session for this request
+    db: DBSession = next(get_db())
     try:
-        user_message_content = request.history[-1]['content']
-        current_session_id = request.session_id
-        user_id = current_user.id # Use ID from the authenticated user object
+        session_id = request.session_id
+        user_id = current_user.id
+        aika_response_text: str = "" 
+        history_to_return: List[Dict[str, str]] = []
+        
+        # --- Determine Flow: Event or Message ---
+        if request.event:
+            # --- === Handle Event (e.g., Button Click) === ---
+            if request.event.type == 'start_module':
+                module_id = request.event.module_id
+                logger.info(f"EVENT: User {user_id} starting module '{module_id}' in session {session_id}")
 
-        # --- 2. Detect Session Change and Trigger Previous Summary ---
-        previous_session_id_to_summarize = None
-        latest_message_from_user = db.query(Conversation)\
-            .filter(Conversation.user_id == user_id)\
-            .order_by(Conversation.timestamp.desc())\
-            .first()
+                # 1. Set Initial Module State in Redis (Placeholder call)
+                initial_step = 1
+                try:
+                    await set_module_state(session_id, module_id, initial_step)
+                    logger.info(f"Redis: Set state for session {session_id} - module={module_id}, step={initial_step}")
+                except Exception as e:
+                    logger.error(f"Redis Error setting module state for session {session_id}: {e}", exc_info=True)
+                    raise HTTPException(status_code=500, detail="Failed to initialize module state")
 
-        is_new_session = False # Flag to track if it's a new session
-        if latest_message_from_user and latest_message_from_user.session_id != current_session_id:
-            previous_session_id_to_summarize = latest_message_from_user.session_id
-            is_new_session = True
-            logger.info(f"New session detected ({current_session_id}) for user {user_id}. Previous session was {previous_session_id_to_summarize}.")
-            # --- Trigger background task ---
-            # Pass IDs, not the full DB session object
-            background_tasks.add_task(summarize_and_save, user_id, previous_session_id_to_summarize)
-        elif not latest_message_from_user:
-            is_new_session = True # First message ever is technically a new session start
-            logger.info(f"First ever message for user {user_id} in session {current_session_id}.")
-        # else: same session
+                # 2. Get the Starting Prompt/Message for this Module
+                try:
+                    aika_response_text = await get_module_start_prompt(module_id, initial_step)
+                except Exception as e:
+                    logger.error(f"Error getting start prompt for module {module_id}: {e}", exc_info=True)
+                    # Clean up Redis state if start fails
+                    try:
+                        await clear_module_state(session_id)
+                    except Exception as redis_clear_err:
+                        logger.error(f"Redis Error clearing state after failed start for session {session_id}: {redis_clear_err}", exc_info=True)
+                    raise HTTPException(status_code=500, detail=f"Failed to generate start message for module {module_id}")
+
+                # 3. Prepare history for response: Use history *sent by frontend* + new assistant message
+                # Frontend already has its history; we add the new assistant message to it.
+                # If frontend didn't send history with event, use an empty list.
+                history_basis = request.history if request.history is not None else []
+                history_to_return = history_basis + [{"role": "assistant", "content": aika_response_text}]
+
+                # NOTE: We are NOT saving this initial assistant prompt to the Conversation DB here.
+                # We could, but it might be better to save only after the *user's first response* within the module.
+                # Or save it now if required. Let's skip saving for now.
+
+            else:
+                logger.warning(f"Unsupported event type received: {request.event.type} for session {session_id}")
+                raise HTTPException(status_code=400, detail=f"Unsupported event type: {request.event.type}")
+
+        elif request.message:
+            # --- === Handle Standard Text Message === ---
+            user_message_content = request.message
+            # History is guaranteed by Pydantic validator if message is present
+            history_from_request = request.history if request.history is not None else []
+            logger.info(f"MESSAGE: User {user_id} sent message in session {session_id}")
+
+            # 1. Check for Active Module State in Redis (Placeholder call)
+            module_state = await get_module_state(session_id)
+
+            if module_state:
+                # --- User is inside a Guided Module ---
+                module_id = module_state['module']
+                current_step = module_state['step']
+                logger.info(f"MODULE_STEP: Session {session_id} continuing module '{module_id}' at step {current_step}")
+
+                # TODO: Implement LLM call specific to this module/step
+                #   - Need a function like `get_llm_module_response(module_id, current_step, user_message_content, history_from_request)`
+                #   - This function would use a specific prompt for the step.
+                #   - It would return the AI response text.
+                aika_response_text = f"TEMP: Processing '{user_message_content}' for {module_id} Step {current_step}. (LLM Response Needed)" # Placeholder
+
+                # TODO: Update module state (Placeholder call)
+                #   - Determine the next step based on module logic.
+                #   - `next_step = calculate_next_step(module_id, current_step, user_message_content)`
+                #   - Handle module completion or exit commands.
+                #   - `await set_module_state(session_id, module_id, next_step)` OR `await clear_module_state(session_id)`
+                logger.warning(f"MODULE_STEP: State update logic not implemented yet for session {session_id}")
+
+                # --- Save conversation turn for module step ---
+                try:
+                    # Save user message and AI response for this step
+                    conv_entry = Conversation(user_id=user_id, session_id=session_id, message=user_message_content, response=aika_response_text, timestamp=datetime.now())
+                    db.add(conv_entry)
+                    db.commit()
+                except Exception as e:
+                    db.rollback()
+                    logger.error(f"DB Error saving module conversation turn for session {session_id}: {e}", exc_info=True)
+                    # Decide if we should raise HTTPException or try to return response anyway
+                    raise HTTPException(status_code=500, detail="Could not save module conversation turn.")
+
+                # Prepare history for response
+                history_to_return = history_from_request + [{"role": "assistant", "content": aika_response_text}]
+
+            else:
+                # --- Standard Conversation Flow (No Active Module) ---
+                logger.info(f"STANDARD_CHAT: Processing standard message for session {session_id}")
+
+                # --- Session Change Detection & Summary Handling (Your existing logic, MOVED INSIDE this block) ---
+                previous_session_id_to_summarize = None
+                latest_message_from_user = db.query(Conversation)\
+                    .filter(Conversation.user_id == user_id)\
+                    .order_by(Conversation.timestamp.desc())\
+                    .first()
+
+                is_new_session = False
+                if latest_message_from_user and latest_message_from_user.session_id != session_id:
+                    previous_session_id_to_summarize = latest_message_from_user.session_id
+                    is_new_session = True
+                    logger.info(f"STANDARD_CHAT: New session detected ({session_id}). Previous: {previous_session_id_to_summarize}. Triggering summary.")
+                    background_tasks.add_task(summarize_and_save, user_id, previous_session_id_to_summarize)
+                elif not latest_message_from_user:
+                    is_new_session = True
+                    logger.info(f"STANDARD_CHAT: First message for user {user_id} in session {session_id}.")
+
+                # --- Prepare History for LLM - Inject Summary on New Session Start ---
+                history_for_llm = history_from_request # Start with history from request
+                if is_new_session:
+                    latest_summary = db.query(UserSummary)\
+                        .filter(UserSummary.user_id == user_id)\
+                        .order_by(UserSummary.timestamp.desc())\
+                        .first()
+                    if latest_summary:
+                        summary_injection = {
+                            "role": "system",
+                            "content": f"Reminder of key points from a previous conversation (summarized on {latest_summary.timestamp.strftime('%Y-%m-%d')}): {latest_summary.summary_text}"
+                        }
+                        # Inject at the beginning or after system prompt if present
+                        history_for_llm = [history_for_llm[0]] + [summary_injection] + history_for_llm[1:] if len(history_for_llm)>0 and history_for_llm[0]['role']=='system' else [summary_injection] + history_for_llm
+                        logger.info(f"STANDARD_CHAT: Injected previous summary for user {user_id} into LLM context.")
+
+                # --- Call the Standard LLM ---
+                try:
+                    aika_response_text = await llm.generate_response(
+                        history=history_for_llm, # Use potentially modified history
+                        provider=request.provider,
+                        model=request.model,
+                        max_tokens=request.max_tokens,
+                        temperature=request.temperature,
+                        system_prompt=request.system_prompt
+                    )
+                except Exception as llm_err:
+                     logger.error(f"LLM generation failed for standard chat session {session_id}: {llm_err}", exc_info=True)
+                     # Handle error appropriately, maybe raise HTTPException
+                     raise HTTPException(status_code=503, detail=f"LLM service unavailable or failed: {llm_err}")
 
 
-        # --- 3. Prepare History for LLM - Inject Summary on New Session Start ---
-        history_for_llm = request.history
+                if aika_response_text.startswith("Error:"):
+                    logger.error(f"LLM generation returned error for session {session_id}: {aika_response_text}")
+                    status_code = 400 if "API key" in aika_response_text or "Invalid history" in aika_response_text else 503
+                    raise HTTPException(status_code=status_code, detail=aika_response_text)
 
-        # Fetch latest summary only if it's a new session starting
-        if is_new_session:
-            latest_summary = db.query(UserSummary)\
-                .filter(UserSummary.user_id == user_id)\
-                .order_by(UserSummary.timestamp.desc())\
-                .first()
+                # --- Save the standard conversation turn ---
+                try:
+                    conversation_entry = Conversation(
+                        user_id=user_id,
+                        session_id=session_id,
+                        message=user_message_content,
+                        response=aika_response_text,
+                        timestamp=datetime.now()
+                    )
+                    db.add(conversation_entry)
+                    db.commit()
+                except Exception as e:
+                    db.rollback()
+                    logger.error(f"DB error saving standard conversation turn for session {session_id}: {e}", exc_info=True)
+                    raise HTTPException(status_code=500, detail="Could not save conversation turn.")
 
-            if latest_summary:
-                summary_injection = {
-                    "role": "system",
-                    "content": f"Reminder of key points from a previous conversation (summarized on {latest_summary.timestamp.strftime('%Y-%m-%d')}): {latest_summary.summary_text}"
-                }
-                history_for_llm = [summary_injection] + history_for_llm
-                logger.info(f"Injected previous summary for user {user_id} into LLM context for new session.")
+                # Prepare history for response
+                history_to_return = history_from_request + [{"role": "assistant", "content": aika_response_text}]
 
-        # --- 4. Call the LLM ---
-        generated_text = await llm.generate_response(
-            history=history_for_llm,
-            provider=request.provider,
-            model=request.model,
-            max_tokens=request.max_tokens,
-            temperature=request.temperature,
-            system_prompt=request.system_prompt
-        )
+                # --- Placeholder for Proactive Suggestion Logic ---
+                # TODO: Analyze user_message_content & aika_response_text
+                # if should_suggest_module(...):
+                #    ... modify aika_response_text or add metadata to ChatResponse ...
+                # logger.info(f"STANDARD_CHAT: Proactive suggestion check needed for session {session_id}")
 
-        if generated_text.startswith("Error:"):
-            logger.error(f"LLM generation failed for user {user_id}, provider {request.provider}: {generated_text}")
-            status_code = 400 if "API key" in generated_text or "Invalid history" in generated_text else 503
-            raise HTTPException(status_code=status_code, detail=generated_text)
 
-        # --- 5. Save the CURRENT conversation turn ---
-        try:
-            conversation_entry = Conversation(
-                user_id=user_id,
-                session_id=current_session_id,
-                message=user_message_content,
-                response=generated_text,
-                timestamp=datetime.now()
-            )
-            db.add(conversation_entry)
-            db.commit() # Commit within the request scope
-        except Exception as e:
-            db.rollback()
-            logger.error(f"DB error saving conversation turn for user {user_id}: {e}", exc_info=True)
-            raise HTTPException(status_code=500, detail="Could not save conversation turn.")
+        else:
+            # This case should be prevented by the Pydantic validator
+            logger.error(f"Invalid request structure for session {session_id}: Neither message nor event found.")
+            raise HTTPException(status_code=400, detail="Invalid request: Missing message/history or event.")
 
-        # --- 6. Prepare and return the response ---
+        # --- Prepare and return the final response ---
         actual_model_used = request.model or llm.DEFAULT_PROVIDERS.get(request.provider, "unknown")
-        updated_history_for_frontend = request.history + [{"role": "assistant", "content": generated_text}]
 
         return ChatResponse(
-            response=generated_text,
+            response=aika_response_text,
             provider_used=request.provider,
             model_used=actual_model_used,
-            history=updated_history_for_frontend
+            history=history_to_return # Return the correctly constructed history
         )
 
-    except ValueError as e: # Handle Pydantic validation errors if they reach here
-        logger.warning(f"Value error in /chat endpoint for user {current_user.id if current_user else 'unknown'}: {e}")
-        raise HTTPException(status_code=400, detail=str(e))
-    except Exception as e: # Catch-all for other unexpected errors
+    except ValueError as e:
+        logger.warning(f"Value error in /chat endpoint processing request: {e}")
+        raise HTTPException(status_code=400, detail=str(e)) # Pydantic validation errors often raise ValueError
+    except HTTPException as http_exc:
+         raise http_exc # Re-raise known HTTP exceptions
+    except Exception as e:
         logger.error(f"Unhandled exception in /chat endpoint for user {current_user.id if current_user else 'unknown'}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
     finally:
-        db.close() # Close the session to avoid leaks
-        pass
+        db.close()
 
 
 # --- Define the Summarization Function ---
@@ -178,7 +305,7 @@ Summary:"""
              # Explicitly define provider/model for summarization if different
              provider="gemini", # Or fetch default from config
              model= llm.DEFAULT_PROVIDERS.get("gemini", "gemini-pro"), # Fetch default model
-             max_tokens=250, # Adjust as needed
+             max_tokens=1024, # Adjust as needed
              temperature=0.5 # Lower temp often better for summaries
         )
 
