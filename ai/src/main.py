@@ -18,7 +18,7 @@ async def lifespan(app: FastAPI):
     init_database()
     if GraphDriver:
         with GraphDriver.session() as session:
-            session.write_transaction(create_graph)
+            session.execute_write(create_graph)
     yield
     # Code to run on shutdown
     logger.info("Application shutdown...")
@@ -50,7 +50,7 @@ async def get_answer(question: str = Query(..., description="User input/question
     context_result = ""
     with GraphDriver.session() as session:
         for term in found:
-            ctx = session.read_transaction(get_context, term)
+            ctx = session.execute_read(get_context, term)
             context_result += ctx
 
     return {
