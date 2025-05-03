@@ -3,8 +3,14 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
 import os
 from dotenv import load_dotenv
+import logging
 
+# Load environment variables from .env file
 load_dotenv()
+
+# Logging configuration
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 # Determine which database to use based on environment
 if os.getenv("ENV", "development") == "production":
@@ -17,6 +23,8 @@ else:
     engine = create_engine(
         DATABASE_URL, connect_args={"check_same_thread": False}
     )
+
+logger.info(f"Using database: {DATABASE_URL}")
 
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()

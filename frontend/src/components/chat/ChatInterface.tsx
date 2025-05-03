@@ -316,7 +316,7 @@ return (
           <p className="text-gray-300 max-w-lg">
           Kamu bisa berbagi apapun denganku. Percakapan kita akan direkam, tapi identitas dirimu akan kami rahasiakan! 
           <br />
-          <a href="https://ugm.ac.id/en/privacy-policy" target='_blank' className="text-blue-400 underline">Kebijakan Privasi</a>
+          <a href="https://ugm.ac.id/en/privacy-policy" target='_blank' rel="noopener noreferrer" className="text-blue-400 underline">Kebijakan Privasi</a>
           </p>
         </motion.div>
 

@@ -290,8 +290,9 @@ export default function AppointmentsPage() {
                   <button 
                     onClick={prevWeek}
                     className="p-2 rounded-full hover:bg-white/10 transition"
+                    aria-label="Previous week"
                   >
-                    <FiChevronLeft />
+                    <FiChevronLeft className="text-white" />
                   </button>
                   <h3 className="text-white font-medium">
                     {format(currentWeekStart, 'd MMM')} - {format(addDays(currentWeekStart, 6), 'd MMM yyyy')}
@@ -299,8 +300,9 @@ export default function AppointmentsPage() {
                   <button 
                     onClick={nextWeek}
                     className="p-2 rounded-full hover:bg-white/10 transition"
+                    aria-label="Next week"
                   >
-                    <FiChevronRight />
+                    <FiChevronRight className="text-white" />
                   </button>
                 </div>
                 

@@ -40,11 +40,17 @@ export default function Footer() {
           <div>
             <h3 className="text-lg font-semibold mb-4 text-[#FFCA40]">Quick Links</h3>
             <ul className="space-y-3">
-              <FooterLink href="/aika">Talk to Aika</FooterLink>
-              <FooterLink href="/resources">Resources</FooterLink>
-              <FooterLink href="/about">About Us</FooterLink>
-              <FooterLink href="/faq">FAQs</FooterLink>
-              <FooterLink href="/contact">Contact</FooterLink>
+              {[
+                { href: "/aika", text: "Talk to Aika" },
+                { href: "/resources", text: "Resources" },
+                { href: "/about", text: "About Us" },
+                { href: "/faq", text: "FAQs" },
+                { href: "/contact", text: "Contact" },
+              ].map(link => (
+                <FooterLink key={link.href} href={link.href}>
+                  {link.text}
+                </FooterLink>
+              ))}
             </ul>
           </div>
 

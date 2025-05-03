@@ -254,10 +254,10 @@ export default function AdminDashboard() {
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button className="text-[#FFCA40] hover:text-[#ffb700] mr-3">
+                          <button title="Edit Appointment" className="text-[#FFCA40] hover:text-[#ffb700] mr-3">
                             <FiEdit3 size={18} />
                           </button>
-                          <button className="text-gray-300 hover:text-white">
+                          <button title="Cancel Appointment" className="text-gray-300 hover:text-white">
                             <FiX size={18} />
                           </button>
                         </td>

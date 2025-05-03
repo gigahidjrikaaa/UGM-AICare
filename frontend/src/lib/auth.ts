@@ -91,12 +91,12 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     // The jwt callback is invoked when a JWT is created or updated.
-    async jwt({ token, user, account }) {   // Add trigger if needed
+    async jwt({ token, user, account, profile }) {   // Add trigger if needed
       // console.log(`JWT Callback Trigger: ${trigger}, User Present: ${!!user}, Account Present: ${!!account}`);
       const isSignIn = !!(account && user); // Check if this is a sign-in event
       const needsWalletUpdate  = isSignIn || !token.wallet_address; // Fetch on sign-in, update, or if wallet address is missing
 
-      if (isSignIn) {
+      if (isSignIn && account.provider === 'google' && profile) {
         // On initial sign-in, populate from user/account object first
         token.accessToken = account.access_token;
         token.id = user.id; // Google 'sub'
@@ -136,10 +136,33 @@ export const authOptions: NextAuthOptions = {
               const syncResult = await syncResponse.json();
               // console.log("JWT: Backend user sync successful:", syncResult);
               token.dbUserId = syncResult.user_id; // Optionally store db id
+
+              // AFTER successful sync, fetch the full user profile from backend
+              console.log(`JWT: Fetching updated profile from backend for sub ${token.id.substring(0, 10)}...`);
+              const profileResponse = await fetch(`<span class="math-inline">\{backendUrl\}/api/v1/internal/user\-by\-sub/</span>{token.id}`, {
+                headers: { 'X-Internal-API-Key': internalApiKey },
+              });
+
+              if (profileResponse.ok) {
+                const dbUserData: InternalUserResponse = await profileResponse.json();
+                console.log("JWT: Received profile data post-sync:", dbUserData);
+                // Update token with authoritative data from backend DB
+                token.wallet_address = dbUserData.wallet_address ?? null;
+                token.allow_email_checkins = dbUserData.allow_email_checkins ?? true;
+                // Optionally override role if backend provides it: token.role = dbUserData.role || token.role;
+              } else {
+                const errorBody = await profileResponse.text();
+                console.error(`JWT Error: Fetching profile post-sync failed: ${profileResponse.status} ${errorBody}`);
+                // Set defaults if fetch fails after successful sync
+                token.wallet_address = null;
+                token.allow_email_checkins = true;
+              }
             }
           }
         } catch (error) {
           console.error("JWT Error: Network or other error during backend user sync fetch:", error);
+          token.wallet_address = null;
+          token.allow_email_checkins = true;
         }
         // --- !! End Backend Sync Call !! ---
       }
