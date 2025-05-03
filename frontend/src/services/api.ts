@@ -8,19 +8,19 @@ const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL + "/api/v1" || 'http://loca
 // Define interfaces for type safety
 
 export interface Message {
-  timestamp: Date;
-  role: 'user' | 'assistant' | 'system'; // Allow system role if used
+  timestamp: string; // Assuming ISO string format from backend
+  role: 'user' | 'assistant' | 'system';
   content: string;
 }
 
 // Matches backend ChatRequest model
 export interface ChatRequestPayload {
   history: Message[];
-  provider?: 'togetherai' | 'gemini'; // Make provider optional if backend has default
-  model?: string;
-  max_tokens?: number;
-  temperature?: GLfloat;
-  system_prompt?: string;
+  provider?: 'togetherai' | 'gemini'; // Optional, backend might have a default
+  model?: string; // Optional
+  max_tokens?: number; // Optional
+  temperature?: number; // Optional, use 'number' instead of GLfloat
+  system_prompt?: string; // Optional
   // Add other parameters if defined in backend ChatRequest
 }
 
