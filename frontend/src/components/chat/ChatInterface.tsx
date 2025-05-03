@@ -92,7 +92,7 @@ export default function ChatInterface() {
 
   // Auto-scroll to bottom when messages change
   useEffect(() => {
-    // scrollToBottom();
+    scrollToBottom();
   }, [messages]);
 
   // Auto-focus input on component mount
@@ -125,12 +125,13 @@ export default function ChatInterface() {
   // }, []);
 
 
-  // const scrollToBottom = () => {
-  //   messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  // };
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
 
    // --- Central API Call Function ---
    const sendMessageToBackend = useCallback(async (payload: ChatRequestPayload) => {
+    console.log("Sending payload to backend:", JSON.stringify(payload, null, 2));
     if (!googleSub || !sessionId) {
         setError("User session not fully initialized.");
         return;
@@ -146,6 +147,8 @@ export default function ChatInterface() {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
       const backendUrl = baseUrl.endsWith('/api/v1') ? baseUrl : `${baseUrl}/api/v1`;
+
+      console.log("Sending payload to /api/v1/chat:", JSON.stringify(payload, null, 2));
 
       const response = await axios.post<ChatResponsePayload>(
         `${backendUrl}/chat`,
@@ -219,6 +222,7 @@ export default function ChatInterface() {
       message: trimmedInput,
       system_prompt: AIKA_SYSTEM_PROMPT, // Optional: Include if needed
     }
+    console.log("Sending message to backend:", payload); // Log the payload for debugging
 
     await sendMessageToBackend(payload); // Call central function
 

@@ -46,7 +46,7 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
       profile(profile) {
-        console.log("Google Profile received:", profile); // Debug log
+        // console.log("Google Profile received:", profile); // Debug log
         return {
           id: profile.sub,
           email: profile.email,
@@ -91,8 +91,8 @@ export const authOptions: NextAuthOptions = {
   },
   callbacks: {
     // The jwt callback is invoked when a JWT is created or updated.
-    async jwt({ token, user, account, trigger }) {
-      console.log(`JWT Callback Trigger: ${trigger}, User Present: ${!!user}, Account Present: ${!!account}`);
+    async jwt({ token, user, account }) {   // Add trigger if needed
+      // console.log(`JWT Callback Trigger: ${trigger}, User Present: ${!!user}, Account Present: ${!!account}`);
       const isSignIn = !!(account && user); // Check if this is a sign-in event
       const needsWalletUpdate  = isSignIn || !token.wallet_address; // Fetch on sign-in, update, or if wallet address is missing
 
@@ -103,7 +103,7 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role; // Role from GoogleProvider profile or Credentials
         token.email = user.email; // Email from user object
         
-        console.log(`JWT: Initial sign-in for user ${token.id?.substring(0, 10)}... Role: ${token.role}, Email: ${token.email}`);
+        // console.log(`JWT: Initial sign-in for user ${token.id?.substring(0, 10)}... Role: ${token.role}, Email: ${token.email}`);
 
         // --- !! Call Backend to Sync User !! ---
         try {
@@ -115,7 +115,7 @@ export const authOptions: NextAuthOptions = {
           } else if (!token.id) {
             console.error("JWT Error: User Sub/ID missing, cannot sync.");
           } else {
-            console.log(`JWT: Calling internal sync for user sub ${token.id.substring(0, 10)}...`);
+            // console.log(`JWT: Calling internal sync for user sub ${token.id.substring(0, 10)}...`);
             const syncPayload = {
               google_sub: token.id,
               email: token.email // Pass the email we got from Google profile
@@ -134,8 +134,8 @@ export const authOptions: NextAuthOptions = {
               console.error(`JWT Error: Backend sync failed! Status: ${syncResponse.status}, Body: ${errorBody}`);
             } else {
               const syncResult = await syncResponse.json();
-              console.log("JWT: Backend user sync successful:", syncResult);
-              // token.dbUserId = syncResult.user_id; // Optionally store db id
+              // console.log("JWT: Backend user sync successful:", syncResult);
+              token.dbUserId = syncResult.user_id; // Optionally store db id
             }
           }
         } catch (error) {
@@ -148,7 +148,7 @@ export const authOptions: NextAuthOptions = {
       // It uses the GET /user-by-sub endpoint
       // Ensure token.sub exists (it should after sign-in)
       if (token.sub && needsWalletUpdate) {
-        console.log(`JWT: Fetching/Refreshing wallet data from internal API for sub: ${token.sub.substring(0, 10)}...`);
+        // console.log(`JWT: Fetching/Refreshing wallet data from internal API for sub: ${token.sub.substring(0, 10)}...`);
         try {
           const internalApiUrl = `${process.env.BACKEND_URL || 'http://127.0.0.1:8000'}/api/v1/internal/user-by-sub/${token.sub}`;
           const internalApiKey = process.env.INTERNAL_API_KEY;
@@ -171,7 +171,7 @@ export const authOptions: NextAuthOptions = {
               }
             } else {
               const dbUserData: InternalUserResponse = await response.json();
-              console.log("JWT: Received wallet data from internal API:", dbUserData);
+              // console.log("JWT: Received wallet data from internal API:", dbUserData);
               token.wallet_address = dbUserData.wallet_address ?? null;
               token.allow_email_checkins = dbUserData.allow_email_checkins ?? true;
             }
@@ -189,7 +189,7 @@ export const authOptions: NextAuthOptions = {
       token.id = token.id || token.sub;
       token.role = token.role || "guest"; // Default role
 
-      console.log("JWT Callback - Returning Token:", token); // Log final token before return
+      // console.log("JWT Callback - Returning Token:", token); // Log final token before return
       return token;
     },
 
