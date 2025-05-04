@@ -2,20 +2,12 @@
 import React from 'react';
 import ReactMarkdown from 'react-markdown';
 import { format } from 'date-fns';
-import { id } from 'date-fns/locale'; // Import Indonesian locale
+import { id } from 'date-fns/locale';
 import { Message } from '@/types/chat';
 import { cn } from '@/lib/utils';
-import Image from 'next/image'; // Import Next.js Image
-
-// Simple loading dots animation
-const LoadingDots = () => (
-  <div className="flex space-x-1 items-center">
-    <span className="h-2 w-2 bg-current rounded-full animate-bounce [animation-delay:-0.3s]"></span>
-    <span className="h-2 w-2 bg-current rounded-full animate-bounce [animation-delay:-0.15s]"></span>
-    <span className="h-2 w-2 bg-current rounded-full animate-bounce"></span>
-  </div>
-);
-
+import Image from 'next/image';
+import { motion } from 'framer-motion';
+import { LoadingDots } from '@/components/ui/LoadingDots'; // Import the new component
 
 interface MessageBubbleProps {
   message: Message;
@@ -27,76 +19,90 @@ export function MessageBubble({ message }: MessageBubbleProps) {
 
   if (isSystem) {
     return (
-      <div className="my-2 text-center text-xs text-gray-300/80 italic px-4">
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="my-3 text-center text-xs text-gray-300/80 italic px-4"
+      >
         {message.content}
-      </div>
+      </motion.div>
     );
   }
 
+  const bubbleVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
+  };
+
   return (
-    <>
-    {/* Message Bubble Container */}
-     {/* Flex container to align the message bubble and avatar */}
-     {/* Conditional classes for user vs assistant alignment */}
-    <div
-      className={cn(
-        'flex items-start space-x-3 my-3',
-        isUser ? 'justify-end' : 'justify-start'
-      )}
+    // Row container for avatar, bubble+timestamp
+    <motion.div
+      className={cn('flex items-end gap-2 my-2', isUser ? 'justify-end' : 'justify-start')} // Use gap for spacing
+      variants={bubbleVariants}
+      initial="hidden"
+      animate="visible"
     >
       {/* Assistant Avatar */}
       {!isUser && (
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-ugm-blue flex items-center justify-center overflow-hidden border border-white/20">
-           <Image
-             src="/aika-human.jpeg"
-             alt="Aika"
-             width={32} // Match parent div width (w-8 = 2rem = 32px)
-             height={32} // Match parent div height (h-8 = 2rem = 32px)
-             className="object-cover w-full h-full" // Ensure the image covers the area and fills the container
-           />
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-ugm-blue flex items-center justify-center overflow-hidden border-2 border-white/30 shadow-sm self-start mt-1"> {/* Align avatar top */}
+          <Image src="/aika-human.jpeg" alt="Aika" width={32} height={32} className="object-cover w-full h-full" />
         </div>
       )}
 
-      {/* Bubble */}
-      <div
-        className={cn(
-          'p-3 rounded-lg max-w-xs md:max-w-md lg:max-w-lg shadow-md text-sm', // Adjusted text size
-          isUser
-            ? 'bg-ugm-blue text-white rounded-br-none' // Keep user distinct
-            : 'bg-white/80 backdrop-blur-sm text-ugm-blue-dark rounded-bl-none', // Lighter assistant bubble for contrast
-          message.isLoading && 'flex items-center justify-center min-h-[40px] bg-white/60' // Loading state style
-        )}
-      >
-        {message.isLoading ? (
-          <LoadingDots />
-        ) : (
-          // Apply markdown styling using Tailwind prose or custom styles
-           <div className="prose prose-sm max-w-none prose-p:my-1 prose-li:my-0.5 text-inherit"> {/* Basic prose styling */}
-             <ReactMarkdown
-                components={{
-                    // Customize link rendering if needed
-                    // a: ({node, ...props}) => <a {...props} target="_blank" rel="noopener noreferrer" className="text-ugm-gold hover:underline" />
-                }}
-            >
-              {message.content}
-             </ReactMarkdown>
+      {/* Column for Bubble + Timestamp */}
+      <div className={cn('flex flex-col', isUser ? 'items-end' : 'items-start')}>
+        {/* Bubble */}
+        <div
+          className={cn(
+            'px-3.5 py-2.5 rounded-xl max-w-xs md:max-w-md lg:max-w-lg shadow-md text-sm relative', // Slightly more padding, rounded-xl
+            'min-h-[44px]', // Ensure minimum height even for short messages
+            isUser
+              ? 'bg-ugm-blue text-white rounded-br-none'
+              : 'bg-white/90 backdrop-blur-sm text-ugm-blue-dark rounded-bl-none border border-gray-200/50', // Slightly less transparent, subtle border
+            message.isLoading && 'p-0 bg-white/70 backdrop-blur-sm w-[150px]' // Style loading state bubble
+          )}
+        >
+          {message.isLoading ? (
+             // Use the new LoadingDots component
+             <div className="flex items-center justify-start h-full px-3.5 py-2.5 text-ugm-blue-dark"> {/* Container for loading */}
+                <LoadingDots text="Aika sedang mengetik..." />
+              </div>
+           ) : (
+             // Ensure prose styles don't add excessive margins
+             <div className={cn(
+                 'prose prose-sm max-w-none prose-p:m-0 prose-li:m-0 prose-ul:m-0 prose-ol:m-0', // Reset prose margins
+                 isUser ? 'prose-invert' : 'text-ugm-blue-dark',
+                  'prose-a:font-medium prose-a:transition-colors',
+                  isUser ? 'prose-a:text-ugm-gold hover:prose-a:text-ugm-gold/80' : 'prose-a:text-ugm-blue-dark hover:prose-a:text-ugm-blue/80 prose-a:underline'
+               )}>
+               <ReactMarkdown
+                 components={{
+                     a: ({...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />
+                 }}
+               >
+                 {message.content}
+               </ReactMarkdown>
+             </div>
+          )}
+        </div>
+        {/* Timestamp */}
+        {!message.isLoading && (
+           <div className={cn(
+               'mt-1 text-[10px]',
+               isUser ? 'text-gray-400/90 mr-1' : 'text-gray-500/90 ml-1' // Slightly less faded
+               )}>
+             {format(message.timestamp, 'HH:mm', { locale: id })}
            </div>
         )}
       </div>
 
-        {/* User Avatar (Optional) */}
-        {isUser && (
-         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-ugm-gold flex items-center justify-center text-ugm-blue font-semibold">
-            {/* Use user initial or a generic icon */}
-             Me
-         </div>
-        )}
-
-    </div>
-    {/* Timestamp display below the bubble */}
-    <div className={cn('text-xs text-gray-400 mt-1', isUser ? 'text-right' : 'text-left')}>
-      {format(message.timestamp, 'HH:mm', { locale: id })}
-    </div>
-    </>
+      {/* User Avatar */}
+      {isUser && (
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-ugm-gold flex items-center justify-center text-ugm-blue-dark font-semibold text-xs border-2 border-white/30 shadow-sm self-start mt-1"> {/* Align avatar top */}
+          Me
+        </div>
+      )}
+    </motion.div>
   );
 }

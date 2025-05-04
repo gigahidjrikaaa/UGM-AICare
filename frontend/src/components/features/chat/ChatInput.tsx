@@ -107,7 +107,7 @@ export function ChatInput({
           }
           rows={1}
           className={cn(
-            "flex-1 resize-none overflow-y-auto max-h-28", // Adjusted max height
+            "flex-1 resize-none overflow-y-auto max-h-28 h-fit", // Adjusted max height
             "bg-white/20 text-white placeholder:text-gray-300/80", // Semi-transparent bg
             "rounded-lg border border-white/10 focus:border-ugm-gold/50 focus:ring-ugm-gold/50" // Subtle border/focus
           )}
