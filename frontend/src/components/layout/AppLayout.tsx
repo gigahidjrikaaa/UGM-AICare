@@ -37,7 +37,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
    }
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-full min-h-screen overflow-hidden">
       {/* Render Sidebar only if authenticated */}
       {shouldRenderSidebar && (
         <AppSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />

@@ -3,11 +3,11 @@
 
 import { useState, Suspense, useEffect, useCallback } from 'react'; // Added Suspense
 import { motion } from 'framer-motion';
-import ChatHistoryViewer from '@/components/journaling/ChatHistoryViewer'; // Create this component
-import DailyJournal from '@/components/journaling/DailyJournal';       // Create this component
-import AikaPageSkeleton from '@/components/ui/GlobalSkeleton'; // Or a specific skeleton
-import ActivityCalendar from '@/components/journaling/ActivityCalendar'; // <<< Import Calendar
-import StreakDisplay from '@/components/journaling/StreakDisplay';
+import ChatHistoryViewer from '@/components/features/journaling/ChatHistoryViewer'; // Create this component
+import DailyJournal from '@/components/features/journaling/DailyJournal';       // Create this component
+import AikaPageSkeleton from '@/components/ui/GlobalSkeleton'; 
+import ActivityCalendar from '@/components/features/journaling/ActivityCalendar'; // <<< Import Calendar
+import StreakDisplay from '@/components/features/journaling/StreakDisplay';
 import apiClient from '@/services/api'; // Import API client
 import { startOfMonth, format } from 'date-fns';
 

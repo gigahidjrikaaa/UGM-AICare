@@ -4,7 +4,7 @@ import { FaFacebookF, FaTwitter, FaInstagram, FaLinkedinIn, FaYoutube } from 're
 
 export default function Footer() {
   return (
-    <footer className="bg-gradient-to-b from-[#001545] to-[#001D58] text-white mt-auto">
+    <footer className="bg-gradient-to-b from-[#001545] to-[#001D58] text-white mt-auto z-10">
       {/* Top footer section with columns */}
       <div className="max-w-7xl mx-auto pt-12 pb-8 px-4 sm:px-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-8">
@@ -58,10 +58,16 @@ export default function Footer() {
           <div>
             <h3 className="text-lg font-semibold mb-4 text-[#FFCA40]">Resources</h3>
             <ul className="space-y-3">
-              <FooterLink href="/crisis-support">Crisis Support</FooterLink>
-              <FooterLink href="/mental-health-articles">Articles</FooterLink>
-              <FooterLink href="/self-help-tools">Self-Help Tools</FooterLink>
-              <FooterLink href="/counseling">Counseling Services</FooterLink>
+              {[
+                { href: "/crisis-support", text: "Crisis Support" },
+                { href: "/mental-health-articles", text: "Articles" },
+                { href: "/self-help-tools", text: "Self-Help Tools" },
+                { href: "/counseling", text: "Counseling Services" },
+              ].map(link => (
+                <FooterLink key={link.href} href={link.href}>
+                  {link.text}
+                </FooterLink>
+              ))}
             </ul>
           </div>
 
@@ -69,18 +75,18 @@ export default function Footer() {
           <div>
             <h3 className="text-lg font-semibold mb-4 text-[#FFCA40]">Contact</h3>
             <ul className="space-y-3">
-              <FooterLink href="https://linkedin.com/in/gigahidjrikaaa" className='text-gray-200 text-sm'>
-                <p className='text-md font-bold'>Giga Hidjrika Aura Adkhy</p>
-                <p>(Lead Developer)</p>
-              </FooterLink>
-              <FooterLink href="https://linkedin.com/in/" className='text-gray-200 text-sm'>
-                <p className='text-md font-bold'>Ega Rizky Setiawan</p>
-                <p>(Developer)</p>
-              </FooterLink>
-              <FooterLink href="https://linkedin.com/in/" className='text-gray-200 text-sm'>
-                <p className='text-md font-bold'>Bimo Sunarfri Hartono</p>
-                <p>(Advisor/Lecturer)</p>
-              </FooterLink>
+              {[
+                { href: "https://linkedin.com/in/gigahidjrikaaa", name: "Giga Hidjrika Aura Adkhy", role: "(Lead Developer)" },
+                { href: "https://linkedin.com/in/", name: "Ega Rizky Setiawan", role: "(Developer)" }, // TODO: Add correct LinkedIn URL
+                { href: "https://linkedin.com/in/", name: "Bimo Sunarfri Hartono", role: "(Advisor/Lecturer)" }, // TODO: Add correct LinkedIn URL
+              ].map(contact => (
+                <FooterLink key={contact.name} href={contact.href} className='text-gray-200 text-sm'>
+                  <div>
+                    <span className='block text-md font-bold'>{contact.name}</span>
+                    <span className='block'>{contact.role}</span>
+                  </div>
+                </FooterLink>
+              ))}
             </ul>
           </div>
         </div>

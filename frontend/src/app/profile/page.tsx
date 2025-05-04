@@ -6,7 +6,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { useEffect, useState, useCallback } from 'react';
 import EarnedBadgesDisplay from '@/components/ui/EarnedBadgesDisplay';
-import StreakDisplay from '@/components/journaling/StreakDisplay';
+import StreakDisplay from '@/components/features/journaling/StreakDisplay';
 import GlobalSkeleton from '@/components/ui/GlobalSkeleton'; // Use a skeleton for loading
 import { FiMail, FiCreditCard, FiActivity, FiBell, FiBellOff, FiLoader, FiSettings  } from 'react-icons/fi'; // Icons
 import ParticleBackground from '@/components/ui/ParticleBackground';
