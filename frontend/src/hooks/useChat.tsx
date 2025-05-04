@@ -44,6 +44,7 @@ const AVAILABLE_MODULES = [
 ];
 
 const MAX_CHUNK_LENGTH = 350; // Adjust character limit per bubble as needed
+const MESSAGE_DELAY_MS = 300; // Base delay between chunks (can adjust)
 
 
 export function useChat() {
@@ -79,41 +80,44 @@ export function useChat() {
   }, [messages]); // Scroll whenever messages change
 
   // --- Helper to add messages sequentially with delay and loading ---
-  const addAssistantChunksSequentially = useCallback(async (chunks: string[]) => {
-    const assistantMessages: Message[] = chunks.map(chunk => ({
-      id: uuidv4(),
-      role: 'assistant',
-      content: chunk,
-      timestamp: new Date(), // Consistent timestamp for the logical response
-      isLoading: false,
-    }));
+  const addAssistantChunksSequentially = useCallback(async (
+    chunks: string[],
+    initialLoaderId: string // Accept the ID of the loader to remove first
+    ) => {
+      setMessages((prev) => prev.filter((msg) => msg.id !== initialLoaderId));
 
-    for (let i = 0; i < assistantMessages.length; i++) {
-      const currentChunkMessage = assistantMessages[i];
+      const assistantMessages: Message[] = chunks.map(chunk => ({
+        id: uuidv4(),
+        role: 'assistant',
+        content: chunk,
+        timestamp: new Date(), // Consistent timestamp for the logical response
+        isLoading: false,
+      }));
 
-      // Add the current actual chunk
-      setMessages((prev) => [...prev, currentChunkMessage]);
+      for (let i = 0; i < assistantMessages.length; i++) {
+        const currentChunkMessage = assistantMessages[i];
 
-      // If this isn't the last chunk, calculate delay, show loader, wait, remove loader
-      if (i < assistantMessages.length - 1) {
-        const wordCount = countWords(currentChunkMessage.content);
-        const delay = calculateReadTimeMs(wordCount);
-        const chunkLoaderId = `chunk-loader-${i}`;
+        // Add the current actual chunk
+        setMessages((prev) => [...prev, currentChunkMessage]);
 
-        // Show loading indicator
-        setMessages((prev) => [
-          ...prev,
-          { id: chunkLoaderId, role: 'assistant', content: '', timestamp: new Date(), isLoading: true }
-        ]);
+        // If this isn't the last chunk, calculate delay, show loader, wait, remove loader
+        if (i < assistantMessages.length - 1) {
+          const wordCount = countWords(currentChunkMessage.content);
+          const delay = calculateReadTimeMs(wordCount, 180, MESSAGE_DELAY_MS); // 180 WPM, adjust as needed
+          const chunkLoaderId = `chunk-loader-${i}`; // Unique ID for this specific pause
 
-        // Wait
-        await new Promise(resolve => setTimeout(resolve, delay));
+          setMessages((prev) => [
+            ...prev,
+            { id: chunkLoaderId, role: 'assistant', content: '', timestamp: new Date(), isLoading: true }
+          ]);
 
-        // Remove loading indicator right before adding the next chunk
-        setMessages((prev) => prev.filter((msg) => msg.id !== chunkLoaderId));
+          // Wait
+          await new Promise(resolve => setTimeout(resolve, delay));
+
+          setMessages((prev) => prev.filter((msg) => msg.id !== chunkLoaderId));
+        }
       }
-    }
-  }, []); // No dependencies needed for this helper itself
+  }, []);
 
   // --- API Call Logic ---
   const processMessage = useCallback(async (
@@ -128,6 +132,13 @@ export function useChat() {
     setIsLoading(true);
     setError(null);
 
+    // Show Initial loading message
+    const initialLoaderId = uuidv4();
+    setMessages((prev) => [
+      ...prev,
+      { id: initialLoaderId, role: 'assistant', content: '', timestamp: new Date(), isLoading: true },
+    ]);
+
     const fullPayload: ChatRequestPayload = {
         ...payload,
         google_sub: session.user.id, // Get sub from session
@@ -140,20 +151,10 @@ export function useChat() {
       const data: ChatResponsePayload = await sendApiMessage(fullPayload);
       console.log("Received response from backend:", JSON.stringify(data, null, 2)); // Log response
       
-
-      // Update the loading message with the actual response
-      // setMessages((prev) =>
-      //   prev.map((msg) =>
-      //     msg.id === assistantLoadingId
-      //       ? { ...msg, content: data.response, isLoading: false }
-      //       : msg
-      //   )
-      // );
-
       // Split the response into chunks if it's too long
       const responseChunks = splitLongMessage(data.response, MAX_CHUNK_LENGTH);
       // Call the sequential display helper
-      await addAssistantChunksSequentially(responseChunks);
+      await addAssistantChunksSequentially(responseChunks, initialLoaderId);
     } catch (err: unknown) {
       console.error("API Error:", err);
       let errorMessage: string;
@@ -166,6 +167,7 @@ export function useChat() {
       }
       toast.error(errorMessage);
       setError(errorMessage);
+      setMessages((prev) => prev.filter((msg) => msg.id !== initialLoaderId));
     } finally {
       setIsLoading(false);
     }
