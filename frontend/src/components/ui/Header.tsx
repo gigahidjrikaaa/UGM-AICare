@@ -50,7 +50,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
       <header className={`sticky top-0 z-30 transition-all duration-300 ${ 
         scrolled ? "bg-[#001D58]/90 backdrop-blur-md shadow-md" : "bg-[#001D58]"
       } border-b border-white/10`}>
-        <div className="max-w-7xl mx-auto px-4 py-2 flex items-center justify-between">
+        <div className="mx-auto px-4 py-2 flex items-center justify-between">
           <div className="flex items-center">
             {/* --- Sidebar Toggle Button --- */}
             {/* Show toggle only when logged in (as sidebar is only for logged-in users) */}

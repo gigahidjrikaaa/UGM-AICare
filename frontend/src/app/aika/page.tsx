@@ -5,11 +5,10 @@ import { useState, useEffect } from 'react';
 import ChatInterface from '@/components/features/chat/ChatInterface';
 import ParticleBackground from '@/components/ui/ParticleBackground'; // Assuming this exists
 import Image from 'next/image';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import FeedbackForm from '@/components/features/feedback/FeedBackForm'; // Assume this exists
-import { Toaster, toast } from 'react-hot-toast'; // Import toast here
+import { Toaster } from 'react-hot-toast'; // Import toast here
 
 // Loading Component (Keep as before)
 const LoadingIndicator = () => (
@@ -27,15 +26,9 @@ const LoadingIndicator = () => (
 );
 
 export default function AikaChatPage() {
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [mounted, setMounted] = useState(false);
   const { status } = useSession();
   const router = useRouter();
-
-  const handleFeedbackSuccess = () => {
-    toast.success("Terima kasih atas feedback-nya!");
-    setShowFeedbackModal(false);
-  };
 
   useEffect(() => {
     setMounted(true);
@@ -89,48 +82,6 @@ export default function AikaChatPage() {
           </motion.div>
 
         </motion.div> {/* End centered content area */}
-
-
-        {/* Feedback button - remains fixed */}
-        <motion.button
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.95 }}
-            onClick={() => setShowFeedbackModal(true)}
-            className="fixed bottom-6 right-6 z-50 bg-ugm-gold text-ugm-blue-dark px-5 py-3 rounded-full shadow-lg hover:bg-opacity-90 transition-all font-semibold flex items-center space-x-2"
-            aria-label="Give Feedback"
-        >
-           <span>Beri Feedback</span>
-        </motion.button>
-
-        {/* Feedback Modal (Keep as before) */}
-        <AnimatePresence>
-           {showFeedbackModal && (
-               <motion.div
-                 initial={{ opacity: 0 }}
-                 animate={{ opacity: 1 }}
-                 exit={{ opacity: 0 }}
-                 className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4"
-                 onClick={() => setShowFeedbackModal(false)}
-               >
-                   <motion.div
-                     initial={{ scale: 0.9, opacity: 0 }}
-                     animate={{ scale: 1, opacity: 1 }}
-                     exit={{ scale: 0.9, opacity: 0 }}
-                     transition={{ type: 'spring', damping: 15, stiffness: 200 }}
-                     onClick={(e) => e.stopPropagation()}
-                     className='w-full max-w-2xl rounded-lg bg-white text-gray-800 shadow-2xl overflow-hidden'
-                   >
-                        <FeedbackForm
-                          onClose={() => setShowFeedbackModal(false)}
-                          onSubmitSuccess={handleFeedbackSuccess}
-                        />
-                   </motion.div>
-               </motion.div>
-           )}
-        </AnimatePresence>
-
       </main>
     </>
   );

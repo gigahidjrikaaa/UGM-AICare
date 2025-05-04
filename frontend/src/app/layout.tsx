@@ -32,7 +32,6 @@ export default async function RootLayout({
       >
         <ClientProvider>
           <div className="flex flex-col min-h-screen">
-            {/* <HeaderWrapper /> */}
               <Suspense fallback={<GlobalSkeleton />}>
                 <AppLayout >
                   {children}
@@ -64,7 +63,6 @@ export default async function RootLayout({
                   }}
                 />
               </Suspense>
-            {/* <FooterWrapper /> */}
           </div>
         </ClientProvider>
       </body>
