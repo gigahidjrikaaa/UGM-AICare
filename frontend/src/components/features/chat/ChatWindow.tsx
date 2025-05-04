@@ -9,7 +9,7 @@ interface ChatWindowProps {
   chatContainerRef: React.RefObject<HTMLDivElement | null>; // Ref for the chat container
 }
 
-export function ChatWindow({ messages, isLoading, chatContainerRef }: ChatWindowProps) {
+export function ChatWindow({ messages, chatContainerRef }: ChatWindowProps) {
   return (
     <div
       ref={chatContainerRef}
@@ -20,13 +20,6 @@ export function ChatWindow({ messages, isLoading, chatContainerRef }: ChatWindow
       {messages.map((msg) => (
         <MessageBubble key={msg.id} message={msg} />
       ))}
-       {/* Loading indicator specifically for when Aika is typing */}
-       {isLoading && messages[messages.length - 1]?.role === 'assistant' && messages[messages.length - 1]?.isLoading && (
-         <MessageBubble
-           key="loading-indicator"
-           message={{ id: 'loading', role: 'assistant', content: '', timestamp: new Date(), isLoading: true }}
-         />
-       )}
     </div>
   );
 }

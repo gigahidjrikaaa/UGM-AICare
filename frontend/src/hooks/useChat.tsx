@@ -6,7 +6,8 @@ import { useSession } from 'next-auth/react'; // Use client-side session hook
 
 import type { Message, ChatMode } from '@/types/chat';
 import type { ApiMessage, ChatRequestPayload, ChatResponsePayload } from '@/types/api';
-import { sendMessage as sendApiMessage } from '@/services/api'; // Assuming api.ts exports this
+import { sendMessage as sendApiMessage } from '@/services/api'; 
+import { splitLongMessage, countWords, calculateReadTimeMs } from '@/lib/textUtils';
 
 // Define default system prompt (can be overridden)
 const DEFAULT_SYSTEM_PROMPT = `Kamu adalah Aika, AI pendamping kesehatan mental dari UGM-AICare. Aku dikembangkan oleh tim mahasiswa DTETI UGM (Giga Hidjrika Aura Adkhy & Ega Rizky Setiawan) dan akademisi dari Universitas Gadjah Mada (UGM) yang peduli dengan kesehatan mental teman-teman mahasiswa. Anggap dirimu sebagai teman dekat bagi mahasiswa UGM yang sedang butuh teman cerita. Gunakan bahasa Indonesia yang santai dan kasual (gaya obrolan sehari-hari), jangan terlalu formal, kaku, atau seperti robot. Buat suasana ngobrol jadi nyaman dan nggak canggung (awkward). Sebisa mungkin, sesuaikan juga gaya bahasamu dengan yang dipakai pengguna.
@@ -42,6 +43,8 @@ const AVAILABLE_MODULES = [
     { id: 'activity_scheduling', name: 'Latihan Penjadwalan Aktivitas', description: 'Merencanakan kegiatan positif kecil.' },
 ];
 
+const MAX_CHUNK_LENGTH = 350; // Adjust character limit per bubble as needed
+
 
 export function useChat() {
   const { data: session } = useSession(); // Get user session
@@ -75,6 +78,43 @@ export function useChat() {
     }
   }, [messages]); // Scroll whenever messages change
 
+  // --- Helper to add messages sequentially with delay and loading ---
+  const addAssistantChunksSequentially = useCallback(async (chunks: string[]) => {
+    const assistantMessages: Message[] = chunks.map(chunk => ({
+      id: uuidv4(),
+      role: 'assistant',
+      content: chunk,
+      timestamp: new Date(), // Consistent timestamp for the logical response
+      isLoading: false,
+    }));
+
+    for (let i = 0; i < assistantMessages.length; i++) {
+      const currentChunkMessage = assistantMessages[i];
+
+      // Add the current actual chunk
+      setMessages((prev) => [...prev, currentChunkMessage]);
+
+      // If this isn't the last chunk, calculate delay, show loader, wait, remove loader
+      if (i < assistantMessages.length - 1) {
+        const wordCount = countWords(currentChunkMessage.content);
+        const delay = calculateReadTimeMs(wordCount);
+        const chunkLoaderId = `chunk-loader-${i}`;
+
+        // Show loading indicator
+        setMessages((prev) => [
+          ...prev,
+          { id: chunkLoaderId, role: 'assistant', content: '', timestamp: new Date(), isLoading: true }
+        ]);
+
+        // Wait
+        await new Promise(resolve => setTimeout(resolve, delay));
+
+        // Remove loading indicator right before adding the next chunk
+        setMessages((prev) => prev.filter((msg) => msg.id !== chunkLoaderId));
+      }
+    }
+  }, []); // No dependencies needed for this helper itself
+
   // --- API Call Logic ---
   const processMessage = useCallback(async (
     payload: Omit<ChatRequestPayload, 'google_sub' | 'session_id'> // Omit fields we'll add
@@ -88,13 +128,6 @@ export function useChat() {
     setIsLoading(true);
     setError(null);
 
-    // Add a temporary loading message for the assistant
-    const assistantLoadingId = uuidv4();
-    setMessages((prev) => [
-      ...prev,
-      { id: assistantLoadingId, role: 'assistant', content: '', timestamp: new Date(), isLoading: true },
-    ]);
-
     const fullPayload: ChatRequestPayload = {
         ...payload,
         google_sub: session.user.id, // Get sub from session
@@ -106,44 +139,37 @@ export function useChat() {
       console.log("Sending payload to backend:", JSON.stringify(fullPayload, null, 2)); // Log payload
       const data: ChatResponsePayload = await sendApiMessage(fullPayload);
       console.log("Received response from backend:", JSON.stringify(data, null, 2)); // Log response
+      
 
       // Update the loading message with the actual response
-      setMessages((prev) =>
-        prev.map((msg) =>
-          msg.id === assistantLoadingId
-            ? { ...msg, content: data.response, isLoading: false }
-            : msg
-        )
-      );
+      // setMessages((prev) =>
+      //   prev.map((msg) =>
+      //     msg.id === assistantLoadingId
+      //       ? { ...msg, content: data.response, isLoading: false }
+      //       : msg
+      //   )
+      // );
 
-      // Potentially handle mode changes or suggestions based on response
-      if (data.suggestions) {
-        // Example: if backend suggests modules, switch mode
-        // setCurrentMode('module_selection');
-      }
-      if (data.module_state) {
-        // Example: if backend updates module state
-        // setCurrentMode(`module:${data.module_state.module}`);
-        // setModuleStep(data.module_state.step); // Need state for this
-      }
-
-
+      // Split the response into chunks if it's too long
+      const responseChunks = splitLongMessage(data.response, MAX_CHUNK_LENGTH);
+      // Call the sequential display helper
+      await addAssistantChunksSequentially(responseChunks);
     } catch (err: unknown) {
       console.error("API Error:", err);
-      let errorMessage = "Gagal menghubungi Aika. Coba lagi nanti.";
+      let errorMessage: string;
       if (err instanceof Error) {
         errorMessage = err.message;
       } else if (typeof err === 'string') {
         errorMessage = err;
+      } else {
+        errorMessage = "Gagal menghubungi Aika. Terjadi kesalahan tidak dikenal.";
       }
       toast.error(errorMessage);
       setError(errorMessage);
-       // Remove the loading message on error
-       setMessages((prev) => prev.filter((msg) => msg.id !== assistantLoadingId));
     } finally {
       setIsLoading(false);
     }
-  }, [session, sessionId]); // Add sessionId dependency
+  }, [session, sessionId, addAssistantChunksSequentially]); // Add sessionId dependency
 
   // --- Send User Message ---
   const handleSendMessage = useCallback(async () => {
@@ -157,27 +183,20 @@ export function useChat() {
       timestamp: new Date(),
     };
 
-    // Add user message immediately
-    setMessages((prev) => [...prev, newUserMessage]);
-    setInputValue(''); // Clear input
+    // Add user message *before* clearing input and calling API
+    // Add it to a temporary state that includes the new message for history calculation
+    const messagesWithUser = [...messages, newUserMessage];
+    setMessages(messagesWithUser);
+    setInputValue(''); // Clear input now
 
-    // Prepare history for API (convert to backend format if needed)
-    const historyForApi: ApiMessage[] = [...messages, newUserMessage] // Include the new user message
-      .filter(msg => msg.role !== 'system') // Exclude system messages from history sent
-      .map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-        // timestamp: msg.timestamp.toISOString(), // Backend might expect ISO string
-      }));
+    const historyForApi: ApiMessage[] = messagesWithUser // Use the state *with* the new user message
+      .filter(msg => msg.role !== 'system')
+      .map((msg) => ({ role: msg.role, content: msg.content }));
 
-    // Send payload for standard message
-    await processMessage({
-        message: userMessageContent,
-        history: historyForApi,
-        // Add other defaults if needed: provider, model etc.
-    });
+    // processMessage will handle setting isLoading true/false and adding assistant messages
+    await processMessage({ message: userMessageContent, history: historyForApi });
 
-  }, [inputValue, isLoading, messages, processMessage]);
+  }, [inputValue, isLoading, messages, processMessage]); // Dependencies updated
 
   // --- Start a Module ---
   const handleStartModule = useCallback(async (moduleId: string) => {
@@ -190,22 +209,20 @@ export function useChat() {
         content: `Memulai modul: ${AVAILABLE_MODULES.find(m => m.id === moduleId)?.name || moduleId}...`,
         timestamp: new Date(),
     };
-    setMessages((prev) => [...prev, systemMessage]);
-    setCurrentMode(`module:${moduleId}`); // Set mode immediately
 
-    // Prepare history (can be empty or based on current messages before the system one)
-     const historyForApi: ApiMessage[] = messages
-      .filter(msg => msg.role !== 'system') // Exclude system messages
-      .map((msg) => ({
-        role: msg.role,
-        content: msg.content,
-      }));
+    // Add system message before calling API
+    const messagesWithSystem = [...messages, systemMessage];
+    setMessages(messagesWithSystem);
+    setCurrentMode(`module:${moduleId}`);
 
-    // Send payload with event
-    await processMessage({
-        event: { type: 'start_module', module_id: moduleId },
-        history: historyForApi.length > 0 ? historyForApi : undefined, // Send history if available
-    });
+    const historyForApi: ApiMessage[] = messagesWithSystem // Use state including system message to find previous history
+       .filter(msg => msg.role !== 'system') // Still filter system for API call
+       .map((msg) => ({ role: msg.role, content: msg.content }));
+
+     await processMessage({
+         event: { type: 'start_module', module_id: moduleId },
+         history: historyForApi.length > 0 ? historyForApi : undefined,
+     });
   }, [isLoading, messages, processMessage]);
 
 
@@ -226,5 +243,6 @@ export function useChat() {
     handleInputChange,
     handleSendMessage,
     handleStartModule,
+    // sessionId, // Expose if needed
   };
 }
