@@ -2,19 +2,13 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react'; // Added useCallback
 import { motion } from 'framer-motion';
-import MessageBubble from './MessageBubble'; // Ensure this component now expects { role, content }
+import { MessageBubble } from './MessageBubble';
+import { Message } from '@/types/chat';
 import axios from 'axios';
 import { FiSend } from 'react-icons/fi';
 import { BiBrain, BiCommentDetail, BiHelpCircle, BiListUl, BiMicrophone } from 'react-icons/bi';
 import { useSession } from 'next-auth/react';
 import { v4 as uuidv4 } from 'uuid';
-
-// --- Type Definitions ---
-export interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string | number | Date; // Add timestamp to match MessageBubble's requirements
-}
 
 // Type for the provider selection
 type LLMProviderOption = 'togetherai' | 'gemini';
@@ -175,6 +169,7 @@ export default function ChatInterface() {
         errorMessageText = `Error: ${error.message}`;
       }
       const errorMessage: Message = {
+        id: uuidv4(), // Add a unique ID
         role: 'assistant',
         content: errorMessageText,
         timestamp: new Date()
@@ -201,6 +196,7 @@ export default function ChatInterface() {
 
     // 1. Create the user message in the new format
     const userMessage: Message = {
+      id: uuidv4(), // Add unique ID
       role: 'user',
       content: trimmedInput,
       timestamp: new Date()
@@ -237,6 +233,7 @@ const handleStartModule = useCallback((moduleId: string) => {
 
     // OPTIONAL: Add an immediate visual cue to the chat?
     const startingMessage: Message = {
+      id: uuidv4(), // Add unique ID
       role: 'assistant', // Or 'system'?
       content: `Starting '${guidedModules.find(m => m.id === moduleId)?.label}' exercise...`,
       timestamp: new Date()

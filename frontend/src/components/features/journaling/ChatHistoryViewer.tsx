@@ -3,8 +3,8 @@
 
 import React, { useState, useEffect } from 'react';
 import apiClient from '@/services/api';
-import MessageBubble from '@/components/chat/MessageBubble'; // Reuse bubble
-import { Message } from '@/components/chat/MessageBubble'; // Reuse type
+import { Message } from '@/types/chat'; 
+import { MessageBubble } from '@/components/features/chat/MessageBubble';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 
@@ -23,7 +23,7 @@ export default function ChatHistoryViewer() {
             setLoading(true);
             setError(null);
             try {
-                const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+                const baseUrl = process.env.NEXT_PUBLIC_API_URL;
                 // Assuming apiClient handles auth headers automatically now
                 const response = await apiClient.get<HistoryItem[]>(`${baseUrl}/api/v1/history`); // Use your API client
                 console.log("Chat history response:", response.data);

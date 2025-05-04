@@ -47,7 +47,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
       {/* Assistant Avatar */}
       {!isUser && (
         <div className="flex-shrink-0 w-8 h-8 rounded-full bg-ugm-blue flex items-center justify-center overflow-hidden border border-white/20">
-           <Image src="/UGM_Lambang.png" alt="Aika" width={20} height={20} /> {/* Adjusted path/size */}
+           <Image
+             src="/aika-human.jpeg"
+             alt="Aika"
+             width={32} // Match parent div width (w-8 = 2rem = 32px)
+             height={32} // Match parent div height (h-8 = 2rem = 32px)
+             className="object-cover w-full h-full" // Ensure the image covers the area and fills the container
+           />
         </div>
       )}
 

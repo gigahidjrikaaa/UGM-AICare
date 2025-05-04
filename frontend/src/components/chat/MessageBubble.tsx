@@ -1,158 +1,115 @@
-import { useMemo } from 'react';
-import Image from 'next/image';
+// src/components/features/chat/MessageBubble.tsx
+import React from 'react';
 import ReactMarkdown from 'react-markdown';
-import { motion } from 'framer-motion';
-import { useSession } from 'next-auth/react';
+import { format } from 'date-fns';
+import { id } from 'date-fns/locale';
+import { Message } from '@/types/chat';
+import { cn } from '@/lib/utils';
+import Image from 'next/image';
+import { motion } from 'framer-motion'; // Import motion
 
-export interface Message {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string | number | Date;
-}
+// Simple loading dots animation (no changes needed)
+const LoadingDots = () => (
+  <div className="flex space-x-1.5 items-center justify-center h-full"> {/* Added justify-center */}
+    <span className="h-1.5 w-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.3s]"></span>
+    <span className="h-1.5 w-1.5 bg-current rounded-full animate-bounce [animation-delay:-0.15s]"></span>
+    <span className="h-1.5 w-1.5 bg-current rounded-full animate-bounce"></span>
+  </div>
+);
 
 interface MessageBubbleProps {
   message: Message;
 }
 
-export default function MessageBubble({ message }: MessageBubbleProps) {
-  const isUser = message?.role === 'user';
+export function MessageBubble({ message }: MessageBubbleProps) {
+  const isUser = message.role === 'user';
+  const isSystem = message.role === 'system';
 
-  // Get the user session to access profile picture
-  const { data: session } = useSession();
-  
-  const preprocessMarkdown = (content: string) => {
-    // Ensure bullet points have proper line breaks before them
-    let processed = content.replace(/([^\n])\n\* /g, '$1\n\n* ');
-    
-    // Ensure blank line before numbered lists
-    processed = processed.replace(/([^\n])\n(\d+)\. /g, '$1\n\n$2. ');
-    
-    return processed;
-  };
-  
-  // Use a consistent time format that doesn't rely on locale-specific formatting
-  const formattedTime = useMemo(() => {
-    if (!message?.timestamp) return '';
-    
-    const date = new Date(message.timestamp);
-    const hours = date.getHours().toString().padStart(2, '0');
-    const minutes = date.getMinutes().toString().padStart(2, '0');
-    return `${hours}:${minutes}`;
-  }, [message?.timestamp]);
-  
-  // Add safety check to prevent the error after all hooks are called
-  if (!message) {
-    return null; // Don't render anything if message is undefined
+  if (isSystem) {
+    // Keep system messages subtle and centered
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="my-3 text-center text-xs text-gray-300/80 italic px-4"
+      >
+        {message.content}
+      </motion.div>
+    );
   }
 
-  // Animation variants
-  const containerVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: { opacity: 1, y: 0 }
+  // Framer Motion variants for bubble animation
+  const bubbleVariants = {
+    hidden: { opacity: 0, y: 10 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
   };
 
   return (
-    <motion.div 
-      className={`flex w-full mb-4 items-end ${isUser ? 'justify-end' : 'justify-start'}`}
-      variants={containerVariants}
+    // Use motion.div for the entire message row animation
+    <motion.div
+      className={cn('flex items-end space-x-2 my-3', isUser ? 'justify-end' : 'justify-start')}
+      variants={bubbleVariants}
       initial="hidden"
       animate="visible"
-      transition={{ duration: 0.3 }}
     >
-      {/* Aika Avatar - Only shown for assistant messages */}
+      {/* Assistant Avatar */}
       {!isUser && (
-      <motion.div 
-        initial={{ scale: 0.8, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        className="flex-shrink-0 mr-2"
-      >
-        <div className="relative w-8 h-8 rounded-full overflow-hidden border-2 border-[#FFCA40]/40">
-        <Image 
-          src="/aika-human.jpeg" 
-          alt="Aika" 
-          fill
-          className="object-cover"
-          onError={(e) => {
-          // Fallback if image doesn't exist
-          const target = e.target as HTMLImageElement;
-          target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%23FFCA40'/%3E%3Ctext x='20' y='25' font-family='Arial' font-size='20' text-anchor='middle' fill='%23001D58'%3EA%3C/text%3E%3C/svg%3E";
-          }}
-        />
-        <div className="absolute bottom-0 right-0 w-2.5 h-2.5 bg-green-400 rounded-full border-2 border-white"></div>
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-ugm-blue flex items-center justify-center overflow-hidden border-2 border-white/30 shadow-sm">
+          {/* Ensure path is correct in /public */}
+          <Image src="/UGM_Lambang.png" alt="Aika" width={20} height={20} />
         </div>
-      </motion.div>
       )}
-      
-      {/* Message Bubble */}
-      <div
-      className={`max-w-[80%] rounded-lg px-4 py-2 ${
-        isUser 
-        ? 'bg-[#001D58] text-white rounded-tr-none' 
-        : 'bg-white border border-gray-200 text-gray-800 rounded-tl-none shadow-sm'
-      }`}
-      >
-      <div className="markdown-content">
-        <ReactMarkdown
-        components={{
-          ul: ({...props}) => 
-          <ul className="list-disc pl-5 my-2" {...props} />,
-          ol: ({...props}) => 
-          <ol className="list-decimal pl-5 my-2" {...props} />,
-          li: ({...props}) => 
-          <li className="mb-1" {...props} />,
-          p: ({...props}) => 
-          <p className="mb-2 last:mb-0" {...props} />,
-          h1: ({...props}) => 
-          <h1 className="text-xl font-bold my-3" {...props} />,
-          h2: ({...props}) => 
-          <h2 className="text-lg font-bold my-2" {...props} />,
-          h3: ({...props}) => 
-          <h3 className="text-md font-bold my-2" {...props} />,
-          a: ({...props}) => 
-          <a className={`underline ${isUser ? 'text-blue-200' : 'text-blue-600'}`} {...props} />,
-        }}
+
+      {/* Bubble Content Area */}
+      <div className={cn('flex flex-col', isUser ? 'items-end' : 'items-start')}>
+        <div
+          className={cn(
+            'p-3 rounded-xl max-w-xs md:max-w-md lg:max-w-lg shadow-md text-sm relative', // Softer corners (rounded-xl)
+            // Bubble styles based on role
+            isUser
+              ? 'bg-ugm-blue text-white rounded-br-none' // User bubble style remains distinct
+              : 'bg-white/80 backdrop-blur-sm text-ugm-blue-dark rounded-bl-none border border-white/10', // Assistant glass style with border
+            // Loading state styles
+            message.isLoading && 'h-[48px] w-[60px] p-0 flex items-center justify-center',
+             // Add prose styles here when not loading
+            !message.isLoading && [
+                'prose prose-sm max-w-none prose-p:my-1.5 prose-li:my-0.5', // Base prose styles
+                isUser ? 'prose-invert' : 'text-ugm-blue-dark', // Text color
+                'prose-a:font-medium prose-a:transition-colors', // Base link styles
+                isUser ? 'prose-a:text-ugm-gold hover:prose-a:text-ugm-gold/80' : 'prose-a:text-ugm-blue-dark hover:prose-a:text-ugm-blue/80 prose-a:underline' // Link color per role
+            ]
+          )}
         >
-        {preprocessMarkdown(message.content)}
-        </ReactMarkdown>
+          {message.isLoading ? (
+            <LoadingDots />
+          ) : (
+            <ReactMarkdown
+              components={{
+                  // Customize link rendering
+                  a: ({ ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
+          )}
+        </div>
+        {/* Timestamp (Optional, subtle) */}
+        {!message.isLoading && (
+           <div className={cn(
+               'mt-1 text-[10px]', // Smaller text size
+               isUser ? 'text-gray-400/80 mr-1' : 'text-gray-500/80 ml-1' // Adjusted positioning/color
+               )}>
+             {format(message.timestamp, 'HH:mm', { locale: id })}
+           </div>
+        )}
       </div>
-      <div
-        className={`text-xs mt-1 ${
-        isUser ? 'text-blue-300 text-right' : 'text-gray-500'
-        }`}
-      >
-        {formattedTime}
-      </div>
-      </div>
-      
+
       {/* User Avatar */}
       {isUser && (
-        <motion.div 
-          initial={{ scale: 0.8, opacity: 0 }}
-          animate={{ scale: 1, opacity: 1 }}
-          className="flex-shrink-0 ml-2"
-        >
-          <div className="relative w-8 h-8 rounded-full overflow-hidden border-2 border-[#001D58]/40">
-            <Image 
-              src={session?.user?.image || "/user-avatar.png"}
-              alt={session?.user?.name || "User"}
-              fill
-              className="object-cover"
-              onError={(e) => {
-                // Fallback if image doesn't exist or fails to load
-                const target = e.target as HTMLImageElement;
-                
-                // If we have the user's name, use their initials in the fallback
-                if (session?.user?.name) {
-                  const initials = session.user.name.charAt(0).toUpperCase();
-                  target.src = `data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%23001D58'/%3E%3Ctext x='20' y='25' font-family='Arial' font-size='20' text-anchor='middle' fill='white'%3E${initials}%3C/text%3E%3C/svg%3E`;
-                } else {
-                  // Default fallback with "U"
-                  target.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40' viewBox='0 0 40 40'%3E%3Ccircle cx='20' cy='20' r='20' fill='%23001D58'/%3E%3Ctext x='20' y='25' font-family='Arial' font-size='20' text-anchor='middle' fill='white'%3EU%3C/text%3E%3C/svg%3E";
-                }
-              }}
-            />
-          </div>
-        </motion.div>
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-ugm-gold flex items-center justify-center text-ugm-blue-dark font-semibold text-xs border-2 border-white/30 shadow-sm">
+          Me
+        </div>
       )}
     </motion.div>
   );
