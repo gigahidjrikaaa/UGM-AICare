@@ -439,9 +439,8 @@ return (
            onChange={handleInputChange}
            onKeyDown={handleKeyDown}
            placeholder="Type a message..."
-           className="w-full bg-transparent focus:outline-none resize-none text-white scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-transparent"
+           className="w-full bg-transparent focus:outline-none resize-none text-white scrollbar-thin scrollbar-thumb-white/30 scrollbar-track-transparent min-h-[24px] max-h-[120px]"
            rows={1}
-           style={{ minHeight: "24px", maxHeight: "120px" }}
            disabled={isLoading}
          />
         </div>

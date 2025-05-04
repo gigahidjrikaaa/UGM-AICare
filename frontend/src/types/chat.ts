@@ -1,12 +1,17 @@
 // src/types/chat.ts
 export interface Message {
-    id: string;
-    content: string;
-    role: 'user' | 'assistant';
-    timestamp: Date;
-  }
-  
-  export interface User {
-    id: string;
-    name?: string;
-  }
+  id: string; // Unique ID for each message (frontend generated)
+  content: string;
+  role: 'user' | 'assistant' | 'system'; // System role for initial prompts or summaries
+  timestamp: Date;
+  isLoading?: boolean; // Optional flag for pending assistant messages
+}
+
+// Define possible chat modes
+export type ChatMode = 'standard' | 'module_selection' | `module:${string}`; // e.g., 'module:thought_record'
+
+export interface ChatModule {
+  id: string;
+  name: string;
+  description: string;
+}

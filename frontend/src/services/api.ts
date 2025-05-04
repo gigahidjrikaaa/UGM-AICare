@@ -1,43 +1,14 @@
 // frontend/src/services/api.ts
 
 import axios from 'axios';
+import type { ChatRequestPayload, ChatResponsePayload } from '@/types/api'; // Import types
 
 // Define the base URL for your backend API
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL + "/api/v1" || 'http://localhost:8000/api/v1'; // Adjust if needed
 
-// Define interfaces for type safety
-
-export interface Message {
-  timestamp: string; // Assuming ISO string format from backend
-  role: 'user' | 'assistant' | 'system';
-  content: string;
-}
-
-// Matches backend ChatRequest model
-export interface ChatRequestPayload {
-  history: Message[];
-  provider?: 'togetherai' | 'gemini'; // Optional, backend might have a default
-  model?: string; // Optional
-  max_tokens?: number; // Optional
-  temperature?: number; // Optional, use 'number' instead of GLfloat
-  system_prompt?: string; // Optional
-  // Add other parameters if defined in backend ChatRequest
-}
-
-// Matches backend ChatResponse model
-export interface ChatResponsePayload {
-  response: string;
-  provider_used: string;
-  model_used: string;
-  history: Message[]; // Expect the updated history back
-}
-
-
 const apiClient = axios.create({
-  baseURL: API_BASE_URL || 'http://127.0.0.1:8000/api/v1', // Point to backend base
-  headers: {
-    'Content-Type': 'application/json',
-  },
+  baseURL: API_BASE_URL,
+  headers: { 'Content-Type': 'application/json', },
 });
 
 /// Function to get the JWT from our new API route
@@ -106,24 +77,20 @@ export default apiClient; // Export the configured client if needed elsewhere
  */
 export const sendMessage = async (payload: ChatRequestPayload): Promise<ChatResponsePayload> => {
   try {
-    console.log("Sending to backend:", payload); // Log what's being sent
-    const response = await apiClient.post<ChatResponsePayload>('/api/v1/chat', payload);
-    console.log("Received from backend:", response.data); // Log what's received
+    // No need to explicitly omit google_sub/session_id here as the hook adds them
+    console.log("Sending to backend (/chat):", payload); // Log the final payload being sent
+    // Ensure the endpoint path is correct (includes /api/v1 prefix if needed by backend routes)
+    const response = await apiClient.post<ChatResponsePayload>('/chat', payload); // Endpoint adjusted if needed
+    console.log("Received from backend (/chat):", response.data);
     return response.data;
   } catch (error) {
     console.error('Error sending message to backend:', error);
-    // Provide more specific error feedback if possible
     let errorMessage = 'Failed to get response from AICare assistant.';
     if (axios.isAxiosError(error) && error.response) {
-      // Use the detail message from FastAPI's HTTPException if available
-      errorMessage = error.response.data?.detail || error.message;
+      errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
     } else if (error instanceof Error) {
       errorMessage = error.message;
     }
-    // Re-throw a more structured error or return a specific error object
-    // For simplicity here, we'll throw a new error with the message
-    throw new Error(errorMessage);
+    throw new Error(errorMessage); // Re-throw cleaned error
   }
 };
-
-// You can add other API service functions here (e.g., for login, profile, etc.)
