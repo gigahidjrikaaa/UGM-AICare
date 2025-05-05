@@ -13,7 +13,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Determine which database to use based on environment
-if os.getenv("ENV", "development") == "production":
+if os.getenv("APP_ENV", "development") == "production":
     # Use PostgreSQL in production
     DATABASE_URL = os.getenv("DATABASE_URL")
     engine = create_engine(DATABASE_URL)
