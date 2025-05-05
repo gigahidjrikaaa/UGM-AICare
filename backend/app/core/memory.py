@@ -40,6 +40,8 @@ async def get_redis_client() -> redis.Redis:
             if not REDIS_HOST or not REDIS_PORT:
                 raise ValueError("REDIS_URL and REDIS_PORT must be set in environment variables.")
             if not REDIS_DB:
+                logger.warning("REDIS_DB not set, defaulting to 0.")
+            if not REDIS_USERNAME:
                 raise ValueError("REDIS_USERNAME must be set in environment variables.")
             if not REDIS_PASSWORD:
                 raise ValueError("REDIS_PASSWORD must be set in environment variables.")
