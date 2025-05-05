@@ -11,7 +11,8 @@ load_dotenv()
 # --- Redis Configuration ---
 REDIS_HOST = os.getenv("REDIS_URL")
 REDIS_PORT = os.getenv("REDIS_PORT")
-REDIS_DB = os.getenv("REDIS_USERNAME", "default")
+REDIS_DB = os.getenv("REDIS_DB", 0)
+REDIS_USERNAME = os.getenv("REDIS_USERNAME", "default")
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
 
 # Set an expiration time for module state keys in seconds (e.g., 1 hour)
@@ -48,6 +49,7 @@ async def get_redis_client() -> redis.Redis:
                 host=REDIS_HOST,
                 port=REDIS_PORT,
                 db=REDIS_DB,
+                username=REDIS_USERNAME,
                 password=REDIS_PASSWORD,
                 decode_responses=True # Decode responses to strings automatically
             )
