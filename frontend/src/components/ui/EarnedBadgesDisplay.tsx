@@ -112,7 +112,7 @@ export default function EarnedBadgesDisplay() {
         // Automatically sync achievements when the component mounts
         handleSyncAchievements();
     }, [handleSyncAchievements]); // Depend on handleSyncAchievements
-    
+
     // --- Loading and Error states ---
     if (isLoading) {
         // Improved skeleton for badges
@@ -156,6 +156,13 @@ export default function EarnedBadgesDisplay() {
                     <span className="text-sm text-gray-400 ml-1">{earnedBadges.length} / {Object.keys(badgeMetadataMap).length}</span>
                 </div>
             </div>
+            {/* If wallet is not linked, badges can't be earned. Link your Web3 EVM-compatible wallet now. */}
+            <p className="text-gray-400 text-xs mb-2 text-center sm:text-left">Link your Web3 EVM-compatible wallet to earn badges.</p>
+            {/* Loading spinner while syncing */}
+            {isSyncing && <p className="text-gray-400 text-xs mb-2 text-center sm:text-left"><FiLoader className="animate-spin" /> Syncing...</p>}
+            {/* Display message if no badges are earned yet */}
+            {earnedBadges.length === 0 && !isLoading && <p className="text-gray-400 text-xs mb-2 text-center sm:text-left">No badges earned yet.</p>}
+            {/* Display message if no badges are defined */}
         
             {/* Display sync error if it occurred */}
             {syncError && <p className="text-red-400 text-xs mb-2 text-center sm:text-left">{syncError}</p>}
