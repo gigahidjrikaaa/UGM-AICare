@@ -67,18 +67,14 @@ export default function EarnedBadgesDisplay() {
         }
     }, []);
 
-    // Initial fetch/sync on component mount
-    useEffect(() => {
-        fetchBadges();
-    }, [fetchBadges]);
-
+    
     // --- Sync Achievements function moved from ProfilePage ---
     const handleSyncAchievements = useCallback(async () => {
         if (isSyncing) return;
         setIsSyncing(true);
         setSyncError(null);
         const toastId = toast.loading("Checking for new badges...");
-
+        
         try {
             const response = await apiClient.post<SyncAchievementsResponse>('/profile/sync-achievements'); // Use correct endpoint
             toast.dismiss(toastId);
@@ -110,7 +106,13 @@ export default function EarnedBadgesDisplay() {
             setIsSyncing(false);
         }
     }, [isSyncing, fetchBadges]); // Include fetchBadges in dependencies
-
+    
+    // Initial sync on component mount
+    useEffect(() => {
+        // Automatically sync achievements when the component mounts
+        handleSyncAchievements();
+    }, [handleSyncAchievements]); // Depend on handleSyncAchievements
+    
     // --- Loading and Error states ---
     if (isLoading) {
         // Improved skeleton for badges
