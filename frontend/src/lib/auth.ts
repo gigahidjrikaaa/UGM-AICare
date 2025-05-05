@@ -173,7 +173,7 @@ export const authOptions: NextAuthOptions = {
       if (token.sub && needsWalletUpdate) {
         // console.log(`JWT: Fetching/Refreshing wallet data from internal API for sub: ${token.sub.substring(0, 10)}...`);
         try {
-          const internalApiUrl = `${process.env.BACKEND_URL || 'http://127.0.0.1:8000'}/api/v1/internal/user-by-sub/${token.sub}`;
+          const internalApiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/internal/user-by-sub/${token.sub}`;
           const internalApiKey = process.env.INTERNAL_API_KEY;
 
           if (!internalApiKey) {
