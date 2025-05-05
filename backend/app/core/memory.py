@@ -9,10 +9,10 @@ from dotenv import load_dotenv
 load_dotenv()
 
 # --- Redis Configuration ---
-REDIS_HOST = os.getenv("REDIS_URL", "localhost")
-REDIS_PORT = os.getenv("REDIS_PORT", 6379)
-REDIS_DB = os.getenv("REDIS_USERNAME", None)
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", None)
+REDIS_HOST = os.getenv("REDIS_URL")
+REDIS_PORT = os.getenv("REDIS_PORT")
+REDIS_DB = os.getenv("REDIS_USERNAME", "default")
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
 
 # Set an expiration time for module state keys in seconds (e.g., 1 hour)
 MODULE_STATE_EXPIRY_SECONDS = 3600
@@ -35,6 +35,14 @@ async def get_redis_client() -> redis.Redis:
     global redis_pool
     if redis_pool is None:
         try:
+            # Check environment variables
+            if not REDIS_HOST or not REDIS_PORT:
+                raise ValueError("REDIS_URL and REDIS_PORT must be set in environment variables.")
+            if not REDIS_DB:
+                raise ValueError("REDIS_USERNAME must be set in environment variables.")
+            if not REDIS_PASSWORD:
+                raise ValueError("REDIS_PASSWORD must be set in environment variables.")
+            
             logger.info(f"Initializing Redis connection pool: host={REDIS_HOST}, port={REDIS_PORT}, db={REDIS_DB}")
             redis_pool = redis.ConnectionPool(
                 host=REDIS_HOST,
