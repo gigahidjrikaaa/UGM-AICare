@@ -96,6 +96,9 @@ export const authOptions: NextAuthOptions = {
       const isSignIn = !!(account && user); // Check if this is a sign-in event
       const needsWalletUpdate  = isSignIn || !token.wallet_address; // Fetch on sign-in, update, or if wallet address is missing
 
+      const backendUrl = process.env.NEXT_PUBLIC_API_URL;
+      const internalApiKey = process.env.INTERNAL_API_KEY;
+
       if (isSignIn && account.provider === 'google' && profile) {
         // On initial sign-in, populate from user/account object first
         token.accessToken = account.access_token;
@@ -107,9 +110,6 @@ export const authOptions: NextAuthOptions = {
 
         // --- !! Call Backend to Sync User !! ---
         try {
-          const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-          const internalApiKey = process.env.INTERNAL_API_KEY;
-
           if (!internalApiKey) {
             console.error("JWT Error: INTERNAL_API_KEY missing for backend sync.");
           } else if (!token.id) {
@@ -173,7 +173,7 @@ export const authOptions: NextAuthOptions = {
       if (token.sub && needsWalletUpdate) {
         // console.log(`JWT: Fetching/Refreshing wallet data from internal API for sub: ${token.sub.substring(0, 10)}...`);
         try {
-          const internalApiUrl = `${process.env.NEXT_PUBLIC_API_URL}/api/v1/internal/user-by-sub/${token.sub}`;
+          const internalApiUrl = `${backendUrl}/api/v1/internal/user-by-sub/${token.sub}`;
           const internalApiKey = process.env.INTERNAL_API_KEY;
 
           if (!internalApiKey) {
