@@ -21,8 +21,8 @@ const config: HardhatUserConfig = {
       // Local development network configuration (optional)
     },
     eduTestnet: { // Network configuration for EDUChain Testnet
-      url: eduTestnetRpcUrl || "", // Get URL from .env
-      chainId: 656476, // <<< REPLACE 11155420 with the ACTUAL EDUChain Testnet Chain ID! Found ChainID from ChainList URL provided
+      url: eduTestnetRpcUrl || "", // Get URL from .env1
+      chainId: 656476, // Chain ID for EDUChain Testnet
       accounts: privateKey ? [`0x${privateKey}`] : [], // Use private key from .env
     },
     // Add other networks like EDUChain Mainnet later
