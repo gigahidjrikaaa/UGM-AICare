@@ -110,17 +110,10 @@ export default function EarnedBadgesDisplay() {
     // Initial sync on component mount
     useEffect(() => {
         fetchBadges(); // Load current badges when component mounts
+        handleSyncAchievements(); // Sync achievements on mount
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [fetchBadges]); // Include fetchBadges as a dependency
 
-    // Sync badges once
-    useEffect(() => {
-        const interval = setInterval(() => {
-            if (isSyncing) return; // Skip if already syncing
-            handleSyncAchievements();
-        }, 60000); // Sync every 60 seconds
-
-        return () => clearInterval(interval); // Cleanup on unmount
-    }, [isSyncing, handleSyncAchievements]); // Include isSyncing and handleSyncAchievements in dependencies
 
     // --- Loading and Error states ---
     if (isLoading) {
