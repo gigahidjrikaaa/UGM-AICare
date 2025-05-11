@@ -109,9 +109,8 @@ export default function EarnedBadgesDisplay() {
     
     // Initial sync on component mount
     useEffect(() => {
-        // Automatically sync achievements when the component mounts
-        handleSyncAchievements();
-    }, [handleSyncAchievements]); // Depend on handleSyncAchievements
+        fetchBadges(); // Load current badges when component mounts
+    }, [fetchBadges]); // Include fetchBadges as a dependency
 
     // --- Loading and Error states ---
     if (isLoading) {
