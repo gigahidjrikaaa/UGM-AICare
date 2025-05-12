@@ -1,0 +1,107 @@
+# docker-compose.yml (Place in project root)
+version: '3.8'
+
+services:
+  #################
+  # Database (PostgreSQL)
+  #################
+  db:
+    image: postgres:15-alpine # Using Alpine for smaller size
+    container_name: ugm_aicare_db
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-aicare_db} # Use default if not set in .env
+      POSTGRES_USER: ${POSTGRES_USER:-aicare_user}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-aicare_password}
+    volumes:
+      - pgdata:/var/lib/postgresql/data # Persist data
+    ports:
+      - "${POSTGRES_PORT:-5432}:5432" # Expose if needed for external tools
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-aicare_user} -d ${POSTGRES_DB:-aicare_db}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  #################
+  # Cache (Redis)
+  #################
+  redis:
+    image: redis:7-alpine
+    container_name: ugm_aicare_redis
+    ports:
+      - "${REDIS_PORT_EXTERNAL:-6379}:6379" # Expose if needed for external tools
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  #################
+  # Backend (FastAPI)
+  #################
+  backend:
+    container_name: ugm_aicare_backend
+    build:
+      context: ./backend # Path to directory containing Dockerfile
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount local code into container for hot-reloading
+      # Note: Ensure paths are correct for your OS
+      - ./backend:/app
+    env_file:
+      - .env # Load environment variables from .env file in root
+    environment:
+      # Ensure backend connects to containerized DB and Redis
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aicare_user}:${POSTGRES_PASSWORD:-aicare_password}@db:5432/${POSTGRES_DB:-aicare_db}
+      REDIS_HOST: redis # Service name defined above
+      REDIS_PORT: 6379 # Default Redis port inside Docker network
+      APP_ENV: ${APP_ENV:-development} # Default to development
+      PYTHONPATH: /app # Make sure Python can find modules in /app
+    # Override the default CMD for development with hot-reloading
+    command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app
+    depends_on:
+      db:
+        condition: service_healthy # Wait for db to be ready
+      redis:
+        condition: service_healthy # Wait for redis to be ready
+    restart: unless-stopped
+
+  #################
+  # Frontend (Next.js)
+  #################
+  frontend:
+    container_name: ugm_aicare_frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: development # Use the 'development' stage from the Dockerfile
+    volumes:
+      # Mount local code, but exclude node_modules to use container's version
+      - ./frontend:/app
+      - /app/node_modules # Anonymous volume to persist container's node_modules
+      - /app/.next # Anonymous volume for Next.js cache
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      # Ensures Next.js dev server uses polling for file changes (works better with Docker volumes)
+      WATCHPACK_POLLING: 'true'
+      # Set API URL to point to backend container
+      NEXT_PUBLIC_API_BASE_URL: http://backend:8000/api/v1 # Use service name 'backend'
+      # NEXTAUTH_URL needs to be accessible from the browser (usually localhost)
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NODE_ENV: development
+    depends_on:
+      - backend # Optional: frontend might start faster, but API calls will fail until backend is up
+    restart: unless-stopped
+
+# Define named volumes for data persistence
+volumes:
+  pgdata: # PostgreSQL data
+  # node_modules: # Explicit named volume for node_modules (alternative to anonymous)
+  # next_cache:   # Explicit named volume for .next cache (alternative)

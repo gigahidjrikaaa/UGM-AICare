@@ -28,6 +28,7 @@ const nextConfig = {
     ],
     // Disable unoptimized images
     unoptimized: false,
+    output: 'standalone',
     // Increase image format options
     formats: ['image/webp']
   },
