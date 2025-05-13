@@ -2,6 +2,7 @@
 const nextConfig = {
   /* config options here */
   reactStrictMode: true,
+  output: 'standalone',
   images: {
     // Optimize all images, including remote ones
     domains: [],
@@ -28,7 +29,6 @@ const nextConfig = {
     ],
     // Disable unoptimized images
     unoptimized: false,
-    output: 'standalone',
     // Increase image format options
     formats: ['image/webp']
   },
