@@ -1,8 +1,9 @@
 import json
 import logging
 from fastapi import FastAPI # type: ignore
-from datetime import datetime
+from datetime import datetime, timezone
 from app.database import get_db, init_db
+from sqlalchemy import text
 from app.routes import email, docs, chat, feedback, link_did, internal, journal, summary, profile
 from contextlib import asynccontextmanager
 from app.core.scheduler import start_scheduler, shutdown_scheduler
@@ -99,11 +100,10 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for monitoring"""
-    print("Health check endpoint accessed")
     # Check Database connection
     try:
         db = next(get_db())
-        db.execute("SELECT 1")  # Simple query to check connection
+        db.execute(text("SELECT 1"))  # Simple query to check connection using text()
     except Exception as e:
         logger.error(f"Database connection error: {e}")
         return {"status": "unhealthy", "error": str(e)}
@@ -118,7 +118,7 @@ async def health_check():
     # Return a JSON response with the current timestamp
     # and a status message
     return {
-        "status": "healthy",
+        "timestamp": datetime.now(timezone.utc).isoformat(),  # UTC timestamp (timezone-aware)
         "timestamp": datetime.utcnow().isoformat() + "Z",  # UTC timestamp
         "scheduler_running": start_scheduler.running,
     }
