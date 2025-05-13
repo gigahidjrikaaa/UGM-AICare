@@ -11,7 +11,7 @@ from fastapi.middleware.cors import CORSMiddleware # type: ignore
 import os
 from dotenv import load_dotenv
 
-from backend.app.core.memory import get_redis_client
+from app.core.memory import get_redis_client
 
 load_dotenv()
 
