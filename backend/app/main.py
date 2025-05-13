@@ -92,6 +92,8 @@ logger.info(f"Allowed origins: {origins}")
 
 @app.get("/")
 async def root():
+    """Root endpoint for the API"""
+    logger.info("Root endpoint accessed")
     return {"message": "Welcome to the Aika Chatbot API!"}
 
 @app.get("/health")
@@ -123,6 +125,23 @@ async def health_check():
 
 # For Render deployment
 if __name__ == "__main__":
+    import os
     import uvicorn
-    port = int(os.getenv("PORT", 8000))
-    uvicorn.run("app.main:app", host="0.0.0.0", port=port, reload=False)
+    import multiprocessing
+    
+    try:
+        port = int(os.getenv("PORT", 8000))
+        workers = min(multiprocessing.cpu_count() + 1, 4)  # A common practice: workers = CPU cores + 1
+        
+        uvicorn.run(
+            "app.main:app", 
+            host="0.0.0.0", 
+            port=port, 
+            reload=False,
+            workers=workers,
+            proxy_headers=True,
+            forwarded_allow_ips="*"
+        )
+    except Exception as e:
+        print(f"Failed to start server: {e}")
+        exit(1)
