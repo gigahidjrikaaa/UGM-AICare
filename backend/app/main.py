@@ -1,6 +1,6 @@
 import json
 import logging
-from fastapi import FastAPI # type: ignore
+from fastapi import FastAPI, requests # type: ignore
 from datetime import datetime, timezone
 from app.database import get_db, init_db
 from sqlalchemy import text
@@ -10,6 +10,8 @@ from app.core.scheduler import start_scheduler, shutdown_scheduler
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
 import os
 from dotenv import load_dotenv
+
+from backend.app.core.memory import get_redis_client
 
 load_dotenv()
 
@@ -100,28 +102,68 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for monitoring"""
-    # Check Database connection
-    try:
-        db = next(get_db())
-        db.execute(text("SELECT 1"))  # Simple query to check connection using text()
-    except Exception as e:
-        logger.error(f"Database connection error: {e}")
-        return {"status": "unhealthy", "error": str(e)}
-    finally:
-        db.close()
-    # Check if scheduler is running
-    if not start_scheduler.running:
-        logger.error("Scheduler is not running")
-        return {"status": "unhealthy", "error": "Scheduler is not running"}
-    # If all checks pass
-    logger.info("Health check passed")
-    # Return a JSON response with the current timestamp
-    # and a status message
+    logger.info("Health check endpoint accessed")
     return {
+        "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),  # UTC timestamp (timezone-aware)
         "timestamp": datetime.utcnow().isoformat() + "Z",  # UTC timestamp
-        "scheduler_running": start_scheduler.running,
     }
+
+@app.get("/health/db")
+async def db_health_check():
+    """Database health check endpoint"""
+    logger.info("Database health check endpoint accessed")
+    db = next(get_db())
+    try:
+        # Execute a simple query to check the database connection
+        result = db.execute(text("SELECT 1")).scalar()
+        if result == 1:
+            return {"status": "healthy", "db_status": "connected"}
+        else:
+            return {"status": "unhealthy", "db_status": "not connected"}
+    except Exception as e:
+        logger.error(f"Database health check failed: {e}")
+        return {"status": "unhealthy", "db_status": str(e)}
+    finally:
+        db.close()
+        logger.debug("Database session closed after health check.")
+    raise HTTPException(status_code=403, detail="Invalid API key")
+
+@app.get("/health/redis")
+async def redis_health_check():
+    """Redis health check endpoint"""
+    logger.info("Redis health check endpoint accessed")
+    try:
+        # Assuming you have a Redis client instance named `redis_client`
+        redis_client = get_redis_client()  # Replace with your actual Redis client initialization
+        pong = redis_client.ping()
+        if pong:
+            return {"status": "healthy", "redis_status": "connected"}
+        else:
+            return {"status": "unhealthy", "redis_status": "not connected"}
+    except Exception as e:
+        logger.error(f"Redis health check failed: {e}")
+        return {"status": "unhealthy", "redis_status": str(e)}
+
+@app.get("/health/frontend")
+async def frontend_health_check():
+    """Frontend health check endpoint"""
+    logger.info("Frontend health check endpoint accessed")
+    try:
+        # Assuming you have a way to check the frontend's health
+        # This could be a simple HTTP request to the frontend URL
+        frontend_url = os.getenv("FRONTEND_URL")
+        if not frontend_url:
+            raise ValueError("FRONTEND_URL is not set.")
+        
+        response = requests.get(frontend_url)
+        if response.status_code == 200:
+            return {"status": "healthy", "frontend_status": "connected"}
+        else:
+            return {"status": "unhealthy", "frontend_status": f"HTTP {response.status_code}"}
+    except Exception as e:
+        logger.error(f"Frontend health check failed: {e}")
+        return {"status": "unhealthy", "frontend_status": str(e)}
 
 # For Render deployment
 if __name__ == "__main__":
