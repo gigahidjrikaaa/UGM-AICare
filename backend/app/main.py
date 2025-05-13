@@ -2,7 +2,7 @@ import json
 import logging
 from fastapi import FastAPI # type: ignore
 from datetime import datetime
-from app.database import init_db
+from app.database import get_db, init_db
 from app.routes import email, docs, chat, feedback, link_did, internal, journal, summary, profile
 from contextlib import asynccontextmanager
 from app.core.scheduler import start_scheduler, shutdown_scheduler
@@ -97,7 +97,29 @@ async def root():
 @app.get("/health")
 async def health_check():
     """Health check endpoint for monitoring"""
-    return {"status": "healthy", "timestamp": datetime.now().isoformat()}
+    print("Health check endpoint accessed")
+    # Check Database connection
+    try:
+        db = next(get_db())
+        db.execute("SELECT 1")  # Simple query to check connection
+    except Exception as e:
+        logger.error(f"Database connection error: {e}")
+        return {"status": "unhealthy", "error": str(e)}
+    finally:
+        db.close()
+    # Check if scheduler is running
+    if not start_scheduler.running:
+        logger.error("Scheduler is not running")
+        return {"status": "unhealthy", "error": "Scheduler is not running"}
+    # If all checks pass
+    logger.info("Health check passed")
+    # Return a JSON response with the current timestamp
+    # and a status message
+    return {
+        "status": "healthy",
+        "timestamp": datetime.utcnow().isoformat() + "Z",  # UTC timestamp
+        "scheduler_running": start_scheduler.running,
+    }
 
 # For Render deployment
 if __name__ == "__main__":
