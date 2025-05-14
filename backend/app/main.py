@@ -97,7 +97,14 @@ logger.info(f"Allowed origins: {origins}")
 async def root():
     """Root endpoint for the API"""
     logger.info("Root endpoint accessed")
-    return {"message": "Welcome to the Aika Chatbot API!"}
+    return {
+        "message": "Welcome to the Aika Chatbot API!",
+        "documentation": {
+            "swagger_ui": "/docs",
+            "redoc": "/redoc"
+        },
+        "api_base_url": "/api/v1"
+    }
 
 @app.get("/health")
 async def health_check():
@@ -106,7 +113,16 @@ async def health_check():
     return {
         "status": "healthy",
         "timestamp": datetime.now(timezone.utc).isoformat(),  # UTC timestamp (timezone-aware)
-        "timestamp": datetime.utcnow().isoformat() + "Z",  # UTC timestamp
+        "version": "0.1",
+        "description": "Aika Chatbot API - UGM AI Care",
+        "api_version": "v1",
+        "api_base_url": "/api/v1",
+        "allowed_origins": os.getenv("ALLOWED_ORIGINS", "*").split(","),
+        "environment": os.getenv("APP_ENV", "development"),
+        "database": {
+            "status": "connected" if os.getenv("DATABASE_URL") else "not connected",
+            "url": os.getenv("DATABASE_URL", "Not set"),
+        },
     }
 
 @app.get("/health/db")
