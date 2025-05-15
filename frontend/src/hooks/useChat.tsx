@@ -3,6 +3,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from 'react-hot-toast';
 import { useSession } from 'next-auth/react'; // Use client-side session hook
+import apiClient from '@/services/api';
 
 import type { Message, ChatMode } from '@/types/chat';
 import type { ApiMessage, ChatRequestPayload, ChatResponsePayload } from '@/types/api';
@@ -48,7 +49,7 @@ const MESSAGE_DELAY_MS = 300; // Base delay between chunks (can adjust)
 
 
 export function useChat() {
-  const { data: session } = useSession(); // Get user session
+  const { data: session, status } = useSession(); // Get user session and status
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -57,20 +58,63 @@ export function useChat() {
   const [sessionId] = useState<string>(() => uuidv4()); // Generate unique session ID on hook init
   const chatContainerRef = useRef<HTMLDivElement | null>(null); // For scrolling
 
+  const [initialGreeting, setInitialGreeting] = useState<string>(
+    "Halo! Aku Aika, teman AI-mu dari UGM-AICare. Ada yang ingin kamu ceritakan hari ini? 😊"
+  );
+  const [isGreetingLoading, setIsGreetingLoading] = useState<boolean>(true);
+
   // --- Initial Greeting ---
   useEffect(() => {
-    // Display initial greeting only once when component mounts and messages are empty
-    if (messages.length === 0) {
-      setMessages([
-        {
-          id: uuidv4(),
-          role: 'assistant',
-          content: "Halo! Aku Aika, teman AI-mu dari UGM-AICare. Ada yang ingin kamu ceritakan hari ini? 😊",
-          timestamp: new Date(),
-        },
-      ]);
+  // Display initial greeting only once when component mounts,
+  // messages are empty, and greeting is no longer loading.
+  if (messages.length === 0 && !isGreetingLoading) {
+    setMessages([
+      {
+        id: uuidv4(),
+        role: 'assistant',
+        content: initialGreeting, // Use the dynamic initialGreeting
+        timestamp: new Date(),
+      },
+    ]);
+  }
+}, [messages.length, initialGreeting, isGreetingLoading]); // Dependencies updated
+
+  // --- Fetch Last Session Summary ---
+  // This effect fetches the last session summary when the user is authenticated
+  useEffect(() => {
+  const fetchInitialGreeting = async () => {
+      if (session?.user?.id && messages.length === 0) { // Only fetch if user is present and no messages yet
+        setIsGreetingLoading(true);
+        try {
+          // Use your apiClient to call the new backend endpoint
+          const response = await apiClient.get<{ summary_text: string | null; timestamp: string | null }>('/user/latest-summary');
+          const data = response.data;
+
+          if (data && data.summary_text) {
+            // Construct a personalized greeting
+            // Example: "Welcome back! Last time we talked about [summary]. How are you today?"
+            // Be mindful of the summary length and presentation.
+            const personalizedGreeting = `Halo! Senang bertemu denganmu lagi. Di sesi terakhir kita, kita sempat membahas tentang ${data.summary_text}. Ada yang ingin kamu ceritakan atau lanjutkan hari ini?`;
+            setInitialGreeting(personalizedGreeting);
+          }
+          // If no summary, the default greeting remains.
+        } catch (error) {
+          console.error("Failed to fetch last session summary:", error);
+          // Keep default greeting on error
+        } finally {
+          setIsGreetingLoading(false);
+        }
+      } else if (messages.length > 0) {
+          setIsGreetingLoading(false); // If messages already exist, no need to fetch greeting
+      }
+    };
+
+    if (status === 'authenticated') {
+      fetchInitialGreeting();
+    } else if (status === 'unauthenticated') {
+      setIsGreetingLoading(false); // Not logged in, no summary to fetch
     }
-  }, [messages.length]); // Only run on first render
+  }, [session, status, messages.length]); // Rerun if session or status changes, or if messages get populated
 
   // --- Scroll to Bottom ---
   useEffect(() => {
