@@ -195,22 +195,43 @@ async def handle_chat_request(
                 # --- Prepare History for LLM - Inject Summary on New Session Start ---
                 history_for_llm = list(history_from_request) # Create a mutable copy
                 if is_new_session:
-                    latest_summary = db.query(UserSummary)\
+                    N_SUMMARIES_FOR_CONTEXT = 3 # Number of recent summaries to include
+                    past_summaries = db.query(UserSummary)\
                         .filter(UserSummary.user_id == user_id)\
                         .order_by(UserSummary.timestamp.desc())\
-                        .first()
-                    if latest_summary:
-                        summary_injection_content = f"Pengingat poin-poin penting dari percakapan sebelumnya (diringkas pada {latest_summary.timestamp.strftime('%Y-%m-%d %H:%M')}): {latest_summary.summary_text}"
+                        .limit(N_SUMMARIES_FOR_CONTEXT)\
+                        .all()
+
+                    if past_summaries:
+                        past_summaries.reverse() # To have them in chronological order (oldest of the N first)
+
+                        # Prepare a concise header for the combined summaries
+                        combined_summary_text = "Untuk membantumu mengingat, berikut adalah beberapa poin penting dari beberapa sesi terakhir kita:\n"
+
+                        for idx, summary_obj in enumerate(past_summaries):
+                            # Make each summary distinct and slightly more conversational if possible
+                            combined_summary_text += f"\n--- Sesi sekitar {summary_obj.timestamp.strftime('%d %B %Y, %H:%M')} ---\n"
+                            combined_summary_text += f"{summary_obj.summary_text}\n"
+
+                        combined_summary_text += "\n--- Akhir dari ringkasan sesi sebelumnya ---"
+
+                        # Optional: Add a character limit for the combined summaries to avoid overly long context
+                        MAX_COMBINED_SUMMARY_LENGTH = 4000 # Example: ~1000 tokens, adjust as needed
+                        if len(combined_summary_text) > MAX_COMBINED_SUMMARY_LENGTH:
+                            combined_summary_text = combined_summary_text[:MAX_COMBINED_SUMMARY_LENGTH] + "... (beberapa ringkasan mungkin dipotong karena panjang)"
+                            logger.warning(f"Combined summary text for user {user_id} was truncated to {MAX_COMBINED_SUMMARY_LENGTH} chars.")
+
                         summary_injection = {
-                            "role": "system",
-                            "content": summary_injection_content
+                            "role": "system", # System message to provide context
+                            "content": combined_summary_text
                         }
-                        # Inject after system prompt if one exists, otherwise at the beginning
+
+                        # Inject after system prompt if one exists from request, otherwise at the beginning
                         if history_for_llm and history_for_llm[0]['role'] == 'system':
                             history_for_llm.insert(1, summary_injection)
                         else:
                             history_for_llm.insert(0, summary_injection)
-                        logger.info(f"STANDARD_CHAT: Injected previous summary for user {user_id} into LLM context.")
+                        logger.info(f"STANDARD_CHAT: Injected {len(past_summaries)} previous summaries for user {user_id} into LLM context.")
 
                 # --- Call the Standard LLM ---
                 try:
