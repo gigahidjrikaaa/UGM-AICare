@@ -20,6 +20,10 @@ logger = logging.getLogger(__name__) # Create a logger for this module
 
 router = APIRouter()
 
+# --- Constants for Summarization ---
+MIN_TURNS_FOR_SUMMARY = 2  # Minimum number of full conversation turns (user msg + AI response) to trigger a summary.
+MAX_HISTORY_CHARS_FOR_SUMMARY = 15000  # Approx 3k-4k tokens, adjust based on your summarization LLM's limits and desired performance.
+
 # --- Helper Function for Background Task Session ---
 def get_background_db():
     """Dependency to get a DB session specifically for background tasks."""
@@ -67,6 +71,14 @@ async def handle_chat_request(
         user_id = current_user.id
         aika_response_text: str = "" 
         history_to_return: List[Dict[str, str]] = []
+
+        #! --- Crucial Note on Frontend session_id Management ---
+        #! The backend's summarization trigger relies on the `session_id` changing
+        #! when a user starts a new distinct conversation.
+        #! Ensure the frontend maintains a consistent `session_id` for an ongoing
+        #! interaction (e.g., until tab closure, explicit logout, or significant inactivity)
+        #! and generates a new one when a new logical session begins.
+        #! Avoid new `session_id` on simple page refreshes if it's the same conversation.
         
         # --- Determine Flow: Event or Message ---
         if request.event:
@@ -160,46 +172,55 @@ async def handle_chat_request(
 
                 # --- Session Change Detection & Summary Handling (Your existing logic, MOVED INSIDE this block) ---
                 previous_session_id_to_summarize = None
-                latest_message_from_user = db.query(Conversation)\
+                # Query the last message saved in the DB for this user to check its session_id
+                latest_db_message_for_user = db.query(Conversation)\
                     .filter(Conversation.user_id == user_id)\
                     .order_by(Conversation.timestamp.desc())\
                     .first()
 
                 is_new_session = False
-                if latest_message_from_user and latest_message_from_user.session_id != session_id:
-                    previous_session_id_to_summarize = latest_message_from_user.session_id
+                if latest_db_message_for_user:
+                    if latest_db_message_for_user.session_id != session_id:
+                        # Session ID from request is different from the last saved session ID for this user
+                        previous_session_id_to_summarize = latest_db_message_for_user.session_id
+                        is_new_session = True
+                        logger.info(f"STANDARD_CHAT: New session detected ({session_id}). Previous DB session: {previous_session_id_to_summarize}. Triggering summary for previous session.")
+                        background_tasks.add_task(summarize_and_save, user_id, previous_session_id_to_summarize)
+                    # else: it's an ongoing session, no summary trigger based on this condition
+                else:
+                    # No previous messages for this user in the DB, so this is their first interaction.
                     is_new_session = True
-                    logger.info(f"STANDARD_CHAT: New session detected ({session_id}). Previous: {previous_session_id_to_summarize}. Triggering summary.")
-                    background_tasks.add_task(summarize_and_save, user_id, previous_session_id_to_summarize)
-                elif not latest_message_from_user:
-                    is_new_session = True
-                    logger.info(f"STANDARD_CHAT: First message for user {user_id} in session {session_id}.")
+                    logger.info(f"STANDARD_CHAT: First message ever for user {user_id} in session {session_id}. No previous session to summarize.")
 
                 # --- Prepare History for LLM - Inject Summary on New Session Start ---
-                history_for_llm = history_from_request # Start with history from request
+                history_for_llm = list(history_from_request) # Create a mutable copy
                 if is_new_session:
                     latest_summary = db.query(UserSummary)\
                         .filter(UserSummary.user_id == user_id)\
                         .order_by(UserSummary.timestamp.desc())\
                         .first()
                     if latest_summary:
+                        summary_injection_content = f"Pengingat poin-poin penting dari percakapan sebelumnya (diringkas pada {latest_summary.timestamp.strftime('%Y-%m-%d %H:%M')}): {latest_summary.summary_text}"
                         summary_injection = {
                             "role": "system",
-                            "content": f"Reminder of key points from a previous conversation (summarized on {latest_summary.timestamp.strftime('%Y-%m-%d')}): {latest_summary.summary_text}"
+                            "content": summary_injection_content
                         }
-                        # Inject at the beginning or after system prompt if present
-                        history_for_llm = [history_for_llm[0]] + [summary_injection] + history_for_llm[1:] if len(history_for_llm)>0 and history_for_llm[0]['role']=='system' else [summary_injection] + history_for_llm
+                        # Inject after system prompt if one exists, otherwise at the beginning
+                        if history_for_llm and history_for_llm[0]['role'] == 'system':
+                            history_for_llm.insert(1, summary_injection)
+                        else:
+                            history_for_llm.insert(0, summary_injection)
                         logger.info(f"STANDARD_CHAT: Injected previous summary for user {user_id} into LLM context.")
 
                 # --- Call the Standard LLM ---
                 try:
                     aika_response_text = await llm.generate_response(
-                        history=history_for_llm, # Use potentially modified history
+                        history=history_for_llm,
                         provider=request.provider,
                         model=request.model,
                         max_tokens=request.max_tokens,
                         temperature=request.temperature,
-                        system_prompt=request.system_prompt
+                        system_prompt=request.system_prompt # This might be None if not sent from frontend
                     )
                 except Exception as llm_err:
                      logger.error(f"LLM generation failed for standard chat session {session_id}: {llm_err}", exc_info=True)
@@ -278,8 +299,8 @@ async def summarize_and_save(user_id: int, session_id_to_summarize: str):
             .order_by(Conversation.timestamp.asc())\
             .all()
 
-        if not conversation_history or len(conversation_history) < 2:
-             logger.info(f"Background Task: Skipping summarization for session {session_id_to_summarize} (too short/no history).")
+        if not conversation_history or len(conversation_history) < MIN_TURNS_FOR_SUMMARY:
+             logger.info(f"Background Task: Skipping summarization for session {session_id_to_summarize} (less than {MIN_TURNS_FOR_SUMMARY} turns).")
              return
 
         # 2. Format history for LLM
@@ -288,6 +309,16 @@ async def summarize_and_save(user_id: int, session_id_to_summarize: str):
             history_lines.append(f"user: {turn.message}")
             history_lines.append(f"assistant: {turn.response}")
         formatted_history = "\n".join(history_lines)
+
+        # --- Optional: Truncate history if too long ---
+        # This is a simple truncation; you might want to use a more sophisticated method
+        if len(formatted_history) > MAX_HISTORY_CHARS_FOR_SUMMARY:
+            original_len = len(formatted_history)
+            formatted_history = formatted_history[-MAX_HISTORY_CHARS_FOR_SUMMARY:] # Take the most recent part
+            logger.warning(f"Background Task: Truncated conversation history for session {session_id_to_summarize} from {original_len} to {len(formatted_history)} chars for summarization.")
+            # Optionally, add a note to the prompt that history was truncated
+            # formatted_history = "[History truncated due to length]\n...\n" + formatted_history
+
 
         # 3. Create the summarization prompt
         # --- Using your improved prompt ---
@@ -304,19 +335,22 @@ Summary:"""
              history=summary_llm_history,
              # Explicitly define provider/model for summarization if different
              provider="gemini", # Or fetch default from config
-             model= llm.DEFAULT_PROVIDERS.get("gemini", "gemini-pro"), # Fetch default model
+             model= llm.DEFAULT_PROVIDERS.get("gemini", "togegerai"),
              max_tokens=1024, # Adjust as needed
              temperature=0.5 # Lower temp often better for summaries
         )
 
         if summary_text.startswith("Error:"):
-             raise Exception(f"LLM Error during summarization: {summary_text}")
+             # Log the full error from LLM for better debugging
+             logger.error(f"Background Task: LLM Error during summarization for session {session_id_to_summarize}: {summary_text}")
+             raise Exception(f"LLM Error during summarization") # Generic error to frontend/caller
 
         # 5. Save the summary
         new_summary = UserSummary(
              user_id=user_id,
-             session_id=session_id_to_summarize, # Store the summarized session ID
-             summary_text=summary_text.strip()
+             summarized_session_id=session_id_to_summarize,
+             summary_text=summary_text.strip(),
+             timestamp=datetime.now() # Ensure timestamp is set here
         )
         db.add(new_summary)
         db.commit() # Commit within this background task's session
@@ -338,14 +372,14 @@ async def get_chat_history(
 ):
     """Fetches conversation history for the authenticated user."""
     try:
-        llm.logger.info(f"Fetching conversation turns for user {current_user.id}")
+        logger.info(f"Fetching conversation turns for user {current_user.id}") # Use the module's logger
 
         # 1. Fetch conversation turns from DB in chronological order
         conversation_turns = db.query(Conversation)\
             .filter(Conversation.user_id == current_user.id)\
             .order_by(Conversation.timestamp.asc()) \
             .all()
-        llm.logger.info(f"Retrieved {len(conversation_turns)} conversation turns for user {current_user.id}")
+        logger.info(f"Retrieved {len(conversation_turns)} conversation turns for user {current_user.id}")
 
         # 2. Transform the data into individual history items
         history_items: List[Dict] = []
@@ -370,12 +404,12 @@ async def get_chat_history(
 
         # 4. Apply pagination (limit/skip) to the final transformed list
         paginated_history = history_items[skip : skip + limit]
-        llm.logger.info(f"Returning {len(paginated_history)} transformed history items for user {current_user.id} (skip={skip}, limit={limit})")
+        logger.info(f"Returning {len(paginated_history)} transformed history items for user {current_user.id} (skip={skip}, limit={limit})")
 
         # 5. Return the transformed list (FastAPI will validate against response_model)
         return paginated_history
 
     except Exception as e:
-        llm.logger.error(f"Error fetching/transforming chat history for user {current_user.id}: {e}", exc_info=True)
+        logger.error(f"Error fetching/transforming chat history for user {current_user.id}: {e}", exc_info=True)
         # Ensure a generic error is raised to avoid leaking details
         raise HTTPException(status_code=500, detail="Failed to retrieve chat history")
