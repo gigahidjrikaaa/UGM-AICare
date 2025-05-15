@@ -331,3 +331,8 @@ class TestEmailPayload(BaseModel):
 class SyncAchievementsResponse(BaseModel):
     message: str
     newly_awarded_badges: List[EarnedBadgeInfo] = [] # Return info about newly minted badges
+
+#? --- Pydantic Model for Summary ---
+class LatestSummaryResponse(BaseModel):
+    summary_text: Optional[str] = None
+    timestamp: Optional[datetime] = None
