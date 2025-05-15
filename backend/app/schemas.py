@@ -1,9 +1,11 @@
 # backend/app/schemas.py
+from decimal import Decimal
 from pydantic import BaseModel, Field, EmailStr, validator, model_validator
 from typing import Any, List, Dict, Optional, Literal
 from datetime import datetime, date
 
 from app.core.llm import LLMProvider
+from app.models import AppointmentStatus
 
 #? --- Request Body Model ---
 
@@ -343,3 +345,90 @@ class GreetingHookRequest(BaseModel):
 
 class GreetingHookResponse(BaseModel):
     greeting_hook: Optional[str] = None
+
+# --- Counselor Schemas ---
+class CounselorBase(BaseModel):
+    name: str
+    specialization: Optional[str] = None
+    image_url: Optional[str] = None
+    is_generally_available: bool = True
+    work_hours_json: Optional[str] = None # Or parse into a structured Dict
+    lisk_address: Optional[str] = None
+
+class CounselorCreate(CounselorBase):
+    pass
+
+class Counselor(CounselorBase): # For response
+    id: int
+
+    class Config:
+        orm_mode = True
+
+# --- AppointmentType Schemas ---
+class AppointmentTypeBase(BaseModel):
+    name: str
+    description: Optional[str] = None
+    duration_minutes: int
+    price_idrx_wei: Decimal # Use Decimal for precision in Pydantic, maps to Numeric
+
+class AppointmentTypeCreate(AppointmentTypeBase):
+    pass
+
+class AppointmentType(AppointmentTypeBase): # For response
+    id: int
+
+    class Config:
+        orm_mode = True
+
+# --- Availability Slot Schema (for API response) ---
+class TimeSlot(BaseModel):
+    time: str # "HH:MM"
+    available: bool
+
+class AvailabilityResponse(BaseModel):
+    date: date
+    slots: List[TimeSlot]
+
+# --- Appointment Schemas ---
+class AppointmentCreateRequest(BaseModel): # For student initiating a booking
+    counselor_id: int
+    appointment_type_id: int
+    appointment_date: date # e.g., "2025-05-20"
+    appointment_time: str # e.g., "09:30" (will be combined with date)
+    notes_for_counselor: Optional[str] = None
+
+class AppointmentInitiateResponse(BaseModel): # Response after initiating
+    appointment_id: int
+    student_user_id: int
+    counselor_id: int
+    appointment_type_id: int
+    appointment_datetime: datetime
+    status: AppointmentStatus
+    price_to_pay_idrx_wei: Decimal
+    payment_address: str # Lisk Smart Contract address to send IDRX
+    notes_for_counselor: Optional[str] = None
+
+
+class AppointmentPaymentVerificationRequest(BaseModel):
+    lisk_transaction_hash: str # Student provides this after sending payment
+
+class Appointment(BaseModel): # Full appointment details for response
+    id: int
+    student_user_id: int
+    counselor: Counselor # Nested counselor details
+    appointment_type: AppointmentType # Nested type details
+    appointment_datetime: datetime
+    status: AppointmentStatus
+    notes_for_counselor: Optional[str] = None
+    counselor_notes: Optional[str] = None
+    lisk_transaction_hash: Optional[str] = None
+    price_paid_idrx_wei: Optional[Decimal] = None
+    created_at: datetime
+    updated_at: Optional[datetime] = None # onupdate might not always be there on creation
+
+    class Config:
+        orm_mode = True
+        json_encoders = {
+            # Handles the enum for JSON responses
+            AppointmentStatus: lambda v: v.value if v else None 
+        }
