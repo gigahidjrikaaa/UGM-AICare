@@ -4,7 +4,7 @@ from fastapi import FastAPI, requests # type: ignore
 from datetime import datetime, timezone
 from app.database import get_db, init_db
 from sqlalchemy import text
-from app.routes import email, docs, chat, feedback, link_did, internal, journal, summary, profile
+from app.routes import email, docs, chat, feedback, link_did, internal, journal, summary, profile, session_events
 from contextlib import asynccontextmanager
 from app.core.scheduler import start_scheduler, shutdown_scheduler
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
@@ -88,7 +88,9 @@ app.include_router(link_did.router, prefix="/api/v1", tags=["Link DID"]) # Added
 app.include_router(email.router) 
 app.include_router(journal.router)
 app.include_router(internal.router) 
-app.include_router(summary.router)
+app.include_router(session_events.session_event_router) # This will have prefix /api/v1/chat
+app.include_router(summary.activity_router) # This will have prefix /api/v1/activity-summary
+app.include_router(summary.user_data_router)  # This will have prefix /api/v1/user
 app.include_router(profile.router)
 # logger.info(f"List of routers (/api/v1): {app.routes}")
 logger.info(f"Allowed origins: {origins}")

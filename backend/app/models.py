@@ -45,8 +45,9 @@ class Conversation(Base):
 class UserSummary(Base):
     __tablename__ = "user_summaries"
 
-    id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True) # Link to the User
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
+    summarized_session_id = Column(String, index=True, nullable=True) # Session ID for the summary
     summary_text = Column(Text, nullable=False) # The actual summary content
     timestamp = Column(DateTime, default=datetime.now, nullable=False) # When the summary was created
 
