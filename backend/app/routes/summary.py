@@ -7,7 +7,8 @@ from datetime import date, timedelta, datetime, time
 from typing import Dict, List, Set
 
 from app.database import get_db
-from app.models import User, JournalEntry, Conversation, UserBadge
+from app.models import User, JournalEntry, Conversation, UserBadge, UserSummary
+from app.schemas import LatestSummaryResponse
 from app.dependencies import get_current_active_user
 from app.core.blockchain_utils import mint_nft_badge
 from app.schemas import ActivitySummaryResponse, ActivityData, EarnedBadgeInfo
@@ -165,3 +166,22 @@ async def get_my_earned_badges(
     except Exception as e:
         logger.error(f"Error fetching earned badges for user {current_user.id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to retrieve earned badges")
+    
+# --- Endpoint to Fetch Latest Summary ---
+@router.get("/user/latest-summary", response_model=LatestSummaryResponse)
+async def get_latest_user_summary(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    latest_summary = db.query(UserSummary)\
+        .filter(UserSummary.user_id == current_user.id)\
+        .order_by(UserSummary.timestamp.desc())\
+        .first()
+
+    if not latest_summary:
+        return LatestSummaryResponse(summary_text=None, timestamp=None)
+
+    return LatestSummaryResponse(
+        summary_text=latest_summary.summary_text,
+        timestamp=latest_summary.timestamp
+    )
