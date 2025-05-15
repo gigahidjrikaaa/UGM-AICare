@@ -56,12 +56,18 @@ export function useChat() {
   const [error, setError] = useState<string | null>(null);
   const [currentMode, setCurrentMode] = useState<ChatMode>('standard');
   const [sessionId] = useState<string>(() => uuidv4()); // Generate unique session ID on hook init
+  const sessionIdRef = useRef<string>(sessionId); // Create a ref to store sessionId
   const chatContainerRef = useRef<HTMLDivElement | null>(null); // For scrolling
 
   const [initialGreeting, setInitialGreeting] = useState<string>(
     "Halo! Aku Aika, teman AI-mu dari UGM-AICare. Ada yang ingin kamu ceritakan hari ini? 😊"
   );
   const [isGreetingLoading, setIsGreetingLoading] = useState<boolean>(true);
+
+  // Update the ref when sessionId changes
+  useEffect(() => {
+    sessionIdRef.current = sessionId;
+  }, [sessionId]);
 
   // --- Initial Greeting ---
   useEffect(() => {
@@ -115,6 +121,40 @@ export function useChat() {
       setIsGreetingLoading(false); // Not logged in, no summary to fetch
     }
   }, [session, status, messages.length]); // Rerun if session or status changes, or if messages get populated
+
+  useEffect(() => {
+  const handleBeforeUnload = () => {
+    if (sessionIdRef.current) { // Assuming you store current session_id in a ref or state
+      const payload = JSON.stringify({ session_id: sessionIdRef.current });
+      navigator.sendBeacon('/api/v1/chat/end-session', payload);
+      // Or use fetch with keepalive: true
+      // fetch('/api/v1/chat/end-session', {
+      //   method: 'POST',
+      //   body: payload,
+      //   headers: { 'Content-Type': 'application/json' },
+      //   keepalive: true,
+      // });
+    }
+  };
+
+  window.addEventListener('beforeunload', handleBeforeUnload);
+
+  // Alternative or complementary: visibilitychange
+  // const handleVisibilityChange = () => {
+  //   if (document.visibilityState === 'hidden' && sessionIdRef.current) {
+  //     const payload = JSON.stringify({ session_id: sessionIdRef.current });
+  //     // Consider if sendBeacon is appropriate here or if you only want it for full unload
+  //     // For tab switching, you might not want to end the session immediately
+  //     // but this is an option. For now, focusing on beforeunload.
+  //   }
+  // };
+  // document.addEventListener('visibilitychange', handleVisibilityChange);
+
+  return () => {
+    window.removeEventListener('beforeunload', handleBeforeUnload);
+    // document.removeEventListener('visibilitychange', handleVisibilityChange);
+  };
+}, []); // Dependencies: ensure sessionIdRef.current is stable or add to deps
 
   // --- Scroll to Bottom ---
   useEffect(() => {
