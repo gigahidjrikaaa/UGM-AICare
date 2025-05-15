@@ -7,6 +7,7 @@ from sqlalchemy import text
 from app.routes import email, docs, chat, feedback, link_did, internal, journal, summary, profile, session_events
 from contextlib import asynccontextmanager
 from app.core.scheduler import start_scheduler, shutdown_scheduler
+from app.routes import appointments as appointments_router
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
 import os
 from dotenv import load_dotenv
@@ -92,6 +93,7 @@ app.include_router(session_events.session_event_router) # This will have prefix 
 app.include_router(summary.activity_router) # This will have prefix /api/v1/activity-summary
 app.include_router(summary.user_data_router)  # This will have prefix /api/v1/user
 app.include_router(profile.router)
+app.include_router(appointments_router.router)
 # logger.info(f"List of routers (/api/v1): {app.routes}")
 logger.info(f"Allowed origins: {origins}")
 
