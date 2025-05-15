@@ -6,9 +6,10 @@ from pydantic import BaseModel, Field
 from datetime import date, timedelta, datetime, time
 from typing import Dict, List, Set, Optional 
 
+from app.core import llm
 from app.database import get_db
 from app.models import User, JournalEntry, Conversation, UserBadge, UserSummary
-from app.schemas import LatestSummaryResponse, ActivitySummaryResponse, ActivityData, EarnedBadgeInfo
+from app.schemas import LatestSummaryResponse, ActivitySummaryResponse, ActivityData, EarnedBadgeInfo, GreetingHookRequest, GreetingHookResponse
 from app.dependencies import get_current_active_user
 import logging
 import os
@@ -167,6 +168,67 @@ async def get_my_earned_badges(
         logger.error(f"Error fetching earned badges for user {current_user.id}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="Failed to retrieve earned badges")
     
+# --- Endpoint to Generate Greeting Hook ---
+GREETING_HOOK_PROMPT_TEMPLATE = """
+Anda adalah Aika, AI chatbot pendamping kesehatan mental dari UGM AICare yang sangat ramah, empatik, dan suportif.
+Tugas Anda adalah membuat SATU kalimat sapaan pembuka yang sangat singkat dan alami berdasarkan ringkasan detail dari percakapan terakhir dengan pengguna.
+Sapaan ini harus merujuk secara halus ke salah satu topik utama atau perasaan penting pengguna dari sesi terakhir, dan mengajak pengguna untuk melanjutkan percakapan.
+Fokus untuk membuat pengguna merasa didengar dan diingat.
+
+CONTOH SAPAAN YANG DIINGINKAN:
+
+"Halo! Di sesi terakhir kita bicara soal [topik utama], bagaimana kelanjutannya?"
+"Hai, apa kabar? Kemarin kita sempat diskusi tentang [perasaan utama] kamu. Mau cerita lagi hari ini?"
+"Selamat datang kembali! Terakhir kita ngobrolin [isu spesifik], ada perkembangan baru?"
+"Halo, gimana kabar skripsimu kemarin? ada progres? atau kamu mau nyampein hal lain?"
+ATURAN PENTING:
+
+Sapaan HARUS dalam Bahasa Indonesia yang santai dan akrab.
+Sapaan HARUS sangat singkat, idealnya tidak lebih dari 1-2 kalimat pendek (maksimal sekitar 20-25 kata).
+JANGAN mengulang detail panjang dari ringkasan.
+JANGAN menyertakan bagian seperti "Key points:", "User's feelings:", dll. Langsung ke kalimat sapaannya.
+Jika ringkasan tidak memberikan cukup info untuk sapaan spesifik, berikan sapaan umum yang ramah seperti "Halo! Senang bertemu lagi. Ada yang ingin kamu ceritakan hari ini?"
+Berikut adalah ringkasan detail dari percakapan terakhir pengguna:
+{detailed_summary_text}
+SAPAAN PEMBUKA SINGKAT UNTUK PENGGUNA:"""
+
+@user_data_router.post("/generate-greeting-hook", response_model=GreetingHookResponse)
+async def generate_greeting_hook_from_summary(
+    request: GreetingHookRequest,
+    current_user: User = Depends(get_current_active_user) # Optional: if you want to log it against user
+):
+    logger.info(f"Generating greeting hook for user {current_user.id} based on provided summary.")
+    if not request.detailed_summary_text or len(request.detailed_summary_text) < 10: # Basic validation
+        logger.warning("Detailed summary text is too short or missing for greeting hook generation.")
+        return GreetingHookResponse(greeting_hook=None)
+
+    try:
+        prompt_for_llm = GREETING_HOOK_PROMPT_TEMPLATE.format(detailed_summary_text=request.detailed_summary_text)
+        
+        # Use your existing llm.generate_response function
+        # The history for this call is just a single user message containing the full prompt
+        greeting_hook_llm_history = [{"role": "user", "content": prompt_for_llm}]
+        
+        hook_text = await llm.generate_response(
+            history=greeting_hook_llm_history,
+            # provider="gemini", # Or your preferred provider for this task
+            # model="gemini-1.5-flash", # A fast model is good here
+            max_tokens=60, # Short response needed
+            temperature=0.6, # Allow some creativity but not too much
+            system_prompt=None # The main instruction is in the user prompt
+        )
+
+        if hook_text.startswith("Error:") or not hook_text.strip():
+            logger.error(f"LLM failed to generate greeting hook or returned empty: {hook_text}")
+            return GreetingHookResponse(greeting_hook=None)
+
+        logger.info(f"Generated greeting hook: {hook_text.strip()}")
+        return GreetingHookResponse(greeting_hook=hook_text.strip())
+
+    except Exception as e:
+        logger.error(f"Error generating greeting hook: {e}", exc_info=True)
+        return GreetingHookResponse(greeting_hook=None) # Fallback
+
 # --- Endpoint to Fetch Latest Summary ---
 @user_data_router.get("/latest-summary", response_model=LatestSummaryResponse)
 async def get_latest_user_summary(

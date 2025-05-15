@@ -336,3 +336,10 @@ class SyncAchievementsResponse(BaseModel):
 class LatestSummaryResponse(BaseModel):
     summary_text: Optional[str] = None
     timestamp: Optional[datetime] = None
+
+#? --- Pydantic Model for Greeting Hook ---
+class GreetingHookRequest(BaseModel):
+    detailed_summary_text: str
+
+class GreetingHookResponse(BaseModel):
+    greeting_hook: Optional[str] = None
