@@ -139,7 +139,7 @@ export const authOptions: NextAuthOptions = {
 
               // AFTER successful sync, fetch the full user profile from backend
               console.log(`JWT: Fetching updated profile from backend for sub ${token.id.substring(0, 10)}...`);
-              const profileResponse = await fetch(`<span class="math-inline">\{backendUrl\}/api/v1/internal/user\-by\-sub/</span>{token.id}`, {
+              const profileResponse = await fetch(`${backendUrl}/api/v1/internal/user-by-sub/${token.id}`, {
                 headers: { 'X-Internal-API-Key': internalApiKey },
               });
 
