@@ -1,6 +1,8 @@
 # app/models.py
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean, Date, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean, Date, UniqueConstraint, Numeric, Time, Enum as SQLAlchemyEnum
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql import func # For server_default=func.now()
+import enum
 from app.database import Base
 # from app.database.base import BaseModel # Assuming BaseModel provides created_at, updated_at if needed
 from datetime import datetime
@@ -171,3 +173,71 @@ class JournalEntry(Base):
 
     # Add a unique constraint for user_id and entry_date to ensure one entry per user per day
     __table_args__ = (UniqueConstraint('user_id', 'entry_date', name='_user_entry_date_uc'),)
+
+
+
+# # --- Counselor and Appointment Models ---
+class Counselor(Base):
+    __tablename__ = "counselors"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String, nullable=False)
+    specialization = Column(String, nullable=True)
+    image_url = Column(String, nullable=True) # For counselor image
+    lisk_address = Column(String, nullable=True, unique=True, index=True) # For LISK IDRX payouts
+    is_generally_available = Column(Boolean, default=True) # General availability flag
+    # For hackathon simplicity, store typical weekly availability as JSON-like string or Text.
+    # Example: {"monday": ["09:00-12:00", "14:00-17:00"], "tuesday": [...]}
+    # A more robust solution would be separate tables for availability rules.
+    work_hours_json = Column(Text, nullable=True) 
+
+    appointments = relationship("Appointment", back_populates="counselor")
+
+class AppointmentType(Base):
+    __tablename__ = "appointment_types"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    name = Column(String, nullable=False, unique=True)
+    description = Column(Text, nullable=True)
+    duration_minutes = Column(Integer, nullable=False) # e.g., 45, 60, 90
+    # Store price in its smallest unit (wei equivalent for IDRX) to avoid floating point issues
+    # Numeric is good for precision. If IDRX has 18 decimals, (total_digits, decimal_places)
+    # For simplicity, if IDRX is like Rupiah with 0-2 decimals effectively for display,
+    # storing as integer (e.g. 100000 for Rp 1000.00 if 2 decimals tracked) is common.
+    # Let's assume IDRX smallest unit.
+    price_idrx_wei = Column(Numeric(30, 0), nullable=False) # Represents price in smallest IDRX unit
+
+    appointments = relationship("Appointment", back_populates="appointment_type")
+
+class AppointmentStatus(str, enum.Enum):
+    PENDING_PAYMENT = "PENDING_PAYMENT"
+    CONFIRMED = "CONFIRMED"
+    CANCELLED_BY_USER = "CANCELLED_BY_USER"
+    CANCELLED_BY_COUNSELOR = "CANCELLED_BY_COUNSELOR"
+    COMPLETED = "COMPLETED"
+    NO_SHOW = "NO_SHOW"
+
+class Appointment(Base):
+    __tablename__ = "appointments"
+
+    id = Column(Integer, primary_key=True, index=True, autoincrement=True)
+    student_user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True) # Assuming your User model PK is Integer
+    counselor_id = Column(Integer, ForeignKey("counselors.id"), nullable=False, index=True)
+    appointment_type_id = Column(Integer, ForeignKey("appointment_types.id"), nullable=False, index=True)
+    
+    appointment_datetime = Column(DateTime(timezone=True), nullable=False) # Specific date and time of the appointment
+    status = Column(SQLAlchemyEnum(AppointmentStatus), default=AppointmentStatus.PENDING_PAYMENT, nullable=False)
+    
+    notes_for_counselor = Column(Text, nullable=True) # From student
+    counselor_notes = Column(Text, nullable=True) # Added by counselor after session (optional)
+
+    # Lisk Payment Fields
+    lisk_transaction_hash = Column(String, nullable=True, unique=True, index=True) # To verify payment
+    price_paid_idrx_wei = Column(Numeric(30, 0), nullable=True) # Actual amount paid
+
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
+
+    student = relationship("User") # Assuming your User model is named "User"
+    counselor = relationship("Counselor", back_populates="appointments")
+    appointment_type = relationship("AppointmentType", back_populates="appointments")
