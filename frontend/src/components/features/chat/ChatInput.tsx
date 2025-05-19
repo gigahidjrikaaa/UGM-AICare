@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/TextArea'; // Corrected casing
 import { SendHorizonal, BrainCircuit, X } from 'lucide-react'; // Using lucide-react icons
-import { ChatMode, ChatModule } from '@/types/chat';
+import { ChatMode, AvailableModule as ChatModule } from '@/types/chat';
 import { cn } from '@/lib/utils';
 
 interface ChatInputProps {
