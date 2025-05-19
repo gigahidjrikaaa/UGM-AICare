@@ -3,7 +3,7 @@ import json
 from sqlalchemy.orm import Session as DBSession # DBSession is a common alias for SQLAlchemy session
 from sqlalchemy import desc
 from fastapi import APIRouter, HTTPException, Body, Depends, status, BackgroundTasks, Query # type: ignore
-from typing import List, Dict, Optional, Literal
+from typing import Any, List, Dict, Optional, Literal
 from datetime import datetime, timedelta # Import datetime
 import logging
 
@@ -13,7 +13,13 @@ from app.models import User, Conversation, UserSummary
 from app.core import llm
 from app.core.memory import get_module_state, set_module_state, clear_module_state
 from app.dependencies import get_current_active_user
-from app.schemas import ChatRequest, ChatResponse, ConversationHistoryItem, SummarizeRequest, ChatEvent
+from app.schemas import ChatRequest, ChatResponse, ConversationHistoryItem, SummarizeRequest
+from app.core.cbt_module_logic import (
+    get_module_step_prompt,
+    process_user_response_for_step,
+    # get_module_definition # if needed for descriptions, etc.
+)
+from app.core.cbt_module_types import CBTModuleData # For type hinting
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__) # Create a logger for this module
@@ -33,26 +39,6 @@ def get_background_db():
     finally:
         db.close()
 
-# --- Placeholder for getting module starting prompts ---
-async def get_module_start_prompt(module_id: str, step: int) -> str:
-    """
-    Placeholder function to get the initial prompt for a guided module.
-    Replace with actual logic (e.g., database lookup, LLM call, hardcoded strings).
-    """
-    logger.info(f"Getting start prompt for module: {module_id}, step: {step}")
-    start_prompts = {
-        "thought_record": "Okay, let's try exploring those thoughts. First, could you briefly describe the situation or event that triggered the difficult feeling? Just a few words is fine.",
-        "problem_breakdown": "Got it. Sometimes breaking things down helps. What's the main problem or task that feels overwhelming right now?",
-        "activity_scheduling": "Planning something positive, even small, can make a difference. What's one simple, enjoyable, or useful activity you could realistically do in the next day or so?",
-        "help_me_start": "No problem! Sometimes it's hard to know where to begin. I have a few exercises we can try: 'Explore My Thoughts' helps look at difficult thinking patterns, 'Break Down a Problem' helps with feeling overwhelmed, and 'Plan a Small Step' helps schedule positive activities. Which one sounds most useful right now? (You can also just tell me what's on your mind!)"
-    }
-    # Basic step handling example (expand later)
-    if step == 1:
-        return start_prompts.get(module_id, "Let's try this exercise. What's the first thing on your mind?")
-    else:
-        # Handle subsequent steps later
-        return f"Continuing {module_id}... (Step {step} prompt placeholder)"
-
 # --- API Endpoint (Async) ---
 # Add dependencies=[Depends(get_current_user)] if you have authentication
 @router.post("/chat", response_model=ChatResponse)
@@ -68,9 +54,9 @@ async def handle_chat_request(
     db: DBSession = next(get_db())
     try:
         session_id = request.session_id
+        conversation_id = request.conversation_id
         user_id = current_user.id
         aika_response_text: str = "" 
-        history_to_return: List[Dict[str, str]] = []
 
         #! --- Crucial Note on Frontend session_id Management ---
         #! The backend's summarization trigger relies on the `session_id` changing
@@ -87,92 +73,109 @@ async def handle_chat_request(
                 module_id = request.event.module_id
                 logger.info(f"EVENT: User {user_id} starting module '{module_id}' in session {session_id}")
 
-                # 1. Set Initial Module State in Redis (Placeholder call)
                 initial_step = 1
+                initial_module_data: CBTModuleData = {}
                 try:
-                    await set_module_state(session_id, module_id, initial_step)
-                    logger.info(f"Redis: Set state for session {session_id} - module={module_id}, step={initial_step}")
-                except Exception as e:
-                    logger.error(f"Redis Error setting module state for session {session_id}: {e}", exc_info=True)
-                    raise HTTPException(status_code=500, detail="Failed to initialize module state")
+                    # Get the first prompt using the new CBT logic
+                    aika_response_text = get_module_step_prompt(module_id, initial_step, initial_module_data)
+                    if aika_response_text is None:
+                        logger.error(f"Could not find module or step 1 for module_id: {module_id}")
+                        raise HTTPException(status_code=404, detail=f"Module {module_id} or its first step not found.")
 
-                # 2. Get the Starting Prompt/Message for this Module
-                try:
-                    aika_response_text = await get_module_start_prompt(module_id, initial_step)
+                    # Set initial module state in Redis, now including module_data
+                    await set_module_state(session_id, module_id, initial_step, initial_module_data)
+                    logger.info(f"Redis: Set state for session {session_id} - module={module_id}, step={initial_step}, data={initial_module_data}")
+
+                except HTTPException as http_exc: # Catch specific known exception
+                    raise http_exc
                 except Exception as e:
-                    logger.error(f"Error getting start prompt for module {module_id}: {e}", exc_info=True)
-                    # Clean up Redis state if start fails
+                    logger.error(f"Error initializing or getting start prompt for module {module_id}: {e}", exc_info=True)
+                    # Attempt to clear Redis state if start fails partially
                     try:
                         await clear_module_state(session_id)
                     except Exception as redis_clear_err:
                         logger.error(f"Redis Error clearing state after failed start for session {session_id}: {redis_clear_err}", exc_info=True)
-                    raise HTTPException(status_code=500, detail=f"Failed to generate start message for module {module_id}")
+                    raise HTTPException(status_code=500, detail=f"Failed to initialize or generate start message for module {module_id}")
 
-                # 3. Prepare history for response: Use history *sent by frontend* + new assistant message
-                # Frontend already has its history; we add the new assistant message to it.
-                # If frontend didn't send history with event, use an empty list.
-                history_basis = request.history if request.history is not None else []
-                history_to_return = history_basis + [{"role": "assistant", "content": aika_response_text}]
+                # For events, history for response is just the new AI message appended to what frontend might have sent
+                # Frontend's types/api.ts shows ChatRequestPayload.history can be List[ApiMessage]
+                # And ApiMessage is {role, content, timestamp?}
+                # ChatResponse.history needs to be List[Dict[str,str]]
+                # Ensure history from request (if any) is correctly formatted.
+                # The frontend's useChat.tsx `handleStartModule` sends history, so it should be used.
 
-                # NOTE: We are NOT saving this initial assistant prompt to the Conversation DB here.
-                # We could, but it might be better to save only after the *user's first response* within the module.
-                # Or save it now if required. Let's skip saving for now.
+                request_history_dicts: List[Dict[str, str]] = []
+                if request.history: # request.history is List[Dict[str,str]] from Pydantic if frontend sends ApiMessage[]
+                    request_history_dicts = [{"role": item["role"], "content": item["content"]} for item in request.history]
 
-            else:
+
+            else: # Other event types
                 logger.warning(f"Unsupported event type received: {request.event.type} for session {session_id}")
                 raise HTTPException(status_code=400, detail=f"Unsupported event type: {request.event.type}")
 
         elif request.message:
             # --- === Handle Standard Text Message === ---
             user_message_content = request.message
-            # History is guaranteed by Pydantic validator if message is present
-            history_from_request = request.history if request.history is not None else []
-            logger.info(f"MESSAGE: User {user_id} sent message in session {session_id}")
 
-            # 1. Check for Active Module State in Redis (Placeholder call)
-            module_state = await get_module_state(session_id)
+            history_from_request_dicts: List[Dict[str, str]] = []
+            if request.history:
+                 history_from_request_dicts = [{"role": item["role"], "content": item["content"]} for item in request.history]
 
-            if module_state:
-                # --- User is inside a Guided Module ---
-                module_id = module_state['module']
-                current_step = module_state['step']
-                logger.info(f"MODULE_STEP: Session {session_id} continuing module '{module_id}' at step {current_step}")
+            logger.info(f"MESSAGE: User {user_id} sent message in session {session_id}, conversation {conversation_id}")
 
-                # TODO: Implement LLM call specific to this module/step
-                #   - Need a function like `get_llm_module_response(module_id, current_step, user_message_content, history_from_request)`
-                #   - This function would use a specific prompt for the step.
-                #   - It would return the AI response text.
-                aika_response_text = f"TEMP: Processing '{user_message_content}' for {module_id} Step {current_step}. (LLM Response Needed)" # Placeholder
+            module_state_full = await get_module_state(session_id)
 
-                # TODO: Update module state (Placeholder call)
-                #   - Determine the next step based on module logic.
-                #   - `next_step = calculate_next_step(module_id, current_step, user_message_content)`
-                #   - Handle module completion or exit commands.
-                #   - `await set_module_state(session_id, module_id, next_step)` OR `await clear_module_state(session_id)`
-                logger.warning(f"MODULE_STEP: State update logic not implemented yet for session {session_id}")
+            if module_state_full:
+                module_id = module_state_full['module_id'] # Key changed in memory.py
+                current_step_id = module_state_full['step_id'] # Key changed in memory.py
+                current_module_data: CBTModuleData = module_state_full['data']
+                logger.info(f"MODULE_STEP: Session {session_id} continuing module '{module_id}' at step {current_step_id}")
 
-                # --- Save conversation turn for module step ---
                 try:
-                    # Save user message and AI response for this step
-                    conv_entry = Conversation(user_id=user_id, session_id=session_id, message=user_message_content, response=aika_response_text, timestamp=datetime.now())
+                    updated_module_data, next_step_id, action = process_user_response_for_step(
+                        module_id, current_step_id, user_message_content, current_module_data
+                    )
+
+                    if action == "complete_module":
+                        aika_response_text = get_module_step_prompt(module_id, current_step_id, updated_module_data) # Get prompt of the completing step
+                        if aika_response_text is None: # Fallback if completing step has no prompt
+                            aika_response_text = "Modul telah selesai. Terima kasih!"
+                        await clear_module_state(session_id)
+                        logger.info(f"MODULE_COMPLETE: Module {module_id} completed for session {session_id}. State cleared.")
+                    else:
+                        await set_module_state(session_id, module_id, next_step_id, updated_module_data)
+                        aika_response_text = get_module_step_prompt(module_id, next_step_id, updated_module_data)
+                        if aika_response_text is None:
+                            logger.error(f"Could not find next step prompt for module {module_id}, step {next_step_id}")
+                            # This case might mean module ended without explicit "complete_module"
+                            # Or an issue in module definition.
+                            await clear_module_state(session_id) # Clear state to prevent loop
+                            aika_response_text = "Sepertinya ada sedikit kendala dengan langkah selanjutnya di modul ini. Mari kita coba lagi nanti atau kembali ke percakapan biasa."
+
+
+                except Exception as e:
+                    logger.error(f"Error processing module step for {module_id}, step {current_step_id}: {e}", exc_info=True)
+                    # Consider clearing module state on error to prevent user from being stuck
+                    await clear_module_state(session_id)
+                    raise HTTPException(status_code=500, detail="Terjadi kesalahan saat memproses langkah modul.")
+
+                # Save conversation turn for module step
+                try:
+                    conv_entry = Conversation(user_id=user_id, session_id=session_id, conversation_id=conversation_id, message=user_message_content, response=aika_response_text, timestamp=datetime.now())
                     db.add(conv_entry)
                     db.commit()
                 except Exception as e:
                     db.rollback()
                     logger.error(f"DB Error saving module conversation turn for session {session_id}: {e}", exc_info=True)
-                    # Decide if we should raise HTTPException or try to return response anyway
                     raise HTTPException(status_code=500, detail="Could not save module conversation turn.")
 
-                # Prepare history for response
-                history_to_return = history_from_request + [{"role": "assistant", "content": aika_response_text}]
 
-            else:
-                # --- Standard Conversation Flow (No Active Module) ---
-                logger.info(f"STANDARD_CHAT: Processing standard message for session {session_id}")
-
-                # --- Session Change Detection & Summary Handling (Your existing logic, MOVED INSIDE this block) ---
+            else: # Standard Conversation Flow (No Active Module)
+                logger.info(f"STANDARD_CHAT: Processing standard message for session {session_id}, conversation {conversation_id}")
+                # --- Session Change Detection & Summary Handling ---
+                # (Your existing summary logic - seems mostly fine, ensure DB queries are correct)
+                # ... (previous summarization logic here) ...
                 previous_session_id_to_summarize = None
-                # Query the last message saved in the DB for this user to check its session_id
                 latest_db_message_for_user = db.query(Conversation)\
                     .filter(Conversation.user_id == user_id)\
                     .order_by(Conversation.timestamp.desc())\
@@ -181,84 +184,81 @@ async def handle_chat_request(
                 is_new_session = False
                 if latest_db_message_for_user:
                     if latest_db_message_for_user.session_id != session_id:
-                        # Session ID from request is different from the last saved session ID for this user
                         previous_session_id_to_summarize = latest_db_message_for_user.session_id
                         is_new_session = True
                         logger.info(f"STANDARD_CHAT: New session detected ({session_id}). Previous DB session: {previous_session_id_to_summarize}. Triggering summary for previous session.")
-                        background_tasks.add_task(summarize_and_save, user_id, previous_session_id_to_summarize)
-                    # else: it's an ongoing session, no summary trigger based on this condition
+                        background_tasks.add_task(summarize_and_save, user_id, previous_session_id_to_summarize, db_session_creator=get_background_db) # Pass db_session_creator
+                    else: # Check for new conversation within the same session
+                        if latest_db_message_for_user.conversation_id != conversation_id:
+                            is_new_session = True # Treat as new context for summary injection
+                            logger.info(f"STANDARD_CHAT: New conversation detected ({conversation_id}) in existing session {session_id}. Will inject summary if available.")
+
                 else:
-                    # No previous messages for this user in the DB, so this is their first interaction.
                     is_new_session = True
                     logger.info(f"STANDARD_CHAT: First message ever for user {user_id} in session {session_id}. No previous session to summarize.")
 
-                # --- Prepare History for LLM - Inject Summary on New Session Start ---
-                history_for_llm = list(history_from_request) # Create a mutable copy
-                if is_new_session:
-                    N_SUMMARIES_FOR_CONTEXT = 3 # Number of recent summaries to include
-                    past_summaries = db.query(UserSummary)\
+                # --- Prepare History for LLM - Inject Summary on New Session/Conversation Start ---
+                history_for_llm_api_message: List[Dict[str,str]] = []
+                if request.history: # Convert to List[Dict[str,str]] for internal use before llm.py
+                    history_for_llm_api_message = [{"role": h["role"], "content": h["content"]} for h in request.history]
+
+
+                if is_new_session: # Or new conversation
+                    N_SUMMARIES_FOR_CONTEXT = 1 # Fetch only the most recent summary
+                    past_summary = db.query(UserSummary)\
                         .filter(UserSummary.user_id == user_id)\
                         .order_by(UserSummary.timestamp.desc())\
-                        .limit(N_SUMMARIES_FOR_CONTEXT)\
-                        .all()
+                        .first() # Fetch one
 
-                    if past_summaries:
-                        past_summaries.reverse() # To have them in chronological order (oldest of the N first)
-
-                        # Prepare a concise header for the combined summaries
-                        combined_summary_text = "Untuk membantumu mengingat, berikut adalah beberapa poin penting dari beberapa sesi terakhir kita:\n"
-
-                        for idx, summary_obj in enumerate(past_summaries):
-                            # Make each summary distinct and slightly more conversational if possible
-                            combined_summary_text += f"\n--- Sesi sekitar {summary_obj.timestamp.strftime('%d %B %Y, %H:%M')} ---\n"
-                            combined_summary_text += f"{summary_obj.summary_text}\n"
-
-                        combined_summary_text += "\n--- Akhir dari ringkasan sesi sebelumnya ---"
-
-                        # Optional: Add a character limit for the combined summaries to avoid overly long context
-                        MAX_COMBINED_SUMMARY_LENGTH = 4000 # Example: ~1000 tokens, adjust as needed
-                        if len(combined_summary_text) > MAX_COMBINED_SUMMARY_LENGTH:
-                            combined_summary_text = combined_summary_text[:MAX_COMBINED_SUMMARY_LENGTH] + "... (beberapa ringkasan mungkin dipotong karena panjang)"
-                            logger.warning(f"Combined summary text for user {user_id} was truncated to {MAX_COMBINED_SUMMARY_LENGTH} chars.")
-
-                        summary_injection = {
-                            "role": "system", # System message to provide context
-                            "content": combined_summary_text
-                        }
-
+                    if past_summary:
+                        summary_injection_text = (
+                            "Untuk membantumu mengingat, ini ringkasan singkat dari percakapan kita sebelumnya:\n"
+                            f"{past_summary.summary_text}\n"
+                            "--- Akhir dari ringkasan ---\n\nSekarang, mari kita lanjutkan. Ada apa?"
+                        )
+                        summary_injection_message = {"role": "system", "content": summary_injection_text}
+                        
                         # Inject after system prompt if one exists from request, otherwise at the beginning
-                        if history_for_llm and history_for_llm[0]['role'] == 'system':
-                            history_for_llm.insert(1, summary_injection)
-                        else:
-                            history_for_llm.insert(0, summary_injection)
-                        logger.info(f"STANDARD_CHAT: Injected {len(past_summaries)} previous summaries for user {user_id} into LLM context.")
+                        # System prompt from request.system_prompt (if any) should be first
+                        final_history_for_llm = []
+                        if request.system_prompt: # Check if a custom system prompt is provided in the request
+                             final_history_for_llm.append({"role": "system", "content": request.system_prompt})
+                        final_history_for_llm.append(summary_injection_message)
+                        final_history_for_llm.extend(history_for_llm_api_message) # Add the actual chat history
+                        history_for_llm_api_message = final_history_for_llm # Replace with augmented history
+                        logger.info(f"STANDARD_CHAT: Injected previous summary for user {user_id} into LLM context.")
+
 
                 # --- Call the Standard LLM ---
                 try:
+                    # llm.generate_response expects history as List[Dict[str, str]]
+                    # request.history is already List[Dict[str,str]] if it comes from ChatRequest
+                    # history_for_llm_api_message is the one to use here.
                     aika_response_text = await llm.generate_response(
-                        history=history_for_llm,
+                        history=history_for_llm_api_message, # Use the potentially augmented history
                         provider=request.provider,
                         model=request.model,
                         max_tokens=request.max_tokens,
                         temperature=request.temperature,
-                        system_prompt=request.system_prompt # This might be None if not sent from frontend
+                        system_prompt=request.system_prompt if not history_for_llm_api_message or history_for_llm_api_message[0].get("role") != "system" else None
+                        # Pass system_prompt only if not already covered by augmented history
                     )
                 except Exception as llm_err:
                      logger.error(f"LLM generation failed for standard chat session {session_id}: {llm_err}", exc_info=True)
-                     # Handle error appropriately, maybe raise HTTPException
-                     raise HTTPException(status_code=503, detail=f"LLM service unavailable or failed: {llm_err}")
+                     raise HTTPException(status_code=503, detail=f"LLM service unavailable or failed: {str(llm_err)}")
 
 
-                if aika_response_text.startswith("Error:"):
+                if aika_response_text.startswith("Error:"): # Check for errors returned by LLM service itself
                     logger.error(f"LLM generation returned error for session {session_id}: {aika_response_text}")
-                    status_code = 400 if "API key" in aika_response_text or "Invalid history" in aika_response_text else 503
-                    raise HTTPException(status_code=status_code, detail=aika_response_text)
+                    status_code_llm = 400 if "API key" in aika_response_text or "Invalid history" in aika_response_text else 503
+                    raise HTTPException(status_code=status_code_llm, detail=aika_response_text)
 
                 # --- Save the standard conversation turn ---
                 try:
                     conversation_entry = Conversation(
                         user_id=user_id,
                         session_id=session_id,
+                        conversation_id=conversation_id, # Save conversation_id
                         message=user_message_content,
                         response=aika_response_text,
                         timestamp=datetime.now()
@@ -270,49 +270,56 @@ async def handle_chat_request(
                     logger.error(f"DB error saving standard conversation turn for session {session_id}: {e}", exc_info=True)
                     raise HTTPException(status_code=500, detail="Could not save conversation turn.")
 
-                # Prepare history for response
-                history_to_return = history_from_request + [{"role": "assistant", "content": aika_response_text}]
-
-                # --- Placeholder for Proactive Suggestion Logic ---
-                # TODO: Analyze user_message_content & aika_response_text
-                # if should_suggest_module(...):
-                #    ... modify aika_response_text or add metadata to ChatResponse ...
-                # logger.info(f"STANDARD_CHAT: Proactive suggestion check needed for session {session_id}")
-
-
-        else:
-            # This case should be prevented by the Pydantic validator
+        else: # Neither message nor event
             logger.error(f"Invalid request structure for session {session_id}: Neither message nor event found.")
             raise HTTPException(status_code=400, detail="Invalid request: Missing message/history or event.")
 
         # --- Prepare and return the final response ---
-        actual_model_used = request.model or llm.DEFAULT_PROVIDERS.get(request.provider, "unknown")
+        # The history returned to frontend should be the original history + new AI response
+        # request.history is List[Dict[str, str]]
+        final_history_to_return: List[Dict[str, str]] = []
+        if request.history:
+            final_history_to_return.extend(request.history)
+        if request.message : # Add user message to history if it was a message request
+             final_history_to_return.append({"role": "user", "content": request.message})
+        final_history_to_return.append({"role": "assistant", "content": aika_response_text})
+
+
+        # Determine model_used based on provider and request, fallback to default if not specified
+        actual_provider_used = request.provider or "gemini" # Default if not specified
+        actual_model_used = request.model # Use model from request if provided
+        if not actual_model_used and llm.DEFAULT_PROVIDERS: # Check if DEFAULT_PROVIDERS is defined in llm
+             actual_model_used = llm.DEFAULT_PROVIDERS.get(actual_provider_used, "unknown_model")
+        elif not actual_model_used:
+             actual_model_used = "unknown_model"
+
 
         return ChatResponse(
             response=aika_response_text,
-            provider_used=request.provider,
-            model_used=actual_model_used,
-            history=history_to_return # Return the correctly constructed history
+            provider_used=str(actual_provider_used), # Ensure it's string
+            model_used=str(actual_model_used), # Ensure it's string
+            history=final_history_to_return
         )
 
-    except ValueError as e:
-        logger.warning(f"Value error in /chat endpoint processing request: {e}")
-        raise HTTPException(status_code=400, detail=str(e)) # Pydantic validation errors often raise ValueError
+    except ValueError as e: # Catch Pydantic validation errors
+        logger.warning(f"Value error in /chat endpoint processing request: {e}", exc_info=True)
+        raise HTTPException(status_code=400, detail=str(e))
     except HTTPException as http_exc:
-         raise http_exc # Re-raise known HTTP exceptions
+         raise http_exc
     except Exception as e:
         logger.error(f"Unhandled exception in /chat endpoint for user {current_user.id if current_user else 'unknown'}: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
     finally:
-        db.close()
+        if db: # Ensure db is closed
+            db.close()
 
 
 # --- Define the Summarization Function ---
-async def summarize_and_save(user_id: int, session_id_to_summarize: str):
+async def summarize_and_save(user_id: int, session_id_to_summarize: str, db_session_creator: Optional[DBSession] = None):
     """Fetches history, calls LLM to summarize, and saves to UserSummary table."""
     logger.info(f"Background Task: Starting summarization for user {user_id}, session {session_id_to_summarize}")
     # --- Use a dedicated DB session for the background task ---
-    db: DBSession = next(get_background_db())
+    db: DBSession = next(db_session_creator())
     try:
         # 1. Retrieve conversation history
         conversation_history = db.query(Conversation)\
@@ -352,13 +359,16 @@ Summary:"""
 
         # 4. Call the LLM
         summary_llm_history = [{"role": "user", "content": summarization_prompt}]
+        # Ensure DEFAULT_PROVIDERS and actual model name resolution logic is robust in llm.py
+        summary_provider = "gemini" # Or configurable
+        summary_model = llm.DEFAULT_PROVIDERS.get(summary_provider, "gemini-pro") if hasattr(llm, 'DEFAULT_PROVIDERS') else "gemini-pro"
+
         summary_text = await llm.generate_response(
              history=summary_llm_history,
-             # Explicitly define provider/model for summarization if different
-             provider="gemini", # Or fetch default from config
-             model= llm.DEFAULT_PROVIDERS.get("gemini", "togegerai"),
-             max_tokens=1024, # Adjust as needed
-             temperature=0.5 # Lower temp often better for summaries
+             provider=summary_provider,
+             model= summary_model,
+             max_tokens=1024,
+             temperature=0.5
         )
 
         if summary_text.startswith("Error:"):
@@ -403,7 +413,7 @@ async def get_chat_history(
         logger.info(f"Retrieved {len(conversation_turns)} conversation turns for user {current_user.id}")
 
         # 2. Transform the data into individual history items
-        history_items: List[Dict] = []
+        history_items: List[Dict[str, Any]] = []
         for turn in conversation_turns:
             # Add user message
             history_items.append({
@@ -421,14 +431,14 @@ async def get_chat_history(
             })
 
         # 3. Sort the combined list of messages (user + assistant) by timestamp descending
-        history_items.sort(key=lambda x: x["timestamp"], reverse=True)
+        history_items.sort(key=lambda x: x["timestamp"], reverse=False)
 
         # 4. Apply pagination (limit/skip) to the final transformed list
         paginated_history = history_items[skip : skip + limit]
         logger.info(f"Returning {len(paginated_history)} transformed history items for user {current_user.id} (skip={skip}, limit={limit})")
 
         # 5. Return the transformed list (FastAPI will validate against response_model)
-        return paginated_history
+        return [ConversationHistoryItem(**item) for item in paginated_history] # Ensure all fields match
 
     except Exception as e:
         logger.error(f"Error fetching/transforming chat history for user {current_user.id}: {e}", exc_info=True)
