@@ -27,6 +27,7 @@ export function ChatInput({
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showModules, setShowModules] = useState(false);
+  const prevIsLoadingRef = useRef<boolean>(isLoading);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey && !isLoading) {
@@ -45,6 +46,14 @@ export function ChatInput({
     }
   }, [inputValue]);
 
+  useEffect(() => {
+    // If previously loading and now not loading, and input is empty (message sent and cleared)
+    if (prevIsLoadingRef.current && !isLoading && !inputValue && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+    // Update the ref to the current isLoading state for the next render
+    prevIsLoadingRef.current = isLoading;
+  }, [isLoading, inputValue]);
 
   const handleModuleClick = (moduleId: string) => {
       onStartModule(moduleId);
