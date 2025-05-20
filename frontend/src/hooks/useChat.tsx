@@ -203,8 +203,8 @@ export function useChat() {
   const addAssistantChunksSequentially = useCallback(async (
     responseContent: string,
     initialLoaderId: string,
-    responseSessionId: string, // Pass session and conversation IDs for new messages
-    responseConversationId: string
+    messageSessionId: string,
+    messageConversationId: string
   ) => {
     setMessages((prev) => prev.filter((msg) => msg.id !== initialLoaderId));
 
@@ -216,8 +216,8 @@ export function useChat() {
       content: chunkContent,
       timestamp: baseTimestamp,
       isLoading: false,
-      session_id: responseSessionId,
-      conversation_id: responseConversationId,
+      session_id: messageSessionId,
+      conversation_id: messageConversationId,
       created_at: baseTimestamp.toISOString(),
       updated_at: baseTimestamp.toISOString(),
     }));
@@ -239,8 +239,8 @@ export function useChat() {
             content: '',
             timestamp: new Date(),
             isLoading: true,
-            session_id: responseSessionId,
-            conversation_id: responseConversationId,
+            session_id: messageSessionId,
+            conversation_id: messageConversationId,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
           }
@@ -302,8 +302,23 @@ export function useChat() {
         conversationIdToUse // Use conversation ID from the request context
       );
       
-      // Module completion logic removed from here as 'event' is not in ChatResponsePayload
-      // It should be handled by the module's last step message or a UI interaction.
+      // --- CHECK FOR MODULE COMPLETION ---
+      if (data.module_completed_id && data.module_completed_id === currentMode.replace('module:', '')) {
+        toast.success(`Modul "${UPDATED_AVAILABLE_MODULES.find(m => m.id === data.module_completed_id)?.name || data.module_completed_id}" selesai.`);
+        setCurrentMode('standard');
+        // Optionally add a system message confirming mode change
+        const systemMsg: Message = {
+            id: uuidv4(),
+            role: 'system',
+            content: `Kamu kembali ke mode percakapan standar.`,
+            timestamp: new Date(),
+            session_id: currentSessionId,
+            conversation_id: conversationIdToUse,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        };
+        setMessages(prev => [...prev, systemMsg]);
+      }
 
     } catch (err: unknown) {
       console.error("API Error:", err);
@@ -343,7 +358,7 @@ export function useChat() {
     } finally {
       setIsLoading(false);
     }
-  }, [session, currentSessionId, messages, addAssistantChunksSequentially]); // `messages` is needed for conversationIdToUse
+  }, [session, currentSessionId, messages, addAssistantChunksSequentially, currentMode]);
 
   // --- Send Message Logic ---
   // Function to handle sending a message

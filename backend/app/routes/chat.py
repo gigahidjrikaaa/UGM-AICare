@@ -52,6 +52,7 @@ async def handle_chat_request(
     and injects the *latest available* summary into the context for the *current* session.
     """
     db: DBSession = next(get_db())
+    module_just_completed_id: Optional[str] = None # Variable to hold completed module ID
     try:
         session_id = request.session_id
         conversation_id = request.conversation_id
@@ -142,6 +143,7 @@ async def handle_chat_request(
                             aika_response_text = "Modul telah selesai. Terima kasih!"
                         await clear_module_state(session_id)
                         logger.info(f"MODULE_COMPLETE: Module {module_id} completed for session {session_id}. State cleared.")
+                        module_just_completed_id = module_id
                     else:
                         await set_module_state(session_id, module_id, next_step_id, updated_module_data)
                         aika_response_text = get_module_step_prompt(module_id, next_step_id, updated_module_data)
@@ -151,13 +153,16 @@ async def handle_chat_request(
                             # Or an issue in module definition.
                             await clear_module_state(session_id) # Clear state to prevent loop
                             aika_response_text = "Sepertinya ada sedikit kendala dengan langkah selanjutnya di modul ini. Mari kita coba lagi nanti atau kembali ke percakapan biasa."
+                            module_just_completed_id = module_id
 
 
                 except Exception as e:
                     logger.error(f"Error processing module step for {module_id}, step {current_step_id}: {e}", exc_info=True)
                     # Consider clearing module state on error to prevent user from being stuck
                     await clear_module_state(session_id)
-                    raise HTTPException(status_code=500, detail="Terjadi kesalahan saat memproses langkah modul.")
+                    module_just_completed_id = module_id # Consider this an end to the module attempt
+                    aika_response_text = "Maaf, terjadi kesalahan internal saat memproses modul ini. Kita kembali ke percakapan biasa ya."
+                    # raise HTTPException(status_code=500, detail="Terjadi kesalahan saat memproses langkah modul.")
 
                 # Save conversation turn for module step
                 try:
@@ -298,7 +303,8 @@ async def handle_chat_request(
             response=aika_response_text,
             provider_used=str(actual_provider_used), # Ensure it's string
             model_used=str(actual_model_used), # Ensure it's string
-            history=final_history_to_return
+            history=final_history_to_return,
+            module_completed_id=module_just_completed_id
         )
 
     except ValueError as e: # Catch Pydantic validation errors
@@ -308,6 +314,13 @@ async def handle_chat_request(
          raise http_exc
     except Exception as e:
         logger.error(f"Unhandled exception in /chat endpoint for user {current_user.id if current_user else 'unknown'}: {e}", exc_info=True)
+        # Try to clear module state if an unexpected error occurs during module processing
+        if module_state_full: # If we were in a module
+            try:
+                await clear_module_state(session_id)
+                logger.info(f"MODULE_CLEARED_ON_ERROR: Cleared module state for session {session_id} due to unhandled exception.")
+            except Exception as redis_err:
+                logger.error(f"Failed to clear module state for session {session_id} during unhandled exception: {redis_err}")
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
     finally:
         if db: # Ensure db is closed

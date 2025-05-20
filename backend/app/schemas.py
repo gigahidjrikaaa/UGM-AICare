@@ -117,6 +117,7 @@ class ChatResponse(BaseModel):
     provider_used: str = Field(..., description="The LLM provider that generated the response")
     model_used: str = Field(..., description="The specific model that generated the response")
     history: List[Dict[str, str]] = Field(..., description="The updated conversation history")
+    module_completed_id: Optional[str] = Field(None, description="If a module was just completed, this will be its ID.")
 
 class ConversationHistoryItem(BaseModel):
     role: str

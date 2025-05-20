@@ -63,4 +63,5 @@ export interface ChatResponsePayload {
     // These will need to be taken from the client-side context when creating assistant messages.
     module_state?: { module: string; step: number }; // Example if backend sends state
     suggestions?: ChatModule[]; // Example if backend sends suggestions
+    module_completed_id?: string;
   }
