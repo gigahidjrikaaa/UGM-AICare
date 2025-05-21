@@ -1,5 +1,6 @@
 # backend/app/routes/chat.py
 import json
+import re
 from sqlalchemy.orm import Session as DBSession # DBSession is a common alias for SQLAlchemy session
 from sqlalchemy import desc
 from fastapi import APIRouter, HTTPException, Body, Depends, status, BackgroundTasks, Query # type: ignore
@@ -175,17 +176,29 @@ async def handle_chat_request(
                     raise HTTPException(status_code=500, detail="Could not save module conversation turn.")
             
             else: # No active module, check for memory query
-                memory_trigger_phrases = [
-                    "apakah kamu ingat percakapan kita",
-                    "kamu inget gak obrolan kita",
-                    "ingat percakapan kita",
-                    "inget obrolan kita",
-                    "apa kamu ingat kita ngobrol apa",
-                    "do you remember our conversation",
-                    "do you remember what we talked about"
+                user_message_lower = user_message_content.lower().strip()
+
+                # Pola Regex untuk mendeteksi pertanyaan tentang ingatan percakapan
+                # Pola ini mencoba menangkap variasi umum dalam bahasa Indonesia dan Inggris
+                patterns = [
+                    # Pola umum: (ingat/inget/remember) ... (percakapan/obrolan/...)
+                    r"(ingat|inget|remember)\s*(?:lagi|kah|kan|dong|ga|gak|nggak)?\s*(?:tentang|soal|mengenai|apa)?\s*(?:percakapan|obrolan|diskusi|pembicaraan|sesi|chat|history|summary|ringkasan|resume|resume kita|resume obrolan|resume percakapan)\s*(?:kita|sebelumnya|kemarin|terakhir|our|last|previous)?",
+                    # Pola pertanyaan: (apa/apakah) ... (kamu/you) ... (ingat/inget/remember) ... (percakapan/obrolan/...)
+                    r"(?:apa|apakah|do|did)\s*(?:kah)?\s*(?:kamu|you)\s*(?:sih|ya)?\s*(?:masih\s+)?(ingat|inget|remember)\s*(?:lagi|kah|kan|dong|ga|gak|nggak)?\s*(?:tentang|soal|mengenai|apa)?\s*(?:percakapan|obrolan|diskusi|pembicaraan|sesi|chat|history|summary|ringkasan|resume)\s*(?:kita|sebelumnya|kemarin|terakhir|our|last|previous)?",
+                    # Pola "apa yang kita bahas/bicarakan"
+                    r"apa\s*(?:lagi)?\s*(?:sih|ya)?\s*(?:yang|yg)\s*(?:pernah|sempat|udah|sudah)?\s*(?:kita|we)\s*(?:bahas|bicarakan|diskusikan|obrolin|omongin|talked\s+about|discussed)",
+                    # Frasa langsung yang sangat umum (sebagai tambahan jika regex kompleks terlewat)
+                    r"ingat\s+obrolan\s+kita",
+                    r"ingat\s+percakapan\s+kita",
+                    r"kamu\s+inget\s+gak", # Ini lebih umum, mungkin perlu dipertimbangkan konteksnya jika terlalu banyak false positive
+                    r"do\s+you\s+remember" # Umum dalam bahasa Inggris
                 ]
-                normalized_user_message = user_message_content.lower().strip()
-                asked_about_memory = any(phrase in normalized_user_message for phrase in memory_trigger_phrases)
+
+                asked_about_memory = False
+                for pattern in patterns:
+                    if re.search(pattern, user_message_lower):
+                        asked_about_memory = True
+                        break
 
                 if asked_about_memory:
                     logger.info(f"MEMORY_QUERY: User {user_id} asked about previous conversation memory in session {session_id}.")
@@ -196,9 +209,12 @@ async def handle_chat_request(
 
                     if latest_summary and latest_summary.summary_text:
                         summary_snippet = latest_summary.summary_text
-                        # Optional: Truncate summary_snippet if too long for a natural response
-                        if len(summary_snippet) > 150: # Keep it brief for a natural response
-                            summary_snippet = summary_snippet[:147] + "..."
+
+                        # Light cleaning for any lingering formal prefixes, just in case
+                        prefixes_to_remove = ["poin-poin utama:", "poin utama:", "ringkasan:", "summary:", "secara garis besar,"]
+                        for prefix in prefixes_to_remove:
+                            if summary_snippet.lower().startswith(prefix.lower()):
+                                summary_snippet = summary_snippet[len(prefix):].strip()
                         
                         aika_response_text = (
                             f"Tentu, aku ingat percakapan kita sebelumnya. "
