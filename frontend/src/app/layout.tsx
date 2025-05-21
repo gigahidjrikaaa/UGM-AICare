@@ -31,7 +31,7 @@ export default async function RootLayout({
         className={inter.className}
       >
         <ClientProvider>
-          <div className="flex flex-col min-h-screen">
+          <div className="flex flex-col min-h-screen h-full">
               <Suspense fallback={<GlobalSkeleton />}>
                 <AppLayout >
                   {children}
