@@ -244,12 +244,14 @@ class UserSyncResponse(BaseModel):
 class JournalEntryBase(BaseModel):
     entry_date: date
     content: str
+    prompt_text: Optional[str] = None
 
 class JournalEntryCreate(JournalEntryBase):
     pass
 
 class JournalEntryUpdate(BaseModel):
     content: str # Allow updating only content for a specific date
+    prompt_text: Optional[str] = None # Allow updating prompt_text too, if desired
 
 class JournalEntryResponse(JournalEntryBase):
     id: int
@@ -258,7 +260,7 @@ class JournalEntryResponse(JournalEntryBase):
     updated_at: datetime
 
     class Config:
-        orm_mode = True # or from_attributes = True for Pydantic v2
+        from_attributes = True
 
 #? --- Link DID Schemas ---
 class LinkDIDRequest(BaseModel):
