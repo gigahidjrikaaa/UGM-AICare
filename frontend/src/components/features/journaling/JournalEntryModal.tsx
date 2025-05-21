@@ -37,20 +37,27 @@ export default function JournalEntryModal({
         setIsFetchingEntry(true);
         setError(null);
         try {
-            const response = await apiClient.get<JournalEntryItem>(`/journal/${dateToFetch}`);
-            setContent(response.data.content);
-            setSelectedPromptId(response.data.prompt?.id || null); // Set selected prompt if entry exists
-        } catch (err: unknown) { 
-            const error = err as { response?: { status?: number } }; // Type assertion for error structure
-            if (error.response?.status === 404) {
+            const response = await apiClient.get<JournalEntryItem>(`/journal/${dateToFetch}`, {
+                // Configure validateStatus to treat 404 as a non-error for this specific call
+                validateStatus: function (status) {
+                    return (status >= 200 && status < 300) || status === 404;
+                }
+            });
+
+            if (response.status === 404) {
                 setContent(''); // No entry for this date, clear content
                 setSelectedPromptId(null); // Clear selected prompt
-                toast("Journal is empty. Remember what you felt this day?", { duration: 4000, icon: '🤔' });
+                toast("Journal is empty. Remember what you felt this day?", { duration: 4000, icon: '🤔', position: 'bottom-center' });
+            } else if (response.status >= 200 && response.status < 300) {
+                setContent(response.data.content);
+                setSelectedPromptId(response.data.prompt?.id || null);
             } else {
-                console.error("Error fetching journal entry:", err);
-                setError("Failed to load existing entry.");
-                toast.error("Failed to load existing entry.");
+                throw new Error(`Unexpected response status: ${response.status}`);
             }
+        } catch (err: unknown) { 
+            console.error("Error fetching journal entry (unexpected error):", err);
+            setError("Failed to load existing entry.");
+            toast.error("Failed to load existing entry.");
         } finally {
             setIsFetchingEntry(false);
         }
