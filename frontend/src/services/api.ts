@@ -1,7 +1,7 @@
 // frontend/src/services/api.ts
 
 import axios from 'axios';
-import type { ChatRequestPayload, ChatResponsePayload } from '@/types/api'; // Import types
+import type { ChatRequestPayload, ChatResponsePayload, JournalPromptResponse, JournalEntryItem } from '@/types/api'; // Import types
 
 // Define the base URL for your backend API
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL + "/api/v1" || 'http://localhost:8000/api/v1'; // Adjust if needed
@@ -92,5 +92,47 @@ export const sendMessage = async (payload: ChatRequestPayload): Promise<ChatResp
       errorMessage = error.message;
     }
     throw new Error(errorMessage); // Re-throw cleaned error
+  }
+};
+
+// --- Journal Prompts API ---
+export const getActiveJournalPrompts = async (): Promise<JournalPromptResponse[]> => {
+  try {
+    const response = await apiClient.get<JournalPromptResponse[]>('/journal-prompts/');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching journal prompts:', error);
+    let errorMessage = 'Failed to load journal prompts.';
+    if (axios.isAxiosError(error) && error.response) {
+      errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    throw new Error(errorMessage);
+  }
+};
+
+// --- Journal Entries API (Example for creating/updating if not already in a specific hook/component) ---
+// You might already have this logic within JournalEntryModal.tsx, but for completeness:
+export interface JournalEntryPayload {
+  entry_date: string; // YYYY-MM-DD
+  content: string;
+  prompt_id?: number | null;
+}
+
+export const saveJournalEntry = async (payload: JournalEntryPayload): Promise<JournalEntryItem> => {
+  try {
+    // The backend endpoint is POST /journal/ for both create and update based on date
+    const response = await apiClient.post<JournalEntryItem>('/journal/', payload);
+    return response.data;
+  } catch (error) {
+    console.error('Error saving journal entry:', error);
+    let errorMessage = 'Failed to save journal entry.';
+    if (axios.isAxiosError(error) && error.response) {
+      errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    throw new Error(errorMessage);
   }
 };
