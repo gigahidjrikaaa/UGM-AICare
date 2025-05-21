@@ -10,6 +10,7 @@ import ActivityCalendar from '@/components/features/journaling/ActivityCalendar'
 import StreakDisplay from '@/components/features/journaling/StreakDisplay';
 import apiClient from '@/services/api'; // Import API client
 import { startOfMonth, format } from 'date-fns';
+import JournalEntryModal from '@/components/features/journaling/JournalEntryModal';
 
 type JournalTab = 'history' | 'daily';
 
@@ -37,6 +38,10 @@ export default function JournalingPage() {
     const [calendarError, setCalendarError] = useState<string | null>(null);
     const [currentStreak, setCurrentStreak] = useState<number>(0);
     const [longestStreak, setLongestStreak] = useState<number>(0);
+
+    // State for JournalEntryModal
+    const [isModalOpen, setIsModalOpen] = useState(false);
+    const [selectedDateForModal, setSelectedDateForModal] = useState<string | undefined>(undefined);
 
     // Function to fetch activity data
     const fetchActivityData = useCallback(async (monthDate: Date) => {
@@ -67,15 +72,19 @@ export default function JournalingPage() {
         fetchActivityData(currentMonth);
     }, [currentMonth, fetchActivityData]);
 
+    const handleCalendarDateClick = (date: Date) => {
+        setSelectedDateForModal(format(date, 'yyyy-MM-dd'));
+        setIsModalOpen(true);
+    };
+
+    const handleModalSaveSuccess = () => {
+        setIsModalOpen(false);
+        fetchActivityData(currentMonth); // Refresh calendar data
+        // Potentially also refresh DailyJournal if it's visible and manages its own list
+    };
+
     return (
         <div className="bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white p-4 md:p-6 flex flex-col flex-1">
-            {/* 
-                Removed the explicit h-screen and overflow handling from the direct children of AppLayout.
-                AppLayout should provide the main scroll container.
-                The p-4 md:p-6 provides padding for the content within the page.
-                flex flex-col flex-1 allows this page to take up available space if AppLayout uses flex.
-            */}
-            
             <h1 className="text-2xl font-bold mb-4 sm:mb-6"> {/* Adjusted margin */}
                 <span className="text-[#FFCA40]">Aika</span> Journal
             </h1>
@@ -90,6 +99,7 @@ export default function JournalingPage() {
                             activityData={activityData}
                             onMonthChange={setCurrentMonth}
                             isLoading={isCalendarLoading}
+                            onDateClick={handleCalendarDateClick}
                         />
                         {calendarError && <p className='text-red-400 text-sm text-center -mt-4 mb-2'>{calendarError}</p>}
                     </div>
@@ -152,17 +162,23 @@ export default function JournalingPage() {
             <div className="flex-grow"> 
                 <Suspense fallback={<AikaPageSkeleton />}>
                     {activeTab === 'daily' && (
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} > {/* Removed h-full */}
-                            <DailyJournal />
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} >
+                            <DailyJournal key={currentMonth.toISOString() + Object.keys(activityData).length} />
                         </motion.div>
                     )}
                     {activeTab === 'history' && (
-                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} > {/* Removed h-full */}
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} >
                             <ChatHistoryViewer />
                         </motion.div>
                     )}
                 </Suspense>
             </div>
+            <JournalEntryModal
+                isOpen={isModalOpen}
+                onClose={() => setIsModalOpen(false)}
+                onSaveSuccess={handleModalSaveSuccess}
+                initialDate={selectedDateForModal}
+            />
         </div>
     );
 }

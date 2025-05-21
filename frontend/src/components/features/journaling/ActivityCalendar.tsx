@@ -31,13 +31,15 @@ interface ActivityCalendarProps {
     activityData: ActivitySummary; // Data fetched from the backend
     onMonthChange: (newMonth: Date) => void; // Callback to change month in parent
     isLoading?: boolean; // Optional loading state
+    onDateClick?: (date: Date) => void; // Optional callback for date click
 }
 
 export default function ActivityCalendar({
     currentMonth,
     activityData,
     onMonthChange,
-    isLoading = false
+    isLoading = false,
+    onDateClick,
 }: ActivityCalendarProps) {
 
     const monthStart = startOfMonth(currentMonth);
@@ -56,12 +58,14 @@ export default function ActivityCalendar({
     const getDayClasses = (day: Date): string => {
         const dateStr = format(day, 'yyyy-MM-dd');
         const data = activityData[dateStr];
-        let classes = "text-center py-1 text-xs rounded aspect-square flex flex-col items-center justify-center transition-colors duration-150 relative cursor-default ";
+        let classes = `text-center py-1 text-xs rounded aspect-square flex flex-col items-center justify-center transition-colors duration-150 relative ${onDateClick ? 'cursor-pointer' : 'cursor-default'} `;
 
         if (!isSameMonth(day, monthStart)) {
             classes += " text-gray-600 hover:bg-gray-700/50"; // Dim days from other months
+            if (onDateClick) classes += " hover:bg-gray-700/50";
         } else {
              classes += " text-gray-200 hover:bg-gray-700/50";
+             if (onDateClick) classes += " hover:bg-gray-700/70"; // Brighter hover for current month days
              if (isSameDay(day, new Date())) {
                  classes += " border border-[#FFCA40]"; // Highlight today
              }
@@ -126,14 +130,35 @@ export default function ActivityCalendar({
                 ))}
 
                 {/* Day Cells */}
-                {days.map((d, i) => (
-                    <div key={i} className={getDayClasses(d)}>
-                        {format(d, 'd')}
-                        {/* Example using dots instead of background */}
-                        {/* {activityData[format(d, 'yyyy-MM-dd')]?.hasJournal && <span className="absolute bottom-1 left-1/2 -translate-x-2 w-1 h-1 bg-green-400 rounded-full"></span>}
-                        {activityData[format(d, 'yyyy-MM-dd')]?.hasConversation && <span className="absolute bottom-1 left-1/2 translate-x-1 w-1 h-1 bg-blue-400 rounded-full"></span>} */}
-                    </div>
-                ))}
+                {days.map((d, i) => {
+                    const isInteractive = onDateClick && isSameMonth(d, monthStart);
+                    return (
+                        <div
+                            key={i}
+                            className={getDayClasses(d)}
+                            onClick={isInteractive ? () => onDateClick!(d) : undefined} // Call onDateClick only for current month days
+                            onKeyDown={isInteractive ? (e) => {
+                                if (e.key === 'Enter' || e.key === ' ') {
+                                    onDateClick!(d);
+                                }
+                            } : undefined}
+                            {...(isInteractive ? { role: "button" } : {})}
+                            tabIndex={isInteractive ? 0 : undefined}
+                            aria-label={isInteractive ? `Journal for ${format(d, 'MMMM d, yyyy')}` : undefined}
+                        >
+                            {format(d, 'd')}
+
+                            {/* Example using dots instead of background */}
+
+                            {activityData[format(d, 'yyyy-MM-dd')]?.hasJournal && (
+                                <span className="absolute bottom-1 left-1/2 -translate-x-2 w-1 h-1 bg-green-400 rounded-full"></span>
+                            )}
+                            {activityData[format(d, 'yyyy-MM-dd')]?.hasConversation && (
+                                <span className="absolute bottom-1 left-1/2 translate-x-1 w-1 h-1 bg-blue-400 rounded-full"></span>
+                            )}
+                        </div>
+                    );
+                })}
             </div>
 
              {/* Optional Legend */}
