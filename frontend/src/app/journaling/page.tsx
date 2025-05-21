@@ -129,11 +129,24 @@ export default function JournalingPage() {
                         </div>
                     </div>
 
-                    <h3 className="text-lg font-semibold text-gray-100 mt-4 mb-2">Using Your Activity Calendar</h3>
-                    <p>🗓️ <strong>Select a date:</strong> Click any day to write a new journal entry or review past ones.</p>
-                    <p>↔️ <strong>Navigate months:</strong> Use the arrow buttons (‹ ›) next to the month/year to go back or forward in time.</p>
-                    <p>💡 <strong>Activity markers:</strong> Dates with journal entries or AI conversations are highlighted, helping you track your engagement.</p>
-                    <p className="mt-3 text-gray-400">Keep journaling to build your streak and gain deeper insights into your well-being!</p>
+                    <div className="mt-6 p-4 bg-slate-700/30 backdrop-blur-md rounded-xl shadow-lg border border-slate-600/50">
+                        <h3 className="text-md font-semibold text-gray-100 mb-3">How to Use Your Journal</h3>
+                        <ul className="space-y-2 text-sm">
+                            <li className="flex items-start">
+                                <span className="text-lg mr-2 mt-0.5">🗓️</span>
+                                <div><strong>Select a Date:</strong> Click any day on the calendar to write or review an entry for that date.</div>
+                            </li>
+                            <li className="flex items-start">
+                                <span className="text-lg mr-2 mt-0.5">↔️</span>
+                                <div><strong>Navigate Months:</strong> Use the arrow buttons (‹ ›) by the month/year to explore different periods.</div>
+                            </li>
+                            <li className="flex items-start">
+                                <span className="text-lg mr-2 mt-0.5">💡</span>
+                                <div><strong>Activity Markers:</strong> Colored backgrounds on dates show your journal and chat activity, helping you track engagement.</div>
+                            </li>
+                        </ul>
+                        <p className="mt-4 text-xs text-gray-400">Keep journaling to build your streak and gain deeper insights!</p>
+                    </div>
                 </div>
             </div>
 
