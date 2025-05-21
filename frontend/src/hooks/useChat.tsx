@@ -5,9 +5,7 @@ import { toast } from 'react-hot-toast';
 import { useSession } from 'next-auth/react'; // Use client-side session hook
 import apiClient from '@/services/api';
 
-import type { Message, ChatMode } from '@/types/chat';
-import type { ApiMessage, ChatRequestPayload, ChatResponsePayload } from '@/types/api';
-import { sendMessage as sendApiMessage } from '@/services/api'; 
+import type { Message, ChatMode, AvailableModule, ApiMessage, ChatRequestPayload, ChatResponsePayload, ChatEventPayload  } from '@/types/chat';
 import { splitLongMessage, countWords, calculateReadTimeMs } from '@/lib/textUtils';
 
 // Define default system prompt (can be overridden)
@@ -47,27 +45,64 @@ SARAN PROAKTIF (Berikan dengan Hati-hati & Kontekstual):
 Jika percakapan mengarah ke masalah serius atau pengguna tampak sangat kesulitan (di luar kemampuanmu untuk sekadar menjadi teman dengar), prioritaskan kembali untuk mengarahkan mereka secara halus agar mencari bantuan profesional (misal: konselor UGM, psikolog). Fokusmu adalah sebagai teman ngobrol yang suportif dan membantu refleksi diri. Jaga respons tetap ringkas namun bermakna. Sapa pengguna dengan ramah dan akhiri percakapan dengan baik jika pengguna ingin mengakhiri. Anda adalah AI yang diciptakan oleh UGM, jadi tunjukkan kebanggaan dan profesionalisme sebagai perwakilan institusi.
 `
 
-// Define available modules (could be fetched from backend later)
-const AVAILABLE_MODULES = [
-    { id: 'help_me_start', name: 'Mulai dari Mana?', description: 'Bantu aku memilih latihan yang cocok.' },
-    { id: 'thought_record', name: 'Latihan Catatan Pikiran', description: 'Mengidentifikasi dan mengevaluasi pikiran negatif.' },
-    { id: 'problem_breakdown', name: 'Latihan Memecah Masalah', description: 'Mengatasi rasa kewalahan dengan memecah masalah.' },
-    { id: 'activity_scheduling', name: 'Latihan Penjadwalan Aktivitas', description: 'Merencanakan kegiatan positif kecil.' },
+const UPDATED_AVAILABLE_MODULES: AvailableModule[] = [
+  {
+    id: 'help_me_start',
+    name: 'Mulai dari Mana?',
+    description: 'Bantu aku memilih latihan yang cocok untukku saat ini.',
+    // icon: SparklesIcon, // Example icon import
+  },
+  {
+    id: 'cbt_cognitive_restructuring', // Matches refactored backend ID
+    name: 'Menantang Pikiran Negatif', // Updated name for consistency
+    description: 'Latihan untuk mengidentifikasi, menantang, dan mengubah pola pikir yang tidak membantu.',
+    // icon: LightBulbIcon,
+  },
+  {
+    id: 'cbt_problem_solving', // Matches refactored backend ID
+    name: 'Latihan Memecahkan Masalah',
+    description: 'Mengatasi rasa kewalahan dengan memecah masalah menjadi langkah-langkah yang lebih mudah dikelola.',
+    // icon: PuzzlePieceIcon,
+  },
+  {
+    id: 'cbt_express_feelings', // New module
+    name: 'Belajar Mengekspresikan Perasaan dan Pikiran',
+    description: 'Latihan interaktif untuk membantumu mengenali dan mengungkapkan perasaan serta pikiran secara sehat.',
+    // icon: ChatBubbleLeftRightIcon,
+  },
+  {
+    id: 'cbt_deal_with_guilt', // New module
+    name: 'Belajar Mengatasi Rasa Bersalah',
+    description: 'Modul untuk membantumu memahami dan mengelola perasaan bersalah secara konstruktif.',
+    // icon: ShieldCheckIcon,
+  },
+  // {
+  //   id: 'activity_scheduling', // Keep if implemented on backend with this ID
+  //   name: 'Latihan Penjadwalan Aktivitas',
+  //   description: 'Merencanakan kegiatan positif kecil untuk meningkatkan mood.',
+  // },
 ];
 
 const MAX_CHUNK_LENGTH = 350; // Adjust character limit per bubble as needed
 const MESSAGE_DELAY_MS = 300; // Base delay between chunks (can adjust)
 
+// Interface for the parameters of processApiCall
+interface ProcessApiCallParams {
+  messageContent?: string;
+  event?: ChatEventPayload;
+  history?: ApiMessage[];
+  conversation_id: string;
+}
 
 export function useChat() {
-  const { data: session, status } = useSession(); // Get user session and status
+  const { data: session } = useSession(); // Get user session and status
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState<string>('');
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [currentMode, setCurrentMode] = useState<ChatMode>('standard');
-  const [sessionId] = useState<string>(() => uuidv4()); // Generate unique session ID on hook init
-  const sessionIdRef = useRef<string>(sessionId); // Create a ref to store sessionId
+  const [currentSessionId] = useState<string>(() => uuidv4()); // Initialize session ID
+  const sessionIdRef = useRef<string>(currentSessionId); // Create a ref to store sessionId
   const chatContainerRef = useRef<HTMLDivElement | null>(null); // For scrolling
   
   const DEFAULT_GREETING = "Halo! Aku Aika, teman AI-mu dari UGM-AICare. Ada yang ingin kamu ceritakan hari ini? 😊";
@@ -76,12 +111,12 @@ export function useChat() {
 
   // Update the ref when sessionId changes
   useEffect(() => {
-    sessionIdRef.current = sessionId;
-  }, [sessionId]);
+    sessionIdRef.current = currentSessionId;
+  }, [currentSessionId]);
 
   useEffect(() => {
   const fetchAndPrepareGreeting = async () => {
-    if (status === 'authenticated' && session?.user?.id && messages.length === 0) {
+    if (session?.user?.id && messages.length === 0) {
       setIsGreetingLoading(true);
       try {
         // Step 1: Fetch the latest detailed summary
@@ -117,61 +152,45 @@ export function useChat() {
       } finally {
         setIsGreetingLoading(false);
       }
-    } else if (messages.length > 0 || status !== 'authenticated') {
-      setIsGreetingLoading(false); // Already have messages or not logged in
-    }
+    } else if (messages.length > 0 || !session?.user?.id) { // Condition for not fetching
+        setIsGreetingLoading(false);
+      }
   };
 
   fetchAndPrepareGreeting();
-  }, [status, session, messages.length]); // Dependencies
+  }, [session, messages.length]); // Dependencies
 
   // useEffect that sets the initial message for Aika
   useEffect(() => {
     if (messages.length === 0 && !isGreetingLoading && initialGreeting) {
+      const newConversationId = uuidv4();
       setMessages([
         {
-          id: uuidv4(), // Ensure uuidv4 is imported
+          id: uuidv4(),
           role: 'assistant',
           content: initialGreeting,
           timestamp: new Date(),
+          session_id: currentSessionId, // Add session_id
+          conversation_id: newConversationId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
         },
       ]);
     }
-  }, [isGreetingLoading, initialGreeting, messages.length]); // Dependencies updated
+  }, [isGreetingLoading, initialGreeting, messages.length, currentSessionId]); // Dependencies updated
 
   useEffect(() => {
-  const handleBeforeUnload = () => {
-    if (sessionIdRef.current) { // Assuming you store current session_id in a ref or state
-      const payload = JSON.stringify({ session_id: sessionIdRef.current });
-      navigator.sendBeacon('/api/v1/chat/end-session', payload);
-      // Or use fetch with keepalive: true
-      // fetch('/api/v1/chat/end-session', {
-      //   method: 'POST',
-      //   body: payload,
-      //   headers: { 'Content-Type': 'application/json' },
-      //   keepalive: true,
-      // });
-    }
-  };
-
-  window.addEventListener('beforeunload', handleBeforeUnload);
-
-  // Alternative or complementary: visibilitychange
-  // const handleVisibilityChange = () => {
-  //   if (document.visibilityState === 'hidden' && sessionIdRef.current) {
-  //     const payload = JSON.stringify({ session_id: sessionIdRef.current });
-  //     // Consider if sendBeacon is appropriate here or if you only want it for full unload
-  //     // For tab switching, you might not want to end the session immediately
-  //     // but this is an option. For now, focusing on beforeunload.
-  //   }
-  // };
-  // document.addEventListener('visibilitychange', handleVisibilityChange);
-
-  return () => {
-    window.removeEventListener('beforeunload', handleBeforeUnload);
-    // document.removeEventListener('visibilitychange', handleVisibilityChange);
-  };
-}, []); // Dependencies: ensure sessionIdRef.current is stable or add to deps
+    const handleBeforeUnload = () => {
+      if (sessionIdRef.current) {
+        const payload = JSON.stringify({ session_id: sessionIdRef.current });
+        navigator.sendBeacon('/api/v1/chat/end-session', payload);
+      }
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, []);
 
   // --- Scroll to Bottom ---
   useEffect(() => {
@@ -182,151 +201,237 @@ export function useChat() {
 
   // --- Helper to add messages sequentially with delay and loading ---
   const addAssistantChunksSequentially = useCallback(async (
-    chunks: string[],
-    initialLoaderId: string // Accept the ID of the loader to remove first
-    ) => {
-      setMessages((prev) => prev.filter((msg) => msg.id !== initialLoaderId));
+    responseContent: string,
+    initialLoaderId: string,
+    messageSessionId: string,
+    messageConversationId: string
+  ) => {
+    setMessages((prev) => prev.filter((msg) => msg.id !== initialLoaderId));
 
-      const assistantMessages: Message[] = chunks.map(chunk => ({
-        id: uuidv4(),
-        role: 'assistant',
-        content: chunk,
-        timestamp: new Date(), // Consistent timestamp for the logical response
-        isLoading: false,
-      }));
+    const chunks = splitLongMessage(responseContent, MAX_CHUNK_LENGTH);
+    const baseTimestamp = new Date(); // Use a single base timestamp for all chunks of a response
+    const assistantMessages: Message[] = chunks.map(chunkContent  => ({
+      id: uuidv4(),
+      role: 'assistant' as const,
+      content: chunkContent,
+      timestamp: baseTimestamp,
+      isLoading: false,
+      session_id: messageSessionId,
+      conversation_id: messageConversationId,
+      created_at: baseTimestamp.toISOString(),
+      updated_at: baseTimestamp.toISOString(),
+    }));
 
-      for (let i = 0; i < assistantMessages.length; i++) {
-        const currentChunkMessage = assistantMessages[i];
+    // Add each chunk to the messages state sequentially
+    for (let i = 0; i < assistantMessages.length; i++) {
+      const currentChunkMessage = assistantMessages[i];
+      setMessages((prev) => [...prev, currentChunkMessage]);
 
-        // Add the current actual chunk
-        setMessages((prev) => [...prev, currentChunkMessage]);
-
-        // If this isn't the last chunk, calculate delay, show loader, wait, remove loader
-        if (i < assistantMessages.length - 1) {
-          const wordCount = countWords(currentChunkMessage.content);
-          const delay = calculateReadTimeMs(wordCount, 180, MESSAGE_DELAY_MS); // 180 WPM, adjust as needed
-          const chunkLoaderId = `chunk-loader-${i}`; // Unique ID for this specific pause
-
-          setMessages((prev) => [
-            ...prev,
-            { id: chunkLoaderId, role: 'assistant', content: '', timestamp: new Date(), isLoading: true }
-          ]);
-
-          // Wait
-          await new Promise(resolve => setTimeout(resolve, delay));
-
-          setMessages((prev) => prev.filter((msg) => msg.id !== chunkLoaderId));
-        }
+      if (i < assistantMessages.length - 1) {
+        const wordCount = countWords(currentChunkMessage.content);
+        const delay = calculateReadTimeMs(wordCount, 180, MESSAGE_DELAY_MS);
+        const chunkLoaderId = `chunk-loader-${i}`;
+        setMessages((prev) => [
+          ...prev,
+          {
+            id: chunkLoaderId,
+            role: 'assistant' as const,
+            content: '',
+            timestamp: new Date(),
+            isLoading: true,
+            session_id: messageSessionId,
+            conversation_id: messageConversationId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          }
+        ]);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        setMessages((prev) => prev.filter((msg) => msg.id !== chunkLoaderId));
       }
+    }
   }, []);
 
+
   // --- API Call Logic ---
-  const processMessage = useCallback(async (
-    payload: Omit<ChatRequestPayload, 'google_sub' | 'session_id'> // Omit fields we'll add
-  ) => {
+  const processApiCall = useCallback(async (params: ProcessApiCallParams) => {
     if (!session?.user?.id) {
-        toast.error("Autentikasi gagal. Silakan login kembali.");
-        setError("User not authenticated");
-        return;
+      toast.error("Autentikasi gagal. Silakan login kembali.");
+      setError("User not authenticated");
+      return;
     }
 
     setIsLoading(true);
     setError(null);
 
-    // Show Initial loading message
+    const conversationIdToUse = params.conversation_id || messages.find(m => m.conversation_id)?.conversation_id || uuidv4();
+
     const initialLoaderId = uuidv4();
-    setMessages((prev) => [
-      ...prev,
-      { id: initialLoaderId, role: 'assistant', content: '', timestamp: new Date(), isLoading: true },
-    ]);
+    const loaderMessage: Message = { // Explicitly type loader message
+      id: initialLoaderId,
+      role: 'assistant' as const,
+      content: '',
+      timestamp: new Date(),
+      isLoading: true,
+      session_id: currentSessionId,
+      conversation_id: conversationIdToUse,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+    setMessages((prev) => [...prev, loaderMessage]);
 
     const fullPayload: ChatRequestPayload = {
-        ...payload,
-        google_sub: session.user.id, // Get sub from session
-        session_id: sessionId,
-        system_prompt: DEFAULT_SYSTEM_PROMPT, // Include default system prompt
+      message: params.messageContent,
+      event: params.event,
+      history: params.history,
+      google_sub: session.user.id,
+      session_id: currentSessionId, // from hook state
+      conversation_id: conversationIdToUse, // from params
+      system_prompt: DEFAULT_SYSTEM_PROMPT,
     };
 
     try {
-      console.log("Sending payload to backend:", JSON.stringify(fullPayload, null, 2)); // Log payload
-      const data: ChatResponsePayload = await sendApiMessage(fullPayload);
-      console.log("Received response from backend:", JSON.stringify(data, null, 2)); // Log response
+      console.log("Sending payload to backend:", JSON.stringify(fullPayload, null, 2));
+      const data: ChatResponsePayload = await apiClient.post<ChatResponsePayload>('/chat', fullPayload).then(res => res.data);
+      console.log("Received response from backend:", JSON.stringify(data, null, 2));
+
+      // Use data.response directly as it's a string
+      await addAssistantChunksSequentially(
+        data.response, // This is the string content
+        initialLoaderId,
+        currentSessionId, // Use session ID from the request context
+        conversationIdToUse // Use conversation ID from the request context
+      );
       
-      // Split the response into chunks if it's too long
-      const responseChunks = splitLongMessage(data.response, MAX_CHUNK_LENGTH);
-      // Call the sequential display helper
-      await addAssistantChunksSequentially(responseChunks, initialLoaderId);
+      // --- CHECK FOR MODULE COMPLETION ---
+      if (data.module_completed_id && data.module_completed_id === currentMode.replace('module:', '')) {
+        toast.success(`Modul "${UPDATED_AVAILABLE_MODULES.find(m => m.id === data.module_completed_id)?.name || data.module_completed_id}" selesai.`);
+        setCurrentMode('standard');
+        // Optionally add a system message confirming mode change
+        const systemMsg: Message = {
+            id: uuidv4(),
+            role: 'system',
+            content: `Kamu kembali ke mode percakapan standar.`,
+            timestamp: new Date(),
+            session_id: currentSessionId,
+            conversation_id: conversationIdToUse,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+        };
+        setMessages(prev => [...prev, systemMsg]);
+      }
+
     } catch (err: unknown) {
       console.error("API Error:", err);
-      let errorMessage: string;
+      let errorMessageText: string;
       if (err instanceof Error) {
-        errorMessage = err.message;
+        errorMessageText = err.message;
       } else if (typeof err === 'string') {
-        errorMessage = err;
+        errorMessageText = err;
       } else {
-        errorMessage = "Gagal menghubungi Aika. Terjadi kesalahan tidak dikenal.";
+        errorMessageText = "Gagal menghubungi Aika. Terjadi kesalahan tidak dikenal.";
       }
-      toast.error(errorMessage);
-      setError(errorMessage);
-      setMessages((prev) => prev.filter((msg) => msg.id !== initialLoaderId));
+      toast.error(errorMessageText);
+      setError(errorMessageText);
+      
+      setMessages((prev) => prev.map(msg => {
+        if (msg.id === initialLoaderId) {
+          const errorMsgContent = `Error: ${errorMessageText}`;
+          // Return a complete Message object for the error
+          return {
+            ...msg, // Spread existing relevant fields like id, session_id, conversation_id
+            role: 'system' as const, // Correctly typed role
+            content: errorMsgContent,
+            isLoading: false,
+            timestamp: new Date(), // Update timestamp for the error
+            created_at: msg.created_at, // Keep original creation for loader, or update
+            updated_at: new Date().toISOString(), // Update modification time
+            // Ensure all required Message fields are present
+            feedback_id: undefined,
+            annotations: undefined,
+            run_id: undefined,
+            metadata: undefined,
+            user_id: undefined,
+          };
+        }
+        return msg;
+      }));
     } finally {
       setIsLoading(false);
     }
-  }, [session, sessionId, addAssistantChunksSequentially]); // Add sessionId dependency
+  }, [session, currentSessionId, messages, addAssistantChunksSequentially, currentMode]);
 
-  // --- Send User Message ---
+  // --- Send Message Logic ---
+  // Function to handle sending a message
   const handleSendMessage = useCallback(async () => {
     const userMessageContent = inputValue.trim();
     if (!userMessageContent || isLoading) return;
 
+    const activeConversationId = messages.find(m => m.conversation_id)?.conversation_id || uuidv4();
+
     const newUserMessage: Message = {
       id: uuidv4(),
-      role: 'user',
+      role: 'user' as const,
       content: userMessageContent,
       timestamp: new Date(),
+      session_id: currentSessionId,
+      conversation_id: activeConversationId,
+      user_id: session?.user?.id,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
-    // Add user message *before* clearing input and calling API
-    // Add it to a temporary state that includes the new message for history calculation
     const messagesWithUser = [...messages, newUserMessage];
     setMessages(messagesWithUser);
-    setInputValue(''); // Clear input now
+    setInputValue('');
 
-    const historyForApi: ApiMessage[] = messagesWithUser // Use the state *with* the new user message
-      .filter(msg => msg.role !== 'system')
-      .map((msg) => ({ role: msg.role, content: msg.content }));
+    const historyForApi: ApiMessage[] = messagesWithUser
+      .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+      .slice(-10)
+      .map((msg) => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
 
-    // processMessage will handle setting isLoading true/false and adding assistant messages
-    await processMessage({ message: userMessageContent, history: historyForApi });
-
-  }, [inputValue, isLoading, messages, processMessage]); // Dependencies updated
+    await processApiCall({
+        messageContent: userMessageContent, // Pass content as string
+        history: historyForApi,
+        conversation_id: activeConversationId
+    });
+  }, [inputValue, isLoading, messages, processApiCall, session, currentSessionId]);
 
   // --- Start a Module ---
   const handleStartModule = useCallback(async (moduleId: string) => {
     if (isLoading) return;
 
-    // You might want an introductory message before the module starts
+    const activeConversationId = messages.find(m => m.conversation_id)?.conversation_id || uuidv4();
+
+    const systemMessageContent = `Memulai modul: ${UPDATED_AVAILABLE_MODULES.find(m => m.id === moduleId)?.name || moduleId}...`;
     const systemMessage: Message = {
-        id: uuidv4(),
-        role: 'system',
-        content: `Memulai modul: ${AVAILABLE_MODULES.find(m => m.id === moduleId)?.name || moduleId}...`,
-        timestamp: new Date(),
+      id: uuidv4(),
+      role: 'system' as const,
+      content: systemMessageContent,
+      timestamp: new Date(),
+      session_id: currentSessionId,
+      conversation_id: activeConversationId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
     };
 
-    // Add system message before calling API
     const messagesWithSystem = [...messages, systemMessage];
     setMessages(messagesWithSystem);
     setCurrentMode(`module:${moduleId}`);
 
-    const historyForApi: ApiMessage[] = messagesWithSystem // Use state including system message to find previous history
-       .filter(msg => msg.role !== 'system') // Still filter system for API call
-       .map((msg) => ({ role: msg.role, content: msg.content }));
+    const historyForApi: ApiMessage[] = messagesWithSystem
+      .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+      .slice(-10)
+      .map((msg) => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
+    
+    const eventPayload: ChatEventPayload = { type: 'start_module', module_id: moduleId };
 
-     await processMessage({
-         event: { type: 'start_module', module_id: moduleId },
-         history: historyForApi.length > 0 ? historyForApi : undefined,
-     });
-  }, [isLoading, messages, processMessage]);
+    await processApiCall({
+      event: eventPayload,
+      history: historyForApi.length > 0 ? historyForApi : undefined,
+      conversation_id: activeConversationId
+    });
+  }, [isLoading, messages, processApiCall, currentSessionId]);
+
 
 
   // --- Input Change Handler ---
@@ -341,11 +446,11 @@ export function useChat() {
     isLoading,
     error,
     currentMode,
-    availableModules: AVAILABLE_MODULES, // Expose modules
+    availableModules: UPDATED_AVAILABLE_MODULES, // Expose the updated list
     chatContainerRef,
     handleInputChange,
     handleSendMessage,
     handleStartModule,
-    // sessionId, // Expose if needed
+    // currentSessionId, // Expose if needed elsewhere
   };
 }

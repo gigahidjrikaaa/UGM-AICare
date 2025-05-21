@@ -11,7 +11,7 @@ load_dotenv()
 # --- Redis Configuration ---
 REDIS_HOST = os.getenv("REDIS_URL")
 REDIS_PORT = os.getenv("REDIS_PORT")
-REDIS_DB = os.getenv("REDIS_DB", 0)
+REDIS_DB = os.getenv("REDIS_DB", "0")
 REDIS_USERNAME = os.getenv("REDIS_USERNAME", "default")
 REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
 
@@ -49,8 +49,8 @@ async def get_redis_client() -> redis.Redis:
             logger.info(f"Initializing Redis connection pool: host={REDIS_HOST}, port={REDIS_PORT}, db={REDIS_DB}")
             redis_pool = redis.ConnectionPool(
                 host=REDIS_HOST,
-                port=REDIS_PORT,
-                db=REDIS_DB,
+                port=int(REDIS_PORT), # Ensure port is integer
+                db=int(REDIS_DB),     # Ensure DB is integer
                 username=REDIS_USERNAME,
                 password=REDIS_PASSWORD,
                 decode_responses=True # Decode responses to strings automatically
@@ -75,7 +75,7 @@ def _get_module_state_key(session_id: str) -> str:
 
 # --- Guided Module State Functions ---
 
-async def set_module_state(session_id: str, module_id: str, step: int):
+async def set_module_state(session_id: str, module_id: str, step: int, module_data: Dict[str, Any]):
     """
     Stores the current guided module state (module ID and step) in Redis for a session.
     Sets an expiration time for the key.
@@ -94,11 +94,11 @@ async def set_module_state(session_id: str, module_id: str, step: int):
         return
 
     key = _get_module_state_key(session_id)
-    state_data = {"module": module_id, "step": step}
+    state_to_store = {"module_id": module_id, "step_id": step, "data": module_data}
 
     try:
         client = await get_redis_client()
-        json_state = json.dumps(state_data)
+        json_state = json.dumps(state_to_store)
         await client.set(key, json_state, ex=MODULE_STATE_EXPIRY_SECONDS)
         logger.info(f"Redis SET: Key='{key}', Value='{json_state}', EX='{MODULE_STATE_EXPIRY_SECONDS}'")
     except ConnectionError:
@@ -135,12 +135,14 @@ async def get_module_state(session_id: str) -> Optional[Dict[str, Any]]:
             logger.debug(f"Redis GET Success: Key='{key}', Value='{json_state}'")
             try:
                 state_data = json.loads(json_state)
-                # Basic validation
-                if isinstance(state_data, dict) and 'module' in state_data and 'step' in state_data:
+                # --- VALIDATE and return all parts, including data ---
+                if (isinstance(state_data, dict) and
+                        'module_id' in state_data and
+                        'step_id' in state_data and
+                        'data' in state_data and isinstance(state_data['data'], dict)): # Ensure 'data' is a dict
                      return state_data
                 else:
-                     logger.warning(f"Redis GET: Invalid JSON structure found for key '{key}': {json_state}")
-                     # Optionally delete the invalid key here: await client.delete(key)
+                     logger.warning(f"Redis GET: Invalid JSON structure for module state key '{key}': {json_state}")
                      return None
             except json.JSONDecodeError:
                 logger.error(f"Redis GET: Failed to decode JSON for key '{key}': {json_state}", exc_info=True)

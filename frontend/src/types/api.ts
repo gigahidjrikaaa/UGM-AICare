@@ -37,6 +37,7 @@ export interface ApiMessage {
     // Add other potential fields backend might send based on mode
     module_state?: { module: string; step: number }; // Example if backend sends state
     suggestions?: ChatModule[]; // Example if backend sends suggestions
+    module_completed_id?: string;
   }
   
   // Define a basic structure for ChatModule, adjust as needed based on backend

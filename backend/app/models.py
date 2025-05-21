@@ -33,6 +33,8 @@ class Conversation(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False) # Link to User table's primary key
     session_id = Column(String, index=True, nullable=False) # Add session identifier
+
+    conversation_id = Column(String, index=True, nullable=False) 
     message = Column(Text, nullable=False) # User's message
     response = Column(Text, nullable=False) # Chatbot's response
     timestamp = Column(DateTime, default=datetime.now, nullable=False) # Ensure timestamp is always set

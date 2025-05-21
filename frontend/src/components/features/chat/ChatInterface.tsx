@@ -13,7 +13,7 @@ export default function ChatInterface() {
     messages,
     inputValue,
     isLoading,
-    // error, // You can display this error if needed
+    error, // You can display this error if needed
     currentMode,
     availableModules,
     chatContainerRef,
@@ -44,7 +44,7 @@ export default function ChatInterface() {
         availableModules={availableModules}
       />
       {/* Optional: Display general errors here */}
-      {/* {error && <div className="p-2 text-center text-red-500 text-xs">{error}</div>} */}
+      {error && <div className="p-2 text-center text-red-500 text-xs">{error}</div>}
     </div>
   );
 }

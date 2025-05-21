@@ -3,7 +3,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/TextArea'; // Corrected casing
 import { SendHorizonal, BrainCircuit, X } from 'lucide-react'; // Using lucide-react icons
-import { ChatMode, ChatModule } from '@/types/chat';
+import { ChatMode, AvailableModule as ChatModule } from '@/types/chat';
 import { cn } from '@/lib/utils';
 
 interface ChatInputProps {
@@ -27,6 +27,7 @@ export function ChatInput({
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showModules, setShowModules] = useState(false);
+  const prevIsLoadingRef = useRef<boolean>(isLoading);
 
   const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (event.key === 'Enter' && !event.shiftKey && !isLoading) {
@@ -45,6 +46,14 @@ export function ChatInput({
     }
   }, [inputValue]);
 
+  useEffect(() => {
+    // If previously loading and now not loading, and input is empty (message sent and cleared)
+    if (prevIsLoadingRef.current && !isLoading && !inputValue && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+    // Update the ref to the current isLoading state for the next render
+    prevIsLoadingRef.current = isLoading;
+  }, [isLoading, inputValue]);
 
   const handleModuleClick = (moduleId: string) => {
       onStartModule(moduleId);
