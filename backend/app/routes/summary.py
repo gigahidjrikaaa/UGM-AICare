@@ -62,17 +62,34 @@ async def get_activity_summary(
         # Fetch all-time activity dates for streak calculation
         all_journal_dates_query = db.query(func.distinct(JournalEntry.entry_date))\
             .filter(JournalEntry.user_id == current_user.id, JournalEntry.entry_date.isnot(None))
-        all_journal_dates: Set[date] = {r[0] for r in all_journal_dates_query.all()}
+        all_journal_dates: Set[date] = set()
+        for r in all_journal_dates_query.all():
+            if isinstance(r[0], str):
+                try:
+                    all_journal_dates.add(datetime.strptime(r[0], "%Y-%m-%d").date())
+                except ValueError:
+                    logger.warning(f"Skipping invalid date string from journal_entries: {r[0]}")
+            elif isinstance(r[0], date):
+                all_journal_dates.add(r[0])
 
         all_conv_timestamps_query = db.query(func.distinct(func.date(Conversation.timestamp)))\
             .filter(Conversation.user_id == current_user.id, Conversation.timestamp.isnot(None))
-        all_conv_dates: Set[date] = {r[0] for r in all_conv_timestamps_query.all()}
+        all_conv_dates: Set[date] = set()
+        for r in all_conv_timestamps_query.all():
+            if isinstance(r[0], str): # Should ideally be a date object due to func.date()
+                try:
+                    all_conv_dates.add(datetime.strptime(r[0], "%Y-%m-%d").date())
+                except ValueError:
+                     logger.warning(f"Skipping invalid date string from conversation timestamps: {r[0]}")
+            elif isinstance(r[0], date):
+                all_conv_dates.add(r[0])
+
 
         all_activity_dates_ever = all_journal_dates.union(all_conv_dates)
 
         # Filter for the requested month (for the summary response)
-        journal_dates_this_month = {d for d in all_journal_dates if start_date <= d <= end_date_of_month}
-        conv_dates_this_month = {d for d in all_conv_dates if start_date <= d <= end_date_of_month}
+        journal_dates_this_month = {d for d in all_journal_dates if isinstance(d, date) and start_date <= d <= end_date_of_month}
+        conv_dates_this_month = {d for d in all_conv_dates if isinstance(d, date) and start_date <= d <= end_date_of_month}
         all_activity_dates_this_month = journal_dates_this_month.union(conv_dates_this_month)
 
         # Streak Calculation
