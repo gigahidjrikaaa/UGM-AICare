@@ -3,155 +3,193 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '@/services/api'; // Use your configured client
-import { format } from 'date-fns';
-import { motion, AnimatePresence } from 'framer-motion';
-import { FiSave, FiLoader, FiXCircle } from 'react-icons/fi';
-
-interface JournalEntryData {
-    id?: number;
-    entry_date: string; // yyyy-MM-dd
-    content: string;
-    created_at?: string;
-    updated_at?: string;
-}
+import { format, parseISO } from 'date-fns';
+import { Dialog } from '@headlessui/react';
+import { FiSave, FiLoader, FiX, FiMessageSquare, FiChevronDown } from 'react-icons/fi';
+import type { JournalPromptResponse, JournalEntryItem } from '@/types/api'; // Import new types
+import { getActiveJournalPrompts, saveJournalEntry } from '@/services/api'; // Import new service
+import { toast } from 'react-hot-toast';
 
 interface JournalEntryModalProps {
     isOpen: boolean;
     onClose: () => void;
-    onSaveSuccess: () => void; // Callback to trigger refresh in parent
+    onSaveSuccess: () => void;
+    initialDate?: string; // YYYY-MM-DD, defaults to today
 }
 
-export default function JournalEntryModal({ isOpen, onClose, onSaveSuccess }: JournalEntryModalProps) {
-    const todayDateStr = format(new Date(), 'yyyy-MM-dd');
-    const [entryContent, setEntryContent] = useState<string>('');
-    const [isLoading, setIsLoading] = useState(false); // Loading state for fetching/saving
+export default function JournalEntryModal({
+    isOpen,
+    onClose,
+    onSaveSuccess,
+    initialDate,
+}: JournalEntryModalProps) {
+    const [entryDate, setEntryDate] = useState(initialDate || format(new Date(), 'yyyy-MM-dd'));
+    const [content, setContent] = useState('');
+    const [isLoading, setIsLoading] = useState(false);
+    const [isFetchingEntry, setIsFetchingEntry] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [isFetching, setIsFetching] = useState(false); // Separate loading state for initial fetch
 
-    // Fetch today's entry when the modal opens
-    const fetchTodaysEntry = useCallback(async () => {
-        if (!isOpen) return; // Don't fetch if modal is closed
+    const [prompts, setPrompts] = useState<JournalPromptResponse[]>([]);
+    const [selectedPromptId, setSelectedPromptId] = useState<number | null>(null);
+    const [isFetchingPrompts, setIsFetchingPrompts] = useState(false);
 
-        setIsFetching(true);
+    const fetchEntryForDate = useCallback(async (dateToFetch: string) => {
+        setIsFetchingEntry(true);
         setError(null);
-        setEntryContent(''); // Reset content
         try {
-            // Use relative path with apiClient
-            const response = await apiClient.get<JournalEntryData>(`/journal/${todayDateStr}`);
-            setEntryContent(response.data.content); // Set content if entry exists
-            console.log("Fetched today's entry:", response.data);
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (err: any) {
-            if (err.response?.status === 404) {
-                // No entry for today yet, fine to start blank
-                console.log("No journal entry found for today yet.");
+            const response = await apiClient.get<JournalEntryItem>(`/journal/${dateToFetch}`);
+            setContent(response.data.content);
+            setSelectedPromptId(response.data.prompt?.id || null); // Set selected prompt if entry exists
+        } catch (err: unknown) { 
+            const error = err as { response?: { status?: number } }; // Type assertion for error structure
+            if (error.response?.status === 404) {
+                setContent(''); // No entry for this date, clear content
+                setSelectedPromptId(null); // Clear selected prompt
             } else {
-                console.error("Error fetching today's journal entry:", err);
-                setError("Failed to load today's journal entry data.");
+                console.error("Error fetching journal entry:", err);
+                setError("Failed to load existing entry.");
             }
         } finally {
-            setIsFetching(false);
+            setIsFetchingEntry(false);
         }
-    }, [isOpen, todayDateStr]); // Dependency: isOpen, todayDateStr
+    }, []);
+
+    const fetchPrompts = useCallback(async () => {
+        setIsFetchingPrompts(true);
+        try {
+            const fetchedPrompts = await getActiveJournalPrompts();
+            setPrompts(fetchedPrompts);
+        } catch (err) {
+            console.error("Error fetching prompts:", err);
+            toast.error("Could not load journal prompts.");
+        } finally {
+            setIsFetchingPrompts(false);
+        }
+    }, []);
 
     useEffect(() => {
-        fetchTodaysEntry();
-    }, [fetchTodaysEntry]); // Run fetch when modal opens
+        if (isOpen) {
+            const dateToUse = initialDate || format(new Date(), 'yyyy-MM-dd');
+            setEntryDate(dateToUse);
+            fetchEntryForDate(dateToUse);
+            if (prompts.length === 0) { // Fetch prompts if not already fetched
+                fetchPrompts();
+            }
+        } else {
+            // Reset state when modal closes
+            setContent('');
+            setSelectedPromptId(null);
+            setError(null);
+        }
+    }, [isOpen, initialDate, fetchEntryForDate, fetchPrompts, prompts.length]);
 
-    // Handle saving (Create or Update for Today)
     const handleSave = async () => {
-        if (!entryContent.trim()) {
-            setError("Journal entry cannot be empty.");
+        if (!content.trim()) {
+            setError("Journal content cannot be empty.");
             return;
         }
         setIsLoading(true);
         setError(null);
         try {
-            const payload = {
-                entry_date: todayDateStr, // Always use today's date
-                content: entryContent.trim(),
-            };
-            console.log("Saving today's journal payload:", JSON.stringify(payload, null, 2));
-            // POST endpoint handles both create and update based on date+user
-            await apiClient.post<JournalEntryData>('/journal/', payload); // Use relative path
-            onSaveSuccess(); // Trigger parent refresh
-            onClose(); // Close modal on success
-        } catch (err) {
-            console.error("Error saving today's journal entry:", err);
-            setError("Failed to save journal entry.");
+            await saveJournalEntry({
+                entry_date: entryDate,
+                content,
+                prompt_id: selectedPromptId,
+            });
+            toast.success('Journal entry saved!');
+            onSaveSuccess();
+        } catch (err: unknown) {
+            console.error("Error saving journal entry:", err);
+            const errorMessage = err instanceof Error ? err.message : "Failed to save entry. Please try again.";
+            setError(errorMessage);
+            toast.error(errorMessage);
         } finally {
             setIsLoading(false);
         }
     };
 
+    const selectedPromptText = prompts.find(p => p.id === selectedPromptId)?.text;
+
     return (
-        <AnimatePresence>
-            {isOpen && (
-                <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    exit={{ opacity: 0 }}
-                    className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4"
-                    onClick={onClose} // Close on backdrop click
-                >
-                    {/* Modal Content Box */}
-                    <motion.div
-                        initial={{ opacity: 0, scale: 0.9 }}
-                        animate={{ opacity: 1, scale: 1 }}
-                        exit={{ opacity: 0, scale: 0.9 }}
-                        transition={{ duration: 0.2 }}
-                        className="bg-gradient-to-br from-gray-800 via-gray-900 to-black text-white rounded-xl shadow-2xl w-full max-w-lg border border-gray-700 overflow-hidden"
-                        onClick={(e) => e.stopPropagation()} // Prevent closing when clicking inside
-                    >
-                        {/* Modal Header */}
-                        <div className="flex justify-between items-center p-4 border-b border-gray-700">
-                            <h2 className="text-lg font-semibold text-[#FFCA40]">
-                                Journal Entry for {format(new Date(), 'MMMM d, yyyy')}
-                            </h2>
-                            <button onClick={onClose} className="text-gray-500 hover:text-white transition-colors" aria-label="Close modal">
-                                <FiXCircle size={20} />
-                            </button>
-                        </div>
+        <Dialog open={isOpen} onClose={onClose} className="relative z-50">
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" aria-hidden="true" />
+            <div className="fixed inset-0 flex w-screen items-center justify-center p-4">
+                <Dialog.Panel className="w-full max-w-lg rounded-xl bg-[#0a2a6e]/80 border border-white/20 p-6 shadow-2xl text-white">
+                    <Dialog.Title className="text-lg font-semibold text-[#FFCA40] flex justify-between items-center">
+                        Journal Entry for {format(parseISO(entryDate), 'MMMM d, yyyy')}
+                        <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label="Close modal">
+                            <FiX size={20} />
+                        </button>
+                    </Dialog.Title>
+                    <Dialog.Description className="mt-1 text-sm text-gray-300 mb-4">
+                        {isFetchingEntry ? "Loading entry..." : "Reflect on your day or use a prompt to guide your thoughts."}
+                    </Dialog.Description>
 
-                        {/* Modal Body */}
-                        <div className="p-4 sm:p-6">
-                            {isFetching ? (
-                                <div className="text-center py-10"><FiLoader className="animate-spin inline-block mr-2"/>Loading...</div>
-                            ) : error ? (
-                                <div className="text-center py-10 text-red-400">{error}</div>
-                            ) : (
-                                <textarea
-                                    value={entryContent}
-                                    onChange={(e) => setEntryContent(e.target.value)}
-                                    placeholder="What's on your mind today?"
-                                    className="w-full h-48 sm:h-64 p-3 bg-gray-700 border border-gray-600 rounded-lg focus:outline-none focus:border-[#FFCA40] focus:ring-1 focus:ring-[#FFCA40] transition text-white mb-4"
-                                    disabled={isLoading}
-                                />
-                            )}
+                    {/* Prompt Selection */}
+                    <div className="mb-4">
+                        <label htmlFor="journal-prompt" className="block text-sm font-medium text-gray-300 mb-1">
+                            Choose a Prompt (Optional)
+                        </label>
+                        <div className="relative">
+                            <select
+                                id="journal-prompt"
+                                value={selectedPromptId || ""}
+                                onChange={(e) => setSelectedPromptId(e.target.value ? parseInt(e.target.value) : null)}
+                                disabled={isFetchingPrompts || isFetchingEntry}
+                                className="w-full bg-white/10 border border-white/20 rounded-md py-2 px-3 text-white focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] appearance-none"
+                            >
+                                <option value="">-- Write freely --</option>
+                                {isFetchingPrompts && <option disabled>Loading prompts...</option>}
+                                {prompts.map(prompt => (
+                                    <option key={prompt.id} value={prompt.id}>
+                                        {prompt.category ? `[${prompt.category}] ` : ''}{prompt.text.substring(0, 70)}{prompt.text.length > 70 ? '...' : ''}
+                                    </option>
+                                ))}
+                            </select>
+                            <FiChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
                         </div>
+                        {selectedPromptText && (
+                            <div className="mt-2 p-3 bg-white/5 rounded-md border border-white/10">
+                                <p className="text-sm text-gray-300 italic">
+                                    <FiMessageSquare className="inline mr-2 mb-0.5 text-[#FFCA40]" />
+                                    {selectedPromptText}
+                                </p>
+                            </div>
+                        )}
+                    </div>
 
-                        {/* Modal Footer */}
-                        <div className="flex justify-end p-4 bg-gray-900/50 border-t border-gray-700 space-x-3">
-                             {error && !isLoading && <p className="text-red-400 text-sm mr-auto">{error}</p>}
-                            <button
-                                onClick={onClose}
-                                type="button"
-                                className="px-4 py-2 bg-gray-600 hover:bg-gray-500 rounded-lg transition text-sm font-medium disabled:opacity-50"
-                                disabled={isLoading}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleSave}
-                                disabled={isLoading || isFetching || !entryContent.trim()}
-                                className="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-white font-medium flex items-center disabled:opacity-50"
-                            >
-                                <FiSave className="mr-1.5"/> {isLoading ? "Saving..." : "Save Entry"}
-                            </button>
-                        </div>
-                    </motion.div>
-                </motion.div>
-            )}
-        </AnimatePresence>
+                    <textarea
+                        rows={8}
+                        value={content}
+                        onChange={(e) => setContent(e.target.value)}
+                        placeholder={selectedPromptId ? "Respond to the prompt above..." : "What's on your mind today?"}
+                        className="w-full bg-white/10 border border-white/20 rounded-md p-3 text-gray-200 focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] placeholder-gray-500"
+                        disabled={isFetchingEntry || isLoading}
+                    />
+
+                    {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
+
+                    <div className="mt-6 flex justify-end space-x-3">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            disabled={isLoading}
+                            className="px-4 py-2 text-sm font-medium text-gray-300 hover:bg-white/10 rounded-md transition"
+                        >
+                            Cancel
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleSave}
+                            disabled={isLoading || isFetchingEntry}
+                            className="px-4 py-2 text-sm font-medium bg-blue-600 hover:bg-blue-500 text-white rounded-md flex items-center justify-center transition disabled:opacity-50"
+                        >
+                            {isLoading ? <FiLoader className="animate-spin mr-2" /> : <FiSave className="mr-2" />}
+                            Save Entry
+                        </button>
+                    </div>
+                </Dialog.Panel>
+            </div>
+        </Dialog>
     );
 }
