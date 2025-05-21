@@ -108,13 +108,13 @@ export default function JournalingPage() {
                         
                         <div className="mt-3 space-y-1.5">
                             <p className="text-sm text-gray-300">
-                                <span className="font-semibold text-green-400">📝 Journal Entries:</span> You've written on {Object.values(activityData).filter(d => d.hasJournal).length} days this month.
+                                <span className="font-semibold text-green-400">📝 Journal Entries:</span> You&apos;ve written on {Object.values(activityData).filter(d => d.hasJournal).length} days this month.
                             </p>
                             <p className="text-sm text-gray-300">
-                                <span className="font-semibold text-sky-400">💬 AI Conversations:</span> You've chatted on {Object.values(activityData).filter(d => d.hasConversation).length} days this month.
+                                <span className="font-semibold text-sky-400">💬 AI Conversations:</span> You&apos;ve chatted on {Object.values(activityData).filter(d => d.hasConversation).length} days this month.
                             </p>
                             <p className="text-sm text-gray-300">
-                                <span className="font-semibold text-purple-400">🌟 Both Activities:</span> You've done both on {Object.values(activityData).filter(d => d.hasJournal && d.hasConversation).length} days this month.
+                                <span className="font-semibold text-purple-400">🌟 Both Activities:</span> You&apos;ve done both on {Object.values(activityData).filter(d => d.hasJournal && d.hasConversation).length} days this month.
                             </p>
                         </div>
                     </div>
