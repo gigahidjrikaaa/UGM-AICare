@@ -33,7 +33,7 @@ user_data_router = APIRouter(
 # --- API Endpoint ---
 @activity_router.get("/", response_model=ActivitySummaryResponse)
 async def get_activity_summary(
-    month_query: str = Query(..., regex=r"^\d{4}-\d{2}$", description="Month in YYYY-MM format"),
+    month_query: str = Query(..., alias="month", regex=r"^\d{4}-\d{2}$", description="Month in YYYY-MM format"),
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
