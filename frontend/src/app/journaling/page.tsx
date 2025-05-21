@@ -68,67 +68,99 @@ export default function JournalingPage() {
     }, [currentMonth, fetchActivityData]);
 
     return (
-        <div className="flex flex-col h-screen bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white">
-            <header className="p-4 border-b border-white/10 bg-[#001D58]/80 backdrop-blur-sm sticky top-0 z-10">
-                <h1 className="text-xl font-bold">Journaling & History</h1>
-            </header>
+        <div className="bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white p-4 md:p-6 flex flex-col flex-1">
+            {/* 
+                Removed the explicit h-screen and overflow handling from the direct children of AppLayout.
+                AppLayout should provide the main scroll container.
+                The p-4 md:p-6 provides padding for the content within the page.
+                flex flex-col flex-1 allows this page to take up available space if AppLayout uses flex.
+            */}
+            
+            <h1 className="text-2xl font-bold mb-4 sm:mb-6"> {/* Adjusted margin */}
+                <span className="text-[#FFCA40]">Aika</span> Journal
+            </h1>
 
-            <div className="flex-1 flex overflow-hidden">
-                <main className="flex-1 overflow-y-auto p-4 md:p-6">
-                    {/* --- Streak Display Component --- */}
-                    {/* Pass loading state to show skeleton */}
-                    <StreakDisplay
-                        currentStreak={currentStreak}
-                        longestStreak={longestStreak}
-                        isLoading={isCalendarLoading}
-                    />
+            <StreakDisplay
+                currentStreak={currentStreak}
+                longestStreak={longestStreak}
+                isLoading={isCalendarLoading}
+            />
 
-                    <div className="max-h-1/2 overflow-y-scroll mb-6">
-                        {/* Calendar Component */}
+            {/* Two-column layout for Calendar and Descriptions */}
+            <div className="flex flex-col md:flex-row gap-4 lg:gap-8 mb-4 sm:mb-6 items-center md:items-start">
+                {/* Left Column: Calendar */}
+                <div className="w-full md:w-1/2 md:flex-shrink-0"> {/* Calendar column takes its content's width on md+ */}
+                    <div className="max-w-full mx-auto md:mx-0"> {/* Ensures calendar is centered on mobile, left-aligned on md+ */}
                         <ActivityCalendar
                             currentMonth={currentMonth}
                             activityData={activityData}
-                            onMonthChange={setCurrentMonth} // Pass setter function
+                            onMonthChange={setCurrentMonth}
                             isLoading={isCalendarLoading}
                         />
-                        {calendarError && <p className='text-red-400 text-sm text-center -mt-4 mb-4'>{calendarError}</p>}
+                        {calendarError && <p className='text-red-400 text-sm text-center -mt-4 mb-2'>{calendarError}</p>}
                     </div>
-                    {/* Tab Navigation */}
-                    <div className="mb-6 border-b border-white/10">
-                        <nav className="flex space-x-4" aria-label="Tabs">
-                            <button
-                                onClick={() => setActiveTab('daily')}
-                                className={`px-3 py-2 font-medium text-sm rounded-t-lg ${
-                                    activeTab === 'daily' ? 'border-b-2 border-[#FFCA40] text-[#FFCA40]' : 'text-gray-400 hover:text-gray-200'
-                                }`}
-                            >
-                                Daily Journal Entries
-                            </button>
-                            <button
-                                onClick={() => setActiveTab('history')}
-                                className={`px-3 py-2 font-medium text-sm rounded-t-lg ${
-                                    activeTab === 'history' ? 'border-b-2 border-[#FFCA40] text-[#FFCA40]' : 'text-gray-400 hover:text-gray-200'
-                                }`}
-                            >
-                                Previous Conversations
-                            </button>
-                        </nav>
-                    </div>
+                </div>
 
-                    {/* Tab Content */}
-                    <Suspense fallback={<AikaPageSkeleton />}>
-                        {activeTab === 'daily' && (
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                <DailyJournal />
-                            </motion.div>
-                        )}
-                        {activeTab === 'history' && (
-                            <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
-                                <ChatHistoryViewer />
-                            </motion.div>
-                        )}
-                    </Suspense>
-                </main>
+                {/* Right Column: Descriptions */}
+                <div className="w-full md:flex-1 text-sm text-gray-300 space-y-2 text-center md:text-left p-2 md:p-0">
+                    {/* md:flex-1 allows this column to take remaining space */}
+                    {/* text-center for mobile, md:text-left for larger screens. Added padding for mobile. */}
+                    <h3 className="text-lg font-semibold text-gray-100 mb-2">Using Your Activity Calendar</h3>
+                    <p>🗓️ <strong>Select a date:</strong> Click any day to write a new journal entry or review past ones.</p>
+                    <p>↔️ <strong>Navigate months:</strong> Use the arrow buttons (‹ ›) next to the month/year to go back or forward in time.</p>
+                    <p>💡 <strong>Activity markers:</strong> Dates with journal entries or AI conversations are highlighted, helping you track your engagement.</p>
+                    <p className="mt-3 text-gray-400">Keep journaling to build your streak and gain deeper insights into your well-being!</p>
+
+                    <div>
+                        {/* Activity Data */}
+                        <p className="text-gray-400 text-sm mt-4">
+                            <span className="text-green-500">📝 Journal</span> - You have journaled on {Object.keys(activityData).length} days this month.
+                        </p>
+                        <p className="text-gray-400 text-sm">
+                            <span className="text-blue-500">💬 Conversations</span> - You have had conversations on {Object.keys(activityData).length} days this month.
+                        </p>
+                        <p className="text-gray-400 text-sm">
+                            <span className="text-purple-500">📝 + 💬</span> - You have both journaled and conversed on {Object.keys(activityData).length} days this month.
+                        </p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="mb-4 sm:mb-6 border-b border-white/10"> {/* Adjusted margin */}
+                <nav className="flex space-x-2 sm:space-x-4" aria-label="Tabs">
+                    <button
+                        onClick={() => setActiveTab('daily')}
+                        className={`px-3 py-2 font-medium text-sm rounded-t-lg transition-colors duration-150 ${
+                            activeTab === 'daily' ? 'border-b-2 border-[#FFCA40] text-[#FFCA40]' : 'text-gray-400 hover:text-gray-200 hover:border-gray-500/50'
+                        }`}
+                    >
+                        Daily Journal Entries
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('history')}
+                        className={`px-3 py-2 font-medium text-sm rounded-t-lg transition-colors duration-150 ${
+                            activeTab === 'history' ? 'border-b-2 border-[#FFCA40] text-[#FFCA40]' : 'text-gray-400 hover:text-gray-200 hover:border-gray-500/50'
+                        }`}
+                    >
+                        Previous Conversations
+                    </button>
+                </nav>
+            </div>
+
+            {/* Tab Content - flex-grow helps it take remaining vertical space if parent is flex-col */}
+            <div className="flex-grow"> 
+                <Suspense fallback={<AikaPageSkeleton />}>
+                    {activeTab === 'daily' && (
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} > {/* Removed h-full */}
+                            <DailyJournal />
+                        </motion.div>
+                    )}
+                    {activeTab === 'history' && (
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} > {/* Removed h-full */}
+                            <ChatHistoryViewer />
+                        </motion.div>
+                    )}
+                </Suspense>
             </div>
         </div>
     );

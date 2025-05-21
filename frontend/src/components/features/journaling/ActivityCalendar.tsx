@@ -56,7 +56,7 @@ export default function ActivityCalendar({
     const getDayClasses = (day: Date): string => {
         const dateStr = format(day, 'yyyy-MM-dd');
         const data = activityData[dateStr];
-        let classes = "text-center py-1 sm:py-1.5 text-xs sm:text-sm rounded aspect-square flex items-center justify-center transition-colors duration-150 relative ";
+        let classes = "text-center py-1 text-xs rounded aspect-square flex flex-col items-center justify-center transition-colors duration-150 relative cursor-default ";
 
         if (!isSameMonth(day, monthStart)) {
             classes += " text-gray-600 hover:bg-gray-700/50"; // Dim days from other months
@@ -137,10 +137,10 @@ export default function ActivityCalendar({
             </div>
 
              {/* Optional Legend */}
-            <div className="flex justify-center space-x-3 mt-3 text-xs text-gray-400">
-                 <span className="flex items-center"><span className="w-2.5 h-2.5 bg-green-600/40 rounded-full mr-1.5"></span> Journal</span>
-                 <span className="flex items-center"><span className="w-2.5 h-2.5 bg-blue-600/40 rounded-full mr-1.5"></span> Chat</span>
-                 <span className="flex items-center"><span className="w-2.5 h-2.5 bg-purple-600/40 rounded-full mr-1.5"></span> Both</span>
+            <div className="flex justify-center space-x-3 mt-3 text-xs">
+                 <span className="flex items-center"><span className="w-2.5 h-2.5 bg-green-600 rounded-full mr-1.5"></span> Journal</span>
+                 <span className="flex items-center"><span className="w-2.5 h-2.5 bg-blue-600 rounded-full mr-1.5"></span> Chat</span>
+                 <span className="flex items-center"><span className="w-2.5 h-2.5 bg-purple-600 rounded-full mr-1.5"></span> Both</span>
              </div>
         </div>
     );
