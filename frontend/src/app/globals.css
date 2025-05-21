@@ -26,6 +26,28 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+@property --angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.animated-yellow-border::before {
+  content: '';
+  position: absolute;
+  z-index: -1; /* Behind the parent's content/background */
+  inset: -2.5px; /* Adjust for border thickness, negative makes it appear outside */
+  border-radius: inherit; /* Match parent's rounded corners */
+  background: conic-gradient(
+    from var(--angle),
+    transparent 0deg,
+    transparent 270deg,    /* Majority transparent */
+    #FFE08C 310deg,        /* Lighter yellow (ugm.gold.light) - head of the comet */
+    #FFCA40 335deg,        /* Main yellow (ugm.gold.DEFAULT) - body of the comet */
+    #FFCA40 360deg         /* End with main yellow */
+  );
+  /* The animation 'animate-border-spin' will be applied via Tailwind class */
+}
 
 /* Markdown content */
 .markdown-content ul {

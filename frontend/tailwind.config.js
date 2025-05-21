@@ -23,6 +23,16 @@ module.exports = {
       fontFamily: {
         sans: ['Inter', 'sans-serif'],
       },
+      animation: {
+        'border-spin': 'borderSpin 3s linear infinite', // Animation utility
+      },
+      keyframes: {
+        borderSpin: {
+          'to': { // '0%' is implicit for the 'from' state
+            '--angle': '360deg',
+          },
+        },
+      },
     },
   },
   plugins: [],

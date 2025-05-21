@@ -190,7 +190,7 @@ export default function EarnedBadgesDisplay() {
                     // Define base classes and conditional classes
                     const baseClasses = "flex flex-col items-center text-center p-2 rounded-lg bg-white/10 transition-all duration-200 group";
                     const lockedClasses = "grayscale opacity-50 cursor-default";
-                    const unlockedClasses = "hover:bg-white/20 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/50";
+                    const unlockedClasses = "hover:bg-white/20 cursor-pointer focus:outline-none focus:ring-2 focus:ring-ugm-gold-light/50 animated-yellow-border animate-border-spin shadow-[0_0_15px_3px_theme(colors.ugm.gold.DEFAULT/0.5)]";
 
                     return (
                         <Tooltip title={tooltipTitle} arrow placement="top" key={badgeId}>
@@ -208,10 +208,10 @@ export default function EarnedBadgesDisplay() {
                                         alt={meta.name}
                                         width={80}
                                         height={80}
-                                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-full mb-1 group-hover:scale-110 transition-transform duration-200 bg-gray-700" // Added bg
+                                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-full mb-1 group-hover:scale-110 transition-transform duration-200 bg-gray-700 z-[1]"
                                         onError={(e) => { e.currentTarget.src = '/badges/badge-placeholder.png'; }}
                                     />
-                                    <span className="text-xs text-gray-200 group-hover:text-[#FFCA40] w-full px-1 flex items-center justify-center gap-1">
+                                    <span className="text-xs text-gray-200 group-hover:text-[#FFCA40] w-full px-1 flex items-center justify-center gap-1 relative z-[1]">
                                         {meta.name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
                                      </span>
                                     <span className="text-xs text-gray-400">{awardedDate}</span>
