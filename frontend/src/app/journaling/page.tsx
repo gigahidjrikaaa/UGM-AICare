@@ -80,12 +80,6 @@ export default function JournalingPage() {
                 <span className="text-[#FFCA40]">Aika</span> Journal
             </h1>
 
-            <StreakDisplay
-                currentStreak={currentStreak}
-                longestStreak={longestStreak}
-                isLoading={isCalendarLoading}
-            />
-
             {/* Two-column layout for Calendar and Descriptions */}
             <div className="flex flex-col md:flex-row gap-4 lg:gap-8 mb-4 sm:mb-6 items-center md:items-start">
                 {/* Left Column: Calendar */}
@@ -103,26 +97,33 @@ export default function JournalingPage() {
 
                 {/* Right Column: Descriptions */}
                 <div className="w-full md:flex-1 text-sm text-gray-300 space-y-2 text-center md:text-left p-2 md:p-0">
-                    {/* md:flex-1 allows this column to take remaining space */}
-                    {/* text-center for mobile, md:text-left for larger screens. Added padding for mobile. */}
-                    <h3 className="text-lg font-semibold text-gray-100 mb-2">Using Your Activity Calendar</h3>
+                    <div className="p-4 bg-slate-700/30 backdrop-blur-md rounded-xl shadow-lg border border-slate-600/50">
+                        <h2 className="text-lg font-semibold text-gray-100 mb-2">Your Activity Summary</h2>
+
+                        <StreakDisplay
+                            currentStreak={currentStreak}
+                            longestStreak={longestStreak}
+                            isLoading={isCalendarLoading}
+                        />
+                        
+                        <div className="mt-3 space-y-1.5">
+                            <p className="text-sm text-gray-300">
+                                <span className="font-semibold text-green-400">📝 Journal Entries:</span> You've written on {Object.values(activityData).filter(d => d.hasJournal).length} days this month.
+                            </p>
+                            <p className="text-sm text-gray-300">
+                                <span className="font-semibold text-sky-400">💬 AI Conversations:</span> You've chatted on {Object.values(activityData).filter(d => d.hasConversation).length} days this month.
+                            </p>
+                            <p className="text-sm text-gray-300">
+                                <span className="font-semibold text-purple-400">🌟 Both Activities:</span> You've done both on {Object.values(activityData).filter(d => d.hasJournal && d.hasConversation).length} days this month.
+                            </p>
+                        </div>
+                    </div>
+
+                    <h3 className="text-lg font-semibold text-gray-100 mt-4 mb-2">Using Your Activity Calendar</h3>
                     <p>🗓️ <strong>Select a date:</strong> Click any day to write a new journal entry or review past ones.</p>
                     <p>↔️ <strong>Navigate months:</strong> Use the arrow buttons (‹ ›) next to the month/year to go back or forward in time.</p>
                     <p>💡 <strong>Activity markers:</strong> Dates with journal entries or AI conversations are highlighted, helping you track your engagement.</p>
                     <p className="mt-3 text-gray-400">Keep journaling to build your streak and gain deeper insights into your well-being!</p>
-
-                    <div>
-                        {/* Activity Data */}
-                        <p className="text-gray-400 text-sm mt-4">
-                            <span className="text-green-500">📝 Journal</span> - You have journaled on {Object.keys(activityData).length} days this month.
-                        </p>
-                        <p className="text-gray-400 text-sm">
-                            <span className="text-blue-500">💬 Conversations</span> - You have had conversations on {Object.keys(activityData).length} days this month.
-                        </p>
-                        <p className="text-gray-400 text-sm">
-                            <span className="text-purple-500">📝 + 💬</span> - You have both journaled and conversed on {Object.keys(activityData).length} days this month.
-                        </p>
-                    </div>
                 </div>
             </div>
 
