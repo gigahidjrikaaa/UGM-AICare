@@ -43,6 +43,8 @@ export default function JournalingPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [selectedDateForModal, setSelectedDateForModal] = useState<string | undefined>(undefined);
 
+    const [dailyJournalRefreshKey, setDailyJournalRefreshKey] = useState(0); // Key to force re-render of DailyJournal component
+
     // Function to fetch activity data
     const fetchActivityData = useCallback(async (monthDate: Date) => {
         setIsCalendarLoading(true); // Set loading true when fetch starts
@@ -80,7 +82,7 @@ export default function JournalingPage() {
     const handleModalSaveSuccess = () => {
         setIsModalOpen(false);
         fetchActivityData(currentMonth); // Refresh calendar data
-        // Potentially also refresh DailyJournal if it's visible and manages its own list
+        setDailyJournalRefreshKey(prevKey => prevKey + 1); // Increment key to trigger DailyJournal refresh
     };
 
     return (
@@ -176,7 +178,7 @@ export default function JournalingPage() {
                 <Suspense fallback={<AikaPageSkeleton />}>
                     {activeTab === 'daily' && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} >
-                            <DailyJournal key={currentMonth.toISOString() + Object.keys(activityData).length} />
+                            <DailyJournal key={`daily-journal-${dailyJournalRefreshKey}`} />
                         </motion.div>
                     )}
                     {activeTab === 'history' && (

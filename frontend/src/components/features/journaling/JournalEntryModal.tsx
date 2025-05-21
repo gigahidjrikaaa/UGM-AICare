@@ -45,9 +45,11 @@ export default function JournalEntryModal({
             if (error.response?.status === 404) {
                 setContent(''); // No entry for this date, clear content
                 setSelectedPromptId(null); // Clear selected prompt
+                toast("Journal is empty. Remember what you felt this day?", { duration: 4000, icon: '🤔' });
             } else {
                 console.error("Error fetching journal entry:", err);
                 setError("Failed to load existing entry.");
+                toast.error("Failed to load existing entry.");
             }
         } finally {
             setIsFetchingEntry(false);
