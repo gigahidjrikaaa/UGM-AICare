@@ -152,3 +152,32 @@ async def sync_user_achievements(
     except Exception as e:
         logger.error(f"Unexpected error syncing achievements for user {current_user.id}: {e}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to sync achievements")
+
+@router.get("/my-badges", response_model=List[EarnedBadgeInfo])
+async def get_my_earned_badges(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Retrieves all badges earned by the current user."""
+    logger.info(f"Fetching earned badges for user {current_user.id}")
+    try:
+        earned_badges = db.query(UserBadge).filter(UserBadge.user_id == current_user.id).order_by(UserBadge.awarded_at.desc()).all()
+        
+        # Convert to Pydantic model, ensuring all required fields are present
+        # The EarnedBadgeInfo schema expects: badge_id, awarded_at, transaction_hash, contract_address
+        response_badges = []
+        for badge in earned_badges:
+            response_badges.append(
+                EarnedBadgeInfo(
+                    badge_id=badge.badge_id,
+                    awarded_at=badge.awarded_at, # This is already a datetime object
+                    transaction_hash=badge.transaction_hash,
+                    contract_address=badge.contract_address
+                )
+            )
+        return response_badges
+    except Exception as e:
+        logger.error(f"Error fetching badges for user {current_user.id}: {e}", exc_info=True)
+        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not retrieve earned badges.")
+    
+    

@@ -53,7 +53,8 @@ export default function EarnedBadgesDisplay() {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await apiClient.get<EarnedBadge[]>('/activity-summary/my-badges');
+            const response = await apiClient.get<EarnedBadge[]>('/profile/my-badges');
+            
             setEarnedBadges(response.data);
             setEarnedBadgeIds(new Set(response.data.map(badge => badge.badge_id)));
         } catch (err) {
