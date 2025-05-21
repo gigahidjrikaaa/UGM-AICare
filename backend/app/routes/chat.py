@@ -422,12 +422,20 @@ async def summarize_and_save(user_id: int, session_id_to_summarize: str, db_sess
 
         # 3. Create the summarization prompt
         # --- Using your improved prompt ---
-        summarization_prompt = f"""Please summarize the key points, user's expressed feelings, and main topics discussed in the following conversation history. Focus on aspects relevant to mental well-being for UGM-AICare users. Be concise. Write the response in Indonesian/Bahasa Indonesia. Do not use markdown format because the value is stored in a SQL cell.
+        summarization_prompt = f"""Kamu adalah Aika, AI pendamping dari UGM-AICare. Tugasmu adalah membuat ringkasan singkat dari percakapan sebelumnya dengan pengguna. Ringkasan ini akan kamu gunakan untuk mengingatkan pengguna tentang apa yang telah dibahas jika mereka bertanya "apakah kamu ingat percakapan kita?".
 
-Conversation:
+Buatlah ringkasan dalam 1-2 kalimat saja, dalam Bahasa Indonesia yang alami dan kasual, seolah-olah kamu sedang berbicara santai dengan teman. Fokus pada inti atau perasaan utama yang diungkapkan pengguna.
+Hindari penggunaan daftar, poin-poin, judul seperti "Poin Utama", atau format markdown. Cukup tuliskan sebagai paragraf singkat yang mengalir.
+
+Contoh output yang baik:
+"kita sempat ngobrolin soal kamu yang lagi ngerasa nggak nyaman karena pernah gagal memimpin organisasi."
+"kamu cerita tentang perasaanmu yang campur aduk setelah kejadian di kampus."
+"kita kemarin membahas tentang kesulitanmu mencari teman dan bagaimana itu membuatmu merasa kesepian."
+
+Percakapan yang perlu diringkas:
 {formatted_history}
 
-Summary:"""
+Ringkasan singkat dan kasual:"""
 
         # 4. Call the LLM
         summary_llm_history = [{"role": "user", "content": summarization_prompt}]
