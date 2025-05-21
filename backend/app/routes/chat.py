@@ -53,9 +53,10 @@ async def handle_chat_request(
     """
     db: DBSession = next(get_db())
     module_just_completed_id: Optional[str] = None # Variable to hold completed module ID
+    module_state_full: Optional[Dict[str, Any]] = None # Initialize here
+    session_id = request.session_id # Define session_id early for use in error logging if needed
+    conversation_id = request.conversation_id # Define conversation_id early
     try:
-        session_id = request.session_id
-        conversation_id = request.conversation_id
         user_id = current_user.id
         aika_response_text: str = "" 
 
@@ -104,11 +105,10 @@ async def handle_chat_request(
                 # ChatResponse.history needs to be List[Dict[str,str]]
                 # Ensure history from request (if any) is correctly formatted.
                 # The frontend's useChat.tsx `handleStartModule` sends history, so it should be used.
-
-                request_history_dicts: List[Dict[str, str]] = []
-                if request.history: # request.history is List[Dict[str,str]] from Pydantic if frontend sends ApiMessage[]
-                    request_history_dicts = [{"role": item["role"], "content": item["content"]} for item in request.history]
-
+                final_history_to_return: List[Dict[str, str]] = []
+                if request.history:
+                    final_history_to_return.extend(request.history)
+                final_history_to_return.append({"role": "assistant", "content": aika_response_text}) # Add AI response
 
             else: # Other event types
                 logger.warning(f"Unsupported event type received: {request.event.type} for session {session_id}")
@@ -118,9 +118,9 @@ async def handle_chat_request(
             # --- === Handle Standard Text Message === ---
             user_message_content = request.message
 
-            history_from_request_dicts: List[Dict[str, str]] = []
+            history_from_request_api_messages: List[Dict[str, str]] = []
             if request.history:
-                 history_from_request_dicts = [{"role": item["role"], "content": item["content"]} for item in request.history]
+                 history_from_request_api_messages = [{"role": item["role"], "content": item["content"]} for item in request.history]
 
             logger.info(f"MESSAGE: User {user_id} sent message in session {session_id}, conversation {conversation_id}")
 
@@ -173,107 +173,165 @@ async def handle_chat_request(
                     db.rollback()
                     logger.error(f"DB Error saving module conversation turn for session {session_id}: {e}", exc_info=True)
                     raise HTTPException(status_code=500, detail="Could not save module conversation turn.")
+            
+            else: # No active module, check for memory query
+                memory_trigger_phrases = [
+                    "apakah kamu ingat percakapan kita",
+                    "kamu inget gak obrolan kita",
+                    "ingat percakapan kita",
+                    "inget obrolan kita",
+                    "apa kamu ingat kita ngobrol apa",
+                    "do you remember our conversation",
+                    "do you remember what we talked about"
+                ]
+                normalized_user_message = user_message_content.lower().strip()
+                asked_about_memory = any(phrase in normalized_user_message for phrase in memory_trigger_phrases)
 
-
-            else: # Standard Conversation Flow (No Active Module)
-                logger.info(f"STANDARD_CHAT: Processing standard message for session {session_id}, conversation {conversation_id}")
-                # --- Session Change Detection & Summary Handling ---
-                # (Your existing summary logic - seems mostly fine, ensure DB queries are correct)
-                # ... (previous summarization logic here) ...
-                previous_session_id_to_summarize = None
-                latest_db_message_for_user = db.query(Conversation)\
-                    .filter(Conversation.user_id == user_id)\
-                    .order_by(Conversation.timestamp.desc())\
-                    .first()
-
-                is_new_session = False
-                if latest_db_message_for_user:
-                    if latest_db_message_for_user.session_id != session_id:
-                        previous_session_id_to_summarize = latest_db_message_for_user.session_id
-                        is_new_session = True
-                        logger.info(f"STANDARD_CHAT: New session detected ({session_id}). Previous DB session: {previous_session_id_to_summarize}. Triggering summary for previous session.")
-                        background_tasks.add_task(summarize_and_save, user_id, previous_session_id_to_summarize, db_session_creator=get_background_db) # Pass db_session_creator
-                    else: # Check for new conversation within the same session
-                        if latest_db_message_for_user.conversation_id != conversation_id:
-                            is_new_session = True # Treat as new context for summary injection
-                            logger.info(f"STANDARD_CHAT: New conversation detected ({conversation_id}) in existing session {session_id}. Will inject summary if available.")
-
-                else:
-                    is_new_session = True
-                    logger.info(f"STANDARD_CHAT: First message ever for user {user_id} in session {session_id}. No previous session to summarize.")
-
-                # --- Prepare History for LLM - Inject Summary on New Session/Conversation Start ---
-                history_for_llm_api_message: List[Dict[str,str]] = []
-                if request.history: # Convert to List[Dict[str,str]] for internal use before llm.py
-                    history_for_llm_api_message = [{"role": h["role"], "content": h["content"]} for h in request.history]
-
-
-                if is_new_session: # Or new conversation
-                    N_SUMMARIES_FOR_CONTEXT = 1 # Fetch only the most recent summary
-                    past_summary = db.query(UserSummary)\
+                if asked_about_memory:
+                    logger.info(f"MEMORY_QUERY: User {user_id} asked about previous conversation memory in session {session_id}.")
+                    latest_summary = db.query(UserSummary)\
                         .filter(UserSummary.user_id == user_id)\
                         .order_by(UserSummary.timestamp.desc())\
-                        .first() # Fetch one
+                        .first()
 
-                    if past_summary:
-                        summary_injection_text = (
-                            "Untuk membantumu mengingat, ini ringkasan singkat dari percakapan kita sebelumnya:\n"
-                            f"{past_summary.summary_text}\n"
-                            "--- Akhir dari ringkasan ---\n\nSekarang, mari kita lanjutkan. Ada apa?"
-                        )
-                        summary_injection_message = {"role": "system", "content": summary_injection_text}
+                    if latest_summary and latest_summary.summary_text:
+                        summary_snippet = latest_summary.summary_text
+                        # Optional: Truncate summary_snippet if too long for a natural response
+                        if len(summary_snippet) > 150: # Keep it brief for a natural response
+                            summary_snippet = summary_snippet[:147] + "..."
                         
-                        # Inject after system prompt if one exists from request, otherwise at the beginning
-                        # System prompt from request.system_prompt (if any) should be first
-                        final_history_for_llm = []
-                        if request.system_prompt: # Check if a custom system prompt is provided in the request
-                             final_history_for_llm.append({"role": "system", "content": request.system_prompt})
-                        final_history_for_llm.append(summary_injection_message)
-                        final_history_for_llm.extend(history_for_llm_api_message) # Add the actual chat history
-                        history_for_llm_api_message = final_history_for_llm # Replace with augmented history
-                        logger.info(f"STANDARD_CHAT: Injected previous summary for user {user_id} into LLM context.")
+                        aika_response_text = (
+                            f"Tentu, aku ingat percakapan kita sebelumnya. "
+                            f"Secara garis besar, kita sempat membahas tentang {summary_snippet}. "
+                            f"Ada yang ingin kamu diskusikan lebih lanjut dari situ, atau ada hal baru yang ingin kamu ceritakan hari ini?"
+                        )
+                        logger.info(f"MEMORY_QUERY: Responded with summary for user {user_id}.")
+                    else:
+                        aika_response_text = (
+                            "Sepertinya ini percakapan pertama kita, atau aku belum punya ringkasan dari obrolan kita sebelumnya untuk diingat. "
+                            "Ada yang ingin kamu ceritakan untuk memulai?"
+                        )
+                        logger.info(f"MEMORY_QUERY: No summary found, responded accordingly for user {user_id}.")
 
-
-                # --- Call the Standard LLM ---
-                try:
-                    # llm.generate_response expects history as List[Dict[str, str]]
-                    # request.history is already List[Dict[str,str]] if it comes from ChatRequest
-                    # history_for_llm_api_message is the one to use here.
-                    aika_response_text = await llm.generate_response(
-                        history=history_for_llm_api_message, # Use the potentially augmented history
-                        provider=request.provider,
-                        model=request.model,
-                        max_tokens=request.max_tokens,
-                        temperature=request.temperature,
-                        system_prompt=request.system_prompt if not history_for_llm_api_message or history_for_llm_api_message[0].get("role") != "system" else None
-                        # Pass system_prompt only if not already covered by augmented history
-                    )
-                except Exception as llm_err:
-                     logger.error(f"LLM generation failed for standard chat session {session_id}: {llm_err}", exc_info=True)
-                     raise HTTPException(status_code=503, detail=f"LLM service unavailable or failed: {str(llm_err)}")
-
-
-                if aika_response_text.startswith("Error:"): # Check for errors returned by LLM service itself
-                    logger.error(f"LLM generation returned error for session {session_id}: {aika_response_text}")
-                    status_code_llm = 400 if "API key" in aika_response_text or "Invalid history" in aika_response_text else 503
-                    raise HTTPException(status_code=status_code_llm, detail=aika_response_text)
-
-                # --- Save the standard conversation turn ---
-                try:
-                    conversation_entry = Conversation(
-                        user_id=user_id,
-                        session_id=session_id,
-                        conversation_id=conversation_id, # Save conversation_id
-                        message=user_message_content,
+                    # --- Save this specific interaction ---
+                    try:
+                        conv_entry = Conversation(
+                            user_id=user_id, session_id=session_id, conversation_id=conversation_id,
+                            message=user_message_content, response=aika_response_text, timestamp=datetime.now()
+                        )
+                        db.add(conv_entry)
+                        db.commit()
+                    except Exception as e:
+                        db.rollback()
+                        logger.error(f"DB Error saving memory query conversation turn for session {session_id}: {e}", exc_info=True)
+                    
+                    # --- Prepare and return the constructed response directly ---
+                    final_history_to_return: List[Dict[str, str]] = []
+                    if request.history: # request.history is List[ApiMessage] which is List[Dict[str,str]]
+                        final_history_to_return.extend(request.history)
+                    final_history_to_return.append({"role": "user", "content": user_message_content})
+                    final_history_to_return.append({"role": "assistant", "content": aika_response_text})
+                    
+                    return ChatResponse(
                         response=aika_response_text,
-                        timestamp=datetime.now()
+                        provider_used="system_direct_response", # Custom provider string
+                        model_used="memory_retrieval",      # Custom model string
+                        history=final_history_to_return,
+                        module_completed_id=None # No module involved here
                     )
-                    db.add(conversation_entry)
-                    db.commit()
-                except Exception as e:
-                    db.rollback()
-                    logger.error(f"DB error saving standard conversation turn for session {session_id}: {e}", exc_info=True)
-                    raise HTTPException(status_code=500, detail="Could not save conversation turn.")
+                else: # Standard Conversation Flow (No Active Module AND not a memory query)
+                    logger.info(f"STANDARD_CHAT: Processing standard message for session {session_id}, conversation {conversation_id}")
+                    
+                    # --- Session Change Detection & Summary Handling ---
+                    previous_session_id_to_summarize = None
+                    latest_db_message_for_user = db.query(Conversation)\
+                        .filter(Conversation.user_id == user_id)\
+                        .order_by(Conversation.timestamp.desc())\
+                        .first()
+
+                    is_new_session = False
+                    if latest_db_message_for_user:
+                        if latest_db_message_for_user.session_id != session_id:
+                            previous_session_id_to_summarize = latest_db_message_for_user.session_id
+                            is_new_session = True
+                            logger.info(f"STANDARD_CHAT: New session detected ({session_id}). Previous DB session: {previous_session_id_to_summarize}. Triggering summary for previous session.")
+                            background_tasks.add_task(summarize_and_save, user_id, previous_session_id_to_summarize, db_session_creator=get_background_db) # Pass db_session_creator
+                        else: # Check for new conversation within the same session
+                            if latest_db_message_for_user.conversation_id != conversation_id:
+                                is_new_session = True # Treat as new context for summary injection
+                                logger.info(f"STANDARD_CHAT: New conversation detected ({conversation_id}) in existing session {session_id}. Will inject summary if available.")
+
+                    else:
+                        is_new_session = True
+                        logger.info(f"STANDARD_CHAT: First message ever for user {user_id} in session {session_id}. No previous session to summarize.")
+
+                    # --- Prepare History for LLM - Inject Summary on New Session/Conversation Start ---
+                    history_for_llm_call = list(history_from_request_api_messages) # Make a copy to modify
+
+
+                    if is_new_session:
+                        past_summary = db.query(UserSummary)\
+                            .filter(UserSummary.user_id == user_id)\
+                            .order_by(UserSummary.timestamp.desc())\
+                            .first()
+
+                        if past_summary:
+                            summary_injection_text = (
+                                "Untuk membantumu mengingat, ini ringkasan singkat dari percakapan kita sebelumnya:\n"
+                                f"{past_summary.summary_text}\n"
+                                "--- Akhir dari ringkasan ---\n\nSekarang, mari kita lanjutkan. Ada apa?"
+                            )
+                            summary_injection_message = {"role": "system", "content": summary_injection_text}
+                            
+                            temp_history_for_llm = []
+                            if request.system_prompt:
+                                 temp_history_for_llm.append({"role": "system", "content": request.system_prompt})
+                            temp_history_for_llm.append(summary_injection_message)
+                            temp_history_for_llm.extend(history_for_llm_call) # Add the actual chat history
+                            history_for_llm_call = temp_history_for_llm # Replace with augmented history
+                            logger.info(f"STANDARD_CHAT: Injected previous summary for user {user_id} into LLM context for new session.")
+
+                    history_for_llm_call.append({"role": "user", "content": user_message_content})
+
+                    # --- Call the Standard LLM ---
+                    try:
+                        # llm.generate_response expects history as List[Dict[str, str]]
+                        # request.history is already List[Dict[str,str]] if it comes from ChatRequest
+                        # history_for_llm_api_message is the one to use here.
+                        aika_response_text = await llm.generate_response(
+                            history=history_for_llm_call, # Use the potentially augmented history
+                            provider=request.provider,
+                            model=request.model,
+                            max_tokens=request.max_tokens,
+                            temperature=request.temperature,
+                            system_prompt=request.system_prompt if not any(h['role'] == 'system' for h in history_for_llm_call) else None
+                        )
+                    except Exception as llm_err:
+                        logger.error(f"LLM generation failed for standard chat session {session_id}: {llm_err}", exc_info=True)
+                        raise HTTPException(status_code=503, detail=f"LLM service unavailable or failed: {str(llm_err)}")
+
+
+                    if aika_response_text.startswith("Error:"): # Check for errors returned by LLM service itself
+                        logger.error(f"LLM generation returned error for session {session_id}: {aika_response_text}")
+                        status_code_llm = 400 if "API key" in aika_response_text or "Invalid history" in aika_response_text else 503
+                        raise HTTPException(status_code=status_code_llm, detail=aika_response_text)
+
+                    # --- Save the standard conversation turn ---
+                    try:
+                        conversation_entry = Conversation(
+                            user_id=user_id,
+                            session_id=session_id,
+                            conversation_id=conversation_id, # Save conversation_id
+                            message=user_message_content,
+                            response=aika_response_text,
+                            timestamp=datetime.now()
+                        )
+                        db.add(conversation_entry)
+                        db.commit()
+                    except Exception as e:
+                        db.rollback()
+                        logger.error(f"DB error saving standard conversation turn for session {session_id}: {e}", exc_info=True)
+                        raise HTTPException(status_code=500, detail="Could not save conversation turn.")
 
         else: # Neither message nor event
             logger.error(f"Invalid request structure for session {session_id}: Neither message nor event found.")
@@ -313,7 +371,8 @@ async def handle_chat_request(
     except HTTPException as http_exc:
          raise http_exc
     except Exception as e:
-        logger.error(f"Unhandled exception in /chat endpoint for user {current_user.id if current_user else 'unknown'}: {e}", exc_info=True)
+        user_id_for_log = current_user.id if current_user else "unknown_user"
+        logger.error(f"Unhandled exception in /chat endpoint for user {user_id_for_log}, session {session_id}: {e}", exc_info=True)
         # Try to clear module state if an unexpected error occurs during module processing
         if module_state_full: # If we were in a module
             try:
