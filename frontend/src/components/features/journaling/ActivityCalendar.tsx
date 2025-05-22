@@ -13,9 +13,12 @@ import {
     addDays,
     isSameMonth,
     isSameDay,
+    isAfter,
+    startOfDay,
 } from 'date-fns';
 import { id } from 'date-fns/locale'; // For Indonesian day names if needed
 import { FiChevronLeft, FiChevronRight, FiLoader } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 
 // Define the structure of the data received from the backend
 interface ActivityData {
@@ -58,28 +61,39 @@ export default function ActivityCalendar({
     const getDayClasses = (day: Date): string => {
         const dateStr = format(day, 'yyyy-MM-dd');
         const data = activityData[dateStr];
+        const today = startOfDay(new Date());
+        const isFutureDay = isAfter(startOfDay(day), today);
+
         let classes = `text-center py-1 text-xs rounded aspect-square flex flex-col items-center justify-center transition-colors duration-150 relative ${onDateClick ? 'cursor-pointer' : 'cursor-default'} `;
+        
 
         if (!isSameMonth(day, monthStart)) {
             classes += " text-gray-600 hover:bg-gray-700/50"; // Dim days from other months
-            if (onDateClick) classes += " hover:bg-gray-700/50";
+            if (onDateClick) classes += " hover:bg-gray-700/50 cursor-pointer";
+            else classes += " cursor-default";
         } else {
              classes += " text-gray-200 hover:bg-gray-700/50";
-             if (onDateClick) classes += " hover:bg-gray-700/70"; // Brighter hover for current month days
+             if (onDateClick) {
+                if (isFutureDay) {
+                    classes += " hover:bg-red-500/30 cursor-pointer"; // Indicate future days differently on hover if clickable
+                } else {
+                    classes += " hover:bg-gray-700/70 cursor-pointer"; // Brighter hover for current month past/present days
+                }
+             } else {
+                classes += " cursor-default";
+             }
+
              if (isSameDay(day, new Date())) {
                  classes += " border border-[#FFCA40]"; // Highlight today
              }
 
-             // Apply activity markers
-             if (data) {
+             // Apply activity markers (only for past/present days if desired, or all days)
+             if (data && !isFutureDay) { // Example: only show markers for non-future days
                  if (data.hasJournal && data.hasConversation) {
-                     // Both activities - e.g., purple background or two dots
                      classes += " bg-purple-600/40 hover:bg-purple-600/60";
                  } else if (data.hasJournal) {
-                     // Only Journal - e.g., green background or dot
                      classes += " bg-green-600/40 hover:bg-green-600/60";
                  } else if (data.hasConversation) {
-                     // Only Conversation - e.g., blue background or dot
                      classes += " bg-blue-600/40 hover:bg-blue-600/60";
                  }
              }
@@ -89,6 +103,22 @@ export default function ActivityCalendar({
     };
 
     const dayNames = ['Sen', 'Sel', 'Rab', 'Kam', 'Jum', 'Sab', 'Min']; // Adjust if locale needed
+
+    const handleDayClick = (date: Date) => {
+        if (!onDateClick) return;
+
+        const today = startOfDay(new Date());
+        const clickedDay = startOfDay(date);
+
+        if (isAfter(clickedDay, today)) {
+            toast.error("⏳ Oops! Looks like you're trying to write in the future. Please select today or a past date.", {
+                duration: 4000,
+                position: 'bottom-center',
+            });
+        } else {
+            onDateClick(date); // Call original onDateClick for past or present days
+        }
+    };
 
     return (
         <div className="bg-white/5 p-2 sm:p-3 rounded-lg border border-white/10 mb-6">
@@ -136,10 +166,10 @@ export default function ActivityCalendar({
                         <div
                             key={i}
                             className={getDayClasses(d)}
-                            onClick={isInteractive ? () => onDateClick!(d) : undefined} // Call onDateClick only for current month days
+                            onClick={isInteractive ? () => handleDayClick!(d) : undefined} // Call onDateClick only for current month days
                             onKeyDown={isInteractive ? (e) => {
                                 if (e.key === 'Enter' || e.key === ' ') {
-                                    onDateClick!(d);
+                                    handleDayClick!(d);
                                 }
                             } : undefined}
                             {...(isInteractive ? { role: "button" } : {})}
@@ -148,12 +178,11 @@ export default function ActivityCalendar({
                         >
                             {format(d, 'd')}
 
-                            {/* Example using dots instead of background */}
-
-                            {activityData[format(d, 'yyyy-MM-dd')]?.hasJournal && (
+                            {/* Activity markers - ensure they are not shown for future days if that's the logic in getDayClasses */}
+                            {isSameMonth(d, monthStart) && !isAfter(startOfDay(d), startOfDay(new Date())) && activityData[format(d, 'yyyy-MM-dd')]?.hasJournal && (
                                 <span className="absolute bottom-1 left-1/2 -translate-x-2 w-1 h-1 bg-green-400 rounded-full"></span>
                             )}
-                            {activityData[format(d, 'yyyy-MM-dd')]?.hasConversation && (
+                            {isSameMonth(d, monthStart) && !isAfter(startOfDay(d), startOfDay(new Date())) && activityData[format(d, 'yyyy-MM-dd')]?.hasConversation && (
                                 <span className="absolute bottom-1 left-1/2 translate-x-1 w-1 h-1 bg-blue-400 rounded-full"></span>
                             )}
                         </div>
