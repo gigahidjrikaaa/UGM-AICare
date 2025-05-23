@@ -6,7 +6,7 @@ import { useSession } from "next-auth/react";
 import GoogleSignInButton from "@/components/ui/GoogleSignInButton";
 import Image from "next/image";
 import { motion } from "framer-motion";
-import ErrorMessage from "../../components/ErrorMessage";
+import ErrorMessage from "../../../components/ErrorMessage";
 // import AccountLinker from "@/components/AccountLinker";
 
 export default function SignIn() {
