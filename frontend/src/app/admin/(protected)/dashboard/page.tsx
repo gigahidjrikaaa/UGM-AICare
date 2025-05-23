@@ -2,12 +2,12 @@
 
 import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
-import { useRouter } from 'next/navigation'; // Keep for potential future use, but layout handles primary auth
+import { useRouter } from 'next/navigation'; 
 import Link from 'next/link';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
-import AdminLayout from '@/components/layout/AdminLayout';
+// AdminLayout import is no longer needed here as it's applied by Next.js file-system routing
 import { 
   FiCalendar, FiClock, FiUsers, 
   FiPieChart,
@@ -73,26 +73,24 @@ const cardVariants = {
 
 export default function AdminDashboardPage() {
   const { data: session, status } = useSession();
-  const router = useRouter(); // Maintained for potential direct actions
+  const router = useRouter(); 
 
-  // The AdminLayout now primarily handles authentication and role checks.
+  // The AdminLayout (from layout.tsx) now primarily handles authentication and role checks.
   // This useEffect can be a secondary check or removed if AdminLayout is robust.
   useEffect(() => {
     if (status === "authenticated" && session?.user?.role !== 'admin') {
-      // This case should ideally be caught by AdminLayout or middleware first.
       router.push('/access-denied');
     }
   }, [status, session, router]);
   
-  // Loading and unauthenticated states are handled by AdminLayout
+  // Loading and unauthenticated states are handled by AdminLayout (layout.tsx)
   if (status === "loading" || (status === "authenticated" && session?.user?.role !== 'admin')) {
     // AdminLayout will show its own loading/redirecting state.
-    // This return is a fallback or can be removed if AdminLayout covers all scenarios.
     return null; 
   }
 
+  // Remove the <AdminLayout> wrapper from here
   return (
-    <AdminLayout>
       <div className="space-y-6 md:space-y-8">
         {/* Page Title */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
@@ -276,6 +274,5 @@ export default function AdminDashboardPage() {
           </div>
         </motion.div>
       </div>
-    </AdminLayout>
   );
 }
