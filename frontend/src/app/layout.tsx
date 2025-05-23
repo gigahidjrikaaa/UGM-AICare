@@ -2,12 +2,10 @@ import type { Metadata } from "next";
 import "./globals.css";
 import { Inter } from 'next/font/google'
 import ClientProvider from "@/components/auth/ClientProvider";
-// import HeaderWrapper from "@/components/ui/HeaderWrapper";
-// import FooterWrapper from "@/components/ui/FooterWrapper";
 import { Suspense } from "react";
 import GlobalSkeleton from "@/components/ui/GlobalSkeleton";
 import { Toaster } from "react-hot-toast";
-import AppLayout from "@/components/layout/AppLayout";
+// AppLayout import is removed from here
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -33,9 +31,8 @@ export default async function RootLayout({
         <ClientProvider>
           <div className="flex flex-col min-h-screen h-full">
               <Suspense fallback={<GlobalSkeleton />}>
-                <AppLayout >
-                  {children}
-                </AppLayout>
+                {/* AppLayout is removed from here, children are rendered directly */}
+                {children}
                 <Toaster
                   position="top-right"
                   reverseOrder={false}
