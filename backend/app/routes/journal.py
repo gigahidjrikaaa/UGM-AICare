@@ -34,6 +34,7 @@ async def create_or_update_journal_entry(
     if existing_entry:
         # Update existing entry
         existing_entry.content = entry_data.content
+        existing_entry.prompt_id = entry_data.prompt_id # Update prompt_text
         existing_entry.updated_at = datetime.now()
         db.add(existing_entry)
         db.commit()
@@ -41,9 +42,12 @@ async def create_or_update_journal_entry(
         return existing_entry
     else:
         # Create new entry
+        new_entry_data = entry_data.dict()
         new_entry = JournalEntry(
-            **entry_data.dict(),
-            user_id=current_user.id
+            user_id=current_user.id,
+            entry_date=new_entry_data.get("entry_date"),
+            content=new_entry_data.get("content"),
+            prompt_id=new_entry_data.get("prompt_id")
         )
         db.add(new_entry)
         try:
@@ -56,40 +60,34 @@ async def create_or_update_journal_entry(
 
 
 @router.get("/", response_model=List[JournalEntryResponse])
-async def get_journal_entries(
-    start_date: Optional[date] = None,
-    end_date: Optional[date] = None,
+async def get_all_journal_entries(
+    skip: int = 0,
+    limit: int = 100,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Gets journal entries for the current user, optionally filtered by date range."""
-    query = db.query(JournalEntry).filter(JournalEntry.user_id == current_user.id)
-    if start_date:
-        query = query.filter(JournalEntry.entry_date >= start_date)
-    if end_date:
-        query = query.filter(JournalEntry.entry_date <= end_date)
-    entries = query.order_by(JournalEntry.entry_date.desc()).all()
+    """Retrieves all journal entries for the current user with pagination."""
+    entries = db.query(JournalEntry).filter(
+        JournalEntry.user_id == current_user.id
+    ).order_by(JournalEntry.entry_date.desc()).offset(skip).limit(limit).all()
     return entries
 
-@router.get("/{entry_date_str}", response_model=JournalEntryResponse)
+@router.get("/{entry_date}", response_model=JournalEntryResponse)
 async def get_journal_entry_by_date(
-    entry_date_str: str, # Receive date as string YYYY-MM-DD
+    entry_date: date,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
-    """Gets a specific journal entry for the current user by date."""
-    try:
-        entry_date = date.fromisoformat(entry_date_str)
-    except ValueError:
-        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Invalid date format. Use YYYY-MM-DD.")
-
+    """Retrieves a journal entry for the current user by date."""
     entry = db.query(JournalEntry).filter(
         JournalEntry.user_id == current_user.id,
         JournalEntry.entry_date == entry_date
-    ).first()
+    ).first() # Use .options(selectinload(JournalEntry.prompt)) for eager loading if needed
+    
     if not entry:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Journal entry not found for this date")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Journal entry not found for this date.")
     return entry
+
 
 #! TODO: DELETE endpoint
 # @router.delete("/{entry_date_str}", status_code=status.HTTP_204_NO_CONTENT)

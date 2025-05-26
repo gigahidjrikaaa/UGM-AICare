@@ -1,6 +1,37 @@
 import { NextAuthOptions } from "next-auth";
+// import { JWT } from "next-auth/jwt";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
+
+// Augment the NextAuth types to include custom properties
+declare module "next-auth" {
+  interface Session {
+    accessToken?: string;
+    user: {
+      id?: string | null;
+      role?: string | null;
+      wallet_address?: string | null;
+      allow_email_checkins?: boolean | null;
+    } & User; // Keep existing User properties
+  }
+
+  interface User { // Used in GoogleProvider profile and CredentialsProvider authorize
+    role?: string | null;
+    accessToken?: string; // For GoogleProvider profile
+  }
+}
+
+declare module "next-auth/jwt" {
+  interface JWT {
+    id?: string;
+    role?: string;
+    accessToken?: string;
+    wallet_address?: string | null;
+    allow_email_checkins?: boolean;
+    dbUserId?: number; // If you store DB user ID in token
+  }
+}
+
 
 // Environment variables type checking
 const checkEnvVariables = () => {
@@ -92,33 +123,45 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     // The jwt callback is invoked when a JWT is created or updated.
     async jwt({ token, user, account, profile }) {   // Add trigger if needed
-      // console.log(`JWT Callback Trigger: ${trigger}, User Present: ${!!user}, Account Present: ${!!account}`);
-      const isSignIn = !!(account && user); // Check if this is a sign-in event
-      const needsWalletUpdate  = isSignIn || !token.wallet_address; // Fetch on sign-in, update, or if wallet address is missing
-
       const backendUrl = process.env.NEXT_PUBLIC_API_URL;
       const internalApiKey = process.env.INTERNAL_API_KEY;
 
-      if (isSignIn && account.provider === 'google' && profile) {
-        // On initial sign-in, populate from user/account object first
+      // Handle admin user sign-in specifically
+      if (account?.provider === 'admin-login' && user?.role === 'admin') {
+        token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
+        token.role = user.role;
+        // console.log("JWT Callback: Admin user signed in. Token populated:", token);
+        return token; // Return early, no backend sync needed for admin
+      }
+
+      // Existing logic for Google users and other general token updates
+      const isSignIn = !!(account && user);
+      // Determine if wallet/profile data needs fetching/refreshing
+      // For Google users, fetch on sign-in or if data is missing.
+      // Avoid fetching if role is already admin (covered by the block above)
+      const needsBackendDataFetch = token.role !== 'admin' && (isSignIn || !token.wallet_address);
+
+      if (isSignIn && account?.provider === 'google' && profile) {
+        // This block is for initial Google sign-in
         token.accessToken = account.access_token;
         token.id = user.id; // Google 'sub'
-        token.role = user.role; // Role from GoogleProvider profile or Credentials
+        token.role = user.role ?? undefined; // Role from GoogleProvider profile
         token.email = user.email; // Email from user object
         
-        // console.log(`JWT: Initial sign-in for user ${token.id?.substring(0, 10)}... Role: ${token.role}, Email: ${token.email}`);
+        // console.log(`JWT: Initial Google sign-in for user ${token.id?.substring(0, 10)}... Role: ${token.role}, Email: ${token.email}`);
 
-        // --- !! Call Backend to Sync User !! ---
         try {
           if (!internalApiKey) {
             console.error("JWT Error: INTERNAL_API_KEY missing for backend sync.");
           } else if (!token.id) {
             console.error("JWT Error: User Sub/ID missing, cannot sync.");
           } else {
-            // console.log(`JWT: Calling internal sync for user sub ${token.id.substring(0, 10)}...`);
+            // console.log(`JWT: Calling internal sync for Google user sub ${token.id.substring(0, 10)}...`);
             const syncPayload = {
               google_sub: token.id,
-              email: token.email // Pass the email we got from Google profile
+              email: token.email
             };
             const syncResponse = await fetch(`${backendUrl}/api/v1/internal/sync-user`, {
               method: 'POST',
@@ -131,50 +174,44 @@ export const authOptions: NextAuthOptions = {
 
             if (!syncResponse.ok) {
               const errorBody = await syncResponse.text();
-              console.error(`JWT Error: Backend sync failed! Status: ${syncResponse.status}, Body: ${errorBody}`);
+              console.error(`JWT Error: Backend sync failed for Google user! Status: ${syncResponse.status}, Body: ${errorBody}`);
             } else {
               const syncResult = await syncResponse.json();
-              // console.log("JWT: Backend user sync successful:", syncResult);
-              token.dbUserId = syncResult.user_id; // Optionally store db id
+              // console.log("JWT: Backend Google user sync successful:", syncResult);
+              token.dbUserId = syncResult.user_id;
 
               // AFTER successful sync, fetch the full user profile from backend
-              console.log(`JWT: Fetching updated profile from backend for sub ${token.id.substring(0, 10)}...`);
+              // console.log(`JWT: Fetching updated profile from backend for Google user sub ${token.id.substring(0, 10)}...`);
               const profileResponse = await fetch(`${backendUrl}/api/v1/internal/user-by-sub/${token.id}`, {
                 headers: { 'X-Internal-API-Key': internalApiKey },
               });
 
               if (profileResponse.ok) {
                 const dbUserData: InternalUserResponse = await profileResponse.json();
-                console.log("JWT: Received profile data post-sync:", dbUserData);
-                // Update token with authoritative data from backend DB
+                // console.log("JWT: Received profile data post-sync for Google user:", dbUserData);
                 token.wallet_address = dbUserData.wallet_address ?? null;
                 token.allow_email_checkins = dbUserData.allow_email_checkins ?? true;
-                // Optionally override role if backend provides it: token.role = dbUserData.role || token.role;
               } else {
                 const errorBody = await profileResponse.text();
-                console.error(`JWT Error: Fetching profile post-sync failed: ${profileResponse.status} ${errorBody}`);
-                // Set defaults if fetch fails after successful sync
+                console.error(`JWT Error: Fetching profile post-sync for Google user failed: ${profileResponse.status} ${errorBody}`);
                 token.wallet_address = null;
-                token.allow_email_checkins = true;
+                token.allow_email_checkins = true; // Default on error
               }
             }
           }
         } catch (error) {
-          console.error("JWT Error: Network or other error during backend user sync fetch:", error);
+          console.error("JWT Error: Network or other error during backend Google user sync/fetch:", error);
           token.wallet_address = null;
-          token.allow_email_checkins = true;
+          token.allow_email_checkins = true; // Default on error
         }
-        // --- !! End Backend Sync Call !! ---
       }
       
-      // This runs on sign-in AND subsequent reads if wallet isn't already in token
-      // It uses the GET /user-by-sub endpoint
-      // Ensure token.sub exists (it should after sign-in)
-      if (token.sub && needsWalletUpdate) {
-        // console.log(`JWT: Fetching/Refreshing wallet data from internal API for sub: ${token.sub.substring(0, 10)}...`);
+      // This block fetches/refreshes wallet data for non-admin users on subsequent requests if needed
+      if (token.id && needsBackendDataFetch && account?.provider !== 'admin-login') {
+        // console.log(`JWT: Fetching/Refreshing wallet data from internal API for non-admin user: ${token.id.substring(0, 10)}...`);
         try {
-          const internalApiUrl = `${backendUrl}/api/v1/internal/user-by-sub/${token.sub}`;
-          const internalApiKey = process.env.INTERNAL_API_KEY;
+          const internalApiUrl = `${backendUrl}/api/v1/internal/user-by-sub/${token.id}`;
+          // internalApiKey is already defined above
 
           if (!internalApiKey) {
             console.error("JWT Error: INTERNAL_API_KEY missing for wallet fetch.");
@@ -185,34 +222,26 @@ export const authOptions: NextAuthOptions = {
 
             if (!response.ok) {
               if (response.status === 404) {
-                console.warn(`JWT: User sub ${token.sub} not found in backend DB during wallet fetch.`);
-                // If user not found here, wallet is definitely null
+                console.warn(`JWT: User sub ${token.id} not found in backend DB during wallet fetch (non-admin).`);
                 token.wallet_address = null;
+                token.allow_email_checkins = true; // Default if user not found
               } else {
                  const errorBody = await response.text();
-                 console.error(`JWT Error: Internal API wallet fetch failed: ${response.status} ${errorBody}`);
+                 console.error(`JWT Error: Internal API wallet fetch failed (non-admin): ${response.status} ${errorBody}`);
               }
             } else {
               const dbUserData: InternalUserResponse = await response.json();
-              // console.log("JWT: Received wallet data from internal API:", dbUserData);
+              // console.log("JWT: Received wallet data from internal API (non-admin):", dbUserData);
               token.wallet_address = dbUserData.wallet_address ?? null;
               token.allow_email_checkins = dbUserData.allow_email_checkins ?? true;
             }
           }
         } catch (error) {
-          console.error("JWT: Network or other error fetching user data from internal API:", error);
-          // Only set wallet to null if it wasn't already set
-          if (token.wallet_address === undefined) token.wallet_address = null;
+          console.error("JWT Error: Network or other error during wallet data fetch (non-admin):", error);
+          token.wallet_address = null;
+          token.allow_email_checkins = true; // Default on error
         }
-      } else if (!token.sub) {
-        console.warn("JWT: No token.sub found, cannot fetch wallet data.");
       }
-
-      // Ensure essential fields exist even if sign-in failed partially
-      token.id = token.id || token.sub;
-      token.role = token.role || "guest"; // Default role
-
-      // console.log("JWT Callback - Returning Token:", token); // Log final token before return
       return token;
     },
 
@@ -240,18 +269,16 @@ export const authOptions: NextAuthOptions = {
 
     // The session callback is invoked when a session is checked.
     async session({ session, token }) {
-      // console.log("Session Callback - Received Token:", token);
-              
-      // Assign user info from the token object to the session object
-      if (session.user) {
-        session.user.id = token.sub || token.id || "unknown"; // Ensure ID exists
-        session.user.role = token.role || "guest";
-        session.user.accessToken = token.accessToken; // Pass Google token if needed
-        session.user.wallet_address = token.wallet_address ?? null; // Pass wallet address
+      // Send properties to the client, like role, accessToken, and wallet_address.
+      if (token) {
+        session.accessToken = token.accessToken as string | undefined;
+        session.user.id = token.id as string; 
+        session.user.role = token.role as string | undefined;
+        session.user.wallet_address = token.wallet_address as string | null | undefined;
+        session.user.allow_email_checkins = token.allow_email_checkins as boolean | undefined;
+        // console.log("Session Callback: Populating session from token:", session.user.role, session.user.id?.substring(0,10));
       }
-      
-      console.log("Session Callback - Final Session Object:", session);
-      return session; // The session object is returned to the client
+      return session;
    },
   },
   pages: {

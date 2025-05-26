@@ -8,6 +8,7 @@ import toast from 'react-hot-toast';
 
 // Import from the new constants file
 import { getIpfsUrl, badgeMetadataMap, getBadgeMeta } from '@/lib/badgeConstants';
+import InteractiveBadgeCard from '@/components/ui/InteractiveBadgeCard';
 
 // --- Define EDUChain Testnet Explorer ---
 const EDUCHAIN_TESTNET_EXPLORER_BASE_URL = "https://edu-chain-testnet.blockscout.com";
@@ -53,9 +54,19 @@ export default function EarnedBadgesDisplay() {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await apiClient.get<EarnedBadge[]>('/activity-summary/my-badges');
-            setEarnedBadges(response.data);
-            setEarnedBadgeIds(new Set(response.data.map(badge => badge.badge_id)));
+            const response = await apiClient.get<EarnedBadge[]>('/profile/my-badges');
+            
+            const processedBadges: EarnedBadge[] = response.data.map(badgeInfo => {
+                const meta = getBadgeMeta(badgeInfo.badge_id);
+                return {
+                    ...badgeInfo,
+                    name: meta.name,
+                    description: meta.description,
+                    image_url: getIpfsUrl(meta.image), // Assuming meta.image is the CID
+                };
+            });
+            setEarnedBadges(processedBadges);
+            setEarnedBadgeIds(new Set(processedBadges.map(badge => badge.badge_id)));
         } catch (err) {
             console.error("Error fetching earned badges:", err);
             setError("Could not load earned badges.");
@@ -187,48 +198,65 @@ export default function EarnedBadgesDisplay() {
                     }
 
                     // Define base classes and conditional classes
-                    const baseClasses = "flex flex-col items-center text-center p-2 rounded-lg bg-white/10 transition-all duration-200 group";
-                    const lockedClasses = "grayscale opacity-50 cursor-default";
-                    const unlockedClasses = "hover:bg-white/20 cursor-pointer focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/50";
+                    const baseCardClasses = "flex flex-col items-center text-center p-2 rounded-lg bg-white/10 transition-all duration-200 group relative overflow-hidden h-full";
+                    const lockedCardClasses = `${baseCardClasses} grayscale opacity-50 cursor-default`;
+                    const unlockedCardClasses = `${baseCardClasses} hover:bg-white/20 cursor-pointer focus:outline-none focus:ring-2 focus:ring-ugm-gold-light/50 aurora-border animate-aurora-flow`;
+
+                    const cardContent = (
+                        <>
+                            <Image
+                                src={getIpfsUrl(meta.image)}
+                                alt={meta.name}
+                                width={80}
+                                height={80}
+                                className="w-16 h-16 sm:w-20 sm:h-20 group-hover:shadow-ugm-gold group-hover:shadow-[0_0_10px_3px_var(--tw-shadow-color)] rounded-full mb-3 group-hover:scale-110 transition-all duration-200 bg-gray-700 relative z-[3]"
+                                onError={(e) => { e.currentTarget.src = '/badges/badge-placeholder.png'; }}
+                            />
+                            {/* Inner wrapper for text content for better readability */}
+                            <div className="relative z-[2] w-full mt-auto p-2 bg-black/40 rounded-md flex flex-col flex-grow min-h-[5.5rem]"> 
+                                <span
+                                    className="text-sm font-medium text-gray-50 group-hover:text-ugm-gold-light w-full min-w-0 relative whitespace-normal break-words text-center min-h-[2.8rem] flex items-center justify-center leading-tight mb-1" // text-sm, font-medium, brighter base text, adjusted min-h, leading-tight, mb-1
+                                    title={meta.name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                                >
+                                    {meta.name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
+                                 </span>
+                                {isEarned && awardedDate && (
+                                    <span className="text-xs text-gray-300 group-hover:text-ugm-gold-light/80 relative mt-auto pt-1 block text-center text-opacity-80 group-hover:text-opacity-100 transition-opacity"> {/* Added opacity transition */}
+                                        {awardedDate}
+                                    </span>
+                                )}
+                            </div>
+                        </>
+                    );
+                    
+                    const lockedContent = (
+                         <>
+                            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full mb-2 bg-gray-700/50 flex items-center justify-center text-gray-500 group-hover:bg-gray-600/70 relative z-[3]"> {/* Increased mb-2 */}
+                                <FiHelpCircle size={32} />
+                            </div>
+                            {/* Inner wrapper for text content */}
+                            <div className="relative z-[2] w-full mt-auto p-2 bg-black/40 rounded-md flex flex-col flex-grow min-h-[5.5rem]"> {/* Increased padding, darker scrim, flex properties, min-height, mt-auto */}
+                                <span 
+                                    className="text-sm font-medium text-gray-400 group-hover:text-gray-300 w-full min-w-0 relative whitespace-normal break-words text-center min-h-[2.8rem] flex items-center justify-center leading-tight mb-1" // text-sm, font-medium, adjusted min-h, leading-tight, mb-1
+                                    title={meta.name}
+                                >
+                                    {meta.name}
+                                </span>
+                                {/* No date for locked content */}
+                            </div>
+                        </>
+                    );
 
                     return (
-                        <Tooltip title={tooltipTitle} arrow placement="top" key={badgeId}>
-                            {/* Use Link or Div based on earned status */}
-                            {isEarned && earnedData ? (
-                                <a
-                                    href={explorerUrl}
-                                    target="_blank"
-                                    rel="noopener noreferrer"
-                                    className={`${baseClasses} ${unlockedClasses}`}
-                                    aria-label={`View details for earned badge: ${meta.name}`}
-                                >
-                                    <Image
-                                        src={getIpfsUrl(meta.image)} // Use IPFS gateway URL
-                                        alt={meta.name}
-                                        width={80}
-                                        height={80}
-                                        className="w-16 h-16 sm:w-20 sm:h-20 rounded-full mb-1 group-hover:scale-110 transition-transform duration-200 bg-gray-700" // Added bg
-                                        onError={(e) => { e.currentTarget.src = '/badges/badge-placeholder.png'; }}
-                                    />
-                                    <span className="text-xs text-gray-200 group-hover:text-[#FFCA40] w-full px-1 flex items-center justify-center gap-1">
-                                        {meta.name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                                     </span>
-                                    <span className="text-xs text-gray-400">{awardedDate}</span>
-                                </a>
-                            ) : (
-                                <div
-                                    className={`${baseClasses} ${lockedClasses}`}
-                                    aria-label={`Locked badge: ${meta.name}`}
-                                >
-                                    {/* Placeholder for locked badge */}
-                                    <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full mb-1 bg-gray-700 flex items-center justify-center text-gray-500 group-hover:bg-gray-600">
-                                        <FiHelpCircle size={32} />
-                                        {/* Or use FiLock */}
-                                        {/* <FiLock size={28} /> */}
-                                    </div>
-                                    <span className="text-xs text-gray-500 group-hover:text-gray-400 truncate w-full px-1">{meta.name}</span>
-                                </div>
-                            )}
+                        <Tooltip title={tooltipTitle} arrow placement="top" key={badgeId} className='relative z-[5]'>
+                            <InteractiveBadgeCard
+                                className={isEarned ? unlockedCardClasses : lockedCardClasses}
+                                href={isEarned ? explorerUrl : undefined}
+                                isEarned={isEarned}
+                                ariaLabel={isEarned ? `View details for earned badge: ${meta.name}` : `Locked badge: ${meta.name}`}
+                            >
+                                {isEarned ? cardContent : lockedContent}
+                            </InteractiveBadgeCard>
                         </Tooltip>
                     );
                  })}

@@ -1,32 +1,34 @@
-// frontend/src/components/ui/admin/SidebarLink.tsx
 "use client";
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import React from 'react';
+import { ReactElement } from 'react';
 
 interface SidebarLinkProps {
   href: string;
-  icon: React.ReactNode;
+  icon: ReactElement;
   label: string;
 }
 
 export default function SidebarLink({ href, icon, label }: SidebarLinkProps) {
   const pathname = usePathname();
-  const isActive = pathname === href; // Active state logic
+  const isActive = pathname === href || (href !== '/admin/dashboard' && pathname.startsWith(href) && href.split('/').length <= pathname.split('/').length);
+
 
   return (
     <li>
       <Link
         href={href}
-        className={`flex items-center p-2 rounded-lg transition-colors ${
+        className={`flex items-center px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 group ${
           isActive
-            ? 'bg-[#FFCA40]/20 text-[#FFCA40] font-medium' // Active state styles
-            : 'text-gray-300 hover:bg-white/10' // Default state styles
+            ? 'bg-[#FFCA40]/15 text-[#FFCA40] shadow-sm'
+            : 'text-white/70 hover:bg-white/5 hover:text-white'
         }`}
       >
-        <span className="mr-3 flex-shrink-0 w-5 h-5 flex items-center justify-center">{icon}</span>
-        <span>{label}</span>
+        <span className={`mr-3 flex-shrink-0 ${isActive ? 'text-[#FFCA40]' : 'text-white/60 group-hover:text-white/80'}`}>
+          {icon}
+        </span>
+        <span className="truncate">{label}</span>
       </Link>
     </li>
   );

@@ -46,3 +46,22 @@ export interface ApiMessage {
     name: string;
     description?: string;
   }
+
+  // --- Journal Prompt Types ---
+export interface JournalPromptResponse {
+  id: number;
+  text: string;
+  category?: string | null;
+  is_active: boolean;
+}
+
+// --- Journal Entry Types ---
+// This can be used by DailyJournal.tsx for its allEntries state
+export interface JournalEntryItem {
+  id: number;
+  entry_date: string; // yyyy-MM-dd
+  content: string;
+  created_at: string;
+  updated_at: string;
+  prompt?: JournalPromptResponse | null; // Include the prompt object
+}

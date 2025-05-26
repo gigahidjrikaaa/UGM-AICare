@@ -159,6 +159,14 @@ class Feedback(Base):
     # Optional relationship back to User
     user = relationship("User") 
 
+class JournalPrompt(Base):
+    __tablename__ = "journal_prompts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    category = Column(String, index=True, nullable=True) # e.g., "Gratitude", "Self-Reflection"
+    text = Column(Text, nullable=False) # The prompt question itself
+    is_active = Column(Boolean, default=True) # To enable/disable prompts
+
 class JournalEntry(Base):
     __tablename__ = "journal_entries"
 
@@ -169,7 +177,10 @@ class JournalEntry(Base):
     created_at = Column(DateTime, default=datetime.now, nullable=False)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
 
-    user = relationship("User") # Relationship to User
+    prompt_id = Column(Integer, ForeignKey("journal_prompts.id"), nullable=True) # Link to the prompt used
+
+    user = relationship("User", back_populates="journal_entries") # Relationship to User
+    prompt = relationship("JournalPrompt") # Relationship to JournalPrompt
 
     # Add a unique constraint for user_id and entry_date to ensure one entry per user per day
     __table_args__ = (UniqueConstraint('user_id', 'entry_date', name='_user_entry_date_uc'),)

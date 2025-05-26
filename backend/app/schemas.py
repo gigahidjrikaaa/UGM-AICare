@@ -240,25 +240,48 @@ class UserSyncResponse(BaseModel):
     google_sub: str
     email_stored: bool # Indicate if encrypted email is now stored
 
+#? --- Journal Prompt Schemas ---
+class JournalPromptBase(BaseModel):
+    text: str
+    category: Optional[str] = None
+    is_active: bool = True
+
+class JournalPromptCreate(JournalPromptBase):
+    pass # No extra fields needed for creation beyond base
+
+class JournalPromptUpdate(BaseModel):
+    text: Optional[str] = None
+    category: Optional[str] = None
+    is_active: Optional[bool] = None
+
+class JournalPromptResponse(JournalPromptBase):
+    id: int
+
+    class Config:
+        from_attributes = True
+
 #? --- Journal Schemas ---
 class JournalEntryBase(BaseModel):
     entry_date: date
     content: str
+    prompt_id: Optional[int] = None
 
 class JournalEntryCreate(JournalEntryBase):
     pass
 
 class JournalEntryUpdate(BaseModel):
-    content: str # Allow updating only content for a specific date
+    content: Optional[str] # Allow updating only content for a specific date
+    prompt_id: Optional[int] = None # Allow updating prompt_text too, if desired
 
 class JournalEntryResponse(JournalEntryBase):
     id: int
     user_id: int
     created_at: datetime
     updated_at: datetime
+    prompt: Optional[JournalPromptResponse] = None # Include the full prompt object in the response
 
     class Config:
-        orm_mode = True # or from_attributes = True for Pydantic v2
+        from_attributes = True
 
 #? --- Link DID Schemas ---
 class LinkDIDRequest(BaseModel):

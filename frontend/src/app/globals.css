@@ -26,6 +26,111 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+@property --angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.animated-yellow-border::before {
+  content: '';
+  position: absolute;
+  z-index: -1;
+  inset: -2px; /* Adjust for desired border thickness. -2px is a common choice. */
+  border-radius: inherit;
+  background: conic-gradient(
+    from var(--angle),
+    transparent 0deg,
+    transparent 353deg,              /* Majority of the border is transparent */
+    rgba(255, 224, 140, 0.7) 355deg, /* Soft leading edge of the spark (ugm.gold.light with alpha) */
+    #FFCA40 356deg,                  /* Bright core of the spark (ugm.gold.DEFAULT) */
+    #FFCA40 358deg,                  /* Bright core of the spark */
+    rgba(255, 224, 140, 0.7) 359deg, /* Soft trailing edge of the spark */
+    transparent 360deg               /* Remainder transparent */
+  );
+  /* The opacity of this pseudo-element will be animated by the keyframes */
+}
+
+@layer utilities { /* Or directly if not using layers extensively */
+  .interactive-card-effect {
+    --rotateX: 0deg;
+    --rotateY: 0deg;
+    --gloss-x: 50%;
+    --gloss-y: 50%;
+    --gloss-opacity: 0;
+
+    transform-style: preserve-3d; /* Allows children to be transformed in 3D space */
+    transform: perspective(1200px) rotateX(var(--rotateX)) rotateY(var(--rotateY));
+    /* Default transition for mouse leave, JS overrides for mouse move */
+    transition: transform 0.4s cubic-bezier(0.23, 1, 0.32, 1);
+    /* Ensure overflow:hidden is on the card (it is via baseClasses) */
+    /* Ensure position:relative is on the card (it is via baseClasses) */
+  }
+
+  .interactive-card-effect::before { /* Gloss pseudo-element */
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    border-radius: inherit; /* Inherits rounded-lg from parent */
+    
+    /* Using UGM Gold Light for the sheen */
+    background: radial-gradient(
+      circle 350px at var(--gloss-x) var(--gloss-y), /* Adjust circle size as needed */
+      rgba(255, 224, 140, 0.25) 0%,  /* ugm.gold.light with alpha - #FFE08C */
+      rgba(255, 224, 140, 0.15) 20%,
+      rgba(255, 224, 140, 0.0) 45%
+    );
+
+    opacity: var(--gloss-opacity);
+    transition: opacity 0.4s ease-out; /* Smooth fade for gloss on mouse enter/leave */
+    pointer-events: none; /* So it doesn't interfere with mouse events on the card */
+    z-index: 2; /* Position gloss above card background but below content (content needs z-index > 2) */
+  }
+}
+
+.aurora-border {
+  position: relative; /* Needed for the pseudo-element */
+  z-index: 0; /* Ensure content can be above if needed */
+  /* The card itself will have its own background, e.g., bg-white/10 */
+}
+
+.aurora-border::before {
+  content: '';
+  position: absolute;
+  z-index: -1; /* Behind the parent's content but visible if parent is semi-transparent */
+  inset: -2.5px; /* Creates the border effect. Adjust thickness here. */
+  border-radius: inherit; /* Matches parent's rounded corners (e.g., rounded-lg) */
+  
+  /* Define the large gradient using your new aurora colors from tailwind.config.js */
+  /* The theme() function in Tailwind CSS v3+ can be used here if this CSS is processed by Tailwind.
+     If not, you'll need to hardcode the hex values or use CSS variables.
+     For simplicity here, I'll use the hex values directly.
+     Replace with theme('colors.aurora.pink'), etc., if your setup allows. */
+  background: linear-gradient(
+    60deg,
+    #FF75D1, /* aurora.pink */
+    #C175FF, /* aurora.purple */
+    #75BFFF, /* aurora.blue */
+    #75FFEE, /* aurora.cyan */
+    #FF75D1, /* aurora.pink again to make the loop seamless */
+    #C175FF,
+    #75BFFF,
+    #75FFEE
+  );
+  background-size: 400% 400%; /* Make the gradient much larger than the element */
+  
+  /* The animation will be applied via a Tailwind class like 'animate-aurora-flow' */
+  /* filter: blur(5px); */ /* Optional: Add a blur for a softer, more diffused glow */
+  /* opacity: 0.75; */   /* Optional: Adjust opacity of the glow */
+}
+
+.aurora-border:hover::before {
+  animation-duration: 5s; /* Speed up animation */
+  /* opacity: 1; */ /* Make it more opaque */
+}
 
 /* Markdown content */
 .markdown-content ul {

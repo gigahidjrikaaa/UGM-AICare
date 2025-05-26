@@ -67,7 +67,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Apply conditional blur and pointer-events here */}
       <div
         className={cn(
-            "flex-1 flex flex-col overflow-x-hidden overflow-y-auto transition-filter duration-300", // Use overflow-hidden on the wrapper
+            "flex-1 flex flex-col overflow-x-hidden h-full transition-filter duration-300", // Use overflow-hidden on the wrapper
             isSidebarOpen ? "blur-sm pointer-events-none" : ""
         )}
         >
@@ -75,7 +75,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         <Header onToggleSidebar={toggleSidebar}/>
 
         {/* Content area - allow scrolling */}
-        <main className="flex-1 min-h-screen overflow-x-hidden overflow-y-auto bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 relative z-10">
+        <main className="flex-1 min-h-fit h-full overflow-hidden bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 relative z-10">
             {/* Particle Background can go here or in RootLayout */}
             {/* <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
                  <ParticleBackground ... />
