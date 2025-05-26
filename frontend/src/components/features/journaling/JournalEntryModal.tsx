@@ -5,9 +5,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '@/services/api'; // Use your configured client
 import { format, parseISO } from 'date-fns';
 import { Dialog, Transition } from '@headlessui/react';
-import { FiSave, FiLoader, FiX, FiMessageSquare, FiChevronDown } from 'react-icons/fi';
-import type { JournalPromptResponse, JournalEntryItem } from '@/types/api'; // Import new types
-import { getActiveJournalPrompts, saveJournalEntry } from '@/services/api'; // Import new service
+import { FiSave, FiLoader, FiX, FiMessageSquare, FiChevronDown, FiInfo } from 'react-icons/fi';
+import { getActiveJournalPrompts, saveJournalEntry, getMyJournalReflections } from '@/services/api'; // Add getMyJournalReflections
+import type { JournalPromptResponse, JournalEntryItem, JournalReflectionPointResponse } from '@/types/api'; // Add JournalReflectionPointResponse
 import { toast } from 'react-hot-toast';
 
 interface JournalEntryModalProps {
@@ -32,6 +32,9 @@ export default function JournalEntryModal({
     const [prompts, setPrompts] = useState<JournalPromptResponse[]>([]);
     const [selectedPromptId, setSelectedPromptId] = useState<number | null>(null);
     const [isFetchingPrompts, setIsFetchingPrompts] = useState(false);
+    
+    const [reflectionPoints, setReflectionPoints] = useState<JournalReflectionPointResponse[]>([]); // New state
+    const [isFetchingReflections, setIsFetchingReflections] = useState(false); // New state
 
     const fetchEntryForDate = useCallback(async (dateToFetch: string) => {
         setIsFetchingEntry(true);
@@ -76,22 +79,39 @@ export default function JournalEntryModal({
         }
     }, []);
 
+    const fetchReflectionPoints = useCallback(async () => {
+        if (!isOpen) return; // Only fetch if modal is open
+        setIsFetchingReflections(true);
+        try {
+            const fetchedReflections = await getMyJournalReflections();
+            setReflectionPoints(fetchedReflections);
+        } catch (err) {
+            // Error is handled in getMyJournalReflections, it returns []
+            console.error("Error fetching reflection points in component:", err);
+            // Optionally show a subtle toast if needed, but api.ts handles logging
+        } finally {
+            setIsFetchingReflections(false);
+        }
+    }, [isOpen]);
+
     useEffect(() => {
         if (isOpen) {
             const dateToUse = initialDate || format(new Date(), 'yyyy-MM-dd');
             setEntryDate(dateToUse);
             fetchEntryForDate(dateToUse);
-            if (prompts.length === 0) { // Fetch prompts if not already fetched
+            if (prompts.length === 0) {
                 fetchPrompts();
             }
+            fetchReflectionPoints(); // Fetch reflections when modal opens or initialDate changes
         } else {
             // Reset state when modal closes
             setContent('');
             setSelectedPromptId(null);
             setError(null);
+            setReflectionPoints([]); // Clear reflections
         }
-    }, [isOpen, initialDate, fetchEntryForDate, fetchPrompts, prompts.length]);
-
+    }, [isOpen, initialDate, fetchEntryForDate, fetchPrompts, prompts.length, fetchReflectionPoints]);
+    
     const handleSave = async () => {
         if (!content.trim()) {
             setError("Journal content cannot be empty.");
@@ -106,7 +126,8 @@ export default function JournalEntryModal({
                 prompt_id: selectedPromptId,
             });
             toast.success('Journal entry saved!');
-            onSaveSuccess();
+            onSaveSuccess(); // This should trigger a refetch of calendar data in parent
+            fetchReflectionPoints(); // Refetch reflections after saving, as new ones might be generated soon
         } catch (err: unknown) {
             console.error("Error saving journal entry:", err);
             const errorMessage = err instanceof Error ? err.message : "Failed to save entry. Please try again.";
@@ -187,6 +208,26 @@ export default function JournalEntryModal({
                                     </div>
                                 )}
                             </div>
+
+                            {/* AI Reflection Points / Personalized Prompts */}
+                            {isFetchingReflections && (
+                                <div className="mt-4 text-sm text-gray-400">Loading insights...</div>
+                            )}
+                            {!isFetchingReflections && reflectionPoints.length > 0 && (
+                                <div className="mt-4 p-3 bg-ugm-blue-dark/30 rounded-md border border-ugm-blue-light/30">
+                                    <h4 className="text-sm font-medium text-ugm-gold-light mb-2 flex items-center">
+                                        <FiInfo className="inline mr-2" />
+                                        Some things you might want to reflect on:
+                                    </h4>
+                                    <ul className="space-y-2">
+                                        {reflectionPoints.map(reflection => (
+                                            <li key={reflection.id} className="text-xs text-gray-300 italic pl-2 border-l-2 border-ugm-gold-light/50">
+                                                {reflection.reflection_text}
+                                            </li>
+                                        ))}
+                                    </ul>
+                                </div>
+                            )}
 
                             <textarea
                                 rows={8}

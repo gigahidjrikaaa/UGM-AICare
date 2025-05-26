@@ -16,6 +16,9 @@ logger = logging.getLogger(__name__)
 if os.getenv("APP_ENV", "development") == "production":
     # Use PostgreSQL in production
     DATABASE_URL = os.getenv("DATABASE_URL")
+    if DATABASE_URL is None:
+        logger.error("DATABASE_URL environment variable not set for production.")
+        raise ValueError("DATABASE_URL environment variable not set for production.")
     engine = create_engine(DATABASE_URL)
 else:
     # Use SQLite for development

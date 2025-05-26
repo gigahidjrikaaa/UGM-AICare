@@ -1,7 +1,14 @@
 // frontend/src/services/api.ts
 
 import axios from 'axios';
-import type { ChatRequestPayload, ChatResponsePayload, JournalPromptResponse, JournalEntryItem } from '@/types/api'; // Import types
+import type {
+  ChatRequestPayload,
+  ChatResponsePayload,
+  JournalPromptResponse,
+  JournalEntryItem,
+  JournalReflectionPointResponse // Add this type
+} from '@/types/api'; // Import types
+import toast from 'react-hot-toast';
 
 // Define the base URL for your backend API
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL + "/api/v1" || 'http://localhost:8000/api/v1'; // Adjust if needed
@@ -134,5 +141,28 @@ export const saveJournalEntry = async (payload: JournalEntryPayload): Promise<Jo
       errorMessage = error.message;
     }
     throw new Error(errorMessage);
+  }
+};
+
+// --- Journal Reflection Points API ---
+export const getMyJournalReflections = async (limit: number = 5): Promise<JournalReflectionPointResponse[]> => {
+  try {
+    const response = await apiClient.get<JournalReflectionPointResponse[]>(`/journal-prompts/reflections/me`, {
+      params: { limit }
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching journal reflections:', error);
+    let errorMessage = 'Failed to load personalized reflections.';
+    if (axios.isAxiosError(error) && error.response) {
+      errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    // Don't throw an error that stops the modal, just log and return empty or show a subtle message in UI
+    // throw new Error(errorMessage); 
+    console.warn(errorMessage); // Log the error for debugging
+    toast.error(errorMessage); // Show a toast notification for user feedback
+    return []; // Return empty array on error so UI doesn't break
   }
 };
