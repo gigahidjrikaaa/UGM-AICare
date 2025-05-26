@@ -33,9 +33,9 @@ async def create_or_update_journal_entry(
 
     if existing_entry:
         # Update existing entry
-        existing_entry.content = entry_data.content
-        existing_entry.prompt_id = entry_data.prompt_id # Update prompt_text
-        existing_entry.updated_at = datetime.now()
+        existing_entry.content = entry_data.content  # type: ignore[assignment]
+        existing_entry.prompt_id = entry_data.prompt_id  # type: ignore[assignment] # Update prompt_text
+        existing_entry.updated_at = datetime.now()  # type: ignore[assignment]
         db.add(existing_entry)
         db.commit()
         db.refresh(existing_entry)

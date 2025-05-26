@@ -4,7 +4,7 @@ import re
 from sqlalchemy.orm import Session as DBSession # DBSession is a common alias for SQLAlchemy session
 from sqlalchemy import desc
 from fastapi import APIRouter, HTTPException, Body, Depends, status, BackgroundTasks, Query # type: ignore
-from typing import Any, List, Dict, Optional, Literal
+from typing import Any, List, Dict, Optional, Literal, cast
 from datetime import datetime, timedelta # Import datetime
 import logging
 
@@ -80,10 +80,11 @@ async def handle_chat_request(
                 initial_module_data: CBTModuleData = {}
                 try:
                     # Get the first prompt using the new CBT logic
-                    aika_response_text = get_module_step_prompt(module_id, initial_step, initial_module_data)
-                    if aika_response_text is None:
+                    prompt_result = get_module_step_prompt(module_id, initial_step, initial_module_data)
+                    if prompt_result is None:
                         logger.error(f"Could not find module or step 1 for module_id: {module_id}")
                         raise HTTPException(status_code=404, detail=f"Module {module_id} or its first step not found.")
+                    aika_response_text = prompt_result
 
                     # Set initial module state in Redis, now including module_data
                     await set_module_state(session_id, module_id, initial_step, initial_module_data)
@@ -139,22 +140,26 @@ async def handle_chat_request(
                     )
 
                     if action == "complete_module":
-                        aika_response_text = get_module_step_prompt(module_id, current_step_id, updated_module_data) # Get prompt of the completing step
-                        if aika_response_text is None: # Fallback if completing step has no prompt
+                        completion_prompt = get_module_step_prompt(module_id, current_step_id, updated_module_data) # Get prompt of the completing step
+                        if completion_prompt is None: # Fallback if completing step has no prompt
                             aika_response_text = "Modul telah selesai. Terima kasih!"
+                        else:
+                            aika_response_text = completion_prompt
                         await clear_module_state(session_id)
                         logger.info(f"MODULE_COMPLETE: Module {module_id} completed for session {session_id}. State cleared.")
                         module_just_completed_id = module_id
                     else:
                         await set_module_state(session_id, module_id, next_step_id, updated_module_data)
-                        aika_response_text = get_module_step_prompt(module_id, next_step_id, updated_module_data)
-                        if aika_response_text is None:
+                        prompt_result = get_module_step_prompt(module_id, next_step_id, updated_module_data)
+                        if prompt_result is None:
                             logger.error(f"Could not find next step prompt for module {module_id}, step {next_step_id}")
                             # This case might mean module ended without explicit "complete_module"
                             # Or an issue in module definition.
                             await clear_module_state(session_id) # Clear state to prevent loop
                             aika_response_text = "Sepertinya ada sedikit kendala dengan langkah selanjutnya di modul ini. Mari kita coba lagi nanti atau kembali ke percakapan biasa."
                             module_just_completed_id = module_id
+                        else:
+                            aika_response_text = prompt_result
 
 
                 except Exception as e:
@@ -207,7 +212,7 @@ async def handle_chat_request(
                         .order_by(UserSummary.timestamp.desc())\
                         .first()
 
-                    if latest_summary and latest_summary.summary_text:
+                    if latest_summary and latest_summary.summary_text is not None and latest_summary.summary_text.strip():
                         summary_snippet = latest_summary.summary_text
 
                         # Light cleaning for any lingering formal prefixes, just in case
@@ -267,13 +272,13 @@ async def handle_chat_request(
 
                     is_new_session = False
                     if latest_db_message_for_user:
-                        if latest_db_message_for_user.session_id != session_id:
+                        if str(latest_db_message_for_user.session_id) != str(session_id):
                             previous_session_id_to_summarize = latest_db_message_for_user.session_id
                             is_new_session = True
                             logger.info(f"STANDARD_CHAT: New session detected ({session_id}). Previous DB session: {previous_session_id_to_summarize}. Triggering summary for previous session.")
-                            background_tasks.add_task(summarize_and_save, user_id, previous_session_id_to_summarize, db_session_creator=get_background_db) # Pass db_session_creator
+                            background_tasks.add_task(summarize_and_save, cast(int, current_user.id), cast(str, previous_session_id_to_summarize), db_session_creator=get_background_db) # Pass db_session_creator
                         else: # Check for new conversation within the same session
-                            if latest_db_message_for_user.conversation_id != conversation_id:
+                            if str(latest_db_message_for_user.conversation_id) != str(conversation_id):
                                 is_new_session = True # Treat as new context for summary injection
                                 logger.info(f"STANDARD_CHAT: New conversation detected ({conversation_id}) in existing session {session_id}. Will inject summary if available.")
 
@@ -403,11 +408,14 @@ async def handle_chat_request(
 
 
 # --- Define the Summarization Function ---
-async def summarize_and_save(user_id: int, session_id_to_summarize: str, db_session_creator: Optional[DBSession] = None):
+async def summarize_and_save(user_id: int, session_id_to_summarize: str, db_session_creator = None):
     """Fetches history, calls LLM to summarize, and saves to UserSummary table."""
     logger.info(f"Background Task: Starting summarization for user {user_id}, session {session_id_to_summarize}")
     # --- Use a dedicated DB session for the background task ---
-    db: DBSession = next(db_session_creator())
+    if db_session_creator:
+        db: DBSession = next(db_session_creator())
+    else:
+        db: DBSession = SessionLocal()
     try:
         # 1. Retrieve conversation history
         conversation_history = db.query(Conversation)\
