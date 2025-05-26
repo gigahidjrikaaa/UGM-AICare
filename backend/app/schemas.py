@@ -273,12 +273,31 @@ class JournalEntryUpdate(BaseModel):
     content: Optional[str] # Allow updating only content for a specific date
     prompt_id: Optional[int] = None # Allow updating prompt_text too, if desired
 
-class JournalEntryResponse(JournalEntryBase):
+#? --- Journal Reflection Point Schemas ---
+class JournalReflectionPointBase(BaseModel):
+    reflection_text: str
+    # Optional: reflection_category: Optional[str] = None
+
+class JournalReflectionPointCreate(JournalReflectionPointBase):
+    journal_entry_id: int
+    user_id: int
+
+class JournalReflectionPointResponse(JournalReflectionPointBase):
+    id: int
+    journal_entry_id: int
+    user_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class JournalEntryResponse(JournalEntryBase): # Modify existing schema
     id: int
     user_id: int
     created_at: datetime
     updated_at: datetime
-    prompt: Optional[JournalPromptResponse] = None # Include the full prompt object in the response
+    prompt: Optional[JournalPromptResponse] = None
+    reflection_points: List[JournalReflectionPointResponse] = [] # Add this line
 
     class Config:
         from_attributes = True
