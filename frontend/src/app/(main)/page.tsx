@@ -6,6 +6,7 @@ import { useState, useEffect } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { FaComments, FaHeartbeat, FaLock, FaArrowRight } from 'react-icons/fa';
 import { HiChevronRight } from 'react-icons/hi';
+import { FiAlertTriangle, FiPhone, FiHeart } from 'react-icons/fi'; // Added FiAlertTriangle, FiPhone, FiHeart
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 
@@ -179,8 +180,57 @@ export default function Home() {
         </motion.div>
       </section>
       
+      {/* Immediate Crisis Support Section - Enhanced Affectionate Tone */}
+      <section className="relative py-16 sm:py-20 bg-gradient-to-b from-[#00308F] to-[#002A7A]">
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8, delay: 0.2 }}
+          className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8"
+        >
+          <div className="bg-gradient-to-br from-white/10 via-white/5 to-transparent backdrop-blur-lg p-6 sm:p-8 rounded-2xl border-2 border-yellow-400/60 shadow-xl relative overflow-hidden">
+            {/* Accent Glow - slightly softer */}
+            <div className="absolute -top-1/2 -left-1/2 w-full h-full bg-yellow-400/15 blur-[80px] rounded-full animate-pulse opacity-60"></div>
+            
+            <div className="relative z-10 flex flex-col md:flex-row items-center md:items-start text-center md:text-left gap-6">
+              <FiHeart className="text-yellow-400 text-5xl sm:text-6xl flex-shrink-0 mb-4 md:mb-0 md:mr-6 opacity-80" /> {/* Changed icon to FiHeart for warmth */}
+              <div>
+                <h2 className="text-2xl sm:text-3xl font-bold text-white mb-3">
+                  Your Wellbeing is Our Priority
+                </h2>
+                <p className="text-yellow-100/90 text-sm sm:text-base mb-2 leading-relaxed">
+                  If you're going through a difficult time or feel you're in immediate danger, please know that <strong className="font-semibold text-yellow-200">you are not alone and help is available.</strong> Your safety is paramount.
+                </p>
+                <p className="text-yellow-100/80 text-xs sm:text-sm mb-5 leading-relaxed">
+                  Aika is here to support your journey, but for urgent crisis situations, reaching out to dedicated emergency services is the most important step.
+                </p>
+                <div className="flex flex-col sm:flex-row justify-center md:justify-start gap-4">
+                  <motion.a
+                    href="tel:112" // National Emergency Number for Indonesia
+                    whileHover={{ scale: 1.05, backgroundColor: "rgba(255, 202, 64, 0.95)", color: "#001D58" }}
+                    whileTap={{ scale: 0.98 }}
+                    className="px-5 py-2.5 bg-yellow-400/80 text-white rounded-lg font-semibold text-sm sm:text-base flex items-center justify-center backdrop-blur-md border border-yellow-400/60 shadow-lg w-full sm:w-auto transition-all"
+                  >
+                    <FiPhone className="mr-2" /> Call Emergency: 112
+                  </motion.a>
+                  <motion.a
+                    href="tel:119;ext=8" // Kemenkes Mental Health Hotline
+                    whileHover={{ scale: 1.05, backgroundColor: "rgba(255, 255, 255, 0.3)" }} // Slightly more opaque hover
+                    whileTap={{ scale: 0.98 }}
+                    className="px-5 py-2.5 bg-white/20 text-white rounded-lg font-semibold text-sm sm:text-base flex items-center justify-center backdrop-blur-md border border-white/25 shadow-lg w-full sm:w-auto transition-all"
+                  >
+                    <FiHeart className="mr-2" /> Kemenkes Sejiwa: 119 (ext. 8)
+                  </motion.a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+      </section>
+      
       {/* Features Section with Glass Morphism */}
-      <section className="relative py-24 bg-gradient-to-b from-[#001D58] to-[#00308F]">
+      <section className="relative py-24 bg-gradient-to-b from-[#002A7A] to-[#001D58]"> {/* Adjusted background gradient */}
         <motion.div 
           style={{ scale: featureScale }}
           className="max-w-7xl mx-auto px-4 relative z-10"
@@ -236,7 +286,7 @@ export default function Home() {
                 initial={{ opacity: 0, y: 30 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
-                transition={{ duration: 0.8, delay: 0.3 + feature.delay }}
+                transition={{ duration: 0.8, delay: 0.3 + feature.delay }} // Adjusted delay to account for new section
                 whileHover={{ translateY: -8 }}
                 className="group"
               >
