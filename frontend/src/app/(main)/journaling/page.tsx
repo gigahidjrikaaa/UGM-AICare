@@ -11,6 +11,7 @@ import StreakDisplay from '@/components/features/journaling/StreakDisplay';
 import apiClient from '@/services/api'; // Import API client
 import { startOfMonth, format } from 'date-fns';
 import JournalEntryModal from '@/components/features/journaling/JournalEntryModal';
+import toast from 'react-hot-toast';
 
 type JournalTab = 'history' | 'daily';
 
@@ -60,6 +61,7 @@ export default function JournalingPage() {
             setLongestStreak(response.data.longestStreak || 0); // Set longest streak
         } catch (err) {
             console.error("Error fetching activity summary:", err);
+            toast.error("Failed to load activity data: " + (err instanceof Error ? err.message : "Unknown error"));
             setCalendarError("Failed to load activity data.");
             setActivityData({});
             setCurrentStreak(0); // Reset streak on error
@@ -74,8 +76,9 @@ export default function JournalingPage() {
         fetchActivityData(currentMonth);
     }, [currentMonth, fetchActivityData]);
 
-    const handleCalendarDateClick = (date: Date) => {
-        setSelectedDateForModal(format(date, 'yyyy-MM-dd'));
+    // Unified handler to open the journal modal with a specific date string
+    const handleOpenJournalModal = (dateString?: string) => {
+        setSelectedDateForModal(dateString); // dateString is 'yyyy-MM-dd' or undefined
         setIsModalOpen(true);
     };
 
@@ -101,7 +104,8 @@ export default function JournalingPage() {
                             activityData={activityData}
                             onMonthChange={setCurrentMonth}
                             isLoading={isCalendarLoading}
-                            onDateClick={handleCalendarDateClick}
+                            // Update ActivityCalendar's onDateClick to use the new handler
+                            onDateClick={(date) => handleOpenJournalModal(date ? format(date, 'yyyy-MM-dd') : undefined)}
                         />
                         {calendarError && <p className='text-red-400 text-sm text-center -mt-4 mb-2'>{calendarError}</p>}
                     </div>
@@ -178,7 +182,10 @@ export default function JournalingPage() {
                 <Suspense fallback={<AikaPageSkeleton />}>
                     {activeTab === 'daily' && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} >
-                            <DailyJournal key={`daily-journal-${dailyJournalRefreshKey}`} />
+                            <DailyJournal 
+                                // Pass the new unified handler to DailyJournal
+                                onOpenModalRequest={handleOpenJournalModal}
+                                refreshKey={dailyJournalRefreshKey} />
                         </motion.div>
                     )}
                     {activeTab === 'history' && (
@@ -188,12 +195,15 @@ export default function JournalingPage() {
                     )}
                 </Suspense>
             </div>
-            <JournalEntryModal
-                isOpen={isModalOpen}
-                onClose={() => setIsModalOpen(false)}
-                onSaveSuccess={handleModalSaveSuccess}
-                initialDate={selectedDateForModal}
-            />
+            {/* Conditionally render modal to ensure its internal state (like fetched entry) resets if initialDate changes */}
+            {isModalOpen && (
+                <JournalEntryModal
+                    isOpen={isModalOpen}
+                    onClose={() => setIsModalOpen(false)}
+                    onSaveSuccess={handleModalSaveSuccess}
+                    initialDate={selectedDateForModal}
+                />
+            )}
         </div>
     );
 }

@@ -6,6 +6,7 @@ import axios from 'axios';
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from 'framer-motion'; // Import animation library
 import { FiArrowLeft, FiArrowRight, FiSend, FiXCircle } from 'react-icons/fi'; // Example icons
+import apiClient from '@/services/api'; // Import your configured apiClient
 
 // --- Types (Keep existing types) ---
 type GoalAchievedOption = 'Yes' | 'No' | 'Partially' | null;
@@ -139,8 +140,9 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmitSuccess })
         setError(null);
 
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-            const backendUrl = `${baseUrl}/api/v1/feedback`;
+            // The apiClient already has the baseUrl configured.
+            // The endpoint in feedback.py is /feedback, and apiClient's baseUrl includes /api/v1
+            const endpoint = "/feedback"; 
 
             const payload = {
                 user_identifier: hashedUserId,
@@ -153,27 +155,46 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmitSuccess })
                 improvement_suggestion: answers.improvementSuggestion.trim(),
             };
 
-            console.log("Submitting final feedback payload:", payload);
-            await axios.post(backendUrl, payload);
+            console.log("Submitting final feedback payload to " + endpoint + ":", payload);
+            // Use apiClient.post instead of axios.post
+            await apiClient.post(endpoint, payload);
 
             onSubmitSuccess();
             onClose();
 
         } catch (err) {
-             // Keep existing detailed error handling logic...
-            console.error("Feedback submission error:", err);
-            let message = "Failed to submit feedback. Please try again later.";
-            if (axios.isAxiosError(err)) { 
+            console.error("Feedback submission error object:", err); 
+            let displayMessage = "Failed to submit feedback. Please try again later.";
+            if (axios.isAxiosError(err)) {
                 if (err.response) {
-                    message = `Error: ${err.response.data.detail || err.response.statusText}`;
+                    console.error("Backend error response data:", err.response.data); 
+                    if (err.response.data && err.response.data.detail) {
+                        if (Array.isArray(err.response.data.detail)) {
+                            const firstError = err.response.data.detail[0];
+                            // Check if 'loc' exists and is an array before trying to slice/join
+                            const fieldPath = (firstError.loc && Array.isArray(firstError.loc) && firstError.loc.length > 1)
+                                ? firstError.loc.slice(1).join(' > ') 
+                                : (firstError.loc && Array.isArray(firstError.loc) && firstError.loc.length === 1 && firstError.loc[0] === 'authorization') 
+                                    ? 'Authorization Header' // Specific message for authorization header
+                                    : 'N/A';
+                            displayMessage = `Validation Error: ${firstError.msg} (Field: ${fieldPath})`;
+                        } else if (typeof err.response.data.detail === 'string') {
+                            displayMessage = `Error: ${err.response.data.detail}`;
+                        } else {
+                            displayMessage = `Server error (Status ${err.response.status}): ${err.response.statusText || 'Unknown error'}`;
+                        }
+                    } else {
+                        displayMessage = `Server error (Status ${err.response.status}): ${err.response.statusText || 'No detail provided'}`;
+                    }
                 } else if (err.request) {
-                    message = "No response received from the server.";
+                    displayMessage = "No response received from the server. Please check your connection.";
                 } else {
-                    message = `Error: ${err.message}`;
+                    displayMessage = `Request setup error: ${err.message}`;
                 }
+            } else if (err instanceof Error) {
+                displayMessage = `Client error: ${err.message}`;
             }
-            else if (err instanceof Error) { message = `Error: ${err.message}`; }
-            setError(message);
+            setError(displayMessage);
         } finally {
             setIsLoading(false);
         }
