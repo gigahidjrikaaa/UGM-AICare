@@ -32,34 +32,6 @@ declare module "next-auth/jwt" {
   }
 }
 
-
-// Environment variables type checking
-const checkEnvVariables = () => {
-  const requiredEnvVars = [
-    'NEXTAUTH_SECRET',
-    'GOOGLE_CLIENT_ID',
-    'GOOGLE_CLIENT_SECRET',
-    'NEXTAUTH_URL',
-    'INTERNAL_API_KEY',
-    'NEXT_PUBLIC_API_URL',
-    'ADMIN_EMAIL',
-    'ADMIN_PASSWORD'
-  ];
-  
-  const missingEnvVars = requiredEnvVars.filter(
-    varName => !process.env[varName]
-  );
-  
-  if (missingEnvVars.length > 0) {
-    console.error(
-      `Missing recommended environment variables: ${missingEnvVars.join(', ')}. Some features might fail.`
-    );
-  }
-};
-
-// Execute environment variable check
-checkEnvVariables();
-
 // Interface for the response from GET /internal/user-by-sub
 interface InternalUserResponse {
   id: number; // DB Primary Key

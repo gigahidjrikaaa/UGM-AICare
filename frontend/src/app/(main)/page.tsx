@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
 import { FaComments, FaHeartbeat, FaLock, FaArrowRight } from 'react-icons/fa';
 import { HiChevronRight } from 'react-icons/hi';
-import { FiAlertTriangle, FiPhone, FiHeart } from 'react-icons/fi'; // Added FiAlertTriangle, FiPhone, FiHeart
+import { FiPhone, FiHeart } from 'react-icons/fi'; // Added FiAlertTriangle, FiPhone, FiHeart
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 
@@ -200,7 +200,7 @@ export default function Home() {
                   Your Wellbeing is Our Priority
                 </h2>
                 <p className="text-yellow-100/90 text-sm sm:text-base mb-2 leading-relaxed">
-                  If you're going through a difficult time or feel you're in immediate danger, please know that <strong className="font-semibold text-yellow-200">you are not alone and help is available.</strong> Your safety is paramount.
+                  If you&apos;re going through a difficult time or feel you&apos;re in immediate danger, please know that <strong className="font-semibold text-yellow-200">you are not alone and help is available.</strong> Your safety is paramount.
                 </p>
                 <p className="text-yellow-100/80 text-xs sm:text-sm mb-5 leading-relaxed">
                   Aika is here to support your journey, but for urgent crisis situations, reaching out to dedicated emergency services is the most important step.
