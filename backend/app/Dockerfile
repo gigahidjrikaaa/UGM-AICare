@@ -8,7 +8,12 @@ FROM python:3.13-slim-bookworm as builder
 WORKDIR /app
 
 # Install build dependencies (if any beyond what python image provides for wheel building)
-# RUN apt-get update && apt-get install -y --no-install-recommends gcc python3-dev build-essential && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc \
+    python3-dev \
+    build-essential \
+    # Add any other specific build-time system dependencies if needed by other packages
+    && rm -rf /var/lib/apt/lists/*
 
 # Install Python dependencies
 COPY requirements.txt .
