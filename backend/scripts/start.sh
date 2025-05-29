@@ -2,9 +2,12 @@
 set -e # Exit immediately if a command exits with a non-zero status.
 
 # Run database migrations
-# Assuming Alembic is used, adjust if using another migration tool
-echo "Running database migrations..."
-alembic upgrade head
+echo "Running database migrations for PostgreSQL VM..."
+# Specify the config file and the script directory if it's not the default 'alembic'
+# The -x dir option tells alembic where the script directory is relative to the ini file.
+# However, if script_location in alembic_pg_vm.ini is set correctly (e.g. to "alembic_pg_vm"),
+# just -c should be enough.
+alembic -c alembic_pg_vm.ini upgrade head
 
 # Start the FastAPI application with Gunicorn
 echo "Starting FastAPI application with Gunicorn..."

@@ -88,7 +88,7 @@ services:
       args:
         # Pass build arguments for NEXT_PUBLIC_ variables
         # These values should be in your .env file or set in the VM's environment
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1} # Backend runs on 8000
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/} # Backend runs on 8000
         # Add other NEXT_PUBLIC_ args here
     ports:
       - "4000:3000" # Map host port 4000 to container port 3000
