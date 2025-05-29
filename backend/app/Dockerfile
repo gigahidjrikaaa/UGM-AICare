@@ -12,8 +12,18 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     gcc \
     python3-dev \
     build-essential \
-    # Add any other specific build-time system dependencies if needed by other packages
+    curl \
+    # For Rust installation
+    && curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable \
+    && export PATH="/root/.cargo/bin:${PATH}" \
+    # Verify Rust installation (optional)
+    && rustc --version \
+    && cargo --version \
+    # Clean up
     && rm -rf /var/lib/apt/lists/*
+
+# Add Rust to PATH for subsequent RUN commands
+ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Install Python dependencies
 COPY requirements.txt .
