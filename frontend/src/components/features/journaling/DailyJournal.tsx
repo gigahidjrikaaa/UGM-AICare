@@ -2,20 +2,24 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from 'react';
-import apiClient from '@/services/api'; // Use your configured client
+import apiClient from '@/services/api'; 
 import { format, parseISO } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { FiPlusSquare, FiBookOpen, FiLoader, FiMessageSquare } from 'react-icons/fi'; // Added FiMessageSquare
-import JournalEntryModal from './JournalEntryModal';
+import { FiPlusSquare, FiBookOpen, FiLoader, FiMessageSquare } from 'react-icons/fi';
 import ReactMarkdown from 'react-markdown';
-import type { JournalEntryItem } from '@/types/api'; // Use the updated type
+import type { JournalEntryItem } from '@/types/api';
 
-export default function DailyJournal() {
-    const [allEntries, setAllEntries] = useState<JournalEntryItem[]>([]); // Use JournalEntryItem
+interface DailyJournalProps {
+  // Called when DailyJournal wants to open the modal for a new or existing entry
+  onOpenModalRequest: (date?: string) => void; 
+  // A key that changes when the parent wants DailyJournal to refresh its entries
+  refreshKey?: number; 
+}
+
+export default function DailyJournal({ onOpenModalRequest, refreshKey }: DailyJournalProps) {
+    const [allEntries, setAllEntries] = useState<JournalEntryItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [isModalOpen, setIsModalOpen] = useState(false);
-    const [selectedDateForModal, setSelectedDateForModal] = useState<string | undefined>(undefined);
 
     const fetchAllEntries = useCallback(async () => {
         setIsLoading(true);
@@ -34,17 +38,7 @@ export default function DailyJournal() {
 
     useEffect(() => {
         fetchAllEntries();
-    }, [fetchAllEntries]);
-
-    const handleModalSaveSuccess = () => {
-        setIsModalOpen(false);
-        fetchAllEntries();
-    };
-
-    const openModalForDate = (date?: string) => {
-        setSelectedDateForModal(date);
-        setIsModalOpen(true);
-    };
+    }, [fetchAllEntries, refreshKey]); // Add refreshKey to dependencies
 
     return (
         <div className="space-y-6">
@@ -53,7 +47,7 @@ export default function DailyJournal() {
                     <FiBookOpen className="mr-3 text-[#FFCA40]" /> Your Journal Entries
                 </h2>
                 <button
-                    onClick={() => openModalForDate(format(new Date(), 'yyyy-MM-dd'))}
+                    onClick={() => onOpenModalRequest(format(new Date(), 'yyyy-MM-dd'))}
                     className="px-4 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg text-white font-medium flex items-center transition"
                 >
                     <FiPlusSquare className="mr-2" /> Add/Edit Today&apos;s Entry
@@ -76,10 +70,10 @@ export default function DailyJournal() {
                         <div 
                             key={entry.id} 
                             className="bg-white/5 p-4 rounded-lg border border-white/10 cursor-pointer hover:bg-white/10 transition-colors"
-                            onClick={() => openModalForDate(entry.entry_date)} // Allow editing existing entries
+                            onClick={() => onOpenModalRequest(entry.entry_date)} // Use prop to request modal opening
                             role="button"
                             tabIndex={0}
-                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') openModalForDate(entry.entry_date);}}
+                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpenModalRequest(entry.entry_date);}}
                         >
                             <h3 className="font-semibold text-[#FFCA40] mb-1">
                                 {format(parseISO(entry.entry_date), 'EEEE, MMMM d, yyyy', { locale: id })}
@@ -103,12 +97,13 @@ export default function DailyJournal() {
                 </div>
             )}
 
-            <JournalEntryModal
+            {/* JournalEntryModal is now rendered and managed by the parent component */}
+            {/* <JournalEntryModal
                 isOpen={isModalOpen}
                 onClose={() => setIsModalOpen(false)}
                 onSaveSuccess={handleModalSaveSuccess}
                 initialDate={selectedDateForModal}
-            />
+            /> */}
         </div>
     );
 }

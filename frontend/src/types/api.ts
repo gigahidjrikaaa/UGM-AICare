@@ -53,15 +53,29 @@ export interface JournalPromptResponse {
   text: string;
   category?: string | null;
   is_active: boolean;
+  created_at: string; 
+  updated_at: string;
 }
 
 // --- Journal Entry Types ---
 // This can be used by DailyJournal.tsx for its allEntries state
 export interface JournalEntryItem {
   id: number;
+  user_id: number;
   entry_date: string; // yyyy-MM-dd
   content: string;
   created_at: string;
   updated_at: string;
+  prompt_id?: number | null;
   prompt?: JournalPromptResponse | null; // Include the prompt object
+  reflection_points?: JournalReflectionPointResponse[];
+}
+
+export interface JournalReflectionPointResponse {
+  id: number;
+  journal_entry_id: number;
+  user_id: number;
+  reflection_text: string;
+  // reflection_category?: string | null; // Uncomment if you add this field in the backend schema
+  created_at: string; // ISO date string
 }

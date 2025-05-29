@@ -119,6 +119,10 @@ class ChatResponse(BaseModel):
     history: List[Dict[str, str]] = Field(..., description="The updated conversation history")
     module_completed_id: Optional[str] = Field(None, description="If a module was just completed, this will be its ID.")
 
+    model_config = {
+        "protected_namespaces": ()
+    }
+
 class ConversationHistoryItem(BaseModel):
     role: str
     content: str
@@ -209,8 +213,8 @@ class FeedbackCreate(BaseModel):
     category: Optional[str] = None 
 
     # Ensure Pydantic V2 compatibility if needed
-    # class Config:
-    #    from_attributes = True
+    class Config:
+       from_attributes = True
 
 class FeedbackResponse(BaseModel):
     id: int
@@ -227,7 +231,7 @@ class UserInternalResponse(BaseModel):
     allow_email_checkins: bool = True # Whether user wants email check-ins
 
     class Config:
-         orm_mode = True
+        from_attributes = True # Or orm_mode = True for Pydantic v2
         
 #? --- Schemas for POST /internal/sync-user ---
 class UserSyncPayload(BaseModel):
@@ -273,12 +277,31 @@ class JournalEntryUpdate(BaseModel):
     content: Optional[str] # Allow updating only content for a specific date
     prompt_id: Optional[int] = None # Allow updating prompt_text too, if desired
 
-class JournalEntryResponse(JournalEntryBase):
+#? --- Journal Reflection Point Schemas ---
+class JournalReflectionPointBase(BaseModel):
+    reflection_text: str
+    # Optional: reflection_category: Optional[str] = None
+
+class JournalReflectionPointCreate(JournalReflectionPointBase):
+    journal_entry_id: int
+    user_id: int
+
+class JournalReflectionPointResponse(JournalReflectionPointBase):
+    id: int
+    journal_entry_id: int
+    user_id: int
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class JournalEntryResponse(JournalEntryBase): # Modify existing schema
     id: int
     user_id: int
     created_at: datetime
     updated_at: datetime
-    prompt: Optional[JournalPromptResponse] = None # Include the full prompt object in the response
+    prompt: Optional[JournalPromptResponse] = None
+    reflection_points: List[JournalReflectionPointResponse] = [] # Add this line
 
     class Config:
         from_attributes = True
@@ -310,7 +333,7 @@ class EarnedBadgeInfo(BaseModel):
     image_url: Optional[str] = None
 
     class Config:
-        orm_mode = True # Or from_attributes = True for Pydantic v2
+        from_attributes = True # or orm_mode = True for Pydantic v2
 
 #? --- Pydantic Model for User Profile Response ---
 class UserProfileResponse(BaseModel):
@@ -323,7 +346,7 @@ class UserProfileResponse(BaseModel):
     allow_email_checkins: bool = True # Whether user wants email check-ins
 
     class Config:
-        orm_mode = True # or from_attributes = True for Pydantic v2
+        from_attributes = True # Or orm_mode = True for Pydantic v2
     
 #? --- Pydantic Model for Check-in Settings ---
 # Check-in settings model for updating user preferences

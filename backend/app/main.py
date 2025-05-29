@@ -1,6 +1,6 @@
 import json
 import logging
-from fastapi import FastAPI, requests # type: ignore
+from fastapi import FastAPI, Request as FastAPIRequest # type: ignore
 from datetime import datetime, timezone
 from app.database import get_db, init_db
 from sqlalchemy import text
@@ -17,6 +17,8 @@ load_dotenv()
 
 # Initialize database
 init_db()
+
+import requests # For making HTTP requests
 
 # Set up logging
 # Ensure logs directory exists
@@ -154,8 +156,8 @@ async def redis_health_check():
     logger.info("Redis health check endpoint accessed")
     try:
         # Assuming you have a Redis client instance named `redis_client`
-        redis_client = get_redis_client()  # Replace with your actual Redis client initialization
-        pong = redis_client.ping()
+        redis_client = await get_redis_client()  # Replace with your actual Redis client initialization
+        pong = await redis_client.ping()
         if pong:
             return {"status": "healthy", "redis_status": "connected"}
         else:

@@ -3,158 +3,186 @@
 
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import React from 'react';
-import { FiPhone, FiMapPin, FiAlertTriangle, FiUsers, FiGlobe, FiMessageSquare, FiMail } from 'react-icons/fi'; // Example icons
+import { FiPhone, FiAlertTriangle, FiUsers, FiHeart, FiShield } from 'react-icons/fi';
+import ResourceCard, { ResourceCardProps } from '@/components/ui/ResourceCard'; // Import the new ResourceCard
+
+// --- Data for Resources ---
+const ugmResources: ResourceCardProps[] = [
+    {
+        name: "Gadjah Mada Medical Center (GMC)",
+        description: "Provides various medical services, including psychological counseling (\"Konseling Psikologi\"). Offers support for both physical and mental well-being.",
+        targetAudience: "UGM Students, Staff, and General Public (some services)",
+        servicesOffered: ["Medical Consultation", "Psychological Counseling", "Health Checks"],
+        address: "SEKIP Blok L3, Sendowo, Sinduadi, Mlati, Sleman, DIY 55281",
+        phone: "+62 (0274) 551412",
+        whatsapp: "6281328786991", // Admin WhatsApp
+        website: "gmc.ugm.ac.id",
+        operatingHours: "Mon-Fri: 07.30 - 20.00, Sat: 07.30 - 14.00 (Confirm for specific services)",
+        notes: "Psychological counseling may require an appointment. Check website for details.",
+        category: "UGM",
+    },
+    {
+        name: "Health Promoting University (HPU UGM)",
+        description: "Focuses on holistic health services including mental health support, workshops, and community health programs to foster a healthy campus environment.",
+        targetAudience: "UGM Community",
+        servicesOffered: ["Mental Health Support", "Health Workshops", "Community Programs", "Wellness Info"],
+        address: "Jl. Mahoni, Sekip Utara, Yogyakarta",
+        phone: "+62 (0274) 552406",
+        website: "hpu.ugm.ac.id",
+        operatingHours: "Office hours, specific program times vary.",
+        category: "UGM",
+    },
+    {
+        name: "Faculty of Psychology Counseling Services (PPM)",
+        description: "Professional counseling available through the Center for Public Service (Pusat Pelayanan Masyarakat) with licensed psychologists.",
+        targetAudience: "UGM Students, Staff, and General Public",
+        servicesOffered: ["Individual Counseling", "Group Counseling", "Psychological Assessment"],
+        address: "Faculty of Psychology UGM, Jl. Sosio Humaniora Bulaksumur, Yogyakarta",
+        phone: "+62 (0274) 550435",
+        email: "ppm.psikologi@ugm.ac.id",
+        website: "psikologi.ugm.ac.id/ppm",
+        operatingHours: "Appointment-based, check website or contact for availability.",
+        category: "UGM",
+    },
+    {
+        name: "UGM Student Affairs Crisis Line (Ditmawa)",
+        description: "Available for emergency student support 24/7. Managed by the Directorate of Student Affairs for urgent mental health concerns and crisis situations.",
+        targetAudience: "UGM Students",
+        servicesOffered: ["24/7 Crisis Support", "Emergency Mental Health Aid"],
+        phone: "+62 812-2877-3800", // Also WhatsApp
+        whatsapp: "6281228773800",
+        website: "ditmawa.ugm.ac.id",
+        operatingHours: "24/7",
+        notes: "For urgent situations and crisis intervention.",
+        category: "UGM",
+    }
+];
+
+const nationalHotlines: ResourceCardProps[] = [
+    {
+        name: "Kemenkes SEJIWA (Counseling)",
+        description: "Ministry of Health's national mental health counseling service.",
+        targetAudience: "General Public (Indonesia)",
+        servicesOffered: ["Mental Health Counseling", "Crisis Support"],
+        phone: "119 ext. 8",
+        website: "www.healing119.id", // Assuming this is the correct website
+        operatingHours: "24/7 (typically, confirm via call)",
+        category: "National",
+    },
+    {
+        name: "LISA Suicide Prevention Helpline (Bahasa Indonesia)",
+        description: "Dedicated suicide prevention helpline offering support in Bahasa Indonesia.",
+        targetAudience: "Individuals in crisis, those with suicidal thoughts (Bahasa)",
+        servicesOffered: ["Suicide Prevention", "Crisis Intervention"],
+        phone: "+62 811 3855 472",
+        category: "National",
+    },
+    {
+        name: "LISA Suicide Prevention Helpline (English)",
+        description: "Dedicated suicide prevention helpline offering support in English.",
+        targetAudience: "Individuals in crisis, those with suicidal thoughts (English)",
+        servicesOffered: ["Suicide Prevention", "Crisis Intervention"],
+        phone: "+62 811 3815 472",
+        category: "National",
+    },
+    {
+        name: "Yayasan Inti Mata Jiwa",
+        description: "Foundation providing mental health support and counseling services.",
+        targetAudience: "General Public",
+        servicesOffered: ["Counseling", "Mental Health Awareness"],
+        phone: "+62 821 3860 8128",
+        category: "National",
+    },
+    {
+        name: "SAPA 129 (KemenPPPA)",
+        description: "Ministry of Women Empowerment and Child Protection's hotline for reporting violence against women and children.",
+        targetAudience: "Women and Children experiencing violence, reporters",
+        servicesOffered: ["Reporting Violence", "Protection Services Info"],
+        phone: "129",
+        website: "sapa129.kemenpppa.go.id", // Example, verify actual website
+        category: "National",
+    },
+    {
+        name: "IndoPsyCare (Admin Chat for Info)",
+        description: "Provides information and admin support for psychological care services.",
+        targetAudience: "General Public seeking info",
+        servicesOffered: ["Information on Psychologists", "Appointment Assistance (potentially)"],
+        phone: "+62 812-1511-3685", // Likely WhatsApp for admin chat
+        whatsapp: "6281215113685",
+        category: "National",
+    }
+];
+
 
 export default function ResourcesPage() {
     return (
-        <div className="min-h-screen bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white pt-16 relative"> {/* Adjust pt-16 if header height differs */}
-            <div className="absolute inset-0 z-0 opacity-40">
-                <ParticleBackground count={70} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={1} />
+        <div className="min-h-screen bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white pt-4 md:pt-10 relative pb-16"> {/* Increased top padding, added bottom padding */}
+            <div className="absolute inset-0 z-0 opacity-30">
+                <ParticleBackground count={80} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={1} maxSize={5} speed={0.8} />
             </div>
 
-            <main className="max-w-4xl mx-auto p-4 md:p-8 relative z-10">
-                <h1 className="text-3xl font-bold text-center mb-8 text-[#FFCA40]">Mental Health Resources</h1>
+            <main className="max-w-5xl mx-auto p-4 md:p-6 lg:p-8 relative z-10">
+                <header className="text-center mb-10 md:mb-12">
+                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[#FFCA40] mb-3">
+                        Mental Health & Well-being Resources
+                    </h1>
+                    <p className="text-base sm:text-lg text-gray-300 max-w-2xl mx-auto">
+                        Your well-being matters. Explore these resources for support, guidance, and information.
+                    </p>
+                </header>
 
-                {/* Disclaimer */}
-                <div className="mb-8 p-4 bg-red-500/10 border border-red-500/30 rounded-lg flex items-start text-white">
-                    <FiAlertTriangle className="text-red-300 mr-3 mt-1 flex-shrink-0" size={20} />
+                {/* Disclaimer - Enhanced Styling */}
+                <div className="mb-10 md:mb-12 p-4 sm:p-5 bg-red-700/80 border-2 border-red-500/70 rounded-xl shadow-2xl flex items-start text-white">
+                    <FiAlertTriangle className="text-red-200 mr-3 sm:mr-4 mt-1 flex-shrink-0" size={28} />
                     <div>
-                        <h2 className="font-semibold mb-1">Immediate Crisis Support</h2>
-                        <p className="text-sm">
-                            If you or someone you know is in immediate danger or crisis, please reach out to emergency services or a dedicated crisis hotline immediately. Aika is not a substitute for emergency services.
+                        <h2 className="text-lg sm:text-xl font-semibold mb-1.5 text-red-100">Immediate Crisis Support</h2>
+                        <p className="text-sm sm:text-base mb-3">
+                            If you or someone you know is in immediate danger or crisis, please reach out to emergency services or a dedicated crisis hotline immediately. <strong>Aika is not a substitute for emergency services.</strong>
                         </p>
-                        <p className="text-sm mt-2">
-                            Call Emergency Services: <a href="tel:112" className="font-semibold underline hover:text-red-200">112</a> or the Ministry of Health Hotline: <a href="tel:119" className="font-semibold underline hover:text-red-200">119 (ext. 8)</a>.
-                        </p>
+                        <div className="flex flex-wrap gap-3">
+                            <a href="tel:112" className="px-4 py-2 bg-red-500 hover:bg-red-400 rounded-lg font-semibold text-white transition-colors text-sm inline-flex items-center shadow-md">
+                                <FiPhone className="mr-2" /> Call Emergency: 112
+                            </a>
+                            <a href="tel:119;ext=8" className="px-4 py-2 bg-red-500 hover:bg-red-400 rounded-lg font-semibold text-white transition-colors text-sm inline-flex items-center shadow-md">
+                                <FiHeart className="mr-2" /> Kemenkes Hotline: 119 (ext. 8)
+                            </a>
+                        </div>
                     </div>
                 </div>
 
                 {/* UGM On-Campus Resources */}
-                <section className="mb-8">
-                    <h2 className="text-2xl font-semibold border-b border-[#FFCA40]/50 pb-2 mb-4 flex items-center">
-                        <FiUsers className="mr-3 text-[#FFCA40]" /> UGM On-Campus Resources
+                <section className="mb-10 md:mb-12">
+                    <h2 className="text-2xl sm:text-3xl font-semibold border-b-2 border-[#FFCA40]/60 pb-3 mb-6 flex items-center text-white">
+                        <FiUsers className="mr-3 text-[#FFCA40]" size={28} /> UGM On-Campus Resources
                     </h2>
-                    <div className="space-y-5">
-                        {/* Gadjah Mada Medical Center (GMC) */}
-                        <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                            <h3 className="text-lg font-semibold text-white mb-2">Gadjah Mada Medical Center (GMC)</h3>
-                            <p className="text-sm text-gray-300 mb-3">Provides various medical services, including psychological counseling (&quot;Konseling Psikologi&quot;).</p>
-                            <div className="flex items-start text-sm mb-2">
-                                <FiMapPin className="mr-2 mt-1 flex-shrink-0 text-gray-400" />
-                                <span>SEKIP Blok L3, Sendowo, Sinduadi, Mlati, Kabupaten Sleman, DIY 55281</span>
-                            </div>
-                            <div className="flex items-center text-sm mb-2">
-                                <FiPhone className="mr-2 flex-shrink-0 text-gray-400" />
-                                <a href="tel:+62274551412" className="hover:text-[#FFCA40]">+62 (0274) 551412</a>
-                            </div>
-                            <div className="flex items-center text-sm mb-1">
-                                <FiMessageSquare className="mr-2 flex-shrink-0 text-gray-400" />
-                                <span>WhatsApp Admin: <a href="https://wa.me/6281328786991" target="_blank" rel="noopener noreferrer" className="hover:text-[#FFCA40]">0813-2878-6991</a></span>
-                            </div>
-                            <div className="text-xs text-gray-400 ml-6"> (Other numbers available for Prolanis & Claims)</div>
-                            <div className="flex items-center text-sm mt-1">
-                                <FiGlobe className="mr-2 flex-shrink-0 text-gray-400" />
-                                <a href="https://gmc.ugm.ac.id/" target="_blank" rel="noopener noreferrer" className="hover:text-[#FFCA40]">gmc.ugm.ac.id</a>
-                            </div>
-                        </div>
-
-                        {/* Health Promoting University (HPU UGM) */}
-                        <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                            <h3 className="text-lg font-semibold text-white mb-2">Health Promoting University (HPU UGM)</h3>
-                            <p className="text-sm text-gray-300 mb-3">Provides holistic health services including mental health support, workshops and community health programs.</p>
-                            <div className="flex items-start text-sm mb-2">
-                                <FiMapPin className="mr-2 mt-1 flex-shrink-0 text-gray-400" />
-                                <span>Jl. Mahoni, Sekip Utara, Yogyakarta</span>
-                            </div>
-                            <div className="flex items-center text-sm mb-2">
-                                <FiPhone className="mr-2 flex-shrink-0 text-gray-400" />
-                                <a href="tel:+62274552406" className="hover:text-[#FFCA40]">+62 (0274) 552406</a>
-                            </div>
-                            <div className="flex items-center text-sm mt-1">
-                                <FiGlobe className="mr-2 flex-shrink-0 text-gray-400" />
-                                <a href="https://hpu.ugm.ac.id" target="_blank" rel="noopener noreferrer" className="hover:text-[#FFCA40]">hpu.ugm.ac.id</a>
-                            </div>
-                        </div>
-
-                        {/* Faculty of Psychology Counseling Services */}
-                        <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                            <h3 className="text-lg font-semibold text-white mb-2">Faculty of Psychology Counseling Services</h3>
-                            <p className="text-sm text-gray-300 mb-3">Professional counseling available through the Center for Public Service (Pusat Pelayanan Masyarakat) with licensed psychologists.</p>
-                            <div className="flex items-start text-sm mb-2">
-                                <FiMapPin className="mr-2 mt-1 flex-shrink-0 text-gray-400" />
-                                <span>Faculty of Psychology UGM, Jl. Sosio Humaniora Bulaksumur, Yogyakarta</span>
-                            </div>
-                            <div className="flex items-center text-sm mb-2">
-                                <FiPhone className="mr-2 flex-shrink-0 text-gray-400" />
-                                <a href="tel:+62274550435" className="hover:text-[#FFCA40]">+62 (0274) 550435</a>
-                            </div>
-                            <div className="flex items-center text-sm mb-1">
-                                <FiMail className="mr-2 flex-shrink-0 text-gray-400" />
-                                <a href="mailto:ppm.psikologi@ugm.ac.id" className="hover:text-[#FFCA40]">ppm.psikologi@ugm.ac.id</a>
-                            </div>
-                            <div className="flex items-center text-sm mt-1">
-                                <FiGlobe className="mr-2 flex-shrink-0 text-gray-400" />
-                                <a href="https://psikologi.ugm.ac.id/ppm" target="_blank" rel="noopener noreferrer" className="hover:text-[#FFCA40]">psikologi.ugm.ac.id/ppm</a>
-                            </div>
-                        </div>
-
-                        {/* UGM Student Affairs Crisis Line */}
-                        <div className="p-4 bg-white/5 rounded-lg border border-white/10">
-                            <h3 className="text-lg font-semibold text-white mb-2">UGM Student Affairs Crisis Line</h3>
-                            <p className="text-sm text-gray-300 mb-3">Available for emergency student support 24/7. Managed by the Directorate of Student Affairs for urgent mental health concerns.</p>
-                            <div className="flex items-center text-sm mb-2">
-                                <FiPhone className="mr-2 flex-shrink-0 text-gray-400" />
-                                <a href="tel:+6281228773800" className="hover:text-[#FFCA40]">+62 812-2877-3800</a> (WhatsApp/Call)
-                            </div>
-                            <div className="flex items-center text-sm mt-1">
-                                <FiGlobe className="mr-2 flex-shrink-0 text-gray-400" />
-                                <a href="https://ditmawa.ugm.ac.id" target="_blank" rel="noopener noreferrer" className="hover:text-[#FFCA40]">ditmawa.ugm.ac.id</a>
-                            </div>
-                        </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
+                        {ugmResources.map((resource) => (
+                            <ResourceCard key={resource.name} {...resource} />
+                        ))}
                     </div>
                 </section>
 
                 {/* National Hotlines & Support */}
-                <section>
-                    <h2 className="text-2xl font-semibold border-b border-[#FFCA40]/50 pb-2 mb-4 flex items-center">
-                        <FiPhone className="mr-3 text-[#FFCA40]" /> National Hotlines & Support (Indonesia)
+                <section className="mb-10 md:mb-12">
+                    <h2 className="text-2xl sm:text-3xl font-semibold border-b-2 border-[#FFCA40]/60 pb-3 mb-6 flex items-center text-white">
+                        <FiShield className="mr-3 text-[#FFCA40]" size={28} /> National Hotlines & Support (Indonesia)
                     </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <ResourceItem name="Kemenkes SEJIWA (Counseling)" phone="119 ext. 8" website="www.healing119.id" />
-                        <ResourceItem name="LISA Suicide Prevention Helpline (Bahasa)" phone="+62 811 3855 472" />
-                        <ResourceItem name="LISA Suicide Prevention Helpline (English)" phone="+62 811 3815 472" />
-                        <ResourceItem name="Yayasan Inti Mata Jiwa" phone="+62 821 3860 8128" />
-                        <ResourceItem name="SAPA 129 (Kemenppa - Child/Women Protection)" phone="129" />
-                        <ResourceItem name="IndoPsyCare (Admin Chat for Info)" phone="+62 812-1511-3685" />
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
+                        {nationalHotlines.map((resource) => (
+                            <ResourceCard key={resource.name} {...resource} />
+                        ))}
                     </div>
                 </section>
+
+                {/* Future: How to Choose Section / Filters / Search */}
+                {/* 
+                <section className="mb-10 md:mb-12 p-6 bg-white/5 rounded-xl border border-white/10">
+                    <h2 className="text-xl font-semibold mb-4 text-ugm-gold-light">Finding the Right Support</h2>
+                    <p className="text-gray-300">Not sure where to start? [Placeholder for guidance]</p>
+                </section>
+                */}
 
             </main>
         </div>
     );
 }
-
-// Helper component for resource items
-interface ResourceItemProps {
-    name: string;
-    phone?: string;
-    website?: string;
-}
-
-const ResourceItem: React.FC<ResourceItemProps> = ({ name, phone, website }) => (
-    <div className="p-3 bg-white/5 rounded-lg border border-white/10">
-        <h4 className="font-medium text-white">{name}</h4>
-        {phone && (
-            <div className="flex items-center text-sm mt-1">
-                <FiPhone className="mr-2 flex-shrink-0 text-gray-400" size={14} />
-                <a href={`tel:${phone.replace(/\s+/g, '')}`} className="text-gray-300 hover:text-[#FFCA40]">{phone}</a>
-            </div>
-        )}
-        {website && (
-            <div className="flex items-center text-sm mt-1">
-                <FiGlobe className="mr-2 flex-shrink-0 text-gray-400" size={14} />
-                <a href={`http://${website}`} target="_blank" rel="noopener noreferrer" className="text-gray-300 hover:text-[#FFCA40] truncate">{website}</a>
-            </div>
-        )}
-    </div>
-);

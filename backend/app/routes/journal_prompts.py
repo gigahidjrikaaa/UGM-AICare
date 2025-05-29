@@ -3,8 +3,8 @@ from sqlalchemy.orm import Session
 from typing import List
 
 from app.database import get_db
-from app.models import JournalPrompt
-from app.schemas import JournalPromptCreate, JournalPromptResponse, JournalPromptUpdate
+from app.models import JournalPrompt, User, JournalReflectionPoint # Add JournalReflectionPoint
+from app.schemas import JournalPromptCreate, JournalPromptResponse, JournalPromptUpdate, JournalReflectionPointResponse # Add JournalReflectionPointResponse
 from app.dependencies import get_current_active_user # Or a specific admin dependency
 
 router = APIRouter(
@@ -81,3 +81,20 @@ async def delete_journal_prompt(
     db.delete(prompt)
     db.commit()
     return None
+
+# You can add this to a new router group like "Journal Insights" or keep it with prompts
+@router.get("/reflections/me", response_model=List[JournalReflectionPointResponse])
+async def get_my_journal_reflection_points(
+    limit: int = 5, # Get the latest 5 reflections, for example
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    """Retrieves the latest AI-generated reflection points for the current user."""
+    reflections = db.query(JournalReflectionPoint).filter(
+        JournalReflectionPoint.user_id == current_user.id
+    ).order_by(JournalReflectionPoint.created_at.desc()).limit(limit).all()
+    
+    if not reflections:
+        # It's okay if there are no reflections yet, don't raise 404
+        return []
+    return reflections

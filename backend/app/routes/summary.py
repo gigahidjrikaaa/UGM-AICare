@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func
 from pydantic import BaseModel, Field
 from datetime import date, timedelta, datetime, time
-from typing import Dict, List, Set, Optional 
+from typing import Dict, List, Set, Optional, Any, cast # Import Any and cast
 
 from app.core import llm
 from app.database import get_db
@@ -97,50 +97,51 @@ async def get_activity_summary(
         yesterday = today - timedelta(days=1)
         activity_today = today in all_activity_dates_ever
 
-        current_db_streak = current_user.current_streak if current_user.current_streak is not None else 0
-        longest_db_streak = current_user.longest_streak if current_user.longest_streak is not None else 0
-        last_activity_db = current_user.last_activity_date
+        # Explicitly cast attributes from current_user to help Pylance
+        _cs_any = cast(Any, current_user.current_streak)
+        _cs_opt_int: Optional[int] = _cs_any
+        current_db_streak_val: int = _cs_opt_int if _cs_opt_int is not None else 0
 
-        new_streak = current_db_streak
-        new_last_activity = last_activity_db
+        _ls_any = cast(Any, current_user.longest_streak)
+        _ls_opt_int: Optional[int] = _ls_any
+        longest_db_streak_val: int = _ls_opt_int if _ls_opt_int is not None else 0
+
+        _lad_any = cast(Any, current_user.last_activity_date)
+        last_activity_db_val: Optional[date] = _lad_any
+
+        new_streak_val = current_db_streak_val
+        new_last_activity_val = last_activity_db_val
 
         if activity_today:
-            if last_activity_db == yesterday:
-                new_streak = current_db_streak + 1
-            elif last_activity_db != today: # New activity after a gap or first activity
-                new_streak = 1
-            # If last_activity_db == today, streak already counted for today, no change.
-            new_last_activity = today
-        else: # No activity today
-            if last_activity_db is not None and last_activity_db < today: # Check if streak should be reset
-                 # Only reset if last activity was before yesterday. If it was yesterday, streak remains until tomorrow.
-                 # If last activity was yesterday and no activity today, streak does not change today, but will reset tomorrow if still no activity.
-                 # This logic might need refinement based on exact streak definition (e.g. reset if no activity *yesterday* or *today*)
-                 # Current: if not active today, and last activity was before today, streak is maintained from previous days.
-                 # If streak requires *daily* activity, then if not activity_today and last_activity_db < today, new_streak = 0.
-                 # For "days in a row" streak:
-                 if last_activity_db is not None and last_activity_db < yesterday : # if last activity was before yesterday, streak is broken.
-                    new_streak = 0
+            if last_activity_db_val == yesterday:
+                new_streak_val = current_db_streak_val + 1
+            elif last_activity_db_val != today:
+                new_streak_val = 1
+            new_last_activity_val = today
+        else:
+            if last_activity_db_val is not None and last_activity_db_val < yesterday:
+                new_streak_val = 0
+        
+        new_longest_streak_val = max(longest_db_streak_val, new_streak_val)
 
-
-        new_longest_streak = max(longest_db_streak, new_streak)
-
-        if (new_streak != current_user.current_streak or
-            new_longest_streak != current_user.longest_streak or
-            new_last_activity != current_user.last_activity_date):
-            current_user.current_streak = new_streak
-            current_user.longest_streak = new_longest_streak
-            current_user.last_activity_date = new_last_activity
+        if (new_streak_val != current_db_streak_val or
+            new_longest_streak_val != longest_db_streak_val or
+            new_last_activity_val != last_activity_db_val):
+            
+            # Cast current_user to Any before attribute assignment to satisfy Pylance
+            user_for_update = cast(Any, current_user)
+            user_for_update.current_streak = new_streak_val
+            user_for_update.longest_streak = new_longest_streak_val
+            user_for_update.last_activity_date = new_last_activity_val
+            
             try:
-                db.add(current_user)
+                db.add(current_user) # Add the original current_user object
                 db.commit()
-                db.refresh(current_user) # Get the updated values, including any defaults set by DB
-                logger.info(f"User {current_user.id} streak data updated: Current={new_streak}, Longest={new_longest_streak}, LastActivity={new_last_activity}")
+                db.refresh(current_user)
+                logger.info(f"User {current_user.id} streak data updated: Current={new_streak_val}, Longest={new_longest_streak_val}, LastActivity={new_last_activity_val}")
             except Exception as e:
                 db.rollback()
                 logger.error(f"Database error saving user streak update for user {current_user.id}: {e}", exc_info=True)
-                # Potentially re-fetch user to ensure we return consistent (pre-error or post-error) data
-                # For simplicity, we'll return the in-memory (potentially stale on error) current_user data.
 
         summary_data: Dict[str, ActivityData] = {}
         # Iterate through all days of the queried month to ensure all days are present in summary
@@ -153,10 +154,15 @@ async def get_activity_summary(
             )
             current_day_in_month += timedelta(days=1)
 
+
+        # For Pydantic model instantiation, ensure the values are Python types
+        final_current_streak = cast(Optional[int], current_user.current_streak)
+        final_longest_streak = cast(Optional[int], current_user.longest_streak)
+
         return ActivitySummaryResponse(
             summary=summary_data,
-            currentStreak=current_user.current_streak if current_user.current_streak is not None else 0,
-            longestStreak=current_user.longest_streak if current_user.longest_streak is not None else 0
+            currentStreak=final_current_streak if final_current_streak is not None else 0,
+            longestStreak=final_longest_streak if final_longest_streak is not None else 0
         )
 
     except Exception as e:
@@ -254,18 +260,22 @@ async def get_latest_user_summary(
     current_user: User = Depends(get_current_active_user)
 ):
     logger.info(f"Fetching latest summary for user ID: {current_user.id}")
-    latest_summary = db.query(UserSummary)\
+    latest_summary_instance: Optional[UserSummary] = db.query(UserSummary)\
         .filter(UserSummary.user_id == current_user.id)\
         .order_by(UserSummary.timestamp.desc())\
         .first()
 
-    if not latest_summary:
+    if not latest_summary_instance:
         logger.info(f"No summary found for user ID: {current_user.id}")
-        # Return a 200 OK with null data as per LatestSummaryResponse schema
         return LatestSummaryResponse(summary_text=None, timestamp=None)
 
-    logger.info(f"Found summary for user ID: {current_user.id} from {latest_summary.timestamp}")
+    logger.info(f"Found summary for user ID: {current_user.id} from {latest_summary_instance.timestamp}")
+    
+    # Explicitly cast attributes from latest_summary_instance for Pydantic model
+    summary_text_val = cast(Optional[str], latest_summary_instance.summary_text)
+    timestamp_val = cast(Optional[datetime], latest_summary_instance.timestamp)
+
     return LatestSummaryResponse(
-        summary_text=latest_summary.summary_text,
-        timestamp=latest_summary.timestamp
+        summary_text=summary_text_val,
+        timestamp=timestamp_val
     )

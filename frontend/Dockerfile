@@ -40,9 +40,11 @@ RUN npm ci --omit=dev
 # Copy the rest of the source code
 COPY . .
 
-# Set build-time environment variables if needed (e.g., NEXT_PUBLIC_*)
-# ARG NEXT_PUBLIC_API_BASE_URL
-# ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
+# Set build-time environment variables
+# These will be baked into the static assets by Next.js
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+# Add other NEXT_PUBLIC_ ARGs and ENVs here
 
 # Build the Next.js application
 RUN npm run build

@@ -17,6 +17,43 @@ export const metadata: Metadata = {
     apple: '/apple-icon.png',
   }
 };
+// Environment variables type checking
+const checkEnvVariables = () => {
+  const requiredEnvVars = [
+    'NEXTAUTH_SECRET',
+    'GOOGLE_CLIENT_ID',
+    'GOOGLE_CLIENT_SECRET',
+    'NEXTAUTH_URL',
+    'INTERNAL_API_KEY',
+    'NEXT_PUBLIC_API_URL',
+    'ADMIN_EMAIL',
+    'ADMIN_PASSWORD'
+  ];
+  
+  console.log("--- Environment Variable Check (Layout) ---");
+  requiredEnvVars.forEach(varName => {
+    const value = process.env[varName];
+    if (value === undefined) {
+      console.warn(`LAYOUT: ${varName} is UNDEFINED.`);
+    } else if (value === "") {
+      console.warn(`LAYOUT: ${varName} is an EMPTY STRING.`);
+    } else {
+      // For sensitive values, you might want to just log that it's set, not the value itself
+      // For NEXTAUTH_URL, logging the value is fine for this debugging.
+      if (varName === 'NEXTAUTH_URL' || varName === 'NEXT_PUBLIC_API_URL') {
+        console.log(`LAYOUT: ${varName} is SET to: "${value}"`);
+      } else {
+        console.log(`LAYOUT: ${varName} is SET (value hidden for security).`);
+      }
+    }
+  });
+  console.log("--- End Environment Variable Check (Layout) ---");
+};
+
+// Execute environment variable check when the module loads
+if(process.env.APP_ENV !== 'production') {
+  checkEnvVariables();
+}
 
 export default async function RootLayout({
   children,
