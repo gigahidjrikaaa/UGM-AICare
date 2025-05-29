@@ -49,7 +49,7 @@ services:
     container_name: ugm_aicare_backend
     build:
       context: ./backend # Path to directory containing Dockerfile
-      dockerfile: Dockerfile
+      dockerfile: app/Dockerfile
       # Add build arguments if needed by the backend Dockerfile
       # args:
       #   SOME_BUILD_ARG: ${SOME_BUILD_ARG_FROM_ENV}
