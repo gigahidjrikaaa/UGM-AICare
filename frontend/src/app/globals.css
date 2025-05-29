@@ -189,3 +189,37 @@ body {
     display: none;
   }
 }
+
+/* Scrollbar */
+/* For Webkit-based browsers (Chrome, Safari, Edge, Opera) */
+::-webkit-scrollbar {
+  width: 8px; /* Width of the vertical scrollbar */
+  height: 8px; /* Height of the horizontal scrollbar */
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(10, 42, 110, 0.1); /* A very subtle track, matching your dark theme base */
+  border-radius: 10px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 202, 64, 0.6); /* UGM Gold, slightly transparent */
+  border-radius: 10px;
+  border: 2px solid transparent; /* Creates a small padding around the thumb */
+  background-clip: content-box; /* Ensures the border doesn't overlap the thumb color */
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 202, 64, 0.8); /* UGM Gold, less transparent on hover */
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent; /* Hides the corner piece where vertical and horizontal scrollbars meet */
+}
+
+/* For Firefox */
+/* Note: Firefox scrollbar styling is more limited */
+* {
+  scrollbar-width: thin; /* "auto" or "thin" */
+  scrollbar-color: rgba(255, 202, 64, 0.6) rgba(10, 42, 110, 0.1); /* thumb and track color */
+}
