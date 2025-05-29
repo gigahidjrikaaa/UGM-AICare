@@ -171,7 +171,7 @@ export default function JournalEntryModal({
                             {/* Main Dialog Panel - Wider to accommodate side-by-side */}
                             <Dialog.Panel className={`w-full rounded-xl bg-[#0a2a6e]/90 border border-white/20 shadow-2xl text-white flex overflow-hidden ${showReflectionPanel ? 'max-w-5xl' : 'max-w-lg'}`}>
                                 {/* Right Side: Reflection Points Panel (Conditional) */}
-                                { (isFetchingReflections || reflectionPoints.length > 0) && (
+                                { showReflectionPanel && (
                                     <div className="w-1/3 min-w-md bg-ugm-blue-dark/30 border-l border-white/10 overflow-y-auto max-h-[80vh]">
                                         <ReflectionPointsPanel
                                             reflectionPoints={reflectionPoints}
