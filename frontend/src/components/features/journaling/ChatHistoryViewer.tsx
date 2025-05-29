@@ -53,7 +53,7 @@ export default function ChatHistoryViewer() {
 
     // Simple rendering - consider grouping by date or session later
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 min-h-[70vh] p-4 bg-white/10 text-white">
             {history.map((msg, index) => (
                <div key={index}>
                  {/* Optional: Display date dividers */}

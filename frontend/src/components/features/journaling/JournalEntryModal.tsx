@@ -167,11 +167,23 @@ export default function JournalEntryModal({
                             leave="ease-in duration-200"
                             leaveFrom="opacity-100 scale-100"
                             leaveTo="opacity-0 scale-95"
-                        >
+                            >
                             {/* Main Dialog Panel - Wider to accommodate side-by-side */}
-                            <Dialog.Panel className={`w-full rounded-xl bg-[#0a2a6e]/90 border border-white/20 shadow-2xl text-white flex overflow-hidden ${showReflectionPanel ? 'max-w-4xl' : 'max-w-lg'}`}>
+                            <Dialog.Panel className={`w-full rounded-xl bg-[#0a2a6e]/90 border border-white/20 shadow-2xl text-white flex overflow-hidden ${showReflectionPanel ? 'max-w-5xl' : 'max-w-lg'}`}>
+                                {/* Right Side: Reflection Points Panel (Conditional) */}
+                                { (isFetchingReflections || reflectionPoints.length > 0) && (
+                                    <div className="w-1/3 min-w-md bg-ugm-blue-dark/30 border-l border-white/10 overflow-y-auto max-h-[80vh]">
+                                        <ReflectionPointsPanel
+                                            reflectionPoints={reflectionPoints}
+                                            entryDate={format(parseISO(entryDate), 'MMMM d, yyyy')}
+                                            isLoading={isFetchingReflections}
+                                            // You could add an onClose here if you want a dedicated close for this panel
+                                            // e.g., onClose={() => setReflectionPoints([])} to hide it
+                                        />
+                                    </div>
+                                )}
                                 {/* Left Side: Journal Entry Form */}
-                                <div className="flex-1 p-6 overflow-y-auto max-h-[80vh]">
+                                <div className="flex-1 p-6 min-w-lg overflow-y-auto max-h-[80vh]">
                                     <Dialog.Title className="text-lg font-semibold text-[#FFCA40] flex justify-between items-center">
                                         Journal Entry for {format(parseISO(entryDate), 'MMMM d, yyyy')}
                                         <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label="Close modal">
@@ -216,7 +228,7 @@ export default function JournalEntryModal({
                                     </div>
                                     
                                     <textarea
-                                        rows={10} // Adjusted rows for potentially less vertical space
+                                        rows={9} // Adjusted rows for potentially less vertical space
                                         value={content}
                                         onChange={(e) => setContent(e.target.value)}
                                         placeholder={selectedPromptId ? "Respond to the prompt above..." : "What's on your mind today?"}
@@ -247,24 +259,11 @@ export default function JournalEntryModal({
                                     </div>
                                 </div>
 
-                                {/* Right Side: Reflection Points Panel (Conditional) */}
-                                { (isFetchingReflections || reflectionPoints.length > 0) && (
-                                    <div className="w-1/3 min-w-[300px] bg-ugm-blue-dark/30 border-l border-white/10 overflow-y-auto max-h-[80vh]">
-                                        <ReflectionPointsPanel
-                                            reflectionPoints={reflectionPoints}
-                                            entryDate={format(parseISO(entryDate), 'MMMM d, yyyy')}
-                                            isLoading={isFetchingReflections}
-                                            // You could add an onClose here if you want a dedicated close for this panel
-                                            // e.g., onClose={() => setReflectionPoints([])} to hide it
-                                        />
-                                    </div>
-                                )}
                             </Dialog.Panel>
                         </Transition.Child>
                     </div>
                 </Dialog>
             </Transition>
-            {/* The separate ReflectionPointsModal is no longer rendered here */}
         </>
     );
 }
