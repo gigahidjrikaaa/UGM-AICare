@@ -17,7 +17,7 @@ config = context.config
 # Assumes env.py is in '.../backend/alembic_pg_vm/' and 'app' is in '.../backend/app/'
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
 
-from app.db.base import Base
+from app.database import Base
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
