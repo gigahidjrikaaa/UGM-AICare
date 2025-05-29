@@ -2,7 +2,7 @@
 # Multi-stage build for a more efficient and secure container
 
 # ---- Build Stage ----
-FROM python:3.13-slim-bookworm as builder
+FROM python:3.11-slim-bookworm as builder
 
 # Set work directory
 WORKDIR /app
@@ -32,7 +32,7 @@ COPY requirements.txt .
 RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
 # ---- Final Stage ----
-FROM python:3.13-slim-bookworm
+FROM python:3.11-slim-bookworm
 
 # Create a non-root user
 RUN useradd -m -s /bin/bash appuser
