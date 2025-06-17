@@ -84,11 +84,6 @@ RUN mkdir -p /app/logs && \
     chown -R appuser:appgroup /app/logs && \
     chmod -R 750 /app/logs # Or more restrictive if appropriate
 
-# Copy the startup script
-# Ensure this script exists at ./scripts/start.sh relative to the build context (./backend)
-COPY --chown=appuser:appgroup ./scripts/start.sh /app/start.sh
-RUN chmod +x /app/start.sh
-
 # Switch to the non-root user
 USER appuser
 
@@ -101,4 +96,5 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD curl -f http://localhost:8000/health || exit 1
 
 # Define the entrypoint for the container
-ENTRYPOINT ["/app/start.sh"]
+# This will run migrations and then start Gunicorn
+ENTRYPOINT ["sh", "-c", "echo 'Running database migrations for PostgreSQL VM...' && alembic -c alembic_pg_vm.ini upgrade head && echo 'Starting FastAPI application with Gunicorn...' && exec gunicorn -k uvicorn.workers.UvicornWorker app.main:app --workers ${WORKERS_PER_CORE:-4} --worker-tmp-dir /dev/shm --bind 0.0.0.0:8000"]
