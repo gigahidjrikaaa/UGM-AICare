@@ -7,7 +7,6 @@ import GoogleSignInButton from "@/components/ui/GoogleSignInButton";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import ErrorMessage from "../../../components/ErrorMessage";
-import ParticleBackground from "@/components/ui/ParticleBackground";
 // import AccountLinker from "@/components/AccountLinker";
 
 export default function SignIn() {
@@ -24,7 +23,6 @@ export default function SignIn() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col">
-      <ParticleBackground></ParticleBackground>
       {/* Content */}
       <div className="flex-1 flex items-center justify-center p-6">
         <motion.div 
