@@ -6,14 +6,15 @@ import os
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
+
 load_dotenv()
 
 # --- Redis Configuration ---
-REDIS_HOST = os.getenv("REDIS_URL")
-REDIS_PORT = os.getenv("REDIS_PORT")
-REDIS_DB = os.getenv("REDIS_DB", "0")
-REDIS_USERNAME = os.getenv("REDIS_USERNAME", "default")
-REDIS_PASSWORD = os.getenv("REDIS_PASSWORD")
+REDIS_HOST_ENV = os.getenv("REDIS_HOST")            # Example value: "redis-19980.c334.asia-southeast2-1.gce.redns.redis-cloud.com"
+REDIS_PORT_ENV = os.getenv("REDIS_PORT")            # Example value: "19980"
+REDIS_DB_ENV = os.getenv("REDIS_DB", "0")           # Default to 0 if not set
+REDIS_USERNAME_ENV = os.getenv("REDIS_USERNAME")    # Example value: "default"
+REDIS_PASSWORD_ENV = os.getenv("REDIS_PASSWORD")    # Example value: "your_password_here"
 
 # Set an expiration time for module state keys in seconds (e.g., 1 hour)
 MODULE_STATE_EXPIRY_SECONDS = 3600
@@ -37,24 +38,27 @@ async def get_redis_client() -> redis.Redis:
     if redis_pool is None:
         try:
             # Check environment variables
-            if not REDIS_HOST or not REDIS_PORT:
-                raise ValueError("REDIS_URL and REDIS_PORT must be set in environment variables.")
-            if not REDIS_DB:
+            if not REDIS_HOST_ENV or not REDIS_PORT_ENV:
+                raise ValueError("REDIS_HOST and REDIS_PORT must be set in environment variables.")
+            if not REDIS_DB_ENV:
                 logger.warning("REDIS_DB not set, defaulting to 0.")
-            if not REDIS_USERNAME:
-                raise ValueError("REDIS_USERNAME must be set in environment variables.")
-            if not REDIS_PASSWORD:
-                raise ValueError("REDIS_PASSWORD must be set in environment variables.")
             
-            logger.info(f"Initializing Redis connection pool: host={REDIS_HOST}, port={REDIS_PORT}, db={REDIS_DB}")
-            redis_pool = redis.ConnectionPool(
-                host=REDIS_HOST,
-                port=int(REDIS_PORT), # Ensure port is integer
-                db=int(REDIS_DB),     # Ensure DB is integer
-                username=REDIS_USERNAME,
-                password=REDIS_PASSWORD,
-                decode_responses=True # Decode responses to strings automatically
-            )
+            # Prepare connection arguments
+            connection_args = {
+                "host": REDIS_HOST_ENV,
+                "port": int(REDIS_PORT_ENV), 
+                "db": int(REDIS_DB_ENV), 
+                "decode_responses": True
+            }
+
+            # Only add username and password if they are provided
+            if REDIS_USERNAME_ENV:
+                connection_args["username"] = REDIS_USERNAME_ENV # Changed variable name
+            if REDIS_PASSWORD_ENV:
+                connection_args["password"] = REDIS_PASSWORD_ENV # Changed variable name
+            
+            logger.info(f"Initializing Redis connection pool with args: {connection_args}")
+            redis_pool = redis.ConnectionPool(**connection_args)
         except Exception as e:
             logger.error(f"Failed to initialize Redis connection pool: {e}", exc_info=True)
             raise ConnectionError("Could not connect to Redis") from e

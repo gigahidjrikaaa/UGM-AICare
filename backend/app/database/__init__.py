@@ -13,16 +13,27 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Determine which database to use based on environment
-if os.getenv("APP_ENV", "development") == "production":
-    # Use PostgreSQL in production
-    DATABASE_URL = os.getenv("DATABASE_URL")
-    if DATABASE_URL is None:
-        logger.error("DATABASE_URL environment variable not set for production.")
-        raise ValueError("DATABASE_URL environment variable not set for production.")
+# if os.getenv("APP_ENV", "development") == "production":
+#     # Use PostgreSQL in production
+#     DATABASE_URL = os.getenv("DATABASE_URL")
+#     if DATABASE_URL is None:
+#         logger.error("DATABASE_URL environment variable not set for production.")
+#         raise ValueError("DATABASE_URL environment variable not set for production.")
+#     engine = create_engine(DATABASE_URL)
+# else:
+#     # Use SQLite for development
+#     DATABASE_URL = "sqlite:///./aika.db"
+#     engine = create_engine(
+#         DATABASE_URL, connect_args={"check_same_thread": False}
+#     )
+
+# Determine the database URL from environment variables (should be using Dockerized setup)
+DATABASE_URL = os.getenv("DATABASE_URL", "sqlite:///./aika.db")
+if DATABASE_URL.startswith("postgresql://") or DATABASE_URL.startswith("postgresql+psycopg2://"):
+    # Use PostgreSQL
     engine = create_engine(DATABASE_URL)
 else:
     # Use SQLite for development
-    DATABASE_URL = "sqlite:///./aika.db"
     engine = create_engine(
         DATABASE_URL, connect_args={"check_same_thread": False}
     )
