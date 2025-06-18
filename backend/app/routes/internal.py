@@ -83,7 +83,7 @@ async def get_user_by_google_sub(google_sub: str, db: Session = Depends(get_db))
     #     db_user.email = plain_email # Set decrypted email for response (if needed)
 
     return UserInternalResponse(
-        id=int(db_user.id),
+        id=db_user.id, # type: ignore
         google_sub=str(db_user.google_sub),
         email=str(db_user.email) if db_user.email is not None else None,  # Convert Column to str for proper typing
         wallet_address=str(db_user.wallet_address) if db_user.wallet_address is not None else None,
@@ -115,7 +115,7 @@ async def sync_user_on_login(
 
     return UserSyncResponse(
         message="User synced successfully",
-        user_id=db_user.id,
+        user_id=db_user.id, # type: ignore
         google_sub=str(db_user.google_sub),
         email_stored=(db_user.email is not None)
     )
