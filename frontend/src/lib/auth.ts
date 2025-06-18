@@ -135,6 +135,7 @@ export const authOptions: NextAuthOptions = {
               google_sub: token.id,
               email: token.email
             };
+            console.log("SYNC: Calling backend sync-user", backendUrl, syncPayload, internalApiKey);
             const syncResponse = await fetch(`${backendUrl}/api/v1/internal/sync-user`, {
               method: 'POST',
               headers: {
@@ -143,6 +144,7 @@ export const authOptions: NextAuthOptions = {
               },
               body: JSON.stringify(syncPayload),
             });
+            console.log("SYNC: Sync-user response status", syncResponse.status);
 
             if (!syncResponse.ok) {
               const errorBody = await syncResponse.text();
