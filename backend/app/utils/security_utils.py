@@ -1,6 +1,6 @@
 # backend/app/utils/security_utils.py
 import os
-from cryptography.fernet import Fernet, InvalidToken
+from cryptography.fernet import Fernet, InvalidToken # type: ignore
 from dotenv import load_dotenv
 import logging
 from typing import Optional
