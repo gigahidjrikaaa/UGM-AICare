@@ -1,23 +1,29 @@
 from fastapi import APIRouter, HTTPException, Depends
 import time
 
-from src.service.llm import LLMService
 from src.service.data__ingestion import DataIngestion
+from src.service.llm import LLMService
+from src.service.graph import GraphService
+
 
 router = APIRouter()
+
+async def get_data_ingestion_service():
+  return DataIngestion()
 
 async def get_llm_service():
   return LLMService()
 
-async def get_data_ingestion_service():
-  return DataIngestion()
+async def get_graph_service():
+  return GraphService()
 
 @router.post("/extract")
 async def extract_entities(
   file_path: str,
   file_type: str,
+  data_ingestion_service: DataIngestion = Depends(get_data_ingestion_service),
   llm_service: LLMService = Depends(get_llm_service),
-  data_ingestion_service: DataIngestion = Depends(get_data_ingestion_service)
+  graph_service: GraphService = Depends(get_graph_service)
 ):
   """Extract entities from text"""
   start_time = time.time()
@@ -26,7 +32,7 @@ async def extract_entities(
     f =  open(file=file_path, mode="rb")
     texts = data_ingestion_service.extract_text_from_files(file_bytes= f.read(), type=file_type)
     # split into chunk
-    text = "\n".join(texts[20:40])
+    text = "\n".join(texts)
 
     # Get Entities
     entities = await llm_service.extract_entities(text=text)
@@ -47,6 +53,9 @@ async def extract_entities(
 
     for index, embedding in enumerate(embeddings):
       entities[index]["embedding"] = embedding
+
+    insert_entity = await graph_service.insert_entities(entities=entities)
+    insert_relation = await graph_service.insert_relations(relations=relations)
 
     processing_time = time.time() - start_time
     return {

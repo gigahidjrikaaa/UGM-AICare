@@ -2,9 +2,12 @@ from google import genai
 from google.genai import types
 import re
 import json
+import logging
 
 from src.config import Config
 from src.model.schema import Entity, Relation
+
+logger = logging.getLogger(__name__)
 
 class LLMService:
     def __init__(self):
@@ -52,7 +55,7 @@ class LLMService:
             )
 
             res = self.string_to_list(response.candidates[0].content.parts[0].text)
-
+            logger.info(f"Extracted {len(res)} entities from Document")
             return res
 
         except Exception as e:
@@ -95,6 +98,8 @@ class LLMService:
 
             res = self.string_to_list(response.candidates[0].content.parts[0].text)
 
+            logger.info(f"Extracted {len(res)} relations from Document")
+            
             return res
         except Exception as e:
             print(f"[ERROR] Failed to extract relations: {e}")
