@@ -260,6 +260,8 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmitSuccess })
                                         onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
                                         className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer range-lg accent-teal-400" // Basic slider styling
                                         disabled={isLoading}
+                                        title={currentQuestion.label}
+                                        placeholder={currentQuestion.labels?.[currentQuestion.min as keyof typeof currentQuestion.labels] ?? "Select a value"}
                                     />
                                     {/* Labels for Min/Max/Current - CORRECTED ACCESS */}
                                     <div className="flex justify-between text-xs text-gray-400 mt-2 px-1">

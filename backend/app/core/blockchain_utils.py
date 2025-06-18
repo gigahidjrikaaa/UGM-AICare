@@ -18,9 +18,9 @@ MINTER_PRIVATE_KEY = os.getenv("BACKEND_MINTER_PRIVATE_KEY")
 # --- Load ABI (Option 1: Paste directly) ---
 # CONTRACT_ABI = [...] # Paste the ABI array here
 # --- OR Load ABI (Option 2: From file) ---
+# Adjust path if you save ABI elsewhere
+abi_path = os.path.join(os.path.dirname(__file__), 'abi', 'UGMJournalBadges.json')
 try:
-    # Adjust path if you save ABI elsewhere
-    abi_path = os.path.join(os.path.dirname(__file__), 'abi', 'UGMJournalBadges.json')
     with open(abi_path, 'r') as f:
         contract_json = json.load(f)
         CONTRACT_ABI = contract_json['abi']
