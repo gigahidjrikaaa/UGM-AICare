@@ -1,5 +1,4 @@
 # docker-compose.yml (Place in project root)
-version: '3.8'
 
 services:
   #################
@@ -115,4 +114,6 @@ volumes:
 
 networks:
   aicare_network:
-    driver: bridge
+    # driver: bridge
+    # external: true
+    
