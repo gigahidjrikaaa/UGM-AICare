@@ -8,6 +8,7 @@ from app.routes import email, docs, chat, feedback, link_did, internal, journal,
 from contextlib import asynccontextmanager
 from app.core.scheduler import start_scheduler, shutdown_scheduler
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
+from app.utils.env_check import check_env
 import os
 from dotenv import load_dotenv
 
@@ -97,6 +98,10 @@ app.include_router(summary.user_data_router)  # This will have prefix /api/v1/us
 app.include_router(profile.router)
 # logger.info(f"List of routers (/api/v1): {app.routes}")
 logger.info(f"Allowed origins: {origins}")
+
+# Check environment variables
+check_env()
+
 
 @app.get("/")
 async def root():

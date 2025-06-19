@@ -1,6 +1,7 @@
 # app/models.py
+from typing import Optional
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean, Date, UniqueConstraint
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 # from app.database.base import BaseModel # Assuming BaseModel provides created_at, updated_at if needed
 from datetime import datetime
@@ -12,7 +13,7 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     google_sub = Column(String, unique=True, index=True, nullable=False) # Hashed version
     twitter_id = Column(String, unique=True, index=True, nullable=True)
-    email = Column(Text, unique=True, index=True, nullable=True)
+    email: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     sentiment_score = Column(Float, default=0.0)
     wallet_address = Column(String, unique=True, index=True, nullable=True) # Optional EDU Chain wallet address
 

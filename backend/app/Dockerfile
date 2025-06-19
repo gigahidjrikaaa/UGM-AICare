@@ -1,78 +1,100 @@
 # filepath: d:\Ngoding Moment\Github\UGM-AICare\backend\app\Dockerfile
 # Multi-stage build for a more efficient and secure container
 
-# ---- Build Stage ----
+# ---- Build Stage (builder) ----
 FROM python:3.11-slim-bookworm as builder
 
 # Set work directory
 WORKDIR /app
 
-# Install build dependencies (if any beyond what python image provides for wheel building)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# Install essential build tools for Python packages and Rust
+# Separating this from Rust installation for better layer caching
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
     gcc \
     python3-dev \
     build-essential \
-    curl \
-    # For Rust installation
-    && curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable \
-    && export PATH="/root/.cargo/bin:${PATH}" \
-    # Verify Rust installation (optional)
-    && rustc --version \
-    && cargo --version \
-    # Clean up
-    && rm -rf /var/lib/apt/lists/*
+    curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Add Rust to PATH for subsequent RUN commands
+# Install Rust (needed for compiling some Python packages)
+# This is a separate layer, so changes to apt packages above don't trigger a Rust reinstall
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+
+# Add Rust to PATH for subsequent RUN commands in this stage
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Install Python dependencies
+# Verify Rust installation (optional, good for debugging)
+RUN rustc --version && cargo --version
+
+# Copy requirements file first to leverage Docker cache
 COPY requirements.txt .
-# Using --no-deps here assumes all dependencies are in requirements.txt
-# Consider --no-binary :all: for some packages if wheels are problematic, but usually not needed.
+
+# Install Python dependencies and compile them into wheels
+# Using --no-deps here assumes all dependencies are explicitly in requirements.txt
 RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
-# ---- Final Stage ----
+
+# ---- Final Stage (production) ----
 FROM python:3.11-slim-bookworm
 
-# Create a non-root user
-RUN useradd -m -s /bin/bash appuser
+# Create a non-root user and group
+RUN groupadd -r appgroup && useradd --no-log-init -r -g appgroup -m -s /bin/bash appuser
 
 WORKDIR /app
 
+# Set environment variables
+# PYTHONDONTWRITEBYTECODE: Prevents Python from writing .pyc files to disc
+# PYTHONUNBUFFERED: Forces stdin, stdout, and stderr to be totally unbuffered. Useful for logging.
+# PYTHONPATH: Adds /app to Python's module search path.
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PYTHONPATH=/app \
-    # Add other necessary runtime ENV variables here if not sourced from .env via docker-compose
-    APP_ENV=production
+    APP_ENV=production \
+    # Ensure Gunicorn and Alembic can find their executables
+    PATH="/home/appuser/.local/bin:${PATH}"
+# Install runtime system dependencies
+# - libpq5 is the runtime library for psycopg2-binary
+# - Add any other essential runtime system dependencies here
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
+    libpq5 && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Install runtime system dependencies (e.g., for psycopg2)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev \
-    # Add any other runtime system deps
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy wheels from builder and install
+# Copy pre-compiled wheels from the builder stage
 COPY --from=builder /app/wheels /wheels
-RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
 
-# Copy application code
+# Install Python dependencies from wheels
+# This is faster than compiling them again and keeps the image cleaner
+RUN pip install --no-cache-dir --no-index --find-links=/wheels /wheels/* && \
+    rm -rf /wheels
+
+# Copy application code into the container
 # Ensure .dockerignore is properly set up to exclude .git, .venv, __pycache__, etc.
-COPY --chown=appuser:appuser . .
+# This should come after installing dependencies to leverage Docker cache
+COPY --chown=appuser:appgroup . .
 
-# Create necessary directories with proper permissions
-# The log directory should match what's in your app's logging config for production
-RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs
+# Create and set permissions for necessary directories (e.g., logs)
+# Ensure the path /app/logs matches your application's logging configuration
+RUN mkdir -p /app/logs && \
+    chown -R appuser:appgroup /app/logs && \
+    chmod -R 750 /app/logs # Or more restrictive if appropriate
 
-EXPOSE 8000
-
+# Switch to the non-root user
 USER appuser
 
+# Expose the port the application runs on
+EXPOSE 8000
+
 # Health check (adjust path if your health endpoint is different)
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
+# Checks if the application is responsive
+HEALTHCHECK --interval=30s --timeout=10s --start-period=15s --retries=3 \
   CMD curl -f http://localhost:8000/health || exit 1
 
-# Add startup script
-COPY --chown=appuser:appuser ./scripts/start.sh /app/start.sh
-RUN chmod +x /app/start.sh
-
-ENTRYPOINT ["/app/start.sh"]
+# Define the entrypoint for the container
+# This will run migrations and then start Gunicorn
+ENTRYPOINT ["sh", "-c", "echo 'Running database migrations for PostgreSQL VM...' && alembic -c alembic_pg_vm.ini upgrade head && echo 'Starting FastAPI application with Gunicorn...' && exec gunicorn -k uvicorn.workers.UvicornWorker app.main:app --workers ${WORKERS_PER_CORE:-4} --worker-tmp-dir /dev/shm --bind 0.0.0.0:8000"]

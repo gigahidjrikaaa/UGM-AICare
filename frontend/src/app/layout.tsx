@@ -51,10 +51,6 @@ const checkEnvVariables = () => {
 };
 
 // Execute environment variable check when the module loads
-// if(process.env.APP_ENV !== 'production') {
-  // checkEnvVariables();
-// }
-
 checkEnvVariables();
 
 export default async function RootLayout({
