@@ -15,7 +15,7 @@ async def get_llm_service():
   return LLMService()
 
 async def get_graph_service():
-  return GraphService()
+  return GraphService(llm_service=await get_llm_service())
 
 @router.post("/extract")
 async def extract_entities(
