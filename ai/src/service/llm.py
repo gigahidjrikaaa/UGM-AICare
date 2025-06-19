@@ -21,6 +21,40 @@ class LLMService:
         return json.loads(re.sub(r"```json|```", "", input).strip())
 
 
+    async def answer_query_with_knowledge_retrieval(self, query: str, knowledge: list[dict]) -> str:
+        try:
+            prompt = f"""
+            Kueri:
+            {query}
+
+            Knowledge:
+            {knowledge}
+            """
+
+            config = types.GenerateContentConfig(
+                system_instruction="""
+                Kamu adalah chatbot kesehatan mental yang akan menjawab pertanyaan seputar topik kesehatan mental.
+                Akan disediakan kueri yang berupa pertanyaan pengguna dan knowledge yang berupa pengetahuan tambahan untuk menjawab pertanyaan.
+                Jawab pertanyaan secara langsung tanpa pernyataan seperti "Berdasarkan knowledge yang diberikan"
+                """
+            )
+
+            content = types.Content(
+                role    = "user",
+                parts   = [
+                    types.Part.from_text(text = prompt)
+                    ]
+            )
+
+            response = self.client.models.generate_content(
+                model       = "gemini-2.5-flash",
+                contents    = content,
+                config      = config
+            )
+            return response.candidates[0].content.parts[0].text
+        except Exception as e:
+            logger.error(f"Failed to answer question: {e}")
+
     async def extract_entities(self, text: str) -> list[dict]:
         """Extract entites within document using LLM approaches"""
         try:
@@ -59,7 +93,7 @@ class LLMService:
             return res
 
         except Exception as e:
-            print(f"[ERROR] Failed to extract entities: {e}")
+            logger(f"Failed to extract entities: {e}")
             return None 
         
     async def extract_relations(self, text: str, entities: list) -> list[dict]:
