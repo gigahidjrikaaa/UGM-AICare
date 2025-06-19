@@ -144,7 +144,11 @@ async def db_health_check():
         # Execute a simple query to check the database connection
         result = db.execute(text("SELECT 1")).scalar()
         if result == 1:
-            return {"status": "healthy", "db_status": "connected"}
+            return {
+            "status": "healthy",
+            "db_status": "connected",
+            "db_url": os.getenv("DATABASE_URL", "Not set"),
+            }
         else:
             return {"status": "unhealthy", "db_status": "not connected"}
     except Exception as e:
