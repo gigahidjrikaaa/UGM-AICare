@@ -59,9 +59,9 @@ services:
       - .env # Load environment variables from .env file in root
     environment:
       # Ensure backend connects to containerized DB and Redis
-      DATABASE_URL: postgresql://${POSTGRES_USER:-aicare_user}:${POSTGRES_PASSWORD:-aicare_password}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-aicare_db}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aicare_user}:${POSTGRES_PASSWORD:-aicare_password}@10.10.1.113:5432/${POSTGRES_DB:-aicare_db}
       FRONTEND_URL: ${FRONTEND_URL:-https://aicare.ina17.com} # Use service name for internal communication
-      BACKEND_URL: ${BACKEND_URL:-http://apiaicare.ina17.com} # Use service name for internal communication
+      BACKEND_URL: ${BACKEND_URL:-https://apiaicare.ina17.com} # Use service name for internal communication
       REDIS_HOST: redis # Service name defined above
       REDIS_PORT: 6379 # Default Redis port inside Docker network
       APP_ENV: production # Explicitly set for production
@@ -89,8 +89,8 @@ services:
       args:
         # Pass build arguments for NEXT_PUBLIC_ variables
         # These values should be in your .env file or set in the VM's environment
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-apiaicare.ina17.com} # Backend runs on 8000
-        NEXTAUTH_URL: ${NEXTAUTH_URL:-aicare.ina17.com} # Default to production URL
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://apiaicare.ina17.com} # Backend runs on 8000
+        NEXTAUTH_URL: ${NEXTAUTH_URL:-https://aicare.ina17.com} # Default to production URL
     ports:
       - "4000:3000" # Map host port 4000 to container port 3000
     # No source code volumes for production
