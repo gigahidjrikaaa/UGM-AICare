@@ -83,9 +83,22 @@ class GraphService:
             YIELD node, score
             RETURN node.name AS name, node.type AS type, node.description AS description, score
             """
-
+            query_cypher3 = """
+            CALL db.index.vector.queryNodes("entityIndex", $top_k, $query_embedding)
+            YIELD node AS central, score
+            MATCH (central)-[r]-(neighbor)
+            RETURN 
+                central.name AS central_name,
+                central.type AS central_type,
+                central.description AS central_description,
+                score,
+                neighbor.name AS neighbor_name,
+                neighbor.type AS neighbor_type,
+                neighbor.description AS neighbor_description,
+                r.name AS relation_name
+            """
             result = await neo4j_conn.execute_query(
-                query=query_cypher2,
+                query=query_cypher3,
                 parameters={
                     "query_embedding": query_embedding[0],
                     "top_k": top_k
