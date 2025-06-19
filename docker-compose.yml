@@ -59,7 +59,7 @@ services:
       - .env # Load environment variables from .env file in root
     environment:
       # Ensure backend connects to containerized DB and Redis
-      DATABASE_URL: postgresql://${POSTGRES_USER:-aicare_user}:${POSTGRES_PASSWORD:-aicare_password}@db:5432/${POSTGRES_DB:-aicare_db}
+      DATABASE_URL: postgresql://${POSTGRES_USER:-aicare_user}:${POSTGRES_PASSWORD:-aicare_password}@${POSTGRES_HOST:-db}:5432/${POSTGRES_DB:-aicare_db}
       FRONTEND_URL: ${FRONTEND_URL:-https://aicare.ina17.com} # Use service name for internal communication
       BACKEND_URL: ${BACKEND_URL:-http://apiaicare.ina17.com} # Use service name for internal communication
       REDIS_HOST: redis # Service name defined above
