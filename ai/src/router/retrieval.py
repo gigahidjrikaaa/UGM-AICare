@@ -29,15 +29,41 @@ async def get_answer(
   try:
     query = body.query
 
-    top_k_entities = await graph_service.get_top_k_entities(query=query, top_k=10)
+    graph = await graph_service.OneHopBFS(query=query, top_k=10)
+    description = {}
+    knowledge_set = set()
 
-    answer = await llm_service.answer_query_with_knowledge_retrieval(query=query, knowledge=top_k_entities)
+    for fact in graph:
+        if fact["central_name"] not in description:
+            description[fact['central_name']] = fact['central_description'] or ""
+        if fact['neighbor_name'] not in description:
+            description[fact['neighbor_name']] = fact['neighbor_description'] or ""
+
+        relation = fact.get("relation_name", "terkait_dengan")
+
+        if fact['direction'] == "OUTGOING":
+            line = f"{fact['central_name']} {relation} {fact['neighbor_name']}"
+        else:
+            line = f"{fact['neighbor_name']} {relation} {fact['central_name']}"
+
+        knowledge_set.add(line)
+
+
+    description_lines = [f"- {name}: {desc}" for name, desc in description.items()]
+
+    description_text = "Deskripsi:\n" + "\n".join(description_lines)
+    facts_text = "Fakta:\n" + "\n".join(sorted(knowledge_set))
+
+    knowledge = f"{description_text}\n\n{facts_text}"
+
+    answer = await llm_service.answer_query_with_knowledge_retrieval(query=query, knowledge=knowledge)
 
     return{
       "message": "Sucessfull",
       "data": {
         "answer"    : answer,
-        "knowledge" : top_k_entities,
+        # "graph"     : graph,
+        # "knowledge" : knowledge
       }
     }
 
