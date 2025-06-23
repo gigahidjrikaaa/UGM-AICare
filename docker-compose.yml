@@ -65,6 +65,9 @@ services:
       ALLOWED_ORIGINS: https://aicare.ina17.com # Add this line to specify the allowed origin
       REDIS_HOST: redis # Service name defined above
       REDIS_PORT: 6379 # Default Redis port inside Docker network
+      REDIS_USERNAME: ""
+      REDIS_PASSWORD: ""
+      REDIS_URL: ""
       APP_ENV: production # Explicitly set for production
       PYTHONPATH: /app # Make sure Python can find modules in /app
       # WORKERS_PER_CORE: 4 # Example for Gunicorn workers, can be set in .env
