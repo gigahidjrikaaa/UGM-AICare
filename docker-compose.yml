@@ -5,7 +5,7 @@ services:
   # Database (PostgreSQL)
   #################
   db:
-    image: postgres:15-alpine # Using Alpine for smaller size
+    image: postgres:16-alpine # Using Alpine for smaller size
     container_name: ugm_aicare_db
     environment:
       POSTGRES_DB: ${POSTGRES_DB} # Use default if not set in .env
@@ -17,7 +17,9 @@ services:
       - "${POSTGRES_PORT_EXTERNAL:-5432}:5432" # Expose only if direct DB access from host is needed
     restart: unless-stopped
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER:-aicare_user} -d $${POSTGRES_DB:-aicare_db}"] # $$ to escape $ for shell
+      # Forcing the healthcheck to use TCP via localhost makes it a more reliable
+      # indicator that the database is ready for network connections from other containers.
+      test: ["CMD-SHELL", "pg_isready -h localhost -U $${POSTGRES_USER:-aicare_user} -d $${POSTGRES_DB:-aicare_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -28,9 +30,10 @@ services:
   # Cache (Redis)
   #################
   redis:
-    image: redis:7-alpine
+    image: redis/redis-stack-server:latest
     container_name: ugm_aicare_redis
-    command: redis-server --save 60 1 --loglevel warning --protected-mode no # Add this command
+    volumes:
+      - redisdata:/data
     ports:
       - "${REDIS_PORT_EXTERNAL:-6379}:6379" # Expose only if direct Redis access from host is needed
     restart: unless-stopped
@@ -43,6 +46,32 @@ services:
       - aicare_network
 
   #################
+  # Migration Service
+  #################
+  migrate:
+    container_name: ugm_aicare_migrate
+    build:
+      context: ./backend
+      dockerfile: app/Dockerfile
+    # This command overrides the image's entrypoint.
+    # It waits for the DB, runs migrations, and then exits.
+    entrypoint: >
+      sh -c "
+        /app/scripts/wait-for-it.sh -t 60 db:5432 --
+        echo 'DB is up, running migrations...' &&
+        alembic -c alembic_pg_vm.ini upgrade head
+      "
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - aicare_network
+
+  #################
   # Backend (FastAPI)
   #################
   backend:
@@ -50,9 +79,7 @@ services:
     build:
       context: ./backend # Path to directory containing Dockerfile
       dockerfile: app/Dockerfile
-      # Add build arguments if needed by the backend Dockerfile
-      # args:
-      #   SOME_BUILD_ARG: ${SOME_BUILD_ARG_FROM_ENV}
+    # entrypoint: tail -f /dev/null
     ports:
       - "8000:8000" # Map to host port 8000
     # No source code volumes for production, code is in the image
@@ -73,18 +100,14 @@ services:
       PYTHONPATH: /app # Make sure Python can find modules in /app
       # WORKERS_PER_CORE: 4 # Example for Gunicorn workers, can be set in .env
     depends_on:
+      migrate:
+        condition: service_completed_successfully
       db:
         condition: service_healthy # Wait for db to be ready
       redis:
         condition: service_healthy # Wait for redis to be ready
-    command: >
-      sh -c "wait-for-it.sh -t 60 db:5432 -- wait-for-it.sh -t 60 redis:6379 --
-             echo 'Dependencies are up. Running migrations...' && 
-             alembic upgrade head && 
-             echo 'Starting server...' && 
-             uvicorn app.main:app --host 0.0.0.0 --port 8000"
+    # The command is now handled by the ENTRYPOINT in the Dockerfile, making this cleaner.
     restart: unless-stopped
-    # The command is now handled by start.sh (ENTRYPOINT in Dockerfile)
     networks:
       - aicare_network
 
@@ -122,6 +145,8 @@ services:
     # The command is now handled by CMD in the Dockerfile's production stage
     networks:
       - aicare_network
+
+
 # --- Monitoring Services ---
 
   # prometheus:

@@ -1,8 +1,11 @@
-#!/bin/bash
-# Apply database migrations if needed
-echo "Running database migrations..."
-alembic upgrade head
+#!/bin/sh
+set -e # Exit immediately if a command exits with a non-zero status.
 
-# Start the application
-echo "Starting FastAPI application..."
-exec uvicorn app.main:app --host 0.0.0.0 --port 8000
+# The wait for the DB and migrations are handled by the 'migrate' service.
+# We only need to wait for Redis here.
+# echo "Waiting for Redis..."
+# /app/scripts/wait-for-it.sh -t 60 redis:6379 -- echo "Redis is up."
+
+# Start the FastAPI application with Gunicorn
+echo "Starting FastAPI application with Gunicorn..."
+exec gunicorn -k uvicorn.workers.UvicornWorker app.main:app --workers ${WORKERS_PER_CORE:-4} --worker-tmp-dir /dev/shm --bind 0.0.0.0:8000
