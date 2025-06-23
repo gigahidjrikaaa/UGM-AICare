@@ -58,6 +58,79 @@ class GraphService:
         except Exception as e:
             logger.error(f"Failed to insert relations: {e}")
             return None
+
+    async def find_entity(self, entity: str):
+        """Find entity by exact, fulltext, or vector fallback match."""
+        try:
+            # 1. Exact match (normalized)
+            result = await self._find_by_normalized_name(entity)
+            if result:
+                return result
+
+            # 2. Fulltext match
+            result = await self._find_by_fulltext(entity)
+            if result:
+                return result
+
+            # 3. Vector similarity match
+            result = await self._find_by_vector(entity)
+            if result:
+                return result
+
+            return None
+        except Exception as e:
+            logger.error(f"[ERROR] Failed to find entity: {e}")
+            return None
+
+    
+    async def _find_by_normalized_name(self, name: str) -> dict | None:
+        try:
+            query = """
+            MATCH (e:Entity)
+            WHERE e.normalized_name = toLower(trim($name))
+            RETURN e.name AS name, e.id AS id, e.type AS type, e.description AS description
+            LIMIT 1
+            """
+            result = await neo4j_conn.execute_query(query=query, parameters={"name": name})
+            return dict(result[0]) if result else None
+        except Exception as e:
+            logger.warning(f"Cannot find Entity by exact name {e}")
+            return None
+
+    async def _find_by_fulltext(self, name: str) -> dict | None:
+        try:
+            query = """
+            CALL db.index.fulltext.queryNodes('entityNameIndex', $name)
+            YIELD node, score
+            RETURN node.name AS name, node.id AS id, node.type AS type, node.description AS description, score
+            ORDER BY score DESC
+            LIMIT 1
+            """
+            result = await neo4j_conn.execute_query(query=query, parameters={"name": name})
+            return dict(result[0]) if result else None
+        except Exception as e:
+            logger.warning(f"Cannot find Entity by exact name {e}")
+            return None
+
+    async def _find_by_vector(self, name: str) -> dict | None:
+        try: 
+            embedding = await self.llm_service.get_embeddings(input=[name], task="RETRIEVAL_QUERY")
+            if not embedding or not embedding[0]:
+                return None
+
+            query = """
+            CALL db.index.vector.queryNodes('entityIndex', 1, $embedding)
+            YIELD node, score
+            RETURN node.name AS name, node.id AS id, node.type AS type, node.description AS description, score
+            """
+            result = await neo4j_conn.execute_query(
+                query=query,
+                parameters={"embedding": embedding[0]}
+            )
+            return dict(result[0]) if result else None
+        except Exception as e:
+            logger.warning(f"Cannot find Entity by exact name {e}")
+            return None
         
     async def OneHopBFS(self, 
                                  query: str, 

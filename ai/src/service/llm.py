@@ -20,6 +20,42 @@ class LLMService:
     def string_to_list(input: str) -> list[dict]:
         return json.loads(re.sub(r"```json|```", "", input).strip())
 
+    async def query_classification(self, query: str) -> dict:
+        try:
+            prompt = f"""
+            Kamu adalah asisten yang mengklasifikasikan pertanyaan dalam konteks sistem knowledge graph tentang kesehatan mental.
+
+            Tugasmu:
+            1. Klasifikasikan **jenis pertanyaan** ke dalam salah satu dari kategori berikut:
+            - "entity_lookup" → pengguna ingin tahu informasi tentang satu entitas
+            - "fact_query" → pengguna bertanya tentang fakta/deskripsi tertentu dari entitas
+            - "compare_query" → pengguna ingin membandingkan beberapa entitas
+            - "path_query" → pengguna ingin melihat hubungan antara beberapa entitas
+            - "diagnosis_query" → pengguna menjelaskan gejala dan mencari kemungkinan diagnosis
+
+            2. Temukan **nama-nama entitas** yang disebutkan dalam pertanyaan (dalam bentuk list).
+
+            3. Ambil **kata kunci penting** dalam pertanyaan yang bisa membantu pencarian atau reasoning, seperti: "gejala", "penyebab", "hubungan", "dampak", dll.
+
+            Format jawaban hanya dalam bentuk JSON seperti ini:
+
+            ```json
+            {{
+            "query_type": "...",
+            "entities": ["..."],
+            "keywords": ["..."]
+            }}
+
+            Kueri:
+                {query}
+            """
+
+            result = self.client.models.generate_content(
+                model       = "gemini-2.5-flash",
+                contents    = prompt,
+            )
+        except Exception as e:
+            logger.error(f"Error classifying query: {e}")
 
     async def answer_query_with_knowledge_retrieval(self, query: str, knowledge: list[dict]) -> str:
         try:
