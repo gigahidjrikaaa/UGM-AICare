@@ -7,6 +7,8 @@ FROM python:3.11-slim-bookworm as builder
 # Set work directory
 WORKDIR /app
 
+COPY . /app
+
 # Install essential build tools for Python packages and Rust
 # Separating this from Rust installation for better layer caching
 RUN apt-get update && \
@@ -67,6 +69,10 @@ RUN apt-get update && \
 
 # Copy pre-compiled wheels from the builder stage
 COPY --from=builder /app/wheels /wheels
+
+# Add the wait script and make it executable
+COPY ./wait-for-it.sh /usr/local/bin/wait-for-it.sh
+RUN chmod +x /usr/local/bin/wait-for-it.sh
 
 # Install Python dependencies from wheels
 # This is faster than compiling them again and keeps the image cleaner

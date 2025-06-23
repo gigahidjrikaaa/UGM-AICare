@@ -11,7 +11,7 @@ import type {
 import toast from 'react-hot-toast';
 
 // Define the base URL for your backend API
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL + "/api/v1" || 'http://localhost:8000/api/v1'; // Adjust if needed
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL + "/api/v1"; // Adjust if needed
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,

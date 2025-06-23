@@ -16,8 +16,8 @@ from app.core.memory import get_redis_client
 
 load_dotenv()
 
-# Initialize database
-init_db()
+# This call is being moved to the lifespan event handler to avoid race conditions.
+# init_db()
 
 import requests # For making HTTP requests
 
@@ -48,22 +48,24 @@ if os.getenv("APP_ENV") != "production":
 logging.basicConfig(**log_config)
 logger = logging.getLogger(__name__) # Get a logger for main.py itself
 
-console_handler = logging.StreamHandler()
-console_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
-logging.getLogger().addHandler(console_handler) # Add to root logger
-logging.getLogger().setLevel(logging.INFO) # Ensure root logger level is set
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Code to run on startup
-    logger.info("Application startup...")
-    start_scheduler() # Start the scheduler
+    """
+    Handles application startup and shutdown events.
+    """
+    logger.info("Starting application lifespan...")
+    # Initialize the database
+    init_db()
+    # Start the background scheduler
+    start_scheduler()
     yield
-    # Code to run on shutdown
-    logger.info("Application shutdown...")
-    shutdown_scheduler() # Shut down the scheduler
+    # Clean up resources on shutdown
+    logger.info("Shutting down application lifespan...")
+    shutdown_scheduler()
 
-# FastAPI app instance with lifespan context manager
+# You will need to add the lifespan manager to your FastAPI app instance.
+# Find the line where you create your `app` and add `lifespan=lifespan`.
+# For example, if you have `app = FastAPI()`, change it to:
 app = FastAPI(
     title="Aika Chatbot API", 
     description="API for Aika Chatbot - UGM AI Care. Uses FastAPI.",
