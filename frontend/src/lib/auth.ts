@@ -64,27 +64,37 @@ export const authOptions: NextAuthOptions = {
     // Add a credentials provider for admin login
     CredentialsProvider({
       id: "admin-login",
-      name: "Admin Credentials",
+      name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
+        email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        console.log("Attempting Admin Login:", credentials?.email); // Log attempt, but not password
-            if (
-              credentials?.email === process.env.ADMIN_EMAIL && // Use env vars for admin credentials
-              credentials?.password === process.env.ADMIN_PASSWORD
-            ) {
-              console.log("Admin Login Successful:", credentials?.email);
-              return { // Return the Admin User object
-                id: "admin-user" + credentials?.email, // Use a distinct ID for admin
-                email: credentials?.email,
-                name: "Administrator",
-                role: "admin" // Assign the 'admin' role
-              };
-            }
-            console.warn("Admin Login Failed:", credentials?.email);
-            return null; // Login failed
+        // On the server, prefer the internal URL for container-to-container communication.
+        // Fall back to the public URL for other environments (e.g., local development without Docker).
+        const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+
+        try {
+          // This endpoint is an example, adjust it to your actual admin login endpoint.
+          const res = await fetch(`${apiUrl}/api/v1/auth/login`, {
+            method: 'POST',
+            body: JSON.stringify({
+              username: credentials?.email,
+              password: credentials?.password,
+            }),
+            headers: { "Content-Type": "application/json" }
+          });
+
+          const user = await res.json();
+
+          if (res.ok && user) {
+            return user;
+          }
+          return null;
+        } catch (e) {
+          console.error("Authorize error:", e);
+          return null;
+        }
       }
     }),
   ],
@@ -95,7 +105,9 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     // The jwt callback is invoked when a JWT is created or updated.
     async jwt({ token, user, account, profile }) {   // Add trigger if needed
-      const backendUrl = process.env.NEXT_PUBLIC_API_URL;
+      // On the server, prefer the internal URL for container-to-container communication.
+      // Fall back to the public URL for other environments.
+      const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
       const internalApiKey = process.env.INTERNAL_API_KEY;
 
       // Handle admin user sign-in specifically
@@ -135,8 +147,8 @@ export const authOptions: NextAuthOptions = {
               google_sub: token.id,
               email: token.email
             };
-            console.log("SYNC: Calling backend sync-user", backendUrl, syncPayload, internalApiKey);
-            const syncResponse = await fetch(`${backendUrl}/api/v1/internal/sync-user`, {
+            console.log("SYNC: Calling backend sync-user", apiUrl, syncPayload, internalApiKey);
+            const syncResponse = await fetch(`${apiUrl}/api/v1/internal/sync-user`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -156,7 +168,7 @@ export const authOptions: NextAuthOptions = {
 
               // AFTER successful sync, fetch the full user profile from backend
               // console.log(`JWT: Fetching updated profile from backend for Google user sub ${token.id.substring(0, 10)}...`);
-              const profileResponse = await fetch(`${backendUrl}/api/v1/internal/user-by-sub/${token.id}`, {
+              const profileResponse = await fetch(`${apiUrl}/api/v1/internal/user-by-sub/${token.id}`, {
                 headers: { 'X-Internal-API-Key': internalApiKey },
               });
 
@@ -184,13 +196,12 @@ export const authOptions: NextAuthOptions = {
       if (token.id && needsBackendDataFetch && account?.provider !== 'admin-login') {
         // console.log(`JWT: Fetching/Refreshing wallet data from internal API for non-admin user: ${token.id.substring(0, 10)}...`);
         try {
-          const internalApiUrl = `${backendUrl}/api/v1/internal/user-by-sub/${token.id}`;
           // internalApiKey is already defined above
 
           if (!internalApiKey) {
             console.error("JWT Error: INTERNAL_API_KEY missing for wallet fetch.");
           } else {
-            const response = await fetch(internalApiUrl, {
+            const response = await fetch(`${apiUrl}/api/v1/internal/user-by-sub/${token.id}`, {
               headers: { 'X-Internal-API-Key': internalApiKey },
             });
 
