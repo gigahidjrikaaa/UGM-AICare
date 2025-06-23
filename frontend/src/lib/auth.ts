@@ -120,13 +120,10 @@ export const authOptions: NextAuthOptions = {
         return token; // Return early, no backend sync needed for admin
       }
 
-      // Existing logic for Google users and other general token updates
       const isSignIn = !!(account && user);
-      // Determine if wallet/profile data needs fetching/refreshing
-      // For Google users, fetch on sign-in or if data is missing.
-      // Avoid fetching if role is already admin (covered by the block above)
-      const needsBackendDataFetch = token.role !== 'admin' && (isSignIn || !token.wallet_address);
 
+      // This block handles the initial sign-in for Google users.
+      // It syncs them with the backend and fetches their full profile.
       if (isSignIn && account?.provider === 'google' && profile) {
         // This block is for initial Google sign-in
         token.accessToken = account.access_token;
@@ -134,7 +131,7 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role ?? undefined; // Role from GoogleProvider profile
         token.email = user.email; // Email from user object
         
-        // console.log(`JWT: Initial Google sign-in for user ${token.id?.substring(0, 10)}... Role: ${token.role}, Email: ${token.email}`);
+        console.log(`JWT: Initial Google sign-in for user ${token.id?.substring(0, 10)}...`);
 
         try {
           if (!internalApiKey) {
@@ -142,12 +139,11 @@ export const authOptions: NextAuthOptions = {
           } else if (!token.id) {
             console.error("JWT Error: User Sub/ID missing, cannot sync.");
           } else {
-            // console.log(`JWT: Calling internal sync for Google user sub ${token.id.substring(0, 10)}...`);
             const syncPayload = {
               google_sub: token.id,
               email: token.email
             };
-            console.log("SYNC: Calling backend sync-user", apiUrl, syncPayload, internalApiKey);
+            console.log("SYNC: Calling backend to sync-user...");
             const syncResponse = await fetch(`${apiUrl}/api/v1/internal/sync-user`, {
               method: 'POST',
               headers: {
@@ -156,30 +152,32 @@ export const authOptions: NextAuthOptions = {
               },
               body: JSON.stringify(syncPayload),
             });
-            console.log("SYNC: Sync-user response status", syncResponse.status);
-
+            
             if (!syncResponse.ok) {
               const errorBody = await syncResponse.text();
-              console.error(`JWT Error: Backend sync failed for Google user! Status: ${syncResponse.status}, Body: ${errorBody}`);
+              console.error(`JWT Error: Backend sync failed! Status: ${syncResponse.status}, Body: ${errorBody}`);
+              // If sync fails, set default values.
+              token.wallet_address = null;
+              token.allow_email_checkins = true;
             } else {
               const syncResult = await syncResponse.json();
-              // console.log("JWT: Backend Google user sync successful:", syncResult);
+              console.log("SYNC: Backend sync successful.");
               token.dbUserId = syncResult.user_id;
 
               // AFTER successful sync, fetch the full user profile from backend
-              // console.log(`JWT: Fetching updated profile from backend for Google user sub ${token.id.substring(0, 10)}...`);
+              console.log(`JWT: Fetching updated profile from backend...`);
               const profileResponse = await fetch(`${apiUrl}/api/v1/internal/user-by-sub/${token.id}`, {
                 headers: { 'X-Internal-API-Key': internalApiKey },
               });
 
               if (profileResponse.ok) {
                 const dbUserData: InternalUserResponse = await profileResponse.json();
-                // console.log("JWT: Received profile data post-sync for Google user:", dbUserData);
+                console.log("JWT: Received profile data post-sync.");
                 token.wallet_address = dbUserData.wallet_address ?? null;
                 token.allow_email_checkins = dbUserData.allow_email_checkins ?? true;
               } else {
                 const errorBody = await profileResponse.text();
-                console.error(`JWT Error: Fetching profile post-sync for Google user failed: ${profileResponse.status} ${errorBody}`);
+                console.error(`JWT Error: Fetching profile post-sync failed: ${profileResponse.status} ${errorBody}`);
                 token.wallet_address = null;
                 token.allow_email_checkins = true; // Default on error
               }
@@ -192,64 +190,9 @@ export const authOptions: NextAuthOptions = {
         }
       }
       
-      // This block fetches/refreshes wallet data for non-admin users on subsequent requests if needed
-      if (token.id && needsBackendDataFetch && account?.provider !== 'admin-login') {
-        // console.log(`JWT: Fetching/Refreshing wallet data from internal API for non-admin user: ${token.id.substring(0, 10)}...`);
-        try {
-          // internalApiKey is already defined above
-
-          if (!internalApiKey) {
-            console.error("JWT Error: INTERNAL_API_KEY missing for wallet fetch.");
-          } else {
-            const response = await fetch(`${apiUrl}/api/v1/internal/user-by-sub/${token.id}`, {
-              headers: { 'X-Internal-API-Key': internalApiKey },
-            });
-
-            if (!response.ok) {
-              if (response.status === 404) {
-                console.warn(`JWT: User sub ${token.id} not found in backend DB during wallet fetch (non-admin).`);
-                token.wallet_address = null;
-                token.allow_email_checkins = true; // Default if user not found
-              } else {
-                 const errorBody = await response.text();
-                 console.error(`JWT Error: Internal API wallet fetch failed (non-admin): ${response.status} ${errorBody}`);
-              }
-            } else {
-              const dbUserData: InternalUserResponse = await response.json();
-              // console.log("JWT: Received wallet data from internal API (non-admin):", dbUserData);
-              token.wallet_address = dbUserData.wallet_address ?? null;
-              token.allow_email_checkins = dbUserData.allow_email_checkins ?? true;
-            }
-          }
-        } catch (error) {
-          console.error("JWT Error: Network or other error during wallet data fetch (non-admin):", error);
-          token.wallet_address = null;
-          token.allow_email_checkins = true; // Default on error
-        }
-      }
+      // The redundant block that was causing the confusing logs has been removed.
+      // The logic is now consolidated into the initial sign-in block above.
       return token;
-    },
-
-    // The redirect callback is invoked whenever a redirect is triggered.
-    async redirect({ url, baseUrl }) {
-      // For admin login, redirect to admin dashboard
-      if (url.startsWith("/api/auth/callback/admin-login")) {
-        return `${baseUrl}/admin/dashboard`;
-      }
-
-      if (url.startsWith(baseUrl)) {
-        // For absolute URLs within our app
-        if (url.includes("/signin") && url.includes("callbackUrl")) {
-          // Extract the callbackUrl from the URL if present
-          const callbackUrl = new URL(url).searchParams.get("callbackUrl");
-          if (callbackUrl) return callbackUrl;
-          return `${baseUrl}/aika`;
-        }
-        return url;
-      } else if (url.startsWith("/")) {
-        return `${baseUrl}${url}`;
-      }
-      return url;
     },
 
     // The session callback is invoked when a session is checked.
