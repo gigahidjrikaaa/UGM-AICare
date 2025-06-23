@@ -56,10 +56,19 @@ services:
     # This command overrides the image's entrypoint.
     # It waits for the DB, runs migrations, and then exits.
     entrypoint: >
-      sh -c "
-        /app/scripts/wait-for-it.sh -t 60 db:5432 --
-        echo 'DB is up, running migrations...' &&
-        alembic -c alembic_pg_vm.ini upgrade head
+      bash -c "
+        n=0
+        until [ "$n" -ge 5 ]; do
+           echo 'Attempting to run migrations (attempt #$((n+1)))....'
+           alembic -c alembic_pg_vm.ini upgrade head && break
+           n=$((n+1))
+           echo 'Migration failed, retrying in 5 seconds...'
+           sleep 5
+        done
+        if [ "$n" -ge 5 ]; then
+          echo 'Migrations failed after multiple attempts.'
+          exit 1
+        fi
       "
     env_file:
       - .env
@@ -106,7 +115,6 @@ services:
         condition: service_healthy # Wait for db to be ready
       redis:
         condition: service_healthy # Wait for redis to be ready
-    # The command is now handled by the ENTRYPOINT in the Dockerfile, making this cleaner.
     restart: unless-stopped
     networks:
       - aicare_network
@@ -222,5 +230,5 @@ volumes:
 networks:
   aicare_network:
     # driver: bridge
-    # external: true
+    external: true
 
