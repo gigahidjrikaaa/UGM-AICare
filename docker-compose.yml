@@ -30,6 +30,7 @@ services:
   redis:
     image: redis:7-alpine
     container_name: ugm_aicare_redis
+    command: redis-server --save 60 1 --loglevel warning --protected-mode no # Add this command
     ports:
       - "${REDIS_PORT_EXTERNAL:-6379}:6379" # Expose only if direct Redis access from host is needed
     restart: unless-stopped
@@ -77,8 +78,8 @@ services:
       redis:
         condition: service_healthy # Wait for redis to be ready
     command: >
-      sh -c "wait-for-it.sh db 5432 -- 
-             echo 'Running migrations...' && 
+      sh -c "wait-for-it.sh -t 60 db:5432 -- wait-for-it.sh -t 60 redis:6379 --
+             echo 'Dependencies are up. Running migrations...' && 
              alembic upgrade head && 
              echo 'Starting server...' && 
              uvicorn app.main:app --host 0.0.0.0 --port 8000"
@@ -112,7 +113,7 @@ services:
       INTERNAL_API_URL: http://backend:8000
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET} 
       NEXTAUTH_URL: ${NEXTAUTH_URL:-aicare.ina17.com} # Default to production URL
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-apiaicare.ina17.com} # Ensure this matches backend URL
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://apiaicare.ina17.com} # Ensure this matches backend URL
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
     depends_on:
@@ -197,4 +198,4 @@ networks:
   aicare_network:
     # driver: bridge
     # external: true
-    
+
