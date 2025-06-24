@@ -24,7 +24,8 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - aicare_network
+      - internal_network # Only on the internal network
+
 
   #################
   # Cache (Redis)
@@ -43,7 +44,7 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - aicare_network
+      - internal_network # Only on the internal network
 
   #################
   # Migration Service
@@ -57,18 +58,9 @@ services:
     # It waits for the DB, runs migrations, and then exits.
     entrypoint: >
       bash -c "
-        n=0
-        until [ "$n" -ge 5 ]; do
-           echo 'Attempting to run migrations (attempt #$((n+1)))....'
-           alembic -c alembic_pg_vm.ini upgrade head && break
-           n=$((n+1))
-           echo 'Migration failed, retrying in 5 seconds...'
-           sleep 5
-        done
-        if [ "$n" -ge 5 ]; then
-          echo 'Migrations failed after multiple attempts.'
-          exit 1
-        fi
+        /app/scripts/wait-for-it.sh db:5432 -t 60 -- echo 'Database is ready!' && 
+        echo 'Running Alembic migrations...' &&
+        alembic -c alembic_pg_vm.ini upgrade head
       "
     env_file:
       - .env
@@ -78,7 +70,7 @@ services:
       db:
         condition: service_healthy
     networks:
-      - aicare_network
+      - internal_network # Only needs internal access to the DB
 
   #################
   # Backend (FastAPI)
@@ -117,7 +109,9 @@ services:
         condition: service_healthy # Wait for redis to be ready
     restart: unless-stopped
     networks:
-      - aicare_network
+      aicare_network:
+        ipv4_address: 10.10.1.114
+      internal_network: {} # Also on the internal network to talk to db/redis
 
   #################
   # Frontend (Next.js)
@@ -152,7 +146,8 @@ services:
     restart: unless-stopped
     # The command is now handled by CMD in the Dockerfile's production stage
     networks:
-      - aicare_network
+      aicare_network:
+        ipv4_address: 10.10.1.115
 
 
 # --- Monitoring Services ---
@@ -229,6 +224,7 @@ volumes:
 
 networks:
   aicare_network:
-    # driver: bridge
     external: true
+  internal_network: # This is our new, internal-only bridge network
+    driver: bridge
 
