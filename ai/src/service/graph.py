@@ -1,5 +1,6 @@
 from uuid import uuid4
 import logging
+import asyncio
 
 from src.database import neo4j_conn
 from src.service.llm import LLMService
@@ -59,7 +60,7 @@ class GraphService:
             logger.error(f"Failed to insert relations: {e}")
             return None
 
-    async def find_entity(self, entity: str):
+    async def find_entity(self, entity: str, query: str):
         """Find entity by exact, fulltext, or vector fallback match."""
         try:
             # 1. Exact match (normalized)
@@ -73,7 +74,7 @@ class GraphService:
                 return result
 
             # 3. Vector similarity match
-            result = await self._find_by_vector(entity)
+            result = await self._find_by_vector(name=entity, query=query)
             if result:
                 return result
 
@@ -87,7 +88,7 @@ class GraphService:
         try:
             query = """
             MATCH (e:Entity)
-            WHERE e.normalized_name = toLower(trim($name))
+            WHERE toLower(trim(e.name)) = toLower(trim($name))
             RETURN e.name AS name, e.id AS id, e.type AS type, e.description AS description
             LIMIT 1
             """
@@ -109,12 +110,12 @@ class GraphService:
             result = await neo4j_conn.execute_query(query=query, parameters={"name": name})
             return dict(result[0]) if result else None
         except Exception as e:
-            logger.warning(f"Cannot find Entity by exact name {e}")
+            logger.warning(f"Cannot find Entity by fulltext {e}")
             return None
 
-    async def _find_by_vector(self, name: str) -> dict | None:
+    async def _find_by_vector(self, name: str, query: str) -> dict | None:
         try: 
-            embedding = await self.llm_service.get_embeddings(input=[name], task="RETRIEVAL_QUERY")
+            embedding = await self.llm_service.get_embeddings(input=[f"{name}, {query}"], task="RETRIEVAL_QUERY")
             if not embedding or not embedding[0]:
                 return None
 
@@ -129,17 +130,17 @@ class GraphService:
             )
             return dict(result[0]) if result else None
         except Exception as e:
-            logger.warning(f"Cannot find Entity by exact name {e}")
+            logger.warning(f"Cannot find Entity by vector {e}")
             return None
         
-    async def OneHopBFS(self, 
-                                 query: str, 
+    async def SemanticNeighborSearch(self, 
+                                 query: str,
                                  top_k: int = 10,
                                  ) -> list[dict]:
         try:
             query_embedding = await self.llm_service.get_embeddings(input=[query], task="RETRIEVAL_QUERY")
             if not query_embedding[0]:
-                raise Exception("Fail to generate embedding") 
+                raise Exception("Fail to generate embedding")
             
             query_cypher = """
             CALL db.index.vector.queryNodes("entityIndex", $top_k, $query_embedding)
@@ -177,14 +178,102 @@ class GraphService:
         except Exception as e:
             logger.error(f"Semantic search failed: {e}")
             return []
+    async def EntityBasedNeighborSearch(
+        self,
+        query: str,
+        candidate_entities: list[str],
+        top_k: int = 10,
+    ) -> list[dict]:
+        """
+        Performs neighbor search starting from specific candidate entities.
         
-    async def AllShortestPath(self, query: str, top_k: int = 10) -> list[dict]:
+        Args:
+            query: Original search query (for logging/context)
+            candidate_entities: List of entity names to search from
+            top_k: Maximum number of results to return
+            relation_types: Optional list of relation types to filter by
+            max_execution_time: Maximum execution time in seconds
+            
+        Returns:
+            List of dictionaries containing entity relationship data
+            
+        Raises:
+            ValueError: If input parameters are invalid
+            TimeoutError: If execution exceeds max_execution_time
+        """
+        
+        if not isinstance(candidate_entities, list) or not candidate_entities:
+            raise ValueError("candidate_entities must be a non-empty list")
+        
+        try:
+            logger.info(f"Starting entity-based neighbor search for {len(candidate_entities)} candidates")
+            
+            entities = await asyncio.gather(*[
+                self.find_entity(entity=e, query=query) for e in candidate_entities
+            ])
+            
+            entities = [e for e in entities if e is not None]
+            
+            if not entities:
+                logger.warning("No valid entities found from candidates")
+                return []
+            
+            logger.info(f"Found {len(entities)} valid entities from candidates")
+            
+            query_cypher = f"""
+            UNWIND $entities AS entity
+            MATCH (central:Entity {{name: entity.name}})-[r]-(neighbor)
+            WHERE neighbor.id IS NOT NULL
+            WITH central, neighbor, r,
+                CASE WHEN central.id = startNode(r).id THEN 'OUTGOING' ELSE 'INCOMING' END AS direction
+            RETURN DISTINCT
+                central.id AS central_id,
+                central.name AS central_name,
+                central.type AS central_type,
+                central.description AS central_description,
+                1.0 AS score,
+                neighbor.id AS neighbor_id,
+                neighbor.name AS neighbor_name,
+                neighbor.type AS neighbor_type,
+                neighbor.description AS neighbor_description,
+                r.name AS relation_name,
+                type(r) AS relation_type,
+                direction
+            LIMIT $top_k
+            """
+            
+            parameters = {
+                "entities": entities,
+                "top_k": top_k
+                }
+            
+            # Execute query
+            result = await neo4j_conn.execute_query(
+                query=query_cypher,
+                parameters=parameters
+            )
+            
+            
+            records = result.record if hasattr(result, "record") else result
+            logger.info(f"Entity-based neighbor search completed, returned {len(records)} results")
+            
+            return [dict(record) for record in records]
+        except Exception as e:
+            logger.error(f"Entity-based neighbor search failed: {e}")
+            return []
+        
+    async def SemanticAllShortestPath(self, 
+                              query: str,
+                              max_hop: int = 10,
+                              limit: int = 50,
+                              top_k: int = 10
+                              ) -> list[dict]:
         try:
             query_embedding = await self.llm_service.get_embeddings(input=[query], task="RETRIEVAL_QUERY")
             if not query_embedding[0]:
                 raise Exception("Fail to generate embedding") 
             
-            query_cypher = """
+            query_cypher = f"""
             CALL db.index.vector.queryNodes("entityIndex", $top_k, $query_embedding)
             YIELD node AS central, score
 
@@ -196,22 +285,39 @@ class GraphService:
             WITH source, target
             WHERE source <> target
 
-            MATCH p = shortestPath((source)-[*..5]-(target))
+            MATCH p = allShortestPaths((source)-[*1..{max_hop}]-(target))
             WHERE ALL(n IN nodes(p) WHERE n.id IS NOT NULL)
 
+            WITH p, source, target, nodes(p) as path_nodes_raw, relationships(p) as path_rels_raw
+
             RETURN DISTINCT
-                source.id AS source_id,
-                target.id AS target_id,
-                [n IN nodes(p) | {id: n.id, name: n.name, type: n.type}] AS path_nodes,
-                [r IN relationships(p) | {type: type(r), name: r.name}] AS path_rels,
-                length(p) AS hops
+            source.id AS source_id,
+            target.id AS target_id,
+            [i IN range(0, size(path_nodes_raw)-1) | {{
+                        id: path_nodes_raw[i].id,
+                        name: path_nodes_raw[i].name,
+                        type: path_nodes_raw[i].type,
+                        description: path_nodes_raw[i].description,
+                        position: i
+            }}] AS path_nodes,
+            [i IN range(0, size(path_rels_raw)-1) | {{
+                        type: type(path_rels_raw[i]),
+                        name: path_rels_raw[i].name,
+                        direction: CASE 
+                            WHEN startNode(path_rels_raw[i]).id = path_nodes_raw[i].id 
+                            THEN 'OUTGOING' 
+                            ELSE 'INCOMING' 
+                        END
+            }} AS path_rels,
+            length(p) AS hops
             ORDER BY hops ASC
-            LIMIT 50
+            LIMIT $limit
             """
             result = await neo4j_conn.execute_query(
                 query=query_cypher,
                 parameters={
                     "query_embedding": query_embedding[0],
+                    "limit": limit,
                     "top_k": top_k
                 }
             )
@@ -221,6 +327,75 @@ class GraphService:
         
         except Exception as e:
             logger.error(f"Semantic search failed: {e}")
+            return []
+
+    async def EntityBasedAllShortestPath(self, 
+                              query: str, 
+                              candidate_entities: list = [],
+                              max_hop: int = 5,
+                              limit: int = 50,
+                              ) -> list[dict]:
+        try:
+            entities = await asyncio.gather(*[
+                self.find_entity(entity=e, query=query) for e in candidate_entities
+            ])
+            
+            entities = [e for e in entities if e]
+            if len(entities) < 2:
+                raise Exception("Need at least two valid entities for path finding.")
+            
+            entity_ids = [e["id"] for e in entities]
+
+            query_cypher = f"""
+            UNWIND $entity_ids AS source_id
+            UNWIND $entity_ids AS target_id
+            WITH source_id, target_id WHERE source_id <> target_id
+
+            MATCH (source:Entity {{id: source_id}})
+            MATCH (target:Entity {{id: target_id}})
+            
+            MATCH p = allShortestPaths((source)-[*1..{max_hop}]-(target))
+            WHERE ALL(n IN nodes(p) WHERE n.id IS NOT NULL)
+
+            WITH p, source, target, nodes(p) as path_nodes_raw, relationships(p) as path_rels_raw
+
+            RETURN DISTINCT
+            source.id AS source_id,
+            target.id AS target_id,
+            [i IN range(0, size(path_nodes_raw)-1) | {{
+                        id: path_nodes_raw[i].id,
+                        name: path_nodes_raw[i].name,
+                        type: path_nodes_raw[i].type,
+                        description: path_nodes_raw[i].description,
+                        position: i
+            }}] AS path_nodes,
+            [i IN range(0, size(path_rels_raw)-1) | {{
+                        type: type(path_rels_raw[i]),
+                        name: path_rels_raw[i].name,
+                        direction: CASE 
+                            WHEN startNode(path_rels_raw[i]).id = path_nodes_raw[i].id 
+                            THEN 'OUTGOING' 
+                            ELSE 'INCOMING' 
+                        END
+            }}] AS path_rels,
+            length(p) AS hops
+            ORDER BY hops ASC
+            LIMIT $limit
+            """
+
+            result = await neo4j_conn.execute_query(
+                query=query_cypher,
+                parameters={
+                    "entity_ids": entity_ids,
+                    "limit": limit,
+                }
+            )
+
+            records = result.record if hasattr(result, "record") else result
+            return [dict(record) for record in records]
+        
+        except Exception as e:
+            logger.error(f"Entity Based All Shortest Path search failed: {e}")
             return []
 
     async def graph_traversal(self, entities: list[dict]):

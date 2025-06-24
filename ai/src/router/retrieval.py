@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, Body
 import logging
+from typing import Literal, Optional
 from pydantic import BaseModel
 
 from src.service.llm import LLMService
@@ -15,10 +16,6 @@ async def get_graph_service():
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-
-class GetAnswerBody(BaseModel):
-  query: str
-  top_k: int
 
 def extract_one_hop_bfs_graph_to_knowlwdge(graph: list[dict]) -> str:
   try:
@@ -48,8 +45,64 @@ def extract_one_hop_bfs_graph_to_knowlwdge(graph: list[dict]) -> str:
       knowledge = f"{description_text}\n\n{facts_text}"
       return knowledge
   except Exception as e:
-     return []
-      
+     return ""
+
+def parse_full_path_knowledge(paths: list[dict]) -> str:
+    try:
+      description = {}
+      fact_lines = set()
+
+      for path in paths:
+          nodes = path.get("path_nodes", [])
+          rels = path.get("path_rels", [])
+
+          # 1. Collect descriptions directly from node field
+          for node in nodes:
+              name = node.get("name", "")
+              desc = node.get("description", "")
+              if name and desc and name not in description:
+                description[name] = desc
+
+          # 2. Build full path fact string
+          if len(nodes) >= 2 and len(rels) >= 1:
+              path_str = ""
+              for i in range(len(rels)):
+                  source = nodes[i]["name"]
+                  target = nodes[i + 1]["name"]
+                  relation = rels[i].get("name", "terhubung")
+                  direction = rels[i].get("direction", "OUTGOING")
+
+                  if direction == "OUTGOING":
+                      path_str += f"{source} --[{relation}]--> "
+                  else:
+                      path_str += f"{target} <--[{relation}]-- "
+
+              path_str += nodes[-1]["name"]
+              fact_lines.add(path_str)
+
+      # Merge all output
+      description_str = "Deskripsi:\n" + "\n".join(
+          f"{name}: {desc}" for name, desc in description.items()
+      )
+      fakta_str = "Fakta:\n" + "\n".join(sorted(fact_lines))
+
+      return f"{description_str}\n\n{fakta_str}"
+    except Exception as e:
+       logger.error(f"Fail to parse path response: {e}")
+       return ""
+
+
+class GetAnswerBody(BaseModel):
+  query: str
+  method: Literal[
+     'semantic_neighbor',
+     'semantic_shortest_path',
+     'entity_neighbor',
+     'entity_shortest_path'
+     ] = 'entity_neighbor'
+  max_hop: Optional[int] = 10
+  limit: Optional[int] = 50
+  top_k: Optional[int] = 10
 
 @router.post("/get-answer")
 async def get_answer(
@@ -58,20 +111,55 @@ async def get_answer(
   llm_service: LLMService = Depends(get_llm_service)
 ):
   try:
-    query = body.query
+    query   = body.query
+    method  = body.method
+    max_hop = body.max_hop
+    limit   = body.limit
+    top_k   = body.top_k
 
-    graphBFS = await graph_service.OneHopBFS(query=query, top_k=body.top_k)
-    graphAllShortestPath = await graph_service.AllShortestPath(query=query, top_k=body.top_k)
+    query_class  = await llm_service.query_classification(query=query)
+    candidate_entities = query_class.get("entities", [])
 
-    knowledge = extract_one_hop_bfs_graph_to_knowlwdge(graph=graphBFS)
+    method_map = {
+      'semantic_neighbor': graph_service.SemanticNeighborSearch,
+      'semantic_shortest_path': graph_service.SemanticAllShortestPath,
+      'entity_neighbor': graph_service.EntityBasedNeighborSearch,
+      'entity_shortest_path': graph_service.EntityBasedAllShortestPath
+    }
+
+    result: dict      = {}
+    graph: list[dict] = []
+    knowledge: list   = ""
+
+    if method == "semantic_neighbor":
+      graph = await graph_service.SemanticNeighborSearch(query=query, top_k=top_k)
+      knowledge = extract_one_hop_bfs_graph_to_knowlwdge(graph=graph)
+
+    elif method == "semantic_shortest_path":
+      graph = await graph_service.SemanticAllShortestPath(query=query, top_k=top_k)
+      knowledge = await parse_full_path_knowledge(paths=graph)
+
+    elif method == "entity_neighbor":
+      graph = await graph_service.EntityBasedNeighborSearch(query=query, candidate_entities=candidate_entities, top_k=top_k)
+      knowledge = extract_one_hop_bfs_graph_to_knowlwdge(graph=graph)
+
+    elif method == "entity_shortest_path":
+      graph = await graph_service.EntityBasedAllShortestPath(query=query, candidate_entities=candidate_entities, top_k=top_k, max_hop=10, limit=50)
+      knowledge = parse_full_path_knowledge(paths=graph)
+    else:
+       raise HTTPException(status_code=400, detail=f"Unknown method: {method}") 
 
     answer = await llm_service.answer_query_with_knowledge_retrieval(query=query, knowledge=knowledge)
+    result['method']      = method
+    result['query_class'] = query_class
+    result['answer']      = answer
+    result['knowledge']   = knowledge
+    result['graph']       = graph
+
 
     return{
       "message": "Sucessfull",
-      "data": {
-        "answer"    : answer,
-      }
+      "data": result
     }
 
   except Exception as e:

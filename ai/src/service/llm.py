@@ -17,36 +17,51 @@ class LLMService:
     
 
     @staticmethod
-    def string_to_list(input: str) -> list[dict]:
+    def string_to_json(input: str) -> list[dict] | dict:
         return json.loads(re.sub(r"```json|```", "", input).strip())
 
     async def query_classification(self, query: str) -> dict:
         try:
             prompt = f"""
-            Kamu adalah asisten yang mengklasifikasikan pertanyaan dalam konteks sistem knowledge graph tentang kesehatan mental.
+            Tugas: Klasifikasikan kueri pengguna pada 2 kategori 'entity_query' atau 'path_query', and ekstrak semua entitas yang berkaitan.
 
-            Tugasmu:
-            1. Klasifikasikan **jenis pertanyaan** ke dalam salah satu dari kategori berikut:
-            - "entity_lookup" → pengguna ingin tahu informasi tentang satu entitas
-            - "fact_query" → pengguna bertanya tentang fakta/deskripsi tertentu dari entitas
-            - "compare_query" → pengguna ingin membandingkan beberapa entitas
-            - "path_query" → pengguna ingin melihat hubungan antara beberapa entitas
-            - "diagnosis_query" → pengguna menjelaskan gejala dan mencari kemungkinan diagnosis
+            Definisi:
+            'entity_query': Pertanyaan yang fokus pada 1 entitas dan ingin tahu deskripsinya, gejala, penyebab, dsb.
+            'path_query': Pertanyaan tentang relasi antara 2 atau lebih entitas atau eksplorasi hubungan dalam knowledge graph, atau mencari alur/proses.
 
-            2. Temukan **nama-nama entitas** yang disebutkan dalam pertanyaan (dalam bentuk list).
-
-            3. Ambil **kata kunci penting** dalam pertanyaan yang bisa membantu pencarian atau reasoning, seperti: "gejala", "penyebab", "hubungan", "dampak", dll.
-
-            Format jawaban hanya dalam bentuk JSON seperti ini:
-
-            ```json
+            Output Format (JSON):
             {{
-            "query_type": "...",
-            "entities": ["..."],
-            "keywords": ["..."]
+                "category": "entity_query" | "path_query",
+                "entities": ["Entity 1", "Entity 2", ..., "Entity N"]
             }}
 
-            Kueri:
+            Examples:
+
+            Query: "Apa itu depresi dan bagaimana gejalanya?"
+            Output: {{"category": "entity_query", "entities": ["depresi"]}}
+
+            Query: "Bagaimana cara kerja terapi kognitif-perilaku (CBT) untuk kecemasan?"
+            Output: {{"category": "path_query", "entities": ["terapi kognitif-perilaku (CBT)", "kecemasan"]}}
+
+            Query: "Siapa psikolog yang spesialisasi di terapi trauma?"
+            Output: {{"category": "entity_query", "entities": ["psikolog", "terapi trauma"]}}
+
+            Query: "Layanan dukungan kesehatan mental apa saja yang tersedia untuk remaja di Jakarta?"
+            Output: {{"category": "path_query", "entities": ["layanan dukungan kesehatan mental", "remaja", "Jakarta"]}}
+
+            Query: "Jelaskan peran serotonin dalam gangguan mood."
+            Output: {{"category": "path_query", "entities": ["serotonin", "gangguan mood"]}}
+
+            Query: "Bisakah olahraga membantu mengurangi stres dan meningkatkan kesehatan mental?"
+            Output: {{"category": "path_query", "entities": ["olahraga", "stres", "kesehatan mental"]}}
+
+            Query: "Apa saja jenis obat antidepresan yang umum diresepkan?"
+            Output: {{"category": "entity_query", "entities": ["obat antidepresan"]}}
+
+            ---
+            Klasifikasi and ekstrak entitas untuk kueri berikut:
+
+            Query:
                 {query}
             """
 
@@ -54,6 +69,9 @@ class LLMService:
                 model       = "gemini-2.5-flash",
                 contents    = prompt,
             )
+
+            response  = self.string_to_json(input=result.candidates[0].content.parts[0].text)
+            return response
         except Exception as e:
             logger.error(f"Error classifying query: {e}")
 
@@ -124,7 +142,7 @@ class LLMService:
                 config = config
             )
 
-            res = self.string_to_list(response.candidates[0].content.parts[0].text)
+            res = self.string_to_json(response.candidates[0].content.parts[0].text)
             logger.info(f"Extracted {len(res)} entities from Document")
             return res
 
@@ -166,7 +184,7 @@ class LLMService:
                 config = config
             )
 
-            res = self.string_to_list(response.candidates[0].content.parts[0].text)
+            res = self.string_to_json(response.candidates[0].content.parts[0].text)
 
             logger.info(f"Extracted {len(res)} relations from Document")
             
