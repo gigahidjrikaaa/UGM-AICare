@@ -277,7 +277,7 @@ async def generate_gemma_local_response(
 # --- Unified Generation Function (Async) ---
 async def generate_response(
     history: List[Dict[str, str]],
-    provider: LLMProvider = "gemini", # Default provider changed to Gemini
+    provider: LLMProvider = "gemma_local", # Default provider changed to Gemini
     model: Optional[str] = None,
     max_tokens: int = 512,
     temperature: float = 0.7,
