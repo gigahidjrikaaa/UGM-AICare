@@ -277,19 +277,19 @@ async def generate_gemma_local_response(
 # --- Unified Generation Function (Async) ---
 async def generate_response(
     history: List[Dict[str, str]],
-    provider: LLMProvider = "gemma_local", # Default provider
+    provider: LLMProvider = "gemini", # Default provider changed to Gemini
     model: Optional[str] = None,
     max_tokens: int = 512,
     temperature: float = 0.7,
     system_prompt: Optional[str] = None # Pass system prompt through
 ) -> str:
     """
-    Generates a response using the specified LLM provider (async).
+    Generates a response using the specified LLM provider (async) without fallback.
 
     Args:
         history: The conversation history (list of {'role': str, 'content': str}).
                  Must end with a 'user' message.
-        provider: The LLM provider ('togetherai' or 'gemini').
+        provider: The LLM provider ('gemma_local', 'gemini', or 'togetherai').
         model: The specific model name (optional, uses default for provider if None).
         max_tokens: Maximum number of tokens to generate.
         temperature: Controls randomness (0.0-1.0+).
@@ -304,62 +304,32 @@ async def generate_response(
         logger.error("Invalid history: Must not be empty and end with a 'user' message.")
         return "Error: Invalid conversation history provided."
 
-    # --- Primary Logic: Gemma Local with Fallback to Gemini ---
     if provider == "gemma_local":
-        primary_model = model if model else DEFAULT_GEMMA_LOCAL_MODEL
-        logger.info(f"Primary attempt: Using gemma_local (Model: {primary_model})")
-        try:
-            # Attempt to get a response from the local Gemma service
-            response_text = await generate_gemma_local_response(
-                history=history, model=primary_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
-            )
-            # Check if the response indicates an error from the service itself
-            if response_text.startswith("Error:"):
-                raise ValueError(f"Gemma local service returned an error: {response_text}")
+        gemma_model = model if model else DEFAULT_GEMMA_LOCAL_MODEL
+        logger.info(f"Direct request: Using gemma_local (Model: {gemma_model})")
+        return await generate_gemma_local_response(
+            history=history, model=gemma_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
+        )
 
-            logger.info("Successfully received response from primary provider (gemma_local).")
-            return response_text, "gemma_local", primary_model
-
-        except Exception as e:
-            logger.warning(f"Primary provider 'gemma_local' failed: {e}. Attempting fallback to 'gemini'.")
-            # --- Fallback Logic ---
-            if GOOGLE_API_KEY:
-                fallback_model = DEFAULT_GEMINI_MODEL # Always use the default reliable Gemini model for fallback
-                logger.info(f"Fallback attempt: Using gemini (Model: {fallback_model})")
-                try:
-                    response_text = await generate_gemini_response(
-                        history=history, model=fallback_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
-                    )
-                    if response_text.startswith("Error:"):
-                         raise ValueError(f"Gemini fallback service also returned an error: {response_text}")
-
-                    logger.info("Successfully received response from fallback provider (gemini).")
-                    return response_text, "gemini", fallback_model
-                except Exception as fallback_e:
-                    logger.error(f"Fallback provider 'gemini' also failed: {fallback_e}", exc_info=True)
-                    return f"Error: Primary and fallback providers failed. Last error: {fallback_e}", "system", "error"
-            else:
-                logger.error("Primary provider 'gemma_local' failed, and GOOGLE_API_KEY is not configured for fallback.")
-                return f"Error: The primary AI service failed, and no fallback is configured. {e}", "system", "error"
-
-    # --- Direct Logic for other providers (if explicitly requested) ---
     elif provider == "gemini":
         gemini_model = model if model else DEFAULT_GEMINI_MODEL
         logger.info(f"Direct request: Using gemini (Model: {gemini_model})")
-        response_text = await generate_gemini_response(history, gemini_model, max_tokens, temperature, system_prompt)
-        return response_text, "gemini", gemini_model
+        return await generate_gemini_response(
+            history=history, model=gemini_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
+        )
     
     elif provider == "togetherai":
         together_model = model if model else DEFAULT_TOGETHER_MODEL
         logger.info(f"Direct request: Using togetherai (Model: {together_model})")
-        response_text = await generate_togetherai_response(history, together_model, max_tokens, temperature, system_prompt)
-        return response_text, "togetherai", together_model
+        return await generate_togetherai_response(
+            history=history, model=together_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
+        )
 
     else:
         # This case should ideally be prevented by Pydantic/FastAPI validation
         error_msg = f"Invalid LLM provider: {provider}. Choose 'gemma_local', 'gemini', or 'togetherai'."
         logger.error(error_msg)
-        return error_msg, "system", "error"
+        return error_msg
 
 # --- Constants for default models (can be imported elsewhere) ---
 DEFAULT_PROVIDERS = {
