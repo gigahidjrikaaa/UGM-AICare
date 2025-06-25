@@ -464,8 +464,8 @@ Ringkasan singkat dan kasual:"""
         # 4. Call the LLM
         summary_llm_history = [{"role": "user", "content": summarization_prompt}]
         # Ensure DEFAULT_PROVIDERS and actual model name resolution logic is robust in llm.py
-        summary_provider = "gemini" # Or configurable
-        summary_model = llm.DEFAULT_PROVIDERS.get(summary_provider, "gemini-pro") if hasattr(llm, 'DEFAULT_PROVIDERS') else "gemini-pro"
+        summary_provider = "gemma_local" # Or configurable
+        summary_model = llm.DEFAULT_PROVIDERS.get(summary_provider, "gemma_local") if hasattr(llm, 'DEFAULT_PROVIDERS') else "gemma_local"
 
         summary_text = await llm.generate_response(
              history=summary_llm_history,
