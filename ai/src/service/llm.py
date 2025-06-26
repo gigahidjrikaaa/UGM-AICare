@@ -5,7 +5,7 @@ import json
 import logging
 
 from src.config import Config
-from src.model.schema import Entity, Relation
+from src.model.schema import Entity, Relation, EntityRelationResponse
 
 logger = logging.getLogger(__name__)
 
@@ -192,24 +192,196 @@ class LLMService:
         except Exception as e:
             print(f"[ERROR] Failed to extract relations: {e}")
             return None
+        
+    
+    async def extract_entities_and_relations(self, text: str) -> EntityRelationResponse:
+        """Extract relations between entities using LLM approaches"""
+
+        try:
+            config = types.GenerateContentConfig(
+                system_instruction= """
+                    INSTRUKSI:
+                    Anda adalah sebuah pipeline ekstraksi Knowledge Graph untuk domain kesehatan mental. Dari DOKUMEN yang diberikan, ekstrak semua entitas penting dan relasi di antara mereka. Patuhi struktur JSON dan daftar tipe yang telah ditentukan dengan ketat.
+
+                    LANGKAH-LANGKAH:
+                    1.  **Ekstrak Entitas**: Identifikasi entitas, klasifikasikan tipenya, dan berikan deskripsi singkat dari teks.
+                    2.  **Ekstrak Relasi**: Identifikasi hubungan langsung antar entitas tersebut. `name` relasi harus berupa frasa kerja dari teks, dan `type` adalah kategorisasi formalnya.
+
+                    ---
+
+                    ### **Sistem Tipe (Ontologi)**
+
+                    **A. Tipe Entitas yang Diizinkan:**
+                    * **Gangguan & Kondisi**: `Gangguan_Mental`, `Gejala`, `Kondisi_Medis_Terkait`
+                    * **Intervensi & Perawatan**: `Terapi_Psikologis`, `Obat_Medis`, `Layanan_Kesehatan`, `Aktivitas_Kesejahteraan`
+                    * **Aktor & Pemangku Kepentingan**: `Profesional_Kesehatan`, `Organisasi`, `Individu`
+                    * **Faktor & Konteks**: `Faktor_Risiko`, `Faktor_Pelindung`, `Dokumen_Hukum_Kebijakan`, `Lokasi`
+                    * **Data & Konsep**: `Data_Statistik`, `Konsep_Abstrak`
+                    * **Jaring Pengaman**: `Lainnya` (Gunakan untuk entitas penting yang tidak cocok dengan kategori lain)
+
+                    **B. Tipe Relasi yang Diizinkan:**
+                    * **Sebab-Akibat**: `Menyebabkan`, `Berkontribusi_Pada`, `Mengurangi_Risiko`, `Merupakan_Gejala_Dari`
+                    * **Intervensi**: `Mendiagnosis`, `Menangani`, `Meresepkan`, `Menawarkan_Layanan`
+                    * **Hierarki & Keanggotaan**: `Adalah_Jenis_Dari`, `Bekerja_Di`, `Berlokasi_Di`
+                    * **Deskriptif**: `Memiliki_Atribut`, `Didasarkan_Pada`, `Direkomendasikan_Untuk`
+                    * **Jaring Pengaman**: `Terkait_Dengan` (Gunakan untuk hubungan yang jelas tapi tidak cocok kategori lain)
+
+                    ---
+
+                    ### **Struktur Output JSON**
+                    {
+                    "entities": [
+                        { 
+                        "name": "nama_entitas",
+                        "type": "tipe_entitas_dari_daftar_di_atas",
+                        "description": "penjelasan singkat atau kutipan dari dokumen"
+                        }
+                    ],
+                    "relations": [
+                        {
+                        "source_entity": "nama_entitas_sumber",
+                        "target_entity": "nama_entitas_target",
+                        "name": "frasa_kerja_dari_dokumen",
+                        "type": "tipe_relasi_dari_daftar_di_atas"
+                        }
+                    ]
+                    }
+
+                    ---
+
+                    ### **CONTOH EKSEKUSI**
+
+                    **DOKUMEN:**
+                    Kesehatan Jiwa adalah kondisi dimana seorang individu dapat berkembang secara fisik, mental, spiritual, dan sosial. K
+                    arakteristik gangguan jiwa secara umum yaitu kombinasi pikiran yang abnormal, emosi, dan persepsi. 
+                    Faktor psikologis seperti trauma yang mengakibatkan stres dan faktor biologis seperti genetik merupakan faktor yang berkontribusi terhadap terjadinya gangguan jiwa. 
+                    Sebesar 50% gangguan jiwa berawal pada usia 14 tahun.
+
+                    **JSON_OUTPUT:**
+                    {
+                    "entities": [
+                        {
+                        "name": "Kesehatan Jiwa",
+                        "type": "Konsep_Abstrak",
+                        "description": "kondisi dimana seorang individu dapat berkembang secara fisik, mental, spiritual, dan sosial."
+                        },
+                        {
+                        "name": "Gangguan Jiwa",
+                        "type": "Gangguan_Mental",
+                        "description": "Sebuah kondisi yang memiliki karakteristik seperti kombinasi pikiran abnormal, dan dipengaruhi oleh faktor psikologis serta biologis."
+                        },
+                        {
+                        "name": "Karakteristik Gangguan Jiwa",
+                        "type": "Karakteristik",
+                        "description": "kombinasi pikiran yang abnormal, emosi, dan persepsi."
+                        },
+                        {
+                        "name": "Faktor Psikologis",
+                        "type": "Faktor_Risiko",
+                        "description": "Faktor yang dapat mengakibatkan stres, contohnya trauma."
+                        },
+                        {
+                        "name": "Faktor Biologis",
+                        "type": "Faktor_Risiko",
+                        "description": "Faktor yang berkontribusi pada gangguan jiwa, contohnya genetik."
+                        },
+                        {
+                        "name": "Stres",
+                        "type": "Gejala",
+                        "description": "Sebuah kondisi yang diakibatkan oleh faktor psikologis seperti trauma."
+                        },
+                        {
+                        "name": "Statistik Onset Gangguan Jiwa",
+                        "type": "Data_Statistik",
+                        "description": "Sebesar 50% gangguan jiwa berawal pada usia 14 tahun."
+                        }
+                    ],
+                    "relations": [
+                        {
+                        "source_entity": "Gangguan Jiwa",
+                        "target_entity": "Karakteristik Gangguan Jiwa",
+                        "name": "memiliki karakteristik",
+                        "type": "Memiliki_Atribut"
+                        },
+                        {
+                        "source_entity": "Faktor Psikologis",
+                        "target_entity": "Stres",
+                        "name": "mengakibatkan",
+                        "type": "Menyebabkan"
+                        },
+                        {
+                        "source_entity": "Faktor Psikologis",
+                        "target_entity": "Gangguan Jiwa",
+                        "name": "berkontribusi terhadap",
+                        "type": "Berkontribusi_Pada"
+                        },
+                        {
+                        "source_entity": "Faktor Biologis",
+                        "target_entity": "Gangguan Jiwa",
+                        "name": "berkontribusi terhadap",
+                        "type": "Berkontribusi_Pada"
+                        },
+                        {
+                        "source_entity": "Gangguan Jiwa",
+                        "target_entity": "Statistik Onset Gangguan Jiwa",
+                        "name": "memiliki data onset",
+                        "type": "Memiliki_Atribut"
+                        }
+                    ]
+                    }
+                    """
+            )
+
+            content = types.Content(
+                role="user",
+                parts= [
+                    types.Part.from_text(text=f"Dokumen: \n {text}")
+                ]
+            )
+
+            response = self.client.models.generate_content(
+                model = "gemini-2.5-flash",
+                contents = content,
+                config = config
+            )
+            raw_text = response.candidates[0].content.parts[0].text
+
+            res = self.string_to_json(raw_text)
+
+            if "entities" not in res or "relations" not in res:
+                logger.warning("LLM response missing expected fields")
+                return EntityRelationResponse(entities=[], relations=[])
+            
+            logger.info(f"Extracted {len(res['entities'])} entities and {len(res['relations'])} relations from Document")
+
+            return EntityRelationResponse(**res)
+        except Exception as e:
+            logger.error(f"Failed to extract entity relations: {e}")
+            return EntityRelationResponse(entities=[], relations=[])
 
     async def get_embeddings(self, input: list[str], task: str = "RETRIEVAL_DOCUMENT") -> list[list[float]]:
         """Generate Embeding given text"""
         try:
-            response = self.client.models.embed_content(
-                model="models/embedding-001",
-                contents=input,
-                config=types.EmbedContentConfig(
-                    task_type=task
-                )
-            )
+            MAX_BATCH = 100
+            all_embeddings = []
+            # Split into chunks of MAX_BATCH
+            for i in range(0, len(input), MAX_BATCH):
+                batch = input[i:i + MAX_BATCH]
 
-            embeddings = [e.values for e in response.embeddings]
-            return embeddings
+                response = self.client.models.embed_content(
+                    model="models/embedding-001",
+                    contents=batch,
+                    config=types.EmbedContentConfig(task_type=task)
+                )
+
+                batch_embeddings = [e.values for e in response.embeddings]
+                all_embeddings.extend(batch_embeddings)
+
+            return all_embeddings
+
         except Exception as e:
             print(f"[ERROR] Failed to get embeddings: {e}")
-            return None
-
+            return []
         
     def generate_graph(self, doc: list[str]):
         text = "\n".join(doc)

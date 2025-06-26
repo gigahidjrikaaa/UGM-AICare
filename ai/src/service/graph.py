@@ -4,6 +4,7 @@ import asyncio
 
 from src.database import neo4j_conn
 from src.service.llm import LLMService
+from src.model.schema import Entity, Relation
 
 logger = logging.getLogger(__name__)
 
@@ -12,23 +13,37 @@ class GraphService:
     def __init__(self, llm_service: LLMService):
         self.llm_service = llm_service
 
-    async def insert_entities(self, entities: list[dict]):
+    @staticmethod
+    def __remove_duplicates_dict_list(dict_list):
+        seen = set()
+        unique_list = []
+        for d in dict_list:
+            # Convert to a tuple of sorted items to ensure consistent order
+            dict_tuple = tuple(sorted(d.items()))
+            if dict_tuple not in seen:
+                seen.add(dict_tuple)
+                unique_list.append(d)
+        return unique_list
+    
+    async def insert_entities(self, entities: list[Entity]):
         try:
             query = """
                 UNWIND $data AS row
-                MERGE (e:Entity {name: row.name})
-                SET e.id = row.id,
-                    e.type = row.type,
-                    e.description = row.description,
-                    e.embedding = row.embedding
+                CALL apoc.create.node([row.type], {
+                    name: row.name, 
+                    id: row.id, 
+                    description: row.description, 
+                    embedding: row.embedding
+                    }) YIELD node
+                RETURN node
                 """
 
             for ent in entities:
-                ent["id"] = str(uuid4())
-
+                ent.id = str(uuid4())
+            entity_dicts = [ent.model_dump() for ent in entities]
             result = await neo4j_conn.execute_query(
                 query=query,
-                parameters={"data": entities}
+                parameters={"data": entity_dicts}
             )
             logger.info(f"Add {len(entities)} entities on Graph Database.")
             return result
@@ -36,23 +51,27 @@ class GraphService:
             logger.error(f"Failed to insert entities: {e}")
             return None
 
-    async def insert_relations(self, relations: list[dict]):
+    async def insert_relations(self, relations: list[Relation]):
         try:
             query = """
             UNWIND $data AS row
-            MATCH (source:Entity {name: row.source_entity})
-            MATCH (target:Entity {name: row.target_entity})
-            MERGE (source)-[r:Relation {name: row.name}]->(target)
-            SET r.id = row.id
+            MATCH (source {name: row.source_entity})
+            MATCH (target {name: row.target_entity})
+            CALL apoc.create.relationship(
+                source, 
+                row.type, 
+                {name: row.name, id: row.id}, 
+                target
+                ) YIELD rel
+            RETURN rel
             """
-
             for rel in relations:
-                rel["id"] = str(uuid4())
-                rel.pop("metadata", None)
+                rel.id = str(uuid4())
 
+            relations_dicts = [ent.model_dump() for ent in relations]
             result = await neo4j_conn.execute_query(
                 query=query,
-                parameters={"data": relations}
+                parameters={"data": relations_dicts}
             )
             logger.info(f"Add {len(relations)} relations on Graph Database.")
             return result
@@ -60,31 +79,31 @@ class GraphService:
             logger.error(f"Failed to insert relations: {e}")
             return None
 
-    async def find_entity(self, entity: str, query: str):
+    async def find_entity(self, entity: str, query: str) -> list[dict]:
         """Find entity by exact, fulltext, or vector fallback match."""
         try:
             # 1. Exact match (normalized)
-            result = await self._find_by_normalized_name(entity)
-            if result:
-                return result
+            # result = await self._find_by_normalized_name(entity)
+            # if len(result) >= 0:
+            #     return result
 
             # 2. Fulltext match
             result = await self._find_by_fulltext(entity)
-            if result:
+            if len(result) >= 0:
                 return result
 
             # 3. Vector similarity match
             result = await self._find_by_vector(name=entity, query=query)
-            if result:
+            if len(result) >= 0:
                 return result
 
-            return None
+            return []
         except Exception as e:
             logger.error(f"[ERROR] Failed to find entity: {e}")
-            return None
+            return []
 
     
-    async def _find_by_normalized_name(self, name: str) -> dict | None:
+    async def _find_by_normalized_name(self, name: str) -> list[dict]:
         try:
             query = """
             MATCH (e:Entity)
@@ -93,27 +112,27 @@ class GraphService:
             LIMIT 1
             """
             result = await neo4j_conn.execute_query(query=query, parameters={"name": name})
-            return dict(result[0]) if result else None
+            return [dict(row) for row in result] if result else []
         except Exception as e:
             logger.warning(f"Cannot find Entity by exact name {e}")
-            return None
+            return []
 
-    async def _find_by_fulltext(self, name: str) -> dict | None:
+    async def _find_by_fulltext(self, name: str) -> list[dict]:
         try:
             query = """
             CALL db.index.fulltext.queryNodes('entityNameIndex', $name)
             YIELD node, score
             RETURN node.name AS name, node.id AS id, node.type AS type, node.description AS description, score
             ORDER BY score DESC
-            LIMIT 1
+            LIMIT 10
             """
             result = await neo4j_conn.execute_query(query=query, parameters={"name": name})
-            return dict(result[0]) if result else None
+            return [dict(row) for row in result] if result else []
         except Exception as e:
             logger.warning(f"Cannot find Entity by fulltext {e}")
-            return None
+            return []
 
-    async def _find_by_vector(self, name: str, query: str) -> dict | None:
+    async def _find_by_vector(self, name: str, query: str) -> list[dict]:
         try: 
             embedding = await self.llm_service.get_embeddings(input=[f"{name}, {query}"], task="RETRIEVAL_QUERY")
             if not embedding or not embedding[0]:
@@ -123,15 +142,16 @@ class GraphService:
             CALL db.index.vector.queryNodes('entityIndex', 1, $embedding)
             YIELD node, score
             RETURN node.name AS name, node.id AS id, node.type AS type, node.description AS description, score
+            LIMIT 10
             """
             result = await neo4j_conn.execute_query(
                 query=query,
                 parameters={"embedding": embedding[0]}
             )
-            return dict(result[0]) if result else None
+            return [dict(row) for row in result] if result else []
         except Exception as e:
             logger.warning(f"Cannot find Entity by vector {e}")
-            return None
+            return []
         
     async def SemanticNeighborSearch(self, 
                                  query: str,
@@ -182,7 +202,7 @@ class GraphService:
         self,
         query: str,
         candidate_entities: list[str],
-        top_k: int = 10,
+        limit: int = 50,
     ) -> list[dict]:
         """
         Performs neighbor search starting from specific candidate entities.
@@ -208,11 +228,12 @@ class GraphService:
         try:
             logger.info(f"Starting entity-based neighbor search for {len(candidate_entities)} candidates")
             
-            entities = await asyncio.gather(*[
+            entities_nested = await asyncio.gather(*[
                 self.find_entity(entity=e, query=query) for e in candidate_entities
             ])
+
             
-            entities = [e for e in entities if e is not None]
+            entities = [item for sublist in entities_nested if sublist for item in sublist]
             
             if not entities:
                 logger.warning("No valid entities found from candidates")
@@ -239,20 +260,18 @@ class GraphService:
                 r.name AS relation_name,
                 type(r) AS relation_type,
                 direction
-            LIMIT $top_k
+            LIMIT $limit
             """
             
             parameters = {
                 "entities": entities,
-                "top_k": top_k
+                "limit": limit
                 }
             
-            # Execute query
             result = await neo4j_conn.execute_query(
                 query=query_cypher,
                 parameters=parameters
             )
-            
             
             records = result.record if hasattr(result, "record") else result
             logger.info(f"Entity-based neighbor search completed, returned {len(records)} results")
@@ -308,7 +327,7 @@ class GraphService:
                             THEN 'OUTGOING' 
                             ELSE 'INCOMING' 
                         END
-            }} AS path_rels,
+            }}] AS path_rels,
             length(p) AS hops
             ORDER BY hops ASC
             LIMIT $limit

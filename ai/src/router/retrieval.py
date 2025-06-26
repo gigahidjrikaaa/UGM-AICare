@@ -136,15 +136,15 @@ async def get_answer(
       knowledge = extract_one_hop_bfs_graph_to_knowlwdge(graph=graph)
 
     elif method == "semantic_shortest_path":
-      graph = await graph_service.SemanticAllShortestPath(query=query, top_k=top_k)
-      knowledge = await parse_full_path_knowledge(paths=graph)
+      graph = await graph_service.SemanticAllShortestPath(query=query, max_hop = max_hop, limit= limit, top_k=top_k)
+      knowledge = parse_full_path_knowledge(paths=graph)
 
     elif method == "entity_neighbor":
-      graph = await graph_service.EntityBasedNeighborSearch(query=query, candidate_entities=candidate_entities, top_k=top_k)
+      graph = await graph_service.EntityBasedNeighborSearch(query=query, candidate_entities=candidate_entities, limit=limit)
       knowledge = extract_one_hop_bfs_graph_to_knowlwdge(graph=graph)
 
     elif method == "entity_shortest_path":
-      graph = await graph_service.EntityBasedAllShortestPath(query=query, candidate_entities=candidate_entities, top_k=top_k, max_hop=10, limit=50)
+      graph = await graph_service.EntityBasedAllShortestPath(query=query, candidate_entities=candidate_entities, max_hop=10, limit=50)
       knowledge = parse_full_path_knowledge(paths=graph)
     else:
        raise HTTPException(status_code=400, detail=f"Unknown method: {method}") 

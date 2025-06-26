@@ -8,26 +8,18 @@ class Entity(BaseModel):
     name: str
     type: str
     description: str
-    embeding: Optional[list[float]]
+    embeding: Optional[list[float]] = None
 
-class EntityResponse(BaseModel):
-    entities: List[Entity]
-    text: str
-    processing_time: float
-
-# Relation models
 class Relation(BaseModel):
     id: Optional[str] = None
     source_entity: str
     target_entity: str
     name: str
-    metadata: Optional[dict]
+    type: str
 
-class RelationResponse(BaseModel):
-    relations: List[Relation]
-    entities: List[Entity]
-    text: str
-    processing_time: float
+class EntityRelationResponse(BaseModel):
+    entities: list[Entity]
+    relations: list[Relation]
 
 # Document models
 class Document(BaseModel):
