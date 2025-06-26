@@ -1,5 +1,3 @@
-# docker-compose.yml (Place in project root)
-
 services:
   #################
   # Database (PostgreSQL)
@@ -112,6 +110,7 @@ services:
       aicare_network:
         ipv4_address: 10.10.1.114
       internal_network: {} # Also on the internal network to talk to db/redis
+      shared_services_network: {} # Attached to shared network to talk to gemma_service
 
   #################
   # Frontend (Next.js)
@@ -227,4 +226,6 @@ networks:
     external: true
   internal_network: # This is our new, internal-only bridge network
     driver: bridge
+  shared_services_network:
+    external: true
 

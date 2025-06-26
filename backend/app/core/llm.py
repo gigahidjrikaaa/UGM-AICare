@@ -1,12 +1,12 @@
 # backend/app/core/llm.py
 
 import os
-import httpx # Use httpx for async requests to Together AI
+import httpx
 import google.generativeai as genai # type: ignore
 from google.generativeai.types import HarmCategory, HarmBlockThreshold # type: ignore
 from dotenv import load_dotenv
 import logging
-from typing import List, Dict, Literal, Optional
+from typing import List, Dict, Literal, Optional, Tuple
 
 # Load environment variables
 load_dotenv()
@@ -23,6 +23,7 @@ TOGETHER_API_URL = "https://api.together.xyz/v1/chat/completions"
 DEFAULT_TOGETHER_MODEL = "meta-llama/Llama-3-8b-chat-hf"
 
 DEFAULT_GEMINI_MODEL = "gemini-2.0-flash" 
+DEFAULT_GEMMA_LOCAL_MODEL = "gemma-3-12b-it-gguf"
 
 # Configure Gemini client (do this once at module load)
 if GOOGLE_API_KEY:
@@ -35,7 +36,7 @@ else:
     logger.warning("GOOGLE_API_KEY not found. Gemini API will not be available.")
 
 # --- Provider Type ---
-LLMProvider = Literal['togetherai', 'gemini']
+LLMProvider = Literal['togetherai', 'gemini', 'gemma_local']
 
 # --- Helper: Convert Generic History to Gemini Format ---
 # Gemini expects alternating user/model roles, and uses 'model' instead of 'assistant'
@@ -215,23 +216,80 @@ async def generate_gemini_response(
         # More specific error handling can be added based on google.api_core.exceptions
         return f"Error: An unexpected error occurred with Gemini API. {e}"
 
+# --- Local Gemma 3 API Function (Async) ---
+async def generate_gemma_local_response(
+    history: List[Dict[str, str]],
+    model: str = DEFAULT_GEMMA_LOCAL_MODEL, # Model name is for logging
+    max_tokens: int = 512,
+    temperature: float = 0.7,
+    system_prompt: Optional[str] = None
+) -> str:
+    """Generates a response using the self-hosted Gemma 3 API."""
+    # The URL uses the Docker service name, which acts as a hostname.
+    gemma_api_url = "http://gemma_service:6666/v1/generate"
+    
+    # Construct a single prompt from history. Llama-based models often work best this way.
+    # You may need to experiment with the prompt templating for your fine-tuned model.
+    prompt_lines = []
+    if system_prompt:
+        prompt_lines.append(f"<|system|>\n{system_prompt}")
+    for msg in history:
+        role = msg.get("role")
+        content = msg.get("content")
+        if role == 'user':
+            prompt_lines.append(f"<|user|>\n{content}")
+        elif role == 'assistant':
+            prompt_lines.append(f"<|assistant|>\n{content}")
+            
+    # Combine into a single string
+    full_prompt = "\n".join(prompt_lines)
+
+    data = {
+        "prompt": full_prompt,
+        "max_tokens": max_tokens,
+        "temperature": temperature,
+    }
+
+    async with httpx.AsyncClient(timeout=120.0) as client: # Longer timeout for local generation
+        try:
+            logger.info(f"Sending request to local Gemma API (Model: {model})")
+            response = await client.post(gemma_api_url, json=data)
+            response.raise_for_status()
+            result = response.json()
+            
+            if "generated_text" in result:
+                logger.info("Received response from local Gemma API.")
+                return result["generated_text"].strip()
+            else:
+                logger.warning(f"Unexpected response structure from local Gemma API: {result}")
+                return "Error: Could not parse response from local Gemma API."
+
+        except httpx.RequestError as e:
+            logger.error(f"HTTP error calling local Gemma API: {e}")
+            return "Error: Failed to connect to local Gemma API. Ensure the 'gemma_service' container is running and healthy."
+        except httpx.HTTPStatusError as e:
+             logger.error(f"Local Gemma API returned error status {e.response.status_code}: {e.response.text}")
+             return f"Error: Local Gemma API failed ({e.response.status_code}). Please check its logs."
+        except Exception as e:
+            logger.error(f"An unexpected error occurred with local Gemma API: {e}", exc_info=True)
+            return f"Error: An unexpected error occurred. {e}"
 
 # --- Unified Generation Function (Async) ---
 async def generate_response(
     history: List[Dict[str, str]],
-    provider: LLMProvider = "togetherai", # Default provider
+    provider: LLMProvider = "gemma_local", # Default provider changed to Gemini
     model: Optional[str] = None,
     max_tokens: int = 512,
     temperature: float = 0.7,
     system_prompt: Optional[str] = None # Pass system prompt through
 ) -> str:
     """
-    Generates a response using the specified LLM provider (async).
+    Generates a response using the specified LLM provider (async) without fallback.
 
     Args:
         history: The conversation history (list of {'role': str, 'content': str}).
                  Must end with a 'user' message.
-        provider: The LLM provider ('togetherai' or 'gemini').
+        provider: The LLM provider ('gemma_local', 'gemini', or 'togetherai').
         model: The specific model name (optional, uses default for provider if None).
         max_tokens: Maximum number of tokens to generate.
         temperature: Controls randomness (0.0-1.0+).
@@ -246,35 +304,36 @@ async def generate_response(
         logger.error("Invalid history: Must not be empty and end with a 'user' message.")
         return "Error: Invalid conversation history provided."
 
-    try:
-        if provider == "togetherai":
-            if not model:
-                model = DEFAULT_TOGETHER_MODEL
-            return await generate_togetherai_response(
-                history=history, model=model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
-            )
-        elif provider == "gemini":
-            if not GOOGLE_API_KEY:
-                logger.error("Attempted to use Gemini, but GOOGLE_API_KEY is not set.")
-                return "Error: Gemini API key not configured. Cannot use Gemini provider."
-            if not model:
-                model = DEFAULT_GEMINI_MODEL
-            return await generate_gemini_response(
-                history=history, model=model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
-            )
-        else:
-            # This case should ideally be prevented by Pydantic/FastAPI validation
-            logger.error(f"Invalid provider specified: {provider}")
-            raise ValueError(f"Invalid LLM provider: {provider}. Choose 'togetherai' or 'gemini'.")
-    except ValueError as ve: # Catch config errors etc.
-        logger.error(f"Configuration or value error: {ve}")
-        return str(ve) # Return the error message directly
-    except Exception as e:
-        logger.error(f"Unexpected error during response generation: {e}", exc_info=True)
-        return "Error: An unexpected internal error occurred while generating the response."
+    if provider == "gemma_local":
+        gemma_model = model if model else DEFAULT_GEMMA_LOCAL_MODEL
+        logger.info(f"Direct request: Using gemma_local (Model: {gemma_model})")
+        return await generate_gemma_local_response(
+            history=history, model=gemma_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
+        )
+
+    elif provider == "gemini":
+        gemini_model = model if model else DEFAULT_GEMINI_MODEL
+        logger.info(f"Direct request: Using gemini (Model: {gemini_model})")
+        return await generate_gemini_response(
+            history=history, model=gemini_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
+        )
+    
+    elif provider == "togetherai":
+        together_model = model if model else DEFAULT_TOGETHER_MODEL
+        logger.info(f"Direct request: Using togetherai (Model: {together_model})")
+        return await generate_togetherai_response(
+            history=history, model=together_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
+        )
+
+    else:
+        # This case should ideally be prevented by Pydantic/FastAPI validation
+        error_msg = f"Invalid LLM provider: {provider}. Choose 'gemma_local', 'gemini', or 'togetherai'."
+        logger.error(error_msg)
+        return error_msg
 
 # --- Constants for default models (can be imported elsewhere) ---
 DEFAULT_PROVIDERS = {
     "togetherai": DEFAULT_TOGETHER_MODEL,
-    "gemini": DEFAULT_GEMINI_MODEL
+    "gemini": DEFAULT_GEMINI_MODEL,
+    "gemma_local": DEFAULT_GEMMA_LOCAL_MODEL
 }
