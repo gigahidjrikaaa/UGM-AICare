@@ -46,6 +46,60 @@ def extract_one_hop_bfs_graph_to_knowlwdge(graph: list[dict]) -> str:
       return knowledge
   except Exception as e:
      return ""
+def transform_graph_to_knowledge_text(graph_results: list[dict], desc_limit: int = 100) -> str:
+    """
+    Transforms nested graph results into a rich, LLM-friendly knowledge text,
+    including truncated neighbor descriptions.
+    """
+    if not graph_results:
+        return ""
+
+    knowledge_blocks = []
+    for item in graph_results:
+        central_name = item.get('central_name', 'N/A')
+        central_type = item.get('central_type', 'N/A')
+        central_desc = item.get('central_description', 'Tidak ada deskripsi.')
+        score = item.get('score', 0.0)
+
+        block = [
+            f"### Entitas: {central_name} (Tipe: {central_type})",
+            f"- Deskripsi: {central_desc}",
+            f"- Skor Relevansi Awal: {score:.2f}",
+            "- Hubungan Terkait:"
+        ]
+
+        neighborhood = item.get('neighborhood', [])
+        if not any(n.get('neighbor') for n in neighborhood):
+            block.append("  - Tidak ditemukan hubungan terkait.")
+        else:
+            for relation_info in neighborhood:
+                neighbor = relation_info.get('neighbor', {})
+                relation = relation_info.get('relation', {})
+                
+                neighbor_name = neighbor.get('name', 'N/A')
+                neighbor_type = neighbor.get('type', 'N/A')
+                # MENAMBAHKAN DESKRIPSI TETANGGA
+                neighbor_desc = neighbor.get('description', '')
+                if neighbor_desc and len(neighbor_desc) > desc_limit:
+                    neighbor_desc = neighbor_desc[:desc_limit] + "..."
+                
+                relation_name = relation.get('name', 'terkait dengan')
+                relation_type = relation.get('type', 'TERKAIT_DENGAN')
+                direction = relation.get('direction', 'OUTGOING')
+
+                desc_part = f" | Deskripsi: \"{neighbor_desc}\"" if neighbor_desc else ""
+                
+                if direction == 'OUTGOING':
+                    line = f"  - [OUTGOING] --[{relation_name}|Tipe: {relation_type}]--> {neighbor_name} (Tipe: {neighbor_type}{desc_part})"
+                else:
+                    line = f"  - [INCOMING] <--[{relation_name}|Tipe: {relation_type}]-- {neighbor_name} (Tipe: {neighbor_type}{desc_part})"
+                
+                block.append(line)
+        
+        knowledge_blocks.append("\n".join(block))
+
+    header = "Berikut adalah informasi yang ditemukan dari knowledge graph:\n"
+    return header + "\n\n".join(knowledge_blocks)
 
 def parse_full_path_knowledge(paths: list[dict]) -> str:
     try:
@@ -141,7 +195,7 @@ async def get_answer(
 
     elif method == "entity_neighbor":
       graph = await graph_service.EntityBasedNeighborSearch(query=query, candidate_entities=candidate_entities, limit=limit)
-      knowledge = extract_one_hop_bfs_graph_to_knowlwdge(graph=graph)
+      knowledge = transform_graph_to_knowledge_text(graph_results=graph, desc_limit=100)
 
     elif method == "entity_shortest_path":
       graph = await graph_service.EntityBasedAllShortestPath(query=query, candidate_entities=candidate_entities, max_hop=10, limit=50)

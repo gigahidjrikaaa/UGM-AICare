@@ -8,7 +8,7 @@ class Entity(BaseModel):
     name: str
     type: str
     description: str
-    embeding: Optional[list[float]] = None
+    embedding: Optional[list[float]] = None
 
 class Relation(BaseModel):
     id: Optional[str] = None

@@ -29,7 +29,7 @@ class GraphService:
         try:
             query = """
                 UNWIND $data AS row
-                CALL apoc.create.node([row.type], {
+                CALL apoc.create.node([row.type, 'Entity'], {
                     name: row.name, 
                     id: row.id, 
                     description: row.description, 
@@ -79,7 +79,7 @@ class GraphService:
             logger.error(f"Failed to insert relations: {e}")
             return None
 
-    async def find_entity(self, entity: str, query: str) -> list[dict]:
+    async def find_entity(self, entity: str, query: str, top_k: int = 3) -> list[dict]:
         """Find entity by exact, fulltext, or vector fallback match."""
         try:
             # 1. Exact match (normalized)
@@ -88,12 +88,12 @@ class GraphService:
             #     return result
 
             # 2. Fulltext match
-            result = await self._find_by_fulltext(entity)
+            result = await self._find_by_fulltext(entity, top_k=top_k)
             if len(result) >= 0:
                 return result
 
             # 3. Vector similarity match
-            result = await self._find_by_vector(name=entity, query=query)
+            result = await self._find_by_vector(name=entity, query=query, top_k=top_k)
             if len(result) >= 0:
                 return result
 
@@ -117,36 +117,45 @@ class GraphService:
             logger.warning(f"Cannot find Entity by exact name {e}")
             return []
 
-    async def _find_by_fulltext(self, name: str) -> list[dict]:
+    async def _find_by_fulltext(self, name: str, top_k: int = 5) -> list[dict]:
         try:
             query = """
             CALL db.index.fulltext.queryNodes('entityNameIndex', $name)
             YIELD node, score
             RETURN node.name AS name, node.id AS id, node.type AS type, node.description AS description, score
             ORDER BY score DESC
-            LIMIT 10
+            LIMIT $top_k
             """
-            result = await neo4j_conn.execute_query(query=query, parameters={"name": name})
+            result = await neo4j_conn.execute_query(
+                query=query, 
+                parameters={
+                    "name": name,
+                    "top_k": top_k
+                    }
+            )
             return [dict(row) for row in result] if result else []
         except Exception as e:
             logger.warning(f"Cannot find Entity by fulltext {e}")
             return []
 
-    async def _find_by_vector(self, name: str, query: str) -> list[dict]:
+    async def _find_by_vector(self, name: str, query: str, top_k: int = 3) -> list[dict]:
         try: 
             embedding = await self.llm_service.get_embeddings(input=[f"{name}, {query}"], task="RETRIEVAL_QUERY")
             if not embedding or not embedding[0]:
                 return None
 
             query = """
-            CALL db.index.vector.queryNodes('entityIndex', 1, $embedding)
+            CALL db.index.vector.queryNodes('entityIndex', $top_k, $embedding)
             YIELD node, score
             RETURN node.name AS name, node.id AS id, node.type AS type, node.description AS description, score
             LIMIT 10
             """
             result = await neo4j_conn.execute_query(
                 query=query,
-                parameters={"embedding": embedding[0]}
+                parameters={
+                    "embedding" : embedding[0],
+                    "top_k"     : top_k
+                    }
             )
             return [dict(row) for row in result] if result else []
         except Exception as e:
@@ -202,6 +211,7 @@ class GraphService:
         self,
         query: str,
         candidate_entities: list[str],
+        top_k: int = 3,
         limit: int = 50,
     ) -> list[dict]:
         """
@@ -229,43 +239,56 @@ class GraphService:
             logger.info(f"Starting entity-based neighbor search for {len(candidate_entities)} candidates")
             
             entities_nested = await asyncio.gather(*[
-                self.find_entity(entity=e, query=query) for e in candidate_entities
+                self.find_entity(entity=e, query=query, top_k=top_k) for e in candidate_entities
             ])
 
             
             entities = [item for sublist in entities_nested if sublist for item in sublist]
+            unique_entities_map = {item['id']: item for item in entities}
+            unique_entities = list(unique_entities_map.values())
             
-            if not entities:
+            if not unique_entities:
                 logger.warning("No valid entities found from candidates")
                 return []
             
-            logger.info(f"Found {len(entities)} valid entities from candidates")
+            logger.info(f"Found {len(unique_entities)} valid entities from candidates")
             
-            query_cypher = f"""
+            query_cypher = """
             UNWIND $entities AS entity
-            MATCH (central:Entity {{name: entity.name}})-[r]-(neighbor)
-            WHERE neighbor.id IS NOT NULL
-            WITH central, neighbor, r,
-                CASE WHEN central.id = startNode(r).id THEN 'OUTGOING' ELSE 'INCOMING' END AS direction
-            RETURN DISTINCT
+            MATCH (central:Entity) WHERE central.id = entity.id
+
+            CALL(central) {
+                OPTIONAL MATCH (central)-[r]-(neighbor)
+                
+                RETURN COLLECT({
+                    neighbor: {
+                        id: neighbor.id,
+                        name: neighbor.name,
+                        type: labels(neighbor),
+                        description: neighbor.description
+                    },
+                    relation: {
+                        name: r.name,
+                        type: type(r),
+                        direction: CASE WHEN startNode(r).id = central.id THEN 'OUTGOING' ELSE 'INCOMING' END
+                    }
+                })[..$neighbor_limit] AS limited_neighborhood
+            }
+
+            RETURN
                 central.id AS central_id,
                 central.name AS central_name,
-                central.type AS central_type,
+                labels(central) AS central_type,
                 central.description AS central_description,
-                1.0 AS score,
-                neighbor.id AS neighbor_id,
-                neighbor.name AS neighbor_name,
-                neighbor.type AS neighbor_type,
-                neighbor.description AS neighbor_description,
-                r.name AS relation_name,
-                type(r) AS relation_type,
-                direction
+                entity.score AS score,
+                limited_neighborhood AS neighborhood
             LIMIT $limit
             """
             
             parameters = {
-                "entities": entities,
-                "limit": limit
+                "entities": unique_entities,
+                "limit": limit,
+                "neighbor_limit": 5,
                 }
             
             result = await neo4j_conn.execute_query(

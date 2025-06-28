@@ -21,7 +21,7 @@ class DataIngestion:
     if type == "docx":
       return self.__extract_text_from_docx(file_bytes=file_bytes)
   
-  def extract_text_from_html(self, html_content) -> list[str]:
+  def extract_text_from_html(self, html_content, section_tag: str = "h1") -> list[str]:
     """
     Extract clean text from HTML content, removing all tags and styling.
     
@@ -60,8 +60,8 @@ class DataIngestion:
                 self.ignore_content = True
                 return
                 
-            if tag.lower() == 'h1':
-                self.text_parts.append('H1')
+            if tag.lower() == section_tag.lower():
+                self.text_parts.append(section_tag.lower())
 
             if self.current_tag == 'table':
                 self.in_table = True
@@ -205,7 +205,7 @@ class DataIngestion:
             temp_list = []
             
             for e in self.text_parts:
-                if e == "H1":
+                if e == section_tag.lower():
                     section.append(temp_list)
                     temp_list = []
                     continue
@@ -262,8 +262,9 @@ class DataIngestion:
         parser = HTMLTextExtractor()
         parser.feed(html_content)
         section = parser.get_section()
+        filtered_section = [s for s in section if s.strip()]
         
-        return section
+        return filtered_section
         
     except Exception as e:
         logger.error(f"Fail to extract text from html doc: {e}")

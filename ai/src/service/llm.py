@@ -23,31 +23,28 @@ class LLMService:
     async def query_classification(self, query: str) -> dict:
         try:
             prompt = f"""
-            Tugas: Klasifikasikan kueri pengguna pada 2 kategori 'entity_query' atau 'path_query', and ekstrak semua entitas yang berkaitan.
+            Tugas: Klasifikasikan kueri pengguna ke dalam kategori 'entity_query' atau 'path_query', dan ekstrak semua entitas yang relevan.
 
             Definisi:
-            'entity_query': Pertanyaan yang fokus pada 1 entitas dan ingin tahu deskripsinya, gejala, penyebab, dsb.
-            'path_query': Pertanyaan tentang relasi antara 2 atau lebih entitas atau eksplorasi hubungan dalam knowledge graph, atau mencari alur/proses.
+            'entity_query' (Query Atribut/Node): Pertanyaan yang fokus untuk mendeskripsikan atau mengambil properti/atribut dari sebuah konsep sentral. Contoh: "Apa itu X?", "Apa saja gejala dari X?".
+            'path_query' (Query Relasi/Edge): Pertanyaan tentang hubungan antara dua atau lebih entitas, atau mencari alur/proses. Contoh: "Bagaimana hubungan A dan B?", "Cari A yang terkait dengan B?".
 
             Output Format (JSON):
             {{
-                "category": "entity_query" | "path_query",
-                "entities": ["Entity 1", "Entity 2", ..., "Entity N"]
+            "category": "entity_query" | "path_query",
+            "entities": ["Entity 1", "Entity 2", ..., "Entity N"]
             }}
 
-            Examples:
+            Contoh:
 
             Query: "Apa itu depresi dan bagaimana gejalanya?"
             Output: {{"category": "entity_query", "entities": ["depresi"]}}
 
+            Query: "Apa saja jenis obat antidepresan yang umum diresepkan?"
+            Output: {{"category": "entity_query", "entities": ["obat antidepresan"]}}
+
             Query: "Bagaimana cara kerja terapi kognitif-perilaku (CBT) untuk kecemasan?"
             Output: {{"category": "path_query", "entities": ["terapi kognitif-perilaku (CBT)", "kecemasan"]}}
-
-            Query: "Siapa psikolog yang spesialisasi di terapi trauma?"
-            Output: {{"category": "entity_query", "entities": ["psikolog", "terapi trauma"]}}
-
-            Query: "Layanan dukungan kesehatan mental apa saja yang tersedia untuk remaja di Jakarta?"
-            Output: {{"category": "path_query", "entities": ["layanan dukungan kesehatan mental", "remaja", "Jakarta"]}}
 
             Query: "Jelaskan peran serotonin dalam gangguan mood."
             Output: {{"category": "path_query", "entities": ["serotonin", "gangguan mood"]}}
@@ -55,14 +52,18 @@ class LLMService:
             Query: "Bisakah olahraga membantu mengurangi stres dan meningkatkan kesehatan mental?"
             Output: {{"category": "path_query", "entities": ["olahraga", "stres", "kesehatan mental"]}}
 
-            Query: "Apa saja jenis obat antidepresan yang umum diresepkan?"
-            Output: {{"category": "entity_query", "entities": ["obat antidepresan"]}}
+            Query: "Layanan dukungan kesehatan mental apa saja yang tersedia untuk remaja di Jakarta?"
+            Output: {{"category": "path_query", "entities": ["layanan dukungan kesehatan mental", "remaja", "Jakarta"]}}
+
+            # KOREKSI PENTING: Pertanyaan ini mencari entitas berdasarkan relasinya dengan entitas lain, ini adalah path query.
+            Query: "Siapa psikolog yang spesialisasi di terapi trauma?"
+            Output: {{"category": "path_query", "entities": ["psikolog", "terapi trauma"]}}
 
             ---
-            Klasifikasi and ekstrak entitas untuk kueri berikut:
+            Klasifikasikan dan ekstrak entitas untuk kueri berikut:
 
             Query:
-                {query}
+            {query}
             """
 
             result = self.client.models.generate_content(
