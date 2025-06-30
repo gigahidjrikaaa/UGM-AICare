@@ -67,3 +67,9 @@ def get_or_create_user(db: Session, google_sub: str, plain_email: Optional[str] 
          logger.info(f"SERVICE: No commit needed for user {user.id} (sub {google_sub[:10]}).")
 
     return user
+
+def get_user_by_google_sub(db: Session, google_sub: str) -> Optional[User]:
+    """
+    Retrieves a user by their hashed Google sub identifier.
+    """
+    return db.query(User).filter(User.google_sub == google_sub).first()
