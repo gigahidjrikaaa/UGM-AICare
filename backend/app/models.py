@@ -227,6 +227,11 @@ class AppointmentType(Base):
 
     appointments = relationship("Appointment", back_populates="appointment_type")
 
+    def __init__(self, name: str, duration_minutes: int, description: Optional[str] = None):
+        self.name = name
+        self.duration_minutes = duration_minutes
+        self.description = description
+
 class Appointment(Base):
     __tablename__ = "appointments"
 

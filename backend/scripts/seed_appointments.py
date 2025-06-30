@@ -7,7 +7,7 @@ from sqlalchemy import create_engine
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from app.models import Psychologist, AppointmentType
-from app.database import Base  # <-- Ensure this is the declarative base
+from backend.app.database import Base  # <-- Ensure this is the declarative base
 
 # --- Database Setup ---
 DATABASE_URL = "sqlite:///./test.db"  # Use a test database
