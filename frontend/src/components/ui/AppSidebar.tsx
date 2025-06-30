@@ -25,7 +25,7 @@ interface NavItem {
 const sidebarNavItems: NavItem[] = [
   { href: "/aika", label: "Talk to Aika", icon: <BsChatDots size={18} /> },
   { href: "/journaling", label: "Journaling", icon: <FiActivity size={18} /> },
-  { href: "/appointments", label: "Appointments", icon: <BsCalendar size={18} /> },
+  { href: "/appointment", label: "Book Appointment", icon: <BsCalendar size={18} /> },
   { href: "/profile", label: "Profile", icon: <FiUser size={18} /> }, // Added Profile link
   { href: "/resources", label: "Resources", icon: <FiBookOpen size={18} /> },
   // --- Admin Specific Links ---

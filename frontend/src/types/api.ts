@@ -79,3 +79,40 @@ export interface JournalReflectionPointResponse {
   // reflection_category?: string | null; // Uncomment if you add this field in the backend schema
   created_at: string; // ISO date string
 }
+
+// --- Psychologist Appointment Types ---
+export interface Psychologist {
+  id: number;
+  name: string;
+  specialization?: string | null;
+  image_url?: string | null;
+  is_available: boolean;
+}
+
+export interface AppointmentType {
+  id: number;
+  name: string;
+  duration_minutes: number;
+  description?: string | null;
+}
+
+export interface AppointmentBase {
+  psychologist_id: number;
+  appointment_type_id: number;
+  appointment_datetime: string; // ISO 8601 format string
+  notes?: string | null;
+  status?: string; // e.g., "scheduled", "completed", "cancelled"
+}
+
+export interface AppointmentCreate extends AppointmentBase {
+  user_identifier: string; // google_sub
+}
+
+export interface Appointment extends AppointmentBase {
+  id: number;
+  user_id: number;
+  created_at: string;
+  updated_at: string;
+  psychologist: Psychologist; // Nested object
+  appointment_type: AppointmentType; // Nested object
+}

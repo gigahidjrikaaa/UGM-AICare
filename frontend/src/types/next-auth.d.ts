@@ -12,6 +12,7 @@ declare module "next-auth" {
       accessToken?: string; // Google access token (optional, for specific API calls)
       wallet_address?: string | null;
       allow_email_checkins?: boolean; // For email check-in feature
+      google_sub?: string; // Add google_sub to the user object
     } & DefaultSession["user"]; // Inherit name, email, image
     jwt?: string; // The raw JWT for backend calls
   }
@@ -20,6 +21,7 @@ declare module "next-auth" {
   interface User extends DefaultUser {
     role?: string;
     wallet_address?: string | null;
+    google_sub?: string; // Add google_sub to the User object
   }
 }
 
@@ -31,5 +33,6 @@ declare module "next-auth/jwt" {
     accessToken?: string;
     wallet_address?: string | null;
     allow_email_checkins?: boolean;
+    google_sub?: string; // Add google_sub to the JWT token
   }
 }
