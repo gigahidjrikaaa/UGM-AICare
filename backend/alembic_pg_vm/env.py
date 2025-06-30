@@ -1,42 +1,34 @@
 import os
-import sys
+from sqlalchemy import engine_from_config, pool
 from logging.config import fileConfig
-
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
 
 from alembic import context
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
 # Interpret the config file for Python logging.
-# This line sets up loggers basically.
+# This line sends SCRIPT_LOCATION to the config file...
+fileConfig(config.config_file_name)
 
-# Add the project's 'backend' directory to sys.path to allow importing 'app'
-# Assumes env.py is in '.../backend/alembic_pg_vm/' and 'app' is in '.../backend/app/'
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..')))
-
-from app.database import Base
-if config.config_file_name is not None:
-    fileConfig(config.config_file_name)
-
-# add your model's MetaData object here
+# Add your model's MetaData object here
 # for 'autogenerate' support
 # from myapp import mymodel
 # target_metadata = mymodel.Base.metadata
-target_metadata = Base.metadata # Use the imported Base for metadata
+# Assuming your Base is defined in app.db.base_class or similar
+# Please adjust the import path according to your project structure.
+from app.models import Base  # Example: from app.models import Base
+target_metadata = Base.metadata
 
-# other values from the config, defined by the needs of env.py,
+# Set the sqlalchemy.url from the DATABASE_URL environment variable
+# This is the crucial part for Dockerized setup
+config.set_main_option('sqlalchemy.url', os.environ.get('DATABASE_URL'))
+
 # other values from the config, defined by the needs of env.py,
 # can be acquired:
 # my_important_option = config.get_main_option("my_important_option")
 # ... etc.
-
-def get_url():
-    # Try to get DATABASE_URL from environment variable first (for Docker)
-    # Fallback to the URL in alembic.ini (for local commands)
-    return os.getenv("DATABASE_URL", config.get_main_option("sqlalchemy.url"))
 
 def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
@@ -50,7 +42,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = get_url()
+    url = config.get_main_option("sqlalchemy.url")
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -69,10 +61,8 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    configuration = config.get_section(config.config_ini_section)
-    configuration["sqlalchemy.url"] = get_url() # Use the helper function
     connectable = engine_from_config(
-        configuration,
+        config.get_section(config.config_ini_section),
         prefix="sqlalchemy.",
         poolclass=pool.NullPool,
     )

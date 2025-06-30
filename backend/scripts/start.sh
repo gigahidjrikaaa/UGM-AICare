@@ -1,13 +1,10 @@
-#!/bin/sh
+#!/bin/bash
 set -e # Exit immediately if a command exits with a non-zero status.
 
-# Run database migrations
-echo "Running database migrations for PostgreSQL VM..."
-# Specify the config file and the script directory if it's not the default 'alembic'
-# The -x dir option tells alembic where the script directory is relative to the ini file.
-# However, if script_location in alembic_pg_vm.ini is set correctly (e.g. to "alembic_pg_vm"),
-# just -c should be enough.
-alembic -c alembic_pg_vm.ini upgrade head
+# The wait for the DB and migrations are handled by the 'migrate' service.
+# We only need to wait for Redis here.
+# echo "Waiting for Redis..."
+# /app/scripts/wait-for-it.sh -t 60 redis:6379 -- echo "Redis is up."
 
 # Start the FastAPI application with Gunicorn
 echo "Starting FastAPI application with Gunicorn..."

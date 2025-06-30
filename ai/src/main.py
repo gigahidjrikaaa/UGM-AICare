@@ -1,30 +1,24 @@
-from fastapi import FastAPI, Query
+from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 import logging
 import uvicorn
-from neo4j import GraphDatabase, Driver
 
-from config import Config as app_config
+from src.config import Config
+from src.database import init_database
+from src.router import extraction, retrieval
 
-GraphDriver: Driver = None
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    # Code to run on startup
     logger.info("Application startup...")
-    init_database()
-    if GraphDriver:
-        with GraphDriver.session() as session:
-            session.execute_write(create_graph)
+    await init_database()
+
     yield
-    # Code to run on shutdown
-    logger.info("Application shutdown...")
-    if GraphDriver:
-        GraphDriver.close()
-        logger.info("Neo4j connection closed.")
+
 
 
 app = FastAPI(
@@ -33,40 +27,25 @@ app = FastAPI(
   version="1.0.0",
   lifespan=lifespan
 )
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+app.include_router(extraction.router, prefix="/api/v1/extraction", tags=["extraction"])
+app.include_router(retrieval.router, prefix="/api/v1/retrieval", tags=["retrieval"])
 
-@app.router.get("/")
-async def hello():
-    return ({"message":"Hello Aika Here"})
+@app.get("/")
+async def root():
+    return {"message": "Graph-based RAG AI Service", "status": "running"}
+
+@app.get("/health")
+async def health_check():
+    return {"status": "healthy"}
 
 
-@app.router.get("/get-answer")
-async def get_answer(question: str = Query(..., description="User input/question")):
-    keywords = ["depression", "anxiety", "insomnia", "cbt", "psychologist"]
-    found = [k for k in keywords if k in question.lower()]
-
-    if not found:
-        return {"context": "No relevant mental health topics found."}
-
-    context_result = ""
-    with GraphDriver.session() as session:
-        for term in found:
-            ctx = session.execute_read(get_context, term)
-            context_result += ctx
-
-    return {
-        "matched_terms": found,
-        "graph_context": context_result.strip()
-    }
-
-def init_database():
-    global GraphDriver
-    try:
-      print(app_config.neo4j_uri, app_config.neo4j_username, app_config.neo4j_password)
-      GraphDriver = GraphDatabase.driver(app_config.neo4j_uri, auth=(app_config.neo4j_username, app_config.neo4j_password))
-      logger.info("Connected to Neo4j Database")
-    except Exception as e:
-      logger.error(f"Couldn't Connect to Neo4j Database:s {e}")
-    
 def create_graph(tx):
     tx.run("""
         MERGE (d:Disorder {name: "Depression", desc: "A mood disorder causing persistent sadness."})
@@ -98,12 +77,9 @@ def get_context(tx, term):
     return context
 
 def start():
-    port = int(app_config.port)
+    port = int(Config.PORT)
+    print(port)
     uvicorn.run(app=app, host="0.0.0.0", port=port)
 # For Render deployment
 if __name__ == "__main__":
     start()
-
-
-
-    

@@ -265,8 +265,9 @@ export default function AppointmentsPage() {
             <div className="absolute left-0 right-0 flex justify-center">
               <div className="h-0.5 bg-white/20 w-32 sm:w-52 -z-10 mt-4">
                 <div 
-                  className="h-full bg-[#FFCA40]" 
-                  style={{ width: `${(step - 1) * 50}%` }}
+                  className={`h-full bg-[#FFCA40] ${
+                    step === 1 ? 'w-0' : step === 2 ? 'w-1/2' : 'w-full'
+                  }`}
                 ></div>
               </div>
             </div>

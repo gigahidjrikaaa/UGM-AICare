@@ -51,9 +51,7 @@ const checkEnvVariables = () => {
 };
 
 // Execute environment variable check when the module loads
-if(process.env.APP_ENV !== 'production') {
-  checkEnvVariables();
-}
+checkEnvVariables();
 
 export default async function RootLayout({
   children,
@@ -61,12 +59,12 @@ export default async function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
+    <html lang="en" className="h-full">
       <body
-        className={inter.className}
+        className={`${inter.className} flex flex-col h-full`}
       >
         <ClientProvider>
-          <div className="flex flex-col min-h-screen h-full">
+          <div className="flex flex-col flex-grow">
               <Suspense fallback={<GlobalSkeleton />}>
                 {/* AppLayout is removed from here, children are rendered directly */}
                 {children}

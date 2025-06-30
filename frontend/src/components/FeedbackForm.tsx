@@ -2,10 +2,11 @@
 "use client";
 
 import React, { useState, useCallback, useEffect } from 'react';
-import axios from 'axios';
+import { isAxiosError } from 'axios';
 import { useSession } from "next-auth/react";
 import { motion, AnimatePresence } from 'framer-motion'; // Import animation library
 import { FiArrowLeft, FiArrowRight, FiSend, FiXCircle } from 'react-icons/fi'; // Example icons
+import apiClient from '@/services/api';
 
 // --- Types (Keep existing types) ---
 type GoalAchievedOption = 'Yes' | 'No' | 'Partially' | null;
@@ -139,9 +140,6 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmitSuccess })
         setError(null);
 
         try {
-            const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
-            const backendUrl = `${baseUrl}/api/v1/feedback`;
-
             const payload = {
                 user_identifier: hashedUserId,
                 session_id: null, // General feedback
@@ -154,7 +152,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmitSuccess })
             };
 
             console.log("Submitting final feedback payload:", payload);
-            await axios.post(backendUrl, payload);
+            await apiClient.post('/feedback', payload);
 
             onSubmitSuccess();
             onClose();
@@ -163,7 +161,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmitSuccess })
              // Keep existing detailed error handling logic...
             console.error("Feedback submission error:", err);
             let message = "Failed to submit feedback. Please try again later.";
-            if (axios.isAxiosError(err)) { 
+            if (isAxiosError(err)) { 
                 if (err.response) {
                     message = `Error: ${err.response.data.detail || err.response.statusText}`;
                 } else if (err.request) {
@@ -260,6 +258,8 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmitSuccess })
                                         onChange={(e) => handleAnswerChange(currentQuestion.id, e.target.value)}
                                         className="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer range-lg accent-teal-400" // Basic slider styling
                                         disabled={isLoading}
+                                        title={currentQuestion.label}
+                                        placeholder={currentQuestion.labels?.[currentQuestion.min as keyof typeof currentQuestion.labels] ?? "Select a value"}
                                     />
                                     {/* Labels for Min/Max/Current - CORRECTED ACCESS */}
                                     <div className="flex justify-between text-xs text-gray-400 mt-2 px-1">

@@ -1,78 +1,81 @@
 # filepath: d:\Ngoding Moment\Github\UGM-AICare\backend\app\Dockerfile
 # Multi-stage build for a more efficient and secure container
 
-# ---- Build Stage ----
+# ---- Build Stage (builder) ----
 FROM python:3.11-slim-bookworm as builder
 
 # Set work directory
 WORKDIR /app
 
-# Install build dependencies (if any beyond what python image provides for wheel building)
-RUN apt-get update && apt-get install -y --no-install-recommends \
+COPY . /app
+
+# Install essential build tools for Python packages and Rust
+# Separating this from Rust installation for better layer caching
+RUN apt-get update && \
+    apt-get upgrade -y && \
+    apt-get install -y --no-install-recommends \
     gcc \
     python3-dev \
     build-essential \
-    curl \
-    # For Rust installation
-    && curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable \
-    && export PATH="/root/.cargo/bin:${PATH}" \
-    # Verify Rust installation (optional)
-    && rustc --version \
-    && cargo --version \
-    # Clean up
-    && rm -rf /var/lib/apt/lists/*
+    curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
-# Add Rust to PATH for subsequent RUN commands
+# Install Rust (needed for compiling some Python packages)
+# This is a separate layer, so changes to apt packages above don't trigger a Rust reinstall
+RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
+
+# Add Rust to PATH for subsequent RUN commands in this stage
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Install Python dependencies
+# Verify Rust installation (optional, good for debugging)
+RUN rustc --version && cargo --version
+
+# Copy requirements file first to leverage Docker cache
 COPY requirements.txt .
-# Using --no-deps here assumes all dependencies are in requirements.txt
-# Consider --no-binary :all: for some packages if wheels are problematic, but usually not needed.
+
+# Install Python dependencies and compile them into wheels
+# Using --no-deps here assumes all dependencies are explicitly in requirements.txt
 RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
-# ---- Final Stage ----
+
+# ---- Final Stage (production) ----
 FROM python:3.11-slim-bookworm
 
-# Create a non-root user
-RUN useradd -m -s /bin/bash appuser
+# Install bash and netcat, required by the startup scripts
+RUN apt-get update && apt-get install -y bash netcat-openbsd && rm -rf /var/lib/apt/lists/*
+
+# Create a non-root user and group
+RUN groupadd -r appgroup && useradd --no-log-init -r -g appgroup -m -s /bin/bash appuser
 
 WORKDIR /app
 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1 \
-    PYTHONPATH=/app \
-    # Add other necessary runtime ENV variables here if not sourced from .env via docker-compose
-    APP_ENV=production
+# Set environment variables for Python
+ENV PYTHONDONTWRITEBYTECODE 1
+ENV PYTHONUNBUFFERED 1
 
-# Install runtime system dependencies (e.g., for psycopg2)
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev \
-    # Add any other runtime system deps
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy wheels from builder and install
+# Copy installed wheels from builder stage
 COPY --from=builder /app/wheels /wheels
-RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
+
+# Install dependencies from wheels
+RUN pip install --no-cache-dir /wheels/*
 
 # Copy application code
-# Ensure .dockerignore is properly set up to exclude .git, .venv, __pycache__, etc.
-COPY --chown=appuser:appuser . .
+# Note: Ensure .dockerignore is properly configured to exclude .git, .vscode, etc.
+COPY . .
 
-# Create necessary directories with proper permissions
-# The log directory should match what's in your app's logging config for production
-RUN mkdir -p /app/logs && chown -R appuser:appuser /app/logs
+# Copy startup scripts and make them executable
+COPY ./scripts /app/scripts
+RUN chmod +x /app/scripts/*.sh
 
-EXPOSE 8000
+# Change ownership of the app directory to the non-root user
+RUN chown -R appuser:appgroup /app
 
+# Switch to the non-root user
 USER appuser
 
-# Health check (adjust path if your health endpoint is different)
-HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \
-  CMD curl -f http://localhost:8000/health || exit 1
+# Set the entrypoint for the container to our startup script
+ENTRYPOINT ["/app/scripts/start.sh"]
 
-# Add startup script
-COPY --chown=appuser:appuser ./scripts/start.sh /app/start.sh
-RUN chmod +x /app/start.sh
-
-ENTRYPOINT ["/app/start.sh"]
+# Expose the port the app runs on
+EXPOSE 8000

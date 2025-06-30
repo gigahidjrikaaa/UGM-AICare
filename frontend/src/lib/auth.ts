@@ -64,27 +64,37 @@ export const authOptions: NextAuthOptions = {
     // Add a credentials provider for admin login
     CredentialsProvider({
       id: "admin-login",
-      name: "Admin Credentials",
+      name: "Credentials",
       credentials: {
-        email: { label: "Email", type: "email" },
+        email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        console.log("Attempting Admin Login:", credentials?.email); // Log attempt, but not password
-            if (
-              credentials?.email === process.env.ADMIN_EMAIL && // Use env vars for admin credentials
-              credentials?.password === process.env.ADMIN_PASSWORD
-            ) {
-              console.log("Admin Login Successful:", credentials?.email);
-              return { // Return the Admin User object
-                id: "admin-user" + credentials?.email, // Use a distinct ID for admin
-                email: credentials?.email,
-                name: "Administrator",
-                role: "admin" // Assign the 'admin' role
-              };
-            }
-            console.warn("Admin Login Failed:", credentials?.email);
-            return null; // Login failed
+        // On the server, prefer the internal URL for container-to-container communication.
+        // Fall back to the public URL for other environments (e.g., local development without Docker).
+        const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+
+        try {
+          // This endpoint is an example, adjust it to your actual admin login endpoint.
+          const res = await fetch(`${apiUrl}/api/v1/auth/login`, {
+            method: 'POST',
+            body: JSON.stringify({
+              username: credentials?.email,
+              password: credentials?.password,
+            }),
+            headers: { "Content-Type": "application/json" }
+          });
+
+          const user = await res.json();
+
+          if (res.ok && user) {
+            return user;
+          }
+          return null;
+        } catch (e) {
+          console.error("Authorize error:", e);
+          return null;
+        }
       }
     }),
   ],
@@ -95,7 +105,9 @@ export const authOptions: NextAuthOptions = {
   callbacks: {
     // The jwt callback is invoked when a JWT is created or updated.
     async jwt({ token, user, account, profile }) {   // Add trigger if needed
-      const backendUrl = process.env.NEXT_PUBLIC_API_URL;
+      // On the server, prefer the internal URL for container-to-container communication.
+      // Fall back to the public URL for other environments.
+      const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
       const internalApiKey = process.env.INTERNAL_API_KEY;
 
       // Handle admin user sign-in specifically
@@ -108,13 +120,10 @@ export const authOptions: NextAuthOptions = {
         return token; // Return early, no backend sync needed for admin
       }
 
-      // Existing logic for Google users and other general token updates
       const isSignIn = !!(account && user);
-      // Determine if wallet/profile data needs fetching/refreshing
-      // For Google users, fetch on sign-in or if data is missing.
-      // Avoid fetching if role is already admin (covered by the block above)
-      const needsBackendDataFetch = token.role !== 'admin' && (isSignIn || !token.wallet_address);
 
+      // This block handles the initial sign-in for Google users.
+      // It syncs them with the backend and fetches their full profile.
       if (isSignIn && account?.provider === 'google' && profile) {
         // This block is for initial Google sign-in
         token.accessToken = account.access_token;
@@ -122,7 +131,7 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role ?? undefined; // Role from GoogleProvider profile
         token.email = user.email; // Email from user object
         
-        // console.log(`JWT: Initial Google sign-in for user ${token.id?.substring(0, 10)}... Role: ${token.role}, Email: ${token.email}`);
+        console.log(`JWT: Initial Google sign-in for user ${token.id?.substring(0, 10)}...`);
 
         try {
           if (!internalApiKey) {
@@ -130,12 +139,12 @@ export const authOptions: NextAuthOptions = {
           } else if (!token.id) {
             console.error("JWT Error: User Sub/ID missing, cannot sync.");
           } else {
-            // console.log(`JWT: Calling internal sync for Google user sub ${token.id.substring(0, 10)}...`);
             const syncPayload = {
               google_sub: token.id,
               email: token.email
             };
-            const syncResponse = await fetch(`${backendUrl}/api/v1/internal/sync-user`, {
+            console.log("SYNC: Calling backend to sync-user...");
+            const syncResponse = await fetch(`${apiUrl}/api/v1/internal/sync-user`, {
               method: 'POST',
               headers: {
                 'Content-Type': 'application/json',
@@ -143,29 +152,32 @@ export const authOptions: NextAuthOptions = {
               },
               body: JSON.stringify(syncPayload),
             });
-
+            
             if (!syncResponse.ok) {
               const errorBody = await syncResponse.text();
-              console.error(`JWT Error: Backend sync failed for Google user! Status: ${syncResponse.status}, Body: ${errorBody}`);
+              console.error(`JWT Error: Backend sync failed! Status: ${syncResponse.status}, Body: ${errorBody}`);
+              // If sync fails, set default values.
+              token.wallet_address = null;
+              token.allow_email_checkins = true;
             } else {
               const syncResult = await syncResponse.json();
-              // console.log("JWT: Backend Google user sync successful:", syncResult);
+              console.log("SYNC: Backend sync successful.");
               token.dbUserId = syncResult.user_id;
 
               // AFTER successful sync, fetch the full user profile from backend
-              // console.log(`JWT: Fetching updated profile from backend for Google user sub ${token.id.substring(0, 10)}...`);
-              const profileResponse = await fetch(`${backendUrl}/api/v1/internal/user-by-sub/${token.id}`, {
+              console.log(`JWT: Fetching updated profile from backend...`);
+              const profileResponse = await fetch(`${apiUrl}/api/v1/internal/user-by-sub/${token.id}`, {
                 headers: { 'X-Internal-API-Key': internalApiKey },
               });
 
               if (profileResponse.ok) {
                 const dbUserData: InternalUserResponse = await profileResponse.json();
-                // console.log("JWT: Received profile data post-sync for Google user:", dbUserData);
+                console.log("JWT: Received profile data post-sync.");
                 token.wallet_address = dbUserData.wallet_address ?? null;
                 token.allow_email_checkins = dbUserData.allow_email_checkins ?? true;
               } else {
                 const errorBody = await profileResponse.text();
-                console.error(`JWT Error: Fetching profile post-sync for Google user failed: ${profileResponse.status} ${errorBody}`);
+                console.error(`JWT Error: Fetching profile post-sync failed: ${profileResponse.status} ${errorBody}`);
                 token.wallet_address = null;
                 token.allow_email_checkins = true; // Default on error
               }
@@ -178,65 +190,9 @@ export const authOptions: NextAuthOptions = {
         }
       }
       
-      // This block fetches/refreshes wallet data for non-admin users on subsequent requests if needed
-      if (token.id && needsBackendDataFetch && account?.provider !== 'admin-login') {
-        // console.log(`JWT: Fetching/Refreshing wallet data from internal API for non-admin user: ${token.id.substring(0, 10)}...`);
-        try {
-          const internalApiUrl = `${backendUrl}/api/v1/internal/user-by-sub/${token.id}`;
-          // internalApiKey is already defined above
-
-          if (!internalApiKey) {
-            console.error("JWT Error: INTERNAL_API_KEY missing for wallet fetch.");
-          } else {
-            const response = await fetch(internalApiUrl, {
-              headers: { 'X-Internal-API-Key': internalApiKey },
-            });
-
-            if (!response.ok) {
-              if (response.status === 404) {
-                console.warn(`JWT: User sub ${token.id} not found in backend DB during wallet fetch (non-admin).`);
-                token.wallet_address = null;
-                token.allow_email_checkins = true; // Default if user not found
-              } else {
-                 const errorBody = await response.text();
-                 console.error(`JWT Error: Internal API wallet fetch failed (non-admin): ${response.status} ${errorBody}`);
-              }
-            } else {
-              const dbUserData: InternalUserResponse = await response.json();
-              // console.log("JWT: Received wallet data from internal API (non-admin):", dbUserData);
-              token.wallet_address = dbUserData.wallet_address ?? null;
-              token.allow_email_checkins = dbUserData.allow_email_checkins ?? true;
-            }
-          }
-        } catch (error) {
-          console.error("JWT Error: Network or other error during wallet data fetch (non-admin):", error);
-          token.wallet_address = null;
-          token.allow_email_checkins = true; // Default on error
-        }
-      }
+      // The redundant block that was causing the confusing logs has been removed.
+      // The logic is now consolidated into the initial sign-in block above.
       return token;
-    },
-
-    // The redirect callback is invoked whenever a redirect is triggered.
-    async redirect({ url, baseUrl }) {
-      // For admin login, redirect to admin dashboard
-      if (url.startsWith("/api/auth/callback/admin-login")) {
-        return `${baseUrl}/admin/dashboard`;
-      }
-
-      if (url.startsWith(baseUrl)) {
-        // For absolute URLs within our app
-        if (url.includes("/signin") && url.includes("callbackUrl")) {
-          // Extract the callbackUrl from the URL if present
-          const callbackUrl = new URL(url).searchParams.get("callbackUrl");
-          if (callbackUrl) return callbackUrl;
-          return `${baseUrl}/aika`;
-        }
-        return url;
-      } else if (url.startsWith("/")) {
-        return `${baseUrl}${url}`;
-      }
-      return url;
     },
 
     // The session callback is invoked when a session is checked.
