@@ -6,7 +6,11 @@ import type {
   ChatResponsePayload,
   JournalPromptResponse,
   JournalEntryItem,
-  JournalReflectionPointResponse // Add this type
+  JournalReflectionPointResponse, // Add this type
+  Psychologist,
+  AppointmentType,
+  AppointmentCreate,
+  Appointment
 } from '@/types/api'; // Import types
 import toast from 'react-hot-toast';
 
