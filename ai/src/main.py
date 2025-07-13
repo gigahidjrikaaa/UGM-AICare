@@ -6,7 +6,7 @@ import uvicorn
 
 from src.config import Config
 from src.database import init_database
-from src.router import extraction, retrieval
+from src.router import extraction, retrieval, evaluation
 
 
 logging.basicConfig(level=logging.INFO)
@@ -36,6 +36,7 @@ app.add_middleware(
 )
 app.include_router(extraction.router, prefix="/api/v1/extraction", tags=["extraction"])
 app.include_router(retrieval.router, prefix="/api/v1/retrieval", tags=["retrieval"])
+app.include_router(evaluation.router, prefix="/api/v1/evaluation", tags=["evaluation"])
 
 @app.get("/")
 async def root():

@@ -2,24 +2,42 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 
-# Entity models
+
 class Entity(BaseModel):
     id: Optional[str] = None
+    chunk_id: Optional[str] = None
     name: str
-    type: str
+    type: Optional[str] = None
     description: str
     embedding: Optional[list[float]] = None
 
 class Relation(BaseModel):
     id: Optional[str] = None
+    chunk_id: Optional[str] = None
     source_entity: str
     target_entity: str
     name: str
     type: str
 
+class EntityRelation(BaseModel):
+    entities: List[Entity]
+    relations: List[Relation]
+
+class QueryClassification(BaseModel):
+    category: str
+    entities : List[str]
+
 class EntityRelationResponse(BaseModel):
     entities: list[Entity]
     relations: list[Relation]
+
+
+class EvaluationDataset(BaseModel):
+    id: Optional[str] = None
+    query: str
+    query_lable: str
+    golden_nodes: List[str]
+    golden_answer: str
 
 # Document models
 class Document(BaseModel):

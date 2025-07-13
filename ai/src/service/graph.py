@@ -32,6 +32,7 @@ class GraphService:
                 CALL apoc.create.node([row.type, 'Entity'], {
                     name: row.name, 
                     id: row.id, 
+                    chunk_id: row.chunk_id,
                     description: row.description, 
                     embedding: row.embedding
                     }) YIELD node
@@ -60,7 +61,7 @@ class GraphService:
             CALL apoc.create.relationship(
                 source, 
                 row.type, 
-                {name: row.name, id: row.id}, 
+                {name: row.name, id: row.id, chunk_id: row.chunk_id}, 
                 target
                 ) YIELD rel
             RETURN rel
@@ -78,6 +79,23 @@ class GraphService:
         except Exception as e:
             logger.error(f"Failed to insert relations: {e}")
             return None
+
+    async def get_entities_chunk_id(self, chunk_id: str) -> list[Entity]:
+        try:
+            query = f"""
+            MATCH (n)
+            WHERE n.chunk_id = "{chunk_id}"
+            RETURN n.name AS name, n.description AS description
+            """
+            result = await neo4j_conn.execute_query(
+                query=query,
+            )
+
+            records = result.record if hasattr(result, "record") else result
+            return [Entity(**dict(record)) for record in records]
+        except Exception as e:
+            logger.error(f"Failed to get etities: {e}")
+            return []
 
     async def find_entity(self, entity: str, query: str, top_k: int = 3) -> list[dict]:
         """Find entity by exact, fulltext, or vector fallback match."""
@@ -148,7 +166,6 @@ class GraphService:
             CALL db.index.vector.queryNodes('entityIndex', $top_k, $embedding)
             YIELD node, score
             RETURN node.name AS name, node.id AS id, node.type AS type, node.description AS description, score
-            LIMIT 10
             """
             result = await neo4j_conn.execute_query(
                 query=query,

@@ -1,8 +1,10 @@
 from fastapi import APIRouter, HTTPException, Depends, Body
 from pydantic import BaseModel
+from datetime import datetime
 import logging
 import time
 import asyncio
+import os
 
 from src.service.data__ingestion import DataIngestion
 from src.service.llm import LLMService
@@ -20,7 +22,7 @@ async def get_llm_service():
   return LLMService()
 
 async def get_graph_service():
-  return GraphService(llm_service=await get_llm_service())
+  return GraphService(llm_service = await get_llm_service())
 
 class ExtractEntitiesBody(BaseModel):
   file_path: str
@@ -39,19 +41,24 @@ async def extract_entities_relations(
   try:
     file_path = body.file_path
     file_type = body.file_type
+    logger.info(f"{file_path}, {file_type}")
     logger.info("Entity  Relation Extraction Started")
 
-    if file_type == "html":
-      with open(file_path, mode="r", encoding="utf-8") as f:
-        logger.info("Start extract text from html doc")
-        html_content = f.read()
-        texts = data_ingestion_service.extract_text_from_html(html_content=html_content, section_tag='h1')
-    else:
-      with open(file_path, mode="rb") as f:
-        file_bytes = f.read()
-        texts = data_ingestion_service.extract_text_from_files(file_bytes=file_bytes, type=file_type)
+    texts = data_ingestion_service.extract_text_from_files(file_path=file_path, type=file_type)
 
-    extraction_tasks = [llm_service.extract_entities_and_relations(text=chunk) for chunk in texts]
+
+
+    chunk_data = []
+    for index, text in enumerate(texts):
+        file_base = os.path.splitext(os.path.basename(file_path))[0]
+        file_name = f"{file_base}_{datetime.now().strftime('%Y%m%d_%H%M%S')}_chunk{index+1}.txt"
+
+        with open(f"./data/{file_name}", "w") as f:
+            f.write(text)
+
+        chunk_data.append((text, file_name))
+
+    extraction_tasks = [llm_service.extract_entities_and_relations(text=text, chunk_id=file_name) for text, file_name in chunk_data]
     chunk_results: list[EntityRelationResponse] = await asyncio.gather(*extraction_tasks, return_exceptions=True)
     
     all_results = EntityRelationResponse(entities=[], relations=[])

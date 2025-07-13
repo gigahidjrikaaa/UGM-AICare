@@ -1,300 +1,561 @@
-import pymupdf
-from docx import Document
 import re
-from html.parser import HTMLParser
-from html import unescape
 import io
 import logging
 from typing_extensions import Literal
+import re
 
+import pymupdf
 
+import docx
+from docx import Document
+from docx.document import Document as DocumentType
+from docx.oxml.table import CT_Tbl
+from docx.oxml.text.paragraph import CT_P
+from docx.table import _Cell, Table
+from docx.text.paragraph import Paragraph
+import zipfile
+import xml.etree.ElementTree as ET
+
+from html.parser import HTMLParser
+from html import unescape
 
 logger = logging.getLogger(__name__)
 
 class DataIngestion:
-  def __init__(self):
-    pass
+    def __init__(self):
+        pass
 
-  def extract_text_from_files(self, file_bytes: bytes, type: Literal["pdf", "docx", "html"]) -> list[str]:
-    if type == "pdf":
-      return self.__extract_text_from_pdf(file_bytes=file_bytes)
-    if type == "docx":
-      return self.__extract_text_from_docx(file_bytes=file_bytes)
-  
-  def extract_text_from_html(self, html_content, section_tag: str = "h1") -> list[str]:
-    """
-    Extract clean text from HTML content, removing all tags and styling.
-    
-    Args:
-        html_content (str): HTML string to extract text from
+    def extract_text_from_files(self, file_path: str, type: Literal["pdf", "docx", "html"]) -> list[str]:
+        logger.info("Start Text Extraction")
+        if type == "pdf":
+            return self.__extract_text_from_pdf(file_path=file_path)
+        if type == "docx":
+            return self.__extract_text_from_docx(docx_path=file_path)
+        if type == "html":
+            return self.__extract_text_from_html(file_path=file_path)
         
-    Returns:
-        str: Clean text content with proper spacing and line breaks
-    """
-    
-    class HTMLTextExtractor(HTMLParser):
-        def __init__(self):
-            super().__init__()
-            self.text_parts = []
-            self.block_elements = {
-                'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div', 
-                'article', 'section', 'header', 'footer', 'main',
-                'blockquote', 'pre', 'ul', 'ol', 'li', 'dl', 'dt', 'dd'
-            }
-            self.ignore_tags = {
-                'style', 'script', 'meta', 'link', 'noscript', 'head', 'title'
-            }
-            self.current_tag = None
-            self.ignore_content = False
-            self.in_table = False
-            self.in_cell = False
-            self.current_row = []
-            self.current_table = []
-            self.current_cell_content = []  # Add this to collect cell content
+    @staticmethod
+    def __extract_text_from_html(file_path: str) -> list[str]:
+        """
+        Extract clean text from HTML content, removing all tags and styling.
+        
+        Args:
+            file_path (str): HTML string to extract text from
             
-        def handle_starttag(self, tag, attrs):
-            self.current_tag = tag.lower()
-            
-            # Check if we should ignore content inside this tag
-            if self.current_tag in self.ignore_tags:
-                self.ignore_content = True
-                return
+        Returns:
+            tuple: (extracted_text, sections_list)
+        """
+        
+        class HTMLTextExtractor(HTMLParser):
+            def __init__(self):
+                super().__init__()
+                self.text_parts = []
+                self.block_elements = {
+                    'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'p', 'div', 
+                    'article', 'section', 'header', 'footer', 'main',
+                    'blockquote', 'pre', 'ul', 'ol', 'li', 'dl', 'dt', 'dd',
+                    'table', 'tr', 'td', 'th', 'tbody', 'thead', 'tfoot'
+                }
+                self.ignore_tags = {
+                    'style', 'script', 'meta', 'link', 'noscript', 'head', 'title',
+                    'svg', 'canvas', 'iframe', 'embed', 'object'
+                }
+                self.list_tags = {'ul', 'ol'}
+                self.list_item_tags = {'li'}
                 
-            if tag.lower() == section_tag.lower():
-                self.text_parts.append(section_tag.lower())
-
-            if self.current_tag == 'table':
-                self.in_table = True
+                # State tracking
+                self.current_tag = None
+                self.ignore_content = False
+                
+                # Table handling
+                self.in_table = False
+                self.in_cell = False
+                self.current_row = []
                 self.current_table = []
+                self.current_cell_content = []
+                
+                # List handling
+                self.in_list = False
+                self.list_stack = []  # Track nested lists
+                self.list_item_counter = 0
+                
+                # Headings for sections
+                self.heading_levels = {'h1': 1, 'h2': 2, 'h3': 3, 'h4': 4, 'h5': 5, 'h6': 6}
+                
+            def clean_text(self, text):
+                """Clean and normalize text content"""
+                if not text:
+                    return ""
+                
+                # Decode HTML entities
+                text = unescape(text)
+                
+                # Remove problematic characters
+                text = text.replace('\xa0', ' ')     # Non-breaking space
+                text = text.replace('\u00a0', ' ')   # Another non-breaking space
+                text = text.replace('\u200b', '')    # Zero-width space
+                text = text.replace('\ufeff', '')    # Byte order mark
+                text = text.replace('�', '')         # Replacement character
+                text = text.replace('Â', '')         # Malformed UTF-8
+                text = text.replace('â€™', "'")      # Malformed apostrophe
+                text = text.replace('â€œ', '"')      # Malformed opening quote
+                text = text.replace('â€\x9d', '"')   # Malformed closing quote
+                text = text.replace('\r\n', '\n')    # Normalize line endings
+                text = text.replace('\r', '\n')      # Normalize line endings
+                
+                # Clean whitespace but preserve meaningful spaces
+                text = re.sub(r'[ \t]+', ' ', text)  # Multiple spaces/tabs to single space
+                text = re.sub(r'\n\s*\n', '\n\n', text)  # Clean up multiple newlines
+                text = text.strip()
+                
+                return f"{text} "
+                
+            def handle_starttag(self, tag, attrs):
+                self.current_tag = tag.lower()
+                
+                # Check if we should ignore content inside this tag
+                if self.current_tag in self.ignore_tags:
+                    self.ignore_content = True
+                    return
+                
+                # Handle headings
+                if self.current_tag in self.heading_levels:
+                    # Add H1 marker for section splitting (backward compatibility)
+                    if self.current_tag == 'h1':
+                        self.text_parts.append('H1')
+                    # Add line break before heading
+                    if self.text_parts and not self.text_parts[-1].endswith('\n'):
+                        self.text_parts.append('\n')
+                
+                # Handle lists
+                if self.current_tag in self.list_tags:
+                    self.in_list = True
+                    self.list_stack.append(self.current_tag)
+                    self.list_item_counter = 0
+                    if self.text_parts and not self.text_parts[-1].endswith('\n'):
+                        self.text_parts.append('\n')
+                
+                if self.current_tag in self.list_item_tags and self.in_list:
+                    self.list_item_counter += 1
+                    # Add appropriate list marker
+                    if self.list_stack and self.list_stack[-1] == 'ol':
+                        self.text_parts.append(f"{self.list_item_counter}. ")
+                    else:
+                        self.text_parts.append("• ")
+                
+                # Handle tables
+                if self.current_tag == 'table':
+                    self.in_table = True
+                    self.current_table = []
+                    # Add spacing before table
+                    if self.text_parts and not self.text_parts[-1].endswith('\n'):
+                        self.text_parts.append('\n')
 
-            if self.current_tag == 'tr':
-                if self.in_table:  # Only start a new row if we're in a table
+                if self.current_tag == 'tr' and self.in_table:
                     self.current_row = []
 
-            if self.current_tag in {'td', 'th'}:
-                if self.in_table:  # Only handle cells if we're in a table
+                if self.current_tag in {'td', 'th'} and self.in_table:
                     self.in_cell = True
-                    self.current_cell_content = []  # Reset cell content
+                    self.current_cell_content = []
 
-            # Add line break before block elements
-            if tag.lower() in self.block_elements:
-                if self.text_parts and not self.text_parts[-1].endswith('\n'):
-                    self.text_parts.append('\n')
-                    
-        def handle_endtag(self, tag):
-            tag_lower = tag.lower()
-            
-            if tag_lower == 'td' or tag_lower == 'th':
-                if self.in_cell and self.in_table:
+                # Add line break before block elements (except list items handled above)
+                if (self.current_tag in self.block_elements and 
+                    self.current_tag not in self.list_item_tags and
+                    self.current_tag not in {'table', 'tr', 'td', 'th'}):
+                    if self.text_parts and not self.text_parts[-1].endswith('\n'):
+                        self.text_parts.append('\n')
+                        
+            def handle_endtag(self, tag):
+                tag_lower = tag.lower()
+                
+                # Handle table cells
+                if tag_lower in {'td', 'th'} and self.in_cell:
                     self.in_cell = False
                     # Join all content collected for this cell
                     cell_text = ' '.join(self.current_cell_content).strip()
                     self.current_row.append(cell_text)
                     self.current_cell_content = []
 
-            if tag_lower == 'tr':
-                if self.in_table and self.current_row:  # Only add non-empty rows
-                    self.current_table.append(self.current_row)
+                # Handle table rows
+                if tag_lower == 'tr' and self.in_table:
+                    if self.current_row:  # Only add non-empty rows
+                        self.current_table.append(self.current_row)
                     self.current_row = []
 
-            if tag_lower == 'table':
-                self.in_table = False
-                if self.current_table:
-                    # Convert the table to markdown format
-                    self.text_parts.append('\n')  # Add spacing before table
-                    
-                    # Calculate maximum width for each column for better formatting
-                    if self.current_table:
-                        max_cols = max(len(row) for row in self.current_table)
-                        col_widths = [0] * max_cols
-                        
-                        # Calculate maximum width for each column
-                        for row in self.current_table:
-                            for i, cell in enumerate(row):
-                                if i < len(col_widths):
-                                    col_widths[i] = max(col_widths[i], len(str(cell)))
-                        
-                        # Format table rows in markdown style
-                        for i, row in enumerate(self.current_table):
-                            if row:  # Only process non-empty rows
-                                # Pad cells to make columns align
-                                formatted_cells = []
-                                for j, cell in enumerate(row):
-                                    if j < len(col_widths):
-                                        formatted_cells.append(str(cell).ljust(col_widths[j]))
-                                    else:
-                                        formatted_cells.append(str(cell))
-                                
-                                line = '| ' + ' | '.join(formatted_cells) + ' |'
-                                self.text_parts.append(f"{line}\n")
-                                
-                                # Add markdown header separator after first row
-                                if i == 0:
-                                    separator_cells = []
-                                    for width in col_widths:
-                                        separator_cells.append('-' * max(3, width))  # Minimum 3 dashes
-                                    separator = '| ' + ' | '.join(separator_cells) + ' |'
-                                    self.text_parts.append(f"{separator}\n")
-                    
-                    self.text_parts.append('\n')  # Add spacing after the table
-                # Reset table state
-                self.current_table = []
-                self.current_row = []
+                # Handle table end
+                if tag_lower == 'table':
+                    self.in_table = False
+                    if self.current_table and any(row for row in self.current_table if any(cell.strip() for cell in row)):
+                        table_text = self._format_table_as_markdown(self.current_table)
+                        self.text_parts.append(table_text)
+                    # Reset table state
+                    self.current_table = [] 
+                    self.current_row = []
                 
-            # Stop ignoring content when we close an ignored tag
-            if tag_lower in self.ignore_tags:
-                self.ignore_content = False
-                self.current_tag = None
-                return
-                
-            # Add line break after block elements
-            if tag_lower in self.block_elements:
-                if self.text_parts and not self.text_parts[-1].endswith('\n'):
+                # Handle list end
+                if tag_lower in self.list_tags and self.in_list:
+                    if self.list_stack:
+                        self.list_stack.pop()
+                    if not self.list_stack:
+                        self.in_list = False
                     self.text_parts.append('\n')
-            self.current_tag = None
+                
+                if tag_lower in self.list_item_tags and self.in_list:
+                    self.text_parts.append('\n')
+                
+                # Handle headings
+                if tag_lower in self.heading_levels:
+                    self.text_parts.append('\n')
+                    
+                # Stop ignoring content when we close an ignored tag
+                if tag_lower in self.ignore_tags:
+                    self.ignore_content = False
+                    self.current_tag = None
+                    return
+                    
+                # Add line break after block elements
+                if (tag_lower in self.block_elements and 
+                    tag_lower not in {'table', 'tr', 'td', 'th'} and
+                    tag_lower not in self.list_item_tags):
+                    if self.text_parts and not self.text_parts[-1].endswith('\n'):
+                        self.text_parts.append('\n')
+                        
+                self.current_tag = None
             
-        def handle_data(self, data):
-            # Skip data if we're inside an ignored tag
-            if self.ignore_content:
-                return
-            
-            # Decode HTML entities and clean the data
-            cleaned_data = unescape(data)
-            
-            # Remove problematic characters like non-breaking spaces
-            cleaned_data = cleaned_data.replace('\xa0', ' ')  # Non-breaking space
-            cleaned_data = cleaned_data.replace('\u00a0', ' ')  # Another non-breaking space
-            cleaned_data = cleaned_data.replace('\u200b', '')  # Zero-width space
-            cleaned_data = cleaned_data.replace('\ufeff', '')  # Byte order mark
-            cleaned_data = cleaned_data.replace('�', '')
-            cleaned_data = cleaned_data.replace('Â', '')        # Malformed UTF-8
-            cleaned_data = cleaned_data.replace('â€™', "'")     # Malformed apostrophe
-            cleaned_data = cleaned_data.replace('â€œ', '"')     # Malformed opening quote
-            cleaned_data = cleaned_data.replace('â€\x9d', '"')  # Malformed closing quote
-            
-            # Clean whitespace but preserve meaningful spaces
-            cleaned_data = re.sub(r'\s+', ' ', cleaned_data).strip()
-            
-            if not cleaned_data:
-                return
+            def _format_table_as_markdown(self, table_rows):
+                """Format table rows as markdown table"""
+                if not table_rows:
+                    return ""
+                
+                max_cols = max(len(row) for row in table_rows)
+                col_widths = [0] * max_cols
+                
+                for row in table_rows:
+                    while len(row) < max_cols:
+                        row.append("")
+                
+                for row in table_rows:
+                    for i, cell in enumerate(row):
+                        if i < len(col_widths):
+                            col_widths[i] = max(col_widths[i], len(str(cell)))
+                
+                table_lines = ['\n']
+                
+                for i, row in enumerate(table_rows):
+                    # Format cells with padding
+                    formatted_cells = []
+                    for j, cell in enumerate(row):
+                        if j < len(col_widths):
+                            formatted_cells.append(str(cell).ljust(col_widths[j]))
+                        else:
+                            formatted_cells.append(str(cell))
+                    
+                    line = "| " + " | ".join(formatted_cells) + " |"
+                    table_lines.append(line)
+                    
+                    if i == 0 and len(table_rows) > 1:
+                        separator_cells = []
+                        for width in col_widths:
+                            separator_cells.append("-" * max(3, width))
+                        separator = "| " + " | ".join(separator_cells) + " |"
+                        table_lines.append(separator)
+                
+                table_lines.append('\n')
+                return '\n'.join(table_lines)
+                
+            def handle_data(self, data):
+                if self.ignore_content:
+                    return
+                
+                cleaned_data = self.clean_text(data)
+                
+                if not cleaned_data:
+                    return
 
-            if self.in_table and self.in_cell:
-                # Collect cell content instead of directly appending to row
-                self.current_cell_content.append(cleaned_data)
-            else:
-                self.text_parts.append(cleaned_data)
+                if self.in_table and self.in_cell:
+                    self.current_cell_content.append(cleaned_data)
+                else:
+                    self.text_parts.append(cleaned_data)
+                    
+            def get_text(self):
+                """Get complete extracted text"""
+                text = ''.join(self.text_parts)
                 
-        def get_text(self):
-            # Join all text parts with single spaces
-            text = ' '.join(part for part in self.text_parts if part.strip())
+                text = self.clean_text(text)
+                
+                text = re.sub(r'\n{3,}', '\n\n', text)
+                
+                return text
             
-            # Clean up the text more thoroughly
-            text = re.sub(r'\s+', ' ', text)  # Replace multiple spaces with single space
-            text = text.strip()
-            
-            # Add line breaks for better readability where appropriate
-            # This is a simple approach - you might want to customize this
-            sentences = text.split('. ')
-            if len(sentences) > 1:
-                text = '.\n'.join(sentences[:-1]) + '.' + sentences[-1] if sentences[-1] else '.\n'.join(sentences)
-            
-            return text
+            def get_sections(self):
+                """Get sections split by H1 headings"""
+                sections = []
+                current_section = []
+                
+                for part in self.text_parts:
+                    if part == "H1":
+                        if current_section:
+                            section_text = ''.join(current_section)
+                            section_text = self.clean_text(section_text)
+                            if section_text:
+                                sections.append(section_text)
+                        current_section = []
+                    else:
+                        current_section.append(part)
+                
+                if current_section:
+                    section_text = ''.join(current_section)
+                    section_text = self.clean_text(section_text)
+                    if section_text:
+                        sections.append(section_text)
+                
+                return sections
         
-        def get_section(self):
-            section = []
-            temp_list = []
+        if not file_path or not file_path.strip():
+            return "", []
+        
+        try:
+            parser = HTMLTextExtractor()
+            f =  open(f"./data/{file_path}", "r")
+            parser.feed(f.read())
+            sections = parser.get_sections()
             
-            for e in self.text_parts:
-                if e == section_tag.lower():
-                    section.append(temp_list)
-                    temp_list = []
-                    continue
-                temp_list.append(e)
+            return sections
             
-            # Don't forget to add the last section
-            if temp_list:
-                section.append(temp_list)
+        except Exception as e:
+            logger.error(f"Fail to extract PDF file {e}")
+            return []
+        finally:
+            f.close()
+            parser.close()
+
+
+    @staticmethod
+    def __extract_text_from_pdf(file_path: str) -> list[str] :
+        """Extract raw text from  PDF file"""
+
+        try:
+            text = []
+            file_byte =  open(f"./data/{file_path}", "rb")
+            with pymupdf.open(stream=file_byte.read(), filetype="pdf") as doc:
+                for page in doc:
+                    text.append(page.get_text())
+            return text
+        except Exception as e:
+            logger.error(f"Failed to extract PDF: {e}")
+            raise
+        finally:
+            file_byte.close()
+
+    @staticmethod
+    def __extract_text_from_docx(docx_path: str) -> list[str]:
+        """
+        Extract clean text from DOCX content, handling paragraphs, tables, and headers.
+        
+        Args:
+            docx_path (str): Path to DOCX file or file-like object
+            
+        Returns:
+            tuple: (extracted_text, sections_list)
+        """
+        
+        class DocxTextExtractor:
+            def __init__(self):
+                self.text_parts = []
+                self.sections = []
+                self.current_section = []
                 
-            res = []
-            for item in section:
-                text = ' '.join(part for part in item if part.strip())
-            
-                # Clean up the text more thoroughly
-                text = re.sub(r'\s+', ' ', text)  # Replace multiple spaces with single space
+            def clean_text(self, text):
+                """Clean and normalize text content"""
+                if not text:
+                    return ""
+                    
+                # Remove problematic characters
+                text = text.replace('\xa0', ' ')  # Non-breaking space
+                text = text.replace('\u00a0', ' ')  # Another non-breaking space
+                text = text.replace('\u200b', '')  # Zero-width space
+                text = text.replace('\ufeff', '')  # Byte order mark
+                text = text.replace('�', '')
+                text = text.replace('\r', '\n')  # Convert carriage returns
+                
+                # Clean whitespace but preserve line breaks
+                text = re.sub(r'[ \t]+', ' ', text)  # Replace multiple spaces/tabs with single space
+                text = re.sub(r'\n\s*\n', '\n\n', text)  # Clean up multiple newlines
                 text = text.strip()
                 
-                # Add line breaks for better readability where appropriate
-                # This is a simple approach - you might want to customize this
-                sentences = text.split('. ')
-                if len(sentences) > 1:
-                    text = '.\n'.join(sentences[:-1]) + '.' + sentences[-1] if sentences[-1] else '.\n'.join(sentences)
-                res.append(text)
+                return text
             
-            return res
-
-        def get_text2(self):
-            lines = []
-            for tag, text in self.text_parts:
-                if tag == 'h1':
-                    lines.append(f"# {text}")
-                else:
-                    lines.append(text)
-
-            # Combine and clean
-            full_text = ' '.join(lines)
-            full_text = re.sub(r'\s+', ' ', full_text).strip()
-
-            # Optional: split sentences with newlines
-            sentences = full_text.split('. ')
-            if len(sentences) > 1:
-                full_text = '.\n'.join(sentences[:-1]) + '.' + sentences[-1] if sentences[-1] else '.\n'.join(sentences)
-
-            return full_text
-    
-    if not html_content or not html_content.strip():
-        return "", []
-    
-    try:
-        # Decode HTML entities first
-        html_content = unescape(html_content)
+            def extract_table_text(self, table):
+                """Extract text from a table and format as markdown"""
+                table_rows = []
+                
+                for row in table.rows:
+                    row_cells = []
+                    for cell in row.cells:
+                        # Extract text from each cell, handling merged cells
+                        cell_text = ""
+                        for paragraph in cell.paragraphs:
+                            para_text = paragraph.text.strip()
+                            if para_text:
+                                cell_text += para_text + " "
+                        
+                        # Clean the cell text
+                        cell_text = self.clean_text(cell_text)
+                        row_cells.append(cell_text)
+                    
+                    if any(cell.strip() for cell in row_cells):  # Only add non-empty rows
+                        table_rows.append(row_cells)
+                
+                if not table_rows:
+                    return ""
+                
+                # Format as markdown table
+                if table_rows:
+                    # Calculate column widths
+                    max_cols = max(len(row) for row in table_rows) if table_rows else 0
+                    col_widths = [0] * max_cols
+                    
+                    # Pad rows to have same number of columns
+                    for row in table_rows:
+                        while len(row) < max_cols:
+                            row.append("")
+                    
+                    # Calculate maximum width for each column
+                    for row in table_rows:
+                        for i, cell in enumerate(row):
+                            if i < len(col_widths):
+                                col_widths[i] = max(col_widths[i], len(str(cell)))
+                    
+                    # Format table
+                    table_text = "\n"
+                    for i, row in enumerate(table_rows):
+                        # Format cells with padding
+                        formatted_cells = []
+                        for j, cell in enumerate(row):
+                            if j < len(col_widths):
+                                formatted_cells.append(str(cell).ljust(col_widths[j]))
+                            else:
+                                formatted_cells.append(str(cell))
+                        
+                        line = "| " + " | ".join(formatted_cells) + " |"
+                        table_text += line + "\n"
+                        
+                        # Add header separator after first row
+                        if i == 0:
+                            separator_cells = []
+                            for width in col_widths:
+                                separator_cells.append("-" * max(3, width))
+                            separator = "| " + " | ".join(separator_cells) + " |"
+                            table_text += separator + "\n"
+                    
+                    table_text += "\n"
+                    return table_text
+                
+                return ""
+            
+            def is_heading(self, paragraph):
+                """Check if paragraph is a heading"""
+                if paragraph.style and paragraph.style.name:
+                    style_name = paragraph.style.name.lower()
+                    return (style_name.startswith('heading') or 
+                        style_name.startswith('title') or
+                        'heading' in style_name)
+                return False
+            
+            def get_heading_level(self, paragraph):
+                """Get heading level (1-6)"""
+                if paragraph.style and paragraph.style.name:
+                    style_name = paragraph.style.name.lower()
+                    # Try to extract number from heading style
+                    import re
+                    match = re.search(r'heading\s*(\d+)', style_name)
+                    if match:
+                        return min(int(match.group(1)), 6)
+                    elif 'title' in style_name:
+                        return 1
+                return 1
+            
+            def extract_from_document(self, doc: docx.Document):
+                """Extract text from document maintaining structure"""
+                
+                # Iterate through all elements in document order
+                for element in doc.element.body:
+                    if isinstance(element, CT_P):  # Paragraph
+                        paragraph = Paragraph(element, doc)
+                        text = paragraph.text.strip()
+                        
+                        if text:
+                            cleaned_text = self.clean_text(text)
+                            
+                            if self.is_heading(paragraph):
+                                # Handle headings
+                                level = self.get_heading_level(paragraph)
+                                
+                                # Save current section if it has content
+                                if self.current_section:
+                                    section_text = "\n".join(self.current_section)
+                                    if section_text.strip():
+                                        self.sections.append(section_text.strip())
+                                    self.current_section = []
+                                
+                                # Add heading marker for H1 (for compatibility with your existing code)
+                                if level == 1:
+                                    self.text_parts.append("H1")
+                                
+                                # Format heading with markdown
+                                heading_text = "#" * level + " " + cleaned_text
+                                self.text_parts.append(heading_text)
+                                self.current_section.append(heading_text)
+                            else:
+                                # Regular paragraph
+                                self.text_parts.append(cleaned_text)
+                                self.current_section.append(cleaned_text)
+                    
+                    elif isinstance(element, CT_Tbl):  # Table
+                        table = Table(element, doc)
+                        table_text = self.extract_table_text(table)
+                        if table_text.strip():
+                            self.text_parts.append(table_text)
+                            self.current_section.append(table_text)
+                
+                # Don't forget the last section
+                if self.current_section:
+                    section_text = "\n".join(self.current_section)
+                    if section_text.strip():
+                        self.sections.append(section_text.strip())
+            
+            def get_text(self):
+                """Get complete extracted text"""
+                # Join all text parts
+                text = "\n".join(part for part in self.text_parts if part.strip())
+                return self.clean_text(text)
+            
+            def get_sections(self):
+                """Get sections split by headings"""
+                # Clean sections
+                cleaned_sections = []
+                for section in self.sections:
+                    cleaned = self.clean_text(section)
+                    if cleaned:
+                        cleaned_sections.append(cleaned)
+                return cleaned_sections
         
-        # Create parser and extract text
-        parser = HTMLTextExtractor()
-        parser.feed(html_content)
-        section = parser.get_section()
-        filtered_section = [s for s in section if s.strip()]
-        
-        return filtered_section
-        
-    except Exception as e:
-        logger.error(f"Fail to extract text from html doc: {e}")
-        return []
-  
-  @staticmethod
-  def __extract_text_from_pdf(file_bytes: bytes) -> list[str] :
-    """Extract raw text from  PDF file"""
-
-    try:
-      text = []
-      with pymupdf.open(stream=file_bytes, filetype="pdf") as doc:
-        for page in doc:
-          text.append(page.get_text())
-      return text
-    except Exception as e:
-      logger.error(f"Failed to extract PDF: {e}")
-      raise
-
-  @staticmethod
-  def __extract_text_from_docx(file_bytes: bytes) -> list[str]:
-    """Extract raw text from  PDF file"""
-
-    try:
-      text = []
-      doc = Document(io.BytesIO(file_bytes))
-      
-      text_chunks = [para.text.strip() for para in doc.paragraphs if para.text.strip()]
-      logger.info(f"Extracted {len(text_chunks)} paragraphs from DOCX.")
-      return text_chunks
-    except Exception as e:
-      logger.error(f"Failed to extract DOCX: {e}")
-      raise
+        try:
+            print("Extraxt DOCX file")
+            # Try to open as DOCX file
+            if isinstance(docx_path, str):
+                doc = Document(f"./data/{docx_path}")
+            else:
+                # Assume it's a file-like object
+                doc = Document(f"./data/{docx_path}")
+            
+            extractor = DocxTextExtractor()
+            extractor.extract_from_document(doc)
+            
+            sections = extractor.get_sections()
+            
+            return sections
+            
+        except Exception as e:
+            logger.error("Fail to extract DOCX file")
+            return []

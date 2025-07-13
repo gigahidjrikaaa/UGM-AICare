@@ -3,9 +3,10 @@ from google.genai import types
 import re
 import json
 import logging
+from typing import List
 
 from src.config import Config
-from src.model.schema import Entity, Relation, EntityRelationResponse
+from src.model.schema import Entity, Relation, EntityRelationResponse, EvaluationDataset
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +56,6 @@ class LLMService:
             Query: "Layanan dukungan kesehatan mental apa saja yang tersedia untuk remaja di Jakarta?"
             Output: {{"category": "path_query", "entities": ["layanan dukungan kesehatan mental", "remaja", "Jakarta"]}}
 
-            # KOREKSI PENTING: Pertanyaan ini mencari entitas berdasarkan relasinya dengan entitas lain, ini adalah path query.
             Query: "Siapa psikolog yang spesialisasi di terapi trauma?"
             Output: {{"category": "path_query", "entities": ["psikolog", "terapi trauma"]}}
 
@@ -195,7 +195,7 @@ class LLMService:
             return None
         
     
-    async def extract_entities_and_relations(self, text: str) -> EntityRelationResponse:
+    async def extract_entities_and_relations(self, text: str, chunk_id: str) -> EntityRelationResponse:
         """Extract relations between entities using LLM approaches"""
 
         try:
@@ -330,7 +330,9 @@ class LLMService:
                         }
                     ]
                     }
-                    """
+                    """,
+                    response_schema     = EntityRelationResponse,
+                    response_mime_type  = "application/json"
             )
 
             content = types.Content(
@@ -345,17 +347,24 @@ class LLMService:
                 contents = content,
                 config = config
             )
-            raw_text = response.candidates[0].content.parts[0].text
 
-            res = self.string_to_json(raw_text)
+            res = response.parsed
 
-            if "entities" not in res or "relations" not in res:
+            entities = getattr(res, "entities", None) or res.get("entities")
+            relations = getattr(res, "relations", None) or res.get("relations")
+
+            if entities is None or relations is None:
                 logger.warning("LLM response missing expected fields")
                 return EntityRelationResponse(entities=[], relations=[])
             
-            logger.info(f"Extracted {len(res['entities'])} entities and {len(res['relations'])} relations from Document")
+            for entity in entities:
+                setattr(entity, "chunk_id", chunk_id)
 
-            return EntityRelationResponse(**res)
+            for relation in relations:
+                setattr(relation, "chunk_id", chunk_id)
+
+            logger.info(f"Extracted {len(entities)} entities and {len(relations)} relations from document")
+            return EntityRelationResponse(entities=entities, relations=relations)
         except Exception as e:
             logger.error(f"Failed to extract entity relations: {e}")
             return EntityRelationResponse(entities=[], relations=[])
@@ -383,24 +392,68 @@ class LLMService:
         except Exception as e:
             print(f"[ERROR] Failed to get embeddings: {e}")
             return []
-        
-    def generate_graph(self, doc: list[str]):
-        text = "\n".join(doc)
-        
-        prompt = f"""
-        Extract structured knowledge from the following text in the form of a knowledge graph.
-        Return output as a list of triples (subject, predicate, object) .
-        
-        Text:
-        {text}
-        """
+
+    async def generate_evaluation_dataset(self, doc: str, nodes: List[Entity], minimum: int = 10) -> list[EvaluationDataset]:
+        """Generates the dataset using the Gemini model."""
         try:
-            response = self.client.models.generate_content(
-                model = "gemini-2.0-flash",
-                contents = prompt,
+            nodes_str = json.dumps([node.model_dump() for node in nodes], indent=2)
+            few_shot_examples = """
+            [
+                {
+                    "query": "Jantungku berdebar kencang dan rasanya sesak napas. Apa aku kena serangan panik?",
+                    "query_label": "path_query",
+                    "golden_nodes": ["Serangan Panik", "Detak Jantung Cepat", "Sesak Napas"],
+                    "golden_answer": "Itu terdengar sangat menakutkan. Jantung berdebar dan kesulitan bernapas memang merupakan gejala khas dari serangan panik. Meskipun saya tidak bisa memberikan diagnosis, fokus pada pernapasan Anda bisa membantu saat ini. Coba tarik napas perlahan... dan hembuskan perlahan."
+                },
+                {
+                    "query": "apa itu depresi?",
+                    "query_label": "entity_query",
+                    "golden_nodes": ["Depresi", "Anhedonia"],
+                    "golden_answer": "Depresi adalah gangguan suasana hati yang menyebabkan perasaan sedih yang mendalam dan terus-menerus, serta kehilangan minat pada hal-hal yang biasanya Anda nikmati, atau yang disebut juga anhedonia."
+                }
+            ]
+            """
+            prompt = f"""
+            Anda adalah seorang ahli pembuatan data, ditugaskan untuk membuat dataset evaluasi "Silver Standard" untuk chatbot kesehatan mental.
+            Respons Anda HARUS berupa daftar kamus (list of dictionaries) dalam format JSON yang valid. Jangan tambahkan teks pengantar atau penjelasan di luar struktur JSON.
+
+            **KONTEKS & ATURAN:**
+            1.  **Sumber Kebenaran:** Anda HANYA boleh menggunakan informasi yang disediakan di bagian 'KONTEKS DOKUMEN' dan 'NODE KNOWLEDGE GRAPH' di bawah ini. Jangan gunakan pengetahuan eksternal.
+            2.  **Node Knowledge Graph:** Bagian 'NODE KNOWLEDGE GRAPH' menyediakan daftar node yang tersedia beserta nama dan deskripsinya. Untuk 'golden_nodes', Anda HANYA boleh menggunakan 'name' dari node-node tersebut. Gunakan 'description' untuk memahami arti setiap node dan membuat pilihan yang lebih baik.
+            3.  **Tugas:** Hasilkan minimal {minimum} atau lebih contoh evaluasi yang beragam dalam format JSON yang ditentukan.
+            4.  **Keragaman Query:** Buat campuran `entity_query` (apa itu X?) dan `path_query` (bagaimana/mengapa X terkait dengan Y?).
+            5.  **Gaya Kueri:** 'query' harus mencerminkan pertanyaan pengguna yang ingin mengetahui tentang suatu hal.
+            5.  **Gaya Jawaban:** 'golden_answer' harus empatik, aman, dan sangat berdasarkan pada KONTEKS yang disediakan. Jawaban tidak boleh memberikan nasihat medis.
+
+            ---
+            **KONTEKS DOKUMEN:**
+            {doc}
+            ---
+            **NODE KNOWLEDGE GRAPH:**
+            {nodes_str}
+            ---
+
+            **CONTOH FEW-SHOT (Ikuti format dan gaya ini):**
+            {few_shot_examples}
+            ---
+
+            **TUGAS ANDA:**
+            Sekarang, hasilkan {minimum} contoh baru yang unik berdasarkan semua aturan dan konteks yang diberikan. Pastikan output Anda adalah sebuah list JSON tunggal.
+            """
+
+            config = types.GenerateContentConfig(
+                response_schema=list[EvaluationDataset],
+                response_mime_type= "application/json"
             )
 
-            return response.text
+            response = self.client.models.generate_content(
+                model = "gemini-2.5-flash",
+                contents = prompt,
+                config = config
+            )
+            res = response.parsed
+            
+            return res
         except Exception as e:
-            print(f"[ERROR] Failed to generate graph: {e}")
-            return None
+            logger.error(f"Failed to generate evaluation dataset: {e}" )
+            return []
