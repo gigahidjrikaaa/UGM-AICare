@@ -6,7 +6,11 @@ import type {
   ChatResponsePayload,
   JournalPromptResponse,
   JournalEntryItem,
-  JournalReflectionPointResponse // Add this type
+  JournalReflectionPointResponse, // Add this type
+  Psychologist,
+  AppointmentType,
+  AppointmentCreate,
+  Appointment
 } from '@/types/api'; // Import types
 import toast from 'react-hot-toast';
 
@@ -164,5 +168,54 @@ export const getMyJournalReflections = async (limit: number = 5): Promise<Journa
     console.warn(errorMessage); // Log the error for debugging
     toast.error(errorMessage); // Show a toast notification for user feedback
     return []; // Return empty array on error so UI doesn't break
+  }
+};
+
+// --- Psychologist Appointments API ---
+export const getPsychologists = async (): Promise<Psychologist[]> => {
+  try {
+    const response = await apiClient.get<Psychologist[]>('/psychologists');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching psychologists:', error);
+    let errorMessage = 'Failed to load psychologists.';
+    if (axios.isAxiosError(error) && error.response) {
+      errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    throw new Error(errorMessage);
+  }
+};
+
+export const getAppointmentTypes = async (): Promise<AppointmentType[]> => {
+  try {
+    const response = await apiClient.get<AppointmentType[]>('/appointment-types');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching appointment types:', error);
+    let errorMessage = 'Failed to load appointment types.';
+    if (axios.isAxiosError(error) && error.response) {
+      errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    throw new Error(errorMessage);
+  }
+};
+
+export const createAppointment = async (payload: AppointmentCreate): Promise<Appointment> => {
+  try {
+    const response = await apiClient.post<Appointment>('/appointments', payload);
+    return response.data;
+  } catch (error) {
+    console.error('Error creating appointment:', error);
+    let errorMessage = 'Failed to create appointment.';
+    if (axios.isAxiosError(error) && error.response) {
+      errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    throw new Error(errorMessage);
   }
 };

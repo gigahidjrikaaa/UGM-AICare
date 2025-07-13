@@ -54,6 +54,7 @@ docker-compose.override.yml
 .idea/
 *.iml
 backend/aika.db
+backend/*.db
 
 # Alembic
 alembic.ini
