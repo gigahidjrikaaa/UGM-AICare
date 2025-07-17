@@ -321,7 +321,7 @@ async def handle_chat_request(
                         # history_for_llm_api_message is the one to use here.
                         aika_response_text = await llm.generate_response(
                             history=history_for_llm_call, # Use the potentially augmented history
-                            provider=request.provider,
+                            provider=request.provider or "gemini",  # Ensure provider is never None
                             model=request.model,
                             max_tokens=request.max_tokens,
                             temperature=request.temperature,
