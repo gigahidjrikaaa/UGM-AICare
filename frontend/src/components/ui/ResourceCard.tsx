@@ -1,5 +1,6 @@
 import React from 'react';
 import { FiPhone, FiMapPin, FiGlobe, FiMessageSquare, FiMail, FiUsers, FiClock, FiInfo, FiExternalLink } from 'react-icons/fi';
+import Image from 'next/image';
 
 export interface ResourceCardProps {
     name: string;
@@ -27,7 +28,15 @@ const ResourceCard: React.FC<ResourceCardProps> = ({
         <div className="p-4 sm:p-5 bg-gradient-to-br from-white/5 via-white/10 to-white/5 rounded-xl border border-white/10 shadow-lg hover:border-white/20 transition-all duration-300 ease-in-out flex flex-col h-full">
             {logoUrl && (
                 <div className="mb-3">
-                    <img src={logoUrl} alt={`${name} logo`} className="h-12 w-auto rounded object-contain" />
+                    <Image
+                        src={logoUrl}
+                        alt={`${name} logo`}
+                        className="h-12 w-auto rounded object-contain"
+                        width={48}
+                        height={48}
+                        style={{ width: 'auto', height: '3rem' }}
+                        priority
+                    />
                 </div>
             )}
             <h3 className="text-lg font-semibold text-[#FFCA40] mb-1.5">{name}</h3>
