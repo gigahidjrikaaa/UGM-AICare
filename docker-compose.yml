@@ -107,8 +107,8 @@ services:
         condition: service_healthy # Wait for redis to be ready
     restart: unless-stopped
     networks:
-      aicare_network:
-        ipv4_address: 10.10.1.114
+      # aicare_network:
+      #   ipv4_address: 10.10.1.114
       internal_network: {} # Also on the internal network to talk to db/redis
       shared_services_network: {} # Attached to shared network to talk to gemma_service
 
@@ -144,9 +144,9 @@ services:
       - backend # Optional, if frontend needs backend to be up for some server-side rendering logic
     restart: unless-stopped
     # The command is now handled by CMD in the Dockerfile's production stage
-    networks:
-      aicare_network:
-        ipv4_address: 10.10.1.115
+    # networks:
+    #   aicare_network:
+    #     ipv4_address: 10.10.1.115
 
 
 # --- Monitoring Services ---
@@ -222,10 +222,10 @@ volumes:
   # grafana_data:
 
 networks:
-  aicare_network:
-    external: true
+  # aicare_network:
+  #   external: true
   internal_network: # This is our new, internal-only bridge network
     driver: bridge
-  shared_services_network:
-    external: true
+  # shared_services_network:
+  #   external: true
 

@@ -4,46 +4,27 @@
 # ---- Build Stage (builder) ----
 FROM python:3.11-slim-bookworm as builder
 
-# Set work directory
 WORKDIR /app
 
-COPY . /app
-
-# Install essential build tools for Python packages and Rust
-# Separating this from Rust installation for better layer caching
+# Install essential build tools
 RUN apt-get update && \
-    apt-get upgrade -y && \
-    apt-get install -y --no-install-recommends \
-    gcc \
-    python3-dev \
-    build-essential \
-    curl && \
+    apt-get install -y --no-install-recommends gcc python3-dev build-essential curl && \
+    curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Rust (needed for compiling some Python packages)
-# This is a separate layer, so changes to apt packages above don't trigger a Rust reinstall
-RUN curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable
-
-# Add Rust to PATH for subsequent RUN commands in this stage
+# Add Rust to PATH
 ENV PATH="/root/.cargo/bin:${PATH}"
 
-# Verify Rust installation (optional, good for debugging)
-RUN rustc --version && cargo --version
-
-# Copy requirements file first to leverage Docker cache
+# Copy only the requirements file to leverage Docker cache
 COPY requirements.txt .
 
 # Install Python dependencies and compile them into wheels
-# Using --no-deps here assumes all dependencies are explicitly in requirements.txt
 RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
 
 # ---- Final Stage (production) ----
 FROM python:3.11-slim-bookworm
-
-# Install bash and netcat, required by the startup scripts
-RUN apt-get update && apt-get install -y bash netcat-openbsd && rm -rf /var/lib/apt/lists/*
 
 # Create a non-root user and group
 RUN groupadd -r appgroup && useradd --no-log-init -r -g appgroup -m -s /bin/bash appuser
@@ -54,28 +35,40 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-# Copy installed wheels from builder stage
+# Install runtime system dependencies, including dos2unix
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends libpq5 dos2unix && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
+# Copy pre-compiled wheels from the builder stage
 COPY --from=builder /app/wheels /wheels
 
-# Install dependencies from wheels
-RUN pip install --no-cache-dir /wheels/*
+# Install Python dependencies from wheels
+RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
 
-# Copy application code
-# Note: Ensure .dockerignore is properly configured to exclude .git, .vscode, etc.
-COPY . .
+# Copy the entire application code from the build context (./backend)
+COPY --chown=appuser:appgroup . .
 
-# Copy startup scripts and make them executable
-COPY ./scripts /app/scripts
-RUN chmod +x /app/scripts/*.sh
+# --- Add this line for debugging ---
+RUN ls -laR /app
 
-# Change ownership of the app directory to the non-root user
-RUN chown -R appuser:appgroup /app
+# Find, convert line endings, and set permissions for all shell scripts
+# This is still needed for the 'migrate' service which uses wait-for-it.sh
+RUN find /app/scripts -name "*.sh" -exec dos2unix {} + -exec chmod +x {} +
+
+# Create and set permissions for the logs directory
+RUN mkdir -p /app/logs && \
+    chown -R appuser:appgroup /app/logs && \
+    chmod -R 750 /app/logs
 
 # Switch to the non-root user
 USER appuser
 
-# Set the entrypoint for the container to our startup script
-ENTRYPOINT ["/app/scripts/start.sh"]
-
 # Expose the port the app runs on
 EXPOSE 8000
+
+# Set the command to start the application.
+# This replaces the need for start.sh for the backend service.
+# Using shell form to allow environment variable expansion for WORKERS_PER_CORE.
+CMD exec gunicorn -k uvicorn.workers.UvicornWorker app.main:app --workers ${WORKERS_PER_CORE:-4} --worker-tmp-dir /dev/shm --bind 0.0.0.0:8000

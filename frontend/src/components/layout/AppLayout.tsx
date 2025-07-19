@@ -1,15 +1,15 @@
 // frontend/src/components/layout/AppLayout.tsx
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react'; // Import useEffect
 import { useSession } from 'next-auth/react';
-import { motion, AnimatePresence } from 'framer-motion'; // Import motion and AnimatePresence
-import { toast } from 'react-hot-toast'; // Import toast
+import { motion, AnimatePresence } from 'framer-motion';
+import { toast } from 'react-hot-toast';
 import Header from '@/components/ui/Header';
 import AppSidebar from '@/components/ui/AppSidebar';
 import Footer from '@/components/ui/Footer';
 import FeedbackForm from '@/components/features/feedback/FeedBackForm';
-import { cn } from '@/lib/utils'; // Import cn utility
+import { cn } from '@/lib/utils';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -28,26 +28,23 @@ const AppLoadingIndicator = () => (
 );
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { status } = useSession();
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [showFeedbackModal, setShowFeedbackModal] = useState(false); // State for feedback modal
+  const { data: session, status } = useSession();
+  const [isSidebarOpen, setSidebarOpen] = useState(false);
+  const [isFeedbackOpen, setFeedbackOpen] = useState(false); // Add feedback modal state
 
   const toggleSidebar = () => {
-    setIsSidebarOpen(!isSidebarOpen);
+    setSidebarOpen(!isSidebarOpen);
   };
 
-  // Handler for successful feedback submission
-  const handleFeedbackSuccess = () => {
-    toast.success("Terima kasih atas feedback-nya!");
-    setShowFeedbackModal(false);
-  };
+  // This effect can be used to show a toast message on session status change
+  useEffect(() => {
+    if (status === 'authenticated' && session?.user) {
+      // Example: toast.success(`Welcome back, ${session.user.name}!`);
+      toast.success(`Welcome back, ${session.user.name}!`);
+    }
+  }, [status, session]);
 
-
-  // Determine if the sidebar should be rendered based on auth status
-  const shouldRenderSidebar = status === 'authenticated';
-
-  // Handle loading state
-  if (status === "loading") {
+  if (status === 'loading') {
     return <AppLoadingIndicator />;
   }
 
@@ -57,10 +54,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
     <div className="flex h-screen overflow-hidden"> {/* Ensure h-screen here */}
 
       {/* Render Sidebar only if authenticated */}
-      {shouldRenderSidebar && (
-        // Ensure your AppSidebar handles its own visibility/animation based on isOpen
-        // and uses appropriate z-index (e.g., z-40 or higher)
-        <AppSidebar isOpen={isSidebarOpen} onClose={() => setIsSidebarOpen(false)} />
+      {status === 'authenticated' && (
+        <AppSidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
       )}
 
       {/* Main content area wrapper */}
@@ -80,8 +75,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
             {/* <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
                  <ParticleBackground ... />
              </div> */}
-            {/* Render page content relatively positioned */}
-            <div className="relative z-10">
+            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 h-full">
                 {children}
             </div>
         </main>
@@ -90,55 +84,43 @@ export default function AppLayout({ children }: AppLayoutProps) {
         <Footer />
       </div>
 
-      {/* --- Global Feedback Button & Modal --- */}
-      {/* Rendered outside the blurred container, visibility based on sidebar state */}
-      <AnimatePresence>
-          {isSidebarOpen && shouldRenderSidebar && ( // Show only if sidebar can be open (i.e., authenticated) and *is* open
-              <motion.button
-                  key="global-feedback-button"
-                  initial={{ opacity: 0, scale: 0.8 }}
-                  animate={{ opacity: 1, scale: 1 }}
-                  exit={{ opacity: 0, scale: 0.8 }}
-                  transition={{ duration: 0.2 }}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setShowFeedbackModal(true)}
-                  // Fixed position relative to viewport
-                  className="fixed bottom-6 right-6 z-50 bg-ugm-gold text-ugm-blue-dark px-5 py-3 rounded-full shadow-lg hover:bg-opacity-90 transition-all font-semibold flex items-center space-x-2"
-                  aria-label="Give Feedback"
-              >
-                  <span>Beri Feedback</span>
-              </motion.button>
+      {/* Floating Feedback Button & Modal - Render only if authenticated */}
+      {status === 'authenticated' && (
+        <>
+          {/* Floating Button to open Feedback Form */}
+          {!isFeedbackOpen && (
+            <button
+              type="button"
+              aria-label="Open feedback form"
+              className="fixed bottom-5 right-5 z-50 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg p-4 focus:outline-none focus:ring-2 focus:ring-blue-400"
+              onClick={() => setFeedbackOpen(true)}
+            >
+              {/* You can use an icon here */}
+              <span className="sr-only">Open feedback form</span>
+              📝
+            </button>
           )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-          {showFeedbackModal && (
+          {/* Feedback Form Modal */}
+          <AnimatePresence>
+            {isFeedbackOpen && (
               <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[100] p-4" // High z-index for modal
-                  onClick={() => setShowFeedbackModal(false)}
+                className="fixed bottom-5 right-5 z-50"
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 50 }}
               >
-                  <motion.div
-                      initial={{ scale: 0.9, opacity: 0 }}
-                      animate={{ scale: 1, opacity: 1 }}
-                      exit={{ scale: 0.9, opacity: 0 }}
-                      transition={{ type: 'spring', damping: 15, stiffness: 200 }}
-                      onClick={(e) => e.stopPropagation()}
-                      className='w-full max-w-2xl rounded-lg bg-white text-gray-800 shadow-2xl overflow-hidden'
-                  >
-                      <FeedbackForm
-                          onClose={() => setShowFeedbackModal(false)}
-                          onSubmitSuccess={handleFeedbackSuccess}
-                      />
-                  </motion.div>
+                <FeedbackForm
+                  onClose={() => setFeedbackOpen(false)}
+                  onSubmitSuccess={() => {
+                    toast.success("Thank you for your feedback!");
+                    setFeedbackOpen(false);
+                  }}
+                />
               </motion.div>
-          )}
-      </AnimatePresence>
-      {/* --- End Feedback Button & Modal --- */}
-
+            )}
+          </AnimatePresence>
+        </>
+      )}
     </div>
   );
 }

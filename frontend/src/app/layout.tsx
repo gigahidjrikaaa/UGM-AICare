@@ -33,25 +33,23 @@ const checkEnvVariables = () => {
   console.log("--- Environment Variable Check (Layout) ---");
   requiredEnvVars.forEach(varName => {
     const value = process.env[varName];
-    if (value === undefined) {
-      console.warn(`LAYOUT: ${varName} is UNDEFINED.`);
-    } else if (value === "") {
-      console.warn(`LAYOUT: ${varName} is an EMPTY STRING.`);
+    if (!value) {
+      console.warn(`[ENV CHECK] Missing required environment variable: ${varName}`);
     } else {
-      // For sensitive values, you might want to just log that it's set, not the value itself
-      // For NEXTAUTH_URL, logging the value is fine for this debugging.
-      if (varName === 'NEXTAUTH_URL' || varName === 'NEXT_PUBLIC_API_URL') {
-        console.log(`LAYOUT: ${varName} is SET to: "${value}"`);
+      // For sensitive keys, just log that they are set.
+      if (varName.includes('SECRET') || varName.includes('KEY') || varName.includes('PASSWORD')) {
+        console.log(`[ENV CHECK] ${varName} is set.`);
       } else {
-        console.log(`LAYOUT: ${varName} is SET (value hidden for security).`);
+        console.log(`[ENV CHECK] ${varName}: ${value}`);
       }
     }
   });
-  console.log("--- End Environment Variable Check (Layout) ---");
+  console.log("------------------------------------------");
 };
 
-// Execute environment variable check when the module loads
+// Run the check only on the server during build/startup
 checkEnvVariables();
+
 
 export default async function RootLayout({
   children,
@@ -72,25 +70,10 @@ export default async function RootLayout({
                   position="top-right"
                   reverseOrder={false}
                   toastOptions={{
-                    className: 'bg-white text-black dark:bg-gray-800 dark:text-white',
                     duration: 5000,
                     style: {
                       background: '#363636',
                       color: '#fff',
-                    },
-                    error: {
-                      duration: 5000,
-                      style: {
-                        background: '#f44336',
-                        color: '#fff',
-                      },
-                    },
-                    success: {
-                      duration: 5000,
-                      style: {
-                        background: '#4caf50',
-                        color: '#fff',
-                      },
                     },
                   }}
                 />

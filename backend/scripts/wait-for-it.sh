@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # wait-for-it.sh: wait for a host and port to be available before executing a command.
 #
 # Author: Gilles Fabre
