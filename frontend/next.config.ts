@@ -3,6 +3,18 @@ const nextConfig = {
   /* config options here */
   reactStrictMode: true,
   output: 'standalone',
+  
+  // External packages configuration (moved from experimental)
+  serverExternalPackages: [],
+  
+  // Development server configuration
+  ...(process.env.NODE_ENV === 'development' && {
+    // Configure allowed dev origins for cross-origin requests
+    experimental: {
+      allowedDevOrigins: ['127.0.0.1:3000', 'localhost:3000'],
+    },
+  }),
+  
   images: {
     // Optimize all images, including remote ones
     domains: [],
