@@ -23,33 +23,52 @@ async def get_graph_service():
 
 
 class GenerateEvaluationDatasetBody(BaseModel):
-  chunk_id: str
+  chunk_ids: list[str]
 
 
-@router.get("/generate-evaluation-dataset")
+@router.post("/generate-evaluation-dataset")
 async def generate_evaluation_dataset(
   body: GenerateEvaluationDatasetBody = Body(...),
   llm_service: LLMService = Depends(get_llm_service),
   graph_service: GraphService = Depends(get_graph_service)
 ):
   try:
-    chunk_id = body.chunk_id
-    file_path = f"./data/{chunk_id}"
-
-    if not os.path.exists(file_path):
-      raise HTTPException(status_code=404, detail=f"File not found: {chunk_id}")
-
-    entities: list[Entity] = await graph_service.get_entities_chunk_id(chunk_id=chunk_id)
-    doc = ""
+    chunk_ids = body.chunk_ids
     
-    async with aiofiles.open(file_path, mode="r") as f:
-      doc = await f.read()
+    missing = [cid for cid in chunk_ids if not os.path.exists(f"./data/{cid}")]
+    if missing:
+      raise HTTPException(status_code=404, detail=f"Missing files: {missing}")
+    
 
-    response: List[EvaluationDataset] = await llm_service.generate_evaluation_dataset(doc=doc, nodes=entities, minimum=len(entities))
+    async def process_chunk(chunk_id: str):
+      try:
+          # Load document
+          logger.info(f"Start generate evaluation dataset for chunk {chunk_id}")
+          async with aiofiles.open(f"./data/{chunk_id}", "r") as f:
+              doc = await f.read()
 
+          # Load related entities
+          entities: List[Entity] = await graph_service.get_entities_chunk_id(chunk_id=chunk_id)
+
+          # Generate evaluation dataset
+          evaluation = await llm_service.generate_evaluation_dataset(
+              doc=doc,
+              nodes=entities,
+              minimum = int(len(entities)/2)
+          )
+
+          return evaluation
+      except Exception as e:
+          logger.warning(f"Failed to process chunk {chunk_id}: {e}")
+          return []  # or raise if you want to fail all
+    
+    tasks = [process_chunk(cid) for cid in chunk_ids]
+    results = await asyncio.gather(*tasks)
+
+    all_data = [item for dataset in results for item in dataset]
 
     return {
-      "data": response
+      "data": all_data
     }
   except HTTPException:
     raise

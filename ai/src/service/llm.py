@@ -1,8 +1,10 @@
 from google import genai
 from google.genai import types
+from openai import OpenAI
 import re
 import json
 import logging
+from pydantic import BaseModel
 from typing import List
 
 from src.config import Config
@@ -14,6 +16,8 @@ class LLMService:
     def __init__(self):
         self.api_key = Config.GEMINI_API_KEY
         self.client = genai.Client(api_key=self.api_key)
+        self.openai_api_key = Config.OPENAI_API_KEY
+        self.openai_client = OpenAI(api_key=self.openai_api_key)
 
     
 
@@ -205,7 +209,7 @@ class LLMService:
                     Anda adalah sebuah pipeline ekstraksi Knowledge Graph untuk domain kesehatan mental. Dari DOKUMEN yang diberikan, ekstrak semua entitas penting dan relasi di antara mereka. Patuhi struktur JSON dan daftar tipe yang telah ditentukan dengan ketat.
 
                     LANGKAH-LANGKAH:
-                    1.  **Ekstrak Entitas**: Identifikasi entitas, klasifikasikan tipenya, dan berikan deskripsi singkat dari teks.
+                    1.  **Ekstrak Entitas**: Identifikasi entitas, klasifikasikan tipenya, dan berikan deskripsi yang dapat berupa potongan dari teks asli. Deskripsi dapat meliuti nomor telepon, alamat, atau informasi penting dari entitas. 
                     2.  **Ekstrak Relasi**: Identifikasi hubungan langsung antar entitas tersebut. `name` relasi harus berupa frasa kerja dari teks, dan `type` adalah kategorisasi formalnya.
 
                     ---
@@ -214,7 +218,7 @@ class LLMService:
 
                     **A. Tipe Entitas yang Diizinkan:**
                     * **Gangguan & Kondisi**: `Gangguan_Mental`, `Gejala`, `Kondisi_Medis_Terkait`
-                    * **Intervensi & Perawatan**: `Terapi_Psikologis`, `Obat_Medis`, `Layanan_Kesehatan`, `Aktivitas_Kesejahteraan`
+                    * **Intervensi & Perawatan**: `Terapi_Psikologis`, `Obat_Medis`, `Layanan_Kesehatan`, `Aktivitas_Kesejahteraan`, `Penyedia_Layanan`
                     * **Aktor & Pemangku Kepentingan**: `Profesional_Kesehatan`, `Organisasi`, `Individu`
                     * **Faktor & Konteks**: `Faktor_Risiko`, `Faktor_Pelindung`, `Dokumen_Hukum_Kebijakan`, `Lokasi`
                     * **Data & Konsep**: `Data_Statistik`, `Konsep_Abstrak`
@@ -223,7 +227,7 @@ class LLMService:
                     **B. Tipe Relasi yang Diizinkan:**
                     * **Sebab-Akibat**: `Menyebabkan`, `Berkontribusi_Pada`, `Mengurangi_Risiko`, `Merupakan_Gejala_Dari`
                     * **Intervensi**: `Mendiagnosis`, `Menangani`, `Meresepkan`, `Menawarkan_Layanan`
-                    * **Hierarki & Keanggotaan**: `Adalah_Jenis_Dari`, `Bekerja_Di`, `Berlokasi_Di`
+                    * **Hierarki & Keanggotaan**: `Adalah_Jenis_Dari`, `Bekerja_Di`, `Berlokasi_Di`, `Bagian_Dari`  
                     * **Deskriptif**: `Memiliki_Atribut`, `Didasarkan_Pada`, `Direkomendasikan_Untuk`
                     * **Jaring Pengaman**: `Terkait_Dengan` (Gunakan untuk hubungan yang jelas tapi tidak cocok kategori lain)
 
@@ -235,7 +239,7 @@ class LLMService:
                         { 
                         "name": "nama_entitas",
                         "type": "tipe_entitas_dari_daftar_di_atas",
-                        "description": "penjelasan singkat atau kutipan dari dokumen"
+                        "description": "penjelasan berisi informasi penting dari entitas, dapat berupa kutipan asli dari dokumen atau ringkasannya"
                         }
                     ],
                     "relations": [
@@ -257,6 +261,16 @@ class LLMService:
                     arakteristik gangguan jiwa secara umum yaitu kombinasi pikiran yang abnormal, emosi, dan persepsi. 
                     Faktor psikologis seperti trauma yang mengakibatkan stres dan faktor biologis seperti genetik merupakan faktor yang berkontribusi terhadap terjadinya gangguan jiwa. 
                     Sebesar 50% gangguan jiwa berawal pada usia 14 tahun.
+
+                    Layanan Psikologi UGM dan Fakultas
+
+                    Klinik GMC (Mental Health Support)
+                    Psikolog: +62 813-2620-0342
+                    GMC: +62 851-0047-3123
+
+                    Layanan Psikologi Fakultas (hanya untuk sivitas fakultas yang bersangkutan)
+                    Biologi: form registrasi
+                    Ekonomika dan Bisnis: Telp: +62 811-2843-884 atau isi Form Registrasi melalui Portal SINTESIS di menu Layanan Konsultasi.
 
                     **JSON_OUTPUT:**
                     {
@@ -295,6 +309,26 @@ class LLMService:
                         "name": "Statistik Onset Gangguan Jiwa",
                         "type": "Data_Statistik",
                         "description": "Sebesar 50% gangguan jiwa berawal pada usia 14 tahun."
+                        },
+                        {
+                        "name": "Layanan Kesehatan Mental Rumah Sakit Akademik UGM",
+                        "type": "Penyedia_Layanan",
+                        "description": "Layanan kesehatan mental yang disediakan oleh Rumah Sakit Akademik (RSA) UGM. Kontak dapat dilakukan melalui telepon di +62 811-2548-118."
+                        },
+                        {
+                        "name": "Klinik GMC - Mental Health Support",
+                        "type": "Penyedia_Layanan",
+                        "description": "Layanan dukungan kesehatan mental dari Klinik GMC. Kontak dapat ditujukan ke Psikolog di +62 813-2620-0342 atau ke nomor umum GMC di +62 851-0047-3123."
+                        },
+                        {
+                        "name": "Layanan Psikologi Fakultas Biologi",
+                        "type": "Penyedia_Layanan",
+                        "description": "Layanan psikologi khusus untuk sivitas Fakultas Biologi UGM. Pendaftaran dilakukan dengan mengisi form registrasi yang tersedia."
+                        },
+                        {
+                        "name": "Layanan Konsultasi Fakultas Ekonomika dan Bisnis",
+                        "type": "Penyedia_Layanan",
+                        "description": "Layanan konsultasi khusus untuk sivitas Fakultas Ekonomika dan Bisnis UGM. Pendaftaran dapat dilakukan melalui telepon di +62 811-2843-884 atau dengan mengisi Form Registrasi via Portal SINTESIS."
                         }
                     ],
                     "relations": [
@@ -327,7 +361,22 @@ class LLMService:
                         "target_entity": "Statistik Onset Gangguan Jiwa",
                         "name": "memiliki data onset",
                         "type": "Memiliki_Atribut"
-                        }
+                        },
+                        {
+                        "sumber": "Klinik GMC - Mental Health Support",
+                        "target": "Layanan Kesehatan Mental Universitas Gadjah Mada",
+                        "tipe": "Bagian_Dari"
+                        },
+                        {
+                        "sumber": "Layanan Psikologi Fakultas Biologi",
+                        "target": "Layanan Kesehatan Mental Universitas Gadjah Mada",
+                        "tipe": "Bagian_Dari"
+                        },
+                        {
+                        "sumber": "Layanan Konsultasi Fakultas Ekonomika dan Bisnis",
+                        "target": "Layanan Kesehatan Mental Universitas Gadjah Mada",
+                        "tipe": "Bagian_Dari"
+                        },
                     ]
                     }
                     """,
@@ -393,7 +442,7 @@ class LLMService:
             print(f"[ERROR] Failed to get embeddings: {e}")
             return []
 
-    async def generate_evaluation_dataset(self, doc: str, nodes: List[Entity], minimum: int = 10) -> list[EvaluationDataset]:
+    async def generate_evaluation_dataset(self, doc: str, nodes: List[Entity], minimum: int = 20) -> list[EvaluationDataset]:
         """Generates the dataset using the Gemini model."""
         try:
             nodes_str = json.dumps([node.model_dump() for node in nodes], indent=2)
@@ -406,13 +455,14 @@ class LLMService:
                     "golden_answer": "Itu terdengar sangat menakutkan. Jantung berdebar dan kesulitan bernapas memang merupakan gejala khas dari serangan panik. Meskipun saya tidak bisa memberikan diagnosis, fokus pada pernapasan Anda bisa membantu saat ini. Coba tarik napas perlahan... dan hembuskan perlahan."
                 },
                 {
-                    "query": "apa itu depresi?",
+                    "query": "Saya mau tahu depresi itu apa sih?",
                     "query_label": "entity_query",
                     "golden_nodes": ["Depresi", "Anhedonia"],
                     "golden_answer": "Depresi adalah gangguan suasana hati yang menyebabkan perasaan sedih yang mendalam dan terus-menerus, serta kehilangan minat pada hal-hal yang biasanya Anda nikmati, atau yang disebut juga anhedonia."
                 }
             ]
             """
+
             prompt = f"""
             Anda adalah seorang ahli pembuatan data, ditugaskan untuk membuat dataset evaluasi "Silver Standard" untuk chatbot kesehatan mental.
             Respons Anda HARUS berupa daftar kamus (list of dictionaries) dalam format JSON yang valid. Jangan tambahkan teks pengantar atau penjelasan di luar struktur JSON.
@@ -422,7 +472,7 @@ class LLMService:
             2.  **Node Knowledge Graph:** Bagian 'NODE KNOWLEDGE GRAPH' menyediakan daftar node yang tersedia beserta nama dan deskripsinya. Untuk 'golden_nodes', Anda HANYA boleh menggunakan 'name' dari node-node tersebut. Gunakan 'description' untuk memahami arti setiap node dan membuat pilihan yang lebih baik.
             3.  **Tugas:** Hasilkan minimal {minimum} atau lebih contoh evaluasi yang beragam dalam format JSON yang ditentukan.
             4.  **Keragaman Query:** Buat campuran `entity_query` (apa itu X?) dan `path_query` (bagaimana/mengapa X terkait dengan Y?).
-            5.  **Gaya Kueri:** 'query' harus mencerminkan pertanyaan pengguna yang ingin mengetahui tentang suatu hal.
+            5.  **Gaya Kueri:** 'query' harus mencerminkan pertanyaan pengguna yang ingin mengetahui tentang suatu hal. Buatlah sealami mungkin.
             5.  **Gaya Jawaban:** 'golden_answer' harus empatik, aman, dan sangat berdasarkan pada KONTEKS yang disediakan. Jawaban tidak boleh memberikan nasihat medis.
 
             ---
@@ -438,22 +488,32 @@ class LLMService:
             ---
 
             **TUGAS ANDA:**
-            Sekarang, hasilkan {minimum} contoh baru yang unik berdasarkan semua aturan dan konteks yang diberikan. Pastikan output Anda adalah sebuah list JSON tunggal.
+            Sekarang, hasilkan minimal {minimum} contoh baru yang unik berdasarkan semua aturan dan konteks yang diberikan. Pastikan output Anda adalah sebuah list JSON tunggal.
             """
 
-            config = types.GenerateContentConfig(
-                response_schema=list[EvaluationDataset],
-                response_mime_type= "application/json"
+            messages = [
+                {"role": "user", "content": prompt}
+            ]
+
+            class Output(BaseModel):
+                data: List[EvaluationDataset]
+
+            response = self.openai_client.chat.completions.parse(
+            model='o4-mini',
+            messages=messages,
+            response_format=Output
             )
 
-            response = self.client.models.generate_content(
-                model = "gemini-2.5-flash",
-                contents = prompt,
-                config = config
-            )
-            res = response.parsed
+            content = response.choices[0].message.parsed
+
+            if not content:
+                logger.warning("Received empty parsed content from OpenAI API")
+                return []
             
-            return res
+            items = content.data
+            logger.info(f"Generate {len(items)} evaluation dataset")
+            
+            return items
         except Exception as e:
             logger.error(f"Failed to generate evaluation dataset: {e}" )
             return []
