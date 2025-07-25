@@ -40,7 +40,7 @@ export default function Home() {
   if (!mounted) return null;
 
   return (
-    <main className="min-h-screen overflow-x-hidden">
+    <main className="min-h-screen overflow-x-hidden w-full">
       {/* Hero Section with Particle Background */}
       <section className="relative h-screen flex items-center overflow-hidden bg-gradient-to-br from-[#001D58] to-[#00308F]">
         {/* Particle Background */}

@@ -69,13 +69,13 @@ export default function AppLayout({ children }: AppLayoutProps) {
         {/* Header */}
         <Header onToggleSidebar={toggleSidebar}/>
 
-        {/* Content area - allow scrolling */}
-        <main className="flex-grow bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 relative z-10">
+        {/* Content area - allow scrolling with padding-top for fixed header */}
+        <main className="flex-grow bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 relative z-10 pt-20">
             {/* Particle Background can go here or in RootLayout */}
             {/* <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
                  <ParticleBackground ... />
              </div> */}
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8 h-full">
+            <div className="w-full h-full">
                 {children}
             </div>
         </main>

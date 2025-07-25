@@ -60,7 +60,7 @@ export default function AikaChatPage() {
 
         {/* Content area - Centered */}
         <motion.div
-          className="relative z-10 h-screen flex flex-col items-center justify-center p-4 md:p-6 lg:p-8" // Center content vertically/horizontally
+          className="relative z-10 h-screen flex flex-col items-center justify-center p-2 md:p-4 lg:p-6" // Center content vertically/horizontally
         >
           {/* Main chat container with Glassmorphism */}
           <div className="w-full max-w-5xl h-[90vh] flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">

@@ -14,13 +14,14 @@ interface MobileNavMenuProps {
   onClose: () => void;
 }
 
-// Define navigation items (you can adjust these based on your actual needs)
+// Define navigation items with updated icons and links
 const mobileNavItems = [
+    { href: "/", label: "Home", icon: <FiBookOpen size={18} /> },
+    { href: "/about", label: "About", icon: <FiInfo size={18} /> },
+    { href: "/resources", label: "Resources", icon: <FiBookOpen size={18} /> },
     { href: "/aika", label: "Talk to Aika", icon: <BsChatDots size={18} /> },
-    { href: "/journaling", label: "Journaling", icon: <FiActivity size={18} /> }, // Assuming FiActivity for Journaling
+    { href: "/journaling", label: "Journaling", icon: <FiActivity size={18} /> },
     { href: "/appointments", label: "Appointments", icon: <BsCalendar size={18} /> },
-    { href: "/resources", label: "Resources", icon: <FiBookOpen size={18} /> }, // Assuming FiBookOpen for Resources
-    { href: "/about", label: "About Aika", icon: <FiInfo size={18} /> },
     { href: "/help", label: "Help & Support", icon: <BsQuestionCircle size={18} /> }
 ];
 
@@ -30,60 +31,86 @@ export default function MobileNavMenu({ isOpen, onClose }: MobileNavMenuProps) {
     <AnimatePresence>
       {isOpen && (
         <>
-          {/* Backdrop overlay for mobile - closes sidebar when clicked */}
+          {/* Backdrop overlay - Enhanced iOS style */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            onClick={onClose} // Use the onClose prop
-            className="md:hidden fixed inset-0 bg-black/50 backdrop-blur-sm z-40" // Ensure z-index allows interaction
-            aria-hidden="true" // Hide from accessibility tree when closed conceptually
+            onClick={onClose}
+            className="md:hidden fixed inset-0 bg-black/30 backdrop-blur-md z-40"
+            aria-hidden="true"
           />
 
-          {/* Sidebar container */}
+          {/* Sidebar container - Enhanced iOS Glassmorphism */}
           <motion.div
-            key="mobile-nav-menu" // Added key for AnimatePresence
-            initial={{ x: '-100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '-100%' }}
-            transition={{ type: "spring", stiffness: 300, damping: 30 }}
-            className="md:hidden fixed top-0 left-0 bottom-0 z-50 w-[85%] max-w-[280px] bg-gradient-to-b from-[#001a4f]/95 to-[#00112e]/95 backdrop-blur-lg border-r border-white/10 shadow-xl flex flex-col"
-            role="dialog" // Announce as dialog
-            aria-modal="true" // Indicate it's modal
+            key="mobile-nav-menu"
+            initial={{ x: '-100%', opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: '-100%', opacity: 0 }}
+            transition={{ 
+              type: "spring", 
+              stiffness: 300, 
+              damping: 30,
+              opacity: { duration: 0.3 }
+            }}
+            className="md:hidden fixed top-0 left-0 bottom-0 z-50 w-[85%] max-w-[320px] bg-white/10 backdrop-blur-2xl border-r border-white/20 shadow-2xl flex flex-col"
+            role="dialog"
+            aria-modal="true"
             aria-label="Main menu"
           >
-            {/* Header within the sidebar */}
-            <div className="flex justify-between items-center p-4 border-b border-white/10">
-              <h2 className="text-lg font-semibold text-white">Menu</h2>
-              <button
-                onClick={onClose} // Use the onClose prop
-                className="p-2 rounded-full text-gray-300 hover:bg-white/10 hover:text-white transition-colors"
+            {/* Header within the sidebar - Enhanced */}
+            <div className="flex justify-between items-center p-6 border-b border-white/10 bg-white/5">
+              <h2 className="text-xl font-semibold text-white">Navigation</h2>
+              <motion.button
+                onClick={onClose}
+                whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.15)" }}
+                whileTap={{ scale: 0.9 }}
+                className="p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-all duration-200"
                 aria-label="Close menu"
               >
-                <HiX size={24} />
-              </button>
+                <HiX size={20} />
+              </motion.button>
             </div>
 
-            {/* Navigation Links */}
-            <nav className="flex-1 p-4 overflow-y-auto">
-              <ul className="space-y-1">
-                {mobileNavItems.map((item) => (
-                  <li key={item.href}>
+            {/* Navigation Links - Enhanced iOS Style */}
+            <nav className="flex-1 p-6 overflow-y-auto">
+              <ul className="space-y-2">
+                {mobileNavItems.map((item, index) => (
+                  <motion.li 
+                    key={item.href}
+                    initial={{ opacity: 0, x: -20 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    transition={{ delay: 0.1 * index, duration: 0.3 }}
+                  >
                     <Link
                       href={item.href}
-                      onClick={onClose} // Close menu on link click
-                      className="flex items-center px-3 py-3 rounded-lg text-white/90 hover:bg-[#FFCA40]/10 hover:text-[#FFCA40] transition-colors"
+                      onClick={onClose}
+                      className="flex items-center px-4 py-4 rounded-2xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-300 group"
                     >
-                      <span className="mr-3 flex-shrink-0">{item.icon}</span>
-                      <span className="truncate">{item.label}</span>
+                      <motion.span 
+                        className="mr-4 flex-shrink-0 text-white/60 group-hover:text-[#FFCA40] transition-colors duration-300"
+                        whileHover={{ scale: 1.2 }}
+                      >
+                        {item.icon}
+                      </motion.span>
+                      <span className="truncate font-medium">{item.label}</span>
+                      <motion.div
+                        className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                        initial={{ x: -10 }}
+                        whileHover={{ x: 0 }}
+                      >
+                        <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </motion.div>
                     </Link>
-                  </li>
+                  </motion.li>
                 ))}
               </ul>
             </nav>
 
-             {/* Account Linker Section at the bottom */}
-             <div className="p-4 border-t border-white/10 mt-auto">
+             {/* Account Linker Section at the bottom - Enhanced */}
+             <div className="p-6 border-t border-white/10 mt-auto bg-white/5">
                 <AccountLinker />
              </div>
 
