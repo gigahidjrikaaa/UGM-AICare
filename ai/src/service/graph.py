@@ -1,6 +1,7 @@
 from uuid import uuid4
 import logging
 import asyncio
+from typing import Literal
 
 from src.database import neo4j_conn
 from src.service.llm import LLMService
@@ -89,6 +90,7 @@ class GraphService:
             """
             result = await neo4j_conn.execute_query(
                 query=query,
+                access_mode='READ'
             )
 
             records = result.record if hasattr(result, "record") else result
@@ -97,13 +99,18 @@ class GraphService:
             logger.error(f"Failed to get etities: {e}")
             return []
 
-    async def find_entity(self, entity: str, query: str, top_k: int = 3) -> list[dict]:
+    async def find_entity(self, query: str, entity: str = "", top_k: int = 3, method: Literal['auto', 'vector'] = 'auto') -> list[dict]:
         """Find entity by exact, fulltext, or vector fallback match."""
         try:
             # 1. Exact match (normalized)
             # result = await self._find_by_normalized_name(entity)
             # if len(result) >= 0:
             #     return result
+
+            if(method == 'vector'):
+                result = await self._find_by_vector(name=entity, query=query, top_k=top_k)
+                if len(result) >= 0:
+                    return result
 
             # 2. Fulltext match
             result = await self._find_by_fulltext(entity, top_k=top_k)
@@ -151,6 +158,7 @@ class GraphService:
                     "top_k": top_k
                     }
             )
+            logger.info(f"found {len(result)} entities using fulltext search")
             return [dict(row) for row in result] if result else []
         except Exception as e:
             logger.warning(f"Cannot find Entity by fulltext {e}")
@@ -174,6 +182,7 @@ class GraphService:
                     "top_k"     : top_k
                     }
             )
+            logger.info(f"found {len(result)} entities using vector search")
             return [dict(row) for row in result] if result else []
         except Exception as e:
             logger.warning(f"Cannot find Entity by vector {e}")
@@ -224,10 +233,11 @@ class GraphService:
         except Exception as e:
             logger.error(f"Semantic search failed: {e}")
             return []
-    async def EntityBasedNeighborSearch(
+    async def NeighborExpansion(
         self,
         query: str,
         candidate_entities: list[str],
+        search_method: Literal['vector', 'auto'] = 'auto',
         top_k: int = 3,
         limit: int = 50,
     ) -> list[dict]:
@@ -253,14 +263,16 @@ class GraphService:
             raise ValueError("candidate_entities must be a non-empty list")
         
         try:
-            logger.info(f"Starting entity-based neighbor search for {len(candidate_entities)} candidates")
-            
-            entities_nested = await asyncio.gather(*[
-                self.find_entity(entity=e, query=query, top_k=top_k) for e in candidate_entities
-            ])
+            logger.info(f"Starting entity-based neighbor search for {len(candidate_entities)} candidates using searc {search_method}")
 
-            
-            entities = [item for sublist in entities_nested if sublist for item in sublist]
+            if (search_method == 'vector'):
+                entities = await self.find_entity(query=query, top_k=top_k, method='vector')
+            else:
+                entities_nested = await asyncio.gather(*[
+                    self.find_entity(entity=e, query=query, top_k=top_k, method='auto') for e in candidate_entities
+                ])
+                entities = [item for sublist in entities_nested if sublist for item in sublist]
+
             unique_entities_map = {item['id']: item for item in entities}
             unique_entities = list(unique_entities_map.values())
             
@@ -268,7 +280,7 @@ class GraphService:
                 logger.warning("No valid entities found from candidates")
                 return []
             
-            logger.info(f"Found {len(unique_entities)} valid entities from candidates")
+            logger.info(f"Found {len(unique_entities)} valid entities in total from candidates")
             
             query_cypher = """
             UNWIND $entities AS entity
@@ -305,7 +317,7 @@ class GraphService:
             parameters = {
                 "entities": unique_entities,
                 "limit": limit,
-                "neighbor_limit": 5,
+                "neighbor_limit": 20,   
                 }
             
             result = await neo4j_conn.execute_query(
@@ -388,65 +400,110 @@ class GraphService:
             logger.error(f"Semantic search failed: {e}")
             return []
 
-    async def EntityBasedAllShortestPath(self, 
+    async def N_ShortestPath(self, 
                               query: str, 
+                              search_method: Literal['vector', 'auto'] = 'auto',
                               candidate_entities: list = [],
-                              max_hop: int = 5,
-                              limit: int = 50,
+                              max_hop: int = 10,
+                              paths_per_group: int = 5,
+                              top_k: int = 2,
                               ) -> list[dict]:
         try:
-            entities = await asyncio.gather(*[
-                self.find_entity(entity=e, query=query) for e in candidate_entities
-            ])
+            logger.info(f"Starting entity-based neighbor search for {len(candidate_entities)} candidates")
             
-            entities = [e for e in entities if e]
-            if len(entities) < 2:
-                raise Exception("Need at least two valid entities for path finding.")
+            if (search_method == 'vector'):
+                entities = await self.find_entity(query=query, top_k=top_k, method='vector')
+                entities_nested = [entities]
+            else:
+                entities_nested = await asyncio.gather(*[
+                    self.find_entity(entity=e, query=query, top_k=top_k, method='auto') for e in candidate_entities
+                ])
+                if len(entities_nested) == 1:
+                    entities_nested = [[entity] for entity in entities_nested[0]]
+                entities = [item for sublist in entities_nested if sublist for item in sublist]
+
+            unique_entities_map = {item['id']: item for item in entities}
+            unique_entities = list(unique_entities_map.values())
             
-            entity_ids = [e["id"] for e in entities]
+            if not unique_entities:
+                logger.warning("No valid entities found from candidates")
+                return []
+            
+            logger.info(f"Found {len(unique_entities)} valid entities in total from candidates")
+            
+            entity_groups = [
+                [entity['id'] for entity in group]
+                for group in entities_nested 
+                if group 
+            ]
 
             query_cypher = f"""
-            UNWIND $entity_ids AS source_id
-            UNWIND $entity_ids AS target_id
-            WITH source_id, target_id WHERE source_id <> target_id
+            UNWIND range(0, size($entity_groups)-1) AS i
+            UNWIND range(i+1, size($entity_groups)-1) AS j
+            WITH i, j, $entity_groups[i] AS source_candidates, $entity_groups[j] AS target_candidates
+
+            UNWIND source_candidates AS source_id
+            UNWIND target_candidates AS target_id
+            WITH i, j, source_id, target_id
+
+            WHERE source_id <> target_id
 
             MATCH (source:Entity {{id: source_id}})
             MATCH (target:Entity {{id: target_id}})
-            
+
             MATCH p = allShortestPaths((source)-[*1..{max_hop}]-(target))
             WHERE ALL(n IN nodes(p) WHERE n.id IS NOT NULL)
 
-            WITH p, source, target, nodes(p) as path_nodes_raw, relationships(p) as path_rels_raw
+            WITH i AS source_group_index, 
+                p, source, target, 
+                nodes(p) as path_nodes_raw, 
+                relationships(p) as path_rels_raw,
+                length(p) AS hops
+
+            WITH source_group_index, 
+                collect({{
+                    p: p,
+                    source: source,
+                    target: target,
+                    path_nodes_raw: path_nodes_raw,
+                    path_rels_raw: path_rels_raw,
+                    hops: hops
+                }}) AS group_paths
+
+            WITH source_group_index,
+                [path IN group_paths | path][0..coalesce($paths_per_group, 10)] AS limited_paths
+
+            UNWIND limited_paths AS path_data
 
             RETURN DISTINCT
-            source.id AS source_id,
-            target.id AS target_id,
-            [i IN range(0, size(path_nodes_raw)-1) | {{
-                        id: path_nodes_raw[i].id,
-                        name: path_nodes_raw[i].name,
-                        type: path_nodes_raw[i].type,
-                        description: path_nodes_raw[i].description,
+            path_data.source.id AS source_id,
+            path_data.target.id AS target_id,
+            source_group_index,
+            [i IN range(0, size(path_data.path_nodes_raw)-1) | {{
+                        id: path_data.path_nodes_raw[i].id,
+                        name: path_data.path_nodes_raw[i].name,
+                        type: path_data.path_nodes_raw[i].type,
+                        description: path_data.path_nodes_raw[i].description,
                         position: i
             }}] AS path_nodes,
-            [i IN range(0, size(path_rels_raw)-1) | {{
-                        type: type(path_rels_raw[i]),
-                        name: path_rels_raw[i].name,
+            [i IN range(0, size(path_data.path_rels_raw)-1) | {{
+                        type: type(path_data.path_rels_raw[i]),
+                        name: path_data.path_rels_raw[i].name,
                         direction: CASE 
-                            WHEN startNode(path_rels_raw[i]).id = path_nodes_raw[i].id 
+                            WHEN startNode(path_data.path_rels_raw[i]).id = path_data.path_nodes_raw[i].id 
                             THEN 'OUTGOING' 
                             ELSE 'INCOMING' 
                         END
             }}] AS path_rels,
-            length(p) AS hops
-            ORDER BY hops ASC
-            LIMIT $limit
+            path_data.hops AS hops
+            ORDER BY source_group_index, path_data.hops ASC
             """
 
             result = await neo4j_conn.execute_query(
                 query=query_cypher,
                 parameters={
-                    "entity_ids": entity_ids,
-                    "limit": limit,
+                    "entity_groups": entity_groups,
+                    "paths_per_group": paths_per_group,
                 }
             )
 
@@ -457,5 +514,3 @@ class GraphService:
             logger.error(f"Entity Based All Shortest Path search failed: {e}")
             return []
 
-    async def graph_traversal(self, entities: list[dict]):
-        pass

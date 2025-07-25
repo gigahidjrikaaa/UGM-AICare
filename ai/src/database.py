@@ -1,6 +1,7 @@
 
 from neo4j import AsyncGraphDatabase
 import chromadb
+from typing import Literal
 
 
 from src.config import Config
@@ -20,10 +21,19 @@ class Neo4jConnection:
         if self.driver:
             await self.driver.close()
     
-  async def execute_query(self, query: str, parameters: dict = None):
-    async with self.driver.session() as session:
-      result = await session.run(query, parameters or {})
-      return await result.data()
+  async def execute_query(self, query: str, parameters: dict = None, access_mode: Literal['WRITE', 'READ']='WRITE'):
+        """Execute query with specified access mode"""
+        async with self.driver.session(default_access_mode=access_mode) as session:
+            result = await session.run(query, parameters or {})
+            return await result.data()
+  
+  async def execute_read_query(self, query: str, parameters: dict = None):
+        """Convenience method for read queries"""
+        return await self.execute_query(query, parameters, access_mode='READ')
+    
+  async def execute_write_query(self, query: str, parameters: dict = None):
+        """Convenience method for write queries"""
+        return await self.execute_query(query, parameters, access_mode='WRITE')
   
 class ChromaConnection:
     def __init__(self):

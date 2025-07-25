@@ -27,6 +27,7 @@ async def get_graph_service():
 class ExtractEntitiesBody(BaseModel):
   file_path: str
   file_type: str
+  split: bool = True
 
 @router.post("/extract")
 async def extract_entities_relations(
@@ -41,10 +42,11 @@ async def extract_entities_relations(
   try:
     file_path = body.file_path
     file_type = body.file_type
+    split = body.split
     logger.info(f"{file_path}, {file_type}")
     logger.info("Entity  Relation Extraction Started")
 
-    texts = data_ingestion_service.extract_text_from_files(file_path=file_path, type=file_type)
+    texts = data_ingestion_service.extract_text_from_files(file_path=file_path, type=file_type, split=split)
 
 
 

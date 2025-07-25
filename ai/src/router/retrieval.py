@@ -1,5 +1,6 @@
 from fastapi import APIRouter, HTTPException, Depends, Body
 import logging
+import time
 from typing import Literal, Optional
 from pydantic import BaseModel
 
@@ -101,62 +102,205 @@ def transform_graph_to_knowledge_text(graph_results: list[dict], desc_limit: int
     header = "Berikut adalah informasi yang ditemukan dari knowledge graph:\n"
     return header + "\n\n".join(knowledge_blocks)
 
-def parse_full_path_knowledge(paths: list[dict]) -> str:
+def parse_central_neighbor_knowledge_enhanced(graph_results: list[dict], desc_limit: int = 200) -> str:
+    """
+    Transforms central-neighbor graph results into clean, minimal knowledge text.
+    
+    Args:
+        graph_results: List of graph result dictionaries with central entity and neighbors
+        desc_limit: Maximum character limit for neighbor descriptions
+        
+    Returns:
+        Formatted knowledge string with central entities and their neighborhoods
+    """
+    if not graph_results:
+        return ""
+
     try:
-      description = {}
-      fact_lines = set()
+        knowledge_blocks = []
+        
+        for item_idx, item in enumerate(graph_results):
+            try:
+                # Extract central entity information
+                central_name = item.get('central_name', 'N/A')
+                central_type = item.get('central_type', 'N/A') 
+                central_desc = item.get('central_description', 'Tidak ada deskripsi.')
+                score = item.get('score', 0.0)
 
-      for path in paths:
-          nodes = path.get("path_nodes", [])
-          rels = path.get("path_rels", [])
+                # Build central entity block
+                block = [
+                    f"Entitas: {central_name} ({central_type})",
+                    f"Deskripsi: {central_desc}",
+                    f"Skor: {score:.2f}",
+                    "Hubungan:"
+                ]
 
-          # 1. Collect descriptions directly from node field
-          for node in nodes:
-              name = node.get("name", "")
-              desc = node.get("description", "")
-              if name and desc and name not in description:
-                description[name] = desc
+                # Process neighborhood
+                neighborhood = item.get('neighborhood', [])
+                valid_neighbors = [n for n in neighborhood if n.get('neighbor')]
+                
+                if not valid_neighbors:
+                    block.append("  Tidak ada hubungan terkait.")
+                else:
+                    for relation_info in valid_neighbors:
+                        try:
+                            neighbor = relation_info.get('neighbor', {})
+                            relation = relation_info.get('relation', {})
+                            
+                            # Extract neighbor information
+                            neighbor_name = neighbor.get('name', 'N/A')
+                            neighbor_type = neighbor.get('type', 'N/A')
+                            neighbor_desc = neighbor.get('description', '').strip()
+                            
+                            # Truncate description if needed
+                            if neighbor_desc and len(neighbor_desc) > desc_limit:
+                                neighbor_desc = neighbor_desc[:desc_limit].rstrip() + "..."
+                            
+                            # Extract relationship information
+                            relation_name = relation.get('name', 'terkait dengan')
+                            direction = relation.get('direction', 'OUTGOING')
 
-          # 2. Build full path fact string
-          if len(nodes) >= 2 and len(rels) >= 1:
-              path_str = ""
-              for i in range(len(rels)):
-                  source = nodes[i]["name"]
-                  target = nodes[i + 1]["name"]
-                  relation = rels[i].get("name", "terhubung")
-                  direction = rels[i].get("direction", "OUTGOING")
+                            # Build description part
+                            desc_part = f" | {neighbor_desc}" if neighbor_desc else ""
+                            
+                            # Build relationship line based on direction
+                            if direction == 'OUTGOING':
+                                line = f"  {central_name} --[{relation_name}]--> {neighbor_name} ({neighbor_type}){desc_part}"
+                            else:
+                                line = f"  {neighbor_name} ({neighbor_type}) --[{relation_name}]--> {central_name}{desc_part}"
+                            
+                            block.append(line)
+                            
+                        except Exception as e:
+                            logger.warning(f"Error processing neighbor in item {item_idx}: {e}")
+                            continue
+                
+                knowledge_blocks.append("\n".join(block))
+                
+            except Exception as e:
+                logger.error(f"Error processing graph item {item_idx}: {e}")
+                continue
 
-                  if direction == "OUTGOING":
-                      path_str += f"{source} --[{relation}]--> "
-                  else:
-                      path_str += f"{target} <--[{relation}]-- "
+        if not knowledge_blocks:
+            return ""
 
-              path_str += nodes[-1]["name"]
-              fact_lines.add(path_str)
-
-      # Merge all output
-      description_str = "Deskripsi:\n" + "\n".join(
-          f"{name}: {desc}" for name, desc in description.items()
-      )
-      fakta_str = "Fakta:\n" + "\n".join(sorted(fact_lines))
-
-      return f"{description_str}\n\n{fakta_str}"
+        return "Informasi dari knowledge graph:\n\n" + "\n\n".join(knowledge_blocks)
+        
     except Exception as e:
-       logger.error(f"Fail to parse path response: {e}")
-       return ""
+        logger.error(f"Failed to parse central-neighbor graph: {e}")
+        return ""
+
+def parse_full_path_knowledge(paths: list[dict]) -> str:
+    """
+    Enhanced version with detailed logging and error handling.
+    """
+    try:
+        descriptions = {}
+        fact_lines = set()
+        
+        logger.info(f"Processing {len(paths)} paths")
+
+        for path_idx, path in enumerate(paths):
+            try:
+                nodes = path.get("path_nodes", [])
+                rels = path.get("path_rels", [])
+                
+                logger.debug(f"Path {path_idx}: {len(nodes)} nodes, {len(rels)} relationships")
+
+                # Validate path structure
+                if not nodes:
+                    logger.warning(f"Path {path_idx}: No nodes found")
+                    continue
+                    
+                if len(nodes) >= 2 and len(rels) != len(nodes) - 1:
+                    logger.warning(f"Path {path_idx}: Mismatch between nodes ({len(nodes)}) and relationships ({len(rels)})")
+
+                # 1. Collect descriptions
+                for node_idx, node in enumerate(nodes):
+                    name = node.get("name", "").strip()
+                    desc = node.get("description", "").strip()
+                    node_type = node.get("type", "")
+                    
+                    if not name:
+                        logger.warning(f"Path {path_idx}, Node {node_idx}: Missing name")
+                        continue
+                        
+                    if desc and name not in descriptions:
+                        descriptions[name] = desc
+                        logger.debug(f"Added description for '{name}': {desc[:50]}...")
+
+                # 2. Build path fact
+                if len(nodes) >= 2 and rels:
+                    path_components = []
+                    
+                    for i in range(min(len(rels), len(nodes) - 1)):
+                        # Current node
+                        current_node = nodes[i].get("name", "").strip()
+                        if not current_node:
+                            logger.warning(f"Path {path_idx}: Empty node name at position {i}")
+                            current_node = f"Node_{i}"
+                        
+                        path_components.append(current_node)
+                        
+                        # Relationship
+                        relation = rels[i].get("name", "terhubung").strip() or "terhubung"
+                        direction = rels[i].get("direction", "OUTGOING")
+                        
+                        if direction == "OUTGOING":
+                            path_components.append(f"--[{relation}]-->")
+                        else:
+                            path_components.append(f"<--[{relation}]--")
+                    
+                    # Final node
+                    final_node = nodes[-1].get("name", "").strip()
+                    if final_node:
+                        path_components.append(final_node)
+                    else:
+                        logger.warning(f"Path {path_idx}: Empty final node name")
+                        path_components.append("Node_final")
+                    
+                    # Create path string
+                    path_str = " ".join(path_components)
+                    fact_lines.add(path_str)
+                    logger.debug(f"Added path fact: {path_str}")
+                    
+            except Exception as e:
+                logger.error(f"Error processing path {path_idx}: {e}")
+                continue
+
+        # Format output
+        result_parts = []
+        
+        if descriptions:
+            desc_lines = [f"{name}: {desc}" for name, desc in sorted(descriptions.items())]
+            result_parts.append("Deskripsi:\n" + "\n".join(desc_lines))
+            logger.info(f"Added {len(descriptions)} descriptions")
+        
+        if fact_lines:
+            result_parts.append("Fakta:\n" + "\n".join(sorted(fact_lines)))
+            logger.info(f"Added {len(fact_lines)} facts")
+        
+        result = "\n\n".join(result_parts) if result_parts else ""
+        logger.info(f"Generated knowledge string: {len(result)} characters")
+        
+        return result
+        
+    except Exception as e:
+        logger.error(f"Failed to parse path response: {e}")
+        return ""
 
 
 class GetAnswerBody(BaseModel):
   query: str
-  method: Literal[
-     'semantic_neighbor',
-     'semantic_shortest_path',
-     'entity_neighbor',
-     'entity_shortest_path'
-     ] = 'entity_neighbor'
+  graph_traversal: Literal[
+     'neighbor_expansion',
+     'n-shortest_path',
+     'auto'
+     ] = 'auto'
+  search_method: Literal['vector', 'auto'] = 'auto'
   max_hop: Optional[int] = 10
   limit: Optional[int] = 50
-  top_k: Optional[int] = 10
+  top_k: Optional[int] = 3
 
 @router.post("/get-answer")
 async def get_answer(
@@ -165,50 +309,65 @@ async def get_answer(
   llm_service: LLMService = Depends(get_llm_service)
 ):
   try:
-    query   = body.query
-    method  = body.method
-    max_hop = body.max_hop
-    limit   = body.limit
-    top_k   = body.top_k
+    start = time.perf_counter()
+
+    query           = body.query
+    graph_traversal = body.graph_traversal
+    max_hop         = body.max_hop
+    limit           = body.limit
+    top_k           = body.top_k
+    search_method   = body.search_method
 
     query_class  = await llm_service.query_classification(query=query)
     candidate_entities = query_class.get("entities", [])
-
-    method_map = {
-      'semantic_neighbor': graph_service.SemanticNeighborSearch,
-      'semantic_shortest_path': graph_service.SemanticAllShortestPath,
-      'entity_neighbor': graph_service.EntityBasedNeighborSearch,
-      'entity_shortest_path': graph_service.EntityBasedAllShortestPath
-    }
+    query_category = query_class.get("category", "entity_query")
 
     result: dict      = {}
     graph: list[dict] = []
     knowledge: list   = ""
 
-    if method == "semantic_neighbor":
-      graph = await graph_service.SemanticNeighborSearch(query=query, top_k=top_k)
-      knowledge = extract_one_hop_bfs_graph_to_knowlwdge(graph=graph)
+    if graph_traversal != "auto":
+        graph_traversal_map = {
+            "neighbor_expansion": lambda: graph_service.NeighborExpansion(query=query, candidate_entities=candidate_entities, limit=limit, top_k=top_k, search_method=search_method),
+            "n-shortest_path": lambda: graph_service.N_ShortestPath(query=query, candidate_entities=candidate_entities, max_hop=max_hop, paths_per_group=5, top_k=top_k, search_method=search_method),
+        }
 
-    elif method == "semantic_shortest_path":
-      graph = await graph_service.SemanticAllShortestPath(query=query, max_hop = max_hop, limit= limit, top_k=top_k)
-      knowledge = parse_full_path_knowledge(paths=graph)
+        if graph_traversal not in graph_traversal_map:
+            raise HTTPException(status_code=400, detail=f"Unknown graph_traversal method: {graph_traversal}")
 
-    elif method == "entity_neighbor":
-      graph = await graph_service.EntityBasedNeighborSearch(query=query, candidate_entities=candidate_entities, limit=limit)
-      knowledge = transform_graph_to_knowledge_text(graph_results=graph, desc_limit=100)
+        graph = await graph_traversal_map[graph_traversal]()
 
-    elif method == "entity_shortest_path":
-      graph = await graph_service.EntityBasedAllShortestPath(query=query, candidate_entities=candidate_entities, max_hop=10, limit=50)
-      knowledge = parse_full_path_knowledge(paths=graph)
+        # Parsing step
+        if graph_traversal == 'neighbor_expansion':
+            knowledge = transform_graph_to_knowledge_text(graph_results=graph, desc_limit=1000)
+        else:
+            knowledge = parse_full_path_knowledge(paths=graph)
+
     else:
-       raise HTTPException(status_code=400, detail=f"Unknown method: {method}") 
+        if query_category == "path_query":
+            graph = await graph_service.N_ShortestPath(query=query, candidate_entities=candidate_entities, max_hop=max_hop, paths_per_group=5, top_k=top_k, search_method=search_method)
+            if len(graph) <= 0:
+                graph = await graph_service.NeighborExpansion(query=query, candidate_entities=candidate_entities, limit=limit, top_k=top_k, search_method=search_method)
+                knowledge = transform_graph_to_knowledge_text(graph_results=graph, desc_limit=1000)
+                graph_traversal = "neighbor_expansion"
+                logger.warning("Failed to find path, fallback to neighbor expansion")
+            else:
+                knowledge = parse_full_path_knowledge(paths=graph)
+                graph_traversal = "n-shortest_path"
+        else:
+            graph = await graph_service.NeighborExpansion(query=query, candidate_entities=candidate_entities, limit=limit, top_k=top_k, search_method=search_method)
+            knowledge = transform_graph_to_knowledge_text(graph_results=graph, desc_limit=1000)
+            graph_traversal = "neighbor_expansion"
+
 
     answer = await llm_service.answer_query_with_knowledge_retrieval(query=query, knowledge=knowledge)
-    result['method']      = method
-    result['query_class'] = query_class
-    result['answer']      = answer
-    result['knowledge']   = knowledge
-    result['graph']       = graph
+    end = time.perf_counter()
+    result['latency']           = round(end-start, 4)
+    result['graph_traversal']   = graph_traversal
+    result['query_class']       = query_class
+    result['answer']            = answer
+    result['knowledge']         = knowledge
+    result['graph']             = graph
 
 
     return{

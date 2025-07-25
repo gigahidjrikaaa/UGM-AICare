@@ -25,17 +25,17 @@ class DataIngestion:
     def __init__(self):
         pass
 
-    def extract_text_from_files(self, file_path: str, type: Literal["pdf", "docx", "html"]) -> list[str]:
+    def extract_text_from_files(self, file_path: str, type: Literal["pdf", "docx", "html"], split: bool = True) -> list[str]:
         logger.info("Start Text Extraction")
         if type == "pdf":
-            return self.__extract_text_from_pdf(file_path=file_path)
+            return self.__extract_text_from_pdf(file_path=file_path, split = split)
         if type == "docx":
-            return self.__extract_text_from_docx(docx_path=file_path)
+            return self.__extract_text_from_docx(docx_path=file_path, split = split)
         if type == "html":
-            return self.__extract_text_from_html(file_path=file_path)
+            return self.__extract_text_from_html(file_path=file_path, split = split)
         
     @staticmethod
-    def __extract_text_from_html(file_path: str) -> list[str]:
+    def __extract_text_from_html(file_path: str, split: bool = True) -> list[str]:
         """
         Extract clean text from HTML content, removing all tags and styling.
         
@@ -316,14 +316,19 @@ class DataIngestion:
         
         try:
             parser = HTMLTextExtractor()
-            f =  open(f"./data/{file_path}", "r")
+            f =  open(f"./data/{file_path}", "r", encoding='utf-8')
             parser.feed(f.read())
-            sections = parser.get_sections()
+
+            result = []
+            if (not split):
+                result  = [parser.get_text()]
+            else:
+                result  = parser.get_sections()
             
-            return sections
+            return result
             
         except Exception as e:
-            logger.error(f"Fail to extract PDF file {e}")
+            logger.error(f"Fail to extract HTML file {e}")
             return []
         finally:
             f.close()
@@ -331,8 +336,8 @@ class DataIngestion:
 
 
     @staticmethod
-    def __extract_text_from_pdf(file_path: str) -> list[str] :
-        """Extract raw text from  PDF file"""
+    def __extract_text_from_pdf(file_path: str, split: bool = True) -> list[str] :
+        """Extract raw text from  PDF file return text per page as list"""
 
         try:
             text = []
@@ -340,6 +345,9 @@ class DataIngestion:
             with pymupdf.open(stream=file_byte.read(), filetype="pdf") as doc:
                 for page in doc:
                     text.append(page.get_text())
+            
+            if (not split):
+                return "\n\n".join(text)
             return text
         except Exception as e:
             logger.error(f"Failed to extract PDF: {e}")
@@ -348,7 +356,7 @@ class DataIngestion:
             file_byte.close()
 
     @staticmethod
-    def __extract_text_from_docx(docx_path: str) -> list[str]:
+    def __extract_text_from_docx(docx_path: str, split: bool = True) -> list[str]:
         """
         Extract clean text from DOCX content, handling paragraphs, tables, and headers.
         
@@ -551,11 +559,14 @@ class DataIngestion:
             
             extractor = DocxTextExtractor()
             extractor.extract_from_document(doc)
-            
-            sections = extractor.get_sections()
-            
-            return sections
-            
+
+            result = []
+
+            if (not split):
+                result = [extractor.get_text()]
+            else:
+                result = extractor.get_sections()
+            return result
         except Exception as e:
             logger.error("Fail to extract DOCX file")
             return []
