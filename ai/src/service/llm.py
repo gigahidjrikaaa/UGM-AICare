@@ -5,7 +5,7 @@ import re
 import json
 import logging
 from pydantic import BaseModel
-from typing import List
+from typing import List, Dict
 
 from src.config import Config
 from src.model.schema import Entity, Relation, EntityRelationResponse, EvaluationDataset
@@ -113,6 +113,51 @@ class LLMService:
             return response.candidates[0].content.parts[0].text
         except Exception as e:
             logger.error(f"Failed to answer question: {e}")
+    
+    async def generate_response_rag_vector(self, query: str, retrieved_docs: List[Dict]) -> str:
+        """Generate response using OpenAI API"""
+        try:
+            # Combine retrieved documents
+            context = "\n\n".join([
+                f"Source: {doc['metadata'].get('source', 'Unknown')}\n{doc['content']}" 
+                for doc in retrieved_docs
+            ])
+
+            prompt = f"""
+            Berdasarkan konteks berikut, jawab pertanyannya pada Kueri
+            Konteks:
+            {context}
+
+            Kueri:
+            {query}
+            """
+
+            config = types.GenerateContentConfig(
+                system_instruction="""
+                Kamu adalah chatbot kesehatan mental yang akan menjawab pertanyaan seputar topik kesehatan mental.
+                Akan disediakan kueri yang berupa pertanyaan pengguna dan Komteks yang berupa pengetahuan tambahan untuk menjawab pertanyaan.
+                Jawab pertanyaan secara langsung tanpa pernyataan seperti "Berdasarkan konteks yang diberikan"
+                """
+            )
+
+            content = types.Content(
+                role    = "user",
+                parts   = [
+                    types.Part.from_text(text = prompt)
+                    ]
+            )
+            
+            # Call OpenAI API
+            response = self.client.models.generate_content(
+                model       = "gemini-2.5-flash",
+                contents    = content,
+                config      = config,
+            )
+            return response.candidates[0].content.parts[0].text
+            
+        except Exception as e:
+            print(f"Error generating response: {e}")
+            return f"Sorry, I encountered an error while generating the response: {str(e)}"
 
     async def extract_entities(self, text: str) -> list[dict]:
         """Extract entites within document using LLM approaches"""

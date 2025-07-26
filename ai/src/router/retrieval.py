@@ -1,17 +1,21 @@
 from fastapi import APIRouter, HTTPException, Depends, Body
 import logging
 import time
-from typing import Literal, Optional
+from typing import Literal, Optional, List, Dict
 from pydantic import BaseModel
 
 from src.service.llm import LLMService
 from src.service.graph import GraphService
+from src.service.vector_db_service import VectorDBService
 
 async def get_llm_service():
   return LLMService()
 
 async def get_graph_service():
   return GraphService(llm_service=await get_llm_service())
+
+async def get_vector_service():
+  return VectorDBService(llm_service = await get_llm_service())
 
 
 logger = logging.getLogger(__name__)
@@ -378,3 +382,84 @@ async def get_answer(
   except Exception as e:
     logger.error(f"Error Get answer{e}")
     raise HTTPException(500, detail=str(e))
+
+class QueryRequest(BaseModel):
+    question: str
+    top_k: Optional[int] = 5
+    filter_metadata: Optional[Dict] = None
+
+class RetrievedDocument(BaseModel):
+    id: str
+    score: float
+    content: str
+    metadata: Dict
+
+class QueryResponse(BaseModel):
+    question: str
+    answer: str
+    retrieved_documents: List[RetrievedDocument]
+    sources: List[str]
+    confidence_scores: List[float]
+    latency: float
+
+
+class GetAnswerRAGVectorBody(BaseModel):
+    query: str
+    top_k: int = 5
+
+@router.post("/get-answer-vector-rag")
+async def get_answer_rag_vector(
+    body: GetAnswerRAGVectorBody = Body(...),
+    vector_service: VectorDBService = Depends(get_vector_service),
+    llm_service: LLMService = Depends(get_llm_service)
+):
+    try:
+        start = time.perf_counter()
+        query = body.query
+        top_k = body.top_k
+        # Retrieve similar documents
+        retrieved_docs = await vector_service.retrieve_similar_documents(
+            query=query,
+            top_k=top_k
+        )
+        
+        if not retrieved_docs:
+            raise HTTPException(
+                status_code=404, 
+                detail="No relevant documents found for the query"
+            )
+        
+        # Generate response
+        answer = await llm_service.generate_response_rag_vector(query=query, retrieved_docs=retrieved_docs)
+        
+        # Format response
+        retrieved_documents = [
+            RetrievedDocument(
+                id=doc["id"],
+                score=doc["score"],
+                content=doc["content"],
+                metadata=doc["metadata"]
+            )
+            for doc in retrieved_docs
+        ]
+        
+        sources = list(set([
+            doc["metadata"].get("source", "Unknown") 
+            for doc in retrieved_docs
+        ]))
+        
+        confidence_scores = [doc["score"] for doc in retrieved_docs]
+        end = time.perf_counter()
+        
+        return QueryResponse(
+            question=query,
+            answer=answer,
+            retrieved_documents=retrieved_documents,
+            sources=sources,
+            confidence_scores=confidence_scores,
+            latency=round(end-start, 4)
+        )
+
+    except Exception as e:
+        logger.error(f"Error Get answer{e}")
+        raise HTTPException(500, detail=str(e))
