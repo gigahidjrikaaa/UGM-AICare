@@ -12,7 +12,7 @@
 
 ### Local Development
 
-#### **Clone and Setup**:
+#### **Clone and Setup**
 
 ```bash
 git clone https://github.com/yourusername/UGM-AICare.git
@@ -21,7 +21,7 @@ cp .env.example .env
 # Configure environment variables
 ```
 
-#### **Backend Setup**:
+#### **Backend Setup**
 
 ```bash
 cd backend
@@ -32,7 +32,7 @@ alembic upgrade head
 uvicorn app.main:app --reload
 ```
 
-#### **Frontend Setup**:
+#### **Frontend Setup**
 
 ```bash
 cd frontend
@@ -40,7 +40,7 @@ pnpm install
 pnpm dev
 ```
 
-#### **Services via Docker**:
+#### **Services via Docker**
 
 ```bash
 docker compose up -d db redis
