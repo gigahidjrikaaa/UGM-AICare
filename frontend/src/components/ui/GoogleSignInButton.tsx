@@ -2,8 +2,7 @@
 
 import { signIn, signOut } from "next-auth/react";
 import { useState } from "react";
-import { FaGoogle } from "react-icons/fa";
-import { FiChevronDown, FiUserPlus } from "react-icons/fi";
+import { FaGoogle, FiChevronDown, FiUserPlus } from "@/icons";
 import { motion, AnimatePresence } from "framer-motion";
 
 interface GoogleSignInButtonProps {

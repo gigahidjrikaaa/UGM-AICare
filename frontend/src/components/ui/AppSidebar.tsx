@@ -6,12 +6,18 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
 import {
-    BsChatDots, BsCalendar, BsQuestionCircle} from 'react-icons/bs';
-import {
-    FiActivity, FiUsers, FiPieChart, FiSettings, FiBookOpen, FiUser // Added FiUser
-} from 'react-icons/fi'; // Assuming FiActivity for Journaling
+  BsChatDots, 
+  BsCalendar, 
+  BsQuestionCircle,
+  FiActivity, 
+  FiUsers, 
+  FiPieChart, 
+  FiSettings, 
+  FiBookOpen, 
+  FiUser,
+  HiX
+} from '@/icons';
 import AccountLinker from '@/components/AccountLinker';
-import { HiX } from 'react-icons/hi';
 
 // Interface for navigation items, adding optional admin flag
 interface NavItem {

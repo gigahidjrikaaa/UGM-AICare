@@ -1,5 +1,15 @@
 import React from 'react';
-import { FiPhone, FiMapPin, FiGlobe, FiMessageSquare, FiMail, FiUsers, FiClock, FiInfo, FiExternalLink } from 'react-icons/fi';
+import { 
+  FiPhone, 
+  FiMapPin, 
+  FiGlobe, 
+  FiMessageSquare, 
+  FiMail, 
+  FiUsers, 
+  FiClock, 
+  FiInfo, 
+  FiExternalLink 
+} from '@/icons';
 import Image from 'next/image';
 
 export interface ResourceCardProps {

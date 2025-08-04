@@ -6,7 +6,15 @@ import { useSession, signIn } from "next-auth/react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { FiMail, FiLock, FiEye, FiEyeOff, FiAlertCircle, FiLogIn, FiShield } from "react-icons/fi";
+import { 
+  FiMail, 
+  FiLock, 
+  FiEye, 
+  FiEyeOff, 
+  FiAlertCircle, 
+  FiLogIn, 
+  FiShield 
+} from "@/icons";
 
 export default function SignIn() {
   const router = useRouter();

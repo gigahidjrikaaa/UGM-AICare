@@ -4,7 +4,13 @@ import { useState } from "react";
 import Image from "next/image";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { FiMail, FiAlertCircle, FiSend, FiArrowLeft, FiCheckCircle } from "react-icons/fi";
+import { 
+  FiMail, 
+  FiAlertCircle, 
+  FiSend, 
+  FiArrowLeft, 
+  FiCheckCircle 
+} from "@/icons";
 
 export default function ForgotPassword() {
   const [email, setEmail] = useState("");

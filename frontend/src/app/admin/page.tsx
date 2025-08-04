@@ -4,7 +4,19 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { FiLock, FiMail, FiAlertCircle, FiLogIn, FiEye, FiEyeOff, FiInfo, FiShield, FiUsers, FiBarChart, FiSettings } from "react-icons/fi";
+import { 
+  FiLock, 
+  FiMail, 
+  FiAlertCircle, 
+  FiLogIn, 
+  FiEye, 
+  FiEyeOff, 
+  FiInfo, 
+  FiShield, 
+  FiUsers, 
+  FiBarChart, 
+  FiSettings 
+} from "@/icons";
 import { signIn, useSession } from "next-auth/react";
 import Image from "next/image";
 

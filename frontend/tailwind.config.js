@@ -30,41 +30,34 @@ module.exports = {
         sans: ['Inter', 'sans-serif'],
       },
       animation: {
-        'border-spin': 'borderSpin 3s linear infinite', // Keep if used elsewhere
-        'lightning-border': 'lightningKeyframes 1.2s infinite linear', // New lightning animation
-        'aurora-flow': 'auroraKeyframes 15s ease infinite', // New aurora animation
+        // Simplified animations for better build performance
+        'fade-in': 'fadeIn 0.6s ease-out forwards',
+        'slide-up': 'slideUp 0.6s ease-out forwards',
+        'float': 'float 3s ease-in-out infinite',
+        'pulse-slow': 'pulse 3s ease-in-out infinite',
+        'border-spin': 'borderSpin 3s linear infinite',
+        'lightning-border': 'lightningBorder 2s linear infinite',
       },
       keyframes: {
+        // Simplified keyframes for better performance
+        fadeIn: {
+          '0%': { opacity: '0', transform: 'translateY(10px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' }
+        },
+        slideUp: {
+          '0%': { opacity: '0', transform: 'translateY(20px)' },
+          '100%': { opacity: '1', transform: 'translateY(0)' }
+        },
+        float: {
+          '0%, 100%': { transform: 'translateY(0)' },
+          '50%': { transform: 'translateY(-10px)' }
+        },
         borderSpin: {
-          'to': {
-            '--angle': '360deg',
-          },
+          'to': { '--angle': '360deg' }
         },
-        auroraKeyframes: {
-          '0%, 100%': { backgroundPosition: '0% 50%' },
-          '50%': { backgroundPosition: '100% 50%' },
-        },
-        lightningKeyframes: { // Renamed from cracklingBorder back to lightningKeyframes if you changed it
-          '0%':   { '--angle': '0deg', opacity: 0.85 },
-          '10%':  { '--angle': '36deg', opacity: 1 },    // Move
-          '12%':  { '--angle': '33deg', opacity: 0.75 }, // Jitter back, dip opacity
-          '15%':  { '--angle': '54deg', opacity: 0.95 }, // Move forward
-          '25%':  { '--angle': '90deg', opacity: 1 },    // Move
-          '27%':  { '--angle': '85deg', opacity: 0.8 },  // Jitter back
-          '30%':  { '--angle': '108deg', opacity: 0.9 }, // Move forward
-          '40%':  { '--angle': '144deg', opacity: 1 },   // Move
-          '42%':  { '--angle': '140deg', opacity: 0.7 }, // Jitter back, dip
-          '45%':  { '--angle': '162deg', opacity: 0.95 },// Move forward
-          '55%':  { '--angle': '198deg', opacity: 1 },   // Move
-          '57%':  { '--angle': '195deg', opacity: 0.85 },// Jitter back
-          '60%':  { '--angle': '216deg', opacity: 0.9 }, // Move forward
-          '70%':  { '--angle': '252deg', opacity: 1 },   // Move
-          '72%':  { '--angle': '248deg', opacity: 0.75 },// Jitter back, dip
-          '75%':  { '--angle': '270deg', opacity: 0.95 },// Move forward
-          '85%':  { '--angle': '306deg', opacity: 1 },   // Move
-          '87%':  { '--angle': '300deg', opacity: 0.8 }, // Jitter back
-          '90%':  { '--angle': '324deg', opacity: 0.9 }, // Move forward
-          '100%': { '--angle': '360deg', opacity: 0.85 },
+        lightningBorder: {
+          '0%, 100%': { '--angle': '0deg' },
+          '50%': { '--angle': '180deg' }
         }
       },
     },

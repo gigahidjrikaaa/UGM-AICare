@@ -5,7 +5,7 @@ import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { HiMenu, HiChevronDown } from "react-icons/hi";
+import { HiMenu, HiChevronDown } from "@/icons";
 // --- Import the new MobileNavMenu ---
 import MobileNavMenu from './MobileNavMenu';
 import ProfileDropdown from './ProfileDropdown';

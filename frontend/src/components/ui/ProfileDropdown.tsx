@@ -5,8 +5,15 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import Image from 'next/image';
 import type { Session } from 'next-auth'; // Import Session type
-import { FiLogOut, FiUser, FiSettings, FiHelpCircle, FiActivity } from "react-icons/fi"; // Add required icons
-import { BsChatDots, BsCalendar } from 'react-icons/bs'; // Add required icons
+import { 
+  FiLogOut, 
+  FiUser, 
+  FiSettings, 
+  FiHelpCircle, 
+  FiActivity,
+  BsChatDots, 
+  BsCalendar 
+} from "@/icons";
 
 // Define props for the component
 interface ProfileDropdownProps {

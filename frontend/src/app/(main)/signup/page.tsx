@@ -4,7 +4,15 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { FiMail, FiLock, FiUser, FiPhone, FiCalendar, FiMapPin, FiBook } from "react-icons/fi";
+import { 
+  FiMail, 
+  FiLock, 
+  FiUser, 
+  FiPhone, 
+  FiCalendar, 
+  FiMapPin, 
+  FiBook 
+} from "@/icons";
 import ParticleBackground from "@/components/ui/ParticleBackground";
 
 export default function SignUp() {

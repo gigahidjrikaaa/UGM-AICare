@@ -2,8 +2,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '@/services/api';
 import Image from 'next/image';
-import { FiLoader, FiAward, FiHelpCircle, FiRefreshCw } from 'react-icons/fi';
-import { Tooltip } from '@mui/material';
+import { FiLoader, FiAward, FiHelpCircle, FiRefreshCw } from '@/icons';
+import { Tooltip } from '@/components/ui/Tooltip';
 import toast from 'react-hot-toast';
 
 // Import from the new constants file
@@ -248,7 +248,7 @@ export default function EarnedBadgesDisplay() {
                     );
 
                     return (
-                        <Tooltip title={tooltipTitle} arrow placement="top" key={badgeId} className='relative z-[5]'>
+                        <Tooltip title={tooltipTitle} placement="top" key={badgeId} className='relative z-[5]'>
                             <InteractiveBadgeCard
                                 className={isEarned ? unlockedCardClasses : lockedCardClasses}
                                 href={isEarned ? explorerUrl : undefined}

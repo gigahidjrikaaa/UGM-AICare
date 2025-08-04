@@ -3,9 +3,15 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
-import { HiX } from 'react-icons/hi';
-import { BsChatDots, BsCalendar, BsQuestionCircle } from 'react-icons/bs';
-import { FiActivity, FiBookOpen, FiInfo } from 'react-icons/fi'; // Assuming FiInfo for About
+import { 
+  HiX, 
+  BsChatDots, 
+  BsCalendar, 
+  BsQuestionCircle, 
+  FiActivity, 
+  FiBookOpen, 
+  FiInfo 
+} from '@/icons';
 import AccountLinker from '@/components/AccountLinker'; //
 
 // Define props for the component

@@ -4,16 +4,14 @@ const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
   
-  // External packages configuration (moved from experimental)
-  serverExternalPackages: [],
+  // Bundle optimization
+  experimental: {
+    // Optimize package imports for better tree shaking
+    optimizePackageImports: ['framer-motion', 'react-icons', 'date-fns'],
+  },
   
-  // Development server configuration
-  ...(process.env.NODE_ENV === 'development' && {
-    // Configure allowed dev origins for cross-origin requests
-    experimental: {
-      allowedDevOrigins: ['127.0.0.1:3000', 'localhost:3000'],
-    },
-  }),
+  // External packages configuration
+  serverExternalPackages: [],
   
   images: {
     // Optimize all images, including remote ones
@@ -43,6 +41,12 @@ const nextConfig = {
     unoptimized: false,
     // Increase image format options
     formats: ['image/webp']
+  },
+  
+  // Help prevent hydration issues
+  compiler: {
+    // Remove console.logs in production
+    removeConsole: process.env.NODE_ENV === 'production',
   },
 };
 

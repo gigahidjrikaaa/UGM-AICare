@@ -4,9 +4,15 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect } from 'react';
 import { motion, useScroll, useTransform } from 'framer-motion';
-import { FaComments, FaHeartbeat, FaLock, FaArrowRight } from 'react-icons/fa';
-import { HiChevronRight } from 'react-icons/hi';
-import { FiPhone, FiHeart } from 'react-icons/fi'; // Added FiAlertTriangle, FiPhone, FiHeart
+import { 
+  FaComments, 
+  FaHeartbeat, 
+  FaLock, 
+  FaArrowRight,
+  HiChevronRight,
+  FiPhone, 
+  FiHeart 
+} from '@/icons';
 import GoogleSignInButton from '@/components/ui/GoogleSignInButton';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 
