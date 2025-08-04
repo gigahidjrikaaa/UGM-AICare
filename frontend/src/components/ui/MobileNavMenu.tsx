@@ -91,28 +91,34 @@ export default function MobileNavMenu({ isOpen, onClose }: MobileNavMenuProps) {
                       onClick={onClose}
                       className="flex items-center px-4 py-4 rounded-2xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-300 group relative overflow-hidden"
                     >
-                      <motion.div
-                        className="absolute inset-0 bg-gradient-to-r from-white/5 to-white/8 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300"
-                        whileHover={{ 
-                          boxShadow: "0 0 20px rgba(255,202,64,0.15), inset 0 1px 0 rgba(255,255,255,0.05)"
-                        }}
-                      />
-                      <motion.span 
-                        className="mr-4 flex-shrink-0 text-white/60 group-hover:text-[#FFCA40] transition-colors duration-300 relative z-10"
-                        whileHover={{ scale: 1.2 }}
-                      >
-                        {item.icon}
-                      </motion.span>
-                      <span className="truncate font-medium relative z-10">{item.label}</span>
-                      <motion.div
-                        className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300 relative z-10"
-                        initial={{ x: -10 }}
-                        whileHover={{ x: 0 }}
-                      >
-                        <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
-                      </motion.div>
+                      <span className="flex items-center w-full relative">
+                        {/* Background gradient */}
+                        <motion.div
+                          className="absolute inset-0 bg-gradient-to-r from-white/5 to-white/8 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300"
+                          whileHover={{ 
+                            boxShadow: "0 0 20px rgba(255,202,64,0.15), inset 0 1px 0 rgba(255,255,255,0.05)"
+                          }}
+                        />
+                        {/* Icon */}
+                        <motion.span 
+                          className="mr-4 flex-shrink-0 text-white/60 group-hover:text-[#FFCA40] transition-colors duration-300 relative z-10"
+                          whileHover={{ scale: 1.2 }}
+                        >
+                          {item.icon}
+                        </motion.span>
+                        {/* Label */}
+                        <span className="truncate font-medium relative z-10">{item.label}</span>
+                        {/* Arrow */}
+                        <motion.span
+                          className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300 relative z-10 flex items-center"
+                          initial={{ x: -10 }}
+                          whileHover={{ x: 0 }}
+                        >
+                          <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                          </svg>
+                        </motion.span>
+                      </span>
                     </Link>
                   </motion.li>
                 ))}
