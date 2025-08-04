@@ -111,10 +111,53 @@ export const authOptions: NextAuthOptions = {
       }
     }),
 
+    // Add a credentials provider for regular user login
+    CredentialsProvider({
+      id: "credentials",
+      name: "Email and Password",
+      credentials: {
+        email: { label: "Email", type: "email" },
+        password: { label: "Password", type: "password" }
+      },
+      async authorize(credentials) {
+        // On the server, prefer the internal URL for container-to-container communication.
+        // Fall back to the public URL for other environments (e.g., local development without Docker).
+        const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+
+        try {
+          // Call backend endpoint for regular user authentication
+          const res = await fetch(`${apiUrl}/api/v1/auth/user/login`, {
+            method: 'POST',
+            body: JSON.stringify({
+              email: credentials?.email,
+              password: credentials?.password,
+            }),
+            headers: { "Content-Type": "application/json" }
+          });
+
+          const user = await res.json();
+
+          if (res.ok && user) {
+            return {
+              id: user.id,
+              email: user.email,
+              name: user.name || user.email,
+              role: user.role || "user",
+              image: user.image || null
+            };
+          }
+          return null;
+        } catch (e) {
+          console.error("Regular user authorize error:", e);
+          return null;
+        }
+      }
+    }),
+
     // Add a credentials provider for admin login
     CredentialsProvider({
       id: "admin-login",
-      name: "Credentials",
+      name: "Admin Credentials",
       credentials: {
         email: { label: "Email", type: "text" },
         password: { label: "Password", type: "password" }
@@ -168,6 +211,16 @@ export const authOptions: NextAuthOptions = {
         token.role = user.role;
         // console.log("JWT Callback: Admin user signed in. Token populated:", token);
         return token; // Return early, no backend sync needed for admin
+      }
+
+      // Handle regular credentials user sign-in
+      if (account?.provider === 'credentials' && user) {
+        token.id = user.id;
+        token.email = user.email;
+        token.name = user.name;
+        token.role = user.role || 'user';
+        // console.log("JWT Callback: Regular user signed in. Token populated:", token);
+        return token; // Return early, user already authenticated by backend
       }
 
       const isSignIn = !!(account && user);

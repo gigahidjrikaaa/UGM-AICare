@@ -17,8 +17,8 @@ export async function middleware(request: NextRequest) {
     }
   }
 
-  // Redirect authenticated users away from login page
-  if (pathname.startsWith('/signin') && session) {
+  // Redirect authenticated users away from login pages
+  if ((pathname.startsWith('/signin') || pathname.startsWith('/signin-ugm')) && session) {
     return NextResponse.redirect(new URL('/aika', request.url));
   }
 
@@ -32,5 +32,5 @@ export async function middleware(request: NextRequest) {
 
 // See: https://nextjs.org/docs/app/building-your-application/routing/middleware#matcher
 export const config = {
-  matcher: ['/admin/dashboard/:path*', '/signin', '/aika/:path*'],
+  matcher: ['/admin/dashboard/:path*', '/signin', '/signin-ugm', '/aika/:path*'],
 };
