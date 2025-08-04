@@ -110,7 +110,7 @@ services:
       # aicare_network:
       #   ipv4_address: 10.10.1.114
       internal_network: {} # Also on the internal network to talk to db/redis
-      shared_services_network: {} # Attached to shared network to talk to gemma_service
+      # shared_services_network: {} # Commented out - Attached to shared network to talk to gemma_service
 
   #################
   # Frontend (Next.js)
@@ -143,6 +143,8 @@ services:
     depends_on:
       - backend # Optional, if frontend needs backend to be up for some server-side rendering logic
     restart: unless-stopped
+    networks:
+      - internal_network # Add frontend to the same network as backend
     # The command is now handled by CMD in the Dockerfile's production stage
     # networks:
     #   aicare_network:

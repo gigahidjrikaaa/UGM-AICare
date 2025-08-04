@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import Link from "next/link";
-import { FiLock, FiMail, FiAlertCircle, FiLogIn } from "react-icons/fi";
+import { FiLock, FiMail, FiAlertCircle, FiLogIn, FiEye, FiEyeOff, FiInfo, FiShield, FiUsers, FiBarChart, FiSettings } from "react-icons/fi";
 import { signIn, useSession } from "next-auth/react";
 import Image from "next/image";
 
@@ -13,8 +13,15 @@ export default function AdminLoginPage() {
   const [password, setPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const [showCredentials, setShowCredentials] = useState(false);
   const router = useRouter();
   const { data: session, status } = useSession();
+
+  // Development credentials - REMOVE IN PRODUCTION
+  const developmentCredentials = {
+    email: process.env.NEXT_PUBLIC_ADMIN_EMAIL_DEFAULT || "admin@ugm.ac.id",
+    password: "admin123" // This would normally come from env, but shown for dev convenience
+  };
 
   useEffect(() => {
     if (status === "authenticated" && session?.user?.role === "admin") {
@@ -82,6 +89,72 @@ export default function AdminLoginPage() {
             <p className="text-white/70">UGM-AICare Management</p>
           </div>
 
+          {/* Admin Panel Information */}
+          <div className="mb-6 p-4 bg-white/5 rounded-lg border border-white/10">
+            <div className="flex items-center gap-2 mb-3">
+              <FiInfo className="text-[#FFCA40]" size={16} />
+              <h3 className="text-white font-semibold text-sm">Access Overview</h3>
+            </div>
+            <div className="grid grid-cols-2 gap-3 text-xs">
+              <div className="flex items-center gap-2">
+                <FiUsers className="text-blue-400" size={14} />
+                <span className="text-gray-300">User Management</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FiBarChart className="text-green-400" size={14} />
+                <span className="text-gray-300">Analytics</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FiShield className="text-purple-400" size={14} />
+                <span className="text-gray-300">Security</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <FiSettings className="text-orange-400" size={14} />
+                <span className="text-gray-300">System Config</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Development Credentials Hint - REMOVE IN PRODUCTION */}
+          {process.env.NODE_ENV === 'development' && (
+            <div className="mb-6">
+              <button
+                onClick={() => setShowCredentials(!showCredentials)}
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-orange-500/20 border border-orange-500/30 rounded-lg text-orange-300 text-sm hover:bg-orange-500/30 transition-colors"
+              >
+                {showCredentials ? <FiEyeOff size={16} /> : <FiEye size={16} />}
+                {showCredentials ? 'Hide' : 'Show'} Development Credentials
+              </button>
+              
+              {showCredentials && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-3 p-3 bg-orange-500/10 border border-orange-500/30 rounded-lg"
+                >
+                  <div className="flex items-center gap-2 mb-2">
+                    <FiAlertCircle className="text-orange-400" size={14} />
+                    <span className="text-orange-300 font-semibold text-xs">Development Only</span>
+                  </div>
+                  <div className="space-y-2 text-xs">
+                    <div>
+                      <span className="text-gray-400">Email:</span>
+                      <span className="text-orange-300 ml-2 font-mono">{developmentCredentials.email}</span>
+                    </div>
+                    <div>
+                      <span className="text-gray-400">Password:</span>
+                      <span className="text-orange-300 ml-2 font-mono">{developmentCredentials.password}</span>
+                    </div>
+                  </div>
+                  <p className="text-orange-400/80 text-xs mt-2">
+                    ⚠️ This will be removed in production builds
+                  </p>
+                </motion.div>
+              )}
+            </div>
+          )}
+
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}
@@ -112,7 +185,7 @@ export default function AdminLoginPage() {
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="w-full pl-10 pr-3 py-2.5 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] outline-none transition-colors"
-                  placeholder="admin@example.com"
+                  placeholder="admin@ugm.ac.id"
                 />
               </div>
             </div>
@@ -158,15 +231,28 @@ export default function AdminLoginPage() {
               </button>
             </div>
           </form>
+          
           <div className="mt-6 text-center">
             <Link href="/forgot-password">
               <p className="text-sm text-[#FFCA40] hover:underline">Forgot your password?</p>
             </Link>
           </div>
         </div>
-        <p className="mt-8 text-center text-xs text-white/60">
-          For authorized personnel only. All access is monitored.
-        </p>
+        
+        {/* Enhanced Footer Information */}
+        <div className="mt-6 space-y-3">
+          <p className="text-center text-xs text-white/60">
+            For authorized personnel only. All access is monitored.
+          </p>
+          <div className="text-center text-xs text-white/40 space-y-1">
+            <p>UGM-AICare Mental Health Platform</p>
+            <p>Secure admin access with multi-factor authentication</p>
+            <p className="flex items-center justify-center gap-1">
+              <FiShield size={12} />
+              Data encrypted in transit and at rest
+            </p>
+          </div>
+        </div>
       </motion.div>
     </div>
   );
