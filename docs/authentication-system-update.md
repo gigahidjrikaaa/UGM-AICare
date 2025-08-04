@@ -77,6 +77,7 @@ signIn("admin-login", { email, password })
 ### New Endpoints Needed
 
 #### 1. User Registration
+
 ```bash
 POST /api/v1/auth/register
 Content-Type: application/json
@@ -95,6 +96,7 @@ Response: 201 Created
 ```
 
 #### 2. User Login
+
 ```bash
 POST /api/v1/auth/user/login
 Content-Type: application/json
@@ -114,6 +116,7 @@ Response: 200 OK
 ```
 
 #### 3. Password Reset
+
 ```bash
 POST /api/v1/auth/forgot-password
 Content-Type: application/json
@@ -131,6 +134,7 @@ Response: 200 OK
 ### Database Schema Updates
 
 #### Users Table Enhancement
+
 ```sql
 ALTER TABLE users ADD COLUMN password_hash VARCHAR(255);
 ALTER TABLE users ADD COLUMN email_verified BOOLEAN DEFAULT false;
@@ -144,6 +148,7 @@ CREATE INDEX idx_users_role ON users(role);
 ```
 
 #### Password Reset Tokens Table
+
 ```sql
 CREATE TABLE password_reset_tokens (
   id SERIAL PRIMARY KEY,
@@ -161,6 +166,7 @@ CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens(user_id)
 ## Frontend Implementation Details
 
 ### Sign-In Page Features
+
 - Responsive glassmorphism design
 - Progressive enhancement
 - Accessibility compliance (ARIA labels, keyboard navigation)
@@ -168,6 +174,7 @@ CREATE INDEX idx_password_reset_tokens_user_id ON password_reset_tokens(user_id)
 - Cross-linking between auth pages
 
 ### Form Validation
+
 ```typescript
 // Client-side validation patterns
 const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -175,6 +182,7 @@ const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$
 ```
 
 ### Error Handling
+
 ```typescript
 // Comprehensive error mapping
 if (result?.error === "CredentialsSignin") {
@@ -187,6 +195,7 @@ if (result?.error === "CredentialsSignin") {
 ## Middleware Updates
 
 ### Route Protection
+
 ```typescript
 // Updated middleware patterns
 if (pathname.startsWith('/admin/dashboard')) {
@@ -205,6 +214,7 @@ if (pathname.startsWith('/aika') && !session) {
 ## Testing Checklist
 
 ### Authentication Flow Testing
+
 - [ ] Regular user registration
 - [ ] Regular user login
 - [ ] UGM student Google OAuth
@@ -217,6 +227,7 @@ if (pathname.startsWith('/aika') && !session) {
 - [ ] Logout functionality
 
 ### Security Testing
+
 - [ ] SQL injection protection
 - [ ] XSS prevention
 - [ ] CSRF protection
@@ -227,12 +238,14 @@ if (pathname.startsWith('/aika') && !session) {
 ## Migration Guide
 
 ### For Existing Users
+
 1. Existing UGM users continue using Google OAuth at `/signin-ugm`
 2. New route `/signin` becomes the default entry point
 3. Admin users continue using `/admin` login
 4. Update all internal links to point to appropriate sign-in methods
 
 ### For Developers
+
 1. Update authentication-related imports
 2. Test all authentication flows
 3. Update documentation and API references
@@ -241,6 +254,7 @@ if (pathname.startsWith('/aika') && !session) {
 ## Environment Variables
 
 ### Required New Variables
+
 ```env
 # Email service for password reset (if using external service)
 SMTP_HOST=smtp.example.com
