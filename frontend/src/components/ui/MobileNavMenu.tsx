@@ -63,12 +63,16 @@ export default function MobileNavMenu({ isOpen, onClose }: MobileNavMenuProps) {
               <h2 className="text-xl font-semibold text-white">Navigation</h2>
               <motion.button
                 onClick={onClose}
-                whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.15)" }}
+                whileHover={{ 
+                  scale: 1.1, 
+                  backgroundColor: "rgba(255,255,255,0.15)",
+                  boxShadow: "0 0 20px rgba(255,202,64,0.3), 0 0 40px rgba(255,202,64,0.1)"
+                }}
                 whileTap={{ scale: 0.9 }}
-                className="p-2 rounded-xl text-white/70 hover:text-white hover:bg-white/10 transition-all duration-200"
+                className="p-3 rounded-2xl bg-white/5 text-white/70 hover:text-white hover:bg-white/10 backdrop-blur-sm border border-white/10 hover:border-white/20 transition-all duration-300 shadow-lg hover:shadow-xl"
                 aria-label="Close menu"
               >
-                <HiX size={20} />
+                <HiX size={18} />
               </motion.button>
             </div>
 
@@ -85,17 +89,23 @@ export default function MobileNavMenu({ isOpen, onClose }: MobileNavMenuProps) {
                     <Link
                       href={item.href}
                       onClick={onClose}
-                      className="flex items-center px-4 py-4 rounded-2xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-300 group"
+                      className="flex items-center px-4 py-4 rounded-2xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-300 group relative overflow-hidden"
                     >
+                      <motion.div
+                        className="absolute inset-0 bg-gradient-to-r from-white/5 to-white/8 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300"
+                        whileHover={{ 
+                          boxShadow: "0 0 20px rgba(255,202,64,0.15), inset 0 1px 0 rgba(255,255,255,0.05)"
+                        }}
+                      />
                       <motion.span 
-                        className="mr-4 flex-shrink-0 text-white/60 group-hover:text-[#FFCA40] transition-colors duration-300"
+                        className="mr-4 flex-shrink-0 text-white/60 group-hover:text-[#FFCA40] transition-colors duration-300 relative z-10"
                         whileHover={{ scale: 1.2 }}
                       >
                         {item.icon}
                       </motion.span>
-                      <span className="truncate font-medium">{item.label}</span>
+                      <span className="truncate font-medium relative z-10">{item.label}</span>
                       <motion.div
-                        className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                        className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300 relative z-10"
                         initial={{ x: -10 }}
                         whileHover={{ x: 0 }}
                       >

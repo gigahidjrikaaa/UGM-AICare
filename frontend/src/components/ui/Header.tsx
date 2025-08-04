@@ -59,12 +59,16 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
             {status === "authenticated" && (
                 <motion.button
                   onClick={onToggleSidebar} // Call the handler from props
-                  whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.15)" }}
+                  whileHover={{ 
+                    scale: 1.05, 
+                    backgroundColor: "rgba(255,255,255,0.12)",
+                    boxShadow: "0 0 20px rgba(255,202,64,0.3), 0 0 40px rgba(255,202,64,0.1)"
+                  }}
                   whileTap={{ scale: 0.95 }}
-                  className="mr-4 p-2 rounded-xl hover:bg-white/10 transition-all duration-300 text-white/90 hover:text-white"
+                  className="mr-4 p-3 rounded-2xl bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 hover:border-white/20 transition-all duration-300 text-white/80 hover:text-white shadow-lg hover:shadow-xl"
                   aria-label="Toggle navigation menu"
                 >
-                  <HiMenu size={20} />
+                  <HiMenu size={18} />
                 </motion.button>
             )}
             {/* Logo Section with Animation */}
@@ -97,7 +101,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
           </div>
           
           {/* Desktop Navigation Links - Enhanced iOS Style */}
-          <nav className="hidden md:flex items-center bg-white/5 backdrop-blur-md rounded-2xl px-2 py-1 border border-white/10">
+          <nav className="hidden md:flex items-center bg-white/8 backdrop-blur-xl rounded-3xl px-3 py-2 border border-white/10 shadow-2xl">
             {[
               { href: "/", label: "Home", icon: "🏠" },
               { href: "/about", label: "About", icon: "ℹ️" },
@@ -107,18 +111,27 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
               <motion.div key={i} className="relative">
                 <Link 
                   href={link.href} 
-                  className="flex items-center gap-2 text-white/80 hover:text-white transition-all duration-300 py-2 px-4 rounded-xl relative group overflow-hidden"
+                  className="flex items-center gap-2 text-white/80 hover:text-white transition-all duration-300 py-3 px-4 rounded-2xl relative group overflow-hidden"
                 >
                   <motion.div
-                    className="absolute inset-0 bg-white/10 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                    whileHover={{ scale: 1.02 }}
+                    className="absolute inset-0 bg-gradient-to-r from-white/5 to-white/10 rounded-2xl opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                    whileHover={{ 
+                      scale: 1.02,
+                      boxShadow: "0 0 25px rgba(255,202,64,0.2), inset 0 1px 0 rgba(255,255,255,0.1)"
+                    }}
                   />
-                  <span className="text-sm relative z-10">{link.icon}</span>
+                  <motion.span 
+                    className="text-sm relative z-10"
+                    whileHover={{ scale: 1.1 }}
+                    transition={{ type: "spring", stiffness: 400, damping: 10 }}
+                  >
+                    {link.icon}
+                  </motion.span>
                   <span className="text-sm font-medium relative z-10">{link.label}</span>
                   <motion.div
-                    className="absolute bottom-0 left-1/2 w-0 h-0.5 bg-[#FFCA40] rounded-full"
+                    className="absolute bottom-1 left-1/2 w-0 h-0.5 bg-gradient-to-r from-[#FFCA40] to-[#FFD700] rounded-full shadow-lg"
                     initial={{ width: 0, x: "-50%" }}
-                    whileHover={{ width: "80%", x: "-50%" }}
+                    whileHover={{ width: "70%", x: "-50%" }}
                     transition={{ duration: 0.3, ease: "easeOut" }}
                   />
                 </Link>
@@ -130,16 +143,20 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
           <div className="md:hidden flex items-center">
             <motion.button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-              whileHover={{ scale: 1.1, backgroundColor: "rgba(255,255,255,0.15)" }}
+              whileHover={{ 
+                scale: 1.05, 
+                backgroundColor: "rgba(255,255,255,0.12)",
+                boxShadow: "0 0 20px rgba(255,202,64,0.3), 0 0 40px rgba(255,202,64,0.1)"
+              }}
               whileTap={{ scale: 0.95 }}
-              className="p-2 rounded-xl hover:bg-white/10 transition-all duration-300 text-white/90 hover:text-white mr-3"
+              className="p-3 rounded-2xl bg-white/5 hover:bg-white/10 backdrop-blur-sm border border-white/10 hover:border-white/20 transition-all duration-300 text-white/80 hover:text-white mr-3 shadow-lg hover:shadow-xl"
               aria-label="Toggle mobile menu"
             >
               <motion.div
                 animate={{ rotate: isMobileMenuOpen ? 90 : 0 }}
-                transition={{ duration: 0.3 }}
+                transition={{ duration: 0.3, ease: "easeOut" }}
               >
-                <HiMenu size={20} />
+                <HiMenu size={18} />
               </motion.div>
             </motion.button>
           </div>
@@ -152,24 +169,36 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
                 <motion.button
                   id="user-menu-button"
                   onClick={toggleProfile}
-                  whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.15)" }}
+                  whileHover={{ 
+                    scale: 1.02, 
+                    backgroundColor: "rgba(255,255,255,0.15)",
+                    boxShadow: "0 0 25px rgba(255,202,64,0.4), 0 0 50px rgba(255,202,64,0.15), inset 0 1px 0 rgba(255,255,255,0.1)"
+                  }}
                   whileTap={{ scale: 0.98 }}
-                  className="flex items-center bg-white/8 hover:bg-white/15 backdrop-blur-md rounded-2xl p-2 pr-4 transition-all duration-300 border border-white/10 hover:border-white/20"
+                  className="flex items-center bg-white/8 hover:bg-white/15 backdrop-blur-xl rounded-3xl p-3 pr-4 transition-all duration-300 border border-white/10 hover:border-white/20 shadow-xl hover:shadow-2xl"
                   aria-haspopup="true"
                   aria-expanded={isProfileOpen}
                 >
-                  <div className="relative h-8 w-8 rounded-xl overflow-hidden border-2 border-[#FFCA40]/40 hover:border-[#FFCA40]/60 transition-colors duration-300">
+                  <motion.div 
+                    className="relative h-8 w-8 rounded-2xl overflow-hidden border-2 border-[#FFCA40]/40 hover:border-[#FFCA40]/60 transition-all duration-300"
+                    whileHover={{ 
+                      boxShadow: "0 0 15px rgba(255,202,64,0.5)"
+                    }}
+                  >
                     <Image
                         src={session.user.image || "/default-avatar.png"}
-                        alt={session.user.name || "User"} fill className="object-cover"
+                        alt={session.user.name || "User"} 
+                        fill 
+                        className="object-cover"
                       />
-                  </div>
+                  </motion.div>
                   <span className="ml-3 text-white/90 text-sm font-medium hidden sm:inline-block">
                       {session.user.name?.split(' ')[0]}
                   </span>
                   <motion.div
                     animate={{ rotate: isProfileOpen ? 180 : 0 }}
                     transition={{ duration: 0.3, ease: "easeOut" }}
+                    whileHover={{ scale: 1.1 }}
                   >
                     <HiChevronDown className="ml-2 text-white/60" size={16} />
                   </motion.div>
@@ -189,19 +218,27 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
                   <motion.button
                     whileHover={{ 
                       scale: 1.05, 
-                      backgroundColor: "rgba(255,255,255,0.15)",
-                      borderColor: "rgba(255,202,64,0.5)"
+                      backgroundColor: "rgba(255,255,255,0.12)",
+                      borderColor: "rgba(255,202,64,0.6)",
+                      boxShadow: "0 0 30px rgba(255,202,64,0.4), 0 0 60px rgba(255,202,64,0.15), inset 0 1px 0 rgba(255,255,255,0.1)"
                     }}
                     whileTap={{ scale: 0.95 }}
-                    className="bg-white/8 backdrop-blur-md border border-white/20 hover:border-[#FFCA40]/50 px-6 py-2.5 rounded-2xl text-white/90 hover:text-white transition-all duration-300 text-sm font-medium"
+                    className="bg-white/8 backdrop-blur-xl border border-white/20 hover:border-[#FFCA40]/50 px-8 py-3 rounded-3xl text-white/90 hover:text-white transition-all duration-300 text-sm font-medium shadow-xl hover:shadow-2xl"
                   >
-                    Sign In
+                    <span className="relative z-10">Sign In</span>
                   </motion.button>
                 </Link>
               )
             )}
             {status === "loading" && ( // Loading indicator - Enhanced
-                <div className="w-8 h-8 rounded-xl border-2 border-white/10 border-t-[#FFCA40]/80 animate-spin backdrop-blur-sm"></div>
+                <motion.div 
+                  className="w-10 h-10 rounded-2xl border-2 border-white/10 border-t-[#FFCA40]/80 backdrop-blur-sm shadow-lg"
+                  animate={{ rotate: 360 }}
+                  transition={{ duration: 1, repeat: Infinity, ease: "linear" }}
+                  whileHover={{ 
+                    boxShadow: "0 0 20px rgba(255,202,64,0.3)"
+                  }}
+                />
             )}
           </div>
         </div>
