@@ -9,6 +9,7 @@ import os
 from src.service.data__ingestion import DataIngestion
 from src.service.llm import LLMService
 from src.service.graph import GraphService
+from src.service.vector_db_service import VectorDBService, Document
 from src.model.schema import EntityRelationResponse, Entity, Relation
 from src.utils.extraction import remove_duplicates_by_keys, resolve_entities_with_merged_descriptions, remap_relations
 
@@ -23,6 +24,9 @@ async def get_llm_service():
 
 async def get_graph_service():
   return GraphService(llm_service = await get_llm_service())
+
+async def get_vector_service():
+  return VectorDBService(llm_service = await get_llm_service())
 
 class ExtractEntitiesBody(BaseModel):
   file_path: str
@@ -107,4 +111,54 @@ async def extract_entities_relations(
 
   except Exception as e:
     logger.error(f"Fail to Extract Entities and Relations from Documen {body.file_path} : {str(e)}")
+    raise HTTPException(status_code=500, detail=str(e))
+
+class RAGExtractBody(BaseModel):
+  file_path: str
+  file_type: str
+  chunk_size: int = 1000
+  chunk_overlap: int = 200
+
+class AddDocumentsResponse(BaseModel):
+    success: bool
+    message: str
+    chunks_added: int
+    documents_processed: int
+
+
+
+@router.post("/extract-rag-vector")
+async def add_document(
+  body: RAGExtractBody = Body(...),
+  data_ingestion_service: DataIngestion = Depends(get_data_ingestion_service),
+  vector_service: VectorDBService = Depends(get_vector_service)
+):
+  try:
+
+    file_path     = body.file_path
+    file_type     = body.file_type
+    chunk_size    = body.chunk_size
+    chunk_overlap = body.chunk_overlap
+    logger.info(f"{file_path}, {file_type}")
+    logger.info("Add Document to Vector DB Started")
+
+    input_docs = data_ingestion_service.extract_text_from_files(file_path=file_path, type=file_type, split=False)
+    metadata = {
+      "file_name": file_path
+    }
+
+    documents = []
+    for doc_input in input_docs:
+      doc = Document(
+        content=doc_input,
+        metadata=metadata,
+        doc_id=file_path
+        )
+      documents.append(doc)
+        
+    result = await vector_service.add_documents(documents)
+        
+    return AddDocumentsResponse(**result)
+  except Exception as e:
+    logger.error(f"Fail to add document to RAG database: {e}")
     raise HTTPException(status_code=500, detail=str(e))

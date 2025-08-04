@@ -2,6 +2,7 @@
 from neo4j import AsyncGraphDatabase
 import chromadb
 from typing import Literal
+from pinecone import Pinecone
 
 
 from src.config import Config
@@ -49,13 +50,32 @@ class ChromaConnection:
             name=Config.CHROMA_COLLECTION
         )
 
+class PineconeConnection:
+    def __init__(self):
+        self.client = None
+        self.index = None
+
+    async def connect(self):
+        self.client = Pinecone(api_key=Config.PINECONE_API_KEY)
+
+        if not self.client.has_index(Config.PINECONE_INDEX_NAME):
+            self.client.create_index(
+                name=Config.PINECONE_INDEX_NAME,
+                dimension=768,
+                metric= 'cosine'
+            )
+
+        self.index = self.client.Index(Config.PINECONE_INDEX_NAME)
+
 neo4j_conn = Neo4jConnection()
+pinecone_conn = PineconeConnection()
 # chroma_conn = ChromaConnection()
 
 async def init_database():
     try:
       await neo4j_conn.connect()
-      # chroma_conn.connect()
       print("Connected to Neo4j Database")
+      await pinecone_conn.connect()
+      print("Connected to Pinecone Database")
     except Exception as e:
       print(f"Couldn't Connect to Neo4j Database:s {e}")
