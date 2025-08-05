@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func, desc, asc, or_
 from pydantic import BaseModel, Field
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 from typing import List, Optional, Dict, Any
 import logging
 
@@ -75,6 +75,62 @@ class UserDetailResponse(BaseModel):
     recent_conversations: List[Dict[str, Any]]
     badges: List[Dict[str, Any]]
     appointments: List[Dict[str, Any]]
+    
+    class Config:
+        from_attributes = True
+
+# --- AI Conversations Models ---
+class ConversationListItem(BaseModel):
+    id: int
+    user_id_hash: str  # Censored user identifier
+    session_id: str
+    conversation_id: str
+    message_preview: str  # First 100 chars of user message
+    response_preview: str  # First 100 chars of AI response
+    timestamp: datetime
+    message_length: int
+    response_length: int
+    session_message_count: int  # Number of messages in this session
+    
+    class Config:
+        from_attributes = True
+
+class ConversationDetailResponse(BaseModel):
+    id: int
+    user_id_hash: str  # Censored user identifier
+    session_id: str
+    conversation_id: str
+    message: str
+    response: str
+    timestamp: datetime
+    
+    class Config:
+        from_attributes = True
+
+class ConversationStats(BaseModel):
+    total_conversations: int
+    total_sessions: int
+    total_users_with_conversations: int
+    avg_messages_per_session: float
+    avg_message_length: float
+    avg_response_length: float
+    conversations_today: int
+    conversations_this_week: int
+    most_active_hour: int
+
+class ConversationsResponse(BaseModel):
+    conversations: List[ConversationListItem]
+    total_count: int
+    stats: ConversationStats
+
+class SessionDetailResponse(BaseModel):
+    session_id: str
+    user_id_hash: str  # Censored user identifier
+    conversation_count: int
+    first_message_time: datetime
+    last_message_time: datetime
+    total_duration_minutes: float
+    conversations: List[ConversationDetailResponse]
     
     class Config:
         from_attributes = True
@@ -391,6 +447,235 @@ async def toggle_user_email_checkins(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update user email checkin settings"
         )
+
+
+# --- AI Conversations Endpoints ---
+
+def _hash_user_id(user_id: int) -> str:
+    """Create a consistent but anonymous hash for user identification."""
+    import hashlib
+    return hashlib.md5(f"user_{user_id}_salt".encode()).hexdigest()[:8]
+
+@router.get("/conversations", response_model=ConversationsResponse)
+async def get_conversations(
+    page: int = Query(1, ge=1),
+    limit: int = Query(50, ge=1, le=100),
+    search: Optional[str] = Query(None, description="Search in message or response content"),
+    session_id: Optional[str] = Query(None, description="Filter by session ID"),
+    date_from: Optional[date] = Query(None, description="Filter conversations from this date"),
+    date_to: Optional[date] = Query(None, description="Filter conversations to this date"),
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    """Get paginated list of AI conversations with privacy censoring."""
+    logger.info(f"Admin {admin_user.id} requesting conversations list (page {page}, limit {limit})")
+    
+    # Base query
+    query = db.query(Conversation).order_by(Conversation.timestamp.desc())  # type: ignore
+    
+    # Apply filters
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                Conversation.message.ilike(search_term),  # type: ignore
+                Conversation.response.ilike(search_term)  # type: ignore
+            )
+        )
+    
+    if session_id:
+        query = query.filter(Conversation.session_id == session_id)  # type: ignore
+    
+    if date_from:
+        query = query.filter(func.date(Conversation.timestamp) >= date_from)  # type: ignore
+    
+    if date_to:
+        query = query.filter(func.date(Conversation.timestamp) <= date_to)  # type: ignore
+    
+    # Get total count
+    total_count = query.count()
+    
+    # Apply pagination
+    offset = (page - 1) * limit
+    conversations = query.offset(offset).limit(limit).all()
+    
+    # Get session message counts
+    session_counts = {}
+    if conversations:
+        session_ids = list(set(conv.session_id for conv in conversations))  # type: ignore
+        session_count_query = db.query(
+            Conversation.session_id,  # type: ignore
+            func.count(Conversation.id).label('count')  # type: ignore
+        ).filter(
+            Conversation.session_id.in_(session_ids)  # type: ignore
+        ).group_by(Conversation.session_id)  # type: ignore
+        
+        session_counts = {row.session_id: row.count for row in session_count_query.all()}
+    
+    # Format conversations with censoring
+    conversation_items = []
+    for conv in conversations:
+        conversation_items.append(ConversationListItem(
+            id=conv.id,  # type: ignore
+            user_id_hash=_hash_user_id(conv.user_id),  # type: ignore
+            session_id=conv.session_id,  # type: ignore
+            conversation_id=conv.conversation_id,  # type: ignore
+            message_preview=conv.message[:100] if conv.message else "",  # type: ignore
+            response_preview=conv.response[:100] if conv.response else "",  # type: ignore
+            timestamp=conv.timestamp,  # type: ignore
+            message_length=len(conv.message) if conv.message else 0,  # type: ignore
+            response_length=len(conv.response) if conv.response else 0,  # type: ignore
+            session_message_count=session_counts.get(conv.session_id, 1)  # type: ignore
+        ))
+    
+    # Calculate stats with privacy in mind
+    total_conversations = db.query(func.count(Conversation.id)).scalar() or 0  # type: ignore
+    total_sessions = db.query(func.count(func.distinct(Conversation.session_id))).scalar() or 0  # type: ignore
+    total_users_with_conversations = db.query(func.count(func.distinct(Conversation.user_id))).scalar() or 0  # type: ignore
+    
+    # Calculate averages
+    avg_stats = db.query(
+        func.avg(func.length(Conversation.message)).label('avg_message_length'),  # type: ignore
+        func.avg(func.length(Conversation.response)).label('avg_response_length')  # type: ignore
+    ).first()
+    
+    # Session stats
+    session_counts_subq = db.query(
+        Conversation.session_id,  # type: ignore
+        func.count(Conversation.id).label('count')  # type: ignore
+    ).group_by(Conversation.session_id).subquery()  # type: ignore
+    
+    session_stats = db.query(
+        func.avg(session_counts_subq.c.count).label('avg_messages_per_session')
+    ).first()
+    
+    # Time-based stats
+    today = datetime.now().date()
+    week_ago = today - timedelta(days=7)
+    
+    conversations_today = db.query(func.count(Conversation.id)).filter(  # type: ignore
+        func.date(Conversation.timestamp) == today  # type: ignore
+    ).scalar() or 0
+    
+    conversations_this_week = db.query(func.count(Conversation.id)).filter(  # type: ignore
+        func.date(Conversation.timestamp) >= week_ago  # type: ignore
+    ).scalar() or 0
+    
+    # Most active hour
+    hour_stats = db.query(
+        func.extract('hour', Conversation.timestamp).label('hour'),  # type: ignore
+        func.count(Conversation.id).label('count')  # type: ignore
+    ).group_by(
+        func.extract('hour', Conversation.timestamp)  # type: ignore
+    ).order_by(
+        func.count(Conversation.id).desc()  # type: ignore
+    ).first()
+    
+    most_active_hour = int(hour_stats.hour) if hour_stats else 0
+    
+    # Safely get stats values with None checks
+    avg_messages_per_session = 0.0
+    if session_stats and hasattr(session_stats, 'avg_messages_per_session') and session_stats.avg_messages_per_session:
+        avg_messages_per_session = float(session_stats.avg_messages_per_session)
+    
+    avg_message_length = 0.0
+    if avg_stats and hasattr(avg_stats, 'avg_message_length') and avg_stats.avg_message_length:
+        avg_message_length = float(avg_stats.avg_message_length)
+    
+    avg_response_length = 0.0
+    if avg_stats and hasattr(avg_stats, 'avg_response_length') and avg_stats.avg_response_length:
+        avg_response_length = float(avg_stats.avg_response_length)
+    
+    stats = ConversationStats(
+        total_conversations=total_conversations,
+        total_sessions=total_sessions,
+        total_users_with_conversations=total_users_with_conversations,
+        avg_messages_per_session=avg_messages_per_session,
+        avg_message_length=avg_message_length,
+        avg_response_length=avg_response_length,
+        conversations_today=conversations_today,
+        conversations_this_week=conversations_this_week,
+        most_active_hour=most_active_hour
+    )
+    
+    return ConversationsResponse(
+        conversations=conversation_items,
+        total_count=total_count,
+        stats=stats
+    )
+
+@router.get("/conversations/{conversation_id}", response_model=ConversationDetailResponse)
+async def get_conversation_detail(
+    conversation_id: int,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    """Get detailed view of a specific conversation with privacy censoring."""
+    logger.info(f"Admin {admin_user.id} requesting conversation detail {conversation_id}")
+    
+    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()  # type: ignore
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    
+    return ConversationDetailResponse(
+        id=conversation.id,  # type: ignore
+        user_id_hash=_hash_user_id(conversation.user_id),  # type: ignore
+        session_id=conversation.session_id,  # type: ignore
+        conversation_id=conversation.conversation_id,  # type: ignore
+        message=conversation.message or "",  # type: ignore
+        response=conversation.response or "",  # type: ignore
+        timestamp=conversation.timestamp  # type: ignore
+    )
+
+@router.get("/conversations/session/{session_id}", response_model=SessionDetailResponse)
+async def get_session_detail(
+    session_id: str,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    """Get all conversations in a specific session with privacy censoring."""
+    logger.info(f"Admin {admin_user.id} requesting session detail {session_id}")
+    
+    # Get all conversations for this session
+    conversations = db.query(Conversation).filter(  # type: ignore
+        Conversation.session_id == session_id  # type: ignore
+    ).order_by(Conversation.timestamp.asc()).all()  # type: ignore
+    
+    if not conversations:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    # Calculate session stats
+    first_conv = conversations[0]
+    last_conv = conversations[-1]
+    user_id = first_conv.user_id  # type: ignore
+    
+    duration_minutes = 0
+    if len(conversations) > 1:
+        duration = last_conv.timestamp - first_conv.timestamp  # type: ignore
+        duration_minutes = duration.total_seconds() / 60
+    
+    # Format conversations with censoring
+    conversation_details = []
+    for conv in conversations:
+        conversation_details.append(ConversationDetailResponse(
+            id=conv.id,  # type: ignore
+            user_id_hash=_hash_user_id(conv.user_id),  # type: ignore
+            session_id=conv.session_id,  # type: ignore
+            conversation_id=conv.conversation_id,  # type: ignore
+            message=conv.message or "",  # type: ignore
+            response=conv.response or "",  # type: ignore
+            timestamp=conv.timestamp  # type: ignore
+        ))
+    
+    return SessionDetailResponse(
+        session_id=session_id,
+        user_id_hash=_hash_user_id(user_id),  # type: ignore
+        conversation_count=len(conversations),
+        first_message_time=first_conv.timestamp,  # type: ignore
+        last_message_time=last_conv.timestamp,  # type: ignore
+        total_duration_minutes=duration_minutes,
+        conversations=conversation_details
+    )
 
 @router.get("/stats")
 async def get_admin_stats(

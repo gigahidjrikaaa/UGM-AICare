@@ -45,6 +45,17 @@ interface InternalUserResponse {
 export const authOptions: NextAuthOptions = {
   secret: process.env.NEXTAUTH_SECRET,
   
+  // Debug environment variables
+  ...((() => {
+    console.log('NextAuth Environment Check:');
+    console.log('NEXTAUTH_SECRET:', process.env.NEXTAUTH_SECRET ? '[SET]' : '[NOT SET]');
+    console.log('INTERNAL_API_URL:', process.env.INTERNAL_API_URL);
+    console.log('NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+    console.log('GOOGLE_CLIENT_ID:', process.env.GOOGLE_CLIENT_ID ? '[SET]' : '[NOT SET]');
+    console.log('GOOGLE_CLIENT_SECRET:', process.env.GOOGLE_CLIENT_SECRET ? '[SET]' : '[NOT SET]');
+    return {};
+  })()),
+  
   // Configure cookies for local development
   cookies: {
     sessionToken: {
@@ -163,12 +174,23 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
+        console.log('🔐 ADMIN AUTHORIZE FUNCTION CALLED!');
+        console.log('Credentials received:', credentials);
+        
         // On the server, prefer the internal URL for container-to-container communication.
         // Fall back to the public URL for other environments (e.g., local development without Docker).
-        const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+        const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+        
+        // Debug logging
+        console.log('🌐 Admin authorize - Environment check:');
+        console.log('INTERNAL_API_URL:', process.env.INTERNAL_API_URL);
+        console.log('NEXT_PUBLIC_API_URL:', process.env.NEXT_PUBLIC_API_URL);
+        console.log('Using API URL:', apiUrl);
+        console.log('Credentials:', { email: credentials?.email, hasPassword: !!credentials?.password });
 
         try {
           // This endpoint is an example, adjust it to your actual admin login endpoint.
+          console.log('🚀 Making admin login request to:', `${apiUrl}/api/v1/auth/login`);
           const res = await fetch(`${apiUrl}/api/v1/auth/login`, {
             method: 'POST',
             body: JSON.stringify({
@@ -178,14 +200,18 @@ export const authOptions: NextAuthOptions = {
             headers: { "Content-Type": "application/json" }
           });
 
+          console.log('📡 Admin login response status:', res.status);
           const user = await res.json();
+          console.log('👤 Admin login response data:', user);
 
           if (res.ok && user) {
+            console.log('✅ Admin login successful, returning user:', user);
             return user;
           }
+          console.log('❌ Admin login failed - response not ok or no user data');
           return null;
         } catch (e) {
-          console.error("Authorize error:", e);
+          console.error("💥 Admin authorize error:", e);
           return null;
         }
       }
@@ -316,4 +342,5 @@ export const authOptions: NextAuthOptions = {
     signIn: '/signin',
     error: '/signin',
   },
+  debug: process.env.NODE_ENV === 'development',
 };
