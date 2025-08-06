@@ -2,7 +2,7 @@ import json
 import logging
 from fastapi import FastAPI, Request as FastAPIRequest # type: ignore
 from datetime import datetime, timezone
-from app.database import get_db, init_db
+from app.database import init_db, close_db
 from sqlalchemy import text
 from app.routes import auth, email, docs, chat, feedback, link_did, internal, journal, journal_prompts, summary, profile, session_events, appointments, admin
 from contextlib import asynccontextmanager
@@ -55,13 +55,15 @@ async def lifespan(app: FastAPI):
     """
     logger.info("Starting application lifespan...")
     # Initialize the database
-    init_db()
+    await init_db()
     # Start the background scheduler
     start_scheduler()
     yield
     # Clean up resources on shutdown
     logger.info("Shutting down application lifespan...")
     shutdown_scheduler()
+    # Close database connections
+    await close_db()
 
 # You will need to add the lifespan manager to your FastAPI app instance.
 # Find the line where you create your `app` and add `lifespan=lifespan`.
@@ -172,11 +174,11 @@ async def health_check():
 async def db_health_check():
     """Database health check endpoint"""
     logger.info("Database health check endpoint accessed")
-    db = next(get_db())
+    from app.database import check_db_health
     try:
-        # Execute a simple query to check the database connection
-        result = db.execute(text("SELECT 1")).scalar()
-        if result == 1:
+        # Use the async health check function
+        is_healthy = await check_db_health()
+        if is_healthy:
             return {
             "status": "healthy",
             "db_status": "connected",
@@ -187,9 +189,6 @@ async def db_health_check():
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
         return {"status": "unhealthy", "db_status": str(e)}
-    finally:
-        db.close()
-        logger.debug("Database session closed after health check.")
     raise HTTPException(status_code=403, detail="Invalid API key")
 
 @app.get("/health/redis")

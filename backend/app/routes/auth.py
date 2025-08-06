@@ -1,11 +1,12 @@
 from fastapi import APIRouter, HTTPException, Depends, status
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import Optional
 import os
 import hashlib
 import secrets
-from app.database import get_db
+from app.database import get_async_db
 from app.models import User
 import logging
 
@@ -104,7 +105,7 @@ async def admin_login(request: LoginRequest):
         )
 
 @router.post("/user/login", response_model=LoginResponse)
-async def user_login(request: UserLoginRequest, db: Session = Depends(get_db)):
+async def user_login(request: UserLoginRequest, db: AsyncSession = Depends(get_async_db)):
     """
     Regular user login endpoint for NextAuth credentials provider
     """
@@ -114,6 +115,9 @@ async def user_login(request: UserLoginRequest, db: Session = Depends(get_db)):
         # For now, return a placeholder response since user auth isn't fully implemented
         # In production, you would:
         # 1. Verify user credentials against database
+        # stmt = select(User).where(User.email == request.email)
+        # result = await db.execute(stmt)
+        # user = result.scalar_one_or_none()
         # 2. Check password hash
         # 3. Return user data
         
@@ -131,7 +135,7 @@ async def user_login(request: UserLoginRequest, db: Session = Depends(get_db)):
         )
 
 @router.post("/register", response_model=RegisterResponse)
-async def register_user(request: RegisterRequest, db: Session = Depends(get_db)):
+async def register_user(request: RegisterRequest, db: AsyncSession = Depends(get_async_db)):
     """
     User registration endpoint
     """
@@ -142,8 +146,14 @@ async def register_user(request: RegisterRequest, db: Session = Depends(get_db))
         # In production, you would:
         # 1. Validate email format and password strength
         # 2. Check if user already exists
+        # stmt = select(User).where(User.email == request.email)
+        # result = await db.execute(stmt)
+        # existing_user = result.scalar_one_or_none()
         # 3. Hash password
         # 4. Create user in database
+        # new_user = User(...)
+        # db.add(new_user)
+        # await db.commit()
         # 5. Send verification email
         
         raise HTTPException(

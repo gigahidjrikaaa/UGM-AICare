@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
 from pydantic import BaseModel
-from sqlalchemy.orm import Session as DBSession
-from app.database import get_db # Assuming SessionLocal is used for background_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import get_async_db
 from app.models import Conversation, User # Assuming User is needed for auth
 from app.dependencies import get_current_active_user # If you want to ensure only an authenticated user can end their own session
-from app.routes.chat import summarize_and_save, get_background_db
+from app.routes.chat import summarize_and_save
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,7 +17,7 @@ class SessionEndRequest(BaseModel):
 async def end_chat_session(
     request: SessionEndRequest,
     background_tasks: BackgroundTasks,
-    db: DBSession = Depends(get_db), # For querying user_id
+    db: AsyncSession = Depends(get_async_db), # For querying user_id
     # current_user: User = Depends(get_current_active_user) # Optional: ensure user matches session
 ):
     logger.info(f"Received request to end session: {request.session_id}")
@@ -25,10 +25,10 @@ async def end_chat_session(
     # Find the user_id associated with this session_id
     # This assumes that the session_id is unique enough or you might need
     # current_user.id to scope the query if session_ids are not globally unique.
-    last_message_in_session = db.query(Conversation)\
-        .filter(Conversation.session_id == request.session_id)\
-        .order_by(Conversation.timestamp.desc())\
-        .first()
+    from sqlalchemy import select, desc
+    stmt = select(Conversation).where(Conversation.session_id == request.session_id).order_by(desc(Conversation.timestamp))
+    result = await db.execute(stmt)
+    last_message_in_session = result.first()
 
     if not last_message_in_session:
         logger.warning(f"No conversation found for session_id: {request.session_id} to end and summarize.")

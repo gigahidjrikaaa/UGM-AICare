@@ -12,11 +12,12 @@ httpx
 fastapi-cors==0.0.6
 
 # Database and ORM
-sqlalchemy==2.0.21
+sqlalchemy[asyncio]==2.0.21
 alembic==1.12.0
-pymysql==1.1.0
 redis==5.0.1
-psycopg2-binary
+asyncpg>=0.29.0  # Fast PostgreSQL Database Client Library for Python/asyncio
+psycopg2-binary>=2.9.0  # For Alembic migrations (sync operations)
+aiosqlite  # For async SQLite support (dev/testing only)
 
 # Authentication
 python-jose[cryptography]==3.3.0

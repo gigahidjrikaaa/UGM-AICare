@@ -1,15 +1,15 @@
 # backend/app/routes/chat.py
 import json
 import re
-from sqlalchemy.orm import Session as DBSession # DBSession is a common alias for SQLAlchemy session
-from sqlalchemy import desc
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import desc, select
 from fastapi import APIRouter, HTTPException, Body, Depends, status, BackgroundTasks, Query # type: ignore
 from typing import Any, List, Dict, Optional, Literal, cast
 from datetime import datetime, timedelta # Import datetime
 import logging
 
 # Adjust import based on your project structure
-from app.database import get_db, SessionLocal
+from app.database import get_async_db
 from app.models import User, Conversation, UserSummary
 from app.core import llm
 from app.core.memory import get_module_state, set_module_state, clear_module_state
@@ -31,14 +31,8 @@ router = APIRouter()
 MIN_TURNS_FOR_SUMMARY = 2  # Minimum number of full conversation turns (user msg + AI response) to trigger a summary.
 MAX_HISTORY_CHARS_FOR_SUMMARY = 15000  # Approx 3k-4k tokens, adjust based on your summarization LLM's limits and desired performance.
 
-# --- Helper Function for Background Task Session ---
-def get_background_db():
-    """Dependency to get a DB session specifically for background tasks."""
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
+# --- Helper Functions for Async Database Operations ---
+# No longer need sync database background tasks - all operations are async
 
 # --- API Endpoint (Async) ---
 # Add dependencies=[Depends(get_current_user)] if you have authentication
@@ -46,13 +40,13 @@ def get_background_db():
 async def handle_chat_request(
     request: ChatRequest = Body(...),
     background_tasks: BackgroundTasks = BackgroundTasks(), # For background tasks
-    current_user: User = Depends(get_current_active_user) # Get authenticated user
+    current_user: User = Depends(get_current_active_user), # Get authenticated user
+    db: AsyncSession = Depends(get_async_db) # Use async database session
     ):
     """
     Handles chat, detects session changes to trigger summarization of the *previous* session,
     and injects the *latest available* summary into the context for the *current* session.
     """
-    db: DBSession = next(get_db())
     module_just_completed_id: Optional[str] = None # Variable to hold completed module ID
     module_state_full: Optional[Dict[str, Any]] = None # Initialize here
     session_id = request.session_id # Define session_id early for use in error logging if needed
@@ -174,9 +168,9 @@ async def handle_chat_request(
                 try:
                     conv_entry = Conversation(user_id=user_id, session_id=session_id, conversation_id=conversation_id, message=user_message_content, response=aika_response_text, timestamp=datetime.now())
                     db.add(conv_entry)
-                    db.commit()
+                    await db.commit()
                 except Exception as e:
-                    db.rollback()
+                    await db.rollback()
                     logger.error(f"DB Error saving module conversation turn for session {session_id}: {e}", exc_info=True)
                     raise HTTPException(status_code=500, detail="Could not save module conversation turn.")
             
@@ -207,10 +201,9 @@ async def handle_chat_request(
 
                 if asked_about_memory:
                     logger.info(f"MEMORY_QUERY: User {user_id} asked about previous conversation memory in session {session_id}.")
-                    latest_summary = db.query(UserSummary)\
-                        .filter(UserSummary.user_id == user_id)\
-                        .order_by(UserSummary.timestamp.desc())\
-                        .first()
+                    stmt = select(UserSummary).where(UserSummary.user_id == user_id).order_by(UserSummary.timestamp.desc())
+                    result = await db.execute(stmt)
+                    latest_summary = result.first()
 
                     if latest_summary and latest_summary.summary_text is not None and latest_summary.summary_text.strip():
                         summary_snippet = latest_summary.summary_text
@@ -265,10 +258,9 @@ async def handle_chat_request(
                     
                     # --- Session Change Detection & Summary Handling ---
                     previous_session_id_to_summarize = None
-                    latest_db_message_for_user = db.query(Conversation)\
-                        .filter(Conversation.user_id == user_id)\
-                        .order_by(Conversation.timestamp.desc())\
-                        .first()
+                    stmt = select(Conversation).where(Conversation.user_id == user_id).order_by(Conversation.timestamp.desc())
+                    result = await db.execute(stmt)
+                    latest_db_message_for_user = result.first()
 
                     is_new_session = False
                     if latest_db_message_for_user:
@@ -276,7 +268,7 @@ async def handle_chat_request(
                             previous_session_id_to_summarize = latest_db_message_for_user.session_id
                             is_new_session = True
                             logger.info(f"STANDARD_CHAT: New session detected ({session_id}). Previous DB session: {previous_session_id_to_summarize}. Triggering summary for previous session.")
-                            background_tasks.add_task(summarize_and_save, cast(int, current_user.id), cast(str, previous_session_id_to_summarize), db_session_creator=get_background_db) # Pass db_session_creator
+                            background_tasks.add_task(summarize_and_save, cast(int, current_user.id), cast(str, previous_session_id_to_summarize))
                         else: # Check for new conversation within the same session
                             if str(latest_db_message_for_user.conversation_id) != str(conversation_id):
                                 is_new_session = True # Treat as new context for summary injection
@@ -291,10 +283,9 @@ async def handle_chat_request(
 
 
                     if is_new_session:
-                        past_summary = db.query(UserSummary)\
-                            .filter(UserSummary.user_id == user_id)\
-                            .order_by(UserSummary.timestamp.desc())\
-                            .first()
+                        stmt = select(UserSummary).where(UserSummary.user_id == user_id).order_by(UserSummary.timestamp.desc())
+                        result = await db.execute(stmt)
+                        past_summary = result.first()
 
                         if past_summary:
                             summary_injection_text = (
@@ -348,9 +339,9 @@ async def handle_chat_request(
                             timestamp=datetime.now()
                         )
                         db.add(conversation_entry)
-                        db.commit()
+                        await db.commit()
                     except Exception as e:
-                        db.rollback()
+                        await db.rollback()
                         logger.error(f"DB error saving standard conversation turn for session {session_id}: {e}", exc_info=True)
                         raise HTTPException(status_code=500, detail="Could not save conversation turn.")
 
@@ -408,45 +399,45 @@ async def handle_chat_request(
 
 
 # --- Define the Summarization Function ---
-async def summarize_and_save(user_id: int, session_id_to_summarize: str, db_session_creator = None):
+async def summarize_and_save(user_id: int, session_id_to_summarize: str):
     """Fetches history, calls LLM to summarize, and saves to UserSummary table."""
     logger.info(f"Background Task: Starting summarization for user {user_id}, session {session_id_to_summarize}")
-    # --- Use a dedicated DB session for the background task ---
-    if db_session_creator:
-        db: DBSession = next(db_session_creator())
-    else:
-        db: DBSession = SessionLocal()
-    try:
-        # 1. Retrieve conversation history
-        conversation_history = db.query(Conversation)\
-            .filter(Conversation.session_id == session_id_to_summarize, Conversation.user_id == user_id)\
-            .order_by(Conversation.timestamp.asc())\
-            .all()
+    # --- Use a dedicated async DB session for the background task ---
+    from app.database import AsyncSessionLocal
+    async with AsyncSessionLocal() as db:
+        try:
+            # 1. Retrieve conversation history
+            stmt = select(Conversation).where(
+                Conversation.session_id == session_id_to_summarize,
+                Conversation.user_id == user_id
+            ).order_by(Conversation.timestamp.asc())
+            result = await db.execute(stmt)
+            conversation_history = result.scalars().all()
 
-        if not conversation_history or len(conversation_history) < MIN_TURNS_FOR_SUMMARY:
-             logger.info(f"Background Task: Skipping summarization for session {session_id_to_summarize} (less than {MIN_TURNS_FOR_SUMMARY} turns).")
-             return
+            if not conversation_history or len(conversation_history) < MIN_TURNS_FOR_SUMMARY:
+                 logger.info(f"Background Task: Skipping summarization for session {session_id_to_summarize} (less than {MIN_TURNS_FOR_SUMMARY} turns).")
+                 return
 
-        # 2. Format history for LLM
-        history_lines = []
-        for turn in conversation_history:
-            history_lines.append(f"user: {turn.message}")
-            history_lines.append(f"assistant: {turn.response}")
-        formatted_history = "\n".join(history_lines)
+            # 2. Format history for LLM
+            history_lines = []
+            for turn in conversation_history:
+                history_lines.append(f"user: {turn.message}")
+                history_lines.append(f"assistant: {turn.response}")
+            formatted_history = "\n".join(history_lines)
 
-        # --- Optional: Truncate history if too long ---
-        # This is a simple truncation; you might want to use a more sophisticated method
-        if len(formatted_history) > MAX_HISTORY_CHARS_FOR_SUMMARY:
-            original_len = len(formatted_history)
-            formatted_history = formatted_history[-MAX_HISTORY_CHARS_FOR_SUMMARY:] # Take the most recent part
-            logger.warning(f"Background Task: Truncated conversation history for session {session_id_to_summarize} from {original_len} to {len(formatted_history)} chars for summarization.")
-            # Optionally, add a note to the prompt that history was truncated
-            # formatted_history = "[History truncated due to length]\n...\n" + formatted_history
+            # --- Optional: Truncate history if too long ---
+            # This is a simple truncation; you might want to use a more sophisticated method
+            if len(formatted_history) > MAX_HISTORY_CHARS_FOR_SUMMARY:
+                original_len = len(formatted_history)
+                formatted_history = formatted_history[-MAX_HISTORY_CHARS_FOR_SUMMARY:] # Take the most recent part
+                logger.warning(f"Background Task: Truncated conversation history for session {session_id_to_summarize} from {original_len} to {len(formatted_history)} chars for summarization.")
+                # Optionally, add a note to the prompt that history was truncated
+                # formatted_history = "[History truncated due to length]\n...\n" + formatted_history
 
 
-        # 3. Create the summarization prompt
-        # --- Using your improved prompt ---
-        summarization_prompt = f"""Kamu adalah Aika, AI pendamping dari UGM-AICare. Tugasmu adalah membuat ringkasan singkat dari percakapan sebelumnya dengan pengguna. Ringkasan ini akan kamu gunakan untuk mengingatkan pengguna tentang apa yang telah dibahas jika mereka bertanya "apakah kamu ingat percakapan kita?".
+            # 3. Create the summarization prompt
+            # --- Using your improved prompt ---
+            summarization_prompt = f"""Kamu adalah Aika, AI pendamping dari UGM-AICare. Tugasmu adalah membuat ringkasan singkat dari percakapan sebelumnya dengan pengguna. Ringkasan ini akan kamu gunakan untuk mengingatkan pengguna tentang apa yang telah dibahas jika mereka bertanya "apakah kamu ingat percakapan kita?".
 
 Buatlah ringkasan dalam 1-2 kalimat saja, dalam Bahasa Indonesia yang alami dan kasual, seolah-olah kamu sedang berbicara santai dengan teman. Fokus pada inti atau perasaan utama yang diungkapkan pengguna.
 Hindari penggunaan daftar, poin-poin, judul seperti "Poin Utama", atau format markdown. Cukup tuliskan sebagai paragraf singkat yang mengalir.
@@ -461,48 +452,46 @@ Percakapan yang perlu diringkas:
 
 Ringkasan singkat dan kasual:"""
 
-        # 4. Call the LLM
-        summary_llm_history = [{"role": "user", "content": summarization_prompt}]
-        # Ensure DEFAULT_PROVIDERS and actual model name resolution logic is robust in llm.py
-        summary_provider = "gemma_local" # Or configurable
-        summary_model = llm.DEFAULT_PROVIDERS.get(summary_provider, "gemma_local") if hasattr(llm, 'DEFAULT_PROVIDERS') else "gemma_local"
+            # 4. Call the LLM
+            summary_llm_history = [{"role": "user", "content": summarization_prompt}]
+            # Ensure DEFAULT_PROVIDERS and actual model name resolution logic is robust in llm.py
+            summary_provider = "gemma_local" # Or configurable
+            summary_model = llm.DEFAULT_PROVIDERS.get(summary_provider, "gemma_local") if hasattr(llm, 'DEFAULT_PROVIDERS') else "gemma_local"
 
-        summary_text = await llm.generate_response(
-             history=summary_llm_history,
-             provider=summary_provider,
-             model= summary_model,
-             max_tokens=1024,
-             temperature=0.5
-        )
+            summary_text = await llm.generate_response(
+                 history=summary_llm_history,
+                 provider=summary_provider,
+                 model= summary_model,
+                 max_tokens=1024,
+                 temperature=0.5
+            )
 
-        if summary_text.startswith("Error:"):
-             # Log the full error from LLM for better debugging
-             logger.error(f"Background Task: LLM Error during summarization for session {session_id_to_summarize}: {summary_text}")
-             raise Exception(f"LLM Error during summarization") # Generic error to frontend/caller
+            if summary_text.startswith("Error:"):
+                 # Log the full error from LLM for better debugging
+                 logger.error(f"Background Task: LLM Error during summarization for session {session_id_to_summarize}: {summary_text}")
+                 raise Exception(f"LLM Error during summarization") # Generic error to frontend/caller
 
-        # 5. Save the summary
-        new_summary = UserSummary(
-             user_id=user_id,
-             summarized_session_id=session_id_to_summarize,
-             summary_text=summary_text.strip(),
-             timestamp=datetime.now() # Ensure timestamp is set here
-        )
-        db.add(new_summary)
-        db.commit() # Commit within this background task's session
-        logger.info(f"Background Task: Saved summary for user {user_id} from session {session_id_to_summarize}")
+            # 5. Save the summary
+            new_summary = UserSummary(
+                 user_id=user_id,
+                 summarized_session_id=session_id_to_summarize,
+                 summary_text=summary_text.strip(),
+                 timestamp=datetime.now() # Ensure timestamp is set here
+            )
+            db.add(new_summary)
+            await db.commit() # Commit within this background task's session
+            logger.info(f"Background Task: Saved summary for user {user_id} from session {session_id_to_summarize}")
 
-    except Exception as e:
-        db.rollback() # Rollback this background task's session on error
-        logger.error(f"Background Task: Failed to summarize session {session_id_to_summarize} for user {user_id}: {e}", exc_info=True)
-    finally:
-        db.close() # Explicitly close the background task's session
+        except Exception as e:
+            await db.rollback() # Rollback this background task's session on error
+            logger.error(f"Background Task: Failed to summarize session {session_id_to_summarize} for user {user_id}: {e}", exc_info=True)
 
 # --- New Endpoint for Chat History ---
 @router.get("/history", response_model=List[ConversationHistoryItem])
 async def get_chat_history(
     limit: int = Query(100, ge=1, le=500), # Limit for pagination
     skip: int = Query(0, ge=0), # Optional pagination
-    db: DBSession = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_active_user) # Get authenticated user
 ):
     """Fetches conversation history for the authenticated user."""
@@ -510,10 +499,9 @@ async def get_chat_history(
         logger.info(f"Fetching conversation turns for user {current_user.id}") # Use the module's logger
 
         # 1. Fetch conversation turns from DB in chronological order
-        conversation_turns = db.query(Conversation)\
-            .filter(Conversation.user_id == current_user.id)\
-            .order_by(Conversation.timestamp.asc()) \
-            .all()
+        stmt = select(Conversation).where(Conversation.user_id == current_user.id).order_by(Conversation.timestamp.asc()).offset(skip).limit(limit)
+        result = await db.execute(stmt)
+        conversation_turns = result.scalars().all()
         logger.info(f"Retrieved {len(conversation_turns)} conversation turns for user {current_user.id}")
 
         # 2. Transform the data into individual history items
