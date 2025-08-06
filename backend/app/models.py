@@ -7,6 +7,16 @@ from app.database import Base
 from datetime import datetime
 import hashlib # Import hashlib
 
+# Import agent models
+from app.models.agents import (
+    AnalyticsReport,
+    InterventionCampaign, 
+    CampaignExecution,
+    TriageAssessment,
+    AgentSystemLog,
+    AgentConfiguration
+)
+
 class User(Base):
     __tablename__ = "users"
 
