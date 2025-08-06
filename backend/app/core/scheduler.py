@@ -6,10 +6,11 @@ from app.database import SessionLocal # Factory to create sessions for jobs
 from app.models import User
 from app.utils.security_utils import decrypt_data
 from app.utils.email_utils import send_email
-from datetime import datetime, time, timedelta, date
+from datetime import datetime, time as dt_time, timedelta, date
 import random
 import os
 import logging
+import time
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -41,13 +42,18 @@ def send_proactive_checkins():
         app_url = os.getenv('NEXTAUTH_URL', 'http://localhost:4000')
 
         for user in eligible_users:
-            decrypted_email = decrypt_data(user.email) # Decrypt email from DB
+            if not user.email:  # type: ignore  # Check if email is None or empty string
+                logger.warning(f"Scheduler: User {user.id} has no email address. Skipping check-in.")
+                continue
+                
+            decrypted_email = decrypt_data(user.email)  # type: ignore  # Decrypt email from DB
             if not decrypted_email:
                 logger.error(f"Scheduler: Failed to decrypt email for user {user.id}. Skipping check-in.")
                 continue
 
-            # Prepare email content (use variations)
-            user_name = user.name or 'Teman UGM' # Use name if available
+            # Prepare email content (use variations) 
+            # Note: User model doesn't have 'name' field, using google_sub or default
+            user_name = getattr(user, 'name', None) or 'Teman UGM'  # Use name if available, fallback to default
             checkin_subjects = [ f"Sekadar menyapa dari Aika, {user_name}!", "Checking in - Gimana kabarmu?", "Aika mampir sebentar :)", ]
             checkin_messages = [
                 f"Halo {user_name}, Aika cuma mau mampir sebentar nih. Gimana kabarmu beberapa hari ini? Kalau mau cerita atau sekadar ngobrol, aku ada di sini ya.",
