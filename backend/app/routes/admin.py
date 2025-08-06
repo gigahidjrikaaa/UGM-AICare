@@ -31,6 +31,8 @@ class UserListItem(BaseModel):
     longest_streak: int
     last_activity_date: Optional[date] = None
     allow_email_checkins: bool
+    role: Optional[str] = "user"
+    is_active: Optional[bool] = True
     created_at: Optional[datetime] = None
     
     # Computed fields
@@ -68,6 +70,8 @@ class UserDetailResponse(BaseModel):
     longest_streak: int
     last_activity_date: Optional[date] = None
     allow_email_checkins: bool
+    role: Optional[str] = "user"
+    is_active: Optional[bool] = True
     created_at: Optional[datetime] = None
     
     # Detailed stats
@@ -140,9 +144,22 @@ async def get_admin_user(
     current_user: User = Depends(get_current_active_user)
 ) -> User:
     """Dependency to ensure current user is an admin"""
-    # TODO: Add proper admin role check
-    # For now, assume all authenticated users can access admin endpoints
-    # In production, add: if current_user.role != "admin": raise HTTPException(...)
+    user_role = getattr(current_user, 'role', None)
+    user_active = getattr(current_user, 'is_active', True)
+    
+    if not user_role or user_role not in ["admin", "therapist"]:
+        logger.warning(f"User {current_user.id} with role '{user_role}' attempted to access admin endpoint")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    
+    if not user_active:
+        logger.warning(f"Inactive admin user {current_user.id} attempted to access admin endpoint")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is deactivated"
+        )
     
     return current_user
 
@@ -277,12 +294,14 @@ async def get_users(
                 longest_streak=user.longest_streak,  # type: ignore
                 last_activity_date=user.last_activity_date,  # type: ignore
                 allow_email_checkins=user.allow_email_checkins,  # type: ignore
-                created_at=None,  # TODO: Add when field is available
+                role=getattr(user, 'role', 'user'),  # type: ignore
+                is_active=getattr(user, 'is_active', True),  # type: ignore
+                created_at=getattr(user, 'created_at', None),  # type: ignore
                 total_journal_entries=journal_count,
                 total_conversations=conversation_count,
                 total_badges=badge_count,
                 total_appointments=appointment_count,
-                last_login=None  # TODO: Add when field is available
+                last_login=getattr(user, 'last_login', None)  # type: ignore
             )
             users.append(user_item)
         
@@ -395,7 +414,9 @@ async def get_user_detail(
             longest_streak=user.longest_streak,  # type: ignore
             last_activity_date=user.last_activity_date,  # type: ignore
             allow_email_checkins=user.allow_email_checkins,  # type: ignore
-            created_at=None,  # TODO: Add when field is available
+            role=getattr(user, 'role', 'user'),  # type: ignore
+            is_active=getattr(user, 'is_active', True),  # type: ignore
+            created_at=getattr(user, 'created_at', None),  # type: ignore
             journal_entries=journal_data,
             recent_conversations=conversation_data,
             badges=badge_data,
@@ -446,6 +467,231 @@ async def toggle_user_email_checkins(
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update user email checkin settings"
+        )
+
+
+@router.put("/users/{user_id}/status")
+async def update_user_status(
+    user_id: int,
+    is_active: bool = Query(..., description="Set user active status"),
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    """Update user active status (enable/disable user account)"""
+    logger.info(f"Admin {admin_user.id} updating status for user {user_id} to active={is_active}")
+    
+    try:
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Prevent admins from deactivating themselves
+        if user_id == admin_user.id and not is_active:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot deactivate your own account"
+            )
+        
+        user.is_active = is_active  # type: ignore
+        user.updated_at = datetime.now()  # type: ignore
+        db.commit()
+        
+        return {
+            "message": f"User {user_id} {'activated' if is_active else 'deactivated'} successfully",
+            "user_id": user_id,
+            "is_active": is_active
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating user status for user {user_id}: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update user status"
+        )
+
+
+@router.put("/users/{user_id}/role")
+async def update_user_role(
+    user_id: int,
+    role: str = Query(..., description="New user role", regex="^(user|admin|therapist)$"),
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    """Update user role"""
+    logger.info(f"Admin {admin_user.id} updating role for user {user_id} to {role}")
+    
+    try:
+        # Only admin users can change roles
+        admin_role = getattr(admin_user, 'role', None)
+        if admin_role != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin users can change user roles"
+            )
+        
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Prevent admins from removing their own admin role
+        if user_id == admin_user.id and role != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot remove admin role from your own account"
+            )
+        
+        old_role = getattr(user, 'role', 'user')
+        user.role = role  # type: ignore
+        user.updated_at = datetime.now()  # type: ignore
+        db.commit()
+        
+        return {
+            "message": f"User {user_id} role updated from '{old_role}' to '{role}'",
+            "user_id": user_id,
+            "old_role": old_role,
+            "new_role": role
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error updating user role for user {user_id}: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update user role"
+        )
+
+
+@router.delete("/users/{user_id}")
+async def delete_user(
+    user_id: int,
+    permanent: bool = Query(False, description="Permanently delete user data"),
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    """Delete or deactivate a user account"""
+    logger.info(f"Admin {admin_user.id} attempting to delete user {user_id} (permanent={permanent})")
+    
+    try:
+        # Only admin users can delete accounts
+        admin_role = getattr(admin_user, 'role', None)
+        if admin_role != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin users can delete user accounts"
+            )
+        
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        # Prevent admins from deleting themselves
+        if user_id == admin_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Cannot delete your own account"
+            )
+        
+        if permanent:
+            # Permanent deletion - CASCADE will handle related records
+            db.delete(user)
+            message = f"User {user_id} permanently deleted"
+        else:
+            # Soft delete - just deactivate
+            user.is_active = False  # type: ignore
+            user.updated_at = datetime.now()  # type: ignore
+            message = f"User {user_id} deactivated"
+        
+        db.commit()
+        
+        return {
+            "message": message,
+            "user_id": user_id,
+            "permanent": permanent
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error deleting user {user_id}: {e}", exc_info=True)
+        db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to delete user"
+        )
+
+
+@router.post("/users/{user_id}/reset-password")
+async def reset_user_password(
+    user_id: int,
+    db: Session = Depends(get_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    """Generate a password reset token for a user"""
+    logger.info(f"Admin {admin_user.id} requesting password reset for user {user_id}")
+    
+    try:
+        # Only admin users can reset passwords
+        admin_role = getattr(admin_user, 'role', None)
+        if admin_role != "admin":
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Only admin users can reset passwords"
+            )
+        
+        user = db.query(User).filter(User.id == user_id).first()
+        if not user:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="User not found"
+            )
+        
+        user_email = decrypt_user_email(getattr(user, 'email', None))
+        if not user_email:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="User does not have an email address"
+            )
+        
+        # Generate reset token (simplified implementation)
+        import secrets
+        reset_token = secrets.token_urlsafe(32)
+        
+        # In a real implementation, you would:
+        # 1. Store the reset token in a password_reset_tokens table
+        # 2. Send an email to the user with the reset link
+        # 3. Set an expiration time for the token
+        
+        logger.info(f"Password reset token generated for user {user_id}")
+        
+        return {
+            "message": f"Password reset token generated for user {user_id}",
+            "user_id": user_id,
+            "email": user_email,
+            "reset_token": reset_token,  # In production, don't return this directly
+            "note": "In production, this token would be sent via email"
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error generating password reset for user {user_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate password reset"
         )
 
 

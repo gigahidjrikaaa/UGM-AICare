@@ -69,7 +69,7 @@ ADMIN_PASSWORD=secure_password
 
 ## Useful Links
 
-- Frontend: <http://localhost:3000>
+- Frontend: <http://localhost:4000>
 - Backend API: <http://localhost:8000/docs>
-- Admin Dashboard: <http://localhost:3000/admin>
+- Admin Dashboard: <http://localhost:4000/admin>
 - N8N: <https://ina17.com/n8n>

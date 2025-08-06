@@ -38,7 +38,7 @@ def send_proactive_checkins():
         if not eligible_users: return # Exit early if no one is eligible
 
         # Get App URL for link back
-        app_url = os.getenv('NEXTAUTH_URL', 'http://localhost:3000')
+        app_url = os.getenv('NEXTAUTH_URL', 'http://localhost:4000')
 
         for user in eligible_users:
             decrypted_email = decrypt_data(user.email) # Decrypt email from DB

@@ -16,6 +16,17 @@ class User(Base):
     email = Column(String, nullable=True)
     sentiment_score = Column(Float, default=0.0)
     wallet_address = Column(String, unique=True, index=True, nullable=True) # Optional EDU Chain wallet address
+    
+    # User role and authentication
+    role = Column(String, default="user", nullable=False) # "user", "admin", "therapist"
+    password_hash = Column(String, nullable=True) # For email/password authentication
+    email_verified = Column(Boolean, default=False, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.now, nullable=True)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=True)
+    last_login = Column(DateTime, nullable=True)
 
     # Streaks and activity tracking
     current_streak = Column(Integer, default=0, nullable=False)

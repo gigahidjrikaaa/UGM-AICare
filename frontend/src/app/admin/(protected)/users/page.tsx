@@ -5,7 +5,6 @@ import {
   FiSearch as Search, 
   FiFilter as Filter, 
   FiDownload as Download, 
-  FiMoreHorizontal as MoreHorizontal, 
   FiEye as Eye, 
   FiEdit as Edit, 
   FiMail as Mail, 
@@ -17,6 +16,7 @@ import {
 } from '@/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
+import { apiCall } from '@/utils/adminApi';
 
 interface User {
   id: number;
@@ -28,7 +28,10 @@ interface User {
   longest_streak: number;
   last_activity_date: string | null;
   allow_email_checkins: boolean;
+  role?: string;
+  is_active?: boolean;
   created_at: string | null;
+  updated_at?: string | null;
   total_journal_entries: number;
   total_conversations: number;
   total_badges: number;
@@ -81,24 +84,13 @@ export default function UserManagementPage() {
         ...(searchTerm && { search: searchTerm })
       });
 
-      const response = await fetch(`/api/v1/admin/users?${queryParams}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch users');
-      }
-
-      const data: UsersResponse = await response.json();
+      const data: UsersResponse = await apiCall(`/api/v1/admin/users?${queryParams}`);
       setUsers(data.users);
       setStats(data.stats);
       setTotalCount(data.total_count);
     } catch (error) {
       console.error('Error fetching users:', error);
-      toast.error('Failed to load users');
+      toast.error(error instanceof Error ? error.message : 'Failed to load users');
     } finally {
       setLoading(false);
     }
@@ -120,23 +112,87 @@ export default function UserManagementPage() {
   // Toggle email checkins
   const toggleEmailCheckins = async (userId: number, enabled: boolean) => {
     try {
-      const response = await fetch(`/api/v1/admin/users/${userId}/email-checkins?enabled=${enabled}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('authToken')}`,
-          'Content-Type': 'application/json'
-        }
+      await apiCall(`/api/v1/admin/users/${userId}/email-checkins?enabled=${enabled}`, {
+        method: 'PUT'
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to update email checkins');
-      }
 
       toast.success(`Email checkins ${enabled ? 'enabled' : 'disabled'}`);
       fetchUsers(); // Refresh data
     } catch (error) {
       console.error('Error toggling email checkins:', error);
-      toast.error('Failed to update email checkins');
+      toast.error(error instanceof Error ? error.message : 'Failed to update email checkins');
+    }
+  };
+
+  // Toggle user active status
+  const toggleUserStatus = async (userId: number, isActive: boolean) => {
+    try {
+      await apiCall(`/api/v1/admin/users/${userId}/status?is_active=${isActive}`, {
+        method: 'PUT'
+      });
+
+      toast.success(`User ${isActive ? 'activated' : 'deactivated'}`);
+      fetchUsers(); // Refresh data
+    } catch (error) {
+      console.error('Error toggling user status:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update user status');
+    }
+  };
+
+  // Update user role
+  const updateUserRole = async (userId: number, newRole: string) => {
+    try {
+      await apiCall(`/api/v1/admin/users/${userId}/role?role=${newRole}`, {
+        method: 'PUT'
+      });
+
+      toast.success(`User role updated to ${newRole}`);
+      fetchUsers(); // Refresh data
+    } catch (error) {
+      console.error('Error updating user role:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update user role');
+    }
+  };
+
+  // Delete user
+  const deleteUser = async (userId: number, permanent: boolean = false) => {
+    if (!confirm(`Are you sure you want to ${permanent ? 'permanently delete' : 'deactivate'} this user?`)) {
+      return;
+    }
+
+    try {
+      await apiCall(`/api/v1/admin/users/${userId}?permanent=${permanent}`, {
+        method: 'DELETE'
+      });
+
+      toast.success(`User ${permanent ? 'permanently deleted' : 'deactivated'}`);
+      fetchUsers(); // Refresh data
+    } catch (error) {
+      console.error('Error deleting user:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to delete user');
+    }
+  };
+
+  // Reset user password
+  const resetUserPassword = async (userId: number) => {
+    if (!confirm('Are you sure you want to generate a password reset for this user?')) {
+      return;
+    }
+
+    try {
+      const result = await apiCall<{ reset_token?: string; message: string }>(`/api/v1/admin/users/${userId}/reset-password`, {
+        method: 'POST'
+      });
+
+      toast.success('Password reset token generated');
+      
+      // Show reset token (in production, this would be sent via email)
+      if (result.reset_token) {
+        prompt('Password reset token (copy this):', result.reset_token);
+      }
+    } catch (error) {
+      console.error('Error resetting password:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to reset password');
     }
   };
 
@@ -543,12 +599,72 @@ export default function UserManagementPage() {
                       >
                         <Eye className="h-4 w-4" />
                       </button>
+                      
+                      {/* Role Badge */}
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                        user.role === 'admin' 
+                          ? 'bg-red-500/20 text-red-400' 
+                          : user.role === 'therapist'
+                          ? 'bg-blue-500/20 text-blue-400'
+                          : 'bg-gray-500/20 text-gray-400'
+                      }`}>
+                        {user.role || 'user'}
+                      </span>
+                      
+                      {/* Status Toggle */}
                       <button
-                        className="text-gray-400 hover:text-gray-300 transition-colors"
-                        title="More Actions"
+                        onClick={() => toggleUserStatus(user.id, !(user.is_active ?? true))}
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          user.is_active ?? true
+                            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                            : 'bg-red-500/20 text-red-400 hover:bg-red-500/30'
+                        }`}
+                        title={`${user.is_active ?? true ? 'Deactivate' : 'Activate'} User`}
                       >
-                        <MoreHorizontal className="h-4 w-4" />
+                        {user.is_active ?? true ? 'Active' : 'Inactive'}
                       </button>
+                      
+                      {/* Actions Dropdown */}
+                      <div className="relative">
+                        <select
+                          onChange={(e) => {
+                            const action = e.target.value;
+                            e.target.value = ''; // Reset selection
+                            
+                            switch (action) {
+                              case 'make-admin':
+                                updateUserRole(user.id, 'admin');
+                                break;
+                              case 'make-therapist':
+                                updateUserRole(user.id, 'therapist');
+                                break;
+                              case 'make-user':
+                                updateUserRole(user.id, 'user');
+                                break;
+                              case 'reset-password':
+                                resetUserPassword(user.id);
+                                break;
+                              case 'delete':
+                                deleteUser(user.id, false);
+                                break;
+                              case 'delete-permanent':
+                                deleteUser(user.id, true);
+                                break;
+                            }
+                          }}
+                          className="bg-white/10 text-white text-xs border border-white/20 rounded px-2 py-1 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/50"
+                          title="User Actions Menu"
+                          aria-label="User Actions Menu"
+                        >
+                          <option value="">Actions</option>
+                          <option value="make-admin">Make Admin</option>
+                          <option value="make-therapist">Make Therapist</option>
+                          <option value="make-user">Make User</option>
+                          <option value="reset-password">Reset Password</option>
+                          <option value="delete">Deactivate</option>
+                          <option value="delete-permanent">Delete Permanently</option>
+                        </select>
+                      </div>
                     </div>
                   </td>
                 </motion.tr>

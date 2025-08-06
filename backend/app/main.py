@@ -74,13 +74,31 @@ app = FastAPI(
 )
 
 # Add CORS middleware
-origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+origins_env = os.getenv("ALLOWED_ORIGINS")
+if origins_env:
+    origins = [origin.strip() for origin in origins_env.split(",")]
+else:
+    # Fallback origins for development - ensure all possible origins are covered
+    origins = [
+        "http://localhost:4000",
+        "http://127.0.0.1:4000", 
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:8000",
+        "http://127.0.0.1:8000",
+        "http://frontend:4000",  # Docker internal
+        "http://backend:8000"    # Docker internal
+    ]
+
+logger.info(f"CORS configured with origins: {origins}")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,   # Allow all origins. Change to FRONTEND_URL in production
+    allow_origins=origins,   # Allow specific origins for security
     allow_credentials=True,
-    allow_methods=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
     allow_headers=["*"],
+    expose_headers=["*"]
 )
 
 logger.info("Including API routers...")
@@ -119,6 +137,16 @@ async def root():
             "redoc": "/redoc"
         },
         "api_base_url": "/api/v1"
+    }
+
+@app.get("/cors-test")
+async def cors_test():
+    """Test endpoint to verify CORS configuration"""
+    logger.info("CORS test endpoint accessed")
+    return {
+        "message": "CORS test successful",
+        "origins": os.getenv("ALLOWED_ORIGINS", "*").split(","),
+        "timestamp": datetime.now(timezone.utc).isoformat()
     }
 
 @app.get("/health")

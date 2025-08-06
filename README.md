@@ -214,7 +214,7 @@ This repository contains the monorepo for the UGM-AICare project, including the 
     cd ..
     ```
 
-* Frontend usually runs on `http://localhost:3000`
+* Frontend usually runs on `http://localhost:4000`
 * Backend usually runs on `http://localhost:8000` (API docs at `http://localhost:8000/docs`)
 * Hardhat node usually runs on `http://127.0.0.1:8545/`
 

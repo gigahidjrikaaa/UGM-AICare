@@ -176,7 +176,7 @@ if not exist "%~dp0frontend\.env.local" (
     echo !YELLOW!Frontend .env.local file not found. Creating a template...!RESET!
     echo # Environment Configuration > "%~dp0frontend\.env.local"
     echo NEXT_PUBLIC_API_URL=http://localhost:8000 >> "%~dp0frontend\.env.local"
-    echo NEXTAUTH_URL=http://localhost:3000 >> "%~dp0frontend\.env.local"
+    echo NEXTAUTH_URL=http://localhost:4000 >> "%~dp0frontend\.env.local"
     echo NEXTAUTH_SECRET=your-nextauth-secret-key >> "%~dp0frontend\.env.local"
     echo. >> "%~dp0frontend\.env.local"
     echo # OAuth Configuration >> "%~dp0frontend\.env.local"
@@ -230,13 +230,13 @@ timeout /t 2 /nobreak > nul
 
 :: Start frontend server
 echo !CYAN!Starting frontend server...!RESET!
-start "Frontend Server" cmd /c "cd /d "%~dp0frontend" && echo !GREEN!Frontend server starting on http://localhost:3000!RESET! && npm run dev & echo !RED!Frontend server stopped.!RESET! & pause"
+start "Frontend Server" cmd /c "cd /d "%~dp0frontend" && echo !GREEN!Frontend server starting on http://localhost:4000!RESET! && npm run dev & echo !RED!Frontend server stopped.!RESET! & pause"
 timeout /t 2 /nobreak > nul
 
 :: Open the application in the default browser
 echo !CYAN!Opening application in browser...!RESET!
 timeout /t 5 /nobreak > nul
-start http://localhost:3000
+start http://localhost:4000
 
 echo !GREEN!All services started!!RESET!
 echo.

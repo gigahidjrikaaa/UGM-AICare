@@ -147,7 +147,7 @@
       "production": "Cloud + INA17 hybrid"
     },
     "services": {
-      "frontend": "Port 3000/4000",
+      "frontend": "Port 4000",
       "backend": "Port 8000",
       "database": "Port 5432",
       "redis": "Port 6379",

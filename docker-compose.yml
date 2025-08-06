@@ -87,9 +87,9 @@ services:
     environment:
       # Ensure backend connects to containerized DB and Redis
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      FRONTEND_URL: http://frontend:3000
+      FRONTEND_URL: http://frontend:4000
       BACKEND_URL: ${BACKEND_URL:-https://apiaicare.ina17.com} # Use service name for internal communication
-      ALLOWED_ORIGINS: https://aicare.ina17.com # Add this line to specify the allowed origin
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://aicare.ina17.com,http://localhost:4000,http://127.0.0.1:4000,http://localhost:3000,http://127.0.0.1:3000,http://frontend:4000,http://backend:8000} # Allow both production and development origins
       REDIS_HOST: redis # Service name defined above
       REDIS_PORT: 6379 # Default Redis port inside Docker network
       REDIS_USERNAME: ""
@@ -149,72 +149,6 @@ services:
     # networks:
     #   aicare_network:
     #     ipv4_address: 10.10.1.115
-
-
-# --- Monitoring Services ---
-
-  # prometheus:
-  #   image: prom/prometheus:latest
-  #   container_name: prometheus
-  #   restart: unless-stopped
-  #   ports:
-  #     - "9090:9090"
-  #   volumes:
-  #     - ./prometheus.yml:/etc/prometheus/prometheus.yml
-  #     - prometheus_data:/prometheus
-  #   command:
-  #     - '--config.file=/etc/prometheus/prometheus.yml'
-  #   networks:
-  #     - aicare_network
-  #   depends_on:
-  #     - cadvisor
-  #     - node-exporter
-
-  # grafana:
-  #   image: grafana/grafana:latest
-  #   container_name: grafana
-  #   restart: unless-stopped
-  #   ports:
-  #     - "3031:3000"
-  #   volumes:
-  #     - grafana_data:/var/lib/grafana
-  #   environment:
-  #     - GF_SECURITY_ADMIN_PASSWORD=admin
-  #   networks:
-  #     - aicare_network
-  #   depends_on:
-  #     - prometheus
-
-  # cadvisor:
-  #   image: gcr.io/cadvisor/cadvisor:latest
-  #   container_name: cadvisor
-  #   restart: unless-stopped
-  #   privileged: true
-  #   volumes:
-  #     - /:/rootfs:ro
-  #     - /var/run:/var/run:rw
-  #     - /sys:/sys:ro
-  #     - /var/lib/docker/:/var/lib/docker:ro
-  #   ports:
-  #     - "8080:8080"
-  #   networks:
-  #     - aicare_network
-
-  # node-exporter:
-  #   image: prom/node-exporter:latest
-  #   container_name: node-exporter
-  #   restart: unless-stopped
-  #   volumes:
-  #     - /proc:/host/proc:ro
-  #     - /sys:/host/sys:ro
-  #     - /:/rootfs:ro
-  #   command:
-  #     - '--path.procfs=/host/proc'
-  #     - '--path.sysfs=/host/sys'
-  #   ports:
-  #     - "9100:9100"
-  #   networks:
-  #     - aicare_network
 
 # Define named volumes for data persistence
 volumes:

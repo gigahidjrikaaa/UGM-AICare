@@ -19,7 +19,7 @@ COPY . .
 EXPOSE 3000
 
 # Default command for development (runs dev server)
-CMD ["npm", "run", "dev"]
+CMD ["npm", "run", "dev:docker"]
 
 
 # ---

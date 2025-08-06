@@ -182,7 +182,7 @@ if await module.should_complete(module_state):
 docker-compose up -d
 
 # Services available:
-# Frontend: http://localhost:3000
+# Frontend: http://localhost:4000
 # Backend: http://localhost:8000
 # Database: postgresql://localhost:5432
 # Redis: redis://localhost:6379
