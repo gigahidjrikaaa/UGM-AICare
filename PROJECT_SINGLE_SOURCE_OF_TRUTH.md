@@ -325,6 +325,7 @@ This project includes extensive documentation in the `docs/` folder to support d
 ### 🔗 Integration with Existing Docs
 
 The new documentation builds upon and references existing project documentation:
+
 - **AI Integration Guide**: LLM provider setup and configuration
 - **API Integration Reference**: Endpoint documentation and examples
 - **Mental Health AI Guidelines**: Ethical considerations and response protocols

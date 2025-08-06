@@ -589,7 +589,7 @@ class ContinuousValidation:
 
 - **System Availability**: 99.5% uptime during testing period
 - **Response Time**: < 2 seconds for 95% of API requests
-- **Agent Performance**: 
+- **Agent Performance**:
   - Analytics Agent: Weekly report generation within 1 hour
   - Intervention Agent: Campaign execution within 15 minutes
   - Triage Agent: Classification within 500ms

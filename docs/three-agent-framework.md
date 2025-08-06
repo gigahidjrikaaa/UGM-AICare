@@ -8,7 +8,7 @@ The UGM-AICare system implements a sophisticated three-agent architecture design
 
 ### 🤖 Analytics Agent
 
-#### Core Functionality
+#### Data Analysis and Pattern Recognition
 
 - **Data Sources**: Anonymized conversation logs, user interaction patterns, journal entries, system usage metrics
 - **Analysis Algorithms**:
@@ -54,7 +54,7 @@ class AnalyticsAgent:
 
 ### 📢 Intervention Agent
 
-#### Core Functionality
+#### Campaign Management and Execution
 
 - **Campaign Types**:
   - Preventive education campaigns
@@ -101,7 +101,7 @@ class InterventionAgent:
 
 ### 🩺 Triage Agent
 
-#### Core Functionality
+#### Real-time Classification and Assessment
 
 - **Real-time Classification**:
   - Crisis detection (suicide risk, self-harm indicators)
@@ -153,7 +153,7 @@ class TriageAgent:
 
 ### Data Flow Architecture
 
-```
+```mermaid
 Analytics Agent → Weekly Insights → Intervention Agent
      ↓                                    ↓
 Database Storage ← Performance Metrics ← Campaign Execution

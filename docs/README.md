@@ -7,7 +7,9 @@ This documentation suite provides comprehensive coverage of the UGM-AICare proje
 ## Core Documentation
 
 ### 📋 [Single Source of Truth](single-source-of-truth.md)
-**Primary Reference Document**
+
+#### Primary Reference Document
+
 - Complete project overview and core concept
 - Three-agent framework explanation
 - Technical architecture summary
@@ -17,7 +19,9 @@ This documentation suite provides comprehensive coverage of the UGM-AICare proje
 *This is the definitive reference for understanding the entire project.*
 
 ### 🏗️ [Three-Agent Framework](three-agent-framework.md)
-**Technical Architecture Deep Dive**
+
+#### Technical Architecture Deep Dive
+
 - Detailed agent specifications and functionality
 - Inter-agent communication protocols
 - Performance metrics and monitoring
@@ -25,7 +29,9 @@ This documentation suite provides comprehensive coverage of the UGM-AICare proje
 - Code examples and implementation patterns
 
 ### ⚙️ [Technical Specifications](technical-specifications.md)
-**System Requirements and Design**
+
+#### System Requirements and Design
+
 - Infrastructure requirements and dependencies
 - Database schema and data architecture
 - API design and security specifications
@@ -33,7 +39,9 @@ This documentation suite provides comprehensive coverage of the UGM-AICare proje
 - Performance benchmarks and optimization strategies
 
 ### 🚀 [Implementation Guide](implementation-guide.md)
-**Step-by-Step Development Instructions**
+
+#### Step-by-Step Development Instructions
+
 - Phase-by-phase implementation roadmap
 - Environment setup and configuration
 - Agent development and integration
@@ -41,7 +49,9 @@ This documentation suite provides comprehensive coverage of the UGM-AICare proje
 - Production deployment and monitoring
 
 ### 🔬 [Research Methodology](research-methodology.md)
-**Academic Framework and Validation**
+
+#### Academic Framework and Validation
+
 - Design Science Research methodology
 - Comprehensive validation framework
 - Quality assurance and testing procedures
@@ -70,12 +80,14 @@ This documentation suite provides comprehensive coverage of the UGM-AICare proje
 ### For Developers
 
 **Getting Started:**
+
 1. Read [Single Source of Truth](single-source-of-truth.md) for project understanding
 2. Follow [Implementation Guide](implementation-guide.md) for setup
 3. Reference [Technical Specifications](technical-specifications.md) for development
 4. Use [AI Integration Guide](ai-integration-guide.md) for LLM integration
 
 **Development Workflow:**
+
 1. Review [Development Workflow](development-workflow.md)
 2. Implement following [Three-Agent Framework](three-agent-framework.md)
 3. Test using [Research Methodology](research-methodology.md) validation framework
@@ -84,12 +96,14 @@ This documentation suite provides comprehensive coverage of the UGM-AICare proje
 ### For Researchers
 
 **Academic Research:**
+
 1. Start with [Single Source of Truth](single-source-of-truth.md) for complete context
 2. Study [Research Methodology](research-methodology.md) for validation framework
 3. Reference [Three-Agent Framework](three-agent-framework.md) for technical details
 4. Use [Mental Health AI Guidelines](mental-health-ai-guidelines.md) for ethical considerations
 
 **Publication Preparation:**
+
 - Framework overview: [Single Source of Truth](single-source-of-truth.md)
 - Technical implementation: [Three-Agent Framework](three-agent-framework.md)
 - Validation methodology: [Research Methodology](research-methodology.md)
@@ -98,12 +112,14 @@ This documentation suite provides comprehensive coverage of the UGM-AICare proje
 ### For University Administration
 
 **System Understanding:**
+
 1. Begin with [Single Source of Truth](single-source-of-truth.md) executive summary
 2. Review impact potential and innovation points
 3. Understand deployment requirements in [Technical Specifications](technical-specifications.md)
 4. Consider ethical guidelines in [Mental Health AI Guidelines](mental-health-ai-guidelines.md)
 
 **Implementation Planning:**
+
 - Resource requirements: [Technical Specifications](technical-specifications.md)
 - Deployment roadmap: [Implementation Guide](implementation-guide.md)
 - Quality assurance: [Research Methodology](research-methodology.md)
@@ -111,6 +127,7 @@ This documentation suite provides comprehensive coverage of the UGM-AICare proje
 ### For Mental Health Professionals
 
 **AI-Assisted Support Understanding:**
+
 1. Review [Mental Health AI Guidelines](mental-health-ai-guidelines.md) for ethical framework
 2. Understand triage capabilities in [Three-Agent Framework](three-agent-framework.md)
 3. Learn about intervention strategies in [Single Source of Truth](single-source-of-truth.md)
@@ -118,7 +135,7 @@ This documentation suite provides comprehensive coverage of the UGM-AICare proje
 
 ## Document Relationships
 
-```
+```bash
 Single Source of Truth (Core Reference)
 ├── Three-Agent Framework (Technical Deep Dive)
 │   ├── Analytics Agent Implementation
