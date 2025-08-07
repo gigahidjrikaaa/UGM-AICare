@@ -26,6 +26,7 @@ from app.schemas.agents import (
 )
 from app.dependencies import get_current_active_user
 from app.routes.admin import get_admin_user
+from app.tasks.analytics_tasks import execute_analytics_analysis
 
 logger = logging.getLogger(__name__)
 

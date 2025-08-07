@@ -46,137 +46,23 @@ class BaseAgent(ABC):
     - Database integration
     """
 
-    def __init__(self, agent_type: AgentType, db: Session, redis_client=None):
+    def __init__(self, agent_type: AgentType, redis_client=None):
         self.agent_type = agent_type
         self.status = AgentStatus.IDLE
-        self.db = db
         self.redis_client = redis_client
-        self.start_time = None
-        self.execution_metrics = {}
-        
-        logger.info(f"{self.agent_type.value.title()} Agent initialized")
+        self.logger = logging.getLogger(f"agent.{self.agent_type.value}")
 
     @abstractmethod
-    async def execute(self, **kwargs) -> Dict[str, Any]:
-        """
-        Execute the agent's primary function.
-        Must be implemented by each specific agent.
-        """
+    def execute(self, **kwargs) -> Dict[str, Any]:
+        """Main execution method for the agent."""
         pass
 
     @abstractmethod
     def validate_input(self, **kwargs) -> bool:
-        """
-        Validate input parameters before execution.
-        Must be implemented by each specific agent.
-        """
+        """Validate input parameters for the agent."""
         pass
 
-    async def run(self, **kwargs) -> Dict[str, Any]:
-        """
-        Main execution wrapper with error handling and metrics.
-        """
-        self.start_time = datetime.utcnow()
-        self.status = AgentStatus.RUNNING
-        
-        try:
-            logger.info(f"Starting {self.agent_type.value} agent execution")
-            
-            # Validate input
-            if not self.validate_input(**kwargs):
-                raise ValueError("Input validation failed")
-            
-            # Log start event
-            await self._log_event("started", {"input_params": kwargs})
-            
-            # Execute main logic
-            result = await self.execute(**kwargs)
-            
-            # Calculate metrics
-            execution_time = (datetime.utcnow() - self.start_time).total_seconds()
-            self.execution_metrics = {
-                "execution_time_seconds": execution_time,
-                "success": True,
-                "timestamp": self.start_time.isoformat()
-            }
-            
-            # Log completion
-            await self._log_event("completed", {
-                "result_summary": self._summarize_result(result),
-                "metrics": self.execution_metrics
-            })
-            
-            self.status = AgentStatus.IDLE
-            logger.info(f"{self.agent_type.value} agent execution completed successfully")
-            
-            return result
-            
-        except Exception as e:
-            self.status = AgentStatus.ERROR
-            execution_time = (datetime.utcnow() - self.start_time).total_seconds() if self.start_time else 0
-            
-            error_details = {
-                "error_type": type(e).__name__,
-                "error_message": str(e),
-                "execution_time_seconds": execution_time
-            }
-            
-            logger.error(f"{self.agent_type.value} agent execution failed: {e}", exc_info=True)
-            await self._log_event("error", error_details)
-            
-            raise
-
-    async def _log_event(self, event_type: str, event_data: Dict[str, Any]):
-        """Log agent events to database"""
-        try:
-            from app.models.agents import AgentSystemLog
-            
-            log_entry = AgentSystemLog(
-                agent_type=self.agent_type.value,
-                event_type=event_type,
-                event_data=event_data,
-                status="success" if event_type != "error" else "error",
-                message=f"{self.agent_type.value} agent {event_type}",
-                processing_time_ms=int(self.execution_metrics.get("execution_time_seconds", 0) * 1000)
-            )
-            
-            self.db.add(log_entry)
-            self.db.commit()
-            
-        except Exception as e:
-            logger.error(f"Failed to log event: {e}")
-
-    def _summarize_result(self, result: Dict[str, Any]) -> Dict[str, Any]:
-        """Create a summary of execution result for logging"""
-        summary = {
-            "result_type": type(result).__name__,
-            "keys_present": list(result.keys()) if isinstance(result, dict) else None,
-            "success": True
-        }
-        
-        # Add agent-specific result summaries
-        if self.agent_type == AgentType.ANALYTICS:
-            summary.update({
-                "insights_count": len(result.get("insights", [])),
-                "patterns_detected": len(result.get("patterns", [])),
-                "data_points_analyzed": result.get("data_points_analyzed", 0)
-            })
-        elif self.agent_type == AgentType.INTERVENTION:
-            summary.update({
-                "campaigns_created": len(result.get("campaigns", [])),
-                "target_audience_size": result.get("target_audience_size", 0),
-                "campaign_type": result.get("campaign_type", "unknown")
-            })
-        elif self.agent_type == AgentType.TRIAGE:
-            summary.update({
-                "severity_level": result.get("severity_level", "unknown"),
-                "confidence_score": result.get("confidence_score", 0),
-                "action_recommended": result.get("recommended_action", "unknown")
-            })
-        
-        return summary
-
-    def get_status(self) -> Dict[str, Any]:
+    def get_status(self) -> AgentStatus:
         """Get current agent status and metrics"""
         return {
             "agent_type": self.agent_type.value,
