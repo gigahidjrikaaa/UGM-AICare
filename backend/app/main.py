@@ -3,7 +3,7 @@ import logging
 from fastapi import FastAPI, Request as FastAPIRequest # type: ignore
 from datetime import datetime, timezone
 from app.database import init_db, close_db
-from sqlalchemy import text
+from sqlalchemy import text # type: ignore
 from app.routes import auth, email, chat, feedback, link_did, internal, journal, journal_prompts, summary, profile, session_events, appointments, admin
 from contextlib import asynccontextmanager
 from app.core.scheduler import start_scheduler, shutdown_scheduler
