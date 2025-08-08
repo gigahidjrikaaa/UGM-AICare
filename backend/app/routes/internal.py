@@ -2,13 +2,14 @@
 
 from fastapi import APIRouter, Depends, HTTPException, Security, status, Body # type: ignore
 from fastapi.security import APIKeyHeader # type: ignore
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from typing import Optional, List, Tuple
 
-from app.database import get_db
+from app.database import get_async_db
 from app.schemas import UserInternalResponse, UserSyncPayload, UserSyncResponse
 from app.models import User
-from app.services.user_service import get_or_create_user # Import the user service function
+from app.services.user_service import async_get_or_create_user # Import the user service function
 from app.utils.security_utils import decrypt_data, encrypt_data #! For email decryption ONLY if needed
 import os
 import re
@@ -64,14 +65,15 @@ async def get_api_key(api_key: str = Security(api_key_header)):
 # --- End Security Setup ---
 
 @router.get("/user-by-sub/{google_sub}", response_model=UserInternalResponse, dependencies=[Security(get_api_key)])
-async def get_user_by_google_sub(google_sub: str, db: Session = Depends(get_db)):
+async def get_user_by_google_sub(google_sub: str, db: AsyncSession = Depends(get_async_db)):
     """
     Internal endpoint to fetch user details by Google SUB ID.
     Requires X-Internal-API-Key header.
     """
     logger.info(f"Internal API: Fetching user by sub: {google_sub}")
-    db_user = db.query(User).filter(User.google_sub == google_sub).first()
-    if not db_user:
+    result = await db.execute(select(User).filter(User.google_sub == google_sub))
+    db_user = result.scalar_one_or_none()
+    if not db_user: # type: ignore
         print(f"Internal API: User not found for sub: {google_sub}")
         raise HTTPException(status_code=404, detail="User not found")
 
@@ -95,7 +97,7 @@ async def get_user_by_google_sub(google_sub: str, db: Session = Depends(get_db))
 @router.post("/sync-user", response_model=UserSyncResponse, dependencies=[Security(get_api_key)])
 async def sync_user_on_login(
     payload: UserSyncPayload = Body(...),
-    db: Session = Depends(get_db)
+    db: AsyncSession = Depends(get_async_db)
 ):
     """
     Called internally by NextAuth after login.
@@ -105,7 +107,7 @@ async def sync_user_on_login(
 
     # Always use the service to get or create the user
     try:
-        db_user = get_or_create_user(db, google_sub=payload.google_sub, plain_email=payload.email)
+        db_user = await async_get_or_create_user(db, google_sub=payload.google_sub, plain_email=payload.email)
     except HTTPException as e:
         logger.error(f"User sync failed: {e.detail}")
         raise

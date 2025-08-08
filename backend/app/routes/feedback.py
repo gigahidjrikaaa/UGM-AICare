@@ -1,11 +1,11 @@
 # app/routes/feedback.py
 from fastapi import APIRouter, Depends, HTTPException, status, Body # type: ignore
 from pydantic import BaseModel, Field
-from sqlalchemy.orm import Session
-from typing import Literal, Optional
+from sqlalchemy.ext.asyncio import AsyncSession
+from typing import Literal, Optional, Any
 from datetime import datetime
 
-from app.database import get_db
+from app.database import get_async_db
 from app.models import Feedback, User
 from app.dependencies import get_current_active_user
 from app.schemas import FeedbackCreate, FeedbackResponse
@@ -23,7 +23,7 @@ router = APIRouter(
 @router.post("/", response_model=FeedbackResponse, status_code=status.HTTP_201_CREATED)
 async def submit_feedback(
     feedback_data: FeedbackCreate = Body(...), 
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
@@ -47,15 +47,16 @@ async def submit_feedback(
             category=feedback_data.category
         )
         db.add(new_feedback)
-        db.commit()
-        db.refresh(new_feedback)
+        await db.commit()
+        await db.refresh(new_feedback)
 
-        logger.info(f"Successfully saved feedback with ID: {new_feedback.id} for user ID: {current_user.id}")
+        any_feedback: Any = new_feedback
+        logger.info(f"Successfully saved feedback with ID: {any_feedback.id} for user ID: {current_user.id}")
 
-        return FeedbackResponse(id=new_feedback.id, timestamp=new_feedback.timestamp)
+        return FeedbackResponse(id=any_feedback.id, timestamp=any_feedback.timestamp)
 
     except Exception as e:
-        db.rollback()
+        await db.rollback()
         logger.error(f"Database error saving feedback for user ID {current_user.id}: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,

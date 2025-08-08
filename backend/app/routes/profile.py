@@ -1,14 +1,14 @@
 # backend/app/routes/profile.py (New File or add to existing user routes)
 from datetime import datetime
-from typing import Dict, List, Set
+from typing import Dict, List, Set, Any
 from fastapi import APIRouter, Depends, HTTPException, status # type: ignore
 from pydantic import BaseModel
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
 import logging
 import os
 
-from app.database import get_db
+from app.database import get_async_db
 from app.dependencies import get_current_active_user
 from app.schemas import CheckinSettingsUpdate, CheckinSettingsResponse, EarnedBadgeInfo, SyncAchievementsResponse
 from app.models import UserBadge, JournalEntry, User, Conversation
@@ -34,32 +34,34 @@ BESTIES_BADGE_ID = 8
 @router.put("/settings/checkins", response_model=CheckinSettingsResponse)
 async def update_checkin_settings(
     settings: CheckinSettingsUpdate,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Updates the user's preference for receiving email check-ins."""
-    logger.info(f"Updating check-in settings for user {current_user.id} to: {settings.allow_email_checkins}")
-    current_user.allow_email_checkins = settings.allow_email_checkins
+    any_user: Any = current_user
+    logger.info(f"Updating check-in settings for user {any_user.id} to: {settings.allow_email_checkins}")
+    setattr(any_user, 'allow_email_checkins', settings.allow_email_checkins)
     try:
-        db.add(current_user) # Add to session to track changes
-        db.commit()
-        db.refresh(current_user) # Refresh to confirm
-        return CheckinSettingsResponse(allow_email_checkins=current_user.allow_email_checkins)
+        db.add(any_user) # Add to session to track changes
+        await db.commit()
+        await db.refresh(any_user) # Refresh to confirm
+        return CheckinSettingsResponse(allow_email_checkins=any_user.allow_email_checkins)
     except Exception as e:
-         db.rollback()
+         await db.rollback()
          logger.error(f"Failed to update check-in settings for user {current_user.id}: {e}", exc_info=True)
          raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update settings")
 
 @router.post("/sync-achievements", response_model=SyncAchievementsResponse)
 async def sync_user_achievements(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
     Checks all badge criteria for the current user, attempts to mint any
     missing badges they qualify for, and returns info about newly awarded badges.
     """
-    logger.info(f"Running sync achievements for user {current_user.id}")
+    any_user: Any = current_user
+    logger.info(f"Running sync achievements for user {any_user.id}")
     needs_db_update = False
     badges_to_add_to_db: List[Dict] = [] # Store {'badge_id': id, 'tx_hash': hash}
     newly_awarded_badge_info: List[EarnedBadgeInfo] = [] # Store full info for response
@@ -67,21 +69,22 @@ async def sync_user_achievements(
     try:
         # --- Fetch Necessary Data ---
         # Streaks (already stored on user object)
-        current_streak = current_user.current_streak
+        current_streak = any_user.current_streak
         # Journal Count
-        journal_count = db.query(func.count(JournalEntry.id))\
-            .filter(JournalEntry.user_id == current_user.id)\
-            .scalar() or 0
+        journal_count = (await db.execute(select(func.count(JournalEntry.id))\
+            .filter(JournalEntry.user_id == any_user.id)\
+            )).scalar() or 0
         # Total Activity Days (simplified: just count distinct journal dates for now)
         # More accurate check would involve union with conversation dates again
-        total_activity_days = db.query(func.count(func.distinct(JournalEntry.entry_date)))\
-            .filter(JournalEntry.user_id == current_user.id)\
-            .scalar() or 0
+        total_activity_days = (await db.execute(select(func.count(func.distinct(JournalEntry.entry_date)))\
+            .filter(JournalEntry.user_id == any_user.id)\
+            )).scalar() or 0
         # Awarded Badge IDs
+        awarded_badges_res = await db.execute(select(UserBadge.badge_id).filter(UserBadge.user_id == any_user.id))
         awarded_badge_ids: Set[int] = {
-            r[0] for r in db.query(UserBadge.badge_id).filter(UserBadge.user_id == current_user.id).all()
+            r[0] for r in awarded_badges_res.all()
         }
-        logger.debug(f"User {current_user.id} data: Streak={current_streak}, Journals={journal_count}, ActivityDays={total_activity_days}, Awarded={awarded_badge_ids}")
+        logger.debug(f"User {any_user.id} data: Streak={current_streak}, Journals={journal_count}, ActivityDays={total_activity_days}, Awarded={awarded_badge_ids}")
 
         # --- Badge Awarding Logic ---
         nft_contract_address = os.getenv("NFT_CONTRACT_ADDRESS")
@@ -94,8 +97,8 @@ async def sync_user_achievements(
             nonlocal needs_db_update
             if badge_id not in awarded_badge_ids:
                 logger.info(f"User qualifies for Badge {badge_id} ({reason}).")
-                if current_user.wallet_address:
-                    tx_hash = mint_nft_badge(current_user.wallet_address, badge_id)
+                if any_user.wallet_address:
+                    tx_hash = mint_nft_badge(any_user.wallet_address, badge_id)
                     if tx_hash:
                         badges_to_add_to_db.append({"badge_id": badge_id, "tx_hash": tx_hash})
                         needs_db_update = True
@@ -117,7 +120,7 @@ async def sync_user_achievements(
             current_time = datetime.now() # Use consistent timestamp
             for badge_info in badges_to_add_to_db:
                 new_award = UserBadge(
-                    user_id=current_user.id,
+                    user_id=any_user.id,
                     badge_id=badge_info["badge_id"],
                     contract_address=nft_contract_address,
                     transaction_hash=badge_info["tx_hash"],
@@ -131,15 +134,15 @@ async def sync_user_achievements(
                      transaction_hash=badge_info["tx_hash"],
                      contract_address=nft_contract_address
                 ))
-                logger.info(f"Recorded badge {badge_info['badge_id']} award in session for user {current_user.id}")
+                logger.info(f"Recorded badge {badge_info['badge_id']} award in session for user {any_user.id}")
 
         # --- Commit DB changes ---
         if needs_db_update:
             try:
-                db.commit()
-                logger.info(f"Successfully saved new badge awards for user {current_user.id}")
+                await db.commit()
+                logger.info(f"Successfully saved new badge awards for user {any_user.id}")
             except Exception as e:
-                db.rollback()
+                await db.rollback()
                 logger.error(f"Database error saving new badge awards: {e}", exc_info=True)
                 # Don't fail the whole request, but maybe return a partial success message?
                 return SyncAchievementsResponse(message="Checked achievements, but failed to save some awards.", newly_awarded_badges=[]) # Return empty list on DB error
@@ -150,32 +153,24 @@ async def sync_user_achievements(
         )
 
     except Exception as e:
-        logger.error(f"Unexpected error syncing achievements for user {current_user.id}: {e}", exc_info=True)
+        logger.error(f"Unexpected error syncing achievements for user {any_user.id}: {e}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to sync achievements")
 
 @router.get("/my-badges", response_model=List[EarnedBadgeInfo])
 async def get_my_earned_badges(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Retrieves all badges earned by the current user."""
     logger.info(f"Fetching earned badges for user {current_user.id}")
     try:
-        earned_badges = db.query(UserBadge).filter(UserBadge.user_id == current_user.id).order_by(UserBadge.awarded_at.desc()).all()
-        
-        # Convert to Pydantic model, ensuring all required fields are present
-        # The EarnedBadgeInfo schema expects: badge_id, awarded_at, transaction_hash, contract_address
-        response_badges = []
-        for badge in earned_badges:
-            response_badges.append(
-                EarnedBadgeInfo(
-                    badge_id=badge.badge_id,
-                    awarded_at=badge.awarded_at, # This is already a datetime object
-                    transaction_hash=badge.transaction_hash,
-                    contract_address=badge.contract_address
-                )
-            )
-        return response_badges
+        result = await db.execute(select(UserBadge).filter(UserBadge.user_id == current_user.id).order_by(UserBadge.awarded_at.desc()))
+        earned_badges = result.scalars().all()
+
+        # FastAPI will automatically convert the list of UserBadge ORM objects
+        # to a list of EarnedBadgeInfo Pydantic models due to the response_model
+        # and from_attributes=True in the schema.
+        return earned_badges
     except Exception as e:
         logger.error(f"Error fetching badges for user {current_user.id}: {e}", exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not retrieve earned badges.")

@@ -1,12 +1,12 @@
 # backend/app/routes/journal.py
 from fastapi import APIRouter, Depends, HTTPException, status, Body, BackgroundTasks
-from sqlalchemy.orm import Session
-from sqlalchemy import Date, cast # Import cast
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import Date, cast, select # Import cast
 from pydantic import BaseModel, Field
 from datetime import date, datetime # Import date
 from typing import List, Optional, cast as typing_cast
 
-from app.database import get_db
+from app.database import get_async_db, AsyncSessionLocal
 from app.models import User, JournalEntry, JournalReflectionPoint
 from app.schemas import JournalEntryCreate, JournalEntryResponse, JournalReflectionPointCreate
 from app.core.llm import generate_response, LLMProvider
@@ -23,16 +23,16 @@ router = APIRouter(
 
 # --- Background Task for AI Journal Analysis ---
 async def analyze_journal_entry_for_insights(
-    db: Session,
     user_id: int,
     journal_entry_id: int,
     journal_content: str
 ):
-    logger.info(f"Starting AI analysis for journal entry ID: {journal_entry_id} for user ID: {user_id}")
-    try:
-        # Define a trauma-informed and insight-focused system prompt
-        # This is CRITICAL and needs careful crafting and iteration.
-        system_prompt_for_reflection = """
+    async with AsyncSessionLocal() as db:
+        logger.info(f"Starting AI analysis for journal entry ID: {journal_entry_id} for user ID: {user_id}")
+        try:
+            # Define a trauma-informed and insight-focused system prompt
+            # This is CRITICAL and needs careful crafting and iteration.
+            system_prompt_for_reflection = """
 You are a compassionate AI assistant. Your role is to gently analyze the following journal entry.
 Identify 1-2 potential underlying emotional themes, recurring patterns, or core beliefs that the user might be expressing, possibly related to unresolved feelings or past experiences.
 Frame your observations as gentle, open-ended questions or soft reflections that could encourage deeper self-understanding.
@@ -43,35 +43,35 @@ Example observations:
 - "You mentioned a memory from childhood. How do you feel that experience might be echoing in your present feelings?"
 Keep the reflection concise (1-2 sentences).
 """
-        # Prepare history for the LLM. For analysis, we might just send the content as the user's message.
-        history = [{"role": "user", "content": journal_content}]
+            # Prepare history for the LLM. For analysis, we might just send the content as the user's message.
+            history = [{"role": "user", "content": journal_content}]
 
-        # Choose your provider and model. Gemini Flash might be good for cost/speed.
-        # Consider a more powerful model if deeper analysis is needed, but be mindful of cost/latency.
-        ai_reflection_text = await generate_response(
-            history=history,
-            provider="gemini", # Or "togetherai"
-            system_prompt=system_prompt_for_reflection,
-            max_tokens=150, # Adjust as needed
-            temperature=0.5 # Lower temperature for more focused, less "creative" reflections
-        )
-
-        if ai_reflection_text and not ai_reflection_text.startswith("Error:"):
-            reflection_data = JournalReflectionPointCreate(
-                journal_entry_id=journal_entry_id,
-                user_id=user_id,
-                reflection_text=ai_reflection_text.strip()
+            # Choose your provider and model. Gemini Flash might be good for cost/speed.
+            # Consider a more powerful model if deeper analysis is needed, but be mindful of cost/latency.
+            ai_reflection_text = await generate_response(
+                history=history,
+                provider="gemini", # Or "togetherai"
+                system_prompt=system_prompt_for_reflection,
+                max_tokens=150, # Adjust as needed
+                temperature=0.5 # Lower temperature for more focused, less "creative" reflections
             )
-            new_reflection = JournalReflectionPoint(**reflection_data.dict())
-            db.add(new_reflection)
-            db.commit()
-            logger.info(f"Successfully saved AI reflection for journal entry ID: {journal_entry_id}")
-        else:
-            logger.error(f"AI analysis failed or returned error for journal entry ID: {journal_entry_id}. Response: {ai_reflection_text}")
 
-    except Exception as e:
-        db.rollback() # Rollback in case of error during DB operation for reflection
-        logger.error(f"Error during AI journal analysis for entry ID {journal_entry_id}: {e}", exc_info=True)
+            if ai_reflection_text and not ai_reflection_text.startswith("Error:"):
+                reflection_data = JournalReflectionPointCreate(
+                    journal_entry_id=journal_entry_id,
+                    user_id=user_id,
+                    reflection_text=ai_reflection_text.strip()
+                )
+                new_reflection = JournalReflectionPoint(**reflection_data.dict())
+                db.add(new_reflection)
+                await db.commit()
+                logger.info(f"Successfully saved AI reflection for journal entry ID: {journal_entry_id}")
+            else:
+                logger.error(f"AI analysis failed or returned error for journal entry ID: {journal_entry_id}. Response: {ai_reflection_text}")
+
+        except Exception as e:
+            await db.rollback() # Rollback in case of error during DB operation for reflection
+            logger.error(f"Error during AI journal analysis for entry ID {journal_entry_id}: {e}", exc_info=True)
 
 # --- API Endpoints ---
 
@@ -79,14 +79,15 @@ Keep the reflection concise (1-2 sentences).
 async def create_or_update_journal_entry(
     entry_data: JournalEntryCreate,
     background_tasks: BackgroundTasks, # Add BackgroundTasks dependency
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Creates a new journal entry or updates it if one exists for the user and date."""
-    existing_entry = db.query(JournalEntry).filter(
+    result = await db.execute(select(JournalEntry).filter(
         JournalEntry.user_id == current_user.id,
         JournalEntry.entry_date == entry_data.entry_date
-    ).first()
+    ))
+    existing_entry = result.scalar_one_or_none()
 
     saved_entry = None
     if existing_entry:
@@ -95,8 +96,8 @@ async def create_or_update_journal_entry(
         setattr(existing_entry, 'prompt_id', entry_data.prompt_id)
         setattr(existing_entry, 'updated_at', datetime.now()) # Use setattr for consistency
         db.add(existing_entry)
-        db.commit()
-        db.refresh(existing_entry)
+        await db.commit()
+        await db.refresh(existing_entry)
         saved_entry = existing_entry
     else:
         # Create new entry
@@ -109,21 +110,17 @@ async def create_or_update_journal_entry(
         )
         db.add(new_entry)
         try:
-            db.commit()
-            db.refresh(new_entry)
+            await db.commit()
+            await db.refresh(new_entry)
             saved_entry = new_entry
         except Exception as e:
-             db.rollback()
+             await db.rollback()
              raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Entry for this date might already exist or another error occurred.")
 
     if saved_entry:
         # Add background task for AI analysis
         background_tasks.add_task(
             analyze_journal_entry_for_insights,
-            db=db, # Pass the db session if your background task function needs it directly
-                   # Be cautious with session lifecycle in background tasks.
-                   # A safer approach might be to pass IDs and have the task create its own session.
-                   # For simplicity here, passing it, but for production, consider a session scope for the task.
             user_id=typing_cast(int, saved_entry.user_id),
             journal_entry_id=typing_cast(int, saved_entry.id),
             journal_content=typing_cast(str, saved_entry.content)
@@ -135,7 +132,7 @@ async def create_or_update_journal_entry(
     # or you can re-query the entry with options.
     # Let's assume the relationship in JournalEntryResponse schema handles this if data is present.
     # To ensure it's fresh if the background task was very fast (unlikely but possible):
-    db.refresh(saved_entry) # Refresh to potentially get newly added reflection points if any (though unlikely due to async)
+    await db.refresh(saved_entry) # Refresh to potentially get newly added reflection points if any (though unlikely due to async)
 
     return saved_entry # This will now include an empty reflection_points list initially
 
@@ -144,26 +141,30 @@ async def create_or_update_journal_entry(
 async def get_all_journal_entries(
     skip: int = 0,
     limit: int = 100,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Retrieves all journal entries for the current user with pagination."""
-    entries = db.query(JournalEntry).filter(
+    stmt = select(JournalEntry).filter(
         JournalEntry.user_id == current_user.id
-    ).order_by(JournalEntry.entry_date.desc()).offset(skip).limit(limit).all()
+    ).order_by(JournalEntry.entry_date.desc()).offset(skip).limit(limit)
+    result = await db.execute(stmt)
+    entries = result.scalars().all()
     return entries
 
 @router.get("/{entry_date}", response_model=JournalEntryResponse)
 async def get_journal_entry_by_date(
     entry_date: date,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Retrieves a journal entry for the current user by date."""
-    entry = db.query(JournalEntry).filter(
+    stmt = select(JournalEntry).filter(
         JournalEntry.user_id == current_user.id,
         JournalEntry.entry_date == entry_date
-    ).first() # Use .options(selectinload(JournalEntry.prompt)) for eager loading if needed
+    )
+    result = await db.execute(stmt)
+    entry = result.scalar_one_or_none()
     
     if not entry:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Journal entry not found for this date.")
