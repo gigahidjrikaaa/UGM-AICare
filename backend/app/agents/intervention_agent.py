@@ -16,8 +16,6 @@ from .base_agent import BaseAgent, AgentType
 from app.models.agents import InterventionCampaign, CampaignExecution
 from app.models.user import User
 from app.models.conversation import Conversation
-from app.schemas.agents import TriageClassification
-from app.core.chains import create_intervention_content_chain
 
 logger = logging.getLogger(__name__)
 
@@ -51,43 +49,6 @@ class InterventionAgent(BaseAgent):
             "usage_pattern",
             "demographic"
         ]
-
-    async def _generate_campaign_content(self, campaign_type: str, target_criteria: Dict[str, Any]) -> Dict[str, str]:
-        """Generate campaign content using the Langchain intervention content chain."""
-        content_chain = create_intervention_content_chain()
-
-        # Create a description of the target audience for the LLM
-        target_audience_description = json.dumps(target_criteria)
-
-        # Invoke the chain
-        content = await content_chain.ainvoke({
-            "campaign_type": campaign_type,
-            "target_audience_description": target_audience_description
-        })
-
-        return content
-
-    async def _identify_target_audience(self, target_criteria: Dict[str, Any]) -> List[int]:
-        # Placeholder for audience identification
-        users = self.db.query(User).limit(20).all()
-        return [user.id for user in users]
-
-    async def _deliver_intervention(self, campaign: InterventionCampaign, execution: CampaignExecution) -> Dict[str, bool]:
-        # Placeholder for intervention delivery
-        print(f"Delivering intervention for campaign {campaign.id} to user {execution.user_id}")
-        return {"success": True}
-
-    async def _monitor_campaigns(self, **kwargs) -> Dict[str, Any]:
-        # Placeholder for campaign monitoring
-        return {"active_campaigns": 1, "status": "monitoring"}
-
-    async def _analyze_effectiveness(self, **kwargs) -> Dict[str, Any]:
-        # Placeholder for effectiveness analysis
-        return {"campaign_id": kwargs.get("campaign_id"), "effectiveness_score": 0.85}
-
-    async def _auto_trigger_intervention(self, **kwargs) -> Dict[str, Any]:
-        # Placeholder for auto-trigger
-        return {"triggered": False, "reason": "No trigger conditions met."}
 
     def validate_input(self, **kwargs) -> bool:
         """Validate intervention request parameters"""

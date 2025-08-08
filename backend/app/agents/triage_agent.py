@@ -13,12 +13,9 @@ from sqlalchemy.orm import Session
 from sqlalchemy import and_, func, desc
 
 from .base_agent import BaseAgent, AgentType
-import random
-
 from app.models.agents import TriageAssessment
 from app.models.conversation import Conversation
 from app.models.user import User
-from app.core.chains import create_triage_classification_chain
 
 logger = logging.getLogger(__name__)
 
@@ -69,93 +66,6 @@ class TriageAgent(BaseAgent):
         
         # Response templates
         self.response_templates = self._initialize_response_templates()
-
-    def _initialize_response_templates(self) -> Dict[str, str]:
-        # Placeholder for response templates
-        return {
-            "low": "It sounds like you're going through a tough time. I'm here to listen.",
-            "medium": "I'm concerned about what you're saying. It's important to talk about these feelings.",
-            "high": "What you're describing is serious. It's crucial that you get help right away.",
-            "critical": "You are not alone, and help is available. Please contact a crisis hotline immediately."
-        }
-
-    async def _assess_message_content(self, message_content: str, user_id: Optional[int]) -> Dict[str, Any]:
-        """Assess the message content using the Langchain triage classification chain."""
-        triage_chain = create_triage_classification_chain()
-        
-        # The chain expects a dictionary with the conversation history
-        # For a single message, we can just pass that.
-        # In a real scenario, you'd pass the full conversation history.
-        classification = await triage_chain.ainvoke({"conversation_history": message_content})
-
-        # Map the classification output to the format expected by the agent
-        return {
-            "risk_score": self._severity_to_risk_score(classification.get('severity', 'low')),
-            "severity_level": classification.get('severity', 'low'),
-            "category": classification.get('category', 'unknown'),
-            "is_crisis": classification.get('is_crisis', False),
-            "keywords_detected": [] # This could be populated by another LLM call or regex
-        }
-
-    def _severity_to_risk_score(self, severity: str) -> float:
-        """Converts a severity level string to a numeric risk score."""
-        return {
-            "low": 0.2,
-            "medium": 0.5,
-            "high": 0.8,
-            "critical": 1.0
-        }.get(severity, 0.0)
-
-    async def _get_user_context(self, user_id: int) -> Dict[str, Any]:
-        # Placeholder for user context retrieval
-        return {
-            "previous_risk_level": "low",
-            "recent_activity": "active"
-        }
-
-    async def _apply_user_context_adjustment(self, assessment_result: Dict[str, Any], user_context: Dict[str, Any]) -> Dict[str, Any]:
-        # Placeholder for context adjustment
-        return assessment_result
-
-    async def _generate_response_recommendations(self, assessment_result: Dict[str, Any]) -> List[str]:
-        # Placeholder for response recommendations
-        severity = assessment_result["severity_level"]
-        return [self.response_templates.get(severity, "I'm here for you.")]
-
-    async def _check_escalation_triggers(self, assessment_result: Dict[str, Any]) -> Dict[str, Any]:
-        # Placeholder for escalation checks
-        required = assessment_result["severity_level"] in ["high", "critical"]
-        return {"required": required, "reason": "High severity detected." if required else ""}
-
-    async def _save_triage_assessment(self, conversation_id: Optional[int], user_id: Optional[int], message_content: str, assessment_result: Dict[str, Any]) -> int:
-        # Placeholder for saving assessment
-        assessment = TriageAssessment(
-            conversation_id=conversation_id,
-            user_id=user_id,
-            risk_score=assessment_result['risk_score'],
-            severity_level=assessment_result['severity_level'],
-            assessment_details=assessment_result
-        )
-        self.db.add(assessment)
-        self.db.commit()
-        self.db.refresh(assessment)
-        return assessment.id
-
-    async def _trigger_immediate_actions(self, assessment_result: Dict[str, Any]) -> Dict[str, str]:
-        # Placeholder for immediate actions
-        return {"action_taken": "Notified supervisor", "status": "completed"}
-
-    async def _batch_assessment(self, **kwargs) -> Dict[str, Any]:
-        # Placeholder for batch assessment
-        return {"assessed_conversations": 10, "average_risk_score": 0.25}
-
-    async def _quality_assessment(self, **kwargs) -> Dict[str, Any]:
-        # Placeholder for quality assessment
-        return {"assessed_responses": 5, "quality_score": 0.9}
-
-    async def _crisis_scan(self, **kwargs) -> Dict[str, Any]:
-        # Placeholder for crisis scan
-        return {"active_crises": 0}
 
     def validate_input(self, **kwargs) -> bool:
         """Validate triage request parameters"""

@@ -1,12 +1,12 @@
 # backend/app/routes/agents.py
 from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks, status
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, desc, asc, select
+from sqlalchemy.orm import Session
+from sqlalchemy import func, desc, asc
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 import logging
 
-from app.database import get_async_db
+from app.database import get_db
 from app.models import User, Conversation
 from app.models.agents import (
     AnalyticsReport, InterventionCampaign, CampaignExecution, 
@@ -26,9 +26,7 @@ from app.schemas.agents import (
 )
 from app.dependencies import get_current_active_user
 from app.routes.admin import get_admin_user
-from app.agents.analytics_agent import AnalyticsAgent
-from app.agents.intervention_agent import InterventionAgent
-from app.agents.triage_agent import TriageAgent
+from app.tasks.analytics_tasks import execute_analytics_analysis
 
 logger = logging.getLogger(__name__)
 
@@ -46,33 +44,42 @@ router = APIRouter(
 async def trigger_analytics_analysis(
     background_tasks: BackgroundTasks,
     period: str = Query("weekly", description="Analysis period"),
-    db: AsyncSession = Depends(get_async_db),
+    db: Session = Depends(get_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Manually trigger analytics agent execution"""
     logger.info(f"Admin {admin_user.id} triggering analytics analysis for period: {period}")
     
     try:
-        analytics_agent = AnalyticsAgent(db=db)
+        # Check if analysis is already running
+        running_report = db.query(AnalyticsReport).filter(
+            AnalyticsReport.status == ReportStatus.RUNNING
+        ).first()
         
-        # The run_analysis method should handle its own status reporting and background execution.
-        # We can pass the background_tasks object if the agent needs to schedule sub-tasks.
-        report_id = await analytics_agent.run_analysis(
-            period=period,
-            triggered_by=f"admin_{admin_user.id}",
-            background_tasks=background_tasks
-        )
-        
-        if not report_id:
+        if running_report:
             raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to initiate analytics analysis report."
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Analytics analysis is already running"
             )
+        
+        # Create pending report
+        report = AnalyticsReport(
+            report_period=period,
+            status=ReportStatus.PENDING,
+            insights={},
+            data_sources={"triggered_by": f"admin_{admin_user.id}"}
+        )
+        db.add(report)
+        db.commit()
+        db.refresh(report)
+        
+        # Add background task to execute analysis
+        background_tasks.add_task(execute_analytics_analysis, report.id, db)
         
         return AgentApiResponse(
             success=True,
             message=f"Analytics analysis triggered for {period} period",
-            data={"report_id": report_id, "status": "pending"}
+            data={"report_id": report.id, "status": "pending"}
         )
         
     except HTTPException:
@@ -90,32 +97,29 @@ async def get_analytics_reports(
     size: int = Query(20, ge=1, le=100),
     status_filter: Optional[ReportStatus] = Query(None),
     period_filter: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_async_db),
+    db: Session = Depends(get_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Get paginated list of analytics reports"""
     logger.info(f"Admin {admin_user.id} requesting analytics reports")
     
     try:
-        query = select(AnalyticsReport)
-
+        query = db.query(AnalyticsReport)
+        
         # Apply filters
         if status_filter:
-            query = query.where(AnalyticsReport.status == status_filter)
+            query = query.filter(AnalyticsReport.status == status_filter)
         if period_filter:
-            query = query.where(AnalyticsReport.report_period == period_filter)
-
+            query = query.filter(AnalyticsReport.report_period == period_filter)
+        
         # Get total count
-        total_query = select(func.count()).select_from(query.alias())
-        total_result = await db.execute(total_query)
-        total = total_result.scalar_one()
-
+        total = query.count()
+        
         # Apply pagination and ordering
-        paginated_query = query.order_by(desc(AnalyticsReport.generated_at))\
-                               .offset((page - 1) * size)\
-                               .limit(size)
-        reports_result = await db.execute(paginated_query)
-        reports = reports_result.scalars().all()
+        reports = query.order_by(desc(AnalyticsReport.generated_at))\
+                      .offset((page - 1) * size)\
+                      .limit(size)\
+                      .all()
         
         # Convert to summary format
         items = []
@@ -152,15 +156,14 @@ async def get_analytics_reports(
 @router.get("/analytics/reports/{report_id}", response_model=AnalyticsReportResponse)
 async def get_analytics_report(
     report_id: int,
-    db: AsyncSession = Depends(get_async_db),
+    db: Session = Depends(get_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Get detailed analytics report"""
     logger.info(f"Admin {admin_user.id} requesting analytics report {report_id}")
     
     try:
-        result = await db.execute(select(AnalyticsReport).filter(AnalyticsReport.id == report_id))
-        report = result.scalar_one_or_none()
+        report = db.query(AnalyticsReport).filter(AnalyticsReport.id == report_id).first()
         if not report:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -185,28 +188,33 @@ async def get_analytics_report(
 @router.post("/intervention/campaigns", response_model=InterventionCampaignResponse)
 async def create_intervention_campaign(
     campaign: InterventionCampaignCreate,
-    db: AsyncSession = Depends(get_async_db),
+    db: Session = Depends(get_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Create new intervention campaign"""
     logger.info(f"Admin {admin_user.id} creating intervention campaign: {campaign.campaign_name}")
     
     try:
-        intervention_agent = InterventionAgent(db=db)
-        db_campaign = await intervention_agent.create_campaign(campaign_data=campaign)
-
-        if not db_campaign:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Failed to create intervention campaign"
-            )
-
-        return db_campaign
-
-    except HTTPException:
-        raise
+        db_campaign = InterventionCampaign(
+            triggered_by_report_id=campaign.triggered_by_report_id,
+            campaign_name=campaign.campaign_name,
+            campaign_type=campaign.campaign_type,
+            target_criteria=campaign.target_criteria,
+            content=campaign.content,
+            resources=campaign.resources,
+            scheduled_at=campaign.scheduled_at,
+            status=CampaignStatus.DRAFT
+        )
+        
+        db.add(db_campaign)
+        db.commit()
+        db.refresh(db_campaign)
+        
+        return InterventionCampaignResponse.from_orm(db_campaign)
+        
     except Exception as e:
         logger.error(f"Error creating intervention campaign: {e}", exc_info=True)
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to create intervention campaign"
@@ -218,32 +226,29 @@ async def get_intervention_campaigns(
     size: int = Query(20, ge=1, le=100),
     status_filter: Optional[CampaignStatus] = Query(None),
     campaign_type_filter: Optional[str] = Query(None),
-    db: AsyncSession = Depends(get_async_db),
+    db: Session = Depends(get_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Get paginated list of intervention campaigns"""
     logger.info(f"Admin {admin_user.id} requesting intervention campaigns")
     
     try:
-        query = select(InterventionCampaign)
-
+        query = db.query(InterventionCampaign)
+        
         # Apply filters
         if status_filter:
-            query = query.where(InterventionCampaign.status == status_filter)
+            query = query.filter(InterventionCampaign.status == status_filter)
         if campaign_type_filter:
-            query = query.where(InterventionCampaign.campaign_type == campaign_type_filter)
-
+            query = query.filter(InterventionCampaign.campaign_type == campaign_type_filter)
+        
         # Get total count
-        total_query = select(func.count()).select_from(query.alias())
-        total_result = await db.execute(total_query)
-        total = total_result.scalar_one()
-
+        total = query.count()
+        
         # Apply pagination and ordering
-        paginated_query = query.order_by(desc(InterventionCampaign.created_at))\
-                               .offset((page - 1) * size)\
-                               .limit(size)
-        campaigns_result = await db.execute(paginated_query)
-        campaigns = campaigns_result.scalars().all()
+        campaigns = query.order_by(desc(InterventionCampaign.created_at))\
+                         .offset((page - 1) * size)\
+                         .limit(size)\
+                         .all()
         
         items = [InterventionCampaignResponse.from_orm(campaign) for campaign in campaigns]
         
@@ -266,28 +271,35 @@ async def get_intervention_campaigns(
 async def update_intervention_campaign(
     campaign_id: int,
     campaign_update: InterventionCampaignUpdate,
-    db: AsyncSession = Depends(get_async_db),
+    db: Session = Depends(get_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Update intervention campaign"""
     logger.info(f"Admin {admin_user.id} updating campaign {campaign_id}")
     
     try:
-        intervention_agent = InterventionAgent(db=db)
-        campaign = await intervention_agent.update_campaign(campaign_id, campaign_update)
+        campaign = db.query(InterventionCampaign).filter(InterventionCampaign.id == campaign_id).first()
         if not campaign:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Campaign not found"
             )
         
-        return campaign
+        # Update fields
+        update_data = campaign_update.dict(exclude_unset=True)
+        for field, value in update_data.items():
+            setattr(campaign, field, value)
+        
+        db.commit()
+        db.refresh(campaign)
+        
+        return InterventionCampaignResponse.from_orm(campaign)
         
     except HTTPException:
         raise
     except Exception as e:
         logger.error(f"Error updating campaign {campaign_id}: {e}", exc_info=True)
-        # Rollback is handled by the agent or session manager in async context
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update campaign"
@@ -297,28 +309,40 @@ async def update_intervention_campaign(
 async def execute_intervention_campaign(
     campaign_id: int,
     background_tasks: BackgroundTasks,
-    db: AsyncSession = Depends(get_async_db),
+    db: Session = Depends(get_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Execute intervention campaign"""
     logger.info(f"Admin {admin_user.id} executing campaign {campaign_id}")
     
     try:
-        intervention_agent = InterventionAgent(db=db)
-        result = await intervention_agent.execute_campaign(campaign_id, background_tasks)
-
-        if not result or not result.get("success"):
+        campaign = db.query(InterventionCampaign).filter(InterventionCampaign.id == campaign_id).first()
+        if not campaign:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail="Campaign not found"
+            )
+        
+        if campaign.status != CampaignStatus.DRAFT and campaign.status != CampaignStatus.SCHEDULED:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail=result.get("message", "Failed to execute campaign")
+                detail="Campaign cannot be executed in current status"
             )
-
+        
+        # Update campaign status
+        campaign.status = CampaignStatus.ACTIVE
+        campaign.executed_at = datetime.utcnow()
+        db.commit()
+        
+        # Add background task to execute campaign
+        background_tasks.add_task(execute_campaign_task, campaign_id, db)
+        
         return AgentApiResponse(
             success=True,
             message=f"Campaign {campaign_id} execution started",
             data={"campaign_id": campaign_id, "status": "executing"}
         )
-
+        
     except HTTPException:
         raise
     except Exception as e:
@@ -335,31 +359,54 @@ async def execute_intervention_campaign(
 @router.post("/triage/classify", response_model=TriageClassificationResponse)
 async def classify_conversation(
     classification_request: TriageClassificationRequest,
-    db: AsyncSession = Depends(get_async_db),
+    db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """Real-time conversation classification by Triage Agent"""
     logger.info(f"Triage classification for conversation {classification_request.conversation_id}")
     
     try:
-        triage_agent = TriageAgent(db=db)
+        # Here you would implement the actual triage logic
+        # For now, returning a mock response
+        # TODO: Implement actual AI-based classification
         
-        classification_result = await triage_agent.classify_and_escalate(
+        severity = classify_message_severity(classification_request.messages)
+        confidence = calculate_confidence_score(classification_request.messages)
+        action = determine_action_from_severity(severity)
+        resources = get_recommended_resources(severity, classification_request.context)
+        crisis_indicators = detect_crisis_indicators(classification_request.messages)
+        
+        # Create assessment record
+        assessment = TriageAssessment(
             conversation_id=classification_request.conversation_id,
-            user_id=current_user.id, # Assuming the user is the one making the request
-            message_content=[msg.content for msg in classification_request.messages]
+            user_id=classification_request.user_id,
+            severity_level=severity,
+            confidence_score=confidence,
+            crisis_indicators={"indicators": crisis_indicators},
+            recommended_action=action,
+            recommended_resources={"resources": resources},
+            follow_up_required=severity in [SeverityLevel.HIGH, SeverityLevel.CRISIS],
+            escalation_needed=severity == SeverityLevel.CRISIS
         )
-
-        if not classification_result:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Triage agent failed to produce a classification."
-            )
-
-        return classification_result
+        
+        db.add(assessment)
+        db.commit()
+        db.refresh(assessment)
+        
+        return TriageClassificationResponse(
+            severity_level=severity,
+            confidence_score=confidence,
+            recommended_action=action,
+            recommended_resources=resources,
+            crisis_indicators=crisis_indicators,
+            follow_up_required=assessment.follow_up_required,
+            escalation_needed=assessment.escalation_needed,
+            assessment_id=assessment.id
+        )
         
     except Exception as e:
         logger.error(f"Error in triage classification: {e}", exc_info=True)
+        db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to classify conversation"
@@ -372,34 +419,31 @@ async def get_triage_assessments(
     severity_filter: Optional[SeverityLevel] = Query(None),
     user_id_filter: Optional[int] = Query(None),
     crisis_only: bool = Query(False),
-    db: AsyncSession = Depends(get_async_db),
+    db: Session = Depends(get_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Get paginated list of triage assessments"""
     logger.info(f"Admin {admin_user.id} requesting triage assessments")
     
     try:
-        query = select(TriageAssessment)
-
+        query = db.query(TriageAssessment)
+        
         # Apply filters
         if severity_filter:
-            query = query.where(TriageAssessment.severity_level == severity_filter)
+            query = query.filter(TriageAssessment.severity_level == severity_filter)
         if user_id_filter:
-            query = query.where(TriageAssessment.user_id == user_id_filter)
+            query = query.filter(TriageAssessment.user_id == user_id_filter)
         if crisis_only:
-            query = query.where(TriageAssessment.severity_level == SeverityLevel.CRISIS)
-
+            query = query.filter(TriageAssessment.severity_level == SeverityLevel.CRISIS)
+        
         # Get total count
-        total_query = select(func.count()).select_from(query.alias())
-        total_result = await db.execute(total_query)
-        total = total_result.scalar_one()
-
+        total = query.count()
+        
         # Apply pagination and ordering
-        paginated_query = query.order_by(desc(TriageAssessment.assessed_at))\
-                               .offset((page - 1) * size)\
-                               .limit(size)
-        assessments_result = await db.execute(paginated_query)
-        assessments = assessments_result.scalars().all()
+        assessments = query.order_by(desc(TriageAssessment.assessed_at))\
+                           .offset((page - 1) * size)\
+                           .limit(size)\
+                           .all()
         
         items = [TriageAssessmentResponse.from_orm(assessment) for assessment in assessments]
         
@@ -424,7 +468,7 @@ async def get_triage_assessments(
 
 @router.get("/dashboard/stats", response_model=AgentDashboardStats)
 async def get_agent_dashboard_stats(
-    db: AsyncSession = Depends(get_async_db),
+    db: Session = Depends(get_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Get agent system dashboard statistics"""
@@ -432,44 +476,34 @@ async def get_agent_dashboard_stats(
     
     try:
         # Analytics reports count
-        analytics_reports_count_res = await db.execute(select(func.count(AnalyticsReport.id)))
-        analytics_reports_count = analytics_reports_count_res.scalar_one()
-
+        analytics_reports_count = db.query(AnalyticsReport).count()
+        
         # Active campaigns count
-        active_campaigns_count_res = await db.execute(
-            select(func.count(InterventionCampaign.id)).where(InterventionCampaign.status == CampaignStatus.ACTIVE)
-        )
-        active_campaigns_count = active_campaigns_count_res.scalar_one()
-
+        active_campaigns_count = db.query(InterventionCampaign).filter(
+            InterventionCampaign.status == CampaignStatus.ACTIVE
+        ).count()
+        
         # Triage assessments today
         today = datetime.utcnow().date()
-        triage_assessments_today_res = await db.execute(
-            select(func.count(TriageAssessment.id)).where(func.date(TriageAssessment.assessed_at) == today)
-        )
-        triage_assessments_today = triage_assessments_today_res.scalar_one()
-
+        triage_assessments_today = db.query(TriageAssessment).filter(
+            func.date(TriageAssessment.assessed_at) == today
+        ).count()
+        
         # Crisis alerts count (last 24 hours)
         yesterday = datetime.utcnow() - timedelta(days=1)
-        crisis_alerts_count_res = await db.execute(
-            select(func.count(TriageAssessment.id)).where(
-                TriageAssessment.severity_level == SeverityLevel.CRISIS,
-                TriageAssessment.assessed_at >= yesterday
-            )
-        )
-        crisis_alerts_count = crisis_alerts_count_res.scalar_one()
-
+        crisis_alerts_count = db.query(TriageAssessment).filter(
+            TriageAssessment.severity_level == SeverityLevel.CRISIS,
+            TriageAssessment.assessed_at >= yesterday
+        ).count()
+        
         # Average assessment confidence
-        avg_confidence_result = await db.execute(select(func.avg(TriageAssessment.confidence_score)))
-        avg_assessment_confidence = avg_confidence_result.scalar() or 0.0
-
+        avg_confidence_result = db.query(func.avg(TriageAssessment.confidence_score)).scalar()
+        avg_assessment_confidence = float(avg_confidence_result) if avg_confidence_result else 0.0
+        
         # Last analytics run
-        last_analytics_res = await db.execute(
-            select(AnalyticsReport)
-            .where(AnalyticsReport.status == ReportStatus.COMPLETED)
-            .order_by(desc(AnalyticsReport.generated_at))
-            .limit(1)
-        )
-        last_analytics = last_analytics_res.scalar_one_or_none()
+        last_analytics = db.query(AnalyticsReport).filter(
+            AnalyticsReport.status == ReportStatus.COMPLETED
+        ).order_by(desc(AnalyticsReport.generated_at)).first()
         
         return AgentDashboardStats(
             analytics_reports_count=analytics_reports_count,
