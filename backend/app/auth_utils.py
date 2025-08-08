@@ -70,10 +70,13 @@ def decrypt_and_validate_token(token: str) -> TokenPayload:
     try:
         # --- Derive the key first ---
         derived_key = _derive_encryption_key(JWT_SECRET)
-
+        
+        # Ensure derived_key is not None before proceeding
+        if derived_key is None:
+            raise ValueError("Derived key is None, cannot decrypt token.")
         # --- Decrypt using the DERIVED key ---
         decrypted_payload_bytes = jwe.decrypt(token, derived_key)
-        decrypted_payload_str = decrypted_payload_bytes.decode('utf-8')
+        decrypted_payload_str = decrypted_payload_bytes.decode('utf-8') # type: ignore
         payload_dict: Dict[str, Any] = json.loads(decrypted_payload_str)
 
         logger.debug(f"Decrypted JWE payload: {payload_dict}")
