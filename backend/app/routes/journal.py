@@ -50,7 +50,7 @@ Keep the reflection concise (1-2 sentences).
             # Consider a more powerful model if deeper analysis is needed, but be mindful of cost/latency.
             ai_reflection_text = await generate_response(
                 history=history,
-                provider="gemini", # Or "togetherai"
+                provider="gemini",
                 system_prompt=system_prompt_for_reflection,
                 max_tokens=150, # Adjust as needed
                 temperature=0.5 # Lower temperature for more focused, less "creative" reflections
