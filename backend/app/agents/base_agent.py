@@ -46,11 +46,14 @@ class BaseAgent(ABC):
     - Database integration
     """
 
-    def __init__(self, agent_type: AgentType, redis_client=None):
+    def __init__(self, agent_type: AgentType, db: Session, redis_client=None):
         self.agent_type = agent_type
         self.status = AgentStatus.IDLE
+        self.db = db
         self.redis_client = redis_client
         self.logger = logging.getLogger(f"agent.{self.agent_type.value}")
+        self.start_time = None
+        self.execution_metrics = {}
 
     @abstractmethod
     def execute(self, **kwargs) -> Dict[str, Any]:
@@ -101,7 +104,7 @@ class BaseAgent(ABC):
         """Check database connectivity"""
         try:
             # Simple query to test connection
-            self.db.execute(text("SELECT 1"))
+            await self.db.execute(text("SELECT 1"))
             return True
         except Exception as e:
             logger.error(f"Database connection check failed: {e}")

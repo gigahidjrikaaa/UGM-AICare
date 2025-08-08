@@ -12,10 +12,14 @@ from typing import Dict, Any, List, Optional
 from sqlalchemy.orm import Session
 from sqlalchemy import and_, or_, func, desc
 import json
+import random
+import hashlib
+from collections import Counter
 
 from .base_agent import BaseAgent, AgentType, AgentStatus
 from ..models import User, Message, JournalEntry
 from ..database.database import get_db
+from ..core.chains import create_analytics_insight_chain
 
 
 logger = logging.getLogger(__name__)
@@ -79,7 +83,7 @@ class AnalyticsAgent(BaseAgent):
         engagement_metrics = self._analyze_engagement_metrics(user_activity)
         
         # Generate insights
-        insights = self._generate_insights(
+        insights = await self._generate_insights(
             sentiment_trends, topic_patterns, temporal_patterns, engagement_metrics
         )
         
@@ -215,6 +219,64 @@ class AnalyticsAgent(BaseAgent):
         except Exception as e:
             self.logger.error(f"Error fetching user activity: {e}")
             return []
+
+    def _anonymize_content(self, content: str) -> str:
+        # Basic anonymization placeholder
+        return content
+
+    def _generate_user_hash(self, user_id: int) -> str:
+        return hashlib.sha256(str(user_id).encode()).hexdigest()
+
+    def _analyze_sentiment_trends(self, conversation_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        # Placeholder for sentiment analysis
+        if not conversation_data:
+            return {}
+        return {
+            "average_sentiment": random.uniform(-0.5, 0.5),
+            "sentiment_trend": "stable",
+        }
+
+    def _analyze_topic_patterns(self, conversation_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        # Placeholder for topic modeling
+        if not conversation_data:
+            return {}
+        words = [word for msg in conversation_data for word in msg['content'].split()]
+        if not words:
+            return {}
+        common_words = Counter(words).most_common(5)
+        return {"top_topics": [word for word, count in common_words]}
+
+    def _analyze_temporal_patterns(self, conversation_data: List[Dict[str, Any]], journal_data: List[Dict[str, Any]]) -> Dict[str, Any]:
+        # Placeholder for temporal analysis
+        return {
+            "peak_activity_hour": 14,
+            "peak_activity_day": "Wednesday",
+        }
+
+    def _analyze_engagement_metrics(self, user_activity: List[Dict[str, Any]]) -> Dict[str, Any]:
+        # Placeholder for engagement analysis
+        if not user_activity:
+            return {}
+        return {
+            "average_session_length": 15.5,
+            "user_retention_rate": 0.75,
+        }
+
+    def _generate_insights(self, sentiment_trends, topic_patterns, temporal_patterns, engagement_metrics) -> List[str]:
+        # Placeholder for insight generation
+        insights = []
+        if sentiment_trends.get("average_sentiment", 0) < -0.2:
+            insights.append("Overall sentiment is negative.")
+        if "exam" in topic_patterns.get("top_topics", []):
+            insights.append("Exam stress is a common topic.")
+        return insights
+
+    def _identify_intervention_triggers(self, insights: List[str]) -> List[str]:
+        # Placeholder for intervention trigger identification
+        triggers = []
+        if "Overall sentiment is negative." in insights:
+            triggers.append("Negative sentiment trend detected.")
+        return triggers
 
     async def _analyze_sentiment_trends(self, conversation_data: List[Dict[str, Any]]) -> Dict[str, Any]:
         """Analyze sentiment trends in conversations"""
@@ -394,59 +456,24 @@ class AnalyticsAgent(BaseAgent):
             "engagement_rate": round((high_engagement / len(user_activity)) * 100, 2) if user_activity else 0
         }
 
-    async def _generate_insights(self, sentiment_trends: Dict, topic_patterns: Dict, 
-                                temporal_patterns: Dict, engagement_metrics: Dict) -> List[Dict[str, Any]]:
-        """Generate actionable insights from analysis results"""
-        insights = []
+    async def _generate_insights(self, sentiment_trends, topic_patterns, temporal_patterns, engagement_metrics) -> List[Dict[str, Any]]:
+        """Generate actionable insights from analyzed data using Langchain."""
+        analytics_chain = create_analytics_insight_chain()
+
+        # Create a summary of the data to feed into the LLM
+        data_summary = (
+            f"Sentiment Trends: {json.dumps(sentiment_trends)}\n"
+            f"Topic Patterns: {json.dumps(topic_patterns)}\n"
+            f"Temporal Patterns: {json.dumps(temporal_patterns)}\n"
+            f"Engagement Metrics: {json.dumps(engagement_metrics)}"
+        )
+
+        # Invoke the chain
+        result = await analytics_chain.ainvoke({"data_summary": data_summary})
         
-        # Sentiment insights
-        if sentiment_trends.get("crisis_rate", 0) > 5:  # More than 5% Crisis indicators
-            insights.append({
-                "type": "crisis_alert",
-                "severity": "high",
-                "title": "Elevated Crisis Indicators Detected",
-                "description": f"Crisis indicators found in {sentiment_trends['crisis_rate']}% of conversations",
-                "recommendation": "Immediate review of crisis intervention protocols recommended",
-                "data": {"crisis_rate": sentiment_trends["crisis_rate"]},
-                "priority": 1
-            })
-        
-        if sentiment_trends.get("overall_sentiment", 0) < -0.5:
-            insights.append({
-                "type": "sentiment_decline",
-                "severity": "medium",
-                "title": "Overall Sentiment Decline",
-                "description": "Average sentiment has decreased significantly",
-                "recommendation": "Consider proactive outreach campaign for mood support",
-                "data": {"sentiment_score": sentiment_trends["overall_sentiment"]},
-                "priority": 2
-            })
-        
-        # Topic insights
-        if topic_patterns.get("topic_percentages", {}).get("academic_stress", 0) > 30:
-            insights.append({
-                "type": "academic_stress",
-                "severity": "medium",
-                "title": "High Academic Stress Levels",
-                "description": f"Academic stress mentioned in {topic_patterns['topic_percentages']['academic_stress']}% of conversations",
-                "recommendation": "Deploy study skills and stress management resources",
-                "data": {"stress_percentage": topic_patterns["topic_percentages"]["academic_stress"]},
-                "priority": 2
-            })
-        
-        # Engagement insights
-        if engagement_metrics.get("engagement_rate", 0) < 20:
-            insights.append({
-                "type": "low_engagement",
-                "severity": "low",
-                "title": "Low User Engagement",
-                "description": f"Only {engagement_metrics['engagement_rate']}% of users show high engagement",
-                "recommendation": "Review user experience and implement engagement strategies",
-                "data": {"engagement_rate": engagement_metrics["engagement_rate"]},
-                "priority": 3
-            })
-        
-        return sorted(insights, key=lambda x: x["priority"])
+        insights = result.get('insights', [])
+        self.logger.info(f"Generated {len(insights)} insights from data analysis using LLM.")
+        return insights
 
     async def _identify_intervention_triggers(self, insights: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
         """Identify which insights should trigger automated interventions"""
