@@ -14,7 +14,8 @@ from app.models import User, Conversation, UserSummary
 from app.core import llm
 from app.core.memory import get_module_state, set_module_state, clear_module_state
 from app.dependencies import get_current_active_user
-from app.schemas import ChatRequest, ChatResponse, ConversationHistoryItem, SummarizeRequest
+from app.schemas.chat import ChatRequest, ChatResponse, ConversationHistoryItem
+from app.schemas.summary import SummarizeRequest
 from app.core.cbt_module_logic import (
     get_module_step_prompt,
     process_user_response_for_step,

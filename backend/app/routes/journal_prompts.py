@@ -5,7 +5,7 @@ from typing import List
 
 from app.database import get_async_db
 from app.models import JournalPrompt, User, JournalReflectionPoint # Add JournalReflectionPoint
-from app.schemas import JournalPromptCreate, JournalPromptResponse, JournalPromptUpdate, JournalReflectionPointResponse # Add JournalReflectionPointResponse
+from app.schemas.journal import JournalPromptCreate, JournalPromptResponse, JournalPromptUpdate, JournalReflectionPointResponse
 from app.dependencies import get_current_active_user # Or a specific admin dependency
 
 router = APIRouter(

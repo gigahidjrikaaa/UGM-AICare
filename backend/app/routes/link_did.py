@@ -6,7 +6,7 @@ from sqlalchemy import select
 from app.models import User
 from app.dependencies import get_current_active_user
 from app.database import get_async_db
-from app.schemas import LinkDIDRequest
+from app.schemas.user import LinkDIDRequest
 
 router = APIRouter()
 

@@ -1,6 +1,7 @@
 # app/models.py
 from typing import Optional
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean, Date, UniqueConstraint
+from sqlalchemy.types import JSON
 from sqlalchemy.orm import relationship, Mapped
 from app.database import Base
 # from app.database.base import BaseModel # Assuming BaseModel provides created_at, updated_at if needed
@@ -261,3 +262,82 @@ class Appointment(Base):
     user = relationship("User", back_populates="appointments")
     psychologist = relationship("Psychologist", back_populates="appointments")
     appointment_type = relationship("AppointmentType", back_populates="appointments")
+
+# Agent Framework Models
+# These models support the three-agent framework for proactive mental health support.
+
+class AnalyticsReport(Base):
+    __tablename__ = "analytics_reports"
+
+    id = Column(Integer, primary_key=True, index=True)
+    generated_at = Column(DateTime, default=datetime.now, nullable=False)
+    report_period = Column(String(50), nullable=False) # e.g., 'weekly', 'monthly'
+    insights = Column(JSON, nullable=False)
+    trends = Column(JSON, nullable=True)
+    recommendations = Column(JSON, nullable=True)
+    intervention_triggers = Column(JSON, nullable=True)
+
+class InterventionCampaign(Base):
+    __tablename__ = "intervention_campaigns"
+
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_type = Column(String(100), nullable=False)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=True)
+    content = Column(JSON, nullable=False)
+    target_criteria = Column(JSON, nullable=True)
+    target_audience_size = Column(Integer, default=0)
+    priority = Column(String(50), default="medium")
+    status = Column(String(50), default="created", index=True) # e.g., created, active, completed, failed
+    start_date = Column(DateTime, default=datetime.now)
+    end_date = Column(DateTime, nullable=True)
+    
+    executions_delivered = Column(Integer, default=0)
+    executions_failed = Column(Integer, default=0)
+
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    executions = relationship("CampaignExecution", back_populates="campaign", cascade="all, delete-orphan")
+
+class CampaignExecution(Base):
+    __tablename__ = "campaign_executions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    campaign_id = Column(Integer, ForeignKey("intervention_campaigns.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    
+    status = Column(String(50), default="scheduled", index=True) # e.g., scheduled, delivered, failed, engaged
+    scheduled_at = Column(DateTime, default=datetime.now)
+    executed_at = Column(DateTime, nullable=True)
+    delivery_method = Column(String(100), nullable=True)
+    error_message = Column(Text, nullable=True)
+    engagement_score = Column(Float, nullable=True)
+    trigger_data = Column(JSON, nullable=True)
+
+    created_at = Column(DateTime, default=datetime.now)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    campaign = relationship("InterventionCampaign", back_populates="executions")
+    user = relationship("User")
+
+class TriageAssessment(Base):
+    __tablename__ = "triage_assessments"
+
+    id = Column(Integer, primary_key=True, index=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id"), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    
+    risk_score = Column(Float, nullable=False)
+    confidence_score = Column(Float, nullable=False)
+    severity_level = Column(String(50), nullable=False, index=True) # e.g., low, medium, high, critical
+    risk_factors = Column(JSON, nullable=True) # Storing list of strings as JSON array for compatibility
+    recommended_action = Column(String(100), nullable=True) # e.g., immediate, urgent, standard, routine
+    assessment_data = Column(JSON, nullable=True) # Store the full assessment dict from the agent
+    processing_time_ms = Column(Integer, nullable=True)
+    
+    created_at = Column(DateTime, default=datetime.now, index=True)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    conversation = relationship("Conversation")
+    user = relationship("User")

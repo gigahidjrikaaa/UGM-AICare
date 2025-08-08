@@ -9,7 +9,8 @@ from typing import Dict, List, Set, Optional, Any, cast # Import Any and cast
 from app.core import llm
 from app.database import get_async_db
 from app.models import User, JournalEntry, Conversation, UserBadge, UserSummary
-from app.schemas import LatestSummaryResponse, ActivitySummaryResponse, ActivityData, EarnedBadgeInfo, GreetingHookRequest, GreetingHookResponse
+from app.schemas.summary import LatestSummaryResponse, ActivitySummaryResponse, ActivityData, GreetingHookRequest, GreetingHookResponse
+from app.schemas.user import EarnedBadgeInfo
 from app.dependencies import get_current_active_user
 import logging
 import os

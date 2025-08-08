@@ -5,8 +5,8 @@ import os
 import json
 from pathlib import Path
 from typing import Dict, List, Optional, Any
-from pydantic import BaseModel
-from app.schemas import EndpointDoc, EndpointExample, ModuleDoc
+from pydantic import ValidationError
+from app.schemas.docs import ModuleDoc
 
 # Configure router
 router = APIRouter(prefix="/docs", tags=["documentation"])
@@ -274,16 +274,30 @@ API_DOCS = {
     }
 }
 
+# Validate and parse the API_DOCS data using Pydantic models
+parsed_docs: Dict[str, ModuleDoc] = {}
+for module_name, module_data in API_DOCS.items():
+    try:
+        parsed_docs[module_name] = ModuleDoc.model_validate(module_data)
+    except ValidationError as e:
+        # This provides detailed feedback during development if the API_DOCS structure is incorrect.
+        print(f"Error validating documentation for module '{module_name}': {e}")
+        # Depending on strictness, you might want to raise an exception to halt startup.
+        # raise e
+
 # Routes
 @router.get("/", response_class=HTMLResponse if templates else JSONResponse)
 async def api_documentation(request: Request):
     """Main API documentation page"""
     if templates:
-        return templates.TemplateResponse("docs/index.html", {"request": request, "api_docs": API_DOCS})
+        # Pass the parsed Pydantic objects to the template.
+        # The template can then access attributes like `module.name`, `endpoint.path`, etc.
+        return templates.TemplateResponse("docs/index.html", {"request": request, "api_docs": parsed_docs})
     else:
+        # Convert Pydantic objects back to dicts for a consistent JSON response.
         return {
             "title": "UGM-AICare API Documentation",
             "description": "API documentation for the UGM-AICare mental health assistant",
-            "modules": [details for details in API_DOCS.values()],
+            "modules": [details.model_dump() for details in parsed_docs.values()],
             "note": "For a better documentation experience, install Jinja2 and create HTML templates"
         }

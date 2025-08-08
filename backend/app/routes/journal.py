@@ -8,7 +8,7 @@ from typing import List, Optional, cast as typing_cast
 
 from app.database import get_async_db, AsyncSessionLocal
 from app.models import User, JournalEntry, JournalReflectionPoint
-from app.schemas import JournalEntryCreate, JournalEntryResponse, JournalReflectionPointCreate
+from app.schemas.journal import JournalEntryCreate, JournalEntryResponse, JournalReflectionPointCreate
 from app.core.llm import generate_response, LLMProvider
 from app.dependencies import get_current_active_user # Use your auth dependency
 

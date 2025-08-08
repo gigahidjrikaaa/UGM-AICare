@@ -9,7 +9,7 @@ import logging
 from app.utils.email_utils import send_email
 from app.database import get_db
 from app.models import User
-from app.schemas import TestEmailPayload #
+from app.schemas.user import TestEmailPayload
 
 logger = logging.getLogger(__name__)
 

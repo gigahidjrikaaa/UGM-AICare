@@ -10,7 +10,7 @@ import os
 
 from app.database import get_async_db
 from app.dependencies import get_current_active_user
-from app.schemas import CheckinSettingsUpdate, CheckinSettingsResponse, EarnedBadgeInfo, SyncAchievementsResponse
+from app.schemas.user import CheckinSettingsUpdate, CheckinSettingsResponse, EarnedBadgeInfo, SyncAchievementsResponse
 from app.models import UserBadge, JournalEntry, User, Conversation
 from app.core.blockchain_utils import mint_nft_badge # Import the minting function
 

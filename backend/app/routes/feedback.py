@@ -8,7 +8,7 @@ from datetime import datetime
 from app.database import get_async_db
 from app.models import Feedback, User
 from app.dependencies import get_current_active_user
-from app.schemas import FeedbackCreate, FeedbackResponse
+from app.schemas.feedback import FeedbackCreate, FeedbackResponse
 import logging
 
 logger = logging.getLogger(__name__)
