@@ -3,20 +3,6 @@ from pydantic import BaseModel, Field, EmailStr, validator, model_validator
 from typing import Any, List, Dict, Optional, Literal
 from datetime import datetime, date
 
-# Import agent schemas
-from app.schemas.agents import (
-    AgentType, ReportStatus, CampaignStatus, SeverityLevel, ActionType,
-    AnalyticsReportBase, AnalyticsReportCreate, AnalyticsReportResponse, AnalyticsReportSummary,
-    InterventionCampaignBase, InterventionCampaignCreate, InterventionCampaignUpdate, InterventionCampaignResponse,
-    CampaignExecutionResponse, TriageAssessmentCreate, TriageAssessmentResponse,
-    TriageClassificationRequest, TriageClassificationResponse,
-    AgentSystemLogCreate, AgentSystemLogResponse,
-    AgentConfigurationBase, AgentConfigurationCreate, AgentConfigurationUpdate, AgentConfigurationResponse,
-    AgentDashboardStats, AgentPerformanceMetrics, AgentTrendAnalysis,
-    BulkCampaignUpdate, BulkTriageReview, AgentApiResponse,
-    PaginatedAnalyticsReports, PaginatedCampaigns, PaginatedTriageAssessments
-)
-
 #? --- Request Body Model ---
 
 #? --- ChatEvent Model ---
