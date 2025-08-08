@@ -48,8 +48,7 @@ else:
         DATABASE_URL,
         echo=False,
         future=True,
-        # SQLite-specific settings
-        connect_args={"check_same_thread": False}
+        # No specific connect_args needed for aiosqlite in this context
     )
 
 logger.info(f"Using async database with asyncpg: {DATABASE_URL}")

@@ -1,13 +1,13 @@
 # backend/app/routes/admin.py
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy.orm import Session
-from sqlalchemy import func, desc, asc, or_
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, desc, asc, or_, select
 from pydantic import BaseModel, Field
 from datetime import datetime, date, timedelta
 from typing import List, Optional, Dict, Any
 import logging
 
-from app.database import get_db
+from app.database import get_async_db
 from app.models import User, JournalEntry, Conversation, UserBadge, Appointment
 from app.dependencies import get_current_active_user
 from app.utils.security_utils import decrypt_data
@@ -174,7 +174,7 @@ def decrypt_user_email(encrypted_email: Optional[str]) -> Optional[str]:
         logger.warning(f"Failed to decrypt email: {e}")
         return "[Encrypted]"
 
-def get_user_stats(db: Session) -> UserStats:
+async def get_user_stats(db: AsyncSession) -> UserStats:
     """Calculate overall user statistics"""
     from datetime import timedelta
     
@@ -183,29 +183,29 @@ def get_user_stats(db: Session) -> UserStats:
     month_ago = today - timedelta(days=30)
     
     # Basic counts
-    total_users = db.query(func.count(User.id)).scalar() or 0
+    total_users = (await db.execute(select(func.count(User.id)))).scalar() or 0
     
     # Active users (users with activity in last 30/7 days)
-    active_30d = db.query(func.count(User.id)).filter(
+    active_30d = (await db.execute(select(func.count(User.id)).filter(
         User.last_activity_date >= month_ago
-    ).scalar() or 0
+    ))).scalar() or 0
     
-    active_7d = db.query(func.count(User.id)).filter(
+    active_7d = (await db.execute(select(func.count(User.id)).filter(
         User.last_activity_date >= week_ago
-    ).scalar() or 0
+    ))).scalar() or 0
     
     # New users today
-    new_today = db.query(func.count(User.id)).filter(
+    new_today = (await db.execute(select(func.count(User.id)).filter(
         func.date(User.last_activity_date) == today
-    ).scalar() or 0
+    ))).scalar() or 0
     
     # Average sentiment score
-    avg_sentiment = db.query(func.avg(User.sentiment_score)).scalar() or 0.0
+    avg_sentiment = (await db.execute(select(func.avg(User.sentiment_score)))).scalar() or 0.0
     
     # Content counts
-    total_journals = db.query(func.count(JournalEntry.id)).scalar() or 0
-    total_conversations = db.query(func.count(Conversation.id)).scalar() or 0
-    total_badges = db.query(func.count(UserBadge.id)).scalar() or 0
+    total_journals = (await db.execute(select(func.count(JournalEntry.id)))).scalar() or 0
+    total_conversations = (await db.execute(select(func.count(Conversation.id)))).scalar() or 0
+    total_badges = (await db.execute(select(func.count(UserBadge.id)))).scalar() or 0
     
     return UserStats(
         total_users=total_users,
@@ -228,7 +228,7 @@ async def get_users(
     sort_by: str = Query("id", description="Sort field"),
     sort_order: str = Query("desc", description="Sort order (asc/desc)"),
     active_only: bool = Query(False, description="Show only active users"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Get paginated list of users with statistics"""
@@ -236,7 +236,7 @@ async def get_users(
     
     try:
         # Build base query with joins for aggregated data
-        base_query = db.query(
+        base_query = select(
             User,
             func.count(JournalEntry.id).label('journal_count'),
             func.count(Conversation.id).label('conversation_count'),
@@ -262,7 +262,8 @@ async def get_users(
             base_query = base_query.filter(User.last_activity_date >= thirty_days_ago)
         
         # Get total count before pagination
-        total_count = base_query.count()
+        count_query = select(func.count()).select_from(base_query.alias())
+        total_count = (await db.execute(count_query)).scalar() or 0
         
         # Apply sorting
         sort_column = getattr(User, sort_by, User.id)
@@ -273,7 +274,7 @@ async def get_users(
         
         # Apply pagination
         offset = (page - 1) * limit
-        results = base_query.offset(offset).limit(limit).all()
+        results = (await db.execute(base_query.offset(offset).limit(limit))).all()
         
         # Format results
         users = []
@@ -306,7 +307,7 @@ async def get_users(
             users.append(user_item)
         
         # Get overall statistics
-        stats = get_user_stats(db)
+        stats = await get_user_stats(db)
         
         return UsersResponse(
             users=users,
@@ -324,14 +325,15 @@ async def get_users(
 @router.get("/users/{user_id}", response_model=UserDetailResponse)
 async def get_user_detail(
     user_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Get detailed information about a specific user"""
     logger.info(f"Admin {admin_user.id} requesting details for user {user_id}")
     
     try:
-        user = db.query(User).filter(User.id == user_id).first()
+        result = await db.execute(select(User).filter(User.id == user_id))
+        user = result.scalar_one_or
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,

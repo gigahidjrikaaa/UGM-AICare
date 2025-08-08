@@ -1,9 +1,10 @@
 # backend/app/dependencies.py (Modified)
 import logging
 from fastapi import Depends, HTTPException, Header, status # type: ignore
-from sqlalchemy.orm import Session
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import select
 from app.models import User
-from app.database import get_db
+from app.database import get_async_db
 from app.auth_utils import decrypt_and_validate_token
 
 logger = logging.getLogger(__name__)
@@ -25,17 +26,18 @@ def get_token_from_header(authorization: str = Header(...)) -> str:
         )
     return token
 
-def get_current_active_user(
+async def get_current_active_user(
     token: str = Depends(get_token_from_header), # Use the extracted token
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
 ) -> User:
     """Dependency to get the current authenticated and active user from JWT."""
     logger.info("Attempting to authenticate user...")
     payload = decrypt_and_validate_token(token) # Use the helper function
 
     google_sub_id = payload.sub # Pydantic model ensures 'sub' exists
-
-    user = db.query(User).filter(User.google_sub == google_sub_id).first()
+    stmt = select(User).filter(User.google_sub == google_sub_id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
     if not user:
         logger.warning(f"User with hashed_id {google_sub_id} not found in database.")
         raise HTTPException(

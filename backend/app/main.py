@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request as FastAPIRequest # type: ignore
 from datetime import datetime, timezone
 from app.database import init_db, close_db
 from sqlalchemy import text
-from app.routes import auth, email, docs, chat, feedback, link_did, internal, journal, journal_prompts, summary, profile, session_events, appointments, admin
+from app.routes import auth, email, chat, feedback, link_did, internal, journal, journal_prompts, summary, profile, session_events, appointments, admin
 from contextlib import asynccontextmanager
 from app.core.scheduler import start_scheduler, shutdown_scheduler
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
@@ -106,7 +106,6 @@ app.add_middleware(
 logger.info("Including API routers...")
 
 app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"]) # Auth endpoints
-app.include_router(docs.router, prefix="/api/v1", tags=["Documents"]) # Added prefix/tag consistency
 app.include_router(chat.router, prefix="/api/v1", tags=["Chat"]) # Use /api/v1 prefix
 app.include_router(feedback.router, prefix="/api/v1", tags=["Feedback"]) # Added prefix/tag consistency
 app.include_router(link_did.router, prefix="/api/v1", tags=["Link DID"]) # Added prefix/tag consistency)

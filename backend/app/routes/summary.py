@@ -1,13 +1,13 @@
 # backend/app/routes/summary.py (New File)
 from fastapi import APIRouter, Depends, HTTPException, Query, status # type: ignore
-from sqlalchemy.orm import Session
-from sqlalchemy import func
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
 from pydantic import BaseModel, Field
 from datetime import date, timedelta, datetime, time
 from typing import Dict, List, Set, Optional, Any, cast # Import Any and cast
 
 from app.core import llm
-from app.database import get_db
+from app.database import get_async_db
 from app.models import User, JournalEntry, Conversation, UserBadge, UserSummary
 from app.schemas import LatestSummaryResponse, ActivitySummaryResponse, ActivityData, EarnedBadgeInfo, GreetingHookRequest, GreetingHookResponse
 from app.dependencies import get_current_active_user
@@ -34,7 +34,7 @@ user_data_router = APIRouter(
 @activity_router.get("/", response_model=ActivitySummaryResponse)
 async def get_activity_summary(
     month_query: str = Query(..., alias="month", regex=r"^\d{4}-\d{2}$", description="Month in YYYY-MM format"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_active_user)
 ):
     """
@@ -60,10 +60,11 @@ async def get_activity_summary(
 
     try:
         # Fetch all-time activity dates for streak calculation
-        all_journal_dates_query = db.query(func.distinct(JournalEntry.entry_date))\
-            .filter(JournalEntry.user_id == current_user.id, JournalEntry.entry_date.isnot(None))
+        all_journal_dates_stmt = select(func.distinct(JournalEntry.entry_date))\
+            .where(JournalEntry.user_id == current_user.id, JournalEntry.entry_date.isnot(None))
+        journal_result = await db.execute(all_journal_dates_stmt)
         all_journal_dates: Set[date] = set()
-        for r in all_journal_dates_query.all():
+        for r in journal_result.all():
             if isinstance(r[0], str):
                 try:
                     all_journal_dates.add(datetime.strptime(r[0], "%Y-%m-%d").date())
@@ -72,10 +73,11 @@ async def get_activity_summary(
             elif isinstance(r[0], date):
                 all_journal_dates.add(r[0])
 
-        all_conv_timestamps_query = db.query(func.distinct(func.date(Conversation.timestamp)))\
-            .filter(Conversation.user_id == current_user.id, Conversation.timestamp.isnot(None))
+        all_conv_timestamps_stmt = select(func.distinct(func.date(Conversation.timestamp)))\
+            .where(Conversation.user_id == current_user.id, Conversation.timestamp.isnot(None))
+        conv_result = await db.execute(all_conv_timestamps_stmt)
         all_conv_dates: Set[date] = set()
-        for r in all_conv_timestamps_query.all():
+        for r in conv_result.all():
             if isinstance(r[0], str): # Should ideally be a date object due to func.date()
                 try:
                     all_conv_dates.add(datetime.strptime(r[0], "%Y-%m-%d").date())
@@ -136,11 +138,11 @@ async def get_activity_summary(
             
             try:
                 db.add(current_user) # Add the original current_user object
-                db.commit()
-                db.refresh(current_user)
+                await db.commit()
+                await db.refresh(current_user)
                 logger.info(f"User {current_user.id} streak data updated: Current={new_streak_val}, Longest={new_longest_streak_val}, LastActivity={new_last_activity_val}")
             except Exception as e:
-                db.rollback()
+                await db.rollback()
                 logger.error(f"Database error saving user streak update for user {current_user.id}: {e}", exc_info=True)
 
         summary_data: Dict[str, ActivityData] = {}
@@ -173,16 +175,17 @@ async def get_activity_summary(
 # --- NEW: Endpoint to Fetch Earned Badges ---
 @user_data_router.get("/my-badges", response_model=List[EarnedBadgeInfo])
 async def get_my_earned_badges(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_active_user) # Use dependency to get user
 ):
     """Fetches the list of badges earned by the current authenticated user."""
     logger.info(f"Fetching earned badges for user {current_user.id}")
     try:
-        earned_badges = db.query(UserBadge)\
-            .filter(UserBadge.user_id == current_user.id)\
-            .order_by(UserBadge.awarded_at.desc())\
-            .all() # Show newest badges first
+        stmt = select(UserBadge)\
+            .where(UserBadge.user_id == current_user.id)\
+            .order_by(UserBadge.awarded_at.desc()) # Show newest badges first
+        result = await db.execute(stmt)
+        earned_badges = result.scalars().all()
         logger.info(f"Found {len(earned_badges)} earned badges for user {current_user.id}")
         # FastAPI will automatically serialize the list of UserBadge objects
         # into a list of EarnedBadgeInfo objects based on the response_model
@@ -256,14 +259,15 @@ async def generate_greeting_hook_from_summary(
 # --- Endpoint to Fetch Latest Summary ---
 @user_data_router.get("/latest-summary", response_model=LatestSummaryResponse)
 async def get_latest_user_summary(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_current_active_user)
 ):
     logger.info(f"Fetching latest summary for user ID: {current_user.id}")
-    latest_summary_instance: Optional[UserSummary] = db.query(UserSummary)\
-        .filter(UserSummary.user_id == current_user.id)\
-        .order_by(UserSummary.timestamp.desc())\
-        .first()
+    stmt = select(UserSummary)\
+        .where(UserSummary.user_id == current_user.id)\
+        .order_by(UserSummary.timestamp.desc())
+    result = await db.execute(stmt)
+    latest_summary_instance: Optional[UserSummary] = result.scalar_one_or_none()
 
     if not latest_summary_instance:
         logger.info(f"No summary found for user ID: {current_user.id}")

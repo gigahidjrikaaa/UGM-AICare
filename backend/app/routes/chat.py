@@ -234,9 +234,9 @@ async def handle_chat_request(
                             message=user_message_content, response=aika_response_text, timestamp=datetime.now()
                         )
                         db.add(conv_entry)
-                        db.commit()
+                        await db.commit()
                     except Exception as e:
-                        db.rollback()
+                        await db.rollback()
                         logger.error(f"DB Error saving memory query conversation turn for session {session_id}: {e}", exc_info=True)
                     
                     # --- Prepare and return the constructed response directly ---
@@ -393,9 +393,6 @@ async def handle_chat_request(
             except Exception as redis_err:
                 logger.error(f"Failed to clear module state for session {session_id} during unhandled exception: {redis_err}")
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
-    finally:
-        if db: # Ensure db is closed
-            db.close()
 
 
 # --- Define the Summarization Function ---
