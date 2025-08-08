@@ -46,7 +46,7 @@ def get_or_create_user(db: Session, google_sub: str, plain_email: Optional[str] 
         logger.info(f"Existing user {user.id} found with NULL email. Attempting to set email.")
         encrypted_email_str = encrypt_data(plain_email)
         if encrypted_email_str:
-            user.email = encrypted_email_str
+            setattr(user, 'email', encrypted_email_str)
             db.add(user) # Add to session for update tracking
             needs_commit = True # Mark commit needed after potential update
         else:
@@ -110,7 +110,7 @@ async def async_get_or_create_user(db: AsyncSession, google_sub: str, plain_emai
         logger.info(f"Existing user {user.id} found with NULL email. Attempting to set email.")
         encrypted_email_str = encrypt_data(plain_email)
         if encrypted_email_str:
-            user.email = encrypted_email_str
+            setattr(user, 'email', encrypted_email_str)
             db.add(user)
             needs_commit = True
         else:

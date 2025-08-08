@@ -186,21 +186,23 @@ async def get_user_stats(db: AsyncSession) -> UserStats:
     total_users = (await db.execute(select(func.count(User.id)))).scalar() or 0
     
     # Active users (users with activity in last 30/7 days)
-    active_30d = (await db.execute(select(func.count(User.id)).filter(
+    active_30d_res = await db.execute(select(func.count(User.id)).filter(
         User.last_activity_date >= month_ago
-    ))).scalar() or 0
+    ))
+    active_30d = active_30d_res.scalar() or 0
     
-    active_7d = (await db.execute(select(func.count(User.id)).filter(
+    active_7d_res = await db.execute(select(func.count(User.id)).filter(
         User.last_activity_date >= week_ago
-    ))).scalar() or 0
+    ))
+    active_7d = active_7d_res.scalar() or 0
     
     # New users today
-    new_today = (await db.execute(select(func.count(User.id)).filter(
-        func.date(User.last_activity_date) == today
-    ))).scalar() or 0
+    new_today_res = await db.execute(select(func.count(User.id)).filter(func.date(User.created_at) == today))
+    new_today = new_today_res.scalar() or 0
     
     # Average sentiment score
-    avg_sentiment = (await db.execute(select(func.avg(User.sentiment_score)))).scalar() or 0.0
+    avg_sentiment_res = await db.execute(select(func.avg(User.sentiment_score)))
+    avg_sentiment = avg_sentiment_res.scalar() or 0.0
     
     # Content counts
     total_journals = (await db.execute(select(func.count(JournalEntry.id)))).scalar() or 0
@@ -262,7 +264,7 @@ async def get_users(
             base_query = base_query.filter(User.last_activity_date >= thirty_days_ago)
         
         # Get total count before pagination
-        count_query = select(func.count()).select_from(base_query.alias())
+        count_query = select(func.count()).select_from(base_query.subquery())
         total_count = (await db.execute(count_query)).scalar() or 0
         
         # Apply sorting
@@ -333,7 +335,7 @@ async def get_user_detail(
     
     try:
         result = await db.execute(select(User).filter(User.id == user_id))
-        user = result.scalar_one_or
+        user = result.scalar_one_or_none()
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -341,10 +343,12 @@ async def get_user_detail(
             )
         
         # Get user's journal entries (last 10)
-        journal_entries = db.query(JournalEntry)\
+        journal_stmt = select(JournalEntry)\
             .filter(JournalEntry.user_id == user_id)\
             .order_by(desc(JournalEntry.created_at))\
-            .limit(10).all()
+            .limit(10)
+        journal_entries_res = await db.execute(journal_stmt)
+        journal_entries = journal_entries_res.scalars().all()
         
         journal_data = [
             {
@@ -357,10 +361,12 @@ async def get_user_detail(
         ]
         
         # Get recent conversations (last 10)
-        conversations = db.query(Conversation)\
+        conv_stmt = select(Conversation)\
             .filter(Conversation.user_id == user_id)\
             .order_by(desc(Conversation.timestamp))\
-            .limit(10).all()
+            .limit(10)
+        conversations_res = await db.execute(conv_stmt)
+        conversations = conversations_res.scalars().all()
         
         conversation_data = [
             {
@@ -374,9 +380,11 @@ async def get_user_detail(
         ]
         
         # Get user badges
-        badges = db.query(UserBadge)\
+        badge_stmt = select(UserBadge)\
             .filter(UserBadge.user_id == user_id)\
-            .order_by(desc(UserBadge.awarded_at)).all()
+            .order_by(desc(UserBadge.awarded_at))
+        badges_res = await db.execute(badge_stmt)
+        badges = badges_res.scalars().all()
         
         badge_data = [
             {
@@ -390,9 +398,11 @@ async def get_user_detail(
         ]
         
         # Get appointments
-        appointments = db.query(Appointment)\
+        appt_stmt = select(Appointment)\
             .filter(Appointment.user_id == user_id)\
-            .order_by(desc(Appointment.created_at)).all()
+            .order_by(desc(Appointment.created_at))
+        appointments_res = await db.execute(appt_stmt)
+        appointments = appointments_res.scalars().all()
         
         appointment_data = [
             {
@@ -438,14 +448,15 @@ async def get_user_detail(
 async def toggle_user_email_checkins(
     user_id: int,
     enabled: bool = Query(..., description="Enable or disable email checkins"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Toggle email checkins for a specific user"""
     logger.info(f"Admin {admin_user.id} toggling email checkins for user {user_id} to {enabled}")
     
     try:
-        user = db.query(User).filter(User.id == user_id).first()
+        result = await db.execute(select(User).filter(User.id == user_id))
+        user = result.scalar_one_or_none()
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -453,7 +464,8 @@ async def toggle_user_email_checkins(
             )
         
         user.allow_email_checkins = enabled  # type: ignore
-        db.commit()
+        db.add(user)
+        await db.commit()
         
         return {
             "message": f"Email checkins {'enabled' if enabled else 'disabled'} for user {user_id}",
@@ -465,7 +477,7 @@ async def toggle_user_email_checkins(
         raise
     except Exception as e:
         logger.error(f"Error toggling email checkins for user {user_id}: {e}", exc_info=True)
-        db.rollback()
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update user email checkin settings"
@@ -476,14 +488,15 @@ async def toggle_user_email_checkins(
 async def update_user_status(
     user_id: int,
     is_active: bool = Query(..., description="Set user active status"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Update user active status (enable/disable user account)"""
     logger.info(f"Admin {admin_user.id} updating status for user {user_id} to active={is_active}")
     
     try:
-        user = db.query(User).filter(User.id == user_id).first()
+        result = await db.execute(select(User).filter(User.id == user_id))
+        user = result.scalar_one_or_none()
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -499,7 +512,8 @@ async def update_user_status(
         
         user.is_active = is_active  # type: ignore
         user.updated_at = datetime.now()  # type: ignore
-        db.commit()
+        db.add(user)
+        await db.commit()
         
         return {
             "message": f"User {user_id} {'activated' if is_active else 'deactivated'} successfully",
@@ -511,7 +525,7 @@ async def update_user_status(
         raise
     except Exception as e:
         logger.error(f"Error updating user status for user {user_id}: {e}", exc_info=True)
-        db.rollback()
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update user status"
@@ -522,7 +536,7 @@ async def update_user_status(
 async def update_user_role(
     user_id: int,
     role: str = Query(..., description="New user role", regex="^(user|admin|therapist)$"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Update user role"""
@@ -537,7 +551,8 @@ async def update_user_role(
                 detail="Only admin users can change user roles"
             )
         
-        user = db.query(User).filter(User.id == user_id).first()
+        result = await db.execute(select(User).filter(User.id == user_id))
+        user = result.scalar_one_or_none()
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -554,7 +569,8 @@ async def update_user_role(
         old_role = getattr(user, 'role', 'user')
         user.role = role  # type: ignore
         user.updated_at = datetime.now()  # type: ignore
-        db.commit()
+        db.add(user)
+        await db.commit()
         
         return {
             "message": f"User {user_id} role updated from '{old_role}' to '{role}'",
@@ -567,7 +583,7 @@ async def update_user_role(
         raise
     except Exception as e:
         logger.error(f"Error updating user role for user {user_id}: {e}", exc_info=True)
-        db.rollback()
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to update user role"
@@ -578,7 +594,7 @@ async def update_user_role(
 async def delete_user(
     user_id: int,
     permanent: bool = Query(False, description="Permanently delete user data"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Delete or deactivate a user account"""
@@ -593,7 +609,8 @@ async def delete_user(
                 detail="Only admin users can delete user accounts"
             )
         
-        user = db.query(User).filter(User.id == user_id).first()
+        result = await db.execute(select(User).filter(User.id == user_id))
+        user = result.scalar_one_or_none()
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -609,15 +626,16 @@ async def delete_user(
         
         if permanent:
             # Permanent deletion - CASCADE will handle related records
-            db.delete(user)
+            await db.delete(user)
             message = f"User {user_id} permanently deleted"
         else:
             # Soft delete - just deactivate
             user.is_active = False  # type: ignore
             user.updated_at = datetime.now()  # type: ignore
+            db.add(user)
             message = f"User {user_id} deactivated"
         
-        db.commit()
+        await db.commit()
         
         return {
             "message": message,
@@ -629,7 +647,7 @@ async def delete_user(
         raise
     except Exception as e:
         logger.error(f"Error deleting user {user_id}: {e}", exc_info=True)
-        db.rollback()
+        await db.rollback()
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to delete user"
@@ -639,7 +657,7 @@ async def delete_user(
 @router.post("/users/{user_id}/reset-password")
 async def reset_user_password(
     user_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Generate a password reset token for a user"""
@@ -654,7 +672,8 @@ async def reset_user_password(
                 detail="Only admin users can reset passwords"
             )
         
-        user = db.query(User).filter(User.id == user_id).first()
+        result = await db.execute(select(User).filter(User.id == user_id))
+        user = result.scalar_one_or_none()
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
@@ -712,112 +731,117 @@ async def get_conversations(
     session_id: Optional[str] = Query(None, description="Filter by session ID"),
     date_from: Optional[date] = Query(None, description="Filter conversations from this date"),
     date_to: Optional[date] = Query(None, description="Filter conversations to this date"),
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Get paginated list of AI conversations with privacy censoring."""
     logger.info(f"Admin {admin_user.id} requesting conversations list (page {page}, limit {limit})")
     
     # Base query
-    query = db.query(Conversation).order_by(Conversation.timestamp.desc())  # type: ignore
+    query = select(Conversation).order_by(desc(Conversation.timestamp))
     
     # Apply filters
     if search:
         search_term = f"%{search}%"
         query = query.filter(
             or_(
-                Conversation.message.ilike(search_term),  # type: ignore
-                Conversation.response.ilike(search_term)  # type: ignore
+                Conversation.message.ilike(search_term),
+                Conversation.response.ilike(search_term)
             )
         )
     
     if session_id:
-        query = query.filter(Conversation.session_id == session_id)  # type: ignore
+        query = query.filter(Conversation.session_id == session_id)
     
     if date_from:
-        query = query.filter(func.date(Conversation.timestamp) >= date_from)  # type: ignore
+        query = query.filter(func.date(Conversation.timestamp) >= date_from)
     
     if date_to:
-        query = query.filter(func.date(Conversation.timestamp) <= date_to)  # type: ignore
+        query = query.filter(func.date(Conversation.timestamp) <= date_to)
     
     # Get total count
-    total_count = query.count()
+    count_query = select(func.count()).select_from(query.subquery())
+    total_count_res = await db.execute(count_query)
+    total_count = total_count_res.scalar() or 0
     
     # Apply pagination
     offset = (page - 1) * limit
-    conversations = query.offset(offset).limit(limit).all()
+    conversations_res = await db.execute(query.offset(offset).limit(limit))
+    conversations: List[Any] = list(conversations_res.scalars().all())
     
     # Get session message counts
-    session_counts = {}
+    session_counts: Dict[str, int] = {}
     if conversations:
-        session_ids = list(set(conv.session_id for conv in conversations))  # type: ignore
-        session_count_query = db.query(
-            Conversation.session_id,  # type: ignore
-            func.count(Conversation.id).label('count')  # type: ignore
+        session_ids = list(set(conv.session_id for conv in conversations))
+        session_count_query = select(
+            Conversation.session_id,
+            func.count(Conversation.id).label('count')
         ).filter(
-            Conversation.session_id.in_(session_ids)  # type: ignore
-        ).group_by(Conversation.session_id)  # type: ignore
+            Conversation.session_id.in_(session_ids)
+        ).group_by(Conversation.session_id)
         
-        session_counts = {row.session_id: row.count for row in session_count_query.all()}
+        session_count_results = await db.execute(session_count_query)
+        session_counts = {session_id: count for session_id, count in session_count_results}
     
     # Format conversations with censoring
     conversation_items = []
     for conv in conversations:
-        conversation_items.append(ConversationListItem(
-            id=conv.id,  # type: ignore
-            user_id_hash=_hash_user_id(conv.user_id),  # type: ignore
-            session_id=conv.session_id,  # type: ignore
-            conversation_id=conv.conversation_id,  # type: ignore
-            message_preview=conv.message[:100] if conv.message else "",  # type: ignore
-            response_preview=conv.response[:100] if conv.response else "",  # type: ignore
-            timestamp=conv.timestamp,  # type: ignore
-            message_length=len(conv.message) if conv.message else 0,  # type: ignore
-            response_length=len(conv.response) if conv.response else 0,  # type: ignore
-            session_message_count=session_counts.get(conv.session_id, 1)  # type: ignore
-        ))
+        conversation_items.append(
+            ConversationListItem(
+                id=conv.id,
+                user_id_hash=_hash_user_id(conv.user_id),
+                session_id=conv.session_id,
+                conversation_id=conv.conversation_id,
+                message_preview=conv.message[:100] if conv.message else "",
+                response_preview=conv.response[:100] if conv.response else "",
+                timestamp=conv.timestamp,
+                message_length=len(conv.message) if conv.message else 0,
+                response_length=len(conv.response) if conv.response else 0,
+                session_message_count=int(session_counts.get(conv.session_id, 1)),
+            )
+        )
     
     # Calculate stats with privacy in mind
-    total_conversations = db.query(func.count(Conversation.id)).scalar() or 0  # type: ignore
-    total_sessions = db.query(func.count(func.distinct(Conversation.session_id))).scalar() or 0  # type: ignore
-    total_users_with_conversations = db.query(func.count(func.distinct(Conversation.user_id))).scalar() or 0  # type: ignore
+    total_conversations = (await db.execute(select(func.count(Conversation.id)))).scalar() or 0
+    total_sessions = (await db.execute(select(func.count(func.distinct(Conversation.session_id))))).scalar() or 0
+    total_users_with_conversations = (await db.execute(select(func.count(func.distinct(Conversation.user_id))))).scalar() or 0
     
     # Calculate averages
-    avg_stats = db.query(
-        func.avg(func.length(Conversation.message)).label('avg_message_length'),  # type: ignore
-        func.avg(func.length(Conversation.response)).label('avg_response_length')  # type: ignore
-    ).first()
+    avg_stats_res = await db.execute(select(
+        func.avg(func.length(Conversation.message)).label('avg_message_length'),
+        func.avg(func.length(Conversation.response)).label('avg_response_length')
+    ))
+    avg_stats = avg_stats_res.first()
     
     # Session stats
-    session_counts_subq = db.query(
-        Conversation.session_id,  # type: ignore
-        func.count(Conversation.id).label('count')  # type: ignore
-    ).group_by(Conversation.session_id).subquery()  # type: ignore
+    session_counts_subq = select(
+        Conversation.session_id,
+        func.count(Conversation.id).label('count')
+    ).group_by(Conversation.session_id).subquery()
     
-    session_stats = db.query(
+    session_stats_res = await db.execute(select(
         func.avg(session_counts_subq.c.count).label('avg_messages_per_session')
-    ).first()
+    ))
+    session_stats = session_stats_res.first()
     
     # Time-based stats
     today = datetime.now().date()
     week_ago = today - timedelta(days=7)
     
-    conversations_today = db.query(func.count(Conversation.id)).filter(  # type: ignore
-        func.date(Conversation.timestamp) == today  # type: ignore
-    ).scalar() or 0
+    conversations_today = (await db.execute(select(func.count(Conversation.id)).filter(func.date(Conversation.timestamp) == today))).scalar() or 0
     
-    conversations_this_week = db.query(func.count(Conversation.id)).filter(  # type: ignore
-        func.date(Conversation.timestamp) >= week_ago  # type: ignore
-    ).scalar() or 0
+    conversations_this_week = (await db.execute(select(func.count(Conversation.id)).filter(func.date(Conversation.timestamp) >= week_ago))).scalar() or 0
     
     # Most active hour
-    hour_stats = db.query(
-        func.extract('hour', Conversation.timestamp).label('hour'),  # type: ignore
-        func.count(Conversation.id).label('count')  # type: ignore
+    hour_stats_res = await db.execute(select(
+        func.extract('hour', Conversation.timestamp).label('hour'),
+        func.count(Conversation.id).label('count')
     ).group_by(
-        func.extract('hour', Conversation.timestamp)  # type: ignore
+        func.extract('hour', Conversation.timestamp)
     ).order_by(
-        func.count(Conversation.id).desc()  # type: ignore
-    ).first()
+        desc(func.count(Conversation.id))
+    ))
+    hour_stats = hour_stats_res.first()
     
     most_active_hour = int(hour_stats.hour) if hour_stats else 0
     
@@ -855,39 +879,42 @@ async def get_conversations(
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetailResponse)
 async def get_conversation_detail(
     conversation_id: int,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Get detailed view of a specific conversation with privacy censoring."""
     logger.info(f"Admin {admin_user.id} requesting conversation detail {conversation_id}")
     
-    conversation = db.query(Conversation).filter(Conversation.id == conversation_id).first()  # type: ignore
+    result = await db.execute(select(Conversation).filter(Conversation.id == conversation_id))
+    conversation: Any = result.scalar_one_or_none()
     if not conversation:
         raise HTTPException(status_code=404, detail="Conversation not found")
     
     return ConversationDetailResponse(
-        id=conversation.id,  # type: ignore
-        user_id_hash=_hash_user_id(conversation.user_id),  # type: ignore
-        session_id=conversation.session_id,  # type: ignore
-        conversation_id=conversation.conversation_id,  # type: ignore
-        message=conversation.message or "",  # type: ignore
-        response=conversation.response or "",  # type: ignore
-        timestamp=conversation.timestamp  # type: ignore
+        id=conversation.id,
+        user_id_hash=_hash_user_id(conversation.user_id),
+        session_id=conversation.session_id,
+        conversation_id=conversation.conversation_id,
+        message=conversation.message or "",
+        response=conversation.response or "",
+        timestamp=conversation.timestamp,
     )
 
 @router.get("/conversations/session/{session_id}", response_model=SessionDetailResponse)
 async def get_session_detail(
     session_id: str,
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Get all conversations in a specific session with privacy censoring."""
     logger.info(f"Admin {admin_user.id} requesting session detail {session_id}")
     
     # Get all conversations for this session
-    conversations = db.query(Conversation).filter(  # type: ignore
-        Conversation.session_id == session_id  # type: ignore
-    ).order_by(Conversation.timestamp.asc()).all()  # type: ignore
+    stmt = select(Conversation).filter(
+        Conversation.session_id == session_id
+    ).order_by(asc(Conversation.timestamp))
+    result = await db.execute(stmt)
+    conversations: List[Any] = list(result.scalars().all())
     
     if not conversations:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -895,46 +922,48 @@ async def get_session_detail(
     # Calculate session stats
     first_conv = conversations[0]
     last_conv = conversations[-1]
-    user_id = first_conv.user_id  # type: ignore
+    user_id = first_conv.user_id
     
     duration_minutes = 0
     if len(conversations) > 1:
-        duration = last_conv.timestamp - first_conv.timestamp  # type: ignore
+        duration = last_conv.timestamp - first_conv.timestamp
         duration_minutes = duration.total_seconds() / 60
     
     # Format conversations with censoring
     conversation_details = []
     for conv in conversations:
-        conversation_details.append(ConversationDetailResponse(
-            id=conv.id,  # type: ignore
-            user_id_hash=_hash_user_id(conv.user_id),  # type: ignore
-            session_id=conv.session_id,  # type: ignore
-            conversation_id=conv.conversation_id,  # type: ignore
-            message=conv.message or "",  # type: ignore
-            response=conv.response or "",  # type: ignore
-            timestamp=conv.timestamp  # type: ignore
-        ))
+        conversation_details.append(
+            ConversationDetailResponse(
+                id=conv.id,
+                user_id_hash=_hash_user_id(conv.user_id),
+                session_id=conv.session_id,
+                conversation_id=conv.conversation_id,
+                message=conv.message or "",
+                response=conv.response or "",
+                timestamp=conv.timestamp,
+            )
+        )
     
     return SessionDetailResponse(
-        session_id=session_id,
-        user_id_hash=_hash_user_id(user_id),  # type: ignore
+        session_id=session_id, # type: ignore
+        user_id_hash=_hash_user_id(user_id),
         conversation_count=len(conversations),
-        first_message_time=first_conv.timestamp,  # type: ignore
-        last_message_time=last_conv.timestamp,  # type: ignore
+        first_message_time=first_conv.timestamp,
+        last_message_time=last_conv.timestamp,
         total_duration_minutes=duration_minutes,
         conversations=conversation_details
     )
 
 @router.get("/stats")
 async def get_admin_stats(
-    db: Session = Depends(get_db),
+    db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user)
 ):
     """Get overall system statistics"""
     logger.info(f"Admin {admin_user.id} requesting system stats")
     
     try:
-        stats = get_user_stats(db)
+        stats = await get_user_stats(db)
         return stats
         
     except Exception as e:
