@@ -5,9 +5,6 @@ import os
 from dotenv import load_dotenv
 import logging
 
-# Import all models here to ensure they are registered with the Base
-from app.models import *
-
 # Load environment variables from .env file
 load_dotenv()
 

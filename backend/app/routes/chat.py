@@ -234,9 +234,9 @@ async def handle_chat_request(
                             message=user_message_content, response=aika_response_text, timestamp=datetime.now()
                         )
                         db.add(conv_entry)
-                        await db.commit()
+                        db.commit()
                     except Exception as e:
-                        await db.rollback()
+                        db.rollback()
                         logger.error(f"DB Error saving memory query conversation turn for session {session_id}: {e}", exc_info=True)
                     
                     # --- Prepare and return the constructed response directly ---
@@ -395,7 +395,7 @@ async def handle_chat_request(
         raise HTTPException(status_code=500, detail="An internal server error occurred.")
     finally:
         if db: # Ensure db is closed
-            await db.close()
+            db.close()
 
 
 # --- Define the Summarization Function ---

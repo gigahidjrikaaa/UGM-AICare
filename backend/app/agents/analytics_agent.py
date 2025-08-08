@@ -44,7 +44,7 @@ class AnalyticsAgent(BaseAgent):
         
         self.logger.info("Analytics Agent initialized")
 
-    def execute(self, timeframe: str = "weekly", **kwargs) -> Dict[str, Any]:
+    async def execute(self, timeframe: str = "weekly", **kwargs) -> Dict[str, Any]:
         """
         Main execution method for analytics agent
         
@@ -68,18 +68,18 @@ class AnalyticsAgent(BaseAgent):
             raise ValueError(f"Invalid timeframe: {timeframe}")
         
         # Perform analysis
-        conversation_data = self._fetch_conversation_data(start_date, end_date)
-        journal_data = self._fetch_journal_data(start_date, end_date)
-        user_activity = self._fetch_user_activity(start_date, end_date)
+        conversation_data = await self._fetch_conversation_data(start_date, end_date)
+        journal_data = await self._fetch_journal_data(start_date, end_date)
+        user_activity = await self._fetch_user_activity(start_date, end_date)
         
         # Analyze patterns
-        sentiment_trends = self._analyze_sentiment_trends(conversation_data)
-        topic_patterns = self._analyze_topic_patterns(conversation_data)
-        temporal_patterns = self._analyze_temporal_patterns(conversation_data, journal_data)
-        engagement_metrics = self._analyze_engagement_metrics(user_activity)
+        sentiment_trends = await self._analyze_sentiment_trends(conversation_data)
+        topic_patterns = await self._analyze_topic_patterns(conversation_data)
+        temporal_patterns = await self._analyze_temporal_patterns(conversation_data, journal_data)
+        engagement_metrics = await self._analyze_engagement_metrics(user_activity)
         
         # Generate insights
-        insights = self._generate_insights(
+        insights = await self._generate_insights(
             sentiment_trends, topic_patterns, temporal_patterns, engagement_metrics
         )
         
@@ -100,14 +100,17 @@ class AnalyticsAgent(BaseAgent):
             "temporal_patterns": temporal_patterns,
             "engagement_metrics": engagement_metrics,
             "insights": insights,
-            "intervention_triggers": self._identify_intervention_triggers(insights)
+            "intervention_triggers": await self._identify_intervention_triggers(insights)
         }
+        
+        # Store report in database (you'll need to create analytics_reports table)
+        await self._store_analytics_report(report)
         
         self.logger.info(f"Analytics execution completed. Generated {len(insights)} insights")
         
         return report
 
-    def validate_input(self, timeframe: str = "weekly", **kwargs) -> bool:
+    async def validate_input(self, timeframe: str = "weekly", **kwargs) -> bool:
         """Validate input parameters"""
         valid_timeframes = ["daily", "weekly", "monthly"]
         if timeframe not in valid_timeframes:
@@ -120,7 +123,7 @@ class AnalyticsAgent(BaseAgent):
         
         return True
 
-    def _fetch_conversation_data(self, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
+    async def _fetch_conversation_data(self, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
         """Fetch anonymized conversation data for analysis"""
         try:
             # Fetch messages within date range
@@ -155,7 +158,7 @@ class AnalyticsAgent(BaseAgent):
             self.logger.error(f"Error fetching conversation data: {e}")
             return []
 
-    def _fetch_journal_data(self, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
+    async def _fetch_journal_data(self, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
         """Fetch anonymized journal data for analysis"""
         try:
             journal_entries = self.db.query(JournalEntry).filter(
@@ -183,7 +186,7 @@ class AnalyticsAgent(BaseAgent):
             self.logger.error(f"Error fetching journal data: {e}")
             return []
 
-    def _fetch_user_activity(self, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
+    async def _fetch_user_activity(self, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
         """Fetch user activity metrics"""
         try:
             # Get active users and their activity
@@ -235,9 +238,9 @@ class AnalyticsAgent(BaseAgent):
             score = 0
             
             # Check for crisis indicators
-            if any(keyword in content_lower for keyword in Crisis_keywords):
+            if any(keyword in content_lower for keyword in crisis_keywords):
                 crisis_indicators += 1
-                score -= 2  # Strong negative weight for Crisis content
+                score -= 2  # Strong negative weight for crisis content
             
             # Calculate basic sentiment score
             positive_count = sum(1 for keyword in positive_keywords if keyword in content_lower)
@@ -400,7 +403,7 @@ class AnalyticsAgent(BaseAgent):
         insights = []
         
         # Sentiment insights
-        if sentiment_trends.get("crisis_rate", 0) > 5:  # More than 5% Crisis indicators
+        if sentiment_trends.get("crisis_rate", 0) > 5:  # More than 5% crisis indicators
             insights.append({
                 "type": "crisis_alert",
                 "severity": "high",
