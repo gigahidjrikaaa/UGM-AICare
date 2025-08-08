@@ -1,14 +1,10 @@
 # backend/app/routes/email.py 
 
 from fastapi import APIRouter, Depends, HTTPException, status, Body # type: ignore
-from pydantic import BaseModel, EmailStr # Keep for potential test endpoint
-from typing import List, Optional
-from sqlalchemy.orm import Session
+from pydantic import BaseModel, EmailStr
 import logging
 
 from app.utils.email_utils import send_email
-from app.database import get_db
-from app.models import User
 from app.schemas.user import TestEmailPayload
 
 logger = logging.getLogger(__name__)
@@ -17,10 +13,10 @@ logger = logging.getLogger(__name__)
 # Keep the /email prefix for now, maybe for future simple email tasks or testing
 router = APIRouter(prefix="/api/v1/email", tags=["Email Utility"])
 
-# --- OPTIONAL: Add a Simple Test Endpoint ---
-# This can be useful during development to test if your SMTP settings in .env
-# and the send_email utility function are working correctly, without needing
-# the scheduler or other complex logic to run. Remove if not needed.
+# --- Development Utility: Test Endpoint ---
+# This endpoint is a valuable utility for developers to test if the core
+# send_email function and the SMTP settings in the .env file are configured
+# correctly. It is not intended to be used by the main application logic.
 
 @router.post("/test-send", status_code=status.HTTP_200_OK)
 async def send_test_email(
@@ -54,7 +50,5 @@ async def send_test_email(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to send test email. Check backend logs and SMTP configuration in .env."
         )
-
-# --- End Optional Test Endpoint ---
 
 # You can add other simple, direct email-related endpoints here in the future if needed.
