@@ -51,3 +51,26 @@ async def get_current_active_user(
 
     logger.info(f"Successfully authenticated user: {google_sub_id}")
     return user
+
+async def get_admin_user(
+    current_user: User = Depends(get_current_active_user)
+) -> User:
+    """Dependency to ensure current user is an admin or therapist."""
+    user_role = getattr(current_user, 'role', None)
+    user_active = getattr(current_user, 'is_active', True)
+    
+    if not user_role or user_role not in ["admin", "therapist"]:
+        logger.warning(f"User {current_user.id} with role '{user_role}' attempted to access admin endpoint")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin or therapist access required"
+        )
+    
+    if not user_active:
+        logger.warning(f"Inactive admin user {current_user.id} attempted to access admin endpoint")
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is deactivated"
+        )
+    
+    return current_user

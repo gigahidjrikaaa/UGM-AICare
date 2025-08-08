@@ -9,7 +9,7 @@ import logging
 
 from app.database import get_async_db
 from app.models import User, JournalEntry, Conversation, UserBadge, Appointment
-from app.dependencies import get_current_active_user
+from app.dependencies import get_current_active_user, get_admin_user
 from app.utils.security_utils import decrypt_data
 
 logger = logging.getLogger(__name__)
@@ -138,30 +138,6 @@ class SessionDetailResponse(BaseModel):
     
     class Config:
         from_attributes = True
-
-# --- Admin Authentication Helper ---
-async def get_admin_user(
-    current_user: User = Depends(get_current_active_user)
-) -> User:
-    """Dependency to ensure current user is an admin"""
-    user_role = getattr(current_user, 'role', None)
-    user_active = getattr(current_user, 'is_active', True)
-    
-    if not user_role or user_role not in ["admin", "therapist"]:
-        logger.warning(f"User {current_user.id} with role '{user_role}' attempted to access admin endpoint")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin access required"
-        )
-    
-    if not user_active:
-        logger.warning(f"Inactive admin user {current_user.id} attempted to access admin endpoint")
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Account is deactivated"
-        )
-    
-    return current_user
 
 # --- Helper Functions ---
 def decrypt_user_email(encrypted_email: Optional[str]) -> Optional[str]:
