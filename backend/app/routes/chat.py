@@ -261,7 +261,11 @@ async def handle_chat_request(
                     previous_session_id_to_summarize = None
                     stmt = select(Conversation).where(Conversation.user_id == user_id).order_by(Conversation.timestamp.desc())
                     result = await db.execute(stmt)
-                    latest_db_message_for_user = result.first()
+                    row = result.first()
+                    if row:
+                        latest_db_message_for_user = row[0]
+                    else:
+                        latest_db_message_for_user = None
 
                     is_new_session = False
                     if latest_db_message_for_user:
