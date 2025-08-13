@@ -1,14 +1,14 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
-from sqlalchemy.orm import Session
-from app.database import get_db
-from app.database.crud import get_user_by_google_sub
+from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import get_async_db
+from app.services.user_service import async_get_user_by_google_sub
 from app.services.google_auth_service import verify_google_token
-from app.database.models import User
+from app.models import User
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
 
-async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(get_db)) -> User:
+async def get_current_user(token: str = Depends(oauth2_scheme), db: AsyncSession = Depends(get_async_db)) -> User:
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -26,7 +26,7 @@ async def get_current_user(token: str = Depends(oauth2_scheme), db: Session = De
         # Catch any other exceptions during token processing
         raise credentials_exception
 
-    user = get_user_by_google_sub(db, google_sub=google_sub)
+    user = await async_get_user_by_google_sub(db, google_sub=google_sub)
     if user is None:
         raise HTTPException(status_code=404, detail="User not found")
     return user
