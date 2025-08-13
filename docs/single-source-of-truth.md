@@ -16,7 +16,7 @@ UGM-AICare is built around three collaborative AI agents that work together to p
 - **Schedule**: Runs on a weekly schedule
 - **Function**: Analyzes anonymized student interaction data from the database
 - **Output**: Generates insights about mental health trends (e.g., rise in anxiety-related queries during exam periods)
-- **Technology**: Powered by LangChain agents and LLM integration
+- **Technology**: Powered by LLM integration
 
 ### 📢 The Intervention Agent
 
@@ -41,7 +41,7 @@ UGM-AICare is built around three collaborative AI agents that work together to p
 - **Framework**: FastAPI (Python)
 - **Purpose**: Houses core agent logic and business intelligence
 - **Key Components**:
-  - LangChain library for LLM interaction and prompt construction
+  - LLM interaction and prompt construction
   - Agent orchestration and decision-making logic
   - Database management and analytics processing
   - API endpoints for all system interactions

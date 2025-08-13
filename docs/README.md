@@ -65,7 +65,7 @@ This documentation suite provides comprehensive coverage of the UGM-AICare proje
 - **[AI Integration Guide](ai-integration-guide.md)**: LLM provider configuration and dual-provider setup
 - **[API Integration Reference](api-integration-reference.md)**: Comprehensive API endpoint documentation and integration patterns
 - **[Development Workflow](development-workflow.md)**: Development processes and collaboration guidelines
-- **Agent Implementation Plan**: Strategic plan for building the agents with LangChain and N8N.
+- **Agent Implementation Plan**: Strategic plan for building the agents with N8N.
 
 ### Mental Health and Ethics
 

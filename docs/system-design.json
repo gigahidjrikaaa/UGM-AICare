@@ -41,7 +41,7 @@
         ],
         "agent_framework": {
           "orchestration": "N8N (Self-hosted on INA17)",
-          "framework": "LangChain",
+          
           "memory": "Redis-backed conversation memory"
         }
       },
@@ -114,19 +114,7 @@
         "Sync with external systems"
       ]
     },
-    "langchain_agents": {
-      "tools": [
-        "Mental health resource search",
-        "Appointment availability check",
-        "Emergency contact lookup",
-        "CBT exercise recommendation"
-      ],
-      "memory_types": [
-        "Conversation memory (short-term)",
-        "User profile memory (long-term)",
-        "Therapeutic progress memory"
-      ]
-    }
+    
   },
   "security": {
     "authentication": {

@@ -1,13 +1,13 @@
-# Agent Implementation Plan: LangChain & N8N
+# Agent Implementation Plan: N8N
 
-This document outlines the strategic plan for implementing the three-agent framework (Triage, Analytics, Intervention) using LangChain for AI logic and N8N for orchestration and automation.
+This document outlines the strategic plan for implementing the three-agent framework (Triage, Analytics, Intervention) using N8N for orchestration and automation, with direct calls to LLM APIs for AI logic.
 
 ## Guiding Principles
 
 1. **Build Incrementally:** Start with the simplest, most self-contained agent to build momentum.
 2. **Test at Each Stage:** Ensure each component is robust before integrating it with others.
 3. **Leverage Your Design:** The plan directly maps to the components defined in `single-source-of-truth.md` and `technical-specifications.md`.
-4. **Separate Concerns:** The backend (FastAPI/LangChain) handles the "thinking" (LLM logic), while N8N handles the "doing" (scheduling, external actions).
+4. **Separate Concerns:** The backend (FastAPI) provides data and endpoints, while N8N handles the "thinking" (LLM logic) and the "doing" (scheduling, external actions).
 
 ---
 
@@ -58,27 +58,28 @@ This phase establishes the basic code structure for all agents within the backen
 
 The Triage Agent is the best starting point as it's a real-time, synchronous process with clear inputs and outputs, and no dependencies on other agents.
 
-### 1. Backend (FastAPI & LangChain)
+### 1. N8N Workflow (Classification)
 
-* **File:** `backend/app/agents/triage_agent.py`
-* **Logic:**
-  * Create a `TriageAgent` class.
-  * Define a method `classify_message(messages: list)`.
-  * Use LangChain's `ChatPromptTemplate` to instruct the LLM to analyze a conversation and return a structured JSON object with fields like `severity`, `detected_keywords`, and `suggested_action`.
-  * Use LangChain's `PydanticOutputParser` to enforce the JSON schema.
-  * Call the appropriate LLM (likely Gemini for this complex task).
-  * Save the classification result to the `triage_logs` table.
+* **Workflow Name:** "Triage Message Classifier"
+* **Node 1: Webhook Trigger.** This provides a URL for the backend to send new messages to.
+* **Node 2: LLM Node (e.g., OpenAI, Google Generative AI).**
+  * **Prompt:** Instruct the LLM to analyze the conversation and return a structured JSON object with fields like `severity`, `detected_keywords`, and `suggested_action`.
+  * **Input:** The message content from the webhook.
+* **Node 3: HTTP Request Node.**
+  * **URL:** `POST /api/v1/agents/triage/log-classification`
+  * **Body:** The JSON output from the LLM node.
 
-### 2. API Endpoint
+### 2. Backend (API Endpoint)
 
 * **File:** `backend/app/routes/agents.py`
-* **Endpoint:** `POST /api/v1/agents/triage/classify-message`
-* **Function:** This endpoint will receive conversation messages, instantiate the `TriageAgent`, call the `classify_message` method, and return the classification result.
+* **Endpoint:** `POST /api/v1/agents/triage/log-classification`
+* **Function:** This endpoint will receive the classification result from N8N and save it to the `triage_logs` table.
 
 ### 3. Testing
 
-* Use the FastAPI `/docs` page to test the endpoint with various conversation types (benign vs. crisis).
-* Verify that new records are created in the `triage_logs` table with the correct classification.
+* Use a tool like Postman to send a mock message to the N8N webhook URL.
+* Verify the LLM node correctly classifies the message.
+* Verify that a new record is created in the `triage_logs` table.
 
 ---
 
@@ -86,34 +87,33 @@ The Triage Agent is the best starting point as it's a real-time, synchronous pro
 
 This agent is asynchronous and data-intensive, designed to run on a schedule.
 
-### 1. Backend (FastAPI & LangChain)
-
-* **File:** `backend/app/agents/analytics_agent.py`
-* **Logic:**
-  * Create an `AnalyticsAgent` class.
-  * Define a method `run_weekly_analysis()`.
-  * This method will:
-        1. Query the database for anonymized `messages` and `journal_entries` from the last 7 days.
-        2. Use a LangChain summarization chain (e.g., `MapReduceDocumentsChain`) to process the text and extract key themes, sentiment trends, and topics.
-        3. Use a final LLM call to synthesize findings into a structured report (JSON) matching the `analytics_reports` schema.
-        4. Save the final report to the `analytics_reports` table.
-
-### 2. API Endpoint
-
-* **File:** `backend/app/routes/agents.py`
-* **Endpoint:** `POST /api/v1/agents/analytics/trigger-analysis`
-* **Function:** A simple endpoint that instantiates the `AnalyticsAgent` and calls `run_weekly_analysis()`. It is designed to be called by N8N.
-
-### 3. N8N Workflow (Scheduling)
+### 1. N8N Workflow (Scheduling & Analysis)
 
 * **Workflow Name:** "Weekly Analytics Trigger"
 * **Node 1: Cron Trigger.** Configure to run on a schedule (e.g., every Monday at 3 AM).
-* **Node 2: HTTP Request Node.** Configure to make a `POST` request to the `/api/v1/agents/analytics/trigger-analysis` endpoint.
+* **Node 2: HTTP Request Node.**
+  * **URL:** `GET /api/v1/agents/analytics/get-weekly-data`
+  * **Function:** This endpoint will query the database for anonymized `messages` and `journal_entries` from the last 7 days and return the data.
+* **Node 3: LLM Node (e.g., OpenAI, Google Generative AI).**
+  * **Prompt:** Instruct the LLM to perform a summarization and analysis of the weekly data, extracting key themes, sentiment trends, and topics.
+  * **Input:** The data from the previous HTTP request.
+* **Node 4: HTTP Request Node.**
+  * **URL:** `POST /api/v1/agents/analytics/save-report`
+  * **Body:** The JSON report from the LLM node.
 
-### 4. Testing
+### 2. Backend (API Endpoints)
 
-* Manually trigger the API endpoint via `/docs` and check for a new report in the `analytics_reports` table.
-* Manually run the N8N workflow and verify it successfully calls the API.
+* **File:** `backend/app/routes/agents.py`
+* **Endpoint 1:** `GET /api/v1/agents/analytics/get-weekly-data`
+  * **Function:** Queries the database for the last 7 days of data.
+* **Endpoint 2:** `POST /api/v1/agents/analytics/save-report`
+  * **Function:** Saves the generated report to the `analytics_reports` table.
+
+### 3. Testing
+
+* Manually run the N8N workflow.
+* Verify that the workflow successfully retrieves data from the backend.
+* Verify that a new report is created in the `analytics_reports` table.
 
 ---
 
@@ -121,22 +121,22 @@ This agent is asynchronous and data-intensive, designed to run on a schedule.
 
 This final phase connects analytics insights to real-world actions via N8N.
 
-### 1. Backend (Triggering N8N)
-
-* **File:** `backend/app/agents/analytics_agent.py`
-* **Modify `run_weekly_analysis()`:** After a report is saved, add logic to check if any insights require an intervention.
-* If an intervention is needed, make an HTTP `POST` request from the backend to a **new N8N Webhook URL**. The request body should contain the insight data (e.g., `{ "type": "exam_stress", "severity": "high", ... }`).
-
-### 2. N8N Workflow (Campaign Execution)
+### 1. N8N Workflow (Campaign Execution)
 
 * **Workflow Name:** "Intervention Campaign Handler"
-* **Node 1: Webhook Trigger.** This provides the URL for the backend to call and waits for insight data.
+* **Node 1: Webhook Trigger.** This provides a URL for the analytics workflow to call when an intervention is needed.
 * **Node 2: Switch Node.** Routes the workflow based on the `type` of insight received (e.g., "exam_stress" path, "social_anxiety" path).
 * **Path-Specific Nodes:**
   * **Postgres Node:** Query the `users` table to get the list of students to target for the campaign.
   * **Function / LLM Node:** Generate dynamic email content based on the insight details.
   * **Gmail / SMTP Node:** Loop through the target users and send the generated email.
   * **HTTP Request Node:** Call back to a new backend endpoint (e.g., `POST /api/v1/agents/intervention/log-campaign`) to record the campaign's execution in the `intervention_campaigns` table.
+
+### 2. Backend (API Endpoint)
+
+* **File:** `backend/app/routes/agents.py`
+* **Endpoint:** `POST /api/v1/agents/intervention/log-campaign`
+* **Function:** Records the campaign's execution in the `intervention_campaigns` table.
 
 ### 3. Testing
 

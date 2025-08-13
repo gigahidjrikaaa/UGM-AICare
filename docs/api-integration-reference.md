@@ -61,34 +61,7 @@ Body: {
 }
 ```
 
-## LangChain Agent Integration
 
-### Agent Configuration
-
-```python
-from langchain.agents import initialize_agent
-from langchain.tools import Tool
-
-tools = [
-    Tool(
-        name="MentalHealthResources",
-        func=search_resources,
-        description="Search mental health resources"
-    ),
-    Tool(
-        name="AppointmentScheduler",
-        func=check_availability,
-        description="Check counselor availability"
-    )
-]
-
-agent = initialize_agent(
-    tools=tools,
-    llm=gemini_llm,
-    agent="zero-shot-react-description",
-    memory=redis_memory
-)
-```
 
 ## Authentication Flow
 

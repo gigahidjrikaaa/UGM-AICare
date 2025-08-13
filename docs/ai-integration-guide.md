@@ -58,7 +58,7 @@ class LLMRouter:
    - `/webhook/user-activity` - Track engagement patterns
    - `/webhook/crisis-detection` - Emergency keyword monitoring
 
-2. **LangChain Agent Tools**:
+2. **N8N Workflow Tools**:
    - Resource retrieval from knowledge base
    - Appointment scheduling integration
    - Mental health assessment scoring
