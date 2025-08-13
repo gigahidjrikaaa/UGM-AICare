@@ -6,7 +6,6 @@ import React from 'react';
 import { ChatWindow } from './ChatWindow';
 import { ChatInput } from './ChatInput';
 import { useChat } from '@/hooks/useChat'; // Import the custom hook
-import { Toaster } from 'react-hot-toast';
 
 export default function ChatInterface({ model }: { model: string }) {
   const {
@@ -26,7 +25,6 @@ export default function ChatInterface({ model }: { model: string }) {
   return (
     // This outer div fills the container provided by the page
     <div className="flex flex-col h-full w-full">
-       <Toaster position="top-center" reverseOrder={false} /> {/* Keep Toaster close to usage */}
       {/* Chat Window takes up remaining space */}
       <ChatWindow
         messages={messages}

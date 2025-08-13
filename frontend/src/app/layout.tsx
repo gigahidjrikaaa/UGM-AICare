@@ -74,7 +74,7 @@ export default async function RootLayout({
                   toastOptions={{
                     duration: 5000,
                     style: {
-                      background: '#363636',
+                      background: 'rgba(54, 54, 54, 0.7)',
                       color: '#fff',
                     },
                   }}

@@ -8,8 +8,6 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import { Toaster } from 'react-hot-toast'; // Import toast here
-
 // Loading Component (Keep as before)
 const LoadingIndicator = () => (
   <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white">
@@ -52,7 +50,6 @@ export default function AikaChatPage() {
   // --- Main Render (Authenticated) ---
   return (
     <>
-      <Toaster position="top-center" reverseOrder={false} />
       <main className="h-screen w-screen overflow-hidden bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white"> {/* Solid gradient */}
         {/* Particle Background */}
         <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
@@ -68,6 +65,7 @@ export default function AikaChatPage() {
             <select
               value={model}
               onChange={(e) => setModel(e.target.value)}
+              title="Select AI Model"
               className="bg-white/20 text-white rounded-md px-3 py-1 text-sm"
             >
               <option value="gemma_local">Gemma (INA17)</option>
