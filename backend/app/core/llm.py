@@ -246,7 +246,7 @@ async def generate_response(
         )
 
     elif model == "gemini_google":
-        gemini_model = model if model else DEFAULT_GEMINI_MODEL
+        gemini_model = DEFAULT_GEMINI_MODEL
         logger.info(f"Direct request: Using gemini (Model: {gemini_model})")
         return await generate_gemini_response(
             history=history, model=gemini_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
