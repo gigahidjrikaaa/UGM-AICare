@@ -19,7 +19,7 @@ load_dotenv()
 # This call is being moved to the lifespan event handler to avoid race conditions.
 # init_db()
 
-import requests # For making HTTP requests
+import httpx
 
 # Set up logging
 # Ensure logs directory exists
@@ -27,13 +27,19 @@ log_dir = "logs" if os.getenv("APP_ENV") != "production" else "/tmp/logs"
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, "chat.log")
 
+import aiofiles
+
 # Simplified log file existence check for clarity
 if os.getenv("APP_ENV") != "production" and not os.path.exists(log_file):
     try:
-        with open(log_file, "w") as f:
-            f.write(f"Log file created at {datetime.now()}\n")
+        async def create_log_file():
+            async with aiofiles.open(log_file, "w") as f:
+                await f.write(f"Log file created at {datetime.now()}\n")
+        import asyncio
+        asyncio.run(create_log_file())
     except IOError as e:
         print(f"Warning: Could not create log file {log_file}: {e}") # Use print/stderr for early errors
+
 
 log_config = {
     "level": logging.INFO,
@@ -218,7 +224,8 @@ async def frontend_health_check():
         if not frontend_url:
             raise ValueError("FRONTEND_URL is not set.")
         
-        response = requests.get(frontend_url)
+        async with httpx.AsyncClient() as client:
+            response = await client.get(frontend_url)
         if response.status_code == 200:
             return {"status": "healthy", "frontend_status": "connected"}
         else:

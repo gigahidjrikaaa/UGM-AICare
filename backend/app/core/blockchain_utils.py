@@ -1,4 +1,5 @@
 # backend/app/core/blockchain_utils.py
+import asyncio
 import os
 import json
 from typing import Optional
@@ -15,21 +16,27 @@ RPC_URL = os.getenv("EDU_TESTNET_RPC_URL")
 CONTRACT_ADDRESS = os.getenv("NFT_CONTRACT_ADDRESS")
 MINTER_PRIVATE_KEY = os.getenv("BACKEND_MINTER_PRIVATE_KEY")
 
+import aiofiles
+
 # --- Load ABI (Option 1: Paste directly) ---
 # CONTRACT_ABI = [...] # Paste the ABI array here
 # --- OR Load ABI (Option 2: From file) ---
 # Adjust path if you save ABI elsewhere
 abi_path = os.path.join(os.path.dirname(__file__), 'abi', 'UGMJournalBadges.json')
-try:
-    with open(abi_path, 'r') as f:
-        contract_json = json.load(f)
-        CONTRACT_ABI = contract_json['abi']
-except FileNotFoundError:
-    logger.error(f"ABI file not found at {abi_path}. Cannot interact with contract.")
-    CONTRACT_ABI = None
-except Exception as e:
-    logger.error(f"Error loading ABI file: {e}")
-    CONTRACT_ABI = None
+
+async def load_abi():
+    try:
+        async with aiofiles.open(abi_path, 'r') as f:
+            contract_json = json.loads(await f.read())
+            return contract_json['abi']
+    except FileNotFoundError:
+        logger.error(f"ABI file not found at {abi_path}. Cannot interact with contract.")
+        return None
+    except Exception as e:
+        logger.error(f"Error loading ABI file: {e}")
+        return None
+
+CONTRACT_ABI = asyncio.run(load_abi())
 
 
 # --- Web3 Setup ---
@@ -63,6 +70,7 @@ else:
     logger.warning("Blockchain environment variables (RPC_URL, NFT_CONTRACT_ADDRESS, MINTER_PRIVATE_KEY) or ABI not fully configured. Minting disabled.")
 
 # --- Minting Function ---
+# NOTE: This function is synchronous. For a fully async implementation, consider using the async version of the web3.py library.
 def mint_nft_badge(recipient_address: str, badge_id: int, amount: int = 1) -> Optional[str]:
     """Calls the smart contract to mint a badge."""
     if not contract or not w3 or not minter_account:

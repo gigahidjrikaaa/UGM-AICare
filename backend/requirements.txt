@@ -18,6 +18,7 @@ redis==5.0.1
 asyncpg>=0.29.0  # Fast PostgreSQL Database Client Library for Python/asyncio
 psycopg2-binary>=2.9.0  # For Alembic migrations (sync operations)
 aiosqlite  # For async SQLite support (dev/testing only)
+aiofiles # For async file operations
 
 # Authentication
 python-jose[cryptography]==3.3.0
