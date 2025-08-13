@@ -8,7 +8,7 @@ import { ChatInput } from './ChatInput';
 import { useChat } from '@/hooks/useChat'; // Import the custom hook
 import { Toaster } from 'react-hot-toast';
 
-export default function ChatInterface() {
+export default function ChatInterface({ model }: { model: string }) {
   const {
     messages,
     inputValue,
@@ -21,7 +21,7 @@ export default function ChatInterface() {
     handleSendMessage,
     handleStartModule,
     // sessionId, // Get sessionId from the hook if needed elsewhere (e.g., feedback)
-  } = useChat();
+  } = useChat({ model });
 
   return (
     // This outer div fills the container provided by the page

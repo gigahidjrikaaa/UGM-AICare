@@ -36,10 +36,7 @@ ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
 # Install runtime system dependencies, including dos2unix
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends libpq5 dos2unix && \
-    apt-get clean && \
-    rm -rf /var/lib/apt/lists/*
+RUN apt-get update &&     apt-get install -y --no-install-recommends libpq5 dos2unix postgresql-client &&     apt-get clean &&     rm -rf /var/lib/apt/lists/*
 
 # Copy pre-compiled wheels from the builder stage
 COPY --from=builder /app/wheels /wheels
@@ -58,9 +55,9 @@ RUN ls -laR /app
 RUN find /app/scripts -name "*.sh" -exec dos2unix {} + -exec chmod +x {} +
 
 # Create and set permissions for the logs directory
-RUN mkdir -p /app/logs && \
-    chown -R appuser:appgroup /app/logs && \
-    chmod -R 750 /app/logs
+RUN mkdir -p /app/logs &&     chown -R appuser:appgroup /app/logs &&     chmod -R 750 /app/logs
+
+RUN mkdir -p /app/alembic/versions &&     chown -R appuser:appgroup /app/alembic/versions &&     chmod -R 750 /app/alembic/versions
 
 # Switch to the non-root user
 USER appuser

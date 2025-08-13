@@ -212,7 +212,6 @@ async def generate_gemma_local_response(
 # --- Unified Generation Function (Async) ---
 async def generate_response(
     history: List[Dict[str, str]],
-    provider: LLMProvider = "gemma_local", # Default provider changed to Gemini
     model: Optional[str] = None,
     max_tokens: int = 512,
     temperature: float = 0.7,
@@ -233,20 +232,20 @@ async def generate_response(
     Returns:
         The generated text response string or an error message.
     """
-    logger.info(f"Generating response using provider: {provider}")
+    logger.info(f"Generating response using model: {model}")
 
     if not history or history[-1].get('role') != 'user':
         logger.error("Invalid history: Must not be empty and end with a 'user' message.")
         return "Error: Invalid conversation history provided."
 
-    if provider == "gemma_local":
+    if model == "gemma_local":
         gemma_model = model if model else DEFAULT_GEMMA_LOCAL_MODEL
         logger.info(f"Direct request: Using gemma_local (Model: {gemma_model})")
         return await generate_gemma_local_response(
             history=history, model=gemma_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
         )
 
-    elif provider == "gemini":
+    elif model == "gemini_google":
         gemini_model = model if model else DEFAULT_GEMINI_MODEL
         logger.info(f"Direct request: Using gemini (Model: {gemini_model})")
         return await generate_gemini_response(
@@ -255,7 +254,7 @@ async def generate_response(
     
     else:
         # This case should ideally be prevented by Pydantic/FastAPI validation
-        error_msg = f"Invalid LLM provider: {provider}. Choose 'gemma_local' or 'gemini'."
+        error_msg = f"Invalid LLM model: {model}. Choose 'gemma_local' or 'gemini_google'."
         logger.error(error_msg)
         return error_msg
 

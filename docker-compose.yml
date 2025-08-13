@@ -58,11 +58,12 @@ services:
       bash -c "
         /app/scripts/wait-for-it.sh db:5432 -t 60 -- echo 'Database is ready!' && 
         echo 'Running Alembic migrations...' &&
-        alembic -c alembic_pg_vm.ini upgrade head
+        alembic upgrade head
       "
     env_file:
       - .env
     environment:
+      PYTHONPATH: /app
       DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
     depends_on:
       db:
@@ -86,7 +87,7 @@ services:
       - .env # Load environment variables from .env file in root
     environment:
       # Ensure backend connects to containerized DB and Redis
-      DATABASE_URL: postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       FRONTEND_URL: http://frontend:4000
       BACKEND_URL: ${BACKEND_URL:-https://apiaicare.ina17.com} # Use service name for internal communication
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://aicare.ina17.com,http://localhost:4000,http://127.0.0.1:4000,http://localhost:3000,http://127.0.0.1:3000,http://frontend:4000,http://backend:8000} # Allow both production and development origins
@@ -111,6 +112,7 @@ services:
       #   ipv4_address: 10.10.1.114
       internal_network: {} # Also on the internal network to talk to db/redis
       # shared_services_network: {} # Commented out - Attached to shared network to talk to gemma_service
+    dns: 8.8.8.8
 
   #################
   # Frontend (Next.js)

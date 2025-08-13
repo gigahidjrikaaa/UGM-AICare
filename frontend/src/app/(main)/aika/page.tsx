@@ -29,6 +29,7 @@ export default function AikaChatPage() {
   const [mounted, setMounted] = useState(false);
   const { status } = useSession();
   const router = useRouter();
+  const [model, setModel] = useState('gemma_local');
 
   useEffect(() => {
     setMounted(true);
@@ -62,11 +63,23 @@ export default function AikaChatPage() {
         <motion.div
           className="relative z-10 h-screen flex flex-col items-center justify-center p-2 md:p-4 lg:p-6" // Center content vertically/horizontally
         >
+          {/* Model Selector Dropdown */}
+          <div className="w-full max-w-5xl mb-4 flex justify-end">
+            <select
+              value={model}
+              onChange={(e) => setModel(e.target.value)}
+              className="bg-white/20 text-white rounded-md px-3 py-1 text-sm"
+            >
+              <option value="gemma_local">Gemma (INA17)</option>
+              <option value="gemini_google">Gemini (Google)</option>
+            </select>
+          </div>
+
           {/* Main chat container with Glassmorphism */}
-          <div className="w-full max-w-5xl h-[90vh] flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
+          <div className="w-full max-w-5xl h-[85vh] flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
              {/* Chat Interface takes remaining space */}
              <div className="flex-1 overflow-hidden"> {/* Important for ChatWindow's scrolling */}
-                <ChatInterface />
+                <ChatInterface model={model} />
              </div>
           </div>
 

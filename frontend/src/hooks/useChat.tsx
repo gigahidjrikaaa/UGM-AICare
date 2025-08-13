@@ -94,7 +94,7 @@ interface ProcessApiCallParams {
   conversation_id: string;
 }
 
-export function useChat() {
+export function useChat({ model }: { model: string }) {
   const { data: session } = useSession(); // Get user session and status
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState<string>('');
@@ -253,7 +253,7 @@ export function useChat() {
 
 
   // --- API Call Logic ---
-  const processApiCall = useCallback(async (params: ProcessApiCallParams) => {
+  const processApiCall = useCallback(async (params: ProcessApiCallParams & { model: string }) => {
     if (!session?.user?.id) {
       toast.error("Autentikasi gagal. Silakan login kembali.");
       setError("User not authenticated");
@@ -287,6 +287,7 @@ export function useChat() {
       session_id: currentSessionId, // from hook state
       conversation_id: conversationIdToUse, // from params
       system_prompt: DEFAULT_SYSTEM_PROMPT,
+      model: params.model,
     };
 
     try {
@@ -392,7 +393,8 @@ export function useChat() {
     await processApiCall({
         messageContent: userMessageContent, // Pass content as string
         history: historyForApi,
-        conversation_id: activeConversationId
+        conversation_id: activeConversationId,
+        model: model,
     });
   }, [inputValue, isLoading, messages, processApiCall, session, currentSessionId]);
 
@@ -428,7 +430,8 @@ export function useChat() {
     await processApiCall({
       event: eventPayload,
       history: historyForApi.length > 0 ? historyForApi : undefined,
-      conversation_id: activeConversationId
+      conversation_id: activeConversationId,
+      model: model,
     });
   }, [isLoading, messages, processApiCall, currentSessionId]);
 
