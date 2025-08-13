@@ -396,7 +396,7 @@ export function useChat({ model }: { model: string }) {
         conversation_id: activeConversationId,
         model: model,
     });
-  }, [inputValue, isLoading, messages, processApiCall, session, currentSessionId]);
+  }, [inputValue, isLoading, messages, currentSessionId, session?.user?.id, processApiCall, model]);
 
   // --- Start a Module ---
   const handleStartModule = useCallback(async (moduleId: string) => {
@@ -433,7 +433,7 @@ export function useChat({ model }: { model: string }) {
       conversation_id: activeConversationId,
       model: model,
     });
-  }, [isLoading, messages, processApiCall, currentSessionId]);
+  }, [isLoading, messages, currentSessionId, processApiCall, model]);
 
 
 

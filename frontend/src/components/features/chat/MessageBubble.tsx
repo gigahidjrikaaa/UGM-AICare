@@ -8,12 +8,24 @@ import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { LoadingDots } from '@/components/ui/LoadingDots'; // Import the new component
+import { useEffect } from 'react';
 
 interface MessageBubbleProps {
   message: Message;
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
+  useEffect(() => {
+    if (!message.isLoading) {
+      const audio = new Audio(
+        message.role === 'user'
+          ? '/sounds/message_bubble_user.mp3'
+          : '/sounds/message_bubble_aika.mp3'
+      );
+      audio.play().catch(error => console.error("Audio play failed", error));
+    }
+  }, [message.isLoading, message.role]);
+
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
 
