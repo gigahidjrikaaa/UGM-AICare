@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
+import { useSession } from 'next-auth/react'; // Import useSession
 import { Button } from '@/components/ui/Button';
 import { 
   Search, 
@@ -74,23 +75,18 @@ interface ConversationsResponse {
   stats: ConversationStats;
 }
 
-// API functions - client-side only
-const fetchConversations = async (params: {
-  page: number;
-  limit: number;
-  search?: string;
-  session_id?: string;
-  date_from?: string;
-  date_to?: string;
-}): Promise<ConversationsResponse> => {
-  // Ensure this only runs on client side
-  if (typeof window === 'undefined') {
-    throw new Error('This function can only be called on the client side');
+// API function now requires a token
+const fetchConversations = async (
+  token: string,
+  params: {
+    page: number;
+    limit: number;
+    search?: string;
+    session_id?: string;
+    date_from?: string;
+    date_to?: string;
   }
-
-  const token = localStorage.getItem('auth_token');
-  if (!token) throw new Error('No auth token found');
-
+): Promise<ConversationsResponse> => {
   const queryParams = new URLSearchParams({
     page: params.page.toString(),
     limit: params.limit.toString(),
@@ -109,6 +105,10 @@ const fetchConversations = async (params: {
     },
   });
 
+  if (response.status === 401) {
+    throw new Error('Unauthorized');
+  }
+
   if (!response.ok) {
     throw new Error(`Failed to fetch conversations: ${response.statusText}`);
   }
@@ -122,7 +122,6 @@ const ConversationCard: React.FC<{
   onViewSession: (sessionId: string) => void;
   onViewDetail: (conversationId: number) => void;
 }> = ({ conversation, onViewSession, onViewDetail }) => {
-  // Safe date formatting that works consistently on client and server
   const getTimeAgo = (timestamp: string) => {
     try {
       return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
@@ -275,10 +274,12 @@ const StatsCard: React.FC<{ stats: ConversationStats }> = ({ stats }) => {
   );
 };
 
-// Main component - hydration safe
+// Main component - now using useSession
 function AIConversationsContent() {
   const router = useRouter();
-  
+  const { data: session, status } = useSession();
+  const accessToken = (session?.user as any)?.accessToken;
+
   // State
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
   const [stats, setStats] = useState<ConversationStats | null>(null);
@@ -295,12 +296,11 @@ function AIConversationsContent() {
   
   const ITEMS_PER_PAGE = 20;
 
-  // Load conversations - only run on client side
-  const loadConversations = useCallback(async () => {
+  const loadConversations = useCallback(async (token: string) => {
+    setIsLoading(true);
+    setError(null);
     try {
-      setIsLoading(true);
-      setError(null);
-      const data = await fetchConversations({
+      const data = await fetchConversations(token, {
         page: currentPage,
         limit: ITEMS_PER_PAGE,
         search: searchTerm || undefined,
@@ -312,24 +312,26 @@ function AIConversationsContent() {
       setConversations(data.conversations);
       setStats(data.stats);
       setTotalCount(data.total_count);
-    } catch (error) {
-      if (error instanceof Error && error.message === 'No auth token found') {
+    } catch (err) {
+      if (err instanceof Error && err.message === 'Unauthorized') {
+        // Token is invalid or expired, redirect to signin
         router.push('/signin');
       } else {
-        console.error('Failed to load conversations:', error);
+        console.error('Failed to load conversations:', err);
         setError('Failed to load conversations. Please try again later.');
       }
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, searchTerm, sessionFilter, dateFrom, dateTo]);
+  }, [currentPage, searchTerm, sessionFilter, dateFrom, dateTo, router]);
 
-  // Effects - only run on client side
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      loadConversations();
+    if (status === 'authenticated' && accessToken) {
+      loadConversations(accessToken);
     }
-  }, [loadConversations]);
+    // We don't handle 'unauthenticated' status here because the middleware already redirects.
+    // We handle 'loading' status by showing a generic loading state.
+  }, [status, accessToken, loadConversations]);
 
   // Handlers
   const handleSearch = (value: string) => {
@@ -358,8 +360,28 @@ function AIConversationsContent() {
     setCurrentPage(1);
   };
 
+  const handleTryAgain = () => {
+    if (accessToken) {
+      loadConversations(accessToken);
+    }
+  };
+
   // Pagination
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
+
+  if (status === 'loading') {
+     return (
+      <div className="container mx-auto px-4 py-6 max-w-7xl">
+        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 text-center">
+          <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4 animate-pulse" />
+          <h3 className="text-lg font-semibold mb-2">Authenticating...</h3>
+          <p className="text-gray-600 dark:text-gray-400">
+            Please wait while we verify your session.
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   if (error) {
     return (
@@ -367,7 +389,7 @@ function AIConversationsContent() {
         <div className="bg-red-50 dark:bg-red-950 border border-red-200 dark:border-red-800 rounded-lg p-6 text-center">
           <h2 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">Error Loading Conversations</h2>
           <p className="text-red-600 dark:text-red-400 mb-4">{error}</p>
-          <Button onClick={loadConversations}>Try Again</Button>
+          <Button onClick={handleTryAgain}>Try Again</Button>
         </div>
       </div>
     );
@@ -563,3 +585,4 @@ export default function AIConversationsPage() {
     </HydrationSafeWrapper>
   );
 }
+

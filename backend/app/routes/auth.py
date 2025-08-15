@@ -3,14 +3,12 @@ from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from typing import Optional
-import os
-import hashlib
-import secrets
 from app.database import get_async_db
 from app.models import User
 import logging
 from passlib.context import CryptContext
 from datetime import datetime
+from app.auth_utils import create_access_token
 
 logger = logging.getLogger(__name__)
 
@@ -18,9 +16,11 @@ router = APIRouter()
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
-class LoginRequest(BaseModel):
-    username: str
-    password: str
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+    user: dict
+
 
 class UserLoginRequest(BaseModel):
     email: str
@@ -41,12 +41,6 @@ class RegisterRequest(BaseModel):
     yearOfStudy: Optional[str] = None
     allowEmailCheckins: Optional[bool] = None
 
-class LoginResponse(BaseModel):
-    id: str
-    email: str
-    name: str
-    role: str
-
 class RegisterResponse(BaseModel):
     message: str
     user_id: int
@@ -57,86 +51,53 @@ class ForgotPasswordRequest(BaseModel):
 class ForgotPasswordResponse(BaseModel):
     message: str
 
-def verify_admin_credentials(email: str, password: str) -> bool:
-    admin_email = os.getenv("ADMIN_EMAIL", "komentatorugm@gmail.com")
-    admin_password = os.getenv("ADMIN_PASSWORD", "komentatorugm")
-    
-    dev_email = "admin@ugm.ac.id"
-    dev_password = "admin123"
-    
-    logger.info(f"Admin login attempt for email: {email}")
-    
-    if email == admin_email and password == admin_password:
-        logger.info("Admin login successful with primary credentials")
-        return True
-    
-    if email == dev_email and password == dev_password:
-        logger.info("Admin login successful with development fallback credentials")
-        return True
-    
-    logger.warning(f"Admin login failed - no matching credentials for: {email}")
-    return False
-
 def verify_password(plain_password, hashed_password):
     return pwd_context.verify(plain_password, hashed_password)
 
 def get_password_hash(password):
     return pwd_context.hash(password)
 
-@router.post("/login", response_model=LoginResponse)
-async def admin_login(request: LoginRequest):
+@router.post("/token", response_model=Token)
+async def login_for_access_token(request: UserLoginRequest, db: AsyncSession = Depends(get_async_db)):
     try:
-        logger.info(f"Admin login attempt for: {request.username}")
-        
-        if verify_admin_credentials(request.username, request.password):
-            logger.info("Admin login successful")
-            return LoginResponse(
-                id="admin-001",
-                email=request.username,
-                name="Administrator",
-                role="admin"
-            )
-        else:
-            logger.warning(f"Admin login failed for: {request.username}")
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid admin credentials"
-            )
-    except Exception as e:
-        logger.error(f"Admin login error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during admin login"
-        )
-
-@router.post("/user/login", response_model=LoginResponse)
-async def user_login(request: UserLoginRequest, db: AsyncSession = Depends(get_async_db)):
-    try:
-        logger.info(f"User login attempt for: {request.email}")
+        logger.info(f"Login attempt for: {request.email}")
         
         stmt = select(User).where(User.email == request.email)
         result = await db.execute(stmt)
         user = result.scalar_one_or_none()
         
         if not user or not verify_password(request.password, user.password_hash):
+            logger.warning(f"Authentication failed for: {request.email}")
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Invalid credentials"
+                detail="Invalid credentials",
+                headers={"WWW-Authenticate": "Bearer"},
             )
         
-        return LoginResponse(
-            id=str(user.id),
-            email=user.email,
-            name=user.name,
-            role=user.role
+        # Create access token
+        access_token = create_access_token(
+            data={"sub": str(user.id), "role": user.role}
         )
+        
+        logger.info(f"Login successful for user: {user.email}, role: {user.role}")
+        return {
+            "access_token": access_token, 
+            "token_type": "bearer",
+            "user": {
+                "id": str(user.id),
+                "email": user.email,
+                "name": user.name,
+                "role": user.role
+            }
+        }
+
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"User login error: {e}")
+        logger.error(f"Login error for {request.email}: {e}")
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during user login"
+            detail="Internal server error during login",
         )
 
 @router.post("/register", response_model=RegisterResponse)
@@ -179,7 +140,8 @@ async def register_user(request: RegisterRequest, db: AsyncSession = Depends(get
             university=request.university,
             major=request.major,
             year_of_study=request.yearOfStudy,
-            allow_email_checkins=request.allowEmailCheckins
+            allow_email_checkins=request.allowEmailCheckins,
+            role='user' # Default role
         )
         
         db.add(new_user)
@@ -204,8 +166,11 @@ async def forgot_password(request: ForgotPasswordRequest):
     try:
         logger.info(f"Password reset request for: {request.email}")
         
+        # This should contain logic to send a password reset email
+        # For now, it's a placeholder
+        
         return ForgotPasswordResponse(
-            message="Password reset email sent"
+            message="If an account with this email exists, a password reset link has been sent."
         )
     except Exception as e:
         logger.error(f"Password reset error: {e}")

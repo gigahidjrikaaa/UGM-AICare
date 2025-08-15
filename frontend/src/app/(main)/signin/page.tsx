@@ -18,7 +18,7 @@ import {
 
 export default function SignIn() {
   const router = useRouter();
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -60,11 +60,14 @@ export default function SignIn() {
   ];
 
   useEffect(() => {
-    // Redirect if already authenticated
     if (status === "authenticated") {
-      router.push("/aika");
+      if (session?.user?.role === 'admin') {
+        router.push('/admin/conversations');
+      } else {
+        router.push("/aika");
+      }
     }
-  }, [status, router]);
+  }, [status, session, router]);
 
   // Rotate tips every 5 seconds
   useEffect(() => {
@@ -111,16 +114,13 @@ export default function SignIn() {
       if (result?.error) {
         if (result.error === "CredentialsSignin") {
           setError("Invalid email or password. Please try again.");
-        } else if (result.error === "AccessDenied") {
-          setError("Access denied. Please check your credentials.");
         } else {
           setError(`Sign in failed: ${result.error}`);
         }
-      } else if (result?.ok) {
-        router.push("/aika");
-      } else {
+      } else if (!result?.ok) {
         setError("Sign in failed. Please try again.");
       }
+      // On success, the useEffect for status change will handle the redirect.
     } catch (err: unknown) {
       setError("An unexpected error occurred. Please try again.");
       console.error("Sign in error:", err);

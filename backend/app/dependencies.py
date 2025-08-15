@@ -34,12 +34,20 @@ async def get_current_active_user(
     logger.info("Attempting to authenticate user...")
     payload = decrypt_and_validate_token(token) # Use the helper function
 
-    google_sub_id = payload.sub # Pydantic model ensures 'sub' exists
-    stmt = select(User).filter(User.google_sub == google_sub_id)
+    user_id = payload.sub # Pydantic model ensures 'sub' exists
+
+    # Differentiate between DB ID (digits) and Google SUB (longer, may not be all digits)
+    if user_id.isdigit():
+        logger.info(f"Authenticating with DB user ID: {user_id}")
+        stmt = select(User).filter(User.id == int(user_id))
+    else:
+        logger.info(f"Authenticating with Google SUB: {user_id}")
+        stmt = select(User).filter(User.google_sub == user_id)
+
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
     if not user:
-        logger.warning(f"User with google_sub {google_sub_id} not found in database.")
+        logger.warning(f"User with identifier '{user_id}' not found in database.")
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found",
@@ -49,7 +57,7 @@ async def get_current_active_user(
     # if not user.is_active:
     #     raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Inactive user")
 
-    logger.info(f"Successfully authenticated user: {google_sub_id}")
+    logger.info(f"Successfully authenticated user: {user.email} (ID: {user.id})")
     return user
 
 async def get_admin_user(

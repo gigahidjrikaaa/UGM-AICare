@@ -2,17 +2,36 @@
 import os
 import logging
 import json
-from typing import Optional, Dict, Any
+from datetime import datetime, timedelta, timezone
+from typing import Any, Dict, Optional
+
+from hkdf import Hkdf  # type: ignore
 from jose import jwe, jwt, exceptions as jose_exceptions, JWTError # type: ignore
-from fastapi import HTTPException, status # type: ignore
 from pydantic import BaseModel, ValidationError
-from hkdf import Hkdf # type: ignore
 
 # Load environment variables
 JWT_SECRET = os.environ.get("JWT_SECRET_KEY")
-# ALGORITHM = os.environ.get("JWT_ALGORITHM", "HS512")
+ALGORITHM = "HS256"
+ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", 60 * 24))
+
 
 logger = logging.getLogger(__name__)
+
+
+def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -> str:
+    """Creates a new JWT access token."""
+    to_encode = data.copy()
+    if expires_delta:
+        expire = datetime.now(timezone.utc) + expires_delta
+    else:
+        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+    to_encode.update({"exp": expire})
+    
+    if not JWT_SECRET:
+        raise ValueError("JWT_SECRET_KEY is not set, cannot create token.")
+
+    encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=ALGORITHM)
+    return encoded_jwt
 
 # --- Input Validation ---
 if not JWT_SECRET:
