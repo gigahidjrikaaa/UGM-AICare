@@ -313,8 +313,12 @@ function AIConversationsContent() {
       setStats(data.stats);
       setTotalCount(data.total_count);
     } catch (error) {
-      console.error('Failed to load conversations:', error);
-      setError('Failed to load conversations');
+      if (error instanceof Error && error.message === 'No auth token found') {
+        router.push('/signin');
+      } else {
+        console.error('Failed to load conversations:', error);
+        setError('Failed to load conversations. Please try again later.');
+      }
     } finally {
       setIsLoading(false);
     }

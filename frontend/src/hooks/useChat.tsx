@@ -119,6 +119,7 @@ export function useChat({ model }: { model: string }) {
     if (session?.user?.id && messages.length === 0) {
       setIsGreetingLoading(true);
       try {
+        await new Promise(resolve => setTimeout(resolve, 2000)); // Add a 2-second delay
         // Step 1: Fetch the latest detailed summary
         const summaryResponse = await apiClient.get<{ summary_text: string | null; timestamp: string | null }>('/user/latest-summary'); // Path from summary.py
         const detailedSummary = summaryResponse.data?.summary_text;

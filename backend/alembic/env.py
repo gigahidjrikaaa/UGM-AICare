@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 
 from sqlalchemy import engine_from_config
 from sqlalchemy import pool
+from sqlalchemy import create_engine
 
 from alembic import context
 
@@ -65,11 +66,14 @@ def run_migrations_online():
     and associate a connection with the context.
 
     """
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    db_url = os.getenv("DATABASE_URL")
+    if not db_url:
+        raise ValueError("DATABASE_URL environment variable is not set")
+
+    # Replace asyncpg with psycopg2 for synchronous operations
+    sync_db_url = db_url.replace("asyncpg", "psycopg2")
+
+    connectable = create_engine(sync_db_url)
 
     with connectable.connect() as connection:
         context.configure(

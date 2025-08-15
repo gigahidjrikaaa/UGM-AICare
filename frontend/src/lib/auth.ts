@@ -206,6 +206,7 @@ export const authOptions: NextAuthOptions = {
 
           if (res.ok && user) {
             console.log('✅ Admin login successful, returning user:', user);
+            user.accessToken = "admin-dummy-token"; // Replace with a real token if available
             return user;
           }
           console.log('❌ Admin login failed - response not ok or no user data');
@@ -235,6 +236,7 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email;
         token.name = user.name;
         token.role = user.role;
+        token.accessToken = user.accessToken;
         // console.log("JWT Callback: Admin user signed in. Token populated:", token);
         return token; // Return early, no backend sync needed for admin
       }

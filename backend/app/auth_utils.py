@@ -80,6 +80,7 @@ def decrypt_and_validate_token(token: str) -> TokenPayload:
         payload_dict: Dict[str, Any] = json.loads(decrypted_payload_str)
 
         logger.debug(f"Decrypted JWE payload: {payload_dict}")
+        logger.info(f"Extracted google_sub from token: {payload_dict.get('sub')}")
 
         # --- Payload Validation ---
         # Validate payload structure using Pydantic

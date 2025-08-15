@@ -9,13 +9,17 @@ import secrets
 from app.database import get_async_db
 from app.models import User
 import logging
+from passlib.context import CryptContext
+from datetime import datetime
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
+pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
 class LoginRequest(BaseModel):
-    username: str  # This is actually email, but frontend sends as username
+    username: str
     password: str
 
 class UserLoginRequest(BaseModel):
@@ -28,6 +32,14 @@ class RegisterRequest(BaseModel):
     password: str
     firstName: Optional[str] = None
     lastName: Optional[str] = None
+    phone: Optional[str] = None
+    dateOfBirth: Optional[str] = None
+    gender: Optional[str] = None
+    city: Optional[str] = None
+    university: Optional[str] = None
+    major: Optional[str] = None
+    yearOfStudy: Optional[str] = None
+    allowEmailCheckins: Optional[bool] = None
 
 class LoginResponse(BaseModel):
     id: str
@@ -46,24 +58,18 @@ class ForgotPasswordResponse(BaseModel):
     message: str
 
 def verify_admin_credentials(email: str, password: str) -> bool:
-    """Verify admin credentials against environment variables and development fallbacks"""
     admin_email = os.getenv("ADMIN_EMAIL", "komentatorugm@gmail.com")
     admin_password = os.getenv("ADMIN_PASSWORD", "komentatorugm")
     
-    # Development fallback credentials (should be removed in production)
     dev_email = "admin@ugm.ac.id"
     dev_password = "admin123"
     
     logger.info(f"Admin login attempt for email: {email}")
-    logger.info(f"Expected admin email: {admin_email}")
-    logger.info(f"Development mode fallback available: {dev_email}")
     
-    # Check primary admin credentials
     if email == admin_email and password == admin_password:
         logger.info("Admin login successful with primary credentials")
         return True
     
-    # Check development fallback credentials (for development only)
     if email == dev_email and password == dev_password:
         logger.info("Admin login successful with development fallback credentials")
         return True
@@ -71,22 +77,21 @@ def verify_admin_credentials(email: str, password: str) -> bool:
     logger.warning(f"Admin login failed - no matching credentials for: {email}")
     return False
 
-def hash_password(password: str) -> str:
-    """Simple password hashing - in production, use bcrypt or similar"""
-    return hashlib.sha256(password.encode()).hexdigest()
+def verify_password(plain_password, hashed_password):
+    return pwd_context.verify(plain_password, hashed_password)
+
+def get_password_hash(password):
+    return pwd_context.hash(password)
 
 @router.post("/login", response_model=LoginResponse)
 async def admin_login(request: LoginRequest):
-    """
-    Admin login endpoint for NextAuth admin-login provider
-    """
     try:
         logger.info(f"Admin login attempt for: {request.username}")
         
         if verify_admin_credentials(request.username, request.password):
             logger.info("Admin login successful")
             return LoginResponse(
-                id="admin-001",  # Static admin ID
+                id="admin-001",
                 email=request.username,
                 name="Administrator",
                 role="admin"
@@ -106,24 +111,24 @@ async def admin_login(request: LoginRequest):
 
 @router.post("/user/login", response_model=LoginResponse)
 async def user_login(request: UserLoginRequest, db: AsyncSession = Depends(get_async_db)):
-    """
-    Regular user login endpoint for NextAuth credentials provider
-    """
     try:
         logger.info(f"User login attempt for: {request.email}")
         
-        # For now, return a placeholder response since user auth isn't fully implemented
-        # In production, you would:
-        # 1. Verify user credentials against database
-        # stmt = select(User).where(User.email == request.email)
-        # result = await db.execute(stmt)
-        # user = result.scalar_one_or_none()
-        # 2. Check password hash
-        # 3. Return user data
+        stmt = select(User).where(User.email == request.email)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
         
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="User login not yet implemented"
+        if not user or not verify_password(request.password, user.password_hash):
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid credentials"
+            )
+        
+        return LoginResponse(
+            id=str(user.id),
+            email=user.email,
+            name=user.name,
+            role=user.role
         )
     except HTTPException:
         raise
@@ -136,29 +141,54 @@ async def user_login(request: UserLoginRequest, db: AsyncSession = Depends(get_a
 
 @router.post("/register", response_model=RegisterResponse)
 async def register_user(request: RegisterRequest, db: AsyncSession = Depends(get_async_db)):
-    """
-    User registration endpoint
-    """
     try:
         logger.info(f"User registration attempt for: {request.email}")
         
-        # For now, return a placeholder response since user registration isn't fully implemented
-        # In production, you would:
-        # 1. Validate email format and password strength
-        # 2. Check if user already exists
-        # stmt = select(User).where(User.email == request.email)
-        # result = await db.execute(stmt)
-        # existing_user = result.scalar_one_or_none()
-        # 3. Hash password
-        # 4. Create user in database
-        # new_user = User(...)
-        # db.add(new_user)
-        # await db.commit()
-        # 5. Send verification email
+        stmt = select(User).where(User.email == request.email)
+        result = await db.execute(stmt)
+        existing_user = result.scalar_one_or_none()
         
-        raise HTTPException(
-            status_code=status.HTTP_501_NOT_IMPLEMENTED,
-            detail="User registration not yet implemented"
+        if existing_user:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Email already registered"
+            )
+        
+        hashed_password = get_password_hash(request.password)
+        
+        date_of_birth = None
+        if request.dateOfBirth:
+            try:
+                date_of_birth = datetime.strptime(request.dateOfBirth, "%Y-%m-%d").date()
+            except ValueError:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail="Invalid date format for dateOfBirth. Please use YYYY-MM-DD."
+                )
+        
+        new_user = User(
+            name=request.name,
+            email=request.email,
+            password_hash=hashed_password,
+            first_name=request.firstName,
+            last_name=request.lastName,
+            phone=request.phone,
+            date_of_birth=date_of_birth,
+            gender=request.gender,
+            city=request.city,
+            university=request.university,
+            major=request.major,
+            year_of_study=request.yearOfStudy,
+            allow_email_checkins=request.allowEmailCheckins
+        )
+        
+        db.add(new_user)
+        await db.commit()
+        await db.refresh(new_user)
+        
+        return RegisterResponse(
+            message="User registered successfully",
+            user_id=new_user.id
         )
     except HTTPException:
         raise
@@ -171,18 +201,8 @@ async def register_user(request: RegisterRequest, db: AsyncSession = Depends(get
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
 async def forgot_password(request: ForgotPasswordRequest):
-    """
-    Password reset endpoint
-    """
     try:
         logger.info(f"Password reset request for: {request.email}")
-        
-        # For now, return a placeholder response since password reset isn't fully implemented
-        # In production, you would:
-        # 1. Validate email exists in database
-        # 2. Generate reset token
-        # 3. Store token with expiration
-        # 4. Send reset email
         
         return ForgotPasswordResponse(
             message="Password reset email sent"

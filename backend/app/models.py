@@ -12,30 +12,34 @@ class User(Base):
     __tablename__ = "users"
 
     id = Column(Integer, primary_key=True, index=True)
-    google_sub = Column(String, unique=True, index=True, nullable=False) # Hashed version
+    google_sub = Column(String, unique=True, index=True, nullable=True)
     twitter_id = Column(String, unique=True, index=True, nullable=True)
-    email = Column(String, nullable=True)
+    email = Column(String, unique=True, index=True, nullable=False)
+    name = Column(String, nullable=True)
+    first_name = Column(String, nullable=True)
+    last_name = Column(String, nullable=True)
+    phone = Column(String, nullable=True)
+    date_of_birth = Column(Date, nullable=True)
+    gender = Column(String, nullable=True)
+    city = Column(String, nullable=True)
+    university = Column(String, nullable=True)
+    major = Column(String, nullable=True)
+    year_of_study = Column(String, nullable=True)
     sentiment_score = Column(Float, default=0.0)
-    wallet_address = Column(String, unique=True, index=True, nullable=True) # Optional EDU Chain wallet address
-    
-    # User role and authentication
-    role = Column(String, default="user", nullable=False) # "user", "admin", "therapist"
-    password_hash = Column(String, nullable=True) # For email/password authentication
+    wallet_address = Column(String, unique=True, index=True, nullable=True)
+    role = Column(String, default="user", nullable=False)
+    password_hash = Column(String, nullable=True)
     email_verified = Column(Boolean, default=False, nullable=False)
     is_active = Column(Boolean, default=True, nullable=False)
-    
-    # Timestamps
     created_at = Column(DateTime, default=datetime.now, nullable=True)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=True)
     last_login = Column(DateTime, nullable=True)
-
-    # Streaks and activity tracking
     current_streak = Column(Integer, default=0, nullable=False)
     longest_streak = Column(Integer, default=0, nullable=False)
-    last_activity_date = Column(Date, nullable=True) # Last date user had journal/chat activity
-    allow_email_checkins = Column(Boolean, default=True, nullable=False) # Whether user wants email check-ins
+    last_activity_date = Column(Date, nullable=True)
+    allow_email_checkins = Column(Boolean, default=True, nullable=False)
 
-    conversations = relationship("Conversation", back_populates="user") # Relationship name corrected
+    conversations = relationship("Conversation", back_populates="user")
     journal_entries = relationship("JournalEntry", back_populates="user")
     awarded_badges = relationship("UserBadge", back_populates="user")
     appointments = relationship("Appointment", back_populates="user")
