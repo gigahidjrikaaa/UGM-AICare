@@ -59,6 +59,24 @@ def get_password_hash(password):
 
 @router.post("/token", response_model=Token)
 async def login_for_access_token(request: UserLoginRequest, db: AsyncSession = Depends(get_async_db)):
+    # Dev-only hardcoded admin credentials
+    if os.getenv("ALLOW_DEV_CREDENTIALS") == "true":
+        if request.email == "admin@ugm.ac.id" and request.password == "admin123":
+            logger.warning("Performing login using hardcoded development credentials.")
+            access_token = create_access_token(
+                data={"sub": "dev-admin-001", "role": "admin"}
+            )
+            return {
+                "access_token": access_token, 
+                "token_type": "bearer",
+                "user": {
+                    "id": "dev-admin-001",
+                    "email": "admin@ugm.ac.id",
+                    "name": "Development Admin",
+                    "role": "admin"
+                }
+            }
+
     try:
         logger.info(f"Login attempt for: {request.email}")
         

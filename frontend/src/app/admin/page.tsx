@@ -1,4 +1,4 @@
-"use client";
+'use client';
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
@@ -36,8 +36,13 @@ export default function AdminLoginPage() {
   };
 
   useEffect(() => {
-    if (status === "authenticated" && session?.user?.role === "admin") {
-      router.push("/admin/dashboard");
+    if (status === "authenticated") {
+      if (session?.user?.role === "admin") {
+        router.push("/admin/conversations"); // Or your main admin dashboard route
+      } else {
+        // If a non-admin user lands here and is logged in, send them away.
+        router.push("/signin"); 
+      }
     }
   }, [status, session, router]);
 
@@ -47,7 +52,7 @@ export default function AdminLoginPage() {
     setError("");
 
     try {
-      const result = await signIn("admin-login", {
+      const result = await signIn("credentials", {
         redirect: false,
         email,
         password,
@@ -57,13 +62,12 @@ export default function AdminLoginPage() {
         if (result.error === "CredentialsSignin") {
           setError("Invalid email or password. Please try again.");
         } else {
-          setError(`Login failed: ${result.error}`);
+          setError(`Login failed. Please check your credentials and ensure you have admin rights.`);
         }
-      } else if (result?.ok) {
-        router.push("/admin/dashboard"); // Explicit redirect after successful sign-in
-      } else {
+      } else if (!result?.ok) {
         setError("Login failed. Please check your credentials.");
       }
+      // On successful sign-in, the useEffect will handle the redirect.
     } catch (err: unknown) {
       setError("An unexpected error occurred during login.");
       console.error("Login submission error:", err);
@@ -99,32 +103,6 @@ export default function AdminLoginPage() {
             />
             <h1 className="text-3xl font-bold text-white">Admin Panel</h1>
             <p className="text-white/70">UGM-AICare Management</p>
-          </div>
-
-          {/* Admin Panel Information */}
-          <div className="mb-6 p-4 bg-white/5 rounded-lg border border-white/10">
-            <div className="flex items-center gap-2 mb-3">
-              <FiInfo className="text-[#FFCA40]" size={16} />
-              <h3 className="text-white font-semibold text-sm">Access Overview</h3>
-            </div>
-            <div className="grid grid-cols-2 gap-3 text-xs">
-              <div className="flex items-center gap-2">
-                <FiUsers className="text-blue-400" size={14} />
-                <span className="text-gray-300">User Management</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FiBarChart className="text-green-400" size={14} />
-                <span className="text-gray-300">Analytics</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FiShield className="text-purple-400" size={14} />
-                <span className="text-gray-300">Security</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <FiSettings className="text-orange-400" size={14} />
-                <span className="text-gray-300">System Config</span>
-              </div>
-            </div>
           </div>
 
           {/* Development Credentials Hint - REMOVE IN PRODUCTION */}
@@ -184,7 +162,7 @@ export default function AdminLoginPage() {
                 htmlFor="email"
                 className="block text-sm font-medium text-white/80 mb-1"
               >
-                Email Address
+                Admin Email Address
               </label>
               <div className="relative">
                 <FiMail className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/50" />
@@ -239,30 +217,25 @@ export default function AdminLoginPage() {
                 ) : (
                   <FiLogIn className="mr-2 h-5 w-5 transform transition-transform duration-150 group-hover:translate-x-1" />
                 )}
-                {isLoading ? "Signing In..." : "Sign In"}
+                {isLoading ? "Signing In..." : "Sign In Securely"}
               </button>
             </div>
           </form>
           
           <div className="mt-6 text-center">
-            <Link href="/forgot-password">
-              <p className="text-sm text-[#FFCA40] hover:underline">Forgot your password?</p>
+            <Link href="/signin">
+              <p className="text-sm text-white/60 hover:text-white">Are you a user? Go to user login</p>
             </Link>
           </div>
         </div>
         
-        {/* Enhanced Footer Information */}
         <div className="mt-6 space-y-3">
           <p className="text-center text-xs text-white/60">
             For authorized personnel only. All access is monitored.
           </p>
-          <div className="text-center text-xs text-white/40 space-y-1">
-            <p>UGM-AICare Mental Health Platform</p>
-            <p>Secure admin access with multi-factor authentication</p>
-            <p className="flex items-center justify-center gap-1">
-              <FiShield size={12} />
-              Data encrypted in transit and at rest
-            </p>
+          <div className="flex items-center justify-center gap-2 text-center text-xs text-white/40">
+            <FiShield size={12} />
+            <span>Data encrypted in transit and at rest</span>
           </div>
         </div>
       </motion.div>
