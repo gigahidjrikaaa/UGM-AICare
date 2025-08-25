@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation'; 
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion';
 import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
 // AdminLayout import is no longer needed here as it's applied by Next.js file-system routing
@@ -58,7 +58,7 @@ const statsData = {
   satisfactionRate: '92%',
 };
 
-const cardVariants = {
+const cardVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   visible: (i:number) => ({
     opacity: 1,

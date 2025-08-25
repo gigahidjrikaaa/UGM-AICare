@@ -6,7 +6,7 @@ import { id } from 'date-fns/locale';
 import { Message } from '@/types/chat';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
-import { motion } from 'framer-motion';
+import { motion, Variants } from 'framer-motion';
 import { LoadingDots } from '@/components/ui/LoadingDots'; // Import the new component
 import { useEffect } from 'react';
 
@@ -42,7 +42,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     );
   }
 
-  const bubbleVariants = {
+  const bubbleVariants: Variants = {
     hidden: { opacity: 0, y: 10 },
     visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
   };

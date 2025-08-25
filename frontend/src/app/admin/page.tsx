@@ -11,11 +11,7 @@ import {
   FiLogIn, 
   FiEye, 
   FiEyeOff, 
-  FiInfo, 
-  FiShield, 
-  FiUsers, 
-  FiBarChart, 
-  FiSettings 
+  FiShield
 } from "@/icons";
 import { signIn, useSession } from "next-auth/react";
 import Image from "next/image";

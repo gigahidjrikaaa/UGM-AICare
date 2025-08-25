@@ -278,7 +278,7 @@ const StatsCard: React.FC<{ stats: ConversationStats }> = ({ stats }) => {
 function AIConversationsContent() {
   const router = useRouter();
   const { data: session, status } = useSession();
-  const accessToken = (session?.user as any)?.accessToken;
+  const accessToken = (session?.user as { accessToken: string })?.accessToken;
 
   // State
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);

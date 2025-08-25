@@ -40,7 +40,7 @@ export default function ProfilePage() {
     useEffect(() => {
         if (session?.user) {
             // Set initial state from session data (ensure it exists!)
-            setAllowCheckins(session.user.allow_email_checkins ?? true); // Default to true if undefined in session? Or false?
+            setAllowCheckins((session.user as { allow_email_checkins?: boolean }).allow_email_checkins ?? true); // Default to true if undefined in session? Or false?
         }
     }, [session]);
 
