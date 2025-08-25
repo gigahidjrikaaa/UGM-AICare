@@ -10,6 +10,7 @@ import AppSidebar from '@/components/ui/AppSidebar';
 import Footer from '@/components/ui/Footer';
 import FeedbackForm from '@/components/features/feedback/FeedBackForm';
 import { cn } from '@/lib/utils';
+import HydrationSafeWrapper from '@/components/layout/HydrationSafeWrapper';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -45,7 +46,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
   }, [status, session]);
 
   if (status === 'loading') {
-    return <AppLoadingIndicator />;
+    return (
+      <HydrationSafeWrapper>
+        <AppLoadingIndicator />
+      </HydrationSafeWrapper>
+    );
   }
 
   return (

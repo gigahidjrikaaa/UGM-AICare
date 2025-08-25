@@ -1,26 +1,26 @@
 // src/components/layout/HydrationSafeWrapper.tsx
 'use client';
 
-import { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface HydrationSafeWrapperProps {
   children: React.ReactNode;
 }
 
-/**
- * Wrapper component that prevents hydration mismatches caused by browser extensions
- * or other client-side modifications to the DOM
- */
 export default function HydrationSafeWrapper({ children }: HydrationSafeWrapperProps) {
+  const [isMounted, setIsMounted] = useState(false);
+
   useEffect(() => {
-    // Ensure component is properly hydrated on client side
-    // This helps prevent hydration mismatches from browser extensions
+    setIsMounted(true);
   }, []);
 
-  // Always render children, but suppress hydration warnings for known extension issues
+  if (!isMounted) {
+    return null; // Render nothing on the server, or until mounted on client
+  }
+
   return (
-    <div className="flex flex-col flex-grow" suppressHydrationWarning>
+    <React.Fragment> {/* Use Fragment to avoid adding extra div */}
       {children}
-    </div>
+    </React.Fragment>
   );
 }
