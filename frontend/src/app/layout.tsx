@@ -5,7 +5,7 @@ import { Inter } from 'next/font/google'
 import ClientProvider from "@/components/auth/ClientProvider";
 import { Suspense } from "react";
 import GlobalSkeleton from "@/components/ui/GlobalSkeleton";
-import { Toaster } from "react-hot-toast";
+import { ClientOnlyToaster } from "@/components/ui/ClientOnlyToaster";
 import HydrationSafeWrapper from "@/components/layout/HydrationSafeWrapper";
 // AppLayout import is removed from here
 
@@ -69,7 +69,7 @@ export default async function RootLayout({
               <Suspense fallback={<GlobalSkeleton />}>
                 {/* AppLayout is removed from here, children are rendered directly */}
                 {children}
-                <Toaster
+                <ClientOnlyToaster
                   position="top-right"
                   reverseOrder={false}
                   toastOptions={{
