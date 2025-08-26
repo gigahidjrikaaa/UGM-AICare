@@ -1,7 +1,7 @@
 // frontend/src/components/layout/AppLayout.tsx
 "use client";
 
-import React, { useState, useEffect } from 'react'; // Import useEffect
+import React, { useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
@@ -10,7 +10,8 @@ import AppSidebar from '@/components/ui/AppSidebar';
 import Footer from '@/components/ui/Footer';
 import FeedbackForm from '@/components/features/feedback/FeedBackForm';
 import { cn } from '@/lib/utils';
-import HydrationSafeWrapper from '@/components/layout/HydrationSafeWrapper';
+import NoSsr from '@/components/layout/NoSsr';
+import { useIsGrammarlyActive } from '@/hooks/useIsGrammarlyActive';
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -32,25 +33,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
   const { data: session, status } = useSession();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [isFeedbackOpen, setFeedbackOpen] = useState(false); // Add feedback modal state
+  const isGrammarlyActive = useIsGrammarlyActive();
 
   const toggleSidebar = () => {
     setSidebarOpen(!isSidebarOpen);
   };
 
-  // This effect can be used to show a toast message on session status change
-  useEffect(() => {
-    if (status === 'authenticated' && session?.user) {
-      // Example: toast.success(`Welcome back, ${session.user.name}!`);
-      toast.success(`Welcome back, ${session.user.name}!`);
-    }
-  }, [status, session]);
+  
 
-  if (status === 'loading') {
-    return (
-      <HydrationSafeWrapper>
-        <AppLoadingIndicator />
-      </HydrationSafeWrapper>
-    );
+  if (status === 'loading' || isGrammarlyActive) {
+    return <AppLoadingIndicator />;
   }
 
   return (
@@ -60,7 +52,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
 
       {/* Render Sidebar only if authenticated */}
       {status === 'authenticated' && (
-        <AppSidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
+        <NoSsr>
+          <AppSidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
+        </NoSsr>
       )}
 
       {/* Main content area wrapper */}
@@ -72,7 +66,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
         )}
         >
         {/* Header */}
-        <Header onToggleSidebar={toggleSidebar}/>
+        <NoSsr>
+          <Header onToggleSidebar={toggleSidebar}/>
+        </NoSsr>
 
         {/* Content area - allow scrolling with padding-top for fixed header */}
         <main className="flex-grow bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 relative z-10 pt-20">
@@ -86,45 +82,49 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </main>
 
         {/* Footer */}
-        <Footer />
+        <NoSsr>
+          <Footer />
+        </NoSsr>
       </div>
 
       {/* Floating Feedback Button & Modal - Render only if authenticated */}
       {status === 'authenticated' && (
-        <>
-          {/* Floating Button to open Feedback Form */}
-          {!isFeedbackOpen && (
-            <button
-              type="button"
-              aria-label="Open feedback form"
-              className="fixed bottom-5 right-5 z-50 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg p-4 focus:outline-none focus:ring-2 focus:ring-blue-400"
-              onClick={() => setFeedbackOpen(true)}
-            >
-              {/* You can use an icon here */}
-              <span className="sr-only">Open feedback form</span>
-              📝
-            </button>
-          )}
-          {/* Feedback Form Modal */}
-          <AnimatePresence>
-            {isFeedbackOpen && (
-              <motion.div
-                className="fixed bottom-5 right-5 z-50"
-                initial={{ opacity: 0, y: 50 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 50 }}
+        <NoSsr>
+          <>
+            {/* Floating Button to open Feedback Form */}
+            {!isFeedbackOpen && (
+              <button
+                type="button"
+                aria-label="Open feedback form"
+                className="fixed bottom-5 right-5 z-50 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg p-4 focus:outline-none focus:ring-2 focus:ring-blue-400"
+                onClick={() => setFeedbackOpen(true)}
               >
-                <FeedbackForm
-                  onClose={() => setFeedbackOpen(false)}
-                  onSubmitSuccess={() => {
-                    toast.success("Thank you for your feedback!");
-                    setFeedbackOpen(false);
-                  }}
-                />
-              </motion.div>
+                {/* You can use an icon here */}
+                <span className="sr-only">Open feedback form</span>
+                📝
+              </button>
             )}
-          </AnimatePresence>
-        </>
+            {/* Feedback Form Modal */}
+            <AnimatePresence>
+              {isFeedbackOpen && (
+                <motion.div
+                  className="fixed bottom-5 right-5 z-50"
+                  initial={{ opacity: 0, y: 50 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 50 }}
+                >
+                  <FeedbackForm
+                    onClose={() => setFeedbackOpen(false)}
+                    onSubmitSuccess={() => {
+                      toast.success("Thank you for your feedback!");
+                      setFeedbackOpen(false);
+                    }}
+                  />
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </>
+        </NoSsr>
       )}
     </div>
   );
