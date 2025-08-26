@@ -58,7 +58,12 @@ export const useLiveTalk = ({ onTranscriptReceived, messages }: UseLiveTalkProps
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       recognition.onerror = (event: any) => {
-        console.error("Speech recognition error:", event.error);
+        if (event.error === "aborted") {
+          // This is often expected when stopping recognition programmatically
+          console.warn("Speech recognition aborted (expected behavior).");
+        } else {
+          console.error("Speech recognition error:", event.error);
+        }
         setUserSpeaking(false);
       };
 
@@ -107,8 +112,8 @@ export const useLiveTalk = ({ onTranscriptReceived, messages }: UseLiveTalkProps
         setAikaSpeaking(false);
         lastSpokenMessageIdRef.current = lastMessage.id;
         // Resume listening after Aika has finished speaking
-        if (useLiveTalkStore.getState().isLiveTalkActive) {
-          recognitionRef.current?.start();
+        if (useLiveTalkStore.getState().isLiveTalkActive && recognitionRef.current && !recognitionRef.current.listening) {
+          recognitionRef.current.start();
         }
       };
       

@@ -40,9 +40,9 @@ export default function ChatInterface({ model }: { model: string }) {
         isLoading={isLoading}
         chatContainerRef={chatContainerRef}
       />
-      <div className="p-4 bg-gray-900">
+      <div className="bg-gray-900">
         {isLiveTalkActive ? (
-          <div className="flex justify-center items-center">
+          <div className="flex justify-center items-center p-4">
             <SpectrogramBubble isActive={isListening || isAikaSpeaking} />
             <button
               onClick={toggleLiveTalk}
@@ -53,8 +53,10 @@ export default function ChatInterface({ model }: { model: string }) {
             </button>
           </div>
         ) : (
-          <div className="flex items-center">
+          <div className="flex items-center w-full">
             <ChatInput
+              isLiveTalkActive={isLiveTalkActive}
+              toggleLiveTalk={toggleLiveTalk}
               inputValue={inputValue}
               onInputChange={handleInputChange}
               onSendMessage={handleSendMessage}
@@ -63,13 +65,6 @@ export default function ChatInterface({ model }: { model: string }) {
               currentMode={currentMode}
               availableModules={availableModules}
             />
-            <button
-              onClick={toggleLiveTalk}
-              className="ml-2 flex-shrink-0 p-3 bg-blue-500 text-white rounded-full hover:bg-blue-600 transition-colors shadow-md"
-              aria-label="Start Live Talk"
-            >
-              <BsMicFill size={20} />
-            </button>
           </div>
         )}
       </div>

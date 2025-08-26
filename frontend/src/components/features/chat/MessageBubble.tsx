@@ -7,7 +7,7 @@ import { Message } from '@/types/chat';
 import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { motion, Variants } from 'framer-motion';
-import { LoadingDots } from '@/components/ui/LoadingDots'; // Import the new component
+import { LoadingDots } from '@/components/ui/LoadingDots';
 import { useEffect } from 'react';
 
 interface MessageBubbleProps {
@@ -22,7 +22,13 @@ export function MessageBubble({ message }: MessageBubbleProps) {
           ? '/sounds/message_bubble_user.mp3'
           : '/sounds/message_bubble_aika.mp3'
       );
-      audio.play().catch(error => console.error("Audio play failed", error));
+      audio.play().catch(error => {
+        if (error.name === 'NotAllowedError') {
+          console.warn("Audio auto-play blocked by browser. User interaction required.");
+        } else {
+          console.error("Audio play failed:", error);
+        }
+      });
     }
   }, [message.isLoading, message.role]);
 
@@ -47,74 +53,76 @@ export function MessageBubble({ message }: MessageBubbleProps) {
     visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
   };
 
+  const renderAvatar = () => {
+    if (isUser) {
+      return (
+        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-ugm-gold flex items-center justify-center text-ugm-blue-dark font-semibold text-xs border-2 border-white/30 shadow-sm self-start mt-1">
+          Me
+        </div>
+      );
+    }
+    return (
+      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-ugm-blue flex items-center justify-center overflow-hidden border-2 border-white/30 shadow-sm self-start mt-1">
+        <Image src="/aika-human.jpeg" alt="Aika" width={32} height={32} className="object-cover w-full h-full" />
+      </div>
+    );
+  };
+
+  const renderBubbleContent = () => {
+    if (message.isLoading) {
+      return (
+        <div className="flex items-center justify-start h-full px-3.5 py-2.5 text-ugm-blue-dark">
+          <LoadingDots text="Aika sedang mengetik..." />
+        </div>
+      );
+    }
+    return (
+      <div className={cn(
+        'prose prose-sm max-w-none prose-p:m-0 prose-li:m-0 prose-ul:m-0 prose-ol:m-0',
+        isUser ? 'prose-invert' : 'text-ugm-blue-dark',
+        'prose-a:font-medium prose-a:transition-colors',
+        isUser ? 'prose-a:text-ugm-gold hover:prose-a:text-ugm-gold/80' : 'prose-a:text-ugm-blue-dark hover:prose-a:text-ugm-blue/80 prose-a:underline'
+      )}>
+        <ReactMarkdown
+          components={{
+            a: ({ ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />
+          }}
+        >
+          {message.content}
+        </ReactMarkdown>
+      </div>
+    );
+  };
+
   return (
-    // Row container for avatar, bubble+timestamp
     <motion.div
-      className={cn('flex items-end gap-2 my-2', isUser ? 'justify-end' : 'justify-start')} // Use gap for spacing
+      className={cn('flex items-end gap-2 my-2', isUser ? 'justify-end' : 'justify-start')}
       variants={bubbleVariants}
       initial="hidden"
       animate="visible"
     >
-      {/* Assistant Avatar */}
-      {!isUser && (
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-ugm-blue flex items-center justify-center overflow-hidden border-2 border-white/30 shadow-sm self-start mt-1"> {/* Align avatar top */}
-          <Image src="/aika-human.jpeg" alt="Aika" width={32} height={32} className="object-cover w-full h-full" />
-        </div>
-      )}
-
-      {/* Column for Bubble + Timestamp */}
+      {!isUser && renderAvatar()}
       <div className={cn('flex flex-col', isUser ? 'items-end' : 'items-start')}>
-        {/* Bubble */}
-        <div
-          className={cn(
-            'px-3.5 py-2.5 rounded-xl max-w-xs md:max-w-md lg:max-w-lg shadow-md text-sm relative', // Slightly more padding, rounded-xl
-            'min-h-[44px]', // Ensure minimum height even for short messages
-            isUser
-              ? 'bg-ugm-blue text-white rounded-br-none'
-              : 'bg-white/90 backdrop-blur-sm text-ugm-blue-dark rounded-bl-none border border-gray-200/50', // Slightly less transparent, subtle border
-            message.isLoading && 'p-0 bg-white/70 backdrop-blur-sm w-[150px]' // Style loading state bubble
-          )}
-        >
-          {message.isLoading ? (
-             // Use the new LoadingDots component
-             <div className="flex items-center justify-start h-full px-3.5 py-2.5 text-ugm-blue-dark"> {/* Container for loading */}
-                <LoadingDots text="Aika sedang mengetik..." />
-              </div>
-           ) : (
-             // Ensure prose styles don't add excessive margins
-             <div className={cn(
-                 'prose prose-sm max-w-none prose-p:m-0 prose-li:m-0 prose-ul:m-0 prose-ol:m-0', // Reset prose margins
-                 isUser ? 'prose-invert' : 'text-ugm-blue-dark',
-                  'prose-a:font-medium prose-a:transition-colors',
-                  isUser ? 'prose-a:text-ugm-gold hover:prose-a:text-ugm-gold/80' : 'prose-a:text-ugm-blue-dark hover:prose-a:text-ugm-blue/80 prose-a:underline'
-               )}>
-               <ReactMarkdown
-                 components={{
-                     a: ({...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />
-                 }}
-               >
-                 {message.content}
-               </ReactMarkdown>
-             </div>
-          )}
+        <div className={cn(
+          'px-3.5 py-2.5 rounded-xl max-w-xs md:max-w-md lg:max-w-lg shadow-md text-sm relative',
+          'min-h-[44px]',
+          isUser
+            ? 'bg-ugm-blue text-white rounded-br-none'
+            : 'bg-white/90 backdrop-blur-sm text-ugm-blue-dark rounded-bl-none border border-gray-200/50',
+          message.isLoading && 'p-0 bg-white/70 backdrop-blur-sm w-[150px]'
+        )}>
+          {renderBubbleContent()}
         </div>
-        {/* Timestamp */}
         {!message.isLoading && (
-           <div className={cn(
-               'mt-1 text-[10px]',
-               isUser ? 'text-gray-400/90 mr-1' : 'text-gray-500/90 ml-1' // Slightly less faded
-               )}>
-             {format(message.timestamp, 'HH:mm', { locale: id })}
-           </div>
+          <div className={cn(
+            'mt-1 text-[10px]',
+            isUser ? 'text-gray-400/90 mr-1' : 'text-gray-500/90 ml-1'
+          )}>
+            {format(message.timestamp, 'HH:mm', { locale: id })}
+          </div>
         )}
       </div>
-
-      {/* User Avatar */}
-      {isUser && (
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-ugm-gold flex items-center justify-center text-ugm-blue-dark font-semibold text-xs border-2 border-white/30 shadow-sm self-start mt-1"> {/* Align avatar top */}
-          Me
-        </div>
-      )}
+      {isUser && renderAvatar()}
     </motion.div>
   );
 }

@@ -49,7 +49,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        const apiUrl = process.env.INTERNAL_API_URL || process.env.NEXT_PUBLIC_API_URL;
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
 
         try {
           const res = await fetch(`${apiUrl}/api/v1/auth/token`, {

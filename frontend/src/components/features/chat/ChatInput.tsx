@@ -15,6 +15,8 @@ interface ChatInputProps {
   isLoading: boolean;
   currentMode: ChatMode;
   availableModules: ChatModule[];
+  isLiveTalkActive: boolean;
+  toggleLiveTalk: () => void;
 }
 
 export function ChatInput({
@@ -25,6 +27,8 @@ export function ChatInput({
   isLoading,
   currentMode,
   availableModules,
+  isLiveTalkActive,
+  toggleLiveTalk,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showModules, setShowModules] = useState(false);
@@ -64,11 +68,9 @@ export function ChatInput({
 
   const isStandardMode = currentMode === 'standard';
 
-  const handleVoiceInput = () => {};
-
   return (
     // Apply glassmorphism to the wrapper, including bottom rounding matching parent
-    <div className="p-3 md:p-4 border-t border-white/10 bg-black/10 backdrop-blur-sm">
+    <div className="w-full p-3 md:p-4 border-t border-white/10 bg-black/10 backdrop-blur-sm">
       {/* Module Selection Area - Apply similar glass style */}
       {showModules && (
         <div className="mb-3 p-3 border border-white/10 rounded-lg bg-black/20 backdrop-blur-sm shadow-md max-h-48 overflow-y-auto">
@@ -114,8 +116,8 @@ export function ChatInput({
           onChange={(e) => onInputChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={
-            isLoading ? "Aika sedang mengetik..." :
-            isStandardMode ? "Ketik pesanmu di sini..." :
+            isLoading ? "Aika sedang mengetik..." : 
+            isStandardMode ? "Ketik pesanmu di sini..." : 
             "Ketik jawabanmu..."
           }
           rows={1}
@@ -129,15 +131,15 @@ export function ChatInput({
         />
         {/* Voice Input Button */}
         <Button
-          onClick={handleVoiceInput}
-          disabled={true}
+          onClick={toggleLiveTalk}
+          disabled={isLoading}
           size="icon"
           className={cn(
             "flex-shrink-0",
-            "bg-ugm-gold text-ugm-blue hover:bg-ugm-gold/90",
-            "disabled:bg-ugm-gold/50"
+            isLiveTalkActive ? "bg-red-500 text-white" : "bg-ugm-gold text-ugm-blue hover:bg-ugm-gold/90",
+            "disabled:bg-ugm-gold/50",
           )}
-          aria-label={"Start listening"}
+          aria-label={isLiveTalkActive ? "Stop Live Talk" : "Start Live Talk"}
         >
           <Mic className="h-4 w-4" />
         </Button>

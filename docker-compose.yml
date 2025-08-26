@@ -17,7 +17,7 @@ services:
     healthcheck:
       # Forcing the healthcheck to use TCP via localhost makes it a more reliable
       # indicator that the database is ready for network connections from other containers.
-      test: ["CMD-SHELL", "pg_isready -h localhost -U $${POSTGRES_USER:-aicare_user} -d $${POSTGRES_DB:-aicare_db}"]
+      test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER:-aicare_user} -d ${POSTGRES_DB:-aicare_db}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -90,7 +90,14 @@ services:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       FRONTEND_URL: http://frontend:4000
       BACKEND_URL: ${BACKEND_URL:-https://apiaicare.ina17.com} # Use service name for internal communication
-      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-https://aicare.ina17.com,http://localhost:4000,http://127.0.0.1:4000,http://localhost:3000,http://127.0.0.1:3000,http://frontend:4000,http://backend:8000} # Allow both production and development origins
+      ALLOWED_ORIGINS: >
+        ["https://aicare.ina17.com",
+        "http://localhost:4000",
+        "http://127.0.0.1:4000",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://frontend:4000",
+        "http://backend:8000"]
       REDIS_HOST: redis # Service name defined above
       REDIS_PORT: 6379 # Default Redis port inside Docker network
       REDIS_USERNAME: ""
@@ -137,9 +144,6 @@ services:
       NODE_ENV: production # Already set in Dockerfile, but good for clarity
       PORT: 3000
       INTERNAL_API_URL: http://backend:8000
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET} 
-      NEXTAUTH_URL: ${NEXTAUTH_URL:-aicare.ina17.com} # Default to production URL
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://apiaicare.ina17.com} # Ensure this matches backend URL
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
     depends_on:
