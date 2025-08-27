@@ -7,7 +7,6 @@ import { useChat } from '@/hooks/useChat';
 import { useLiveTalkStore } from '@/store/useLiveTalkStore';
 import { useLiveTalk } from '@/hooks/useLiveTalk';
 import SpectrogramBubble from '@/components/SpectrogramBubble';
-import { BsMicFill } from 'react-icons/bs';
 
 export default function ChatInterface({ model }: { model: string }) {
   const {
@@ -21,6 +20,7 @@ export default function ChatInterface({ model }: { model: string }) {
     handleInputChange,
     handleSendMessage,
     handleStartModule,
+    setLiveTranscript, // Get the new function
   } = useChat({ model });
 
   const {
@@ -30,8 +30,12 @@ export default function ChatInterface({ model }: { model: string }) {
     toggleLiveTalk,
   } = useLiveTalkStore();
 
-  // Pass the chat handler to the live talk hook
-  useLiveTalk({ onTranscriptReceived: handleSendMessage, messages });
+  // Pass the chat handlers to the live talk hook
+  useLiveTalk({
+    onTranscriptReceived: handleSendMessage,
+    onPartialTranscript: setLiveTranscript, // Pass the new handler
+    messages,
+  });
 
   return (
     <div className="flex flex-col h-full w-full">
@@ -42,15 +46,29 @@ export default function ChatInterface({ model }: { model: string }) {
       />
       <div className="bg-gray-900">
         {isLiveTalkActive ? (
-          <div className="flex justify-center items-center p-4">
-            <SpectrogramBubble isActive={isListening || isAikaSpeaking} />
-            <button
-              onClick={toggleLiveTalk}
-              className="ml-4 p-3 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
-              aria-label="Stop Live Talk"
-            >
-              Stop
-            </button>
+          <div className="flex flex-col justify-center items-center p-4 min-h-[120px]">
+            <div className="h-6 text-sm text-gray-400 mb-2">
+              {isAikaSpeaking && (
+                <span className="animate-pulse">Aika is speaking...</span>
+              )}
+              {!isAikaSpeaking && isListening && (
+                <span className="animate-pulse">Listening...</span>
+              )}
+            </div>
+            {/* Display live transcript */}
+            <div className="w-full max-w-md text-center text-white mb-3 px-4 min-h-[28px]">
+              {inputValue}
+            </div>
+            <div className="flex items-center">
+              <SpectrogramBubble isActive={isListening || isAikaSpeaking} />
+              <button
+                onClick={toggleLiveTalk}
+                className="ml-4 px-6 py-3 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"
+                aria-label="Stop Live Talk"
+              >
+                Stop
+              </button>
+            </div>
           </div>
         ) : (
           <div className="flex items-center w-full">

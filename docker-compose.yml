@@ -130,11 +130,6 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: production # Ensure the 'production' stage is built and run
-      args:
-        # Pass build arguments for NEXT_PUBLIC_ variables
-        # These values should be in your .env file or set in the VM's environment
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-https://apiaicare.ina17.com} # Backend runs on 8000
-        NEXTAUTH_URL: ${NEXTAUTH_URL:-https://aicare.ina17.com} # Default to production URL
     ports:
       - "4000:3000" # Map host port 4000 to container port 3000
     # No source code volumes for production
@@ -143,7 +138,6 @@ services:
     environment:
       NODE_ENV: production # Already set in Dockerfile, but good for clarity
       PORT: 3000
-      INTERNAL_API_URL: http://backend:8000
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
     depends_on:

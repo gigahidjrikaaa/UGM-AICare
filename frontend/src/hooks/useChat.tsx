@@ -63,8 +63,8 @@ export function useChat({ model }: { model: string }) {
     }
   }, [isGreetingLoading, initialGreeting, messages.length, currentSessionId, setMessages]);
 
-  const handleSendMessage = useCallback(async () => {
-    const userMessageContent = inputValue.trim();
+  const handleSendMessage = useCallback(async (message?: string) => {
+    const userMessageContent = (typeof message === 'string' ? message : inputValue).trim();
     if (!userMessageContent || isLoading) return;
 
     const activeConversationId = messages.find(m => m.conversation_id)?.conversation_id || uuidv4();
@@ -137,6 +137,10 @@ export function useChat({ model }: { model: string }) {
     setInputValue(value);
   }, []);
 
+  const setLiveTranscript = useCallback((transcript: string) => {
+    setInputValue(transcript);
+  }, []);
+
   return {
     messages,
     inputValue,
@@ -148,5 +152,6 @@ export function useChat({ model }: { model: string }) {
     handleInputChange,
     handleSendMessage,
     handleStartModule,
+    setLiveTranscript,
   };
 }
