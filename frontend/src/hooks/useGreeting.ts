@@ -2,10 +2,11 @@
 import { useState, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import apiClient from '@/services/api';
+import type { Message } from '@/types/chat';
 
 const DEFAULT_GREETING = "Halo! Aku Aika, teman AI-mu dari UGM-AICare. Ada yang ingin kamu ceritakan hari ini? 😊";
 
-export function useGreeting(messages: any[]) {
+export function useGreeting(messages: Message[]) {
   const { data: session } = useSession();
   const [initialGreeting, setInitialGreeting] = useState<string>(DEFAULT_GREETING);
   const [isGreetingLoading, setIsGreetingLoading] = useState<boolean>(true);

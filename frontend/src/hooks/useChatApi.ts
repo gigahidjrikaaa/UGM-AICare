@@ -1,9 +1,9 @@
 // src/hooks/useChatApi.ts
-import { useState, useCallback } from 'react';
+import { useState, useCallback, Dispatch, SetStateAction } from 'react';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-hot-toast';
 import apiClient from '@/services/api';
-import type { ChatRequestPayload, ChatResponsePayload, ChatEventPayload, ApiMessage } from '@/types/chat';
+import type { ChatRequestPayload, ChatResponsePayload, ChatEventPayload, ApiMessage, Message } from '@/types/chat';
 import { v4 as uuidv4 } from 'uuid';
 
 const DEFAULT_SYSTEM_PROMPT = `
@@ -50,7 +50,12 @@ interface ProcessApiCallParams {
   model: string;
 }
 
-export function useChatApi(currentSessionId: string, currentMode: string, addAssistantChunksSequentially: any, setMessages: any) {
+export function useChatApi(
+  currentSessionId: string, 
+  currentMode: string, 
+  addAssistantChunksSequentially: (responseContent: string, initialLoaderId: string, messageSessionId: string, messageConversationId: string) => Promise<void>, 
+  setMessages: Dispatch<SetStateAction<Message[]>>
+) {
   const { data: session } = useSession();
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -68,7 +73,7 @@ export function useChatApi(currentSessionId: string, currentMode: string, addAss
     const conversationIdToUse = params.conversation_id || uuidv4();
 
     const initialLoaderId = uuidv4();
-    const loaderMessage = {
+    const loaderMessage: Message = {
       id: initialLoaderId,
       role: 'assistant' as const,
       content: '',
@@ -79,7 +84,7 @@ export function useChatApi(currentSessionId: string, currentMode: string, addAss
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    setMessages((prev: any) => [...prev, loaderMessage]);
+    setMessages((prev: Message[]) => [...prev, loaderMessage]);
 
     const fullPayload: ChatRequestPayload = {
       message: params.messageContent,
@@ -120,7 +125,7 @@ export function useChatApi(currentSessionId: string, currentMode: string, addAss
       toast.error(errorMessageText);
       setError(errorMessageText);
 
-      setMessages((prev: any) => prev.map((msg: any) => {
+      setMessages((prev: Message[]) => prev.map((msg: Message) => {
         if (msg.id === initialLoaderId) {
           return {
             ...msg,

@@ -30,7 +30,7 @@ const AppLoadingIndicator = () => (
 );
 
 export default function AppLayout({ children }: AppLayoutProps) {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
   const [isFeedbackOpen, setFeedbackOpen] = useState(false); // Add feedback modal state
   const isGrammarlyActive = useIsGrammarlyActive();
