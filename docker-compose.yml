@@ -130,6 +130,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: production # Ensure the 'production' stage is built and run
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     ports:
       - "4000:3000" # Map host port 4000 to container port 3000
     # No source code volumes for production

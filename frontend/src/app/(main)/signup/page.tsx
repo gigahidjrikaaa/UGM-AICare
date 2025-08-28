@@ -14,6 +14,7 @@ import {
   FiBook 
 } from "@/icons";
 import ParticleBackground from "@/components/ui/ParticleBackground";
+import { registerUser } from "@/services/api";
 
 export default function SignUp() {
   const router = useRouter();
@@ -153,20 +154,8 @@ export default function SignUp() {
       return;
     }
 
-    import { registerUser } from "@/services/api";
-
-// ...
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setIsLoading(true);
-    setError(null);
-    setSuccess(null);
-
-    // ... (validation logic remains the same)
-
     try {
-      const response = await registerUser({
+      await registerUser({
         name: `${formData.firstName} ${formData.lastName}`,
         firstName: formData.firstName,
         lastName: formData.lastName,

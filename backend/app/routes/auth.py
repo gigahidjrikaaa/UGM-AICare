@@ -10,6 +10,7 @@ import logging
 from passlib.context import CryptContext
 from datetime import datetime
 from app.auth_utils import create_access_token
+from app.utils.security_utils import encrypt_data
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,15 @@ async def login_for_access_token(request: UserLoginRequest, db: AsyncSession = D
     try:
         logger.info(f"Login attempt for: {request.email}")
         
-        stmt = select(User).where(User.email == request.email)
+        encrypted_email = encrypt_data(request.email)
+        if not encrypted_email:
+            logger.error(f"Login error for {request.email}: Failed to encrypt email.")
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Internal server error during login",
+            )
+
+        stmt = select(User).where(User.email == encrypted_email)
         result = await db.execute(stmt)
         user = result.scalar_one_or_none()
         
@@ -125,7 +134,14 @@ async def register_user(request: RegisterRequest, db: AsyncSession = Depends(get
     try:
         logger.info(f"User registration attempt for: {request.email}")
         
-        stmt = select(User).where(User.email == request.email)
+        encrypted_email = encrypt_data(request.email)
+        if not encrypted_email:
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not process email."
+            )
+
+        stmt = select(User).where(User.email == encrypted_email)
         result = await db.execute(stmt)
         existing_user = result.scalar_one_or_none()
         
@@ -148,17 +164,17 @@ async def register_user(request: RegisterRequest, db: AsyncSession = Depends(get
                 )
         
         new_user = User(
-            name=request.name,
-            email=request.email,
+            name=encrypt_data(request.name),
+            email=encrypted_email,
             password_hash=hashed_password,
-            first_name=request.firstName,
-            last_name=request.lastName,
-            phone=request.phone,
+            first_name=encrypt_data(request.firstName) if request.firstName else None,
+            last_name=encrypt_data(request.lastName) if request.lastName else None,
+            phone=encrypt_data(request.phone) if request.phone else None,
             date_of_birth=date_of_birth,
-            gender=request.gender,
-            city=request.city,
-            university=request.university,
-            major=request.major,
+            gender=encrypt_data(request.gender) if request.gender else None,
+            city=encrypt_data(request.city) if request.city else None,
+            university=encrypt_data(request.university) if request.university else None,
+            major=encrypt_data(request.major) if request.major else None,
             year_of_study=request.yearOfStudy,
             allow_email_checkins=request.allowEmailCheckins,
             role='user' # Default role
