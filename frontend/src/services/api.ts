@@ -225,3 +225,20 @@ export const createAppointment = async (payload: AppointmentCreate): Promise<App
     throw new Error(errorMessage);
   }
 };
+
+// --- User Registration ---
+export const registerUser = async (payload: any): Promise<any> => {
+  try {
+    const response = await apiClient.post('/auth/register', payload);
+    return response.data;
+  } catch (error) {
+    console.error('Error registering user:', error);
+    let errorMessage = 'Failed to register user.';
+    if (axios.isAxiosError(error) && error.response) {
+      errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    throw new Error(errorMessage);
+  }
+};

@@ -61,13 +61,36 @@ export const useLiveTalk = ({
   const SpeechRecognition =
     typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
 
-  const { isLiveTalkActive, isAikaSpeaking, setUserSpeaking, setAikaSpeaking } =
-    useLiveTalkStore();
+  const {
+    isLiveTalkActive,
+    isAikaSpeaking,
+    setUserSpeaking,
+    setAikaSpeaking,
+    setMicrophones,
+    setSpeakers,
+    selectedSpeaker,
+  } = useLiveTalkStore();
 
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
   const lastSpokenMessageIdRef = useRef<string | null>(null);
   const isListeningRef = useRef(false);
   const finalTranscriptRef = useRef(''); // To accumulate final transcript
+
+  // Effect 0: Get media devices
+  useEffect(() => {
+    const getDevices = async () => {
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        const mics = devices.filter((d) => d.kind === 'audioinput');
+        const spks = devices.filter((d) => d.kind === 'audiooutput');
+        setMicrophones(mics);
+        setSpeakers(spks);
+      } catch (error) {
+        console.error("Error enumerating media devices:", error);
+      }
+    };
+    getDevices();
+  }, [setMicrophones, setSpeakers]);
 
   // Effect 1: Create, configure, and tear down the recognition instance
   useEffect(() => {

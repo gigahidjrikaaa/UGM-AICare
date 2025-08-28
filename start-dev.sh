@@ -16,7 +16,7 @@ echo "Starting development environment..."
 # The -f flags are technically not needed if docker-compose.override.yml is present,
 # as Docker Compose picks it up automatically, but it's explicit.
 # Remove --build if you don't want to rebuild images every time.
-docker-compose -f docker-compose.yml -f docker-compose.override.yml up --build
+docker-compose -f docker-compose.yml -f docker-compose.override.yml up --build -d
 
 # If you prefer to run in detached mode and then view logs:
 # docker-compose -f docker-compose.yml -f docker-compose.override.yml up --build -d

@@ -60,6 +60,7 @@ def get_password_hash(password):
 
 @router.post("/token", response_model=Token)
 async def login_for_access_token(request: UserLoginRequest, db: AsyncSession = Depends(get_async_db)):
+    logger.info(f"Checking for dev credentials. ALLOW_DEV_CREDENTIALS='{os.getenv('ALLOW_DEV_CREDENTIALS')}'")
     # Dev-only hardcoded admin credentials
     if os.getenv("ALLOW_DEV_CREDENTIALS") == "true":
         if request.email == "admin@ugm.ac.id" and request.password == "admin123":

@@ -7,6 +7,7 @@ import { useChat } from '@/hooks/useChat';
 import { useLiveTalkStore } from '@/store/useLiveTalkStore';
 import { useLiveTalk } from '@/hooks/useLiveTalk';
 import SpectrogramBubble from '@/components/SpectrogramBubble';
+import DeviceSelector from './DeviceSelector';
 
 export default function ChatInterface({ model }: { model: string }) {
   const {
@@ -39,6 +40,7 @@ export default function ChatInterface({ model }: { model: string }) {
 
   return (
     <div className="flex flex-col h-full w-full">
+      {!isLiveTalkActive && <DeviceSelector />}
       <ChatWindow
         messages={messages}
         isLoading={isLoading}
