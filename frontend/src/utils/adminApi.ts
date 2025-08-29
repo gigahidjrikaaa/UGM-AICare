@@ -52,6 +52,7 @@ export async function handleApiResponse<T>(response: Response): Promise<T> {
  * Combined function for authenticated API calls with error handling
  */
 export async function apiCall<T>(url: string, options: RequestOptions = {}): Promise<T> {
-  const response = await authenticatedFetch(url, options);
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const response = await authenticatedFetch(`${apiUrl}${url}`, options);
   return handleApiResponse<T>(response);
 }

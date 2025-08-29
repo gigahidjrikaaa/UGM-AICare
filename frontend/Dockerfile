@@ -48,6 +48,7 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 
 # Build the Next.js application
 RUN npm run build
+RUN echo "NEXT_PUBLIC_API_URL is $NEXT_PUBLIC_API_URL"
 
 
 # ---
