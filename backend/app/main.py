@@ -95,7 +95,9 @@ else:
         "http://localhost:8000",
         "http://127.0.0.1:8000",
         "http://frontend:4000",  # Docker internal
-        "http://backend:8000"    # Docker internal
+        "http://backend:8000",    # Docker internal
+        "https://aicare.ina17.com",
+        "https://api.aicare.ina17.com"
     ]
 
 logger.info(f"CORS configured with origins: {origins}")
