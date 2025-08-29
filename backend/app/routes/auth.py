@@ -184,10 +184,10 @@ async def register_user(request: RegisterRequest, db: AsyncSession = Depends(get
         await db.commit()
         await db.refresh(new_user)
         
-        return RegisterResponse(
-            message="User registered successfully",
-            user_id=new_user.id
-        )
+        return {
+            "message": "User registered successfully",
+            "user_id": new_user.id
+        }
     except HTTPException:
         raise
     except Exception as e:

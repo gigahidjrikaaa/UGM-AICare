@@ -193,8 +193,11 @@ export default function SignUp() {
       setTimeout(() => {
         router.push("/signin");
       }, 3000);
-    } catch (err: any) {
-      setError(err.message || "An unexpected error occurred. Please try again.");
+    } catch (err: unknown) {
+      setError(
+        (err instanceof Error && err.message) ||
+          "An unexpected error occurred. Please try again."
+      );
       console.error("Registration error:", err);
     } finally {
       setIsLoading(false);

@@ -68,7 +68,6 @@ export const useLiveTalk = ({
     setAikaSpeaking,
     setMicrophones,
     setSpeakers,
-    selectedSpeaker,
   } = useLiveTalkStore();
 
   const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);

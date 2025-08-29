@@ -1,7 +1,6 @@
-'use client';
+"use client";
 
-import React from 'react';
-import { useLiveTalkStore } from '@/store/useLiveTalkStore';
+import { useLiveTalkStore } from "@/store/useLiveTalkStore";
 
 const DeviceSelector = () => {
   const {
@@ -14,45 +13,52 @@ const DeviceSelector = () => {
   } = useLiveTalkStore();
 
   return (
-    <div className="flex gap-4 p-2 bg-gray-800 rounded-lg">
-      <div className="flex-1">
-        <label htmlFor="mic-select" className="text-xs text-gray-400">
+    <div className="space-y-6">
+      <div>
+        <label htmlFor="microphone-select" className="block text-sm font-medium text-white/80 mb-2">
           Microphone
         </label>
         <select
-          id="mic-select"
+          id="microphone-select"
           value={selectedMicrophone || ''}
           onChange={(e) => setSelectedMicrophone(e.target.value)}
-          className="w-full p-2 bg-gray-700 text-white rounded-md text-sm"
+          className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-all duration-200"
+          disabled={microphones.length === 0}
         >
-          {microphones.map((mic) => (
-            <option key={mic.deviceId} value={mic.deviceId}>
-              {mic.label || `Microphone ${mic.deviceId}`}
-            </option>
-          ))}
+          {microphones.length > 0 ? (
+            microphones.map((mic) => (
+              <option key={mic.deviceId} value={mic.deviceId} className="bg-gray-800">
+                {mic.label || `Microphone ${mic.deviceId}`}
+              </option>
+            ))
+          ) : (
+            <option value="" disabled className="bg-gray-800">No microphones found</option>
+          )}
         </select>
-        <p className="text-xs text-gray-500 mt-1">
-          Note: Changing the microphone requires updating your browser's default setting.
-        </p>
       </div>
-      <div className="flex-1">
-        <label htmlFor="speaker-select" className="text-xs text-gray-400">
+      <div>
+        <label htmlFor="speaker-select" className="block text-sm font-medium text-white/80 mb-2">
           Speaker
         </label>
         <select
           id="speaker-select"
           value={selectedSpeaker || ''}
           onChange={(e) => setSelectedSpeaker(e.target.value)}
-          className="w-full p-2 bg-gray-700 text-white rounded-md text-sm"
+          className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-all duration-200"
+          disabled={speakers.length === 0}
         >
-          {speakers.map((speaker) => (
-            <option key={speaker.deviceId} value={speaker.deviceId}>
-              {speaker.label || `Speaker ${speaker.deviceId}`}
-            </option>
-          ))}
+          {speakers.length > 0 ? (
+            speakers.map((speaker) => (
+              <option key={speaker.deviceId} value={speaker.deviceId} className="bg-gray-800">
+                {speaker.label || `Speaker ${speaker.deviceId}`}
+              </option>
+            ))
+          ) : (
+            <option value="" disabled className="bg-gray-800">No speakers found</option>
+          )}
         </select>
-        <p className="text-xs text-gray-500 mt-1">
-          Note: Speaker selection may not be supported on all browsers.
+        <p className="text-xs text-white/50 mt-2">
+          Note: Speaker selection may not be supported on all browsers (e.g., Firefox, Safari).
         </p>
       </div>
     </div>
