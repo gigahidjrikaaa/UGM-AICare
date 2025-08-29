@@ -7,6 +7,7 @@ from app.models import User
 from app.database import get_async_db
 from datetime import datetime
 from app.auth_utils import decrypt_and_validate_token
+from app.services.user_service import async_get_or_create_user # Import the service function
 
 logger = logging.getLogger(__name__)
 
@@ -36,30 +37,12 @@ async def get_current_active_user(
     payload = decrypt_and_validate_token(token) # Use the helper function
 
     user_id = payload.sub # Pydantic model ensures 'sub' exists
+    email = getattr(payload, 'email', None)
 
     logger.info(f"Authenticating with Google SUB: {user_id}")
-    stmt = select(User).filter(User.google_sub == user_id)
-
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
-
-    if not user:
-        logger.warning(f"User with identifier '{user_id}' not found in database. Creating new user.")
-        new_user = User(
-            google_sub=user_id,
-            email=payload.email,
-            name=payload.name,
-            # Set default values for other fields
-            role='user',
-            is_active=True,
-            created_at=datetime.now(),
-            updated_at=datetime.now(),
-            last_login=datetime.now(),
-        )
-        db.add(new_user)
-        await db.commit()
-        await db.refresh(new_user)
-        user = new_user
+    
+    # Use the centralized service function to get or create the user
+    user = await async_get_or_create_user(db, google_sub=user_id, plain_email=email)
 
     # Optional: Add checks for user status (e.g., is_active) if needed
     # if not user.is_active:

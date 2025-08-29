@@ -14,6 +14,7 @@ import {
   FiBook 
 } from "@/icons";
 import ParticleBackground from "@/components/ui/ParticleBackground";
+import { registerUser } from "@/services/api";
 
 export default function SignUp() {
   const router = useRouter();
@@ -154,59 +155,49 @@ export default function SignUp() {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
-      const response = await fetch(`${apiUrl}/api/v1/auth/register`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          name: `${formData.firstName} ${formData.lastName}`,
-          firstName: formData.firstName,
-          lastName: formData.lastName,
-          email: formData.email,
-          phone: formData.phone,
-          dateOfBirth: formData.dateOfBirth,
-          gender: formData.gender,
-          city: formData.city,
-          university: formData.university,
-          major: formData.major,
-          yearOfStudy: formData.yearOfStudy,
-          password: formData.password,
-          allowEmailCheckins: formData.allowEmailCheckins
-        }),
+      await registerUser({
+        name: `${formData.firstName} ${formData.lastName}`,
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        phone: formData.phone,
+        dateOfBirth: formData.dateOfBirth,
+        gender: formData.gender,
+        city: formData.city,
+        university: formData.university,
+        major: formData.major,
+        yearOfStudy: formData.yearOfStudy,
+        password: formData.password,
+        allowEmailCheckins: formData.allowEmailCheckins
       });
 
-      const data = await response.json();
-
-      if (response.ok) {
-        setSuccess("Account created successfully! Please check your email for verification instructions.");
-        // Clear form
-        setFormData({
-          firstName: "",
-          lastName: "",
-          email: "",
-          phone: "",
-          dateOfBirth: "",
-          gender: "",
-          city: "",
-          university: "",
-          major: "",
-          yearOfStudy: "",
-          password: "",
-          confirmPassword: "",
-          agreeToTerms: false,
-          allowEmailCheckins: true
-        });
-        // Redirect to signin after 3 seconds
-        setTimeout(() => {
-          router.push("/signin");
-        }, 3000);
-      } else {
-        setError(data.detail || "Registration failed. Please try again.");
-      }
+      setSuccess("Account created successfully! Please check your email for verification instructions.");
+      // Clear form
+      setFormData({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phone: "",
+        dateOfBirth: "",
+        gender: "",
+        city: "",
+        university: "",
+        major: "",
+        yearOfStudy: "",
+        password: "",
+        confirmPassword: "",
+        agreeToTerms: false,
+        allowEmailCheckins: true
+      });
+      // Redirect to signin after 3 seconds
+      setTimeout(() => {
+        router.push("/signin");
+      }, 3000);
     } catch (err: unknown) {
-      setError("An unexpected error occurred. Please try again.");
+      setError(
+        (err instanceof Error && err.message) ||
+          "An unexpected error occurred. Please try again."
+      );
       console.error("Registration error:", err);
     } finally {
       setIsLoading(false);

@@ -225,3 +225,76 @@ export const createAppointment = async (payload: AppointmentCreate): Promise<App
     throw new Error(errorMessage);
   }
 };
+
+// --- User Registration ---
+export interface RegisterUserPayload {
+  name: string;
+  email: string;
+  password: string;
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  city?: string;
+  university?: string;
+  major?: string;
+  yearOfStudy?: string;
+  allowEmailCheckins?: boolean;
+}
+
+export interface RegisterUserResponse {
+  message: string;
+  user_id: number;
+}
+
+export const registerUser = async (payload: RegisterUserPayload): Promise<RegisterUserResponse> => {
+  try {
+    const response = await apiClient.post('/auth/register', payload);
+    return response.data;
+  } catch (error) {
+    console.error('Error registering user:', error);
+    let errorMessage = 'Failed to register user.';
+    if (axios.isAxiosError(error) && error.response) {
+      errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    throw new Error(errorMessage);
+  }
+};
+
+// --- User Login ---
+export interface LoginUserPayload {
+  email: string;
+  password: string;
+}
+
+export interface UserInfo {
+  id: string;
+  email: string;
+  name: string;
+  role: string;
+}
+
+export interface LoginUserResponse {
+  access_token: string;
+  token_type: string;
+  user: UserInfo;
+}
+
+export const loginUser = async (payload: LoginUserPayload): Promise<LoginUserResponse> => {
+  try {
+    const response = await apiClient.post('/auth/token', payload);
+    return response.data;
+  } catch (error) {
+    console.error('Error logging in:', error);
+    let errorMessage = 'Failed to log in.';
+    if (axios.isAxiosError(error) && error.response) {
+      errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    throw new Error(errorMessage);
+  }
+};

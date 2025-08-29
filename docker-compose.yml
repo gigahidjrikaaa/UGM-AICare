@@ -12,12 +12,12 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data # Persist data
     ports:
-      - "${POSTGRES_PORT_EXTERNAL:-5432}:5432" # Expose only if direct DB access from host is needed
+      - "${POSTGRES_PORT}:5432"
     restart: unless-stopped
     healthcheck:
       # Forcing the healthcheck to use TCP via localhost makes it a more reliable
       # indicator that the database is ready for network connections from other containers.
-      test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER:-aicare_user} -d ${POSTGRES_DB:-aicare_db}"]
+      test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -34,7 +34,7 @@ services:
     volumes:
       - redisdata:/data
     ports:
-      - "${REDIS_PORT_EXTERNAL:-6379}:6379" # Expose only if direct Redis access from host is needed
+      - "${REDIS_PORT}:6379" # Expose only if direct Redis access from host is needed
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -130,6 +130,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       target: production # Ensure the 'production' stage is built and run
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     ports:
       - "4000:3000" # Map host port 4000 to container port 3000
     # No source code volumes for production

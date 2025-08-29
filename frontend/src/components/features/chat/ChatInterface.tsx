@@ -8,6 +8,7 @@ import { useLiveTalkStore } from '@/store/useLiveTalkStore';
 import { useLiveTalk } from '@/hooks/useLiveTalk';
 import SpectrogramBubble from '@/components/SpectrogramBubble';
 
+
 export default function ChatInterface({ model }: { model: string }) {
   const {
     messages,
@@ -39,6 +40,7 @@ export default function ChatInterface({ model }: { model: string }) {
 
   return (
     <div className="flex flex-col h-full w-full">
+      
       <ChatWindow
         messages={messages}
         isLoading={isLoading}
