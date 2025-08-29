@@ -34,7 +34,7 @@ services:
     volumes:
       - redisdata:/data
     ports:
-      - "${REDIS_PORT}:6379" # Expose only if direct Redis access from host is needed
+      - "${REDIS_PORT:-6379}:6379" # Expose only if direct Redis access from host is needed
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]

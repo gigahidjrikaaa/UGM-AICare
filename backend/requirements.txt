@@ -13,7 +13,7 @@ fastapi-cors==0.0.6
 
 # Database and ORM
 sqlalchemy[asyncio]==2.0.21
-alembic==1.12.0
+alembic
 redis==5.0.1
 asyncpg>=0.29.0  # Fast PostgreSQL Database Client Library for Python/asyncio
 psycopg2-binary>=2.9.0  # For Alembic migrations (sync operations)
