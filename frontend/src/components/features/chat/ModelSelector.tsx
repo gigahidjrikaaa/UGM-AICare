@@ -1,7 +1,7 @@
 
 // src/components/features/chat/ModelSelector.tsx
 import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion, AnimatePresence, Variants } from 'framer-motion';
 import { ChevronDown, Check } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -26,7 +26,7 @@ export default function ModelSelector({ model, setModel, options }: ModelSelecto
     setIsOpen(false);
   };
 
-  const dropdownVariants = {
+  const dropdownVariants: Variants = {
     hidden: { opacity: 0, y: -10, scale: 0.95 },
     visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.2, ease: 'easeOut' } },
     exit: { opacity: 0, y: -10, scale: 0.95, transition: { duration: 0.15, ease: 'easeIn' } },
