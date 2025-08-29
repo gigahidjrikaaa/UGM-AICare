@@ -58,6 +58,15 @@ This documentation suite provides comprehensive coverage of the UGM-AICare proje
 - Ethics and safety validation
 - Documentation and reporting standards
 
+### 📊 [Data and Analytics Strategy](data-and-analytics-strategy.md)
+
+#### Data-Driven Insights and Interventions
+
+- Data collection strategy for users and admins
+- Analytics plan for personalized insights
+- Framework for proactive, anonymized institutional analytics
+- Ethical considerations for data handling
+
 ## Existing Documentation Reference
 
 ### Development and Integration
