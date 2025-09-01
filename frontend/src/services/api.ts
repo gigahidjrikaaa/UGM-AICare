@@ -13,6 +13,7 @@ import type {
   Appointment
 } from '@/types/api'; // Import types
 import toast from 'react-hot-toast';
+import { signOut } from 'next-auth/react';
 
 // Define the base URL for your backend API
 const API_BASE_URL =
@@ -73,7 +74,7 @@ apiClient.interceptors.response.use(
     if (error.response?.status === 401) {
       // Handle unauthorized access, e.g., redirect to login
       console.error("API request Unauthorized (401):", error.response.data?.detail);
-      // Optionally: signOut({ callbackUrl: '/signin' });
+      signOut({ callbackUrl: '/signin' });
     }
      // Log other errors
      if (axios.isAxiosError(error)) {
