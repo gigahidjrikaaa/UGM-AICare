@@ -2,13 +2,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, desc, asc, or_, select
+from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, Field
 from datetime import datetime, date, timedelta
 from typing import List, Optional, Dict, Any
 import logging
 
 from app.database import get_async_db
-from app.models import User, JournalEntry, Conversation, UserBadge, Appointment, ContentResource
+from app.models import User, JournalEntry, Conversation, UserBadge, Appointment, ContentResource, Psychologist, TherapistSchedule
 from app.dependencies import get_current_active_user, get_admin_user
 from app.utils.security_utils import decrypt_data
 
@@ -1133,3 +1134,207 @@ async def get_admin_stats(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch system statistics"
         )
+
+# --- Appointment Models ---
+class PsychologistResponse(BaseModel):
+    id: int
+    name: str
+    specialization: Optional[str] = None
+    image_url: Optional[str] = None
+    is_available: bool
+
+    class Config:
+        from_attributes = True
+
+class AppointmentResponse(BaseModel):
+    id: int
+    user: UserListItem
+    psychologist: PsychologistResponse
+    appointment_type: str
+    appointment_datetime: datetime
+    notes: Optional[str] = None
+    status: str
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+# --- Appointment Endpoints ---
+@router.get("/psychologists", response_model=List[UserListItem])
+async def get_psychologists(db: AsyncSession = Depends(get_async_db)):
+    base_query = select(
+        User,
+        func.count(JournalEntry.id).label('journal_count'),
+        func.count(Conversation.id).label('conversation_count'),
+        func.count(UserBadge.id).label('badge_count'),
+        func.count(Appointment.id).label('appointment_count')
+    ).outerjoin(JournalEntry, User.id == JournalEntry.user_id)
+     .outerjoin(Conversation, User.id == Conversation.user_id)
+     .outerjoin(UserBadge, User.id == UserBadge.user_id)
+     .outerjoin(Appointment, User.id == Appointment.user_id)
+     .group_by(User.id)
+    
+    results = await db.execute(base_query.filter(User.role == "therapist"))
+    users = []
+    for result in results.all():
+        user = result[0]
+        journal_count = result[1] or 0
+        conversation_count = result[2] or 0
+        badge_count = result[3] or 0
+        appointment_count = result[4] or 0
+        
+        user_item = UserListItem(
+            id=user.id,
+            email=decrypt_user_email(user.email),
+            google_sub=user.google_sub,
+            wallet_address=user.wallet_address,
+            sentiment_score=user.sentiment_score,
+            current_streak=user.current_streak,
+            longest_streak=user.longest_streak,
+            last_activity_date=user.last_activity_date,
+            allow_email_checkins=user.allow_email_checkins,
+            role=getattr(user, 'role', 'user'),
+            is_active=getattr(user, 'is_active', True),
+            created_at=getattr(user, 'created_at', None),
+            total_journal_entries=journal_count,
+            total_conversations=conversation_count,
+            total_badges=badge_count,
+            total_appointments=appointment_count,
+            last_login=getattr(user, 'last_login', None)
+        )
+        users.append(user_item)
+    return users
+
+@router.get("/appointments", response_model=List[AppointmentResponse])
+async def get_appointments(db: AsyncSession = Depends(get_async_db)):
+    result = await db.execute(
+        select(Appointment)
+        .options(
+            selectinload(Appointment.user),
+            selectinload(Appointment.psychologist),
+            selectinload(Appointment.appointment_type)
+        )
+        .order_by(desc(Appointment.appointment_datetime))
+    )
+    appointments = result.scalars().all()
+    return appointments
+
+@router.get("/appointments/{appointment_id}", response_model=AppointmentResponse)
+async def get_appointment(appointment_id: int, db: AsyncSession = Depends(get_async_db)):
+    result = await db.execute(
+        select(Appointment)
+        .options(
+            selectinload(Appointment.user),
+            selectinload(Appointment.psychologist),
+            selectinload(Appointment.appointment_type)
+        )
+        .filter(Appointment.id == appointment_id)
+    )
+    appointment = result.scalar_one_or_none()
+    if not appointment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+    return appointment
+
+class AppointmentUpdate(BaseModel):
+    status: str
+
+@router.put("/appointments/{appointment_id}", response_model=AppointmentResponse)
+async def update_appointment(appointment_id: int, appointment_data: AppointmentUpdate, db: AsyncSession = Depends(get_async_db)):
+    result = await db.execute(select(Appointment).filter(Appointment.id == appointment_id))
+    db_appointment = result.scalar_one_or_none()
+    if not db_appointment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+
+    db_appointment.status = appointment_data.status
+    db.add(db_appointment)
+    await db.commit()
+    await db.refresh(db_appointment)
+    return db_appointment
+
+@router.delete("/appointments/{appointment_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_appointment(appointment_id: int, db: AsyncSession = Depends(get_async_db)):
+    result = await db.execute(select(Appointment).filter(Appointment.id == appointment_id))
+    db_appointment = result.scalar_one_or_none()
+    if not db_appointment:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
+
+    await db.delete(db_appointment)
+    await db.commit()
+
+# --- Therapist Schedule Models ---
+class TherapistScheduleResponse(BaseModel):
+    id: int
+    day_of_week: str
+    start_time: str
+    end_time: str
+    is_available: bool
+    reason: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+class TherapistScheduleCreate(BaseModel):
+    day_of_week: str
+    start_time: str
+    end_time: str
+    is_available: bool = True
+    reason: Optional[str] = None
+
+class TherapistScheduleUpdate(BaseModel):
+    day_of_week: Optional[str] = None
+    start_time: Optional[str] = None
+    end_time: Optional[str] = None
+    is_available: Optional[bool] = None
+    reason: Optional[str] = None
+
+# --- Therapist Schedule Endpoints ---
+@router.get("/therapists/{therapist_id}/schedule", response_model=List[TherapistScheduleResponse])
+async def get_therapist_schedule(therapist_id: int, db: AsyncSession = Depends(get_async_db)):
+    result = await db.execute(
+        select(TherapistSchedule)
+        .filter(TherapistSchedule.therapist_id == therapist_id)
+    )
+    schedule = result.scalars().all()
+    return schedule
+
+@router.post("/therapists/{therapist_id}/schedule", response_model=TherapistScheduleResponse, status_code=status.HTTP_201_CREATED)
+async def create_therapist_schedule(
+    therapist_id: int,
+    schedule_data: TherapistScheduleCreate,
+    db: AsyncSession = Depends(get_async_db)
+):
+    db_schedule = TherapistSchedule(therapist_id=therapist_id, **schedule_data.dict())
+    db.add(db_schedule)
+    await db.commit()
+    await db.refresh(db_schedule)
+    return db_schedule
+
+@router.put("/therapists/schedule/{schedule_id}", response_model=TherapistScheduleResponse)
+async def update_therapist_schedule(
+    schedule_id: int,
+    schedule_data: TherapistScheduleUpdate,
+    db: AsyncSession = Depends(get_async_db)
+):
+    result = await db.execute(select(TherapistSchedule).filter(TherapistSchedule.id == schedule_id))
+    db_schedule = result.scalar_one_or_none()
+    if not db_schedule:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schedule not found")
+
+    update_data = schedule_data.dict(exclude_unset=True)
+    for key, value in update_data.items():
+        setattr(db_schedule, key, value)
+    
+    db.add(db_schedule)
+    await db.commit()
+    await db.refresh(db_schedule)
+    return db_schedule
+
+@router.delete("/therapists/schedule/{schedule_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_therapist_schedule(schedule_id: int, db: AsyncSession = Depends(get_async_db)):
+    result = await db.execute(select(TherapistSchedule).filter(TherapistSchedule.id == schedule_id))
+    db_schedule = result.scalar_one_or_none()
+    if not db_schedule:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Schedule not found")
+
+    await db.delete(db_schedule)
+    await db.commit()

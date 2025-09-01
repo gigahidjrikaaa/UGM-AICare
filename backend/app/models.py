@@ -408,3 +408,16 @@ class SurveyAnswer(Base):
 
     response = relationship("SurveyResponse", back_populates="answers")
     question = relationship("SurveyQuestion", back_populates="answers")
+
+class TherapistSchedule(Base):
+    __tablename__ = "therapist_schedules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    therapist_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    day_of_week = Column(String, nullable=False)
+    start_time = Column(String, nullable=False)
+    end_time = Column(String, nullable=False)
+    is_available = Column(Boolean, default=True, nullable=False)
+    reason = Column(String, nullable=True)
+
+    therapist = relationship("User")
