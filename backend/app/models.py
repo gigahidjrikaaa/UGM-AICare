@@ -358,3 +358,53 @@ class TriageAssessment(Base):
 
     conversation = relationship("Conversation")
     user = relationship("User")
+
+class Survey(Base):
+    __tablename__ = "surveys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, nullable=False)
+    description = Column(Text, nullable=True)
+    is_active = Column(Boolean, default=False, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    questions = relationship("SurveyQuestion", back_populates="survey", cascade="all, delete-orphan")
+    responses = relationship("SurveyResponse", back_populates="survey", cascade="all, delete-orphan")
+
+class SurveyQuestion(Base):
+    __tablename__ = "survey_questions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    survey_id = Column(Integer, ForeignKey("surveys.id"), nullable=False)
+    question_text = Column(Text, nullable=False)
+    question_type = Column(String, nullable=False)  # "text", "multiple-choice", "rating"
+    options = Column(JSON, nullable=True)  # For multiple-choice questions
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    survey = relationship("Survey", back_populates="questions")
+    answers = relationship("SurveyAnswer", back_populates="question", cascade="all, delete-orphan")
+
+class SurveyResponse(Base):
+    __tablename__ = "survey_responses"
+
+    id = Column(Integer, primary_key=True, index=True)
+    survey_id = Column(Integer, ForeignKey("surveys.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+
+    survey = relationship("Survey", back_populates="responses")
+    user = relationship("User")
+    answers = relationship("SurveyAnswer", back_populates="response", cascade="all, delete-orphan")
+
+class SurveyAnswer(Base):
+    __tablename__ = "survey_answers"
+
+    id = Column(Integer, primary_key=True, index=True)
+    response_id = Column(Integer, ForeignKey("survey_responses.id"), nullable=False)
+    question_id = Column(Integer, ForeignKey("survey_questions.id"), nullable=False)
+    answer_text = Column(Text, nullable=False)
+
+    response = relationship("SurveyResponse", back_populates="answers")
+    question = relationship("SurveyQuestion", back_populates="answers")
