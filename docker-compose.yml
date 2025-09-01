@@ -135,6 +135,7 @@ services:
       PORT: 3000
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      INTERNAL_API_URL: http://backend:8000
     depends_on:
       - backend # Optional, if frontend needs backend to be up for some server-side rendering logic
     restart: unless-stopped

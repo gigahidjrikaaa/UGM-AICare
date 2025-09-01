@@ -39,7 +39,7 @@ export default function ForgotPassword() {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+      const apiUrl = process.env.INTERNAL_API_URL;
       const response = await fetch(`${apiUrl}/api/v1/auth/forgot-password`, {
         method: 'POST',
         headers: {

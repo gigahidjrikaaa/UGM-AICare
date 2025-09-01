@@ -24,7 +24,7 @@ router = APIRouter(
 class UserListItem(BaseModel):
     id: int
     email: Optional[str] = None
-    google_sub: str
+    google_sub: Optional[str] = None
     wallet_address: Optional[str] = None
     sentiment_score: float
     current_streak: int
@@ -63,7 +63,7 @@ class UsersResponse(BaseModel):
 class UserDetailResponse(BaseModel):
     id: int
     email: Optional[str] = None
-    google_sub: str
+    google_sub: Optional[str] = None
     wallet_address: Optional[str] = None
     sentiment_score: float
     current_streak: int

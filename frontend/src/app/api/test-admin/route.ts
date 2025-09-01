@@ -6,7 +6,7 @@ export async function POST(req: NextRequest) {
     console.log('Test admin endpoint received:', body);
     
     // Test the backend endpoint directly
-    const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000';
+    const backendUrl = process.env.INTERNAL_API_URL || 'http://127.0.0.1:8000';
     console.log('Testing backend at:', `${backendUrl}/api/v1/auth/login`);
     
     const response = await fetch(`${backendUrl}/api/v1/auth/login`, {

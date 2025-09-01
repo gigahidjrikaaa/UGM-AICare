@@ -93,75 +93,21 @@ def decrypt_and_validate_token(token: str) -> TokenPayload:
          )
 
     try:
-        # --- Derive the key first ---
-        derived_key = _derive_encryption_key(JWT_SECRET)
-        
-        # Ensure derived_key is not None before proceeding
-        if derived_key is None:
-            raise ValueError("Derived key is None, cannot decrypt token.")
-        # --- Decrypt using the DERIVED key ---
-        decrypted_payload_bytes = jwe.decrypt(token, derived_key)
-        decrypted_payload_str = decrypted_payload_bytes.decode('utf-8') # type: ignore
-        payload_dict: Dict[str, Any] = json.loads(decrypted_payload_str)
-
-        logger.debug(f"Decrypted JWE payload: {payload_dict}")
-        logger.info(f"Extracted google_sub from token: {payload_dict.get('sub')}")
-
-        # --- Payload Validation ---
-        # Validate payload structure using Pydantic
+        payload_dict = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
         payload = TokenPayload(**payload_dict)
-
-        # Optional: Add expiry validation (using the 'exp' claim from the payload)
-        # if payload.exp and payload.exp < time.time():
-        #     logger.warning(f"Token expired for sub: {payload.sub}")
-        #     raise HTTPException(
-        #          status_code=status.HTTP_401_UNAUTHORIZED,
-        #          detail="Token has expired",
-        #          headers={"WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"The token has expired\""},
-        #      )
-
         return payload
 
-    # --- Corrected Exception Handling ---
-    # Catch specific JWE exceptions first
-    except jose_exceptions.ExpiredSignatureError: # Can still happen if inner JWS has expiry
-        logger.warning("Received an expired token signature (within JWE).")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Token has expired",
-            headers={"WWW-Authenticate": "Bearer error=\"invalid_token\", error_description=\"The token has expired\""},
-        )
-    except (jose_exceptions.JWEError, JWTError) as e: # Catch JWEError and base JWTError
+    except JWTError as e:
         logger.error(f"JWE/JWT Decryption/Validation Error: {e}")
-        # Check specific error messages if needed
-        if "signature validation failed" in str(e).lower(): # Check message for integrity failure
-             detail = "Could not validate credentials: Token integrity check failed"
-        elif "key must be" in str(e).lower(): # If key length error persists
-             detail = "Could not validate credentials: Key configuration issue"
-        else:
-             detail = "Could not validate credentials: Invalid or malformed token"
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=detail,
+            detail="Could not validate credentials: Invalid or malformed token",
             headers={"WWW-Authenticate": "Bearer error=\"invalid_token\""},
         )
-    except json.JSONDecodeError:
-        logger.error("Failed to decode decrypted payload string as JSON.")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials: Invalid token payload format",
-            headers={"WWW-Authenticate": "Bearer error=\"invalid_token\""},
-         )
     except ValidationError as e:
         logger.error(f"Token payload validation error: {e}")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Could not validate credentials: Unexpected token payload structure",
             headers={"WWW-Authenticate": "Bearer error=\"invalid_token\""},
-        )
-    except Exception as e:
-        logger.error(f"Unexpected error during token decryption/validation: {e}", exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during token processing",
         )

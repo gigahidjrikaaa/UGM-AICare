@@ -26,6 +26,7 @@ passlib[bcrypt]==1.7.4
 bcrypt==4.0.1
 python-dotenv
 hkdf
+pyOpenSSL>=23.0.0
 
 # Testing
 pytest==7.4.2

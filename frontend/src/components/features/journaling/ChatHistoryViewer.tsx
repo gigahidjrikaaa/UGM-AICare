@@ -23,7 +23,7 @@ export default function ChatHistoryViewer() {
             setLoading(true);
             setError(null);
             try {
-                const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+                const baseUrl = process.env.INTERNAL_API_URL;
                 // Assuming apiClient handles auth headers automatically now
                 const response = await apiClient.get<HistoryItem[]>(`${baseUrl}/api/v1/history`); // Use your API client
                 console.log("Chat history response:", response.data);

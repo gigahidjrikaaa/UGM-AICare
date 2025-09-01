@@ -2,6 +2,7 @@ import { NextAuthOptions } from "next-auth";
 import GoogleProvider from "next-auth/providers/google";
 import CredentialsProvider from "next-auth/providers/credentials";
 
+
 declare module "next-auth" {
   interface Session {
     accessToken?: string;
@@ -49,7 +50,7 @@ export const authOptions: NextAuthOptions = {
         password: { label: "Password", type: "password" }
       },
       async authorize(credentials) {
-        const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+        const apiUrl = process.env.INTERNAL_API_URL;
 
         try {
           const res = await fetch(`${apiUrl}/api/v1/auth/token`, {
@@ -61,9 +62,14 @@ export const authOptions: NextAuthOptions = {
             headers: { "Content-Type": "application/json" }
           });
 
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text);
+          }
+
           const data = await res.json();
 
-          if (res.ok && data && data.user) {
+          if (data && data.user) {
             return {
               ...data.user,
               accessToken: data.access_token,
@@ -72,7 +78,7 @@ export const authOptions: NextAuthOptions = {
           return null;
         } catch (e) {
           console.error("Authorize error:", e);
-          return null;
+          throw e;
         }
       }
     }),
@@ -81,6 +87,7 @@ export const authOptions: NextAuthOptions = {
     strategy: "jwt",
     maxAge: 1 * 24 * 60 * 60, // 1 day
   },
+  
   callbacks: {
     async jwt({ token, user }) {
       if (user) {

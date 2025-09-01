@@ -54,7 +54,7 @@ export async function handleApiResponse<T>(response: Response): Promise<T> {
 export async function apiCall<T>(url: string, options: RequestOptions = {}): Promise<T> {
   const isServer = typeof window === 'undefined';
   const apiUrl = isServer 
-    ? process.env.API_URL_INTERNAL // Use internal URL for server-side
+    ? process.env.INTERNAL_API_URL // Use internal URL for server-side
     : process.env.NEXT_PUBLIC_API_URL; // Use public URL for client-side
     
   const response = await authenticatedFetch(`${apiUrl}${url}`, options);

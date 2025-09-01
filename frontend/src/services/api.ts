@@ -19,7 +19,7 @@ import { signOut } from 'next-auth/react';
 const API_BASE_URL =
   typeof window !== 'undefined' && window.location.hostname === 'localhost'
     ? 'http://localhost:8000/api/v1' // Local development
-    : process.env.NEXT_PUBLIC_API_URL + '/api/v1'; // Docker or production
+    : process.env.INTERNAL_API_URL + '/api/v1'; // Docker or production
 
 console.log("API_BASE_URL:", API_BASE_URL); // Log the resolved URL
 

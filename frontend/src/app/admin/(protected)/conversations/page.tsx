@@ -97,7 +97,7 @@ const fetchConversations = async (
   if (params.date_from) queryParams.append('date_from', params.date_from);
   if (params.date_to) queryParams.append('date_to', params.date_to);
 
-  const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+  const baseUrl = process.env.INTERNAL_API_URL || 'http://localhost:8000';
   const response = await fetch(`${baseUrl}/api/v1/admin/conversations?${queryParams}`, {
     headers: {
       'Authorization': `Bearer ${token}`,
