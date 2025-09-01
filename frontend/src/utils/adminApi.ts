@@ -52,7 +52,11 @@ export async function handleApiResponse<T>(response: Response): Promise<T> {
  * Combined function for authenticated API calls with error handling
  */
 export async function apiCall<T>(url: string, options: RequestOptions = {}): Promise<T> {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL;
+  const isServer = typeof window === 'undefined';
+  const apiUrl = isServer 
+    ? process.env.API_URL_INTERNAL // Use internal URL for server-side
+    : process.env.NEXT_PUBLIC_API_URL; // Use public URL for client-side
+    
   const response = await authenticatedFetch(`${apiUrl}${url}`, options);
   return handleApiResponse<T>(response);
 }

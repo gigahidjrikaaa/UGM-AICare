@@ -4,6 +4,7 @@ import logging
 import json
 from datetime import datetime, timedelta, timezone
 from typing import Any, Dict, Optional
+from fastapi import HTTPException, status
 
 from hkdf import Hkdf  # type: ignore
 from jose import jwe, jwt, exceptions as jose_exceptions, JWTError # type: ignore
@@ -37,6 +38,11 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
 if not JWT_SECRET:
     logger.error("CRITICAL: JWT_SECRET_KEY environment variable is not set!")
     raise ValueError("JWT_SECRET_KEY must be set in the environment")
+
+# Ensure JWT_SECRET is long enough for JWE (e.g., 32 bytes for A256CBC-HS512)
+if len(JWT_SECRET) < 32:
+    logger.error(f"CRITICAL: JWT_SECRET_KEY is too short ({len(JWT_SECRET)} chars). Must be at least 32 characters for JWE.")
+    raise ValueError("JWT_SECRET_KEY must be at least 32 characters long.")
 
 class TokenPayload(BaseModel):
     """Pydantic model for expected JWT payload structure AFTER decryption"""

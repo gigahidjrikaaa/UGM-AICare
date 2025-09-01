@@ -15,7 +15,7 @@ const mainNavItems = [
   { name: 'AI Conversations', icon: <FiMessageSquare size={18}/>, href: '/admin/conversations' },
   { name: 'Appointments', icon: <FiCalendar size={18}/>, href: '/admin/appointments' },
   { name: 'Journal Insights', icon: <FiBookOpen size={18}/>, href: '/admin/journals' },
-  { name: 'Content Resources', icon: <FiFileText size={18}/>, href: '/admin/resources-cms' },
+  { name: 'Content Resources', icon: <FiFileText size={18}/>, href: '/admin/content-resources' },
   { name: 'Analytics', icon: <FiBarChart2 size={18}/>, href: '/admin/analytics' },
 ];
 

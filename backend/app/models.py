@@ -220,6 +220,19 @@ class JournalReflectionPoint(Base): # New Model
     journal_entry = relationship("JournalEntry", back_populates="reflection_points")
     user = relationship("User") # Relationship to User
 
+
+class ContentResource(Base):
+    __tablename__ = "content_resources"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False)
+    content = Column(Text, nullable=False)
+    source = Column(String(255), nullable=True) # URL or file name
+    type = Column(String(50), nullable=False, default="text") # 'text', 'pdf', 'url'
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+
 # Psychology Appointments
 
 class Psychologist(Base):

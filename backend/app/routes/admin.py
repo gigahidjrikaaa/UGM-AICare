@@ -8,7 +8,7 @@ from typing import List, Optional, Dict, Any
 import logging
 
 from app.database import get_async_db
-from app.models import User, JournalEntry, Conversation, UserBadge, Appointment
+from app.models import User, JournalEntry, Conversation, UserBadge, Appointment, ContentResource
 from app.dependencies import get_current_active_user, get_admin_user
 from app.utils.security_utils import decrypt_data
 
@@ -195,8 +195,6 @@ async def get_user_stats(db: AsyncSession) -> UserStats:
         total_conversations=total_conversations,
         total_badges_awarded=total_badges
     )
-
-)
 
 from app.agents.analytics_agent import AnalyticsAgent
 
@@ -978,6 +976,144 @@ async def get_session_detail(
         total_duration_minutes=duration_minutes,
         conversations=conversation_details
     )
+
+# --- Content Resource Models ---
+class ContentResourceBase(BaseModel):
+    title: str
+    content: str
+    source: Optional[str] = None
+    type: str
+
+class ContentResourceCreate(ContentResourceBase):
+    pass
+
+class ContentResourceItem(ContentResourceBase):
+    id: int
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+class ContentResourceResponse(BaseModel):
+    items: List[ContentResourceItem]
+    total_count: int
+
+
+@router.post("/content-resources", response_model=ContentResourceItem, status_code=status.HTTP_201_CREATED)
+async def create_content_resource(
+    resource: ContentResourceCreate,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    """
+    Create a new content resource.
+    """
+    logger.info(f"Admin {admin_user.id} creating new content resource: {resource.title}")
+    try:
+        db_resource = ContentResource(**resource.dict())
+        db.add(db_resource)
+        await db.commit()
+        await db.refresh(db_resource)
+        return db_resource
+    except Exception as e:
+        logger.error(f"Error creating content resource: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create content resource"
+        )
+
+@router.get("/content-resources", response_model=ContentResourceResponse)
+async def get_content_resources(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    """
+    Get a paginated list of content resources.
+    """
+    logger.info(f"Admin {admin_user.id} requesting content resources (page {page}, limit {limit})")
+    try:
+        # Get total count
+        count_query = select(func.count()).select_from(ContentResource)
+        total_count = (await db.execute(count_query)).scalar() or 0
+        logger.info(f"Total content resources: {total_count}")
+
+        # Get paginated items
+        query = select(ContentResource).order_by(desc(ContentResource.created_at)).offset((page - 1) * limit).limit(limit)
+        results = await db.execute(query)
+        items = results.scalars().all()
+        logger.info(f"Fetched {len(items)} content resources.")
+
+        return ContentResourceResponse(items=items, total_count=total_count)
+    except Exception as e:
+        logger.error(f"Error fetching content resources: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to fetch content resources"
+        )
+
+@router.get("/content-resources/{resource_id}", response_model=ContentResourceItem)
+async def get_content_resource(
+    resource_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    """
+    Get a single content resource by ID.
+    """
+    logger.info(f"Admin {admin_user.id} requesting content resource {resource_id}")
+    result = await db.execute(select(ContentResource).filter(ContentResource.id == resource_id))
+    resource = result.scalar_one_or_none()
+    if not resource:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content resource not found")
+    return resource
+
+@router.put("/content-resources/{resource_id}", response_model=ContentResourceItem)
+async def update_content_resource(
+    resource_id: int,
+    resource_update: ContentResourceCreate,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    """
+    Update a content resource.
+    """
+    logger.info(f"Admin {admin_user.id} updating content resource {resource_id}")
+    result = await db.execute(select(ContentResource).filter(ContentResource.id == resource_id))
+    db_resource = result.scalar_one_or_none()
+    if not db_resource:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content resource not found")
+
+    for key, value in resource_update.dict().items():
+        setattr(db_resource, key, value)
+    
+    db_resource.updated_at = datetime.now()
+    db.add(db_resource)
+    await db.commit()
+    await db.refresh(db_resource)
+    return db_resource
+
+@router.delete("/content-resources/{resource_id}", status_code=status.HTTP_204_NO_CONTENT)
+async def delete_content_resource(
+    resource_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    """
+    Delete a content resource.
+    """
+    logger.info(f"Admin {admin_user.id} deleting content resource {resource_id}")
+    result = await db.execute(select(ContentResource).filter(ContentResource.id == resource_id))
+    db_resource = result.scalar_one_or_none()
+    if not db_resource:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Content resource not found")
+
+    await db.delete(db_resource)
+    await db.commit()
+    return
 
 @router.get("/stats")
 async def get_admin_stats(
