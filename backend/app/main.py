@@ -27,7 +27,7 @@ log_dir = "logs" if os.getenv("APP_ENV") != "production" else "/tmp/logs"
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, "chat.log")
 
-import aiofiles
+import aiofiles # type: ignore
 
 # Simplified log file existence check for clarity
 if os.getenv("APP_ENV") != "production" and not os.path.exists(log_file):

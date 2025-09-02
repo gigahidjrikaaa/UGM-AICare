@@ -69,6 +69,8 @@ export default function UserManagementPage() {
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [activeOnly, setActiveOnly] = useState(false);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [editedUser, setEditedUser] = useState<User | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
   // Fetch users data
@@ -284,6 +286,53 @@ export default function UserManagementPage() {
       </div>
     );
   }
+
+  // Handle changes in editable fields
+  const handleEditChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+    const { name, value, type, checked } = e.target as HTMLInputElement;
+    setEditedUser(prev => {
+      if (!prev) return null;
+      return {
+        ...prev,
+        [name]: type === 'checkbox' ? checked : value
+      };
+    });
+  };
+
+  // Save edited user data
+  const handleSaveUser = async () => {
+    if (!editedUser) return;
+
+    try {
+      setLoading(true);
+      // Only send fields that are editable
+      const payload = {
+        email: editedUser.email,
+        wallet_address: editedUser.wallet_address,
+        allow_email_checkins: editedUser.allow_email_checkins,
+        role: editedUser.role,
+        is_active: editedUser.is_active,
+      };
+
+      await apiCall(`/api/v1/admin/users/${editedUser.id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      toast.success('User updated successfully!');
+      fetchUsers(); // Refresh data
+      setSelectedUser(null); // Close modal
+      setIsEditing(false);
+    } catch (error) {
+      console.error('Error saving user:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to save user');
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -593,8 +642,12 @@ export default function UserManagementPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
                       <button
-                        onClick={() => setSelectedUser(user)}
-                        className="text-[#FFCA40] hover:text-[#ffda63] transition-colors"
+                        onClick={() => {
+                          setSelectedUser(user);
+                          setEditedUser(user);
+                          setIsEditing(false);
+                        }}
+                        className="text-[#FFCA40] hover:text-[#ffda63] transition-colors p-1 rounded-full hover:bg-white/10"
                         title="View Details"
                       >
                         <Eye className="h-4 w-4" />

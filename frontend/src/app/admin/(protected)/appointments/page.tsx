@@ -248,7 +248,7 @@ export default function AppointmentManagementPage() {
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button title="View Schedule" onClick={() => handleScheduleModalOpen(psychologist.id)} className="text-white hover:text-gray-300 transition-colors mr-4">
+                          <button title="View Details" onClick={() => handleScheduleModalOpen(psychologist.id)} className="text-white hover:text-gray-300 transition-colors mr-4">
                             <FiCalendar className="h-4 w-4" />
                           </button>
                         </td>
@@ -322,7 +322,7 @@ export default function AppointmentManagementPage() {
                   {!newSchedule.is_available && (
                     <div className="mt-4">
                       <label className="block text-sm font-medium text-gray-300 mb-2">Reason for Unavailability</label>
-                      <input type="text" name="reason" value={newSchedule.reason} onChange={handleNewScheduleChange} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors" />
+                      <input type="text" title='Delete Schedule' name="reason" value={newSchedule.reason} onChange={handleNewScheduleChange} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors" />
                     </div>
                   )}
                   <div className="mt-4">

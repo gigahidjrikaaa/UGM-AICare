@@ -9,7 +9,7 @@ from typing import List, Optional, Dict, Any
 import logging
 
 from app.database import get_async_db
-from app.models import User, JournalEntry, Conversation, UserBadge, Appointment, ContentResource, Psychologist, TherapistSchedule
+from app.models import User, JournalEntry, Conversation, UserBadge, Appointment, ContentResource, Psychologist, TherapistSchedule, AnalyticsReport
 from app.dependencies import get_current_active_user, get_admin_user
 from app.utils.security_utils import decrypt_data
 
@@ -231,7 +231,7 @@ async def get_analytics(
     """Get the latest analytics report"""
     logger.info(f"Admin {admin_user.id} requesting analytics data")
     try:
-        stmt = select(AnalyticsReportModel).order_by(desc(AnalyticsReportModel.generated_at))
+        stmt = select(AnalyticsReport).order_by(desc(AnalyticsReport.generated_at))
         result = await db.execute(stmt)
         latest_report = result.scalar_one_or_none()
 
@@ -1045,10 +1045,10 @@ async def get_content_resources(
         # Get paginated items
         query = select(ContentResource).order_by(desc(ContentResource.created_at)).offset((page - 1) * limit).limit(limit)
         results = await db.execute(query)
-        items = results.scalars().all()
+        items = list(results.scalars().all())
         logger.info(f"Fetched {len(items)} content resources.")
 
-        return ContentResourceResponse(items=items, total_count=total_count)
+        return ContentResourceResponse(items=[ContentResourceItem.from_orm(item) for item in items], total_count=total_count)
     except Exception as e:
         logger.error(f"Error fetching content resources: {e}", exc_info=True)
         raise HTTPException(
@@ -1091,7 +1091,7 @@ async def update_content_resource(
     for key, value in resource_update.dict().items():
         setattr(db_resource, key, value)
     
-    db_resource.updated_at = datetime.now()
+    setattr(db_resource, 'updated_at', datetime.now())
     db.add(db_resource)
     await db.commit()
     await db.refresh(db_resource)
@@ -1162,47 +1162,68 @@ class AppointmentResponse(BaseModel):
 # --- Appointment Endpoints ---
 @router.get("/psychologists", response_model=List[UserListItem])
 async def get_psychologists(db: AsyncSession = Depends(get_async_db)):
-    base_query = select(
-        User,
-        func.count(JournalEntry.id).label('journal_count'),
-        func.count(Conversation.id).label('conversation_count'),
-        func.count(UserBadge.id).label('badge_count'),
-        func.count(Appointment.id).label('appointment_count')
-    ).outerjoin(JournalEntry, User.id == JournalEntry.user_id)
-     .outerjoin(Conversation, User.id == Conversation.user_id)
-     .outerjoin(UserBadge, User.id == UserBadge.user_id)
-     .outerjoin(Appointment, User.id == Appointment.user_id)
-     .group_by(User.id)
-    
-    results = await db.execute(base_query.filter(User.role == "therapist"))
-    users = []
-    for result in results.all():
-        user = result[0]
-        journal_count = result[1] or 0
-        conversation_count = result[2] or 0
-        badge_count = result[3] or 0
-        appointment_count = result[4] or 0
-        
-        user_item = UserListItem(
-            id=user.id,
-            email=decrypt_user_email(user.email),
-            google_sub=user.google_sub,
-            wallet_address=user.wallet_address,
-            sentiment_score=user.sentiment_score,
-            current_streak=user.current_streak,
-            longest_streak=user.longest_streak,
-            last_activity_date=user.last_activity_date,
-            allow_email_checkins=user.allow_email_checkins,
-            role=getattr(user, 'role', 'user'),
-            is_active=getattr(user, 'is_active', True),
-            created_at=getattr(user, 'created_at', None),
-            total_journal_entries=journal_count,
-            total_conversations=conversation_count,
-            total_badges=badge_count,
-            total_appointments=appointment_count,
-            last_login=getattr(user, 'last_login', None)
+    # Correlated subqueries: accurate counts without join fan-out
+    journal_count_sq = (
+        select(func.count(JournalEntry.id))
+        .where(JournalEntry.user_id == User.id)
+        .correlate(User)
+        .scalar_subquery()
+    )
+    conversation_count_sq = (
+        select(func.count(Conversation.id))
+        .where(Conversation.user_id == User.id)
+        .correlate(User)
+        .scalar_subquery()
+    )
+    badge_count_sq = (
+        select(func.count(UserBadge.id))
+        .where(UserBadge.user_id == User.id)
+        .correlate(User)
+        .scalar_subquery()
+    )
+    appointment_count_sq = (
+        select(func.count(Appointment.id))
+        .where(Appointment.user_id == User.id)
+        .correlate(User)
+        .scalar_subquery()
+    )
+
+    base_query = (
+        select(
+            User,
+            journal_count_sq.label("journal_count"),
+            conversation_count_sq.label("conversation_count"),
+            badge_count_sq.label("badge_count"),
+            appointment_count_sq.label("appointment_count"),
         )
-        users.append(user_item)
+        .where(User.role == "therapist")
+    )
+
+    results = await db.execute(base_query)
+
+    users: List[UserListItem] = []
+    for user, journal_count, conversation_count, badge_count, appointment_count in results.all():
+        users.append(
+            UserListItem(
+                id=user.id,
+                email=decrypt_user_email(user.email),
+                google_sub=user.google_sub,
+                wallet_address=user.wallet_address,
+                sentiment_score=user.sentiment_score,
+                current_streak=user.current_streak,
+                longest_streak=user.longest_streak,
+                last_activity_date=user.last_activity_date,
+                allow_email_checkins=user.allow_email_checkins,
+                role=getattr(user, "role", "user"),
+                is_active=getattr(user, "is_active", True),
+                created_at=getattr(user, "created_at", None),
+                total_journal_entries=int(journal_count or 0),
+                total_conversations=int(conversation_count or 0),
+                total_badges=int(badge_count or 0),
+                total_appointments=int(appointment_count or 0),
+                last_login=getattr(user, "last_login", None),
+            )
+        )
     return users
 
 @router.get("/appointments", response_model=List[AppointmentResponse])
@@ -1245,7 +1266,8 @@ async def update_appointment(appointment_id: int, appointment_data: AppointmentU
     if not db_appointment:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Appointment not found")
 
-    db_appointment.status = appointment_data.status
+    setattr(db_appointment, 'status', appointment_data.status)
+    setattr(db_appointment, 'status', appointment_data.status)
     db.add(db_appointment)
     await db.commit()
     await db.refresh(db_appointment)
