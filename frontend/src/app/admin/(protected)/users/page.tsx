@@ -37,6 +37,10 @@ interface User {
   total_badges: number;
   total_appointments: number;
   last_login: string | null;
+  name?: string; // Added for therapist/admin
+  phone?: string; // Added for therapist/admin
+  date_of_birth?: string; // Added for therapist/admin
+  specialization?: string; // Added for therapist
 }
 
 interface UserStats {
@@ -72,6 +76,24 @@ export default function UserManagementPage() {
   const [editedUser, setEditedUser] = useState<User | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
+  const [userLogs, setUserLogs] = useState<any[]>([]); // State for user logs
+
+  // Fetch user logs
+  const fetchUserLogs = useCallback(async (userId: number) => {
+    try {
+      const logs = await apiCall(`/api/v1/admin/users/${userId}/logs`);
+      setUserLogs(logs);
+    } catch (error) {
+      console.error('Error fetching user logs:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to load user logs');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (selectedUser && selectedUser.role === 'admin') {
+      fetchUserLogs(selectedUser.id);
+    }
+  }, [selectedUser, fetchUserLogs]);
 
   // Fetch users data
   const fetchUsers = useCallback(async () => {
@@ -306,13 +328,19 @@ export default function UserManagementPage() {
     try {
       setLoading(true);
       // Only send fields that are editable
-      const payload = {
+      const payload: Partial<User> = {
         email: editedUser.email,
         wallet_address: editedUser.wallet_address,
         allow_email_checkins: editedUser.allow_email_checkins,
         role: editedUser.role,
         is_active: editedUser.is_active,
       };
+
+      // Add new editable fields if they exist
+      if (editedUser.name !== undefined) payload.name = editedUser.name;
+      if (editedUser.phone !== undefined) payload.phone = editedUser.phone;
+      if (editedUser.date_of_birth !== undefined) payload.date_of_birth = editedUser.date_of_birth;
+      if (editedUser.specialization !== undefined) payload.specialization = editedUser.specialization;
 
       await apiCall(`/api/v1/admin/users/${editedUser.id}`, {
         method: 'PUT',
@@ -571,7 +599,12 @@ export default function UserManagementPage() {
                   key={user.id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="hover:bg-white/5 transition-colors"
+                  className="hover:bg-white/5 transition-colors cursor-pointer"
+                  onClick={() => {
+                    setSelectedUser(user);
+                    setEditedUser(user);
+                    setIsEditing(false);
+                  }}
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
@@ -619,7 +652,10 @@ export default function UserManagementPage() {
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <button
-                      onClick={() => toggleEmailCheckins(user.id, !user.allow_email_checkins)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleEmailCheckins(user.id, !user.allow_email_checkins);
+                      }}
                       className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium transition-colors ${
                         user.allow_email_checkins
                           ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
@@ -642,7 +678,8 @@ export default function UserManagementPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                     <div className="flex items-center justify-end space-x-2">
                       <button
-                        onClick={() => {
+                        onClick={(e) => {
+                          e.stopPropagation();
                           setSelectedUser(user);
                           setEditedUser(user);
                           setIsEditing(false);
@@ -666,7 +703,10 @@ export default function UserManagementPage() {
                       
                       {/* Status Toggle */}
                       <button
-                        onClick={() => toggleUserStatus(user.id, !(user.is_active ?? true))}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleUserStatus(user.id, !(user.is_active ?? true));
+                        }}
                         className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
                           user.is_active ?? true
                             ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
@@ -681,6 +721,7 @@ export default function UserManagementPage() {
                       <div className="relative">
                         <select
                           onChange={(e) => {
+                            e.stopPropagation();
                             const action = e.target.value;
                             e.target.value = ''; // Reset selection
                             
@@ -821,17 +862,45 @@ export default function UserManagementPage() {
               <div className="px-6 py-4 border-b border-white/20">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-medium text-white">
-                    User Details - {selectedUser.email || `User ${selectedUser.id}`}
+                    {isEditing ? 'Edit User' : 'User Details'} - {selectedUser.email || `User ${selectedUser.id}`}
                   </h3>
-                  <button
-                    onClick={() => setSelectedUser(null)}
-                    className="text-gray-400 hover:text-gray-300 transition-colors"
-                  >
-                    <span className="sr-only">Close</span>
-                    <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+                  <div className="flex items-center space-x-2">
+                    {isEditing ? (
+                      <>
+                        <button
+                          onClick={handleSaveUser}
+                          disabled={loading}
+                          className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-black bg-[#FFCA40] hover:bg-[#ffda63] transition-colors disabled:opacity-50"
+                        >
+                          <Edit className="h-4 w-4 mr-2" />
+                          Save
+                        </button>
+                        <button
+                          onClick={() => setIsEditing(false)}
+                          className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-colors"
+                        >
+                          Cancel
+                        </button>
+                      </>
+                    ) : (
+                      <button
+                        onClick={() => setIsEditing(true)}
+                        className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-colors"
+                      >
+                        <Edit className="h-4 w-4 mr-2" />
+                        Edit
+                      </button>
+                    )}
+                    <button
+                      onClick={() => setSelectedUser(null)}
+                      className="text-gray-400 hover:text-gray-300 transition-colors"
+                    >
+                      <span className="sr-only">Close</span>
+                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
               </div>
               
@@ -840,23 +909,118 @@ export default function UserManagementPage() {
                   <div>
                     <h4 className="text-sm font-medium text-gray-300 mb-3">Basic Information</h4>
                     <dl className="space-y-2">
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <dt className="text-sm text-gray-400">User ID:</dt>
                         <dd className="text-sm text-white">{selectedUser.id}</dd>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <dt className="text-sm text-gray-400">Email:</dt>
-                        <dd className="text-sm text-white">{selectedUser.email || 'Not provided'}</dd>
+                        {isEditing ? (
+                          <input
+                            type="email"
+                            name="email"
+                            value={editedUser?.email || ''}
+                            onChange={handleEditChange}
+                            className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                          />
+                        ) : (
+                          <dd className="text-sm text-white">{selectedUser.email || 'Not provided'}</dd>
+                        )}
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
+                        <dt className="text-sm text-gray-400">Name:</dt>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            name="name"
+                            value={editedUser?.name || ''}
+                            onChange={handleEditChange}
+                            className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                          />
+                        ) : (
+                          <dd className="text-sm text-white">{selectedUser.name || 'Not provided'}</dd>
+                        )}
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <dt className="text-sm text-gray-400">Phone:</dt>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            name="phone"
+                            value={editedUser?.phone || ''}
+                            onChange={handleEditChange}
+                            className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                          />
+                        ) : (
+                          <dd className="text-sm text-white">{selectedUser.phone || 'Not provided'}</dd>
+                        )}
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <dt className="text-sm text-gray-400">Date of Birth:</dt>
+                        {isEditing ? (
+                          <input
+                            type="date"
+                            name="date_of_birth"
+                            value={editedUser?.date_of_birth || ''}
+                            onChange={handleEditChange}
+                            className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                          />
+                        ) : (
+                          <dd className="text-sm text-white">{selectedUser.date_of_birth || 'Not provided'}</dd>
+                        )}
+                      </div>
+                      <div className="flex justify-between items-center">
                         <dt className="text-sm text-gray-400">Wallet Address:</dt>
-                        <dd className="text-xs text-white font-mono">
-                          {selectedUser.wallet_address || 'Not connected'}
-                        </dd>
+                        {isEditing ? (
+                          <input
+                            type="text"
+                            name="wallet_address"
+                            value={editedUser?.wallet_address || ''}
+                            onChange={handleEditChange}
+                            className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-xs font-mono focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                          />
+                        ) : (
+                          <dd className="text-xs text-white font-mono">
+                            {selectedUser.wallet_address || 'Not connected'}
+                          </dd>
+                        )}
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <dt className="text-sm text-gray-400">Last Activity:</dt>
                         <dd className="text-sm text-white">{formatDate(selectedUser.last_activity_date)}</dd>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <dt className="text-sm text-gray-400">Role:</dt>
+                        {isEditing ? (
+                          <select
+                            name="role"
+                            value={editedUser?.role || 'user'}
+                            onChange={handleEditChange}
+                            className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                          >
+                            <option value="user" className="bg-gray-800">User</option>
+                            <option value="therapist" className="bg-gray-800">Therapist</option>
+                            <option value="admin" className="bg-gray-800">Admin</option>
+                          </select>
+                        ) : (
+                          <dd className="text-sm text-white">{selectedUser.role || 'user'}</dd>
+                        )}
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <dt className="text-sm text-gray-400">Status:</dt>
+                        {isEditing ? (
+                          <select
+                            name="is_active"
+                            value={editedUser?.is_active ? 'true' : 'false'}
+                            onChange={handleEditChange}
+                            className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                          >
+                            <option value="true" className="bg-gray-800">Active</option>
+                            <option value="false" className="bg-gray-800">Inactive</option>
+                          </select>
+                        ) : (
+                          <dd className="text-sm text-white">{selectedUser.is_active ? 'Active' : 'Inactive'}</dd>
+                        )}
                       </div>
                     </dl>
                   </div>
@@ -864,30 +1028,78 @@ export default function UserManagementPage() {
                   <div>
                     <h4 className="text-sm font-medium text-gray-300 mb-3">Engagement Stats</h4>
                     <dl className="space-y-2">
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <dt className="text-sm text-gray-400">Current Streak:</dt>
                         <dd className="text-sm text-white">{selectedUser.current_streak} days</dd>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <dt className="text-sm text-gray-400">Longest Streak:</dt>
                         <dd className="text-sm text-white">{selectedUser.longest_streak} days</dd>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <dt className="text-sm text-gray-400">Sentiment Score:</dt>
                         <dd className={`text-sm font-medium ${getSentimentColor(selectedUser.sentiment_score)}`}>
                           {(selectedUser.sentiment_score * 100).toFixed(1)}%
                         </dd>
                       </div>
-                      <div className="flex justify-between">
+                      <div className="flex justify-between items-center">
                         <dt className="text-sm text-gray-400">Email Checkins:</dt>
-                        <dd className="text-sm text-white">
-                          {selectedUser.allow_email_checkins ? 'Enabled' : 'Disabled'}
-                        </dd>
+                        {isEditing ? (
+                          <input
+                            type="checkbox"
+                            name="allow_email_checkins"
+                            checked={editedUser?.allow_email_checkins || false}
+                            onChange={handleEditChange}
+                            className="h-4 w-4 text-[#FFCA40] focus:ring-[#FFCA40] bg-white/10 border-white/20 rounded"
+                          />
+                        ) : (
+                          <dd className="text-sm text-white">
+                            {selectedUser.allow_email_checkins ? 'Enabled' : 'Disabled'}
+                          </dd>
+                        )}
                       </div>
                     </dl>
+                    {selectedUser.role === 'therapist' && (
+                      <div className="mt-6">
+                        <h4 className="text-sm font-medium text-gray-300 mb-3">Therapist Information</h4>
+                        <dl className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <dt className="text-sm text-gray-400">Specialization:</dt>
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                name="specialization"
+                                value={editedUser?.specialization || ''}
+                                onChange={handleEditChange}
+                                className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                              />
+                            ) : (
+                              <dd className="text-sm text-white">{selectedUser.specialization || 'Not specified'}</dd>
+                            )}
+                          </div>
+                        </dl>
+                      </div>
+                    )}
                   </div>
                 </div>
                 
+                {selectedUser.role === 'admin' && (
+                  <div className="mt-6">
+                    <h4 className="text-sm font-medium text-gray-300 mb-3">User Activity Logs</h4>
+                    <div className="bg-white/5 rounded-lg p-4 max-h-60 overflow-y-auto text-sm text-gray-300">
+                      {userLogs.length > 0 ? (
+                        userLogs.map((log, index) => (
+                          <div key={index} className="mb-1">
+                            <span className="font-medium text-white">{formatDate(log.timestamp)}:</span> {log.activity}
+                          </div>
+                        ))
+                      ) : (
+                        <p>No activity logs available for this user.</p>
+                      )}
+                    </div>
+                  </div>
+                )}
+
                 <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
                   <div className="bg-[#FFCA40]/20 rounded-lg p-4 text-center border border-[#FFCA40]/30">
                     <div className="text-2xl font-bold text-[#FFCA40]">{selectedUser.total_journal_entries}</div>
