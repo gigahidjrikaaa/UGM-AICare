@@ -600,10 +600,19 @@ export default function UserManagementPage() {
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
                   className="hover:bg-white/5 transition-colors cursor-pointer"
-                  onClick={() => {
-                    setSelectedUser(user);
-                    setEditedUser(user);
-                    setIsEditing(false);
+                  onClick={async () => {
+                    setLoading(true); // Set loading for the modal
+                    try {
+                      const fullUserDetails: User = await apiCall(`/api/v1/admin/users/${user.id}`);
+                      setSelectedUser(fullUserDetails);
+                      setEditedUser(fullUserDetails);
+                      setIsEditing(false);
+                    } catch (error) {
+                      console.error('Error fetching user details for modal:', error);
+                      toast.error(error instanceof Error ? error.message : 'Failed to load user details');
+                    } finally {
+                      setLoading(false); // Reset loading
+                    }
                   }}
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
@@ -859,266 +868,274 @@ export default function UserManagementPage() {
               className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="px-6 py-4 border-b border-white/20">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-medium text-white">
-                    {isEditing ? 'Edit User' : 'User Details'} - {selectedUser.email || `User ${selectedUser.id}`}
-                  </h3>
-                  <div className="flex items-center space-x-2">
-                    {isEditing ? (
-                      <>
-                        <button
-                          onClick={handleSaveUser}
-                          disabled={loading}
-                          className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-black bg-[#FFCA40] hover:bg-[#ffda63] transition-colors disabled:opacity-50"
-                        >
-                          <Edit className="h-4 w-4 mr-2" />
-                          Save
-                        </button>
-                        <button
-                          onClick={() => setIsEditing(false)}
-                          className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-colors"
-                        >
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <button
-                        onClick={() => setIsEditing(true)}
-                        className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-colors"
-                      >
-                        <Edit className="h-4 w-4 mr-2" />
-                        Edit
-                      </button>
-                    )}
-                    <button
-                      onClick={() => setSelectedUser(null)}
-                      className="text-gray-400 hover:text-gray-300 transition-colors"
-                    >
-                      <span className="sr-only">Close</span>
-                      <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                      </svg>
-                    </button>
-                  </div>
+              {loading ? (
+                <div className="p-6 text-white text-center">
+                  Loading user details...
                 </div>
-              </div>
-              
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-300 mb-3">Basic Information</h4>
-                    <dl className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <dt className="text-sm text-gray-400">User ID:</dt>
-                        <dd className="text-sm text-white">{selectedUser.id}</dd>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <dt className="text-sm text-gray-400">Email:</dt>
+              ) : (
+                <>
+                  <div className="px-6 py-4 border-b border-white/20">
+                    <div className="flex items-center justify-between">
+                      <h3 className="text-lg font-medium text-white">
+                        {isEditing ? 'Edit User' : 'User Details'} - {selectedUser.email || `User ${selectedUser.id}`}
+                      </h3>
+                      <div className="flex items-center space-x-2">
                         {isEditing ? (
-                          <input
-                            type="email"
-                            name="email"
-                            value={editedUser?.email || ''}
-                            onChange={handleEditChange}
-                            className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
-                          />
+                          <>
+                            <button
+                              onClick={handleSaveUser}
+                              disabled={loading}
+                              className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-black bg-[#FFCA40] hover:bg-[#ffda63] transition-colors disabled:opacity-50"
+                            >
+                              <Edit className="h-4 w-4 mr-2" />
+                              Save
+                            </button>
+                            <button
+                              onClick={() => setIsEditing(false)}
+                              className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-colors"
+                            >
+                              Cancel
+                            </button>
+                          </>
                         ) : (
-                          <dd className="text-sm text-white">{selectedUser.email || 'Not provided'}</dd>
-                        )}
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <dt className="text-sm text-gray-400">Name:</dt>
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            name="name"
-                            value={editedUser?.name || ''}
-                            onChange={handleEditChange}
-                            className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
-                          />
-                        ) : (
-                          <dd className="text-sm text-white">{selectedUser.name || 'Not provided'}</dd>
-                        )}
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <dt className="text-sm text-gray-400">Phone:</dt>
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            name="phone"
-                            value={editedUser?.phone || ''}
-                            onChange={handleEditChange}
-                            className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
-                          />
-                        ) : (
-                          <dd className="text-sm text-white">{selectedUser.phone || 'Not provided'}</dd>
-                        )}
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <dt className="text-sm text-gray-400">Date of Birth:</dt>
-                        {isEditing ? (
-                          <input
-                            type="date"
-                            name="date_of_birth"
-                            value={editedUser?.date_of_birth || ''}
-                            onChange={handleEditChange}
-                            className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
-                          />
-                        ) : (
-                          <dd className="text-sm text-white">{selectedUser.date_of_birth || 'Not provided'}</dd>
-                        )}
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <dt className="text-sm text-gray-400">Wallet Address:</dt>
-                        {isEditing ? (
-                          <input
-                            type="text"
-                            name="wallet_address"
-                            value={editedUser?.wallet_address || ''}
-                            onChange={handleEditChange}
-                            className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-xs font-mono focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
-                          />
-                        ) : (
-                          <dd className="text-xs text-white font-mono">
-                            {selectedUser.wallet_address || 'Not connected'}
-                          </dd>
-                        )}
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <dt className="text-sm text-gray-400">Last Activity:</dt>
-                        <dd className="text-sm text-white">{formatDate(selectedUser.last_activity_date)}</dd>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <dt className="text-sm text-gray-400">Role:</dt>
-                        {isEditing ? (
-                          <select
-                            name="role"
-                            value={editedUser?.role || 'user'}
-                            onChange={handleEditChange}
-                            className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                          <button
+                            onClick={() => setIsEditing(true)}
+                            className="inline-flex items-center px-3 py-1.5 rounded-md text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-colors"
                           >
-                            <option value="user" className="bg-gray-800">User</option>
-                            <option value="therapist" className="bg-gray-800">Therapist</option>
-                            <option value="admin" className="bg-gray-800">Admin</option>
-                          </select>
-                        ) : (
-                          <dd className="text-sm text-white">{selectedUser.role || 'user'}</dd>
+                            <Edit className="h-4 w-4 mr-2" />
+                            Edit
+                          </button>
                         )}
+                        <button
+                          onClick={() => setSelectedUser(null)}
+                          className="text-gray-400 hover:text-gray-300 transition-colors"
+                        >
+                          <span className="sr-only">Close</span>
+                          <svg className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                          </svg>
+                        </button>
                       </div>
-                      <div className="flex justify-between items-center">
-                        <dt className="text-sm text-gray-400">Status:</dt>
-                        {isEditing ? (
-                          <select
-                            name="is_active"
-                            value={editedUser?.is_active ? 'true' : 'false'}
-                            onChange={handleEditChange}
-                            className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
-                          >
-                            <option value="true" className="bg-gray-800">Active</option>
-                            <option value="false" className="bg-gray-800">Inactive</option>
-                          </select>
-                        ) : (
-                          <dd className="text-sm text-white">{selectedUser.is_active ? 'Active' : 'Inactive'}</dd>
-                        )}
-                      </div>
-                    </dl>
+                    </div>
                   </div>
                   
-                  <div>
-                    <h4 className="text-sm font-medium text-gray-300 mb-3">Engagement Stats</h4>
-                    <dl className="space-y-2">
-                      <div className="flex justify-between items-center">
-                        <dt className="text-sm text-gray-400">Current Streak:</dt>
-                        <dd className="text-sm text-white">{selectedUser.current_streak} days</dd>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <dt className="text-sm text-gray-400">Longest Streak:</dt>
-                        <dd className="text-sm text-white">{selectedUser.longest_streak} days</dd>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <dt className="text-sm text-gray-400">Sentiment Score:</dt>
-                        <dd className={`text-sm font-medium ${getSentimentColor(selectedUser.sentiment_score)}`}>
-                          {(selectedUser.sentiment_score * 100).toFixed(1)}%
-                        </dd>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <dt className="text-sm text-gray-400">Email Checkins:</dt>
-                        {isEditing ? (
-                          <input
-                            type="checkbox"
-                            name="allow_email_checkins"
-                            checked={editedUser?.allow_email_checkins || false}
-                            onChange={handleEditChange}
-                            className="h-4 w-4 text-[#FFCA40] focus:ring-[#FFCA40] bg-white/10 border-white/20 rounded"
-                          />
-                        ) : (
-                          <dd className="text-sm text-white">
-                            {selectedUser.allow_email_checkins ? 'Enabled' : 'Disabled'}
-                          </dd>
-                        )}
-                      </div>
-                    </dl>
-                    {selectedUser.role === 'therapist' && (
-                      <div className="mt-6">
-                        <h4 className="text-sm font-medium text-gray-300 mb-3">Therapist Information</h4>
+                  <div className="p-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-300 mb-3">Basic Information</h4>
                         <dl className="space-y-2">
                           <div className="flex justify-between items-center">
-                            <dt className="text-sm text-gray-400">Specialization:</dt>
+                            <dt className="text-sm text-gray-400">User ID:</dt>
+                            <dd className="text-sm text-white">{selectedUser.id}</dd>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <dt className="text-sm text-gray-400">Email:</dt>
                             {isEditing ? (
                               <input
-                                type="text"
-                                name="specialization"
-                                value={editedUser?.specialization || ''}
+                                type="email"
+                                name="email"
+                                value={editedUser?.email || ''}
                                 onChange={handleEditChange}
                                 className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
                               />
                             ) : (
-                              <dd className="text-sm text-white">{selectedUser.specialization || 'Not specified'}</dd>
+                              <dd className="text-sm text-white">{selectedUser.email || 'Not provided'}</dd>
+                            )}
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <dt className="text-sm text-gray-400">Name:</dt>
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                name="name"
+                                value={editedUser?.name || ''}
+                                onChange={handleEditChange}
+                                className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                              />
+                            ) : (
+                              <dd className="text-sm text-white">{selectedUser.name || 'Not provided'}</dd>
+                            )}
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <dt className="text-sm text-gray-400">Phone:</dt>
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                name="phone"
+                                value={editedUser?.phone || ''}
+                                onChange={handleEditChange}
+                                className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                              />
+                            ) : (
+                              <dd className="text-sm text-white">{selectedUser.phone || 'Not provided'}</dd>
+                            )}
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <dt className="text-sm text-gray-400">Date of Birth:</dt>
+                            {isEditing ? (
+                              <input
+                                type="date"
+                                name="date_of_birth"
+                                value={editedUser?.date_of_birth || ''}
+                                onChange={handleEditChange}
+                                className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                              />
+                            ) : (
+                              <dd className="text-sm text-white">{selectedUser.date_of_birth || 'Not provided'}</dd>
+                            )}
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <dt className="text-sm text-gray-400">Wallet Address:</dt>
+                            {isEditing ? (
+                              <input
+                                type="text"
+                                name="wallet_address"
+                                value={editedUser?.wallet_address || ''}
+                                onChange={handleEditChange}
+                                className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-xs font-mono focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                              />
+                            ) : (
+                              <dd className="text-xs text-white font-mono">
+                                {selectedUser.wallet_address || 'Not connected'}
+                              </dd>
+                            )}
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <dt className="text-sm text-gray-400">Last Activity:</dt>
+                            <dd className="text-sm text-white">{formatDate(selectedUser.last_activity_date)}</dd>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <dt className="text-sm text-gray-400">Role:</dt>
+                            {isEditing ? (
+                              <select
+                                name="role"
+                                value={editedUser?.role || 'user'}
+                                onChange={handleEditChange}
+                                className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                              >
+                                <option value="user" className="bg-gray-800">User</option>
+                                <option value="therapist" className="bg-gray-800">Therapist</option>
+                                <option value="admin" className="bg-gray-800">Admin</option>
+                              </select>
+                            ) : (
+                              <dd className="text-sm text-white">{selectedUser.role || 'user'}</dd>
+                            )}
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <dt className="text-sm text-gray-400">Status:</dt>
+                            {isEditing ? (
+                              <select
+                                name="is_active"
+                                value={editedUser?.is_active ? 'true' : 'false'}
+                                onChange={handleEditChange}
+                                className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                              >
+                                <option value="true" className="bg-gray-800">Active</option>
+                                <option value="false" className="bg-gray-800">Inactive</option>
+                              </select>
+                            ) : (
+                              <dd className="text-sm text-white">{selectedUser.is_active ? 'Active' : 'Inactive'}</dd>
                             )}
                           </div>
                         </dl>
                       </div>
-                    )}
-                  </div>
-                </div>
-                
-                {selectedUser.role === 'admin' && (
-                  <div className="mt-6">
-                    <h4 className="text-sm font-medium text-gray-300 mb-3">User Activity Logs</h4>
-                    <div className="bg-white/5 rounded-lg p-4 max-h-60 overflow-y-auto text-sm text-gray-300">
-                      {userLogs.length > 0 ? (
-                        userLogs.map((log, index) => (
-                          <div key={index} className="mb-1">
-                            <span className="font-medium text-white">{formatDate(log.timestamp)}:</span> {log.activity}
+                      
+                      <div>
+                        <h4 className="text-sm font-medium text-gray-300 mb-3">Engagement Stats</h4>
+                        <dl className="space-y-2">
+                          <div className="flex justify-between items-center">
+                            <dt className="text-sm text-gray-400">Current Streak:</dt>
+                            <dd className="text-sm text-white">{selectedUser.current_streak} days</dd>
                           </div>
-                        ))
-                      ) : (
-                        <p>No activity logs available for this user.</p>
-                      )}
+                          <div className="flex justify-between items-center">
+                            <dt className="text-sm text-gray-400">Longest Streak:</dt>
+                            <dd className="text-sm text-white">{selectedUser.longest_streak} days</dd>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <dt className="text-sm text-gray-400">Sentiment Score:</dt>
+                            <dd className={`text-sm font-medium ${getSentimentColor(selectedUser.sentiment_score)}`}>
+                              {(selectedUser.sentiment_score * 100).toFixed(1)}%
+                            </dd>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <dt className="text-sm text-gray-400">Email Checkins:</dt>
+                            {isEditing ? (
+                              <input
+                                type="checkbox"
+                                name="allow_email_checkins"
+                                checked={editedUser?.allow_email_checkins || false}
+                                onChange={handleEditChange}
+                                className="h-4 w-4 text-[#FFCA40] focus:ring-[#FFCA40] bg-white/10 border-white/20 rounded"
+                              />
+                            ) : (
+                              <dd className="text-sm text-white">
+                                {selectedUser.allow_email_checkins ? 'Enabled' : 'Disabled'}
+                              </dd>
+                            )}
+                          </div>
+                        </dl>
+                        {selectedUser.role === 'therapist' && (
+                          <div className="mt-6">
+                            <h4 className="text-sm font-medium text-gray-300 mb-3">Therapist Information</h4>
+                            <dl className="space-y-2">
+                              <div className="flex justify-between items-center">
+                                <dt className="text-sm text-gray-400">Specialization:</dt>
+                                {isEditing ? (
+                                  <input
+                                    type="text"
+                                    name="specialization"
+                                    value={editedUser?.specialization || ''}
+                                    onChange={handleEditChange}
+                                    className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                                  />
+                                ) : (
+                                  <dd className="text-sm text-white">{selectedUser.specialization || 'Not specified'}</dd>
+                                )}
+                              </div>
+                            </dl>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    
+                    {selectedUser.role === 'admin' && (
+                      <div className="mt-6">
+                        <h4 className="text-sm font-medium text-gray-300 mb-3">User Activity Logs</h4>
+                        <div className="bg-white/5 rounded-lg p-4 max-h-60 overflow-y-auto text-sm text-gray-300">
+                          {userLogs.length > 0 ? (
+                            userLogs.map((log, index) => (
+                              <div key={index} className="mb-1">
+                                <span className="font-medium text-white">{formatDate(log.timestamp)}:</span> {log.activity}
+                              </div>
+                            ))
+                          ) : (
+                            <p>No activity logs available for this user.</p>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                      <div className="bg-[#FFCA40]/20 rounded-lg p-4 text-center border border-[#FFCA40]/30">
+                        <div className="text-2xl font-bold text-[#FFCA40]">{selectedUser.total_journal_entries}</div>
+                        <div className="text-sm text-gray-300">Journal Entries</div>
+                      </div>
+                      <div className="bg-green-500/20 rounded-lg p-4 text-center border border-green-500/30">
+                        <div className="text-2xl font-bold text-green-400">{selectedUser.total_conversations}</div>
+                        <div className="text-sm text-gray-300">Conversations</div>
+                      </div>
+                      <div className="bg-yellow-500/20 rounded-lg p-4 text-center border border-yellow-500/30">
+                        <div className="text-2xl font-bold text-yellow-400">{selectedUser.total_badges}</div>
+                        <div className="text-sm text-gray-300">Badges Earned</div>
+                      </div>
+                      <div className="bg-purple-500/20 rounded-lg p-4 text-center border border-purple-500/30">
+                        <div className="text-2xl font-bold text-purple-400">{selectedUser.total_appointments}</div>
+                        <div className="text-sm text-gray-300">Appointments</div>
+                      </div>
                     </div>
                   </div>
-                )}
-
-                <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-[#FFCA40]/20 rounded-lg p-4 text-center border border-[#FFCA40]/30">
-                    <div className="text-2xl font-bold text-[#FFCA40]">{selectedUser.total_journal_entries}</div>
-                    <div className="text-sm text-gray-300">Journal Entries</div>
-                  </div>
-                  <div className="bg-green-500/20 rounded-lg p-4 text-center border border-green-500/30">
-                    <div className="text-2xl font-bold text-green-400">{selectedUser.total_conversations}</div>
-                    <div className="text-sm text-gray-300">Conversations</div>
-                  </div>
-                  <div className="bg-yellow-500/20 rounded-lg p-4 text-center border border-yellow-500/30">
-                    <div className="text-2xl font-bold text-yellow-400">{selectedUser.total_badges}</div>
-                    <div className="text-sm text-gray-300">Badges Earned</div>
-                  </div>
-                  <div className="bg-purple-500/20 rounded-lg p-4 text-center border border-purple-500/30">
-                    <div className="text-2xl font-bold text-purple-400">{selectedUser.total_appointments}</div>
-                    <div className="text-sm text-gray-300">Appointments</div>
-                  </div>
-                </div>
-              </div>
+                </>
+              )}
             </motion.div>
           </motion.div>
         )}
