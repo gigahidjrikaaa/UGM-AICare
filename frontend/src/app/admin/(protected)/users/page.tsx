@@ -43,6 +43,11 @@ interface User {
   specialization?: string; // Added for therapist
 }
 
+interface UserLog {
+  timestamp: string;
+  activity: string;
+}
+
 interface UserStats {
   total_users: number;
   active_users_30d: number;
@@ -76,12 +81,12 @@ export default function UserManagementPage() {
   const [editedUser, setEditedUser] = useState<User | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
-  const [userLogs, setUserLogs] = useState<any[]>([]); // State for user logs
+  const [userLogs, setUserLogs] = useState<UserLog[]>([]); // State for user logs
 
   // Fetch user logs
   const fetchUserLogs = useCallback(async (userId: number) => {
     try {
-      const logs = await apiCall(`/api/v1/admin/users/${userId}/logs`);
+      const logs = await apiCall<UserLog[]>(`/api/v1/admin/users/${userId}/logs`);
       setUserLogs(logs);
     } catch (error) {
       console.error('Error fetching user logs:', error);
@@ -923,175 +928,181 @@ export default function UserManagementPage() {
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>
                         <h4 className="text-sm font-medium text-gray-300 mb-3">Basic Information</h4>
-                        <dl className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <dt className="text-sm text-gray-400">User ID:</dt>
-                            <dd className="text-sm text-white">{selectedUser.id}</dd>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <dt className="text-sm text-gray-400">Email:</dt>
+                        <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+                          <dt className="text-sm text-gray-400">User ID:</dt>
+                          <dd className="text-sm text-white text-right">{selectedUser.id}</dd>
+                          
+                          <dt className="text-sm text-gray-400">Email:</dt>
+                          <dd className="text-sm text-white text-right">
                             {isEditing ? (
                               <input
                                 type="email"
                                 name="email"
+                                aria-label="Email"
                                 value={editedUser?.email || ''}
                                 onChange={handleEditChange}
-                                className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                                className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
                               />
                             ) : (
-                              <dd className="text-sm text-white">{selectedUser.email || 'Not provided'}</dd>
+                              selectedUser.email || 'Not provided'
                             )}
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <dt className="text-sm text-gray-400">Name:</dt>
+                          </dd>
+
+                          <dt className="text-sm text-gray-400">Name:</dt>
+                          <dd className="text-sm text-white text-right">
                             {isEditing ? (
                               <input
                                 type="text"
                                 name="name"
+                                aria-label="Name"
                                 value={editedUser?.name || ''}
                                 onChange={handleEditChange}
-                                className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                                className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
                               />
                             ) : (
-                              <dd className="text-sm text-white">{selectedUser.name || 'Not provided'}</dd>
+                              selectedUser.name || 'Not provided'
                             )}
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <dt className="text-sm text-gray-400">Phone:</dt>
+                          </dd>
+
+                          <dt className="text-sm text-gray-400">Phone:</dt>
+                          <dd className="text-sm text-white text-right">
                             {isEditing ? (
                               <input
                                 type="text"
                                 name="phone"
+                                aria-label="Phone"
                                 value={editedUser?.phone || ''}
                                 onChange={handleEditChange}
-                                className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                                className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
                               />
                             ) : (
-                              <dd className="text-sm text-white">{selectedUser.phone || 'Not provided'}</dd>
+                              selectedUser.phone || 'Not provided'
                             )}
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <dt className="text-sm text-gray-400">Date of Birth:</dt>
+                          </dd>
+
+                          <dt className="text-sm text-gray-400">Date of Birth:</dt>
+                          <dd className="text-sm text-white text-right">
                             {isEditing ? (
                               <input
                                 type="date"
                                 name="date_of_birth"
+                                aria-label="Date of Birth"
                                 value={editedUser?.date_of_birth || ''}
                                 onChange={handleEditChange}
-                                className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                                className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
                               />
                             ) : (
-                              <dd className="text-sm text-white">{selectedUser.date_of_birth || 'Not provided'}</dd>
+                              selectedUser.date_of_birth || 'Not provided'
                             )}
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <dt className="text-sm text-gray-400">Wallet Address:</dt>
+                          </dd>
+
+                          <dt className="text-sm text-gray-400">Wallet Address:</dt>
+                          <dd className="text-xs text-white font-mono text-right">
                             {isEditing ? (
                               <input
                                 type="text"
                                 name="wallet_address"
+                                aria-label="Wallet Address"
                                 value={editedUser?.wallet_address || ''}
                                 onChange={handleEditChange}
-                                className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-xs font-mono focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                                className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-xs font-mono focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
                               />
                             ) : (
-                              <dd className="text-xs text-white font-mono">
-                                {selectedUser.wallet_address || 'Not connected'}
-                              </dd>
+                              selectedUser.wallet_address || 'Not connected'
                             )}
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <dt className="text-sm text-gray-400">Last Activity:</dt>
-                            <dd className="text-sm text-white">{formatDate(selectedUser.last_activity_date)}</dd>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <dt className="text-sm text-gray-400">Role:</dt>
+                          </dd>
+
+                          <dt className="text-sm text-gray-400">Last Activity:</dt>
+                          <dd className="text-sm text-white text-right">{formatDate(selectedUser.last_activity_date)}</dd>
+
+                          <dt className="text-sm text-gray-400">Role:</dt>
+                          <dd className="text-sm text-white text-right">
                             {isEditing ? (
                               <select
                                 name="role"
+                                aria-label="Role"
                                 value={editedUser?.role || 'user'}
                                 onChange={handleEditChange}
-                                className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                                className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
                               >
                                 <option value="user" className="bg-gray-800">User</option>
                                 <option value="therapist" className="bg-gray-800">Therapist</option>
                                 <option value="admin" className="bg-gray-800">Admin</option>
                               </select>
                             ) : (
-                              <dd className="text-sm text-white">{selectedUser.role || 'user'}</dd>
+                              selectedUser.role || 'user'
                             )}
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <dt className="text-sm text-gray-400">Status:</dt>
+                          </dd>
+
+                          <dt className="text-sm text-gray-400">Status:</dt>
+                          <dd className="text-sm text-white text-right">
                             {isEditing ? (
                               <select
                                 name="is_active"
+                                aria-label="Status"
                                 value={editedUser?.is_active ? 'true' : 'false'}
                                 onChange={handleEditChange}
-                                className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                                className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
                               >
                                 <option value="true" className="bg-gray-800">Active</option>
                                 <option value="false" className="bg-gray-800">Inactive</option>
                               </select>
                             ) : (
-                              <dd className="text-sm text-white">{selectedUser.is_active ? 'Active' : 'Inactive'}</dd>
+                              selectedUser.is_active ? 'Active' : 'Inactive'
                             )}
-                          </div>
+                          </dd>
                         </dl>
                       </div>
                       
                       <div>
                         <h4 className="text-sm font-medium text-gray-300 mb-3">Engagement Stats</h4>
-                        <dl className="space-y-2">
-                          <div className="flex justify-between items-center">
-                            <dt className="text-sm text-gray-400">Current Streak:</dt>
-                            <dd className="text-sm text-white">{selectedUser.current_streak} days</dd>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <dt className="text-sm text-gray-400">Longest Streak:</dt>
-                            <dd className="text-sm text-white">{selectedUser.longest_streak} days</dd>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <dt className="text-sm text-gray-400">Sentiment Score:</dt>
-                            <dd className={`text-sm font-medium ${getSentimentColor(selectedUser.sentiment_score)}`}>
-                              {(selectedUser.sentiment_score * 100).toFixed(1)}%
-                            </dd>
-                          </div>
-                          <div className="flex justify-between items-center">
-                            <dt className="text-sm text-gray-400">Email Checkins:</dt>
+                        <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+                          <dt className="text-sm text-gray-400">Current Streak:</dt>
+                          <dd className="text-sm text-white text-right">{selectedUser.current_streak} days</dd>
+                          
+                          <dt className="text-sm text-gray-400">Longest Streak:</dt>
+                          <dd className="text-sm text-white text-right">{selectedUser.longest_streak} days</dd>
+                          
+                          <dt className="text-sm text-gray-400">Sentiment Score:</dt>
+                          <dd className={`text-sm font-medium ${getSentimentColor(selectedUser.sentiment_score)} text-right`}>
+                            {(selectedUser.sentiment_score * 100).toFixed(1)}%
+                          </dd>
+                          
+                          <dt className="text-sm text-gray-400">Email Checkins:</dt>
+                          <dd className="text-sm text-white text-right">
                             {isEditing ? (
                               <input
                                 type="checkbox"
                                 name="allow_email_checkins"
+                                aria-label="Email Checkins"
                                 checked={editedUser?.allow_email_checkins || false}
                                 onChange={handleEditChange}
                                 className="h-4 w-4 text-[#FFCA40] focus:ring-[#FFCA40] bg-white/10 border-white/20 rounded"
                               />
                             ) : (
-                              <dd className="text-sm text-white">
-                                {selectedUser.allow_email_checkins ? 'Enabled' : 'Disabled'}
-                              </dd>
+                              selectedUser.allow_email_checkins ? 'Enabled' : 'Disabled'
                             )}
-                          </div>
+                          </dd>
                         </dl>
                         {selectedUser.role === 'therapist' && (
                           <div className="mt-6">
                             <h4 className="text-sm font-medium text-gray-300 mb-3">Therapist Information</h4>
-                            <dl className="space-y-2">
-                              <div className="flex justify-between items-center">
-                                <dt className="text-sm text-gray-400">Specialization:</dt>
+                            <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
+                              <dt className="text-sm text-gray-400">Specialization:</dt>
+                              <dd className="text-sm text-white text-right">
                                 {isEditing ? (
                                   <input
                                     type="text"
                                     name="specialization"
+                                    aria-label="Specialization"
                                     value={editedUser?.specialization || ''}
                                     onChange={handleEditChange}
-                                    className="w-1/2 px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
+                                    className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
                                   />
                                 ) : (
-                                  <dd className="text-sm text-white">{selectedUser.specialization || 'Not specified'}</dd>
+                                  selectedUser.specialization || 'Not specified'
                                 )}
-                              </div>
+                              </dd>
                             </dl>
                           </div>
                         )}
