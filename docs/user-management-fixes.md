@@ -1,23 +1,28 @@
 # User Management Fixes for UGM-AICare Admin Dashboard
 
 ## Overview
+
 This document outlines the fixes applied to the user management functions in the admin dashboard. The fixes address authentication issues, missing database fields, and lack of proper user management capabilities.
 
 ## Issues Fixed
 
 ### 1. **Missing User Role and Status Fields**
+
 - **Problem**: The User model was missing essential fields like `role`, `is_active`, `created_at`, etc.
 - **Solution**: Added new fields to the User model in `backend/app/models.py`
 
 ### 2. **Weak Admin Authentication**
+
 - **Problem**: Admin authentication was not properly checking user roles
 - **Solution**: Enhanced `get_admin_user` function in `backend/app/routes/admin.py` to properly validate admin/therapist roles
 
 ### 3. **Frontend Authentication Issues**
+
 - **Problem**: Frontend was using localStorage for auth tokens instead of proper session management
 - **Solution**: Created `adminApi.ts` utility to use NextAuth sessions for API calls
 
 ### 4. **Limited User Management Functions**
+
 - **Problem**: Admin dashboard only had basic user listing and email checkin toggle
 - **Solution**: Added comprehensive user management functions including:
   - User status toggle (activate/deactivate)
@@ -28,6 +33,7 @@ This document outlines the fixes applied to the user management functions in the
 ## Files Modified
 
 ### Backend Changes
+
 1. **`backend/app/models.py`**
    - Added `role`, `is_active`, `created_at`, `updated_at`, `last_login` fields
    - Added `password_hash`, `email_verified` for future email/password auth
@@ -42,6 +48,7 @@ This document outlines the fixes applied to the user management functions in the
    - Updated response models to include new fields
 
 ### Frontend Changes
+
 1. **`frontend/src/utils/adminApi.ts`** (NEW)
    - Authentication helper using NextAuth sessions
    - Proper error handling for API responses
@@ -53,6 +60,7 @@ This document outlines the fixes applied to the user management functions in the
    - Enhanced UI with role badges and action dropdowns
 
 ### Database Migration
+
 1. **`backend/migrations/add_user_management_fields.py`** (NEW)
    - SQL script to add new fields to existing users table
    - Includes indexes for performance
@@ -61,15 +69,18 @@ This document outlines the fixes applied to the user management functions in the
 ## Installation Instructions
 
 ### 1. Apply Database Migration
+
 ```bash
 cd backend
 python migrations/add_user_management_fields.py
 ```
 
 ### 2. Update Environment Variables
+
 Make sure your backend has proper database connection settings.
 
 ### 3. Restart Backend Server
+
 ```bash
 cd backend
 # Stop existing server
@@ -78,6 +89,7 @@ python -m uvicorn app.main:app --reload
 ```
 
 ### 4. Test Admin Functionality
+
 1. Log in to admin dashboard at `/admin`
 2. Navigate to Users page at `/admin/users`
 3. Test new functions:
@@ -90,16 +102,19 @@ python -m uvicorn app.main:app --reload
 ## Security Considerations
 
 ### 1. **Role-Based Access Control**
+
 - Only users with "admin" or "therapist" roles can access admin endpoints
 - Only "admin" users can change roles or delete users
 - Users cannot modify their own admin status
 
 ### 2. **Authentication**
+
 - Frontend now uses proper NextAuth sessions instead of localStorage
 - Backend validates JWT tokens and user roles on every request
 - Proper error handling for authentication failures
 
 ### 3. **Data Protection**
+
 - Soft delete option preserves user data while deactivating accounts
 - Password reset generates secure tokens (would be emailed in production)
 - User emails remain encrypted in database
@@ -107,6 +122,7 @@ python -m uvicorn app.main:app --reload
 ## API Endpoints Reference
 
 ### User Management
+
 - `GET /api/v1/admin/users` - List users with filtering and pagination
 - `GET /api/v1/admin/users/{user_id}` - Get detailed user information
 - `PUT /api/v1/admin/users/{user_id}/email-checkins` - Toggle email checkins
@@ -116,7 +132,9 @@ python -m uvicorn app.main:app --reload
 - `POST /api/v1/admin/users/{user_id}/reset-password` - Generate password reset
 
 ### Authentication Requirements
+
 All admin endpoints require:
+
 - Valid NextAuth session
 - Bearer token in Authorization header
 - User with "admin" or "therapist" role
