@@ -1,51 +1,48 @@
 import { useEffect, useRef, useState } from 'react';
 import { useLiveTalkStore } from '../store/useLiveTalkStore';
 import { type Message as CoreMessage } from '@/types/chat';
+import { VAD, VADOptions } from '@ricky0123/vad-web';
 
-// Minimal Type definitions for Web Speech API to fix TypeScript errors
-interface SpeechRecognitionAlternative {
-  transcript: string;
-}
+// --- Constants ---
+const STT_WEBSOCKET_URL = 'ws://localhost:8001/ws/stt'; // Placeholder for Whisper STT
+const TTS_WEBSOCKET_URL = 'ws://localhost:8002/ws/tts'; // Placeholder for Fish Speech TTS
 
-interface SpeechRecognitionResult {
-  isFinal: boolean;
-  [index: number]: SpeechRecognitionAlternative;
-}
+type SocketStatus = 'connecting' | 'connected' | 'disconnected';
 
-interface SpeechRecognitionResultList {
-  [index: number]: SpeechRecognitionResult;
-  length: number;
-}
+// --- Helper Functions for Browser APIs ---
 
-interface SpeechRecognitionEvent extends Event {
-  resultIndex: number;
-  results: SpeechRecognitionResultList;
-}
-
-interface SpeechRecognitionErrorEvent extends Event {
-  error: string;
-}
-
-interface SpeechRecognition extends EventTarget {
-  lang: string;
-  continuous: boolean;
-  interimResults: boolean;
-  onstart: (() => void) | null;
-  onend: (() => void) | null;
-  onerror: ((event: SpeechRecognitionErrorEvent) => void) | null;
-  onresult: ((event: SpeechRecognitionEvent) => void) | null;
-  abort(): void;
-  start(): void;
-  stop(): void;
-}
-
-// Augment the global Window interface
-declare global {
-  interface Window {
-    SpeechRecognition: new () => SpeechRecognition;
-    webkitSpeechRecognition: new () => SpeechRecognition;
+const getBrowserSpeechRecognition = () => {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (SpeechRecognition) {
+    const recognition = new SpeechRecognition();
+    recognition.lang = 'id-ID';
+    recognition.continuous = true;
+    recognition.interimResults = true;
+    return recognition;
   }
-}
+  return null;
+};
+
+const browserTextToSpeech = (text: string, selectedVoiceURI: string | null, onStart: () => void, onEnd: () => void, onError: (e: any) => void) => {
+  const utterance = new SpeechSynthesisUtterance(text);
+  utterance.lang = 'id-ID';
+
+  if (selectedVoiceURI) {
+    const voices = window.speechSynthesis.getVoices();
+    const selectedVoice = voices.find(v => v.voiceURI === selectedVoiceURI);
+    if (selectedVoice) {
+      utterance.voice = selectedVoice;
+    }
+  }
+
+  utterance.onstart = onStart;
+  utterance.onend = onEnd;
+  utterance.onerror = onError;
+  window.speechSynthesis.speak(utterance);
+};
+
+
+// --- The Main Hook ---
 
 interface UseLiveTalkProps {
   onTranscriptReceived: (transcript: string) => void;
@@ -58,9 +55,6 @@ export const useLiveTalk = ({
   onPartialTranscript,
   messages,
 }: UseLiveTalkProps) => {
-  const SpeechRecognition =
-    typeof window !== 'undefined' && (window.SpeechRecognition || window.webkitSpeechRecognition);
-
   const {
     isLiveTalkActive,
     isAikaSpeaking,
@@ -68,128 +62,159 @@ export const useLiveTalk = ({
     setAikaSpeaking,
     setMicrophones,
     setSpeakers,
+    setVoices,
+    selectedVoice,
   } = useLiveTalkStore();
 
-  const [recognition, setRecognition] = useState<SpeechRecognition | null>(null);
+  // --- Refs ---
+  const sttSocketRef = useRef<WebSocket | null>(null);
+  const ttsSocketRef = useRef<WebSocket | null>(null);
+  const vadRef = useRef<VAD | null>(null);
+  const audioContextRef = useRef<AudioContext | null>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const browserRecognitionRef = useRef<SpeechRecognition | null>(null);
   const lastSpokenMessageIdRef = useRef<string | null>(null);
-  const isListeningRef = useRef(false);
-  const finalTranscriptRef = useRef(''); // To accumulate final transcript
 
-  // Effect 0: Get media devices
+  // --- State ---
+  const [sttSocketStatus, setSttSocketStatus] = useState<SocketStatus>('connecting');
+  const [ttsSocketStatus, setTtsSocketStatus] = useState<SocketStatus>('connecting');
+
+  // --- Effects ---
+
+  // Effect 0: Get media devices and voices
   useEffect(() => {
-    const getDevices = async () => {
+    const getDevicesAndVoices = async () => {
       try {
         const devices = await navigator.mediaDevices.enumerateDevices();
         const mics = devices.filter((d) => d.kind === 'audioinput');
         const spks = devices.filter((d) => d.kind === 'audiooutput');
         setMicrophones(mics);
         setSpeakers(spks);
+
+        // --- Get voices ---
+        const updateVoices = () => {
+          const voices = window.speechSynthesis.getVoices();
+          setVoices(voices);
+        };
+        updateVoices();
+        window.speechSynthesis.onvoiceschanged = updateVoices;
+
       } catch (error) {
-        console.error("Error enumerating media devices:", error);
+        console.error("Error enumerating media devices or voices:", error);
       }
     };
-    getDevices();
-  }, [setMicrophones, setSpeakers]);
+    getDevicesAndVoices();
+  }, [setMicrophones, setSpeakers, setVoices]);
 
-  // Effect 1: Create, configure, and tear down the recognition instance
+  // Effect 1: Setup WebSockets and VAD
   useEffect(() => {
-    if (!SpeechRecognition) {
-      console.error('Speech Recognition API is not supported in this browser.');
-      return;
-    }
-
     if (isLiveTalkActive) {
-      const rec: SpeechRecognition = new SpeechRecognition();
-      rec.lang = 'id-ID';
-      rec.continuous = true;
-      rec.interimResults = true;
-
-      rec.onstart = () => {
-        isListeningRef.current = true;
-        setUserSpeaking(true);
-        finalTranscriptRef.current = ''; // Reset transcript on start
+      // --- STT WebSocket ---
+      const sttWs = new WebSocket(STT_WEBSOCKET_URL);
+      sttSocketRef.current = sttWs;
+      sttWs.onopen = () => setSttSocketStatus('connected');
+      sttWs.onclose = () => setSttSocketStatus('disconnected');
+      sttWs.onerror = () => setSttSocketStatus('disconnected');
+      sttWs.onmessage = (event) => {
+        const transcript = event.data;
+        if (transcript) {
+          onTranscriptReceived(transcript);
+        }
       };
 
-      rec.onend = () => {
-        isListeningRef.current = false;
-        setUserSpeaking(false);
-        // Send the final accumulated transcript if any
-        if (finalTranscriptRef.current) {
-          onTranscriptReceived(finalTranscriptRef.current);
-        }
-        onPartialTranscript(''); // Clear the partial transcript view
+      // --- TTS WebSocket ---
+      const ttsWs = new WebSocket(TTS_WEBSOCKET_URL);
+      ttsSocketRef.current = ttsWs;
+      ttsWs.onopen = () => setTtsSocketStatus('connected');
+      ttsWs.onclose = () => setTtsSocketStatus('disconnected');
+      ttsWs.onerror = () => setTtsSocketStatus('disconnected');
+      ttsWs.onmessage = (event) => {
+        // Assuming the TTS service sends back audio data
+        const audioData = event.data;
+        // Play the audio data
+        // (This part needs more implementation depending on the audio format)
+      };
 
-        // Check if we should restart recognition (e.g., after a pause)
-        const shouldStillBeListening = 
-          useLiveTalkStore.getState().isLiveTalkActive && 
-          !useLiveTalkStore.getState().isAikaSpeaking;
+      // --- VAD Setup ---
+      const setupVAD = async () => {
+        try {
+          const audioContext = new AudioContext();
+          audioContextRef.current = audioContext;
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          mediaStreamRef.current = stream;
 
-        if (shouldStillBeListening) {
-          setTimeout(() => {
-            // Re-check condition in case state changed during timeout
-            if (useLiveTalkStore.getState().isLiveTalkActive && !useLiveTalkStore.getState().isAikaSpeaking) {
-              try {
-                recognition?.start();
-              } catch (e) {
-                console.error("Error restarting recognition in onend:", e);
+          const vadOptions: VADOptions = {
+            onSpeechStart: () => setUserSpeaking(true),
+            onSpeechEnd: (audio) => {
+              setUserSpeaking(false);
+              if (sttSocketStatus === 'connected' && sttSocketRef.current) {
+                const pcm = new Int16Array(audio.length);
+                for (let i = 0; i < audio.length; i++) {
+                  pcm[i] = audio[i] * 32767;
+                }
+                sttSocketRef.current.send(pcm.buffer);
               }
-            }
-          }, 100);
+            },
+          };
+          const vad = await VAD.create(vadOptions);
+          vadRef.current = vad;
+          vad.start();
+        } catch (error) {
+          console.error("Error setting up VAD:", error);
         }
       };
 
-      rec.onerror = (event: SpeechRecognitionErrorEvent) => {
-        console.error('Speech recognition error:', event.error);
-        isListeningRef.current = false;
-        setUserSpeaking(false);
-      };
-
-      rec.onresult = (event: SpeechRecognitionEvent) => {
-        let interimTranscript = '';
-        for (let i = event.resultIndex; i < event.results.length; ++i) {
-          if (event.results[i].isFinal) {
-            finalTranscriptRef.current += event.results[i][0].transcript;
-          } else {
-            interimTranscript += event.results[i][0].transcript;
-          }
-        }
-        onPartialTranscript(finalTranscriptRef.current + interimTranscript);
-      };
-
-      setRecognition(rec);
+      if (sttSocketStatus === 'connected') {
+        setupVAD();
+      }
 
       return () => {
-        rec.abort();
-        isListeningRef.current = false;
-        setRecognition(null);
+        sttWs.close();
+        ttsWs.close();
+        vadRef.current?.destroy();
+        mediaStreamRef.current?.getTracks().forEach(track => track.stop());
+        audioContextRef.current?.close();
       };
-    } else if (recognition) {
-      recognition.abort();
-      setRecognition(null);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLiveTalkActive, SpeechRecognition, setUserSpeaking, onTranscriptReceived, onPartialTranscript]);
+  }, [isLiveTalkActive, sttSocketStatus, onTranscriptReceived, setUserSpeaking]);
 
-  // Effect 2: The Controller - manages starting and stopping recognition
+  // Effect 2: Fallback to Browser STT
   useEffect(() => {
-    if (!recognition) {
-      return;
-    }
-
-    const shouldBeListening = isLiveTalkActive && !isAikaSpeaking;
-
-    if (shouldBeListening && !isListeningRef.current) {
-      try {
+    if (isLiveTalkActive && sttSocketStatus === 'disconnected') {
+      console.log("Using browser STT as fallback.");
+      const recognition = getBrowserSpeechRecognition();
+      if (recognition) {
+        browserRecognitionRef.current = recognition;
+        recognition.onresult = (event) => {
+          let interimTranscript = '';
+          let finalTranscript = '';
+          for (let i = event.resultIndex; i < event.results.length; ++i) {
+            if (event.results[i].isFinal) {
+              finalTranscript += event.results[i][0].transcript;
+            } else {
+              interimTranscript += event.results[i][0].transcript;
+            }
+          }
+          onPartialTranscript(finalTranscript + interimTranscript);
+          if (finalTranscript) {
+            onTranscriptReceived(finalTranscript);
+          }
+        };
+        recognition.onstart = () => setUserSpeaking(true);
+        recognition.onend = () => setUserSpeaking(false);
         recognition.start();
-      } catch (e) {
-        console.error('Error starting speech recognition in controller:', e);
+      } else {
+        console.error("Browser Speech Recognition is not supported.");
       }
-    } else if (!shouldBeListening && isListeningRef.current) {
-      recognition.stop();
-    }
-  }, [recognition, isLiveTalkActive, isAikaSpeaking]);
 
-  // Effect 3: Text-to-Speech (Aika Speaking)
+      return () => {
+        recognition?.stop();
+      };
+    }
+  }, [isLiveTalkActive, sttSocketStatus, onPartialTranscript, onTranscriptReceived, setUserSpeaking]);
+
+
+  // Effect 3: Text-to-Speech (with fallback)
   useEffect(() => {
     if (!isLiveTalkActive || messages.length === 0) {
       return;
@@ -202,27 +227,35 @@ export const useLiveTalk = ({
       lastMessage.id !== lastSpokenMessageIdRef.current &&
       lastMessage.content
     ) {
-      // State change will trigger the controller effect to stop recognition
-      const utterance = new SpeechSynthesisUtterance(
-        lastMessage.content as string,
-      );
-      utterance.lang = 'id-ID';
+      const text = lastMessage.content as string;
 
-      utterance.onstart = () => {
-        setAikaSpeaking(true);
-      };
-
-      utterance.onend = () => {
+      const onStart = () => setAikaSpeaking(true);
+      const onEnd = () => {
         setAikaSpeaking(false);
         lastSpokenMessageIdRef.current = lastMessage.id;
       };
-
-      utterance.onerror = (event: SpeechSynthesisErrorEvent) => {
-        console.error('Speech synthesis error:', event.error);
-        setAikaSpeaking(false); // Ensure state is reset on error
+      const onError = (e: any) => {
+        console.error('TTS error:', e);
+        setAikaSpeaking(false);
       };
 
-      window.speechSynthesis.speak(utterance);
+      if (ttsSocketStatus === 'connected' && ttsSocketRef.current) {
+        // Use WebSocket TTS
+        console.log("Using WebSocket TTS.");
+        ttsSocketRef.current.send(text);
+        // The onmessage handler for the TTS socket will handle the audio playback
+        // For now, we will just log it.
+        onStart(); // We assume the audio will start playing immediately
+        // We need a way to know when the audio has finished playing.
+        // This depends on the TTS service implementation.
+        // For now, we will just set Aika speaking to false after a timeout.
+        setTimeout(() => onEnd(), 3000); // Placeholder
+      } else {
+        // Fallback to Browser TTS
+        console.log("Using browser TTS as fallback.");
+        browserTextToSpeech(text, selectedVoice, onStart, onEnd, onError);
+      }
     }
-  }, [messages, isLiveTalkActive, setAikaSpeaking]);
+  }, [messages, isLiveTalkActive, setAikaSpeaking, ttsSocketStatus, selectedVoice]);
+
 };

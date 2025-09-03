@@ -6,10 +6,13 @@ const DeviceSelector = () => {
   const {
     microphones,
     speakers,
+    voices,
     selectedMicrophone,
     selectedSpeaker,
+    selectedVoice,
     setSelectedMicrophone,
     setSelectedSpeaker,
+    setSelectedVoice,
   } = useLiveTalkStore();
 
   return (
@@ -59,6 +62,31 @@ const DeviceSelector = () => {
         </select>
         <p className="text-xs text-white/50 mt-2">
           Note: Speaker selection may not be supported on all browsers (e.g., Firefox, Safari).
+        </p>
+      </div>
+      <div>
+        <label htmlFor="voice-select" className="block text-sm font-medium text-white/80 mb-2">
+          AI Voice
+        </label>
+        <select
+          id="voice-select"
+          value={selectedVoice || ''}
+          onChange={(e) => setSelectedVoice(e.target.value)}
+          className="w-full px-4 py-3 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-all duration-200"
+          disabled={voices.length === 0}
+        >
+          {voices.length > 0 ? (
+            voices.map((voice) => (
+              <option key={voice.voiceURI} value={voice.voiceURI} className="bg-gray-800">
+                {voice.name} ({voice.lang})
+              </option>
+            ))
+          ) : (
+            <option value="" disabled className="bg-gray-800">No voices found</option>
+          )}
+        </select>
+        <p className="text-xs text-white/50 mt-2">
+          Note: AI voice selection uses the browser&apos;s built-in voices (TTS).
         </p>
       </div>
     </div>
