@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, desc, asc, or_, select
+from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, Field
 from datetime import datetime, date, timedelta
 from typing import List, Optional, Dict, Any
@@ -55,7 +56,7 @@ class SurveyResponseModel(BaseModel):
 
 @router.get("", response_model=List[SurveyResponseModel])
 async def get_surveys(db: AsyncSession = Depends(get_async_db)):
-    result = await db.execute(select(Survey).order_by(desc(Survey.created_at)))
+    result = await db.execute(select(Survey).options(selectinload(Survey.questions)).order_by(desc(Survey.created_at)))
     surveys = result.scalars().all()
     return surveys
 
@@ -80,7 +81,7 @@ async def create_survey(survey_data: SurveyCreate, db: AsyncSession = Depends(ge
 
 @router.get("/{survey_id}", response_model=SurveyResponseModel)
 async def get_survey(survey_id: int, db: AsyncSession = Depends(get_async_db)):
-    result = await db.execute(select(Survey).filter(Survey.id == survey_id))
+    result = await db.execute(select(Survey).options(selectinload(Survey.questions)).filter(Survey.id == survey_id))
     survey = result.scalar_one_or_none()
     if not survey:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Survey not found")
@@ -88,7 +89,7 @@ async def get_survey(survey_id: int, db: AsyncSession = Depends(get_async_db)):
 
 @router.put("/{survey_id}", response_model=SurveyResponseModel)
 async def update_survey(survey_id: int, survey_data: SurveyUpdate, db: AsyncSession = Depends(get_async_db)):
-    result = await db.execute(select(Survey).filter(Survey.id == survey_id))
+    result = await db.execute(select(Survey).options(selectinload(Survey.questions)).filter(Survey.id == survey_id))
     db_survey = result.scalar_one_or_none()
     if not db_survey:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Survey not found")
@@ -104,7 +105,7 @@ async def update_survey(survey_id: int, survey_data: SurveyUpdate, db: AsyncSess
 
 @router.delete("/{survey_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_survey(survey_id: int, db: AsyncSession = Depends(get_async_db)):
-    result = await db.execute(select(Survey).filter(Survey.id == survey_id))
+    result = await db.execute(select(Survey).options(selectinload(Survey.questions)).filter(Survey.id == survey_id))
     db_survey = result.scalar_one_or_none()
     if not db_survey:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Survey not found")
@@ -165,7 +166,7 @@ user_router = APIRouter(
 
 @user_router.get("/active", response_model=SurveyResponseModel)
 async def get_active_survey(db: AsyncSession = Depends(get_async_db)):
-    result = await db.execute(select(Survey).filter(Survey.is_active == True).order_by(desc(Survey.created_at)))
+    result = await db.execute(select(Survey).options(selectinload(Survey.questions)).filter(Survey.is_active == True).order_by(desc(Survey.created_at)))
     survey = result.scalars().first()
     if not survey:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No active survey found")

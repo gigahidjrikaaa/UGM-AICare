@@ -421,3 +421,39 @@ class TherapistSchedule(Base):
     reason = Column(String, nullable=True)
 
     therapist = relationship("User")
+
+class CbtModule(Base):
+    __tablename__ = "cbt_modules"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    steps = relationship("CbtModuleStep", back_populates="module", cascade="all, delete-orphan")
+
+
+class CbtModuleStep(Base):
+    __tablename__ = "cbt_module_steps"
+
+    id = Column(Integer, primary_key=True, index=True)
+    module_id = Column(Integer, ForeignKey("cbt_modules.id"), nullable=False)
+    step_order = Column(Integer, nullable=False)
+    step_type = Column(String(50), nullable=False)
+    content = Column(Text, nullable=False)
+    user_input_type = Column(String(50), nullable=True)
+    user_input_variable = Column(String(100), nullable=True)
+    feedback_prompt = Column(Text, nullable=True)
+    options = Column(JSON, nullable=True)
+    tool_to_run = Column(String(100), nullable=True)
+    is_skippable = Column(Boolean, default=False, nullable=False)
+    delay_after_ms = Column(Integer, default=0, nullable=False)
+    parent_id = Column(Integer, ForeignKey("cbt_module_steps.id"), nullable=True)
+    extra_data = Column(JSON, nullable=True)
+    created_at = Column(DateTime, default=datetime.now, nullable=False)
+    updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
+
+    module = relationship("CbtModule", back_populates="steps")
+    parent = relationship("CbtModuleStep", remote_side=[id], back_populates="children")
+    children = relationship("CbtModuleStep", back_populates="parent")

@@ -152,6 +152,22 @@ export default function SurveyManagementPage() {
     }
   };
 
+  const handleToggleSurveyActive = async (survey: Survey) => {
+    try {
+      await apiCall(`/api/v1/admin/surveys/${survey.id}`,
+        {
+          method: 'PUT',
+          body: JSON.stringify({ is_active: !survey.is_active })
+        }
+      );
+      toast.success(`Survey ${!survey.is_active ? 'activated' : 'deactivated'} successfully`);
+      fetchSurveys();
+    } catch (error) {
+      console.error('Error toggling survey status:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to update survey status');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -190,6 +206,13 @@ export default function SurveyManagementPage() {
                     )}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <button
+                      onClick={() => handleToggleSurveyActive(survey)}
+                      className={`mr-4 transition-colors ${survey.is_active ? 'text-green-400 hover:text-green-300' : 'text-gray-400 hover:text-gray-300'}`}
+                      title={survey.is_active ? 'Deactivate survey' : 'Activate survey'}
+                    >
+                      {survey.is_active ? <FiToggleRight className="h-5 w-5" /> : <FiToggleLeft className="h-5 w-5" />}
+                    </button>
                     <button onClick={() => handleResultsModalOpen(survey.id)} className="text-white hover:text-gray-300 transition-colors mr-4">
                       <FiEye className="h-4 w-4" />
                     </button>

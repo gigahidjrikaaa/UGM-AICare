@@ -262,17 +262,17 @@ async def get_users(
     
     try:
         # Build base query with joins for aggregated data
-        base_query = select(
+        base_query = (select(
             User,
             func.count(JournalEntry.id).label('journal_count'),
             func.count(Conversation.id).label('conversation_count'),
             func.count(UserBadge.id).label('badge_count'),
             func.count(Appointment.id).label('appointment_count')
-        ).outerjoin(JournalEntry, User.id == JournalEntry.user_id)\
-         .outerjoin(Conversation, User.id == Conversation.user_id)\
-         .outerjoin(UserBadge, User.id == UserBadge.user_id)\
-         .outerjoin(Appointment, User.id == Appointment.user_id)\
-         .group_by(User.id)
+        ).outerjoin(JournalEntry, User.id == JournalEntry.user_id)
+         .outerjoin(Conversation, User.id == Conversation.user_id)
+         .outerjoin(UserBadge, User.id == UserBadge.user_id)
+         .outerjoin(Appointment, User.id == Appointment.user_id)
+         .group_by(User.id))
         
         # Apply search filter
         if search:
