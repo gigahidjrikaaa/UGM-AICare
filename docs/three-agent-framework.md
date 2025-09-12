@@ -69,8 +69,7 @@ class AnalyticsAgent:
 class InterventionAgent:
     def __init__(self):
         self.campaign_manager = CampaignManager()
-        self.email_service = EmailService()
-        self.n8n_client = N8NClient()
+        self.webhook_service = WebhookService() # Service to call external webhooks
         
     async def process_analytics_insight(self, insight):
         # Determine intervention type
@@ -86,8 +85,9 @@ class InterventionAgent:
             insight
         )
         
-        # Execute via n8n workflows
-        await self.n8n_client.execute_campaign(campaign)
+        # Trigger stateless peripheral tasks (e.g., sending emails) via webhooks
+        if campaign.requires_email_dispatch:
+            await self.webhook_service.trigger_email_workflow(campaign.get_email_payload())
 ```
 
 #### Campaign Execution Workflow

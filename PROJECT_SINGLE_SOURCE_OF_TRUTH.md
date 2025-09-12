@@ -72,14 +72,25 @@ The solution implements a collaborative system of three specialized AI agents:
 - **Caching/State:** Redis for session management
 - **Authentication:** JWT with NextAuth integration
 
-### ⚡ Orchestration - "The Nervous System" (n8n)
+### ⚡ Conversational Core - "The Central Nervous System" (LangGraph)
 
-- **Platform:** n8n workflow automation engine
+- **Platform:** LangGraph
+- **Role:** Core, stateful conversational agent.
 - **Responsibilities:**
-  - Analytics Agent scheduling
-  - API calls to backend services
-  - Intervention campaign logic management
-  - Cross-agent communication coordination
+    - Orchestrating the entire conversational flow.
+    - Managing the agent's state and memory (conversation history, user context).
+    - Implementing dynamic response strategies and tool usage (e.g., reasoning, acting, observing).
+    - Enforcing critical safety protocols and human-in-the-loop interventions.
+    - Running as an integrated part of our Python-based FastAPI backend.
+
+### ⚙️ Peripheral Automation - (N8N)
+
+- **Platform:** N8N
+- **Role:** Peripheral, stateless automation tasks.
+- **Responsibilities:**
+    - Executing stateless operational workflows triggered by the main application (via webhooks).
+    - Integrating with third-party APIs like Google Calendar for scheduling, email services for notifications, etc.
+    - Handling administrative tasks like generating nightly anonymized reports.
 
 ### 🖥️ Frontend - Admin Dashboard (Next.js)
 
