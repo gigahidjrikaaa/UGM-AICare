@@ -73,6 +73,15 @@ interface ConversationsResponse {
   total_count: number;
   stats: ConversationStats;
 }
+// Grouped session view type
+interface SessionCardItem {
+  session_id: string;
+  user_id_hash: string;
+  message_count: number;
+  first_time: string;
+  last_time: string;
+  last_preview: string;
+}
 
 import { apiCall } from '@/utils/adminApi';
 
@@ -98,6 +107,16 @@ const fetchConversations = async (
   if (params.date_to) queryParams.append('date_to', params.date_to);
 
   return apiCall<ConversationsResponse>(`/api/v1/admin/conversations?${queryParams.toString()}`);
+};
+
+// Server-side sessions listing
+interface SessionsListResponse { sessions: { session_id: string; user_id_hash: string; message_count: number; first_time: string; last_time: string; last_preview: string; }[]; total_count: number; }
+const fetchSessions = async (params: { page: number; limit: number; session_search?: string; date_from?: string; date_to?: string; }) => {
+  const query = new URLSearchParams({ page: String(params.page), limit: String(params.limit) });
+  if (params.session_search) query.append('session_search', params.session_search);
+  if (params.date_from) query.append('date_from', params.date_from);
+  if (params.date_to) query.append('date_to', params.date_to);
+  return apiCall<SessionsListResponse>(`/api/v1/admin/conversation-sessions?${query.toString()}`);
 };
 
 // Components
@@ -191,6 +210,22 @@ const ConversationCard: React.FC<{
           <MessageCircle className="h-3 w-3" />
           View Session
         </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={async () => {
+            const reason = prompt('Reason to flag this session? (optional)') || '';
+            try {
+              await apiCall(`/api/v1/admin/conversation-session/${conversation.session_id}/flag`, { method: 'POST', body: JSON.stringify({ reason }) });
+              alert('Session flagged');
+            } catch (e: any) {
+              alert(e?.message || 'Failed to flag');
+            }
+          }}
+          className="flex-1 flex items-center justify-center gap-1"
+        >
+          Flag
+        </Button>
       </div>
     </div>
   );
@@ -275,6 +310,7 @@ function AIConversationsContent() {
   const [sessionFilter, setSessionFilter] = useState('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+  const [userHashFilter, setUserHashFilter] = useState('');
   
   const ITEMS_PER_PAGE = 20;
 
@@ -282,17 +318,13 @@ function AIConversationsContent() {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await fetchConversations({
-        page: currentPage,
-        limit: ITEMS_PER_PAGE,
-        search: searchTerm || undefined,
-        session_id: sessionFilter || undefined,
-        date_from: dateFrom || undefined,
-        date_to: dateTo || undefined,
-      });
-      
-      setConversations(data.conversations);
-      setStats(data.stats);
+      const data = await fetchSessions({ page: currentPage, limit: ITEMS_PER_PAGE, session_search: sessionFilter || undefined, date_from: dateFrom || undefined, date_to: dateTo || undefined });
+      let sessions = data.sessions;
+      if (userHashFilter.trim()) {
+        const needle = userHashFilter.trim().toLowerCase();
+        sessions = sessions.filter(s => s.user_id_hash.toLowerCase().includes(needle));
+      }
+      setConversations(sessions.map((s, idx) => ({ id: idx, user_id_hash: s.user_id_hash, session_id: s.session_id, conversation_id: s.session_id, message_preview: s.last_preview, response_preview: s.last_preview, timestamp: s.last_time, message_length: s.last_preview.length, response_length: s.last_preview.length, session_message_count: s.message_count })));
       setTotalCount(data.total_count);
     } catch (err) {
       console.error('Failed to load conversations:', err);
@@ -317,8 +349,8 @@ function AIConversationsContent() {
     setCurrentPage(1);
   };
 
-  const handleViewDetail = (conversationId: number) => {
-    router.push(`/admin/conversations/${conversationId}`);
+  const handleViewDetail = (_conversationId: number) => {
+    // Deprecated in session grouping view; keep noop
   };
 
   const handleViewSession = (sessionId: string) => {
@@ -334,9 +366,7 @@ function AIConversationsContent() {
   };
 
   const handleTryAgain = () => {
-    if (accessToken) {
-      loadConversations(accessToken);
-    }
+    loadConversations();
   };
 
   // Pagination
@@ -364,6 +394,37 @@ function AIConversationsContent() {
         <p className="text-gray-600 dark:text-gray-400 mt-2">
           Monitor and analyze AI chat interactions with privacy protection
         </p>
+        <div className="mt-3">
+          <Button
+            variant="outline"
+            className="text-sm"
+            onClick={async () => {
+              try {
+                const isServer = typeof window === 'undefined';
+                const base = isServer ? (process.env.INTERNAL_API_URL as string) : (process.env.NEXT_PUBLIC_API_URL as string);
+                const q = new URLSearchParams();
+                if (sessionFilter) q.append('session_search', sessionFilter);
+                if (dateFrom) q.append('date_from', dateFrom);
+                if (dateTo) q.append('date_to', dateTo);
+                const res = await fetch(`${base}/api/v1/admin/conversation-sessions/export.csv?${q.toString()}`, { credentials: 'include' });
+                const text = await res.text();
+                const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' });
+                const a = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                a.href = url;
+                a.setAttribute('download', 'sessions_export.csv');
+                document.body.appendChild(a);
+                a.click();
+                a.parentNode?.removeChild(a);
+                URL.revokeObjectURL(url);
+              } catch (e) {
+                console.error('Export failed', e);
+              }
+            }}
+          >
+            Export Sessions CSV
+          </Button>
+        </div>
       </div>
 
       {/* Stats */}
@@ -379,37 +440,51 @@ function AIConversationsContent() {
           Search and filter conversations while maintaining user privacy
         </p>
         
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-          <div className="space-y-2">
-            <label htmlFor="search-messages" className="text-sm font-medium">
-              Search Messages
-            </label>
-            <div className="relative">
-              <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
+            <div className="space-y-2">
+              <label htmlFor="search-messages" className="text-sm font-medium">
+                Search Messages
+              </label>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <input
+                  id="search-messages"
+                  type="text"
+                  placeholder="Search in messages..."
+                  value={searchTerm}
+                  onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSearch(e.target.value)}
+                  className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <label htmlFor="session-filter" className="text-sm font-medium">
+                Session ID
+              </label>
               <input
-                id="search-messages"
+                id="session-filter"
                 type="text"
-                placeholder="Search in messages..."
-                value={searchTerm}
-                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                placeholder="Filter by session ID..."
+                value={sessionFilter}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSessionFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
             </div>
-          </div>
-          
-          <div className="space-y-2">
-            <label htmlFor="session-filter" className="text-sm font-medium">
-              Session ID
-            </label>
-            <input
-              id="session-filter"
-              type="text"
-              placeholder="Filter by session ID..."
-              value={sessionFilter}
-              onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSessionFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
-          </div>
+
+            <div className="space-y-2">
+              <label htmlFor="userhash-filter" className="text-sm font-medium">
+                User Hash
+              </label>
+              <input
+                id="userhash-filter"
+                type="text"
+                placeholder="Filter by user hash..."
+                value={userHashFilter}
+                onChange={(e: React.ChangeEvent<HTMLInputElement>) => setUserHashFilter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
           
           <div className="space-y-2">
             <label htmlFor="date-from" className="text-sm font-medium">

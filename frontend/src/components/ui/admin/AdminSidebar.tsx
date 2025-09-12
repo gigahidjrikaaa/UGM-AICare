@@ -19,6 +19,7 @@ const mainNavItems = [
   { name: 'CBT Modules', icon: <FiHeart size={18}/>, href: '/admin/cbt-modules' },
   { name: 'Survey Management', icon: <FiFileText size={18}/>, href: '/admin/surveys' },
   { name: 'Analytics', icon: <FiBarChart2 size={18}/>, href: '/admin/analytics' },
+  { name: 'Flags', icon: <FiShield size={18}/>, href: '/admin/flags' },
 ];
 
 const secondaryNavItems = [

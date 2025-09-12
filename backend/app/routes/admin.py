@@ -1,5 +1,5 @@
 # backend/app/routes/admin.py
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, desc, asc, or_, select
 from sqlalchemy.orm import selectinload
@@ -9,7 +9,7 @@ from typing import List, Optional, Dict, Any
 import logging
 
 from app.database import get_async_db
-from app.models import User, JournalEntry, Conversation, UserBadge, Appointment, ContentResource, Psychologist, TherapistSchedule, AnalyticsReport
+from app.models import User, JournalEntry, Conversation, UserBadge, Appointment, ContentResource, Psychologist, TherapistSchedule, AnalyticsReport, FlaggedSession
 from app.dependencies import get_current_active_user, get_admin_user
 from app.utils.security_utils import decrypt_data
 
@@ -108,6 +108,7 @@ class ConversationDetailResponse(BaseModel):
     message: str
     response: str
     timestamp: datetime
+    sentiment_score: Optional[float] = None
     
     class Config:
         from_attributes = True
@@ -136,6 +137,7 @@ class SessionDetailResponse(BaseModel):
     last_message_time: datetime
     total_duration_minutes: float
     conversations: List[ConversationDetailResponse]
+    analysis: Dict[str, Any]
     
     class Config:
         from_attributes = True
@@ -924,7 +926,7 @@ async def get_conversation_detail(
         timestamp=conversation.timestamp,
     )
 
-@router.get("/conversations/session/{session_id}", response_model=SessionDetailResponse)
+@router.get("/conversation-session/{session_id}", response_model=SessionDetailResponse)
 async def get_session_detail(
     session_id: str,
     db: AsyncSession = Depends(get_async_db),
@@ -956,6 +958,20 @@ async def get_session_detail(
     # Format conversations with censoring
     conversation_details = []
     for conv in conversations:
+        # Simple sentiment heuristic
+        sentiment_score = None
+        try:
+            pos_words = {"good","great","happy","calm","relief","thanks","helpful","better","improve","manage"}
+            neg_words = {"bad","sad","anxious","anxiety","panic","stress","stressed","overwhelmed","angry","depress","hopeless"}
+            import re as _re
+            text = f"{conv.message or ''} {conv.response or ''}".lower()
+            toks = _re.findall(r"[a-zà-öø-ÿ\-']+", text)
+            pos = sum(1 for t in toks if t in pos_words)
+            neg = sum(1 for t in toks if t in neg_words)
+            total = pos + neg
+            sentiment_score = ((pos - neg) / total) if total else None
+        except Exception:
+            sentiment_score = None
         conversation_details.append(
             ConversationDetailResponse(
                 id=conv.id,
@@ -965,9 +981,34 @@ async def get_session_detail(
                 message=conv.message or "",
                 response=conv.response or "",
                 timestamp=conv.timestamp,
+                sentiment_score=sentiment_score,
             )
         )
-    
+    # Build simple analysis
+    total_user_chars = sum(len(conv.message) for conv in conversations if conv.message)
+    total_ai_chars = sum(len(conv.response) for conv in conversations if conv.response)
+    msg_count = len(conversations)
+    avg_user_len = (total_user_chars / msg_count) if msg_count else 0
+    avg_ai_len = (total_ai_chars / msg_count) if msg_count else 0
+
+    # Naive keyword extraction (basic tokenization, length filter)
+    import re
+    all_text = " ".join([(conv.message or "") + " " + (conv.response or "") for conv in conversations])
+    tokens = re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ\-']{4,}", all_text.lower())
+    freq: Dict[str, int] = {}
+    for t in tokens:
+        freq[t] = freq.get(t, 0) + 1
+    top_keywords = sorted(freq.items(), key=lambda x: x[1], reverse=True)[:10]
+
+    analysis = {
+        "message_pairs": msg_count,
+        "total_user_chars": total_user_chars,
+        "total_ai_chars": total_ai_chars,
+        "avg_user_message_length": round(avg_user_len, 2),
+        "avg_ai_message_length": round(avg_ai_len, 2),
+        "top_keywords": top_keywords,
+    }
+
     return SessionDetailResponse(
         session_id=session_id, # type: ignore
         user_id_hash=_hash_user_id(user_id),
@@ -975,8 +1016,255 @@ async def get_session_detail(
         first_message_time=first_conv.timestamp,
         last_message_time=last_conv.timestamp,
         total_duration_minutes=duration_minutes,
-        conversations=conversation_details
+        conversations=conversation_details,
+        analysis=analysis
     )
+
+# --- Sessions list (server-side) ---
+class SessionListItem(BaseModel):
+    session_id: str
+    user_id_hash: str
+    message_count: int
+    first_time: datetime
+    last_time: datetime
+    last_preview: str
+
+class SessionListResponse(BaseModel):
+    sessions: List[SessionListItem]
+    total_count: int
+
+@router.get("/conversation-sessions", response_model=SessionListResponse)
+async def get_conversation_sessions(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    session_search: Optional[str] = Query(None),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    base = select(
+        Conversation.session_id.label('sid'),
+        func.min(Conversation.user_id).label('uid'),
+        func.min(Conversation.timestamp).label('first_time'),
+        func.max(Conversation.timestamp).label('last_time'),
+        func.count(Conversation.id).label('count')
+    )
+    if date_from:
+        base = base.filter(func.date(Conversation.timestamp) >= date_from)
+    if date_to:
+        base = base.filter(func.date(Conversation.timestamp) <= date_to)
+    base = base.group_by(Conversation.session_id)
+    if session_search:
+        like = f"%{session_search}%"
+        base = base.having(func.min(Conversation.session_id).ilike(like))
+
+    # total count
+    total_q = select(func.count()).select_from(base.subquery())
+    total = (await db.execute(total_q)).scalar() or 0
+
+    # pagination
+    offset = (page - 1) * limit
+    res = await db.execute(base.order_by(desc('last_time')).offset(offset).limit(limit))
+    rows = res.all()
+    sessions_map = []
+    sids = []
+    for sid, uid, first_t, last_t, cnt in rows:
+        sessions_map.append({
+            'sid': sid,
+            'uid': uid,
+            'first_time': first_t,
+            'last_time': last_t,
+            'count': int(cnt)
+        })
+        sids.append(sid)
+
+    last_subq = select(
+        Conversation.session_id.label('sid'),
+        func.max(Conversation.timestamp).label('max_ts')
+    ).filter(Conversation.session_id.in_(sids)).group_by(Conversation.session_id).subquery()
+
+    last_join = await db.execute(
+        select(Conversation.session_id, Conversation.message, Conversation.response)
+        .join(last_subq, (Conversation.session_id == last_subq.c.sid) & (Conversation.timestamp == last_subq.c.max_ts))
+    )
+    last_map: Dict[str, str] = {}
+    for sid, msg, resp in last_join.all():
+        preview = resp or msg or ""
+        last_map[str(sid)] = preview[:100]
+
+    items: List[SessionListItem] = []
+    for m in sessions_map:
+        items.append(SessionListItem(
+            session_id=m['sid'],
+            user_id_hash=_hash_user_id(int(m['uid'])) if m['uid'] is not None else 'unknown',
+            message_count=m['count'],
+            first_time=m['first_time'],
+            last_time=m['last_time'],
+            last_preview=last_map.get(m['sid'], "")
+        ))
+
+    return SessionListResponse(sessions=items, total_count=int(total))
+
+@router.get("/conversation-sessions/export.csv")
+async def export_conversation_sessions_csv(
+    session_search: Optional[str] = Query(None),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    base = select(
+        Conversation.session_id.label('sid'),
+        func.min(Conversation.user_id).label('uid'),
+        func.min(Conversation.timestamp).label('first_time'),
+        func.max(Conversation.timestamp).label('last_time'),
+        func.count(Conversation.id).label('count')
+    )
+    if date_from:
+        base = base.filter(func.date(Conversation.timestamp) >= date_from)
+    if date_to:
+        base = base.filter(func.date(Conversation.timestamp) <= date_to)
+    base = base.group_by(Conversation.session_id)
+    if session_search:
+        like = f"%{session_search}%"
+        base = base.having(func.min(Conversation.session_id).ilike(like))
+
+    res = await db.execute(base.order_by(desc('last_time')))
+    rows = res.all()
+
+    # Prepare CSV
+    import csv
+    from io import StringIO
+    buf = StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["session_id","user_hash","message_count","first_time","last_time"]) 
+    for sid, uid, first_t, last_t, cnt in rows:
+        writer.writerow([sid, _hash_user_id(int(uid)) if uid is not None else 'unknown', int(cnt), (first_t.isoformat() if first_t else ''), (last_t.isoformat() if last_t else '')])
+    csv_text = buf.getvalue()
+    headers = {"Content-Disposition": "attachment; filename=sessions_export.csv"}
+    return Response(content=csv_text, media_type="text/csv", headers=headers)
+
+# --- Flagged sessions ---
+class FlagCreate(BaseModel):
+    reason: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+class FlagResponse(BaseModel):
+    id: int
+    session_id: str
+    user_id: Optional[int] = None
+    reason: Optional[str] = None
+    status: str
+    flagged_by_admin_id: Optional[int] = None
+    created_at: datetime
+    updated_at: datetime
+    tags: Optional[List[str]] = None
+    notes: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+@router.post("/conversations/session/{session_id}/flag", response_model=FlagResponse, status_code=status.HTTP_201_CREATED)
+async def flag_session(session_id: str, data: FlagCreate, db: AsyncSession = Depends(get_async_db), admin_user: User = Depends(get_admin_user)):
+    # find any conversation to get user_id
+    c = (await db.execute(select(Conversation).filter(Conversation.session_id == session_id).limit(1))).scalar_one_or_none()
+    flagged = FlaggedSession(session_id=session_id, user_id=c.user_id if c else None, reason=data.reason, status="open", flagged_by_admin_id=admin_user.id, tags=data.tags)
+    db.add(flagged)
+    await db.commit()
+    await db.refresh(flagged)
+    return flagged
+
+@router.get("/flags", response_model=List[FlagResponse])
+async def list_flags(status_filter: Optional[str] = Query(None), db: AsyncSession = Depends(get_async_db), admin_user: User = Depends(get_admin_user)):
+    q = select(FlaggedSession).order_by(desc(FlaggedSession.created_at))
+    if status_filter:
+        q = q.filter(FlaggedSession.status == status_filter)
+    res = await db.execute(q)
+    return list(res.scalars().all())
+
+class FlagUpdate(BaseModel):
+    status: Optional[str] = None
+    reason: Optional[str] = None
+    tags: Optional[List[str]] = None
+    notes: Optional[str] = None
+
+@router.put("/flags/{flag_id}", response_model=FlagResponse)
+async def update_flag(flag_id: int, data: FlagUpdate, db: AsyncSession = Depends(get_async_db), admin_user: User = Depends(get_admin_user)):
+    f = (await db.execute(select(FlaggedSession).filter(FlaggedSession.id == flag_id))).scalar_one_or_none()
+    if not f:
+        raise HTTPException(status_code=404, detail="Flag not found")
+    if data.status is not None:
+        f.status = data.status
+    if data.reason is not None:
+        f.reason = data.reason
+    if data.tags is not None:
+        f.tags = data.tags
+    if data.notes is not None:
+        f.notes = data.notes
+    db.add(f)
+    await db.commit()
+    await db.refresh(f)
+    return f
+
+@router.get("/conversation-session/{session_id}/export.csv")
+async def export_session_csv(session_id: str, db: AsyncSession = Depends(get_async_db), admin_user: User = Depends(get_admin_user)):
+    """Export a session as CSV (turn_id, role, content, timestamp, conversation_id, session_id)."""
+    stmt = select(Conversation).filter(Conversation.session_id == session_id).order_by(asc(Conversation.timestamp))
+    result = await db.execute(stmt)
+    conversations: List[Any] = list(result.scalars().all())
+    if not conversations:
+        raise HTTPException(status_code=404, detail="Session not found")
+    import csv
+    from io import StringIO
+    buf = StringIO()
+    writer = csv.writer(buf)
+    writer.writerow(["turn_id","role","content","timestamp","conversation_id","session_id"]) 
+    for conv in conversations:
+        ts = conv.timestamp.isoformat() if conv.timestamp else ""
+        if conv.message:
+            writer.writerow([conv.id, "user", conv.message, ts, conv.conversation_id, conv.session_id])
+        if conv.response:
+            writer.writerow([conv.id, "assistant", conv.response, ts, conv.conversation_id, conv.session_id])
+    csv_text = buf.getvalue()
+    headers = {"Content-Disposition": f"attachment; filename=session_{session_id}.csv"}
+    return Response(content=csv_text, media_type="text/csv", headers=headers)
+
+@router.get("/conversation-session/{session_id}/export")
+async def export_session_transcript(session_id: str, db: AsyncSession = Depends(get_async_db), admin_user: User = Depends(get_admin_user)):
+    """Export a session transcript as plain text sorted by time."""
+    stmt = select(Conversation).filter(Conversation.session_id == session_id).order_by(asc(Conversation.timestamp))
+    result = await db.execute(stmt)
+    conversations: List[Any] = list(result.scalars().all())
+    if not conversations:
+        raise HTTPException(status_code=404, detail="Session not found")
+    lines: List[str] = []
+    for conv in conversations:
+        ts = conv.timestamp.isoformat() if conv.timestamp else ""
+        if conv.message:
+            lines.append(f"[{ts}] USER: {conv.message}")
+        if conv.response:
+            lines.append(f"[{ts}] AI: {conv.response}")
+        lines.append("")
+    text = "\n".join(lines)
+    headers = {"Content-Disposition": f"attachment; filename=session_{session_id}.txt"}
+    return Response(content=text, media_type="text/plain; charset=utf-8", headers=headers)
+
+@router.get("/conversations/{conversation_id}/export")
+async def export_conversation_turn(conversation_id: int, db: AsyncSession = Depends(get_async_db), admin_user: User = Depends(get_admin_user)):
+    result = await db.execute(select(Conversation).filter(Conversation.id == conversation_id))
+    conv: Any = result.scalar_one_or_none()
+    if not conv:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    ts = conv.timestamp.isoformat() if conv.timestamp else ""
+    parts = []
+    if conv.message:
+        parts.append(f"[{ts}] USER: {conv.message}")
+    if conv.response:
+        parts.append(f"[{ts}] AI: {conv.response}")
+    text = "\n".join(parts) + "\n"
+    headers = {"Content-Disposition": f"attachment; filename=conversation_{conversation_id}.txt"}
+    return Response(content=text, media_type="text/plain; charset=utf-8", headers=headers)
 
 # --- Content Resource Models ---
 class ContentResourceBase(BaseModel):
