@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { signOut } from 'next-auth/react'; // Import signOut
 import {
   FiGrid, FiUsers, FiMessageSquare, FiCalendar, FiBookOpen, 
-  FiBarChart2, FiSettings, FiShield, FiLogOut, FiHelpCircle, FiFileText
+  FiBarChart2, FiSettings, FiShield, FiLogOut, FiHelpCircle, FiFileText, FiHeart
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink'; // Assuming SidebarLink component exists
 
@@ -16,6 +16,7 @@ const mainNavItems = [
   { name: 'Appointments', icon: <FiCalendar size={18}/>, href: '/admin/appointments' },
   { name: 'Journal Insights', icon: <FiBookOpen size={18}/>, href: '/admin/journals' },
   { name: 'Content Resources', icon: <FiFileText size={18}/>, href: '/admin/content-resources' },
+  { name: 'CBT Modules', icon: <FiHeart size={18}/>, href: '/admin/cbt-modules' },
   { name: 'Survey Management', icon: <FiFileText size={18}/>, href: '/admin/surveys' },
   { name: 'Analytics', icon: <FiBarChart2 size={18}/>, href: '/admin/analytics' },
 ];

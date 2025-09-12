@@ -47,6 +47,8 @@
 
 ## CBT Module Implementation
 
+For detailed conversational scripts and psychological principles, see the [CBT Conversational Flows](cbt-conversational-flows.md) document.
+
 ### Supported Modules
 
 1. **Cognitive Restructuring**
