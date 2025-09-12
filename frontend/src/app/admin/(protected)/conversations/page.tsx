@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { useSession } from 'next-auth/react'; // Import useSession
 import { Button } from '@/components/ui/Button';
 import { 
   Search, 
@@ -75,9 +74,10 @@ interface ConversationsResponse {
   stats: ConversationStats;
 }
 
-// API function now requires a token
+import { apiCall } from '@/utils/adminApi';
+
+// API function (uses session automatically via adminApi)
 const fetchConversations = async (
-  token: string,
   params: {
     page: number;
     limit: number;
@@ -97,23 +97,7 @@ const fetchConversations = async (
   if (params.date_from) queryParams.append('date_from', params.date_from);
   if (params.date_to) queryParams.append('date_to', params.date_to);
 
-  const baseUrl = process.env.INTERNAL_API_URL || 'http://localhost:8000';
-  const response = await fetch(`${baseUrl}/api/v1/admin/conversations?${queryParams}`, {
-    headers: {
-      'Authorization': `Bearer ${token}`,
-      'Content-Type': 'application/json',
-    },
-  });
-
-  if (response.status === 401) {
-    throw new Error('Unauthorized');
-  }
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch conversations: ${response.statusText}`);
-  }
-
-  return response.json();
+  return apiCall<ConversationsResponse>(`/api/v1/admin/conversations?${queryParams.toString()}`);
 };
 
 // Components
@@ -277,8 +261,6 @@ const StatsCard: React.FC<{ stats: ConversationStats }> = ({ stats }) => {
 // Main component - now using useSession
 function AIConversationsContent() {
   const router = useRouter();
-  const { data: session, status } = useSession();
-  const accessToken = (session?.user as { accessToken: string })?.accessToken;
 
   // State
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
@@ -296,11 +278,11 @@ function AIConversationsContent() {
   
   const ITEMS_PER_PAGE = 20;
 
-  const loadConversations = useCallback(async (token: string) => {
+  const loadConversations = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
-      const data = await fetchConversations(token, {
+      const data = await fetchConversations({
         page: currentPage,
         limit: ITEMS_PER_PAGE,
         search: searchTerm || undefined,
@@ -313,25 +295,16 @@ function AIConversationsContent() {
       setStats(data.stats);
       setTotalCount(data.total_count);
     } catch (err) {
-      if (err instanceof Error && err.message === 'Unauthorized') {
-        // Token is invalid or expired, redirect to signin
-        router.push('/signin');
-      } else {
-        console.error('Failed to load conversations:', err);
-        setError('Failed to load conversations. Please try again later.');
-      }
+      console.error('Failed to load conversations:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load conversations. Please try again later.');
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, searchTerm, sessionFilter, dateFrom, dateTo, router]);
+  }, [currentPage, searchTerm, sessionFilter, dateFrom, dateTo]);
 
   useEffect(() => {
-    if (status === 'authenticated' && accessToken) {
-      loadConversations(accessToken);
-    }
-    // We don't handle 'unauthenticated' status here because the middleware already redirects.
-    // We handle 'loading' status by showing a generic loading state.
-  }, [status, accessToken, loadConversations]);
+    loadConversations();
+  }, [loadConversations]);
 
   // Handlers
   const handleSearch = (value: string) => {
@@ -369,19 +342,7 @@ function AIConversationsContent() {
   // Pagination
   const totalPages = Math.ceil(totalCount / ITEMS_PER_PAGE);
 
-  if (status === 'loading') {
-     return (
-      <div className="container mx-auto px-4 py-6 max-w-7xl">
-        <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 text-center">
-          <MessageSquare className="h-12 w-12 text-gray-400 mx-auto mb-4 animate-pulse" />
-          <h3 className="text-lg font-semibold mb-2">Authenticating...</h3>
-          <p className="text-gray-600 dark:text-gray-400">
-            Please wait while we verify your session.
-          </p>
-        </div>
-      </div>
-    );
-  }
+  // Authentication is enforced by middleware + adminApi error handling
 
   if (error) {
     return (

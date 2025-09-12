@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
-import { apiCall } from '@/utils/adminApi';
+import { apiCall, authenticatedFetch } from '@/utils/adminApi';
 
 interface AnalyticsQuestion {
   question_id: number;
@@ -43,7 +43,10 @@ export default function SurveyAnalyticsPage() {
   }, [surveyId]);
 
   const handleDownloadCsv = async () => {
-    const text = await apiCall<string>(`/api/v1/admin/surveys/${surveyId}/responses/export`, { raw: true });
+    const isServer = typeof window === 'undefined';
+    const apiUrl = isServer ? (process.env.INTERNAL_API_URL as string) : (process.env.NEXT_PUBLIC_API_URL as string);
+    const res = await authenticatedFetch(`${apiUrl}/api/v1/admin/surveys/${surveyId}/responses/export`);
+    const text = await res.text();
     const blob = new Blob([text], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     const url = URL.createObjectURL(blob);
@@ -105,4 +108,3 @@ export default function SurveyAnalyticsPage() {
     </div>
   );
 }
-
