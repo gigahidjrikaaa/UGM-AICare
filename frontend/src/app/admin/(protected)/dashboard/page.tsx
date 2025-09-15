@@ -108,22 +108,22 @@ export default function AdminDashboardPage() {
 
   // Remove the <AdminLayout> wrapper from here
   return (
-      <div className="space-y-6 md:space-y-8">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl 2xl:max-w-[100rem] space-y-4 sm:space-y-6 md:space-y-8">
         {/* Page Title */}
-        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
           <div>
-            <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
-            <p className="text-md text-gray-400 mt-1">
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">Admin Dashboard</h1>
+            <p className="text-sm sm:text-md text-gray-400 mt-1">
               Overview of UGM-AICare Platform Activity
             </p>
           </div>
-          <p className="text-sm text-gray-300 mt-2 sm:mt-0">
+          <p className="text-xs sm:text-sm text-gray-300 mt-2 sm:mt-0">
             {format(new Date(), 'EEEE, d MMMM yyyy', { locale: id })}
           </p>
         </div>
         
         {/* Quick Stats - Row 1 (User & Session Focus) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
           {[
             { title: 'Total Users', value: statsData.totalUsers, icon: <FiUsers size={22}/>, color: 'blue', trend: '+5% this month' },
             { title: 'Active AI Sessions', value: statsData.activeSessions, icon: <FiMessageSquare size={22}/>, color: 'green', trend: 'Real-time' },
@@ -153,9 +153,9 @@ export default function AdminDashboardPage() {
         </div>
 
         {/* Flags Widget */}
-        <div className="grid grid-cols-1 gap-4 md:gap-6">
+        <div className="grid grid-cols-1 gap-4 sm:gap-6">
           <div className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 shadow-lg overflow-hidden">
-            <div className="flex items-center justify-between p-5 border-b border-white/10">
+            <div className="flex items-center justify-between p-4 sm:p-5 border-b border-white/10">
               <h2 className="text-xl font-semibold text-white flex items-center">
                 <FiShield className="mr-3 text-[#FFCA40]" />
                 Flags
@@ -165,7 +165,7 @@ export default function AdminDashboardPage() {
                 <FiChevronRight className="ml-1" size={16} />
               </Link>
             </div>
-            <div className="p-5">
+            <div className="p-4 sm:p-5">
               <div className="flex items-center justify-between mb-4">
                 <div className="text-gray-300">Open Flags</div>
                 <div className="text-2xl font-bold text-white">{flagsOpenCount}</div>
@@ -306,7 +306,7 @@ export default function AdminDashboardPage() {
         {/* Quick Actions */}
         <motion.div custom={9} variants={cardVariants} initial="hidden" animate="visible">
           <h2 className="text-xl font-semibold text-white mb-4">Quick Actions</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
             {[
               { title: 'New Appointment', desc: 'Schedule directly', icon: <FiPlus/>, href: '/admin/appointments/new', color: 'blue' },
               { title: 'Manage Counselors', desc: 'Add or edit profiles', icon: <FiUsers/>, href: '/admin/counselors', color: 'yellow' },
@@ -314,7 +314,7 @@ export default function AdminDashboardPage() {
               { title: 'System Health', desc: 'Check system status', icon: <FiActivity/>, href: '/admin/system-health', color: 'green' },
             ].map(action => (
               <Link key={action.title} href={action.href}>
-                <div className={`bg-white/5 hover:bg-white/10 backdrop-blur-md rounded-xl p-5 border border-white/10 cursor-pointer transition-all duration-150 shadow-lg hover:shadow-xl flex items-center space-x-4 h-full`}>
+                <div className={`bg-white/5 hover:bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-5 border border-white/10 cursor-pointer transition-all duration-150 shadow-lg hover:shadow-xl flex items-center space-x-4 h-full`}>
                   <div className={`p-3 rounded-lg bg-${action.color}-500/20`}>
                      {React.cloneElement(action.icon, { className: `text-${action.color}-400`, size:20 })}
                   </div>

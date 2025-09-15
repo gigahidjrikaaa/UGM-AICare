@@ -98,12 +98,12 @@ export default function AnalyticsPage() {
 
   if (loading) {
     return (
-      <div className="space-y-6">
+      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl 2xl:max-w-[100rem] space-y-6">
         <div className="animate-pulse">
-          <div className="h-8 bg-white/20 rounded mb-6 w-1/4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+          <div className="h-7 sm:h-8 bg-white/20 rounded mb-4 sm:mb-6 w-2/5 sm:w-1/4"></div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
             {[...Array(8)].map((_, i) => (
-              <div key={i} className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 p-6 h-28"></div>
+              <div key={i} className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 p-4 sm:p-6 h-24 sm:h-28"></div>
             ))}
           </div>
         </div>
@@ -112,19 +112,19 @@ export default function AnalyticsPage() {
   }
 
   return (
-    <div className="space-y-8">
-      <div className="flex justify-between items-start">
+    <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl 2xl:max-w-[100rem] space-y-6 sm:space-y-8">
+      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
         <div>
-          <h1 className="text-3xl font-bold text-white flex items-center">
-            <FiBarChart2 className="mr-3 text-[#FFCA40]" />
+          <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center">
+            <FiBarChart2 className="mr-2 sm:mr-3 text-[#FFCA40]" />
             Analytics Dashboard
           </h1>
-          <p className="text-gray-400 mt-1">AI-powered insights into platform usage and user well-being.</p>
+          <p className="text-gray-400 mt-1 text-xs sm:text-sm">AI-powered insights into platform usage and user well-being.</p>
         </div>
         <button
           onClick={runAgent}
           disabled={running}
-          className="inline-flex items-center px-4 py-2 bg-[#FFCA40] hover:bg-[#ffda63] text-black rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+          className="inline-flex items-center px-3 sm:px-4 py-2 bg-[#FFCA40] hover:bg-[#ffda63] text-black rounded-lg text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 self-start"
         >
           <FiPlayCircle className={`h-4 w-4 mr-2 ${running ? 'animate-spin' : ''}`} />
           {running ? 'Running Agent...' : 'Generate New Report'}
@@ -143,9 +143,9 @@ export default function AnalyticsPage() {
           </div>
 
           {/* Preview of what will appear */}
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
             {/* Patterns preview */}
-            <div className="bg-white/5 rounded-lg border border-white/10 p-5">
+            <div className="bg-white/5 rounded-lg border border-white/10 p-4 sm:p-5">
               <h3 className="text-white font-semibold mb-3">Key Patterns (Preview)</h3>
               <div className="grid grid-cols-1 gap-3">
                 {[1,2,3].map((i) => (
@@ -161,7 +161,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Insights preview */}
-            <div className="bg-white/5 rounded-lg border border-white/10 p-5">
+            <div className="bg-white/5 rounded-lg border border-white/10 p-4 sm:p-5">
               <h3 className="text-white font-semibold mb-3">AI-Generated Insights (Preview)</h3>
               <div className="space-y-3">
                 {[1,2].map((i) => (
@@ -175,7 +175,7 @@ export default function AnalyticsPage() {
             </div>
 
             {/* Recommendations preview */}
-            <div className="bg-white/5 rounded-lg border border-white/10 p-5">
+            <div className="bg-white/5 rounded-lg border border-white/10 p-4 sm:p-5">
               <h3 className="text-white font-semibold mb-3">Recommendations (Preview)</h3>
               <ul className="space-y-2 text-gray-300">
                 <li className="flex items-center"><span className="h-2 w-2 rounded-full bg-white/30 mr-2"/> <span className="h-3 w-56 bg-white/10 rounded inline-block"/></li>
@@ -191,29 +191,29 @@ export default function AnalyticsPage() {
           <section>
             <h2 className="text-xl font-semibold text-white mb-4">Key Patterns (Last {report.report_period})</h2>
             {report.trends?.patterns?.length ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
                 {report.trends.patterns.map((pattern, index) => (
                   <StatCard key={index} title={pattern.name} value={pattern.count} icon={<FiActivity className="h-6 w-6 text-blue-400" />} description={pattern.description} color="blue" />
                 ))}
               </div>
             ) : (
-              <div className="text-gray-400 bg-white/5 border border-white/10 rounded-lg p-6">No patterns detected for this period.</div>
+              <div className="text-gray-400 bg-white/5 border border-white/10 rounded-lg p-4 sm:p-6">No patterns detected for this period.</div>
             )}
           </section>
 
           <section>
             <h2 className="text-xl font-semibold text-white mb-4">AI-Generated Insights</h2>
             {report.insights?.length ? (
-              <div className="space-y-4">
+              <div className="space-y-3 sm:space-y-4">
                 {report.insights.map((insight, index) => (
-                  <motion.div key={index} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white/10 p-4 rounded-lg">
+                  <motion.div key={index} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white/10 p-3 sm:p-4 rounded-lg">
                     <h3 className={`font-bold ${insight.severity === 'High' ? 'text-red-400' : insight.severity === 'Medium' ? 'text-yellow-400' : 'text-green-400'}`}>{insight.title}</h3>
                     <p className="text-gray-300">{insight.description}</p>
                   </motion.div>
                 ))}
               </div>
             ) : (
-              <div className="text-gray-400 bg-white/5 border border-white/10 rounded-lg p-6">No insights generated for this report.</div>
+              <div className="text-gray-400 bg-white/5 border border-white/10 rounded-lg p-4 sm:p-6">No insights generated for this report.</div>
             )}
           </section>
 
@@ -226,7 +226,7 @@ export default function AnalyticsPage() {
                 ))}
               </ul>
             ) : (
-              <div className="text-gray-400 bg-white/5 border border-white/10 rounded-lg p-6">No recommendations available for this report.</div>
+              <div className="text-gray-400 bg-white/5 border border-white/10 rounded-lg p-4 sm:p-6">No recommendations available for this report.</div>
             )}
           </section>
         </>
