@@ -3,18 +3,23 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
-import { 
-  Search, 
-  Filter, 
-  MessageSquare, 
-  Clock, 
-  Hash, 
-  Users, 
+import {
+  Search,
+  Filter,
+  MessageSquare,
+  Clock,
+  Hash,
+  Users,
   BarChart3,
-  Eye,
   MessageCircle,
-  Timer
+  Timer,
+  Flag as FlagIcon,
+  Download as DownloadIcon,
+  FileSpreadsheet
 } from 'lucide-react';
+import Image from 'next/image';
+import { FiMessageCircle as ChatIcon } from '@/icons';
+import Tooltip from '@/components/ui/Tooltip';
 import { formatDistanceToNow } from 'date-fns';
 
 // Hydration safe wrapper to prevent SSR mismatches
@@ -54,6 +59,9 @@ interface ConversationListItem {
   message_length: number;
   response_length: number;
   session_message_count: number;
+  last_text?: string;
+  last_role?: 'assistant' | 'user' | string;
+  open_flag_count?: number;
 }
 
 interface ConversationStats {
@@ -110,7 +118,20 @@ const fetchConversations = async (
 };
 
 // Server-side sessions listing
-interface SessionsListResponse { sessions: { session_id: string; user_id_hash: string; message_count: number; first_time: string; last_time: string; last_preview: string; }[]; total_count: number; }
+interface SessionsListResponse {
+  sessions: {
+    session_id: string;
+    user_id_hash: string;
+    message_count: number;
+    first_time: string;
+    last_time: string;
+    last_preview: string;
+    last_role?: 'assistant' | 'user' | string;
+    last_text?: string;
+    open_flag_count?: number;
+  }[];
+  total_count: number;
+}
 const fetchSessions = async (params: { page: number; limit: number; session_search?: string; date_from?: string; date_to?: string; }) => {
   const query = new URLSearchParams({ page: String(params.page), limit: String(params.limit) });
   if (params.session_search) query.append('session_search', params.session_search);
@@ -120,12 +141,11 @@ const fetchSessions = async (params: { page: number; limit: number; session_sear
 };
 
 // Components
-const ConversationCard: React.FC<{ 
-  conversation: ConversationListItem; 
+const ConversationCard: React.FC<{
+  conversation: ConversationListItem;
   onViewSession: (sessionId: string) => void;
-  onViewDetail: (conversationId: number) => void;
   onFlag: (sessionId: string) => void;
-}> = ({ conversation, onViewSession, onViewDetail, onFlag }) => {
+}> = ({ conversation, onViewSession, onFlag }) => {
   const getTimeAgo = (timestamp: string) => {
     try {
       return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
@@ -136,77 +156,73 @@ const ConversationCard: React.FC<{
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 hover:shadow-md transition-shadow">
+    <div className="bg-white/5 dark:bg-gray-800/60 backdrop-blur-md border border-white/10 dark:border-gray-700 rounded-xl p-5 hover:shadow-lg transition-all overflow-hidden min-w-0">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2">
-          <Hash className="h-4 w-4 text-gray-500" />
-          <span className="bg-gray-100 dark:bg-gray-700 px-2 py-1 rounded font-mono text-xs text-gray-700 dark:text-gray-300">
-            {conversation.user_id_hash}
+      <div className="flex items-center justify-between mb-3 min-w-0">
+        {/* Brand + user hash */}
+        <div className="flex items-center gap-2 min-w-0">
+          <Image src="/UGM_Lambang.png" alt="UGM" width={18} height={18} className="opacity-80" />
+          <span className="bg-white/10 dark:bg-gray-700/50 px-2 py-0.5 rounded font-mono text-xs text-gray-200 truncate flex items-center gap-1">
+            <Hash className="h-3 w-3 text-gray-400" /> {conversation.user_id_hash}
           </span>
         </div>
-        <div className="flex items-center gap-2 text-xs text-gray-500">
-          <Clock className="h-3 w-3" />
-          {getTimeAgo(conversation.timestamp)}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => onFlag(conversation.session_id)}
+            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium border border-red-300/30 text-red-300 hover:bg-red-500/15 transition-colors"
+            title="Flag session"
+          >
+            <FlagIcon className="h-3 w-3" /> Flag
+          </button>
+          <div className="flex items-center gap-1.5 text-xs text-gray-400">
+            <Clock className="h-3 w-3" />
+            {getTimeAgo(conversation.timestamp)}
+          </div>
         </div>
       </div>
 
       {/* Session Info */}
-      <div className="flex items-center gap-2 mb-4">
-        <MessageSquare className="h-4 w-4 text-blue-600" />
-        <span className="text-sm font-medium">Session: {conversation.session_id.slice(-8)}</span>
-        <span className="bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 px-2 py-1 rounded text-xs">
+      <div className="flex items-center gap-2 mb-4 min-w-0">
+        <MessageSquare className="h-4 w-4 text-[#FFCA40]" />
+        <span className="text-sm font-medium truncate">Session: {conversation.session_id.slice(-8)}</span>
+        <span className="bg-blue-500/15 text-blue-200 px-2 py-0.5 rounded-full text-xs whitespace-nowrap">
           {conversation.session_message_count} messages
         </span>
+        {conversation.open_flag_count && conversation.open_flag_count > 0 && (
+          <span className="bg-red-500/15 text-red-200 px-2 py-0.5 rounded-full text-xs whitespace-nowrap border border-red-300/30">
+            {conversation.open_flag_count} flagged
+          </span>
+        )}
       </div>
 
       {/* Content */}
-      <div className="space-y-4 mb-4">
-        {/* User Message */}
-        <div className="p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+      <div className="space-y-4 mb-4 min-w-0">
+        {/* Last Message Preview (user or AI) */}
+        <div className="p-4 bg-white/5 dark:bg-gray-700/50 rounded-lg min-w-0 border border-white/10">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-medium text-blue-600">User Message</span>
-            <span className="bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded text-xs">
-              {conversation.message_length} chars
+            <span className="text-xs font-medium text-[#FFCA40]">Last Message</span>
+            <RolePill
+              isAssistant={(conversation.last_role || 'assistant') === 'assistant'}
+            />
+            <span className="bg-white/10 dark:bg-gray-600/40 px-2 py-0.5 rounded text-xs text-gray-300">
+              {Math.max(conversation.message_length, conversation.response_length)} chars
             </span>
           </div>
-          <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
-            {conversation.message_preview}
-            {conversation.message_length > 100 && '...'}
-          </p>
-        </div>
-        
-        {/* AI Response */}
-        <div className="p-3 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
-          <div className="flex items-center gap-2 mb-1">
-            <span className="text-xs font-medium text-blue-800 dark:text-blue-200">AI Response</span>
-            <span className="bg-gray-200 dark:bg-gray-600 px-2 py-1 rounded text-xs">
-              {conversation.response_length} chars
-            </span>
-          </div>
-          <p className="text-sm text-gray-600 dark:text-gray-300 line-clamp-2">
-            {conversation.response_preview}
-            {conversation.response_length > 100 && '...'}
-          </p>
+          <LastMessageWithTooltip
+            fullText={conversation.last_text}
+            previewText={conversation.response_preview || conversation.message_preview}
+            isTruncated={(conversation.last_text ? conversation.last_text.length > 100 : (conversation.response_length > 100 || conversation.message_length > 100))}
+          />
         </div>
       </div>
-      
+
       {/* Actions */}
-      <div className="flex items-center gap-2">
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onViewDetail(conversation.id)}
-          className="flex-1 flex items-center justify-center gap-1"
-        >
-          <Eye className="h-3 w-3" />
-          View Details
-        </Button>
+      <div className="flex flex-wrap md:flex-nowrap items-center gap-2">
         <Button
           variant="outline"
           size="sm"
           onClick={() => onViewSession(conversation.session_id)}
-          className="flex-1 flex items-center justify-center gap-1"
+          className="flex-1 min-w-[140px] flex items-center justify-center gap-1 border-[#FFCA40]/50 text-[#FFCA40] hover:bg-[#FFCA40] hover:text-[#001D58]"
         >
           <MessageCircle className="h-3 w-3" />
           View Session
@@ -234,9 +250,9 @@ const ConversationCard: React.FC<{
               alert(e?.message || 'Failed to download transcript');
             }
           }}
-          className="flex-1 flex items-center justify-center gap-1"
+          className="flex-1 min-w-[120px] flex items-center justify-center gap-1"
         >
-          Download
+          <DownloadIcon className="h-4 w-4" /> Download
         </Button>
         <Button
           variant="outline"
@@ -260,22 +276,41 @@ const ConversationCard: React.FC<{
               alert(e?.message || 'Failed to download CSV');
             }
           }}
-          className="flex-1 flex items-center justify-center gap-1"
+          className="flex-1 min-w-[120px] flex items-center justify-center gap-1"
         >
-          CSV
-        </Button>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onFlag(conversation.session_id)}
-          className="flex-1 flex items-center justify-center gap-1"
-        >
-          Flag
+          <FileSpreadsheet className="h-4 w-4" /> CSV
         </Button>
       </div>
     </div>
   );
 };
+
+// Lazy tooltip that fetches the full last message on hover
+const LastMessageWithTooltip: React.FC<{ fullText?: string; previewText: string; isTruncated?: boolean }>
+  = ({ fullText, previewText, isTruncated }) => {
+  return (
+    <div className="min-w-0">
+      <Tooltip title={fullText || previewText} placement="top">
+        <p className="text-sm text-gray-200 break-words whitespace-pre-wrap line-clamp-3">
+          {previewText}
+          {isTruncated && '...'}
+        </p>
+      </Tooltip>
+    </div>
+  );
+};
+
+const RolePill: React.FC<{ isAssistant: boolean }> = ({ isAssistant }) => (
+  <span
+    className={
+      'px-2 py-0.5 rounded-full text-[10px] font-semibold ' +
+      (isAssistant ? 'bg-blue-500/15 text-blue-200' : 'bg-gray-500/15 text-gray-200')
+    }
+    title={isAssistant ? 'AI' : 'User'}
+  >
+    {isAssistant ? 'AI' : 'User'}
+  </span>
+);
 
 const StatsCard: React.FC<{ stats: ConversationStats }> = ({ stats }) => {
   return (
@@ -350,6 +385,7 @@ function AIConversationsContent() {
   const [isLoading, setIsLoading] = useState(true);
   const [totalCount, setTotalCount] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [usingDemo, setUsingDemo] = useState(false);
   
   // Filters
   const [currentPage, setCurrentPage] = useState(1);
@@ -360,6 +396,36 @@ function AIConversationsContent() {
   const [userHashFilter, setUserHashFilter] = useState('');
   
   const ITEMS_PER_PAGE = 20;
+
+  // Demo data used when API returns no sessions
+  const DEMO_SESSIONS: ConversationListItem[] = [
+    {
+      id: 0,
+      user_id_hash: '8db3c65d',
+      session_id: 'e09ddd88',
+      conversation_id: 'e09ddd88',
+      message_preview: '',
+      response_preview:
+        'Hai! Gimana kabarmu hari ini? Ada sesuatu yang lagi kamu pikirin atau rasain yang pengen kamu bagiin? Aku di sini buat dengerin. 😊',
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+      message_length: 0,
+      response_length: 142,
+      session_message_count: 9
+    },
+    {
+      id: 1,
+      user_id_hash: '7c61e30b',
+      session_id: '69a96a0c',
+      conversation_id: '69a96a0c',
+      message_preview: '',
+      response_preview:
+        'Wah, makasih udah cerita. Rasanya wajar banget kok ngerasa capek belakangan ini. Mau coba kita atur langkah kecil bareng‑bareng?',
+      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
+      message_length: 0,
+      response_length: 148,
+      session_message_count: 1
+    }
+  ];
 
   // Flag modal state
   const [flagOpen, setFlagOpen] = useState(false);
@@ -377,8 +443,37 @@ function AIConversationsContent() {
         const needle = userHashFilter.trim().toLowerCase();
         sessions = sessions.filter(s => s.user_id_hash.toLowerCase().includes(needle));
       }
-      setConversations(sessions.map((s, idx) => ({ id: idx, user_id_hash: s.user_id_hash, session_id: s.session_id, conversation_id: s.session_id, message_preview: s.last_preview, response_preview: s.last_preview, timestamp: s.last_time, message_length: s.last_preview.length, response_length: s.last_preview.length, session_message_count: s.message_count })));
-      setTotalCount(data.total_count);
+      if (!sessions.length) {
+        // Use demo data for a more illustrative UI when empty
+        setUsingDemo(true);
+        setConversations(DEMO_SESSIONS);
+        setTotalCount(DEMO_SESSIONS.length);
+      } else {
+        setUsingDemo(false);
+        setConversations(
+          sessions.map((s, idx) => {
+            const isAssistant = (s.last_role || 'assistant') === 'assistant';
+            const preview = s.last_preview || '';
+            const conv: ConversationListItem = {
+              id: idx,
+              user_id_hash: s.user_id_hash,
+              session_id: s.session_id,
+              conversation_id: s.session_id,
+              message_preview: isAssistant ? '' : preview,
+              response_preview: isAssistant ? preview : '',
+              timestamp: s.last_time,
+              message_length: isAssistant ? 0 : preview.length,
+              response_length: isAssistant ? preview.length : 0,
+              session_message_count: s.message_count,
+              last_text: s.last_text,
+              last_role: s.last_role,
+              open_flag_count: s.open_flag_count,
+            };
+            return conv;
+          })
+        );
+        setTotalCount(data.total_count);
+      }
     } catch (err) {
       console.error('Failed to load conversations:', err);
       setError(err instanceof Error ? err.message : 'Failed to load conversations. Please try again later.');
@@ -465,10 +560,14 @@ function AIConversationsContent() {
     <div className="container mx-auto px-4 py-6 max-w-7xl">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">AI Conversations</h1>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Monitor and analyze AI chat interactions with privacy protection
-        </p>
+        <div className="flex items-center gap-3">
+          <ChatIcon className="h-7 w-7 mr-0.5 text-[#FFCA40]" />
+          <h1 className="text-3xl font-bold tracking-tight">AI Conversations</h1>
+          {usingDemo && (
+            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-white/10 border border-white/20 text-yellow-300">Demo data</span>
+          )}
+        </div>
+        <p className="text-gray-600 dark:text-gray-400 mt-2">Monitor and analyze AI chat interactions with privacy protection</p>
         <div className="mt-3">
           <Button
             variant="outline"
@@ -499,6 +598,22 @@ function AIConversationsContent() {
           >
             Export Sessions CSV
           </Button>
+        </div>
+      </div>
+
+      {/* Summary chips */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+        <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg p-3">
+          <div className="text-sm text-gray-300">Sessions Loaded</div>
+          <div className="text-lg font-semibold text-white">{conversations.length}</div>
+        </div>
+        <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg p-3">
+          <div className="text-sm text-gray-300">Total Messages</div>
+          <div className="text-lg font-semibold text-white">{conversations.reduce((a,c)=>a + (c.session_message_count||0), 0)}</div>
+        </div>
+        <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg p-3">
+          <div className="text-sm text-gray-300">Found (server)</div>
+          <div className="text-lg font-semibold text-white">{totalCount}</div>
         </div>
       </div>
 
@@ -635,7 +750,6 @@ function AIConversationsContent() {
                 key={conversation.id}
                 conversation={conversation}
                 onViewSession={handleViewSession}
-                onViewDetail={handleViewDetail}
                 onFlag={handleOpenFlag}
               />
             ))}

@@ -1,7 +1,7 @@
 # backend/app/routes/admin.py
 from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import func, desc, asc, or_, select
+from sqlalchemy import func, desc, asc, or_, select, case
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, Field
 from datetime import datetime, date, timedelta
@@ -96,6 +96,9 @@ class ConversationListItem(BaseModel):
     message_length: int
     response_length: int
     session_message_count: int  # Number of messages in this session
+    # Consistency with sessions endpoint
+    last_role: Optional[str] = None
+    last_text: Optional[str] = None
     
     class Config:
         from_attributes = True
@@ -246,9 +249,10 @@ async def get_analytics(
     """Get the latest analytics report"""
     logger.info(f"Admin {admin_user.id} requesting analytics data")
     try:
-        stmt = select(AnalyticsReport).order_by(desc(AnalyticsReport.generated_at))
+        # Fetch the most recent report only
+        stmt = select(AnalyticsReport).order_by(desc(AnalyticsReport.generated_at)).limit(1)
         result = await db.execute(stmt)
-        latest_report = result.scalar_one_or_none()
+        latest_report = result.scalars().first()
 
         if not latest_report:
             return {"message": "No analytics report found. Please run the agent first."}
@@ -807,7 +811,7 @@ async def get_conversations(
     offset = (page - 1) * limit
     conversations_res = await db.execute(query.offset(offset).limit(limit))
     conversations: List[Any] = list(conversations_res.scalars().all())
-    
+
     # Get session message counts
     session_counts: Dict[str, int] = {}
     if conversations:
@@ -821,6 +825,27 @@ async def get_conversations(
         
         session_count_results = await db.execute(session_count_query)
         session_counts = {session_id: count for session_id, count in session_count_results}
+
+        # Also compute last_text and last_role per session for consistency with sessions endpoint
+        last_subq = select(
+            Conversation.session_id.label('sid'),
+            func.max(Conversation.timestamp).label('max_ts')
+        ).filter(Conversation.session_id.in_(session_ids)).group_by(Conversation.session_id).subquery()
+
+        role_expr = case((Conversation.response.isnot(None), 'assistant'), else_='user').label('role')
+        last_join = await db.execute(
+            select(Conversation.session_id, Conversation.message, Conversation.response, role_expr)
+            .join(last_subq, (Conversation.session_id == last_subq.c.sid) & (Conversation.timestamp == last_subq.c.max_ts))
+        )
+        last_role_map: Dict[str, str] = {}
+        last_text_map: Dict[str, str] = {}
+        for sid, msg, resp, role in last_join.all():
+            full_text = resp or msg or ""
+            last_text_map[str(sid)] = full_text
+            last_role_map[str(sid)] = role
+    else:
+        last_role_map = {}
+        last_text_map = {}
     
     # Format conversations with censoring
     conversation_items = []
@@ -837,6 +862,8 @@ async def get_conversations(
                 message_length=len(conv.message) if conv.message else 0,
                 response_length=len(conv.response) if conv.response else 0,
                 session_message_count=int(session_counts.get(conv.session_id, 1)),
+                last_role=last_role_map.get(conv.session_id),
+                last_text=last_text_map.get(conv.session_id),
             )
         )
     
@@ -1060,6 +1087,9 @@ class SessionListItem(BaseModel):
     first_time: datetime
     last_time: datetime
     last_preview: str
+    last_role: str | None = None
+    last_text: str | None = None
+    open_flag_count: int = 0
 
 class SessionListResponse(BaseModel):
     sessions: List[SessionListItem]
@@ -1116,14 +1146,31 @@ async def get_conversation_sessions(
         func.max(Conversation.timestamp).label('max_ts')
     ).filter(Conversation.session_id.in_(sids)).group_by(Conversation.session_id).subquery()
 
+    role_expr = case((Conversation.response.isnot(None), 'assistant'), else_='user').label('role')
     last_join = await db.execute(
-        select(Conversation.session_id, Conversation.message, Conversation.response)
+        select(Conversation.session_id, Conversation.message, Conversation.response, role_expr)
         .join(last_subq, (Conversation.session_id == last_subq.c.sid) & (Conversation.timestamp == last_subq.c.max_ts))
     )
     last_map: Dict[str, str] = {}
-    for sid, msg, resp in last_join.all():
-        preview = resp or msg or ""
-        last_map[str(sid)] = preview[:100]
+    last_role_map: Dict[str, str] = {}
+    last_text_map: Dict[str, str] = {}
+    for sid, msg, resp, role in last_join.all():
+        full_text = resp or msg or ""
+        last_map[str(sid)] = full_text[:100]
+        last_text_map[str(sid)] = full_text
+        last_role_map[str(sid)] = role
+
+    # Open flags count per session
+    open_flags_map: Dict[str, int] = {}
+    if sids:
+        from app.models import FlaggedSession
+        flags_q = select(FlaggedSession.session_id, func.count(FlaggedSession.id))\
+            .filter(FlaggedSession.session_id.in_(sids))\
+            .filter(FlaggedSession.status == 'open')\
+            .group_by(FlaggedSession.session_id)
+        flags_res = await db.execute(flags_q)
+        for sid, cnt in flags_res.all():
+            open_flags_map[str(sid)] = int(cnt)
 
     items: List[SessionListItem] = []
     for m in sessions_map:
@@ -1133,7 +1180,10 @@ async def get_conversation_sessions(
             message_count=m['count'],
             first_time=m['first_time'],
             last_time=m['last_time'],
-            last_preview=last_map.get(m['sid'], "")
+            last_preview=last_map.get(m['sid'], ""),
+            last_role=last_role_map.get(m['sid']),
+            last_text=last_text_map.get(m['sid']),
+            open_flag_count=open_flags_map.get(m['sid'], 0)
         ))
 
     return SessionListResponse(sessions=items, total_count=int(total))
