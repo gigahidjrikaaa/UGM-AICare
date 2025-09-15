@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation'; 
 import Link from 'next/link';
@@ -11,9 +11,11 @@ import { id } from 'date-fns/locale';
 import { 
   FiCalendar, FiClock, FiUsers, 
   FiPieChart,
-  FiCheck, FiX, FiChevronRight, FiEdit3, FiPlus, FiActivity, FiTrendingUp, FiMessageSquare
+  FiCheck, FiX, FiChevronRight, FiEdit3, FiPlus, FiActivity, FiTrendingUp, FiMessageSquare, FiShield
 } from 'react-icons/fi';
 import React from 'react';
+import { useTranslations } from 'next-intl';
+import { apiCall } from '@/utils/adminApi';
 
 // Mock data for today's appointments
 const todayAppointments = [
@@ -74,6 +76,9 @@ const cardVariants: Variants = {
 export default function AdminDashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter(); 
+  const [flagsOpenCount, setFlagsOpenCount] = useState<number>(0);
+  const [recentFlags, setRecentFlags] = useState<{ id: number; session_id: string; status: string; created_at: string; reason?: string | null; tags?: string[] | null; }[]>([]);
+  const t = useTranslations('Dashboard');
 
   // The AdminLayout (from layout.tsx) now primarily handles authentication and role checks.
   // This useEffect can be a secondary check or removed if AdminLayout is robust.
@@ -89,13 +94,27 @@ export default function AdminDashboardPage() {
     return null; 
   }
 
+  // Load flags summary
+  useEffect(() => {
+    const loadFlags = async () => {
+      try {
+        const data = await apiCall<{ open_count: number; recent: { id: number; session_id: string; status: string; created_at: string; reason?: string | null; tags?: string[] | null; }[] }>(`/api/v1/admin/flags/summary?limit=5`);
+        setFlagsOpenCount(data.open_count);
+        setRecentFlags(data.recent);
+      } catch (e) {
+        // ignore summary failures in dashboard
+      }
+    };
+    loadFlags();
+  }, []);
+
   // Remove the <AdminLayout> wrapper from here
   return (
       <div className="space-y-6 md:space-y-8">
         {/* Page Title */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
+            <h1 className="text-3xl font-bold text-white">{t('title')}</h1>
             <p className="text-md text-gray-400 mt-1">
               Overview of UGM-AICare Platform Activity
             </p>
@@ -133,6 +152,43 @@ export default function AdminDashboardPage() {
               <p className="text-xs text-gray-400 mt-3">{stat.trend}</p>
             </motion.div>
           ))}
+        </div>
+
+        {/* Flags Widget */}
+        <div className="grid grid-cols-1 gap-4 md:gap-6">
+          <div className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 shadow-lg overflow-hidden">
+            <div className="flex items-center justify-between p-5 border-b border-white/10">
+              <h2 className="text-xl font-semibold text-white flex items-center">
+                <FiShield className="mr-3 text-[#FFCA40]" />
+                Flags
+              </h2>
+              <Link href="/admin/flags" className="text-sm text-[#FFCA40] hover:underline flex items-center font-medium">
+                Manage Flags
+                <FiChevronRight className="ml-1" size={16} />
+              </Link>
+            </div>
+            <div className="p-5">
+              <div className="flex items-center justify-between mb-4">
+                <div className="text-gray-300">Open Flags</div>
+                <div className="text-2xl font-bold text-white">{flagsOpenCount}</div>
+              </div>
+              {recentFlags.length === 0 ? (
+                <div className="text-gray-400">No recent flags</div>
+              ) : (
+                <ul className="divide-y divide-white/10">
+                  {recentFlags.map((f) => (
+                    <li key={f.id} className="py-3 flex items-center justify-between">
+                      <div>
+                        <div className="text-sm text-white">Session …{f.session_id.slice(-8)} <span className="ml-2 text-xs text-gray-400">#{f.id}</span></div>
+                        <div className="text-xs text-gray-400">{new Date(f.created_at).toLocaleString()} • {f.reason || 'No reason'}</div>
+                      </div>
+                      <Link href={`/admin/conversations/session/${f.session_id}`} className="text-[#FFCA40] text-sm">View</Link>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          </div>
         </div>
 
         {/* Quick Stats - Row 2 (Appointments & Feedback Focus) */}

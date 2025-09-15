@@ -129,9 +129,22 @@ class ConversationsResponse(BaseModel):
     total_count: int
     stats: ConversationStats
 
+class SessionUser(BaseModel):
+    id: int
+    email: Optional[str] = None
+    role: Optional[str] = None
+    is_active: Optional[bool] = None
+    created_at: Optional[datetime] = None
+    last_login: Optional[datetime] = None
+    sentiment_score: Optional[float] = None
+
+    class Config:
+        from_attributes = True
+
 class SessionDetailResponse(BaseModel):
     session_id: str
     user_id_hash: str  # Censored user identifier
+    user: Optional[SessionUser] = None
     conversation_count: int
     first_message_time: datetime
     last_message_time: datetime
@@ -1009,9 +1022,28 @@ async def get_session_detail(
         "top_keywords": top_keywords,
     }
 
+    # Load user details
+    session_user: Optional[SessionUser] = None
+    try:
+        user_res = await db.execute(select(User).filter(User.id == user_id))
+        user_obj = user_res.scalar_one_or_none()
+        if user_obj:
+            session_user = SessionUser(
+                id=user_obj.id,  # type: ignore
+                email=decrypt_user_email(user_obj.email),  # type: ignore
+                role=getattr(user_obj, 'role', None),  # type: ignore
+                is_active=getattr(user_obj, 'is_active', None),  # type: ignore
+                created_at=getattr(user_obj, 'created_at', None),  # type: ignore
+                last_login=getattr(user_obj, 'last_login', None),  # type: ignore
+                sentiment_score=getattr(user_obj, 'sentiment_score', None),  # type: ignore
+            )
+    except Exception:
+        session_user = None
+
     return SessionDetailResponse(
         session_id=session_id, # type: ignore
         user_id_hash=_hash_user_id(user_id),
+        user=session_user,
         conversation_count=len(conversations),
         first_message_time=first_conv.timestamp,
         last_message_time=last_conv.timestamp,
@@ -1206,6 +1238,98 @@ async def update_flag(flag_id: int, data: FlagUpdate, db: AsyncSession = Depends
     await db.commit()
     await db.refresh(f)
     return f
+
+# --- Flags summary & bulk operations ---
+class FlagsSummary(BaseModel):
+    open_count: int
+    recent: List[FlagResponse]
+
+@router.get("/flags/summary", response_model=FlagsSummary)
+async def get_flags_summary(
+    limit: int = Query(5, ge=1, le=50),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    # Count open flags
+    open_count_res = await db.execute(
+        select(func.count(FlaggedSession.id)).filter(FlaggedSession.status == "open")
+    )
+    open_count = int(open_count_res.scalar() or 0)
+
+    # Recent flags
+    recent_res = await db.execute(
+        select(FlaggedSession).order_by(desc(FlaggedSession.created_at)).limit(limit)
+    )
+    recent_flags = list(recent_res.scalars().all())
+
+    return FlagsSummary(open_count=open_count, recent=recent_flags)
+
+class FlagsBulkCloseRequest(BaseModel):
+    ids: List[int] = Field(..., description="Flag IDs to close")
+    status: Optional[str] = Field("resolved", description="Status to set, default 'resolved'")
+
+@router.post("/flags/bulk-close", response_model=List[FlagResponse])
+async def bulk_close_flags(
+    data: FlagsBulkCloseRequest,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    if not data.ids:
+        return []
+    flags_res = await db.execute(select(FlaggedSession).filter(FlaggedSession.id.in_(data.ids)))
+    flags = list(flags_res.scalars().all())
+    for f in flags:
+        f.status = data.status or "resolved"
+        f.updated_at = datetime.now()  # type: ignore
+        db.add(f)
+    await db.commit()
+    # refresh updated
+    updated: List[FlaggedSession] = []
+    for f in flags:
+        await db.refresh(f)
+        updated.append(f)
+    return updated
+
+class FlagsBulkTagRequest(BaseModel):
+    ids: List[int] = Field(..., description="Flag IDs to tag")
+    tags: List[str] = Field(..., description="Tags to add/set")
+    mode: Optional[str] = Field("add", description="'add' to merge, 'set' to replace")
+
+@router.post("/flags/bulk-tag", response_model=List[FlagResponse])
+async def bulk_tag_flags(
+    data: FlagsBulkTagRequest,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    if not data.ids:
+        return []
+    mode = (data.mode or "add").lower()
+    # Normalize incoming tags
+    new_tags_set = {t.strip() for t in (data.tags or []) if t and t.strip()}
+    flags_res = await db.execute(select(FlaggedSession).filter(FlaggedSession.id.in_(data.ids)))
+    flags = list(flags_res.scalars().all())
+    for f in flags:
+        existing = []
+        try:
+            if isinstance(f.tags, list):
+                existing = [str(x) for x in f.tags if isinstance(x, (str, int, float))]
+            elif isinstance(f.tags, str):
+                existing = [f.tags]
+        except Exception:
+            existing = []
+        if mode == "set":
+            merged = list(new_tags_set)
+        else:  # add/merge unique
+            merged = list({*existing, *new_tags_set})
+        f.tags = merged  # type: ignore
+        f.updated_at = datetime.now()  # type: ignore
+        db.add(f)
+    await db.commit()
+    updated: List[FlaggedSession] = []
+    for f in flags:
+        await db.refresh(f)
+        updated.append(f)
+    return updated
 
 @router.get("/conversation-session/{session_id}/export.csv")
 async def export_session_csv(session_id: str, db: AsyncSession = Depends(get_async_db), admin_user: User = Depends(get_admin_user)):

@@ -5,6 +5,7 @@ import { FiCalendar, FiEye, FiEdit, FiTrash2 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { apiCall } from '@/utils/adminApi';
+import { useTranslations } from 'next-intl';
 
 interface User {
   id: number;
@@ -40,6 +41,7 @@ interface Appointment {
 }
 
 export default function AppointmentManagementPage() {
+  const t = useTranslations('Appointments');
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [psychologists, setPsychologists] = useState<Psychologist[]>([]);
   const [loading, setLoading] = useState(true);
@@ -148,7 +150,7 @@ export default function AppointmentManagementPage() {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-white">Appointment Management</h1>
+        <h1 className="text-3xl font-bold text-white">{t('title', { fallback: 'Appointment Management' })}</h1>
       </div>
 
       <div className="flex border-b border-white/20">
@@ -160,7 +162,7 @@ export default function AppointmentManagementPage() {
               : 'text-gray-400 hover:text-white'
           }`}
         >
-          Appointments
+          {t('tab.appointments', { fallback: 'Appointments' })}
         </button>
         <button
           onClick={() => setActiveTab('therapists')}
@@ -170,7 +172,7 @@ export default function AppointmentManagementPage() {
               : 'text-gray-400 hover:text-white'
           }`}
         >
-          Therapists
+          {t('tab.therapists', { fallback: 'Therapists' })}
         </button>
       </div>
 
@@ -186,11 +188,11 @@ export default function AppointmentManagementPage() {
                 <table className="min-w-full divide-y divide-white/20">
                   <thead className="bg-white/5">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Patient</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Therapist</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Date & Time</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">{t('th.patient', { fallback: 'Patient' })}</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">{t('th.therapist', { fallback: 'Therapist' })}</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">{t('th.datetime', { fallback: 'Date & Time' })}</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">{t('th.status', { fallback: 'Status' })}</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">{t('th.actions', { fallback: 'Actions' })}</th>
                     </tr>
                   </thead>
                   <tbody className="bg-transparent divide-y divide-white/20">
@@ -201,13 +203,13 @@ export default function AppointmentManagementPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{new Date(appointment.appointment_datetime).toLocaleString()}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">{appointment.status}</td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button title="View Details" className="text-white hover:text-gray-300 transition-colors mr-4">
+                          <button title={t('action.view', { fallback: 'View Details' })} className="text-white hover:text-gray-300 transition-colors mr-4">
                             <FiEye className="h-4 w-4" />
                           </button>
-                          <button title="Edit Appointment" className="text-blue-400 hover:text-blue-300 transition-colors mr-4">
+                          <button title={t('action.edit', { fallback: 'Edit Appointment' })} className="text-blue-400 hover:text-blue-300 transition-colors mr-4">
                             <FiEdit className="h-4 w-4" />
                           </button>
-                          <button title="Delete Appointment" className="text-red-400 hover:text-red-300 transition-colors">
+                          <button title={t('action.delete', { fallback: 'Delete Appointment' })} className="text-red-400 hover:text-red-300 transition-colors">
                             <FiTrash2 className="h-4 w-4" />
                           </button>
                         </td>
@@ -225,10 +227,10 @@ export default function AppointmentManagementPage() {
                 <table className="min-w-full divide-y divide-white/20">
                   <thead className="bg-white/5">
                     <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Specialization</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">{t('th.name', { fallback: 'Name' })}</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">{t('th.specialization', { fallback: 'Specialization' })}</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">{t('th.status', { fallback: 'Status' })}</th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">{t('th.actions', { fallback: 'Actions' })}</th>
                     </tr>
                   </thead>
                   <tbody className="bg-transparent divide-y divide-white/20">
@@ -239,16 +241,16 @@ export default function AppointmentManagementPage() {
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
                           {psychologist.is_available ? (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
-                              Available
+                              {t('available', { fallback: 'Available' })}
                             </span>
                           ) : (
                             <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400">
-                              Unavailable
+                              {t('unavailable', { fallback: 'Unavailable' })}
                             </span>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button title="View Details" onClick={() => handleScheduleModalOpen(psychologist.id)} className="text-white hover:text-gray-300 transition-colors mr-4">
+                          <button title={t('action.view', { fallback: 'View Details' })} onClick={() => handleScheduleModalOpen(psychologist.id)} className="text-white hover:text-gray-300 transition-colors mr-4">
                             <FiCalendar className="h-4 w-4" />
                           </button>
                         </td>
@@ -279,7 +281,7 @@ export default function AppointmentManagementPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="px-6 py-4 border-b border-white/20">
-                <h3 className="text-lg font-medium text-white">Schedule for {selectedTherapist.name}</h3>
+                <h3 className="text-lg font-medium text-white">{t('scheduleFor', { fallback: 'Schedule for' })} {selectedTherapist.name}</h3>
               </div>
               <div className="p-6">
                 <div className="space-y-4">
@@ -289,7 +291,7 @@ export default function AppointmentManagementPage() {
                         <p className="text-sm font-medium text-white">{schedule.day_of_week}</p>
                         <p className="text-xs text-gray-400">{schedule.start_time} - {schedule.end_time}</p>
                         <p className={`text-xs ${schedule.is_available ? 'text-green-400' : 'text-red-400'}`}>
-                          {schedule.is_available ? 'Available' : 'Unavailable'} {schedule.reason && `(${schedule.reason})`}
+                          {schedule.is_available ? t('available', { fallback: 'Available' }) : t('unavailable', { fallback: 'Unavailable' })} {schedule.reason && `(${schedule.reason})`}
                         </p>
                       </div>
                       <button title="Delete Schedule" onClick={() => handleDeleteSchedule(schedule.id)} className="text-red-400 hover:text-red-300">
@@ -299,16 +301,16 @@ export default function AppointmentManagementPage() {
                   ))}
                 </div>
                 <div className="mt-6">
-                  <h4 className="text-md font-medium text-white mb-2">Add New Schedule</h4>
+                  <h4 className="text-md font-medium text-white mb-2">{t('addSchedule', { fallback: 'Add New Schedule' })}</h4>
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <select aria-label="Day of the week" name="day_of_week" value={newSchedule.day_of_week} onChange={handleNewScheduleChange} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors">
-                      <option>Monday</option>
-                      <option>Tuesday</option>
-                      <option>Wednesday</option>
-                      <option>Thursday</option>
-                      <option>Friday</option>
-                      <option>Saturday</option>
-                      <option>Sunday</option>
+                      <option>{t('day.monday', { fallback: 'Monday' })}</option>
+                      <option>{t('day.tuesday', { fallback: 'Tuesday' })}</option>
+                      <option>{t('day.wednesday', { fallback: 'Wednesday' })}</option>
+                      <option>{t('day.thursday', { fallback: 'Thursday' })}</option>
+                      <option>{t('day.friday', { fallback: 'Friday' })}</option>
+                      <option>{t('day.saturday', { fallback: 'Saturday' })}</option>
+                      <option>{t('day.sunday', { fallback: 'Sunday' })}</option>
                     </select>
                     <input aria-label="Start Time" type="time" name="start_time" value={newSchedule.start_time} onChange={handleNewScheduleChange} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors" />
                     <input aria-label="End Time" type="time" name="end_time" value={newSchedule.end_time} onChange={handleNewScheduleChange} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors" />
@@ -316,24 +318,24 @@ export default function AppointmentManagementPage() {
                   <div className="mt-4">
                     <label className="flex items-center">
                       <input aria-label="Available" type="checkbox" name="is_available" checked={newSchedule.is_available} onChange={handleNewScheduleChange} className="h-4 w-4 text-[#FFCA40] focus:ring-[#FFCA40] bg-white/10 border-white/20 rounded" />
-                      <span className="ml-2 text-sm text-gray-300">Available</span>
+                      <span className="ml-2 text-sm text-gray-300">{t('available', { fallback: 'Available' })}</span>
                     </label>
                   </div>
                   {!newSchedule.is_available && (
                     <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Reason for Unavailability</label>
+                      <label className="block text-sm font-medium text-gray-300 mb-2">{t('unavailableReason', { fallback: 'Reason for Unavailability' })}</label>
                       <input type="text" title='Delete Schedule' name="reason" value={newSchedule.reason} onChange={handleNewScheduleChange} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors" />
                     </div>
                   )}
                   <div className="mt-4">
                     <button onClick={handleCreateSchedule} className="inline-flex items-center px-4 py-2 bg-[#FFCA40] hover:bg-[#ffda63] text-black rounded-lg text-sm font-medium transition-colors">
-                      Add Schedule
+                      {t('addSchedule', { fallback: 'Add Schedule' })}
                     </button>
                   </div>
                 </div>
               </div>
               <div className="px-6 py-4 border-t border-white/20 flex justify-end">
-                <button onClick={handleScheduleModalClose} className="px-4 py-2 bg-gray-500/20 text-gray-300 rounded-lg hover:bg-gray-500/30">Close</button>
+                <button onClick={handleScheduleModalClose} className="px-4 py-2 bg-gray-500/20 text-gray-300 rounded-lg hover:bg-gray-500/30">{t('close', { fallback: 'Close' })}</button>
               </div>
             </motion.div>
           </motion.div>

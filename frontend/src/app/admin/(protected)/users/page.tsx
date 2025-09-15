@@ -17,6 +17,7 @@ import {
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { apiCall } from '@/utils/adminApi';
+import { useTranslations } from 'next-intl';
 
 interface User {
   id: number;
@@ -68,6 +69,7 @@ interface UsersResponse {
 const ITEMS_PER_PAGE = 20;
 
 export default function UserManagementPage() {
+  const t = useTranslations('Users');
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [loading, setLoading] = useState(true);
@@ -374,9 +376,9 @@ export default function UserManagementPage() {
         <div>
           <h1 className="text-3xl font-bold text-white flex items-center">
             <Users className="mr-3 text-[#FFCA40]" />
-            User Management
+            {t('title', { fallback: 'User Management' })}
           </h1>
-          <p className="text-gray-400 mt-1">Manage and monitor platform users</p>
+          <p className="text-gray-400 mt-1">{t('subtitle', { fallback: 'Manage and monitor platform users' })}</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -388,14 +390,14 @@ export default function UserManagementPage() {
             }`}
           >
             <Filter className="h-4 w-4 mr-2" />
-            Filters
+            {t('filters', { fallback: 'Filters' })}
           </button>
           <button
             onClick={exportUsers}
             className="inline-flex items-center px-4 py-2 border border-white/20 rounded-lg text-sm font-medium text-white bg-white/10 hover:bg-white/20 transition-colors"
           >
             <Download className="h-4 w-4 mr-2" />
-            Export
+            {t('export', { fallback: 'Export' })}
           </button>
           <button
             onClick={fetchUsers}
@@ -403,7 +405,7 @@ export default function UserManagementPage() {
             className="inline-flex items-center px-4 py-2 bg-[#FFCA40] hover:bg-[#ffda63] text-black rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            {t('refresh', { fallback: 'Refresh' })}
           </button>
         </div>
       </div>

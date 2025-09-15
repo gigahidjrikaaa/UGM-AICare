@@ -7,6 +7,8 @@ import { Suspense } from "react";
 import GlobalSkeleton from "@/components/ui/GlobalSkeleton";
 import { ClientOnlyToaster } from "@/components/ui/ClientOnlyToaster";
 import HydrationSafeWrapper from "@/components/layout/HydrationSafeWrapper";
+import {NextIntlClientProvider} from 'next-intl';
+import {getLocale, getMessages} from 'next-intl/server';
 // AppLayout import is removed from here
 
 const inter = Inter({ subsets: ['latin'] })
@@ -58,31 +60,35 @@ export default async function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const locale = await getLocale();
+  const messages = await getMessages();
   return (
-    <html lang="en" className="h-full">
+    <html lang={locale} className="h-full">
       <body
         className={`${inter.className} flex flex-col h-full`}
         suppressHydrationWarning={true}
       >
-        <ClientProvider>
-          <HydrationSafeWrapper>
-              <Suspense fallback={<GlobalSkeleton />}>
-                {/* AppLayout is removed from here, children are rendered directly */}
-                {children}
-                <ClientOnlyToaster
-                  position="top-right"
-                  reverseOrder={false}
-                  toastOptions={{
-                    duration: 5000,
-                    style: {
-                      background: 'rgba(54, 54, 54, 0.7)',
-                      color: '#fff',
-                    },
-                  }}
-                />
-              </Suspense>
-          </HydrationSafeWrapper>
-        </ClientProvider>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <ClientProvider>
+            <HydrationSafeWrapper>
+                <Suspense fallback={<GlobalSkeleton />}>
+                  {/* AppLayout is removed from here, children are rendered directly */}
+                  {children}
+                  <ClientOnlyToaster
+                    position="top-right"
+                    reverseOrder={false}
+                    toastOptions={{
+                      duration: 5000,
+                      style: {
+                        background: 'rgba(54, 54, 54, 0.7)',
+                        color: '#fff',
+                      },
+                    }}
+                  />
+                </Suspense>
+            </HydrationSafeWrapper>
+          </ClientProvider>
+        </NextIntlClientProvider>
       </body>
     </html>
   );

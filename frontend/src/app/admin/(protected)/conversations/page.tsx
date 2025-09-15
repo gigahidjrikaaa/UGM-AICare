@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
+import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { 
@@ -83,7 +84,7 @@ interface SessionCardItem {
   last_preview: string;
 }
 
-import { apiCall } from '@/utils/adminApi';
+import { apiCall, authenticatedFetch } from '@/utils/adminApi';
 
 // API function (uses session automatically via adminApi)
 const fetchConversations = async (
@@ -124,7 +125,8 @@ const ConversationCard: React.FC<{
   conversation: ConversationListItem; 
   onViewSession: (sessionId: string) => void;
   onViewDetail: (conversationId: number) => void;
-}> = ({ conversation, onViewSession, onViewDetail }) => {
+  onFlag: (sessionId: string) => void;
+}> = ({ conversation, onViewSession, onViewDetail, onFlag }) => {
   const getTimeAgo = (timestamp: string) => {
     try {
       return formatDistanceToNow(new Date(timestamp), { addSuffix: true });
@@ -214,14 +216,59 @@ const ConversationCard: React.FC<{
           variant="outline"
           size="sm"
           onClick={async () => {
-            const reason = prompt('Reason to flag this session? (optional)') || '';
             try {
-              await apiCall(`/api/v1/admin/conversation-session/${conversation.session_id}/flag`, { method: 'POST', body: JSON.stringify({ reason }) });
-              alert('Session flagged');
+              const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
+              const url = `${apiBase}/api/v1/admin/conversation-session/${conversation.session_id}/export`;
+              const resp = await authenticatedFetch(url, { method: 'GET' });
+              if (!resp.ok) {
+                throw new Error(`Download failed (${resp.status})`);
+              }
+              const txt = await resp.text();
+              const blob = new Blob([txt], { type: 'text/plain;charset=utf-8' });
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(blob);
+              a.download = `session_${conversation.session_id}.txt`;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
             } catch (e: any) {
-              alert(e?.message || 'Failed to flag');
+              alert(e?.message || 'Failed to download transcript');
             }
           }}
+          className="flex-1 flex items-center justify-center gap-1"
+        >
+          Download
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={async () => {
+            try {
+              const apiBase = process.env.NEXT_PUBLIC_API_URL || '';
+              const url = `${apiBase}/api/v1/admin/conversation-session/${conversation.session_id}/export.csv`;
+              const resp = await authenticatedFetch(url, { method: 'GET' });
+              if (!resp.ok) {
+                throw new Error(`CSV download failed (${resp.status})`);
+              }
+              const blob = await resp.blob();
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(blob);
+              a.download = `session_${conversation.session_id}.csv`;
+              document.body.appendChild(a);
+              a.click();
+              a.remove();
+            } catch (e: any) {
+              alert(e?.message || 'Failed to download CSV');
+            }
+          }}
+          className="flex-1 flex items-center justify-center gap-1"
+        >
+          CSV
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={() => onFlag(conversation.session_id)}
           className="flex-1 flex items-center justify-center gap-1"
         >
           Flag
@@ -296,6 +343,7 @@ const StatsCard: React.FC<{ stats: ConversationStats }> = ({ stats }) => {
 // Main component - now using useSession
 function AIConversationsContent() {
   const router = useRouter();
+  const t = useTranslations('Conversations');
 
   // State
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
@@ -313,6 +361,12 @@ function AIConversationsContent() {
   const [userHashFilter, setUserHashFilter] = useState('');
   
   const ITEMS_PER_PAGE = 20;
+
+  // Flag modal state
+  const [flagOpen, setFlagOpen] = useState(false);
+  const [flagSessionId, setFlagSessionId] = useState<string | null>(null);
+  const [flagReason, setFlagReason] = useState('');
+  const [flagTags, setFlagTags] = useState('');
 
   const loadConversations = useCallback(async () => {
     setIsLoading(true);
@@ -357,6 +411,28 @@ function AIConversationsContent() {
     router.push(`/admin/conversations/session/${sessionId}`);
   };
 
+  const handleOpenFlag = (sessionId: string) => {
+    setFlagSessionId(sessionId);
+    setFlagReason('');
+    setFlagTags('');
+    setFlagOpen(true);
+  };
+
+  const submitFlag = async () => {
+    if (!flagSessionId) return;
+    try {
+      const tags = flagTags.split(',').map(t => t.trim()).filter(Boolean);
+      await apiCall(`/api/v1/admin/conversations/session/${flagSessionId}/flag`, {
+        method: 'POST',
+        body: JSON.stringify({ reason: flagReason || undefined, tags: tags.length ? tags : undefined })
+      });
+      setFlagOpen(false);
+      alert('Session flagged');
+    } catch (e: any) {
+      alert(e?.message || 'Failed to flag');
+    }
+  };
+
   const clearFilters = () => {
     setSearchTerm('');
     setSessionFilter('');
@@ -390,9 +466,9 @@ function AIConversationsContent() {
     <div className="container mx-auto px-4 py-6 max-w-7xl">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">AI Conversations</h1>
+        <h1 className="text-3xl font-bold tracking-tight">{t('title', { fallback: 'AI Conversations' })}</h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
-          Monitor and analyze AI chat interactions with privacy protection
+          {t('subtitle', { fallback: 'Monitor and analyze AI chat interactions with privacy protection' })}
         </p>
         <div className="mt-3">
           <Button
@@ -422,7 +498,7 @@ function AIConversationsContent() {
               }
             }}
           >
-            Export Sessions CSV
+            {t('exportCsv', { fallback: 'Export Sessions CSV' })}
           </Button>
         </div>
       </div>
@@ -434,23 +510,23 @@ function AIConversationsContent() {
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">
           <Filter className="h-5 w-5" />
-          <h2 className="text-lg font-semibold">Filters & Search</h2>
+          <h2 className="text-lg font-semibold">{t('filtersTitle', { fallback: 'Filters & Search' })}</h2>
         </div>
         <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
-          Search and filter conversations while maintaining user privacy
+          {t('filtersSubtitle', { fallback: 'Search and filter conversations while maintaining user privacy' })}
         </p>
         
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             <div className="space-y-2">
               <label htmlFor="search-messages" className="text-sm font-medium">
-                Search Messages
+                {t('searchMessages', { fallback: 'Search Messages' })}
               </label>
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <input
                   id="search-messages"
                   type="text"
-                  placeholder="Search in messages..."
+                  placeholder={t('searchMessagesPlaceholder', { fallback: 'Search in messages...' })}
                   value={searchTerm}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSearch(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -460,7 +536,7 @@ function AIConversationsContent() {
             
             <div className="space-y-2">
               <label htmlFor="session-filter" className="text-sm font-medium">
-                Session ID
+                {t('sessionId', { fallback: 'Session ID' })}
               </label>
               <input
                 id="session-filter"
@@ -474,7 +550,7 @@ function AIConversationsContent() {
 
             <div className="space-y-2">
               <label htmlFor="userhash-filter" className="text-sm font-medium">
-                User Hash
+                {t('userHash', { fallback: 'User Hash' })}
               </label>
               <input
                 id="userhash-filter"
@@ -488,7 +564,7 @@ function AIConversationsContent() {
           
           <div className="space-y-2">
             <label htmlFor="date-from" className="text-sm font-medium">
-              Date From
+              {t('dateFrom', { fallback: 'Date From' })}
             </label>
             <input
               id="date-from"
@@ -501,7 +577,7 @@ function AIConversationsContent() {
           
           <div className="space-y-2">
             <label htmlFor="date-to" className="text-sm font-medium">
-              Date To
+              {t('dateTo', { fallback: 'Date To' })}
             </label>
             <input
               id="date-to"
@@ -515,7 +591,7 @@ function AIConversationsContent() {
         
         <div className="flex items-center justify-between">
           <Button variant="outline" onClick={clearFilters} size="sm">
-            Clear Filters
+            {t('clearFilters', { fallback: 'Clear Filters' })}
           </Button>
           <div className="text-sm text-gray-600 dark:text-gray-400">
             Showing {conversations.length} of {totalCount.toLocaleString()} conversations
@@ -561,6 +637,7 @@ function AIConversationsContent() {
                 conversation={conversation}
                 onViewSession={handleViewSession}
                 onViewDetail={handleViewDetail}
+                onFlag={handleOpenFlag}
               />
             ))}
           </div>
@@ -608,6 +685,28 @@ function AIConversationsContent() {
             </div>
           )}
         </>
+      )}
+      {flagOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setFlagOpen(false)} />
+          <div className="relative bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl p-6 w-full max-w-lg mx-4">
+            <h3 className="text-xl font-semibold mb-4">Flag Session …{flagSessionId?.slice(-8)}</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Reason</label>
+                <textarea value={flagReason} onChange={(e) => setFlagReason(e.target.value)} rows={4} className="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-700" placeholder="Describe why this session is being flagged (optional)" />
+              </div>
+              <div>
+                <label className="block text-sm font-medium mb-1">Tags</label>
+                <input value={flagTags} onChange={(e) => setFlagTags(e.target.value)} className="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-700" placeholder="Comma-separated tags (e.g., crisis, escalation)" />
+              </div>
+            </div>
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => setFlagOpen(false)}>Cancel</Button>
+              <Button onClick={submitFlag}>Flag Session</Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

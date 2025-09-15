@@ -3,8 +3,8 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --turbopack -p 4000",
-    "dev:docker": "next dev --turbopack",
+    "dev": "next dev -p 4000",
+    "dev:docker": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint"
@@ -12,6 +12,7 @@
   "dependencies": {
     "@headlessui/react": "^2.2.1",
     "@radix-ui/react-slot": "^1.2.0",
+    "@ricky0123/vad-web": "^0.0.13",
     "autoprefixer": "^10.4.21",
     "axios": "^1.9.0",
     "class-variance-authority": "^0.7.1",
@@ -23,18 +24,18 @@
     "lucide-react": "^0.507.0",
     "next": "^15.3.1",
     "next-auth": "^4.24.11",
+    "next-intl": "^3.26.5",
+    "onnxruntime-web": "^1.18.0",
     "react": "^19.1.0",
     "react-dom": "^19.1.0",
     "react-hot-toast": "^2.5.2",
     "react-icons": "^5.5.0",
     "react-markdown": "^10.1.0",
     "regenerator-runtime": "^0.14.1",
+    "socket.io-client": "^4.7.5",
     "tailwind-merge": "^3.2.0",
     "uuid": "^11.1.0",
-    "zustand": "^5.0.8",
-    "@ricky0123/vad-web": "^0.0.13",
-    "onnxruntime-web": "^1.18.0",
-    "socket.io-client": "^4.7.5"
+    "zustand": "^5.0.8"
   },
   "devDependencies": {
     "@babel/plugin-transform-runtime": "^7.28.3",
