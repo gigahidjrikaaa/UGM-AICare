@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { FiCalendar, FiEye, FiEdit, FiTrash2 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -41,6 +41,7 @@ interface Appointment {
 }
 
 export default function AppointmentManagementPage() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [psychologists, setPsychologists] = useState<Psychologist[]>([]);
@@ -88,6 +89,17 @@ export default function AppointmentManagementPage() {
     if (tab === 'therapists') setActiveTab('therapists');
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const setTabAndUrl = (tab: 'appointments' | 'therapists') => {
+    setActiveTab(tab);
+    try {
+      const current = new URLSearchParams(searchParams?.toString());
+      current.set('tab', tab);
+      router.replace(`/admin/appointments?${current.toString()}`);
+    } catch (e) {
+      // no-op
+    }
+  };
 
   useEffect(() => {
     if (activeTab === 'appointments') {
@@ -162,7 +174,7 @@ export default function AppointmentManagementPage() {
 
       <div className="flex border-b border-white/20">
         <button
-          onClick={() => setActiveTab('appointments')}
+          onClick={() => setTabAndUrl('appointments')}
           className={`px-4 py-2 text-sm font-medium ${
             activeTab === 'appointments'
               ? 'text-[#FFCA40] border-b-2 border-[#FFCA40]'
@@ -172,7 +184,7 @@ export default function AppointmentManagementPage() {
           Appointments
         </button>
         <button
-          onClick={() => setActiveTab('therapists')}
+          onClick={() => setTabAndUrl('therapists')}
           className={`px-4 py-2 text-sm font-medium ${
             activeTab === 'therapists'
               ? 'text-[#FFCA40] border-b-2 border-[#FFCA40]'
