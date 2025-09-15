@@ -8,15 +8,13 @@ import { FiSearch, FiBell, FiMenu, FiChevronDown, FiLogOut, FiUser, FiSettings, 
 import { Popover, Transition } from '@headlessui/react';
 import { Fragment } from 'react';
 import { usePathname } from 'next/navigation';
-import LanguageSwitcher from './LanguageSwitcher';
-import { useTranslations } from 'next-intl';
+// Language switcher removed (next-intl reverted)
 
 export default function AdminHeader() {
   const { data: session } = useSession();
   const [searchQuery, setSearchQuery] = useState('');
   const pathname = usePathname();
-  const t = useTranslations('Header');
-  const tNav = useTranslations('Nav');
+  // i18n removed
   // Add state for mobile sidebar toggle if you implement a drawer sidebar for mobile
 
   return (
@@ -32,7 +30,7 @@ export default function AdminHeader() {
             <FiSearch className="text-gray-400 mr-2" />
             <input 
               type="text" 
-              placeholder={t('search')} 
+              placeholder="Search..." 
               className="bg-transparent border-none outline-none text-white placeholder-gray-400 text-sm w-full"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
@@ -42,7 +40,7 @@ export default function AdminHeader() {
         
         {/* Right side - Notifications & Profile Dropdown */}
         <div className="flex items-center space-x-3 md:space-x-5">
-          <LanguageSwitcher />
+          {/* Language switcher removed */}
           <button className="relative p-2 rounded-full hover:bg-white/10 transition-colors" aria-label="Notifications">
             <FiBell className="text-white" size={20} />
             {/* Example notification badge */}
@@ -82,17 +80,17 @@ export default function AdminHeader() {
                       <p className="text-xs text-gray-400 truncate">{session?.user?.email}</p>
                     </div>
                     <Link href="/admin/profile" className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-[#FFCA40] transition-colors">
-                        <FiUser className="mr-2.5" size={16}/> {t('profile')}
+                        <FiUser className="mr-2.5" size={16}/> Profile
                     </Link>
                     <Link href="/admin/settings" className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-white/10 hover:text-[#FFCA40] transition-colors">
-                        <FiSettings className="mr-2.5" size={16}/> {t('settings')}
+                        <FiSettings className="mr-2.5" size={16}/> Settings
                     </Link>
                     <button
                       onClick={() => signOut({ callbackUrl: '/admin' })}
                       className="w-full text-left flex items-center px-4 py-2 text-sm text-gray-300 hover:bg-red-500/20 hover:text-red-300 transition-colors"
                     >
                       <FiLogOut className="mr-2.5" size={16}/>
-                      {t('sign_out')}
+                      Sign Out
                     </button>
                   </Popover.Panel>
                 </Transition>
@@ -104,10 +102,10 @@ export default function AdminHeader() {
        {/* Mobile Navigation Tabs - shown on smaller screens */}
        <div className="md:hidden border-t border-white/10 overflow-x-auto">
         <nav className="flex px-2 space-x-1">
-          {[{ name: tNav('dashboard'), icon: <FiPieChart size={18}/>, href: '/admin/dashboard' },
-            { name: tNav('appointments'), icon: <FiCalendar size={18}/>, href: '/admin/appointments' },
-            { name: tNav('users'), icon: <FiUsers size={18}/>, href: '/admin/users' },
-            { name: tNav('settings'), icon: <FiSettings size={18}/>, href: '/admin/settings' }].map((item) => {
+          {[{ name: 'Dashboard', icon: <FiPieChart size={18}/>, href: '/admin/dashboard' },
+            { name: 'Appointments', icon: <FiCalendar size={18}/>, href: '/admin/appointments' },
+            { name: 'Users', icon: <FiUsers size={18}/>, href: '/admin/users' },
+            { name: 'Settings', icon: <FiSettings size={18}/>, href: '/admin/settings' }].map((item) => {
             const isActive = pathname === item.href || (item.href !== '/admin/dashboard' && pathname.startsWith(item.href));
             return (
               <Link

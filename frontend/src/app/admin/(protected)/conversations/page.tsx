@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { useTranslations } from 'next-intl';
 import { useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { 
@@ -343,7 +342,7 @@ const StatsCard: React.FC<{ stats: ConversationStats }> = ({ stats }) => {
 // Main component - now using useSession
 function AIConversationsContent() {
   const router = useRouter();
-  const t = useTranslations('Conversations');
+  // i18n removed
 
   // State
   const [conversations, setConversations] = useState<ConversationListItem[]>([]);
@@ -466,9 +465,9 @@ function AIConversationsContent() {
     <div className="container mx-auto px-4 py-6 max-w-7xl">
       {/* Header */}
       <div className="mb-6">
-        <h1 className="text-3xl font-bold tracking-tight">{t('title', { fallback: 'AI Conversations' })}</h1>
+        <h1 className="text-3xl font-bold tracking-tight">AI Conversations</h1>
         <p className="text-gray-600 dark:text-gray-400 mt-2">
-          {t('subtitle', { fallback: 'Monitor and analyze AI chat interactions with privacy protection' })}
+          Monitor and analyze AI chat interactions with privacy protection
         </p>
         <div className="mt-3">
           <Button
@@ -498,7 +497,7 @@ function AIConversationsContent() {
               }
             }}
           >
-            {t('exportCsv', { fallback: 'Export Sessions CSV' })}
+            Export Sessions CSV
           </Button>
         </div>
       </div>
@@ -510,23 +509,23 @@ function AIConversationsContent() {
       <div className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 mb-6">
         <div className="flex items-center gap-2 mb-4">
           <Filter className="h-5 w-5" />
-          <h2 className="text-lg font-semibold">{t('filtersTitle', { fallback: 'Filters & Search' })}</h2>
+          <h2 className="text-lg font-semibold">Filters & Search</h2>
         </div>
         <p className="text-gray-600 dark:text-gray-400 text-sm mb-4">
-          {t('filtersSubtitle', { fallback: 'Search and filter conversations while maintaining user privacy' })}
+          Search and filter conversations while maintaining user privacy
         </p>
         
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
             <div className="space-y-2">
               <label htmlFor="search-messages" className="text-sm font-medium">
-                {t('searchMessages', { fallback: 'Search Messages' })}
+                Search Messages
               </label>
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <input
                   id="search-messages"
                   type="text"
-                  placeholder={t('searchMessagesPlaceholder', { fallback: 'Search in messages...' })}
+                  placeholder="Search in messages..."
                   value={searchTerm}
                   onChange={(e: React.ChangeEvent<HTMLInputElement>) => handleSearch(e.target.value)}
                   className="w-full pl-9 pr-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent"
@@ -536,7 +535,7 @@ function AIConversationsContent() {
             
             <div className="space-y-2">
               <label htmlFor="session-filter" className="text-sm font-medium">
-                {t('sessionId', { fallback: 'Session ID' })}
+                Session ID
               </label>
               <input
                 id="session-filter"
@@ -550,7 +549,7 @@ function AIConversationsContent() {
 
             <div className="space-y-2">
               <label htmlFor="userhash-filter" className="text-sm font-medium">
-                {t('userHash', { fallback: 'User Hash' })}
+                User Hash
               </label>
               <input
                 id="userhash-filter"
@@ -564,7 +563,7 @@ function AIConversationsContent() {
           
           <div className="space-y-2">
             <label htmlFor="date-from" className="text-sm font-medium">
-              {t('dateFrom', { fallback: 'Date From' })}
+              Date From
             </label>
             <input
               id="date-from"
@@ -577,7 +576,7 @@ function AIConversationsContent() {
           
           <div className="space-y-2">
             <label htmlFor="date-to" className="text-sm font-medium">
-              {t('dateTo', { fallback: 'Date To' })}
+              Date To
             </label>
             <input
               id="date-to"
@@ -591,7 +590,7 @@ function AIConversationsContent() {
         
         <div className="flex items-center justify-between">
           <Button variant="outline" onClick={clearFilters} size="sm">
-            {t('clearFilters', { fallback: 'Clear Filters' })}
+            Clear Filters
           </Button>
           <div className="text-sm text-gray-600 dark:text-gray-400">
             Showing {conversations.length} of {totalCount.toLocaleString()} conversations

@@ -1,19 +1,7 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
 import { getToken } from 'next-auth/jwt';
-import createIntlMiddleware from 'next-intl/middleware';
-
-const intl = createIntlMiddleware({
-  locales: ['en', 'id'],
-  defaultLocale: 'en',
-  localePrefix: 'never'
-});
-
 export async function middleware(request: NextRequest) {
-  // First, let next-intl handle locale detection/cookies. Keep response to continue chaining.
-  const intlResponse = intl(request);
-  const baseResponse = intlResponse ?? NextResponse.next();
-
   const session = await getToken({ 
     req: request, 
     secret: process.env.NEXTAUTH_SECRET 
@@ -38,11 +26,10 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL('/signin', request.url));
   }
 
-  return baseResponse;
+  return NextResponse.next();
 }
 
 // See: https://nextjs.org/docs/app/building-your-application/routing/middleware#matcher
 export const config = {
-  // Run on all pages except static files and API
-  matcher: ['/((?!api|_next|_vercel|.*\\..*).*)'],
+  matcher: ['/admin/dashboard/:path*', '/signin', '/signin-ugm', '/aika/:path*'],
 };

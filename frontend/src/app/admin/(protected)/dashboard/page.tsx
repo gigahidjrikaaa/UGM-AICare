@@ -14,7 +14,6 @@ import {
   FiCheck, FiX, FiChevronRight, FiEdit3, FiPlus, FiActivity, FiTrendingUp, FiMessageSquare, FiShield
 } from 'react-icons/fi';
 import React from 'react';
-import { useTranslations } from 'next-intl';
 import { apiCall } from '@/utils/adminApi';
 
 // Mock data for today's appointments
@@ -78,7 +77,6 @@ export default function AdminDashboardPage() {
   const router = useRouter(); 
   const [flagsOpenCount, setFlagsOpenCount] = useState<number>(0);
   const [recentFlags, setRecentFlags] = useState<{ id: number; session_id: string; status: string; created_at: string; reason?: string | null; tags?: string[] | null; }[]>([]);
-  const t = useTranslations('Dashboard');
 
   // The AdminLayout (from layout.tsx) now primarily handles authentication and role checks.
   // This useEffect can be a secondary check or removed if AdminLayout is robust.
@@ -114,7 +112,7 @@ export default function AdminDashboardPage() {
         {/* Page Title */}
         <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-white">{t('title')}</h1>
+            <h1 className="text-3xl font-bold text-white">Admin Dashboard</h1>
             <p className="text-md text-gray-400 mt-1">
               Overview of UGM-AICare Platform Activity
             </p>
