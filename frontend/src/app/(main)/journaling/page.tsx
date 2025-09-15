@@ -2,6 +2,7 @@
 "use client";
 
 import { useState, Suspense, useEffect, useCallback } from 'react'; // Added Suspense
+import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import ChatHistoryViewer from '@/components/features/journaling/ChatHistoryViewer'; // Create this component
 import DailyJournal from '@/components/features/journaling/DailyJournal';       // Create this component
@@ -32,6 +33,8 @@ interface ActivitySummaryResponse {
 }
 
 export default function JournalingPage() {
+    const router = useRouter();
+    const searchParams = useSearchParams();
     const [activeTab, setActiveTab] = useState<JournalTab>('daily');
     const [currentMonth, setCurrentMonth] = useState(startOfMonth(new Date())); // State for calendar month
     const [activityData, setActivityData] = useState<ActivitySummary>({}); // State for calendar data
@@ -86,6 +89,26 @@ export default function JournalingPage() {
         setIsModalOpen(false);
         fetchActivityData(currentMonth); // Refresh calendar data
         setDailyJournalRefreshKey(prevKey => prevKey + 1); // Increment key to trigger DailyJournal refresh
+    };
+
+    // Initialize tab from URL on first render
+    useEffect(() => {
+        try {
+            const tabParam = searchParams?.get('tab');
+            if (tabParam === 'history' || tabParam === 'daily') {
+                setActiveTab(tabParam as JournalTab);
+            }
+        } catch {}
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const setTabAndUrl = (tab: JournalTab) => {
+        setActiveTab(tab);
+        try {
+            const current = new URLSearchParams(searchParams?.toString());
+            current.set('tab', tab);
+            router.replace(`/journaling?${current.toString()}`);
+        } catch {}
     };
 
     return (
@@ -159,7 +182,7 @@ export default function JournalingPage() {
             <div className="mb-4 sm:mb-6 border-b border-white/10"> {/* Adjusted margin */}
                 <nav className="flex space-x-2 sm:space-x-4" aria-label="Tabs">
                     <button
-                        onClick={() => setActiveTab('daily')}
+                        onClick={() => setTabAndUrl('daily')}
                         className={`px-3 py-2 font-medium text-sm rounded-t-lg transition-colors duration-150 ${
                             activeTab === 'daily' ? 'border-b-2 border-[#FFCA40] text-[#FFCA40]' : 'text-gray-400 hover:text-gray-200 hover:border-gray-500/50'
                         }`}
@@ -167,7 +190,7 @@ export default function JournalingPage() {
                         Daily Journal Entries
                     </button>
                     <button
-                        onClick={() => setActiveTab('history')}
+                        onClick={() => setTabAndUrl('history')}
                         className={`px-3 py-2 font-medium text-sm rounded-t-lg transition-colors duration-150 ${
                             activeTab === 'history' ? 'border-b-2 border-[#FFCA40] text-[#FFCA40]' : 'text-gray-400 hover:text-gray-200 hover:border-gray-500/50'
                         }`}
