@@ -16,48 +16,13 @@ import {
 import React from 'react';
 import { apiCall } from '@/utils/adminApi';
 
-// Mock data for today's appointments
-const todayAppointments = [
-  { 
-    id: 1,
-    patientName: 'Budi Setiawan',
-    patientEmail: 'budi.s@mail.ugm.ac.id',
-    time: '09:00',
-    counselor: 'Dr. Putri Handayani',
-    type: 'Initial Consultation',
-    status: 'confirmed'
-  },
-  { 
-    id: 2,
-    patientName: 'Siti Rahayu',
-    patientEmail: 'siti.r@mail.ugm.ac.id',
-    time: '10:30',
-    counselor: 'Dr. Budi Santoso',
-    type: 'Follow-up Session',
-    status: 'confirmed'
-  },
-  { 
-    id: 3,
-    patientName: 'Ahmad Rizal',
-    patientEmail: 'ahmad.r@mail.ugm.ac.id',
-    time: '13:00',
-    counselor: 'Anita Wijaya, M.Psi',
-    type: 'Crisis Intervention',
-    status: 'cancelled'
-  },
-];
-
-// Mock data for statistics
-const statsData = {
-  totalUsers: 1256,
-  activeSessions: 42,
-  newSignupsToday: 15,
-  avgSessionDuration: '23 min',
-  totalAppointmentsThisMonth: 124,
-  completedAppointments: 98,
-  cancellations: 11,
-  satisfactionRate: '92%',
-};
+// Types for fetched summaries
+interface UserStats { total_users: number; active_users_7d: number; active_users_30d: number; new_users_today: number; avg_sentiment_score: number; total_journal_entries: number; total_conversations: number; total_badges_awarded: number; }
+interface ConversationStats { total_conversations: number; total_sessions: number; total_users_with_conversations: number; avg_messages_per_session: number; avg_message_length: number; avg_response_length: number; conversations_today: number; conversations_this_week: number; most_active_hour: number; }
+// Conversations stats are returned directly from summary endpoint
+interface AppointmentSummary { date_from: string; date_to: string; total: number; completed: number; cancelled: number; today_total: number; }
+interface FeedbackSummary { window_days: number; count: number; avg_nps?: number|null; avg_felt_understood?: number|null }
+interface AppointmentItem { id: number; appointment_datetime: string; status: string; user: { email: string|null }; psychologist: { name: string }; appointment_type: string }
 
 const cardVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
@@ -77,6 +42,11 @@ export default function AdminDashboardPage() {
   const router = useRouter(); 
   const [flagsOpenCount, setFlagsOpenCount] = useState<number>(0);
   const [recentFlags, setRecentFlags] = useState<{ id: number; session_id: string; status: string; created_at: string; reason?: string | null; tags?: string[] | null; }[]>([]);
+  const [userStats, setUserStats] = useState<UserStats | null>(null);
+  const [convStats, setConvStats] = useState<ConversationStats | null>(null);
+  const [apptSummary, setApptSummary] = useState<AppointmentSummary | null>(null);
+  const [feedbackSummary, setFeedbackSummary] = useState<FeedbackSummary | null>(null);
+  const [todayAppointments, setTodayAppointments] = useState<AppointmentItem[]>([]);
 
   // The AdminLayout (from layout.tsx) now primarily handles authentication and role checks.
   // This useEffect can be a secondary check or removed if AdminLayout is robust.
@@ -106,6 +76,43 @@ export default function AdminDashboardPage() {
     loadFlags();
   }, []);
 
+  // Load user stats and conversation stats
+  useEffect(() => {
+    const loadCore = async () => {
+      try {
+        const u = await apiCall<UserStats>(`/api/v1/admin/stats`);
+        setUserStats(u);
+      } catch {}
+      try {
+        const c = await apiCall<ConversationStats>(`/api/v1/admin/conversations/summary`);
+        setConvStats(c);
+      } catch {}
+    };
+    loadCore();
+  }, []);
+
+  // Load appointment + feedback summaries and today's appointments
+  useEffect(() => {
+    const loadDash = async () => {
+      try {
+        const a = await apiCall<AppointmentSummary>(`/api/v1/admin/appointments/summary`);
+        setApptSummary(a);
+      } catch {}
+      try {
+        const f = await apiCall<FeedbackSummary>(`/api/v1/admin/feedback/summary?window_days=30`);
+        setFeedbackSummary(f);
+      } catch {}
+      try {
+        const list = await apiCall<AppointmentItem[]>(`/api/v1/admin/appointments`);
+        const today = new Date();
+        const isSameDay = (d: Date) => d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+        const filtered = list.filter(ap => isSameDay(new Date(ap.appointment_datetime))).slice(0, 8);
+        setTodayAppointments(filtered);
+      } catch {}
+    };
+    loadDash();
+  }, []);
+
   // Remove the <AdminLayout> wrapper from here
   return (
       <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl 2xl:max-w-[100rem] space-y-4 sm:space-y-6 md:space-y-8">
@@ -122,13 +129,13 @@ export default function AdminDashboardPage() {
           </p>
         </div>
         
-        {/* Quick Stats - Row 1 (User & Session Focus) */}
+        {/* Quick Stats - Row 1 (Users & Conversations) */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
           {[
-            { title: 'Total Users', value: statsData.totalUsers, icon: <FiUsers size={22}/>, color: 'blue', trend: '+5% this month' },
-            { title: 'Active AI Sessions', value: statsData.activeSessions, icon: <FiMessageSquare size={22}/>, color: 'green', trend: 'Real-time' },
-            { title: 'New Signups (Today)', value: statsData.newSignupsToday, icon: <FiPlus size={22}/>, color: 'yellow', trend: '+2 yesterday' },
-            { title: 'Avg. Session Duration', value: statsData.avgSessionDuration, icon: <FiClock size={22}/>, color: 'purple', trend: 'Stable' },
+            { title: 'Total Users', value: userStats?.total_users ?? '—', icon: <FiUsers size={22}/>, color: 'blue', trend: `Active 7d: ${userStats?.active_users_7d ?? 0}` },
+            { title: 'New Signups Today', value: userStats?.new_users_today ?? '—', icon: <FiPlus size={22}/>, color: 'yellow', trend: `Active 30d: ${userStats?.active_users_30d ?? 0}` },
+            { title: 'Conversations Today', value: convStats?.conversations_today ?? '—', icon: <FiMessageSquare size={22}/>, color: 'green', trend: `Sessions: ${convStats?.total_sessions ?? 0}` },
+            { title: 'Avg Sentiment', value: (userStats ? userStats.avg_sentiment_score.toFixed(2) : '—'), icon: <FiClock size={22}/>, color: 'purple', trend: convStats ? `Active hour: ${convStats.most_active_hour}:00` : '—' },
           ].map((stat, i) => (
             <motion.div 
               key={stat.title}
@@ -192,10 +199,10 @@ export default function AdminDashboardPage() {
         {/* Quick Stats - Row 2 (Appointments & Feedback Focus) */}
          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
           {[
-            { title: 'Appointments (Month)', value: statsData.totalAppointmentsThisMonth, icon: <FiCalendar size={22}/>, color: 'indigo', trend: '+12% last month' },
-            { title: 'Completed Appts.', value: statsData.completedAppointments, icon: <FiCheck size={22}/>, color: 'teal', trend: `${Math.round((statsData.completedAppointments / statsData.totalAppointmentsThisMonth) * 100)}% completion` },
-            { title: 'Cancellations', value: statsData.cancellations, icon: <FiX size={22}/>, color: 'orange', trend: `${Math.round((statsData.cancellations / statsData.totalAppointmentsThisMonth) * 100)}% rate` },
-            { title: 'User Satisfaction', value: statsData.satisfactionRate, icon: <FiTrendingUp size={22}/>, color: 'pink', trend: 'Based on feedback' },
+            { title: 'Appointments (Month)', value: apptSummary?.total ?? '—', icon: <FiCalendar size={22}/>, color: 'indigo', trend: `Today: ${apptSummary?.today_total ?? 0}` },
+            { title: 'Completed Appts.', value: apptSummary?.completed ?? '—', icon: <FiCheck size={22}/>, color: 'teal', trend: apptSummary ? `${Math.round((apptSummary.completed / Math.max(1, apptSummary.total)) * 100)}% completion` : '—' },
+            { title: 'Cancellations', value: apptSummary?.cancelled ?? '—', icon: <FiX size={22}/>, color: 'orange', trend: apptSummary ? `${Math.round((apptSummary.cancelled / Math.max(1, apptSummary.total)) * 100)}% rate` : '—' },
+            { title: 'Satisfaction', value: feedbackSummary?.avg_felt_understood != null ? `${Math.round((feedbackSummary.avg_felt_understood/5)*100)}%` : (feedbackSummary?.avg_nps != null ? `NPS ${feedbackSummary.avg_nps.toFixed(1)}` : '—'), icon: <FiTrendingUp size={22}/>, color: 'pink', trend: feedbackSummary ? `${feedbackSummary.count} responses (last ${feedbackSummary.window_days}d)` : '—' },
           ].map((stat, i) => (
             <motion.div 
               key={stat.title}
@@ -253,26 +260,26 @@ export default function AdminDashboardPage() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="h-9 w-9 rounded-full bg-[#173a7a] flex items-center justify-center mr-3 border border-blue-400/50">
-                          <span className="font-medium text-sm">{appointment.patientName.charAt(0)}</span>
+                          <span className="font-medium text-sm">{(appointment.user.email || 'U').charAt(0).toUpperCase()}</span>
                         </div>
                         <div>
-                          <div className="font-medium text-white">{appointment.patientName}</div>
-                          <div className="text-xs text-gray-400">{appointment.patientEmail}</div>
+                          <div className="font-medium text-white truncate max-w-[40vw]">{appointment.user.email || 'Unknown'}</div>
+                          <div className="text-xs text-gray-400">{new Date(appointment.appointment_datetime).toLocaleTimeString()}</div>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-300">
-                      {appointment.time} WIB
+                      {new Date(appointment.appointment_datetime).toLocaleTimeString()}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-300">
-                      {appointment.counselor}
+                      {appointment.psychologist.name}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-gray-300">
-                      {appointment.type}
+                      {appointment.appointment_type}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
-                        appointment.status === 'confirmed' 
+                        appointment.status === 'completed' 
                           ? 'bg-green-500/20 text-green-300 ring-1 ring-green-400/30'
                           : appointment.status === 'cancelled'
                             ? 'bg-red-500/20 text-red-300 ring-1 ring-red-400/30'
@@ -308,10 +315,10 @@ export default function AdminDashboardPage() {
           <h2 className="text-xl font-semibold text-white mb-4">Quick Actions</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
             {[
-              { title: 'New Appointment', desc: 'Schedule directly', icon: <FiPlus/>, href: '/admin/appointments/new', color: 'blue' },
-              { title: 'Manage Counselors', desc: 'Add or edit profiles', icon: <FiUsers/>, href: '/admin/counselors', color: 'yellow' },
+              { title: 'New Appointment', desc: 'Schedule directly', icon: <FiPlus/>, href: '/admin/appointments', color: 'blue' },
+              { title: 'Manage Counselors', desc: 'Add or edit profiles', icon: <FiUsers/>, href: '/admin/appointments', color: 'yellow' },
               { title: 'View Analytics', desc: 'Platform usage reports', icon: <FiPieChart/>, href: '/admin/analytics', color: 'purple' },
-              { title: 'System Health', desc: 'Check system status', icon: <FiActivity/>, href: '/admin/system-health', color: 'green' },
+              { title: 'System Health', desc: 'Check system status', icon: <FiActivity/>, href: '/admin/analytics', color: 'green' },
             ].map(action => (
               <Link key={action.title} href={action.href}>
                 <div className={`bg-white/5 hover:bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-5 border border-white/10 cursor-pointer transition-all duration-150 shadow-lg hover:shadow-xl flex items-center space-x-4 h-full`}>

@@ -942,6 +942,66 @@ async def get_conversations(
         stats=stats
     )
 
+@router.get("/conversations/summary", response_model=ConversationStats)
+async def get_conversations_summary(
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    """Return only aggregate conversation stats for the dashboard."""
+    # Totals
+    total_conversations = (await db.execute(select(func.count(Conversation.id)))).scalar() or 0
+    total_sessions = (await db.execute(select(func.count(func.distinct(Conversation.session_id))))).scalar() or 0
+    total_users_with_conversations = (await db.execute(select(func.count(func.distinct(Conversation.user_id))))).scalar() or 0
+
+    # Averages
+    avg_stats_res = await db.execute(select(
+        func.avg(func.length(Conversation.message)).label('avg_message_length'),
+        func.avg(func.length(Conversation.response)).label('avg_response_length')
+    ))
+    avg_stats = avg_stats_res.first()
+    avg_message_length = float(avg_stats.avg_message_length) if avg_stats and getattr(avg_stats, 'avg_message_length', None) else 0.0
+    avg_response_length = float(avg_stats.avg_response_length) if avg_stats and getattr(avg_stats, 'avg_response_length', None) else 0.0
+
+    # Avg messages per session
+    session_counts_subq = select(
+        Conversation.session_id,
+        func.count(Conversation.id).label('count')
+    ).group_by(Conversation.session_id).subquery()
+    session_stats_res = await db.execute(select(
+        func.avg(session_counts_subq.c.count).label('avg_messages_per_session')
+    ))
+    avg_messages_per_session = float(session_stats_res.scalar() or 0.0)
+
+    # Time windows
+    today = datetime.now().date()
+    week_ago = today - timedelta(days=7)
+    conversations_today = (await db.execute(select(func.count(Conversation.id)).filter(func.date(Conversation.timestamp) == today))).scalar() or 0
+    conversations_this_week = (await db.execute(select(func.count(Conversation.id)).filter(func.date(Conversation.timestamp) >= week_ago))).scalar() or 0
+
+    # Most active hour
+    hour_stats_res = await db.execute(select(
+        func.extract('hour', Conversation.timestamp).label('hour'),
+        func.count(Conversation.id).label('count')
+    ).group_by(
+        func.extract('hour', Conversation.timestamp)
+    ).order_by(
+        desc(func.count(Conversation.id))
+    ))
+    hour_stats = hour_stats_res.first()
+    most_active_hour = int(hour_stats.hour) if hour_stats else 0
+
+    return ConversationStats(
+        total_conversations=total_conversations,
+        total_sessions=total_sessions,
+        total_users_with_conversations=total_users_with_conversations,
+        avg_messages_per_session=avg_messages_per_session,
+        avg_message_length=avg_message_length,
+        avg_response_length=avg_response_length,
+        conversations_today=int(conversations_today),
+        conversations_this_week=int(conversations_this_week),
+        most_active_hour=most_active_hour,
+    )
+
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetailResponse)
 async def get_conversation_detail(
     conversation_id: int,
@@ -1596,6 +1656,91 @@ async def get_admin_stats(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to fetch system statistics"
         )
+
+# --- Dashboard Summaries ---
+class AppointmentSummary(BaseModel):
+    date_from: date
+    date_to: date
+    total: int
+    completed: int
+    cancelled: int
+    today_total: int
+
+@router.get("/appointments/summary", response_model=AppointmentSummary)
+async def get_appointments_summary(
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    """Lightweight summary for appointments to power the dashboard."""
+    try:
+        today = datetime.now().date()
+        # Default range is current month
+        if not date_from or not date_to:
+            first_day = today.replace(day=1)
+            if today.month == 12:
+                next_month = today.replace(year=today.year + 1, month=1, day=1)
+            else:
+                next_month = today.replace(month=today.month + 1, day=1)
+            last_day = next_month - timedelta(days=1)
+            date_from = date_from or first_day
+            date_to = date_to or last_day
+
+        base = select(Appointment).filter(
+            func.date(Appointment.appointment_datetime) >= date_from,
+            func.date(Appointment.appointment_datetime) <= date_to,
+        )
+
+        total = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
+        completed = (await db.execute(select(func.count(Appointment.id)).filter(Appointment.status == 'completed', func.date(Appointment.appointment_datetime) >= date_from, func.date(Appointment.appointment_datetime) <= date_to))).scalar() or 0
+        cancelled = (await db.execute(select(func.count(Appointment.id)).filter(Appointment.status == 'cancelled', func.date(Appointment.appointment_datetime) >= date_from, func.date(Appointment.appointment_datetime) <= date_to))).scalar() or 0
+        today_total = (await db.execute(select(func.count(Appointment.id)).filter(func.date(Appointment.appointment_datetime) == today))).scalar() or 0
+
+        return AppointmentSummary(
+            date_from=date_from,
+            date_to=date_to,
+            total=int(total),
+            completed=int(completed),
+            cancelled=int(cancelled),
+            today_total=int(today_total),
+        )
+    except Exception as e:
+        logger.error(f"Error generating appointment summary: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch appointment summary")
+
+
+class FeedbackSummary(BaseModel):
+    window_days: int
+    count: int
+    avg_nps: Optional[float] = None
+    avg_felt_understood: Optional[float] = None
+
+@router.get("/feedback/summary", response_model=FeedbackSummary)
+async def get_feedback_summary(
+    window_days: int = Query(30, ge=1, le=365),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user)
+):
+    """Compute simple feedback KPIs (NPS, felt understood) for the last N days."""
+    try:
+        from app.models import Feedback
+        cutoff = datetime.now() - timedelta(days=window_days)
+        base = select(Feedback).filter(Feedback.timestamp >= cutoff)
+        count = (await db.execute(select(func.count()).select_from(base.subquery()))).scalar() or 0
+
+        avg_nps = (await db.execute(select(func.avg(Feedback.nps_rating)).filter(Feedback.timestamp >= cutoff))).scalar()
+        avg_felt = (await db.execute(select(func.avg(Feedback.felt_understood_rating)).filter(Feedback.timestamp >= cutoff))).scalar()
+
+        return FeedbackSummary(
+            window_days=window_days,
+            count=int(count),
+            avg_nps=float(avg_nps) if avg_nps is not None else None,
+            avg_felt_understood=float(avg_felt) if avg_felt is not None else None,
+        )
+    except Exception as e:
+        logger.error(f"Error generating feedback summary: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail="Failed to fetch feedback summary")
 
 # --- Appointment Models ---
 class PsychologistResponse(BaseModel):
