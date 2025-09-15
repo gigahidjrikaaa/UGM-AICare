@@ -81,14 +81,14 @@ export default function AdminLoginPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] flex flex-col items-center justify-center p-3 sm:p-4">
       <motion.div
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.5 }}
-        className="w-full max-w-md"
+        className="w-full max-w-sm sm:max-w-md"
       >
-        <div className="bg-white/10 backdrop-blur-md p-8 md:p-10 rounded-xl shadow-2xl border border-white/20">
+        <div className="bg-white/10 backdrop-blur-md p-6 sm:p-8 md:p-10 rounded-xl shadow-2xl border border-white/20">
           <div className="flex flex-col items-center mb-6">
             <Image
               src="/UGM_Lambang.png"
@@ -97,8 +97,8 @@ export default function AdminLoginPage() {
               height={60}
               className="mb-3"
             />
-            <h1 className="text-3xl font-bold text-white">Admin Panel</h1>
-            <p className="text-white/70">UGM-AICare Management</p>
+            <h1 className="text-2xl sm:text-3xl font-bold text-white">Admin Panel</h1>
+            <p className="text-white/70 text-sm sm:text-base">UGM-AICare Management</p>
           </div>
 
           {/* Development Credentials Hint - REMOVE IN PRODUCTION */}
@@ -106,7 +106,7 @@ export default function AdminLoginPage() {
             <div className="mb-6">
               <button
                 onClick={() => setShowCredentials(!showCredentials)}
-                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-orange-500/20 border border-orange-500/30 rounded-lg text-orange-300 text-sm hover:bg-orange-500/30 transition-colors"
+                className="w-full flex items-center justify-center gap-2 px-3 py-2 bg-orange-500/20 border border-orange-500/30 rounded-lg text-orange-300 text-xs sm:text-sm hover:bg-orange-500/30 transition-colors"
               >
                 {showCredentials ? <FiEyeOff size={16} /> : <FiEye size={16} />}
                 {showCredentials ? 'Hide' : 'Show'} Development Credentials
@@ -123,7 +123,7 @@ export default function AdminLoginPage() {
                     <FiAlertCircle className="text-orange-400" size={14} />
                     <span className="text-orange-300 font-semibold text-xs">Development Only</span>
                   </div>
-                  <div className="space-y-2 text-xs">
+                  <div className="space-y-2 text-[11px] sm:text-xs">
                     <div>
                       <span className="text-gray-400">Email:</span>
                       <span className="text-orange-300 ml-2 font-mono">{developmentCredentials.email}</span>
@@ -156,7 +156,7 @@ export default function AdminLoginPage() {
             <div>
               <label
                 htmlFor="email"
-                className="block text-sm font-medium text-white/80 mb-1"
+                className="block text-xs sm:text-sm font-medium text-white/80 mb-1"
               >
                 Admin Email Address
               </label>
@@ -170,7 +170,7 @@ export default function AdminLoginPage() {
                   required
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2.5 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] outline-none transition-colors"
+                  className="w-full pl-10 pr-3 py-2 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] outline-none transition-colors text-sm"
                   placeholder="admin@ugm.ac.id"
                 />
               </div>
@@ -179,7 +179,7 @@ export default function AdminLoginPage() {
             <div>
               <label
                 htmlFor="password"
-                className="block text-sm font-medium text-white/80 mb-1"
+                className="block text-xs sm:text-sm font-medium text-white/80 mb-1"
               >
                 Password
               </label>
@@ -193,7 +193,7 @@ export default function AdminLoginPage() {
                   required
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full pl-10 pr-3 py-2.5 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] outline-none transition-colors"
+                  className="w-full pl-10 pr-3 py-2 bg-white/5 border border-white/20 rounded-lg text-white placeholder-white/50 focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] outline-none transition-colors text-sm"
                   placeholder="••••••••"
                 />
               </div>
@@ -220,16 +220,16 @@ export default function AdminLoginPage() {
           
           <div className="mt-6 text-center">
             <Link href="/signin">
-              <p className="text-sm text-white/60 hover:text-white">Are you a user? Go to user login</p>
+              <p className="text-xs sm:text-sm text-white/60 hover:text-white">Are you a user? Go to user login</p>
             </Link>
           </div>
         </div>
         
         <div className="mt-6 space-y-3">
-          <p className="text-center text-xs text-white/60">
+          <p className="text-center text-[11px] sm:text-xs text-white/60">
             For authorized personnel only. All access is monitored.
           </p>
-          <div className="flex items-center justify-center gap-2 text-center text-xs text-white/40">
+          <div className="flex items-center justify-center gap-2 text-center text-[11px] sm:text-xs text-white/40">
             <FiShield size={12} />
             <span>Data encrypted in transit and at rest</span>
           </div>

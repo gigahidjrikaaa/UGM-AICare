@@ -557,17 +557,19 @@ function AIConversationsContent() {
   }
 
   return (
-    <div className="container mx-auto px-4 py-6 max-w-7xl">
+    <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl 2xl:max-w-[100rem]">
       {/* Header */}
-      <div className="mb-6">
-        <div className="flex items-center gap-3">
-          <ChatIcon className="h-7 w-7 mr-0.5 text-[#FFCA40]" />
-          <h1 className="text-3xl font-bold tracking-tight">AI Conversations</h1>
-          {usingDemo && (
-            <span className="ml-2 text-xs px-2 py-0.5 rounded-full bg-white/10 border border-white/20 text-yellow-300">Demo data</span>
-          )}
+      <div className="mb-4 sm:mb-6">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 sm:gap-3">
+          <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
+            <ChatIcon className="h-7 w-7 mr-0.5 text-[#FFCA40]" />
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight">AI Conversations</h1>
+            {usingDemo && (
+              <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-white/10 border border-white/20 text-yellow-300">Demo data</span>
+            )}
+          </div>
+          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">Monitor and analyze AI chat interactions with privacy protection</div>
         </div>
-        <p className="text-gray-600 dark:text-gray-400 mt-2">Monitor and analyze AI chat interactions with privacy protection</p>
         <div className="mt-3">
           <Button
             variant="outline"
@@ -602,7 +604,7 @@ function AIConversationsContent() {
       </div>
 
       {/* Summary chips */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-6">
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3 mb-4 sm:mb-6">
         <div className="flex items-center justify-between bg-white/5 border border-white/10 rounded-lg p-3">
           <div className="text-sm text-gray-300">Sessions Loaded</div>
           <div className="text-lg font-semibold text-white">{conversations.length}</div>
@@ -715,7 +717,7 @@ function AIConversationsContent() {
 
       {/* Conversations List */}
       {isLoading ? (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
           {Array.from({ length: 6 }).map((_, i) => (
             <div key={i} className="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-6 animate-pulse">
               <div className="flex items-center justify-between mb-4">
@@ -744,7 +746,7 @@ function AIConversationsContent() {
         </div>
       ) : (
         <>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4 sm:gap-6">
             {conversations.map((conversation) => (
               <ConversationCard
                 key={conversation.id}
