@@ -1,3 +1,6 @@
+"""Pydantic models for admin flag endpoints."""
+from __future__ import annotations
+
 from datetime import datetime
 from typing import List, Optional
 
@@ -34,16 +37,16 @@ class FlagUpdate(BaseModel):
 
 
 class FlagsSummary(BaseModel):
-    open_flags: int
-    closed_flags: int
-    escalated_flags: int
-    tags: List[str]
+    open_count: int
+    recent: List[FlagResponse]
 
 
 class FlagsBulkCloseRequest(BaseModel):
-    flag_ids: List[int]
+    ids: List[int]
+    status: Optional[str] = "resolved"
 
 
 class FlagsBulkTagRequest(BaseModel):
-    flag_ids: List[int]
+    ids: List[int]
     tags: List[str]
+    mode: Optional[str] = "add"

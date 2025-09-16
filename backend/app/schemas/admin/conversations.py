@@ -1,7 +1,10 @@
+"""Pydantic models for admin conversation endpoints."""
+from __future__ import annotations
+
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class ConversationListItem(BaseModel):
@@ -18,9 +21,7 @@ class ConversationListItem(BaseModel):
     last_role: Optional[str] = None
     last_text: Optional[str] = None
 
-    model_config = {
-        "from_attributes": True,
-    }
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ConversationDetailResponse(BaseModel):
@@ -33,9 +34,7 @@ class ConversationDetailResponse(BaseModel):
     timestamp: datetime
     sentiment_score: Optional[float] = None
 
-    model_config = {
-        "from_attributes": True,
-    }
+    model_config = ConfigDict(from_attributes=True)
 
 
 class ConversationStats(BaseModel):
@@ -65,9 +64,7 @@ class SessionUser(BaseModel):
     last_login: Optional[datetime] = None
     sentiment_score: Optional[float] = None
 
-    model_config = {
-        "from_attributes": True,
-    }
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SessionDetailResponse(BaseModel):
@@ -81,24 +78,21 @@ class SessionDetailResponse(BaseModel):
     conversations: List[ConversationDetailResponse]
     analysis: Dict[str, Any]
 
-    model_config = {
-        "from_attributes": True,
-    }
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SessionListItem(BaseModel):
     session_id: str
     user_id_hash: str
-    conversation_count: int
-    first_message_time: datetime
-    last_message_time: datetime
-    total_duration_minutes: float
-    last_message_preview: Optional[str]
-    last_response_preview: Optional[str]
+    message_count: int
+    first_time: datetime
+    last_time: datetime
+    last_preview: str
+    last_role: Optional[str] = None
+    last_text: Optional[str] = None
+    open_flag_count: int = 0
 
-    model_config = {
-        "from_attributes": True,
-    }
+    model_config = ConfigDict(from_attributes=True)
 
 
 class SessionListResponse(BaseModel):
