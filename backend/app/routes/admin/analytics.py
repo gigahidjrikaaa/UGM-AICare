@@ -1,8 +1,11 @@
 """Analytics endpoints for admin panel."""
+from __future__ import annotations
+
+import logging
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
-import logging
 
 from app.agents.analytics_agent import AnalyticsAgent
 from app.database import get_async_db

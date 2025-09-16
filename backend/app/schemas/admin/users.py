@@ -1,7 +1,10 @@
+"""Pydantic models for admin user endpoints."""
+from __future__ import annotations
+
 from datetime import date, datetime
 from typing import Any, Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 
 class UserListItem(BaseModel):
@@ -18,16 +21,14 @@ class UserListItem(BaseModel):
     is_active: Optional[bool] = True
     created_at: Optional[datetime] = None
 
-    # Computed fields
+    # Aggregated counts
     total_journal_entries: int
     total_conversations: int
     total_badges: int
     total_appointments: int
     last_login: Optional[datetime] = None
 
-    model_config = {
-        "from_attributes": True,
-    }
+    model_config = ConfigDict(from_attributes=True)
 
 
 class UserStats(BaseModel):
@@ -61,12 +62,9 @@ class UserDetailResponse(BaseModel):
     is_active: Optional[bool] = True
     created_at: Optional[datetime] = None
 
-    # Detailed stats
     journal_entries: List[Dict[str, Any]]
     recent_conversations: List[Dict[str, Any]]
     badges: List[Dict[str, Any]]
     appointments: List[Dict[str, Any]]
 
-    model_config = {
-        "from_attributes": True,
-    }
+    model_config = ConfigDict(from_attributes=True)
