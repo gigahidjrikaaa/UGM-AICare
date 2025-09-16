@@ -9,16 +9,26 @@ import GlobalSkeleton from '@/components/ui/GlobalSkeleton';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import ContentResourceForm from './ContentResourceForm';
 import DeleteResourceButton from './DeleteResourceButton';
-import { FiPlus, FiEdit, FiTrash2, FiSearch, FiFilter, FiChevronUp, FiChevronDown, FiEye } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiSearch, FiFilter, FiChevronUp, FiChevronDown, FiEye, FiExternalLink } from 'react-icons/fi';
 
 interface ContentResource {
     id: number;
     title: string;
     type: string;
     source: string | null;
+    description?: string | null;
     created_at: string;
     updated_at: string;
     content: string;
+    tags: string[];
+    metadata: Record<string, unknown>;
+    mime_type?: string | null;
+    embedding_status: string;
+    embedding_last_processed_at?: string | null;
+    chunk_count: number;
+    storage_backend: string;
+    object_storage_key?: string | null;
+    object_storage_bucket?: string | null;
 }
 
 interface ContentResourceResponse {
@@ -38,7 +48,7 @@ const ContentResourcesTable = () => {
     const [resourceTypes, setResourceTypes] = useState<string[]>([]);
     const [selectedType, setSelectedType] = useState('');
     const [sortBy, setSortBy] = useState('created_at');
-    const [sortOrder, setSortOrder] = useState('desc');
+    const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [viewingResource, setViewingResource] = useState<ContentResource | null>(null);
 
     const fetchResourceTypes = useCallback(async () => {
@@ -63,7 +73,11 @@ const ContentResourcesTable = () => {
                 sort_order: sortOrder,
             });
             const data = await apiCall<ContentResourceResponse>(`/api/v1/admin/content-resources?${params.toString()}`);
-            setResources(data.items);
+            setResources(data.items.map((item) => ({
+                ...item,
+                tags: item.tags ?? [],
+                metadata: item.metadata ?? {},
+            })));
             setTotalPages(Math.ceil(data.total_count / 10));
         } catch (err: any) {
             setError(err.message);
@@ -168,6 +182,10 @@ const ContentResourcesTable = () => {
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('created_at')}>
                                         Created At {sortBy === 'created_at' && (sortOrder === 'asc' ? <FiChevronUp className="inline" /> : <FiChevronDown className="inline" />)}
                                     </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Tags</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('embedding_status')}>
+                                        Embedding {sortBy === 'embedding_status' && (sortOrder === 'asc' ? <FiChevronUp className="inline" /> : <FiChevronDown className="inline" />)}
+                                    </th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
@@ -176,8 +194,16 @@ const ContentResourcesTable = () => {
                                     <tr key={resource.id} className="hover:bg-white/5 transition-colors">
                                         <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{resource.title}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{resource.type}</td>
-                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{resource.source}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{resource.source ?? '—'}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{new Date(resource.created_at).toLocaleDateString()}</td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">
+                                            {resource.tags.length ? resource.tags.join(', ') : '—'}
+                                        </td>
+                                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                                            <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${resource.embedding_status === 'succeeded' ? 'bg-green-500/20 text-green-200' : resource.embedding_status === 'failed' ? 'bg-red-500/20 text-red-200' : 'bg-yellow-500/20 text-yellow-200'}`}>
+                                                {resource.embedding_status}
+                                            </span>
+                                        </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <button onClick={() => setViewingResource(resource)} className="text-green-400 hover:text-green-300 mr-4"><FiEye /></button>
                                             <button onClick={() => handleEdit(resource)} className="text-blue-400 hover:text-blue-300 mr-4"><FiEdit /></button>
@@ -219,15 +245,60 @@ const ContentResourcesTable = () => {
                 </div>
             )}
             {viewingResource && (
-                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => setViewingResource(null)}>
-                    <div className="bg-slate-800/80 backdrop-blur-lg rounded-xl border border-white/20 shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-6 sm:p-8 z-50" onClick={() => setViewingResource(null)}>
+                    <div className="bg-slate-900/90 backdrop-blur-xl rounded-2xl border border-white/20 shadow-2xl w-full max-w-4xl max-h-[92vh] flex flex-col" onClick={(e) => e.stopPropagation()}>
                         <div className="px-6 py-4 border-b border-white/20">
                             <h3 className="text-lg font-medium text-white">{viewingResource.title}</h3>
-                        </div>
-                        <div className="p-6">
-                            <div className="bg-black/20 p-4 rounded-lg text-gray-200 whitespace-pre-wrap max-h-96 overflow-y-auto">
-                                {viewingResource.content}
+                            {viewingResource.description && (
+                                <p className="mt-1 text-sm text-gray-300">{viewingResource.description}</p>
+                            )}
+                            <div className="mt-2 flex flex-wrap gap-2 text-xs text-gray-300">
+                                <span className="rounded-full bg-white/10 px-3 py-1 uppercase tracking-wide">{viewingResource.type}</span>
+                                {(viewingResource.tags || []).map((tag) => (
+                                    <span key={tag} className="rounded-full bg-white/10 px-3 py-1">{tag}</span>
+                                ))}
+                                <span className="rounded-full bg-white/10 px-3 py-1">Embedding: {viewingResource.embedding_status}</span>
+                                <span className="rounded-full bg-white/10 px-3 py-1">Chunks: {viewingResource.chunk_count}</span>
+                                <span className="rounded-full bg-white/10 px-3 py-1">Storage: {viewingResource.storage_backend}</span>
                             </div>
+                        </div>
+                        <div className="p-6 flex-1 overflow-y-auto">
+                            {viewingResource.type === 'pdf' && viewingResource.object_storage_key ? (
+                                <iframe
+                                    title={viewingResource.title}
+                                    src={`/api/v1/admin/content-resources/${viewingResource.id}/file`}
+                                    className="w-full min-h-[520px] rounded-xl border border-white/20 bg-black/10"
+                                />
+                            ) : viewingResource.type === 'url' ? (
+                                <div className="space-y-4">
+                                    {viewingResource.source && (
+                                        <a href={viewingResource.source} target="_blank" rel="noopener noreferrer" className="inline-flex items-center text-[#FFCA40] hover:text-[#ffd86b]">
+                                            <FiExternalLink className="mr-2" />
+                                            {viewingResource.source}
+                                        </a>
+                                    )}
+                                    <div className="bg-black/20 p-4 rounded-xl text-gray-200 whitespace-pre-wrap max-h-[60vh] overflow-y-auto">
+                                        {viewingResource.content || 'No extracted content available yet.'}
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="bg-black/20 p-4 rounded-xl text-gray-200 whitespace-pre-wrap max-h-[60vh] overflow-y-auto">
+                                    {viewingResource.content}
+                                </div>
+                            )}
+                        </div>
+                        <div className="px-6 pb-6 text-xs text-gray-300 space-y-1">
+                            <div>Created: {new Date(viewingResource.created_at).toLocaleString()}</div>
+                            <div>Updated: {new Date(viewingResource.updated_at).toLocaleString()}</div>
+                            {viewingResource.embedding_last_processed_at && (
+                                <div>Embedded: {new Date(viewingResource.embedding_last_processed_at).toLocaleString()}</div>
+                            )}
+                            {viewingResource.metadata && Object.keys(viewingResource.metadata).length > 0 && (
+                                <div className="mt-3">
+                                    <h4 className="font-medium text-gray-200 mb-2">Metadata</h4>
+                                    <pre className="bg-black/20 p-3 rounded-lg text-[11px] whitespace-pre-wrap break-words">{JSON.stringify(viewingResource.metadata, null, 2)}</pre>
+                                </div>
+                            )}
                         </div>
                         <div className="px-6 py-3 bg-black/20 border-t border-white/20 text-right">
                             <Button onClick={() => setViewingResource(null)} className="bg-white/20 hover:bg-white/30 text-white">Close</Button>

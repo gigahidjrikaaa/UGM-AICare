@@ -45,6 +45,25 @@ services:
       - internal_network # Only on the internal network
 
   #################
+  # Object Storage (MinIO)
+  #################
+  minio:
+    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
+    container_name: ugm_aicare_minio
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_data:/data
+    ports:
+      - "${MINIO_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    restart: unless-stopped
+    networks:
+      - internal_network
+
+  #################
   # Migration Service
   #################
   migrate:
@@ -98,6 +117,11 @@ services:
       REDIS_URL: ""
       APP_ENV: production # Explicitly set for production
       PYTHONPATH: /app # Make sure Python can find modules in /app
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-content-resources}
+      MINIO_SECURE: ${MINIO_SECURE:-false}
       # WORKERS_PER_CORE: 4 # Example for Gunicorn workers, can be set in .env
     depends_on:
       migrate:
@@ -106,6 +130,8 @@ services:
         condition: service_healthy # Wait for db to be ready
       redis:
         condition: service_healthy # Wait for redis to be ready
+      minio:
+        condition: service_started
     restart: unless-stopped
     networks:
       # aicare_network:
@@ -150,6 +176,7 @@ services:
 volumes:
   pgdata:       # PostgreSQL data
   redisdata:    # Redis data
+  minio_data:
   # prometheus_data:
   # grafana_data:
 
@@ -160,4 +187,3 @@ networks:
     driver: bridge
   # shared_services_network:
   #   external: true
-

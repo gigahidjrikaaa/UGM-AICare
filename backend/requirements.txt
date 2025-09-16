@@ -7,6 +7,8 @@ python-multipart==0.0.6
 # HTTP Client
 requests==2.31.0
 httpx
+minio==7.2.9
+beautifulsoup4==4.12.3
 
 # CORS Support
 fastapi-cors==0.0.6
@@ -19,6 +21,7 @@ asyncpg>=0.29.0  # Fast PostgreSQL Database Client Library for Python/asyncio
 psycopg2-binary>=2.9.0  # For Alembic migrations (sync operations)
 aiosqlite  # For async SQLite support (dev/testing only)
 aiofiles # For async file operations
+PyPDF2==3.0.1
 
 # Authentication
 python-jose[cryptography]==3.3.0

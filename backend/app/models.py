@@ -226,12 +226,21 @@ class ContentResource(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     title = Column(String(255), nullable=False)
-    content = Column(Text, nullable=False)
-    source = Column(String(255), nullable=True) # URL or file name
-    type = Column(String(50), nullable=False, default="text") # 'text', 'pdf', 'url'
+    content = Column(Text, nullable=False, default="")
+    source = Column(String(255), nullable=True)  # URL or file name
+    type = Column(String(50), nullable=False, default="text")  # 'text', 'pdf', 'url'
+    description = Column(Text, nullable=True)
+    tags = Column(JSON, default=list)
+    resource_metadata = Column("metadata", JSON, default=dict)
+    mime_type = Column(String(100), nullable=True)
+    storage_backend = Column(String(50), nullable=False, default="database")
+    object_storage_key = Column(String(255), nullable=True)
+    object_storage_bucket = Column(String(255), nullable=True)
+    embedding_status = Column(String(50), nullable=False, default="pending")
+    embedding_last_processed_at = Column(DateTime, nullable=True)
+    chunk_count = Column(Integer, nullable=False, default=0)
     created_at = Column(DateTime, default=datetime.now, nullable=False)
     updated_at = Column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
-
 
 # Psychology Appointments
 

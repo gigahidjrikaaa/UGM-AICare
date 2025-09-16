@@ -26,7 +26,9 @@ class DataLoader:
     async def _load_from_db(self) -> list[str]:
         documents = []
         async with self.async_session() as session:
-            result = await session.execute(select(ContentResource).filter(ContentResource.type == 'text'))
+            result = await session.execute(
+                select(ContentResource).where(ContentResource.embedding_status == 'succeeded')
+            )
             resources = result.scalars().all()
             for resource in resources:
                 documents.append(resource.content)

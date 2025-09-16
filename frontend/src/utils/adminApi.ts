@@ -16,11 +16,16 @@ export async function authenticatedFetch(url: string, options: RequestOptions = 
     throw new Error('No valid session found. Please log in again.');
   }
 
-  const headers = {
-    'Content-Type': 'application/json',
+  const isFormData = typeof FormData !== 'undefined' && options.body instanceof FormData;
+
+  const headers: Record<string, string> = {
     'Authorization': `Bearer ${session.accessToken}`,
     ...options.headers,
   };
+
+  if (!isFormData) {
+    headers['Content-Type'] = headers['Content-Type'] ?? 'application/json';
+  }
 
   return fetch(url, {
     ...options,
