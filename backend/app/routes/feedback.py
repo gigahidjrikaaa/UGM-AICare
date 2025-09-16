@@ -15,12 +15,12 @@ logger = logging.getLogger(__name__)
 
 # --- Router Setup ---
 router = APIRouter(
-    prefix="/feedback", # Define a prefix for feedback routes
-    tags=["Feedback"]           # Tag for API documentation
+    prefix="/api/v1/feedback",  # Normalize API prefix
+    tags=["Feedback"]
 )
 
 # --- API Endpoint ---
-@router.post("/", response_model=FeedbackResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=FeedbackResponse, status_code=status.HTTP_201_CREATED)
 async def submit_feedback(
     feedback_data: FeedbackCreate = Body(...), 
     db: AsyncSession = Depends(get_async_db),

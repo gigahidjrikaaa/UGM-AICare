@@ -5,16 +5,16 @@ from app.dependencies import get_async_db
 from app.schemas import cbt_modules as cbt_modules_schema
 from app.crud import cbt_modules as cbt_modules_crud
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1/admin/cbt-modules", tags=["Admin - CBT Modules"])
 
-@router.get("/", response_model=cbt_modules_schema.CbtModuleResponse)
+@router.get("", response_model=cbt_modules_schema.CbtModuleResponse)
 async def get_cbt_modules(db: AsyncSession = Depends(get_async_db), page: int = 1, limit: int = 10):
     skip = (page - 1) * limit
     modules = await cbt_modules_crud.get_cbt_modules(db, skip=skip, limit=limit)
     count = await cbt_modules_crud.get_cbt_modules_count(db)
     return {"items": modules, "total_count": count}
 
-@router.post("/", response_model=cbt_modules_schema.CbtModule)
+@router.post("", response_model=cbt_modules_schema.CbtModule)
 async def create_cbt_module(module: cbt_modules_schema.CbtModuleCreate, db: AsyncSession = Depends(get_async_db)):
     return await cbt_modules_crud.create_cbt_module(db=db, module=module)
 

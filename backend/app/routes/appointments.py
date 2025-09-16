@@ -7,7 +7,7 @@ from app.schemas.appointments import Appointment, AppointmentCreate, Appointment
 from app.database import get_async_db
 from app.services.user_service import async_get_user_by_google_sub
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1/appointments", tags=["Appointments"])
 
 @router.get("/psychologists", response_model=List[Psychologist])
 async def get_psychologists(db: AsyncSession = Depends(get_async_db)):
@@ -25,7 +25,7 @@ async def get_appointment_types(db: AsyncSession = Depends(get_async_db)):
     result = await db.execute(select(models.AppointmentType))
     return result.scalars().all()
 
-@router.post("/appointments", response_model=Appointment)
+@router.post("", response_model=Appointment)
 async def create_appointment(appointment: AppointmentCreate, db: AsyncSession = Depends(get_async_db)):
     """
     Create a new appointment.

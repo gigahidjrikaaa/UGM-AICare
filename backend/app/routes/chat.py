@@ -26,7 +26,7 @@ from app.core.cbt_module_types import CBTModuleData # For type hinting
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__) # Create a logger for this module
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1", tags=["Chat"])
 
 # --- Constants for Summarization ---
 MIN_TURNS_FOR_SUMMARY = 2  # Minimum number of full conversation turns (user msg + AI response) to trigger a summary.

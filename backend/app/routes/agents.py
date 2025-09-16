@@ -9,7 +9,7 @@ from fastapi import APIRouter
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1/agents", tags=["Agents"])
 
 @router.get("/status", summary="Get the status of the agent system")
 async def get_agent_system_status():

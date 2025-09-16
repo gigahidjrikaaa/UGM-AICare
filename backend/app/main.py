@@ -132,27 +132,27 @@ app.add_middleware(
 
 logger.info("Including API routers...")
 
-app.include_router(auth.router, prefix="/api/v1/auth", tags=["Authentication"]) # Auth endpoints
-app.include_router(chat.router, prefix="/api/v1", tags=["Chat"]) # Use /api/v1 prefix
-app.include_router(feedback.router, prefix="/api/v1", tags=["Feedback"]) # Added prefix/tag consistency
-app.include_router(link_did.router, prefix="/api/v1", tags=["Link DID"]) # Added prefix/tag consistency)
+app.include_router(auth.router)
+app.include_router(chat.router)
+app.include_router(feedback.router)
+app.include_router(link_did.router)
 
-app.include_router(email.router) 
+app.include_router(email.router)
 app.include_router(journal.router)
 app.include_router(journal_prompts.router)
-app.include_router(internal.router) 
+app.include_router(internal.router)
 app.include_router(session_events.session_event_router) # This will have prefix /api/v1/chat
 app.include_router(summary.activity_router) # This will have prefix /api/v1/activity-summary
 app.include_router(summary.user_data_router)  # This will have prefix /api/v1/user
 app.include_router(profile.router)
 app.include_router(admin.router)  # Admin endpoints
-app.include_router(agents.router, prefix="/api/v1/agents", tags=["Agents"])
-app.include_router(triage.router, prefix="/api/v1", tags=["Triage"])
-app.include_router(langgraph.router, prefix="/api/v1/admin", tags=["Admin"])
-app.include_router(appointments.router, prefix="/api/v1/appointments", tags=["Appointments"])
-app.include_router(surveys.router, prefix="/api/v1/admin/surveys", tags=["Admin - Surveys"])
-app.include_router(surveys.user_router, prefix="/api/v1/surveys", tags=["Surveys"])
-app.include_router(cbt_modules.router, prefix="/api/v1/admin/cbt-modules", tags=["Admin - CBT Modules"])
+app.include_router(agents.router)
+app.include_router(triage.router)
+app.include_router(langgraph.router)
+app.include_router(appointments.router)
+app.include_router(surveys.router)
+app.include_router(surveys.user_router)
+app.include_router(cbt_modules.router)
 # logger.info(f"List of routers (/api/v1): {app.routes}")
 logger.info(f"Allowed origins: {origins}")
 

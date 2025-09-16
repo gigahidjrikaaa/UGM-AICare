@@ -14,7 +14,7 @@ from app.utils.security_utils import encrypt_data
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1/auth", tags=["Authentication"])
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 

@@ -31,7 +31,7 @@ const LangGraphViewer = () => {
         setIsLoading(true);
         setError(null);
         try {
-            const data = await apiCall<GraphState>('/api/v1/admin/langgraph-state');
+            const data = await apiCall<GraphState>('/api/v1/admin/agents-config');
             setGraphState(data);
         } catch (err: any) {
             setError(err.message);

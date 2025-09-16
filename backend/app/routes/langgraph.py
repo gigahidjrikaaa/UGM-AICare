@@ -5,10 +5,10 @@ from app.dependencies import get_admin_user
 from app.models import User
 from app.schemas.agents import LangGraphState, LangGraphNode, LangGraphEdge
 
-router = APIRouter(prefix="/langgraph", tags=["Admin"])
+router = APIRouter(prefix="/api/v1/admin/agents-config", tags=["Admin"])
 
 
-@router.get("/state", response_model=LangGraphState)
+@router.get("", response_model=LangGraphState)
 async def get_langgraph_state(admin_user: User = Depends(get_admin_user)) -> LangGraphState:
     """Return the current LangGraph topology. Currently returns a mock payload."""
     nodes = [

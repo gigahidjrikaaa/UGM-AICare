@@ -5,7 +5,7 @@ from langchain_core.messages import HumanMessage
 from app.agents.triage_agent import triage_agent
 from app.schemas.agents import TriageClassifyRequest, TriageClassifyResponse
 
-router = APIRouter(prefix="/triage", tags=["Triage"])
+router = APIRouter(prefix="/api/v1/triage", tags=["Triage"])
 
 
 @router.post("/classify", response_model=TriageClassifyResponse)

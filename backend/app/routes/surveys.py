@@ -14,6 +14,7 @@ from app.dependencies import get_current_active_user, get_admin_user
 logger = logging.getLogger(__name__)
 
 router = APIRouter(
+    prefix="/api/v1/admin/surveys",
     tags=["Admin - Surveys"],
     dependencies=[Depends(get_admin_user)]
 )
@@ -187,6 +188,7 @@ async def get_survey_responses(survey_id: int, db: AsyncSession = Depends(get_as
     return response_models
 
 user_router = APIRouter(
+    prefix="/api/v1/surveys",
     tags=["Surveys"],
     dependencies=[Depends(get_current_active_user)]
 )

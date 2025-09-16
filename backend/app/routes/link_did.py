@@ -8,7 +8,7 @@ from app.dependencies import get_current_active_user
 from app.database import get_async_db
 from app.schemas.user import LinkDIDRequest
 
-router = APIRouter()
+router = APIRouter(prefix="/api/v1", tags=["Link DID"])
 
 @router.post("/link-did")
 async def link_did(payload: LinkDIDRequest, db: AsyncSession = Depends(get_async_db), user: User = Depends(get_current_active_user)):

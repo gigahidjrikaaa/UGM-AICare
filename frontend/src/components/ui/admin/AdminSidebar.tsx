@@ -4,8 +4,8 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { signOut } from 'next-auth/react'; // Import signOut
 import {
-  FiGrid, FiUsers, FiMessageSquare, FiCalendar, FiBookOpen, 
-  FiBarChart2, FiSettings, FiShield, FiLogOut, FiHelpCircle, FiFileText, FiHeart
+  FiGrid, FiUsers, FiMessageSquare, FiCalendar, FiBookOpen,
+  FiBarChart2, FiSettings, FiShield, FiLogOut, FiHelpCircle, FiFileText, FiHeart, FiGitMerge
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink'; // Assuming SidebarLink component exists
 
@@ -19,6 +19,7 @@ const mainNavItems = [
   { name: 'CBT Modules', icon: <FiHeart size={18}/>, href: '/admin/cbt-modules' },
   { name: 'Survey Management', icon: <FiFileText size={18}/>, href: '/admin/surveys' },
   { name: 'Analytics', icon: <FiBarChart2 size={18}/>, href: '/admin/analytics' },
+  { name: 'Agents Config', icon: <FiGitMerge size={18}/>, href: '/admin/agents-config' },
   { name: 'Flags', icon: <FiShield size={18}/>, href: '/admin/flags' },
 ];
 
