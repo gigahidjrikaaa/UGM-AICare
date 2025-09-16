@@ -59,12 +59,12 @@ class AnalyticsAgent:
     async def _get_conversations(self, start_date: datetime, end_date: datetime) -> List[Conversation]:
         stmt = select(Conversation).where(Conversation.timestamp.between(start_date, end_date))
         result = await self.db.execute(stmt)
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     async def _get_journal_entries(self, start_date: datetime, end_date: datetime) -> List[JournalEntry]:
         stmt = select(JournalEntry).where(JournalEntry.created_at.between(start_date, end_date))
         result = await self.db.execute(stmt)
-        return result.scalars().all()
+        return list(result.scalars().all())
 
     def _identify_patterns(self, texts: List[str]) -> List[Pattern]:
         keyword_patterns = {

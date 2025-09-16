@@ -131,7 +131,7 @@ export function useChat({ model }: { model: string }) {
       conversation_id: activeConversationId,
       model: model,
     });
-  }, [isLoading, messages, currentSessionId, processApiCall, model, setMessages]);
+  }, [isLoading, messages, currentSessionId, processApiCall, setMessages]);
 
   const handleInputChange = useCallback((value: string) => {
     setInputValue(value);
@@ -153,5 +153,8 @@ export function useChat({ model }: { model: string }) {
     handleSendMessage,
     handleStartModule,
     setLiveTranscript,
+  };
+}
+anscript,
   };
 }

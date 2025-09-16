@@ -9,7 +9,7 @@ import GlobalSkeleton from '@/components/ui/GlobalSkeleton';
 import ErrorMessage from '@/components/ui/ErrorMessage';
 import ContentResourceForm from './ContentResourceForm';
 import DeleteResourceButton from './DeleteResourceButton';
-import { FiPlus, FiEdit, FiTrash2 } from 'react-icons/fi';
+import { FiPlus, FiEdit, FiTrash2, FiSearch, FiFilter, FiChevronUp, FiChevronDown, FiEye } from 'react-icons/fi';
 
 interface ContentResource {
     id: number;
@@ -34,12 +34,35 @@ const ContentResourcesTable = () => {
     const [totalPages, setTotalPages] = useState(1);
     const [isFormVisible, setIsFormVisible] = useState(false);
     const [selectedResource, setSelectedResource] = useState<ContentResource | undefined>(undefined);
+    const [searchTerm, setSearchTerm] = useState('');
+    const [resourceTypes, setResourceTypes] = useState<string[]>([]);
+    const [selectedType, setSelectedType] = useState('');
+    const [sortBy, setSortBy] = useState('created_at');
+    const [sortOrder, setSortOrder] = useState('desc');
+    const [viewingResource, setViewingResource] = useState<ContentResource | null>(null);
+
+    const fetchResourceTypes = useCallback(async () => {
+        try {
+            const types = await apiCall<string[]>('/api/v1/admin/content-resources/types');
+            setResourceTypes(types);
+        } catch (err: any) {
+            // Ignore error
+        }
+    }, []);
 
     const fetchResources = useCallback(async () => {
         setIsLoading(true);
         setError(null);
         try {
-            const data = await apiCall<ContentResourceResponse>(`/api/v1/admin/content-resources?page=${page}&limit=10`);
+            const params = new URLSearchParams({
+                page: page.toString(),
+                limit: '10',
+                search: searchTerm,
+                type: selectedType,
+                sort_by: sortBy,
+                sort_order: sortOrder,
+            });
+            const data = await apiCall<ContentResourceResponse>(`/api/v1/admin/content-resources?${params.toString()}`);
             setResources(data.items);
             setTotalPages(Math.ceil(data.total_count / 10));
         } catch (err: any) {
@@ -47,11 +70,27 @@ const ContentResourcesTable = () => {
         } finally {
             setIsLoading(false);
         }
-    }, [page]);
+    }, [page, searchTerm, selectedType, sortBy, sortOrder]);
 
     useEffect(() => {
-        fetchResources();
+        fetchResourceTypes();
+    }, [fetchResourceTypes]);
+
+    useEffect(() => {
+        const debounceTimer = setTimeout(() => {
+            fetchResources();
+        }, 500);
+        return () => clearTimeout(debounceTimer);
     }, [fetchResources]);
+
+    const handleSort = (column: string) => {
+        if (sortBy === column) {
+            setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+        } else {
+            setSortBy(column);
+            setSortOrder('asc');
+        }
+    };
 
     const handleFormSuccess = () => {
         setIsFormVisible(false);
@@ -82,7 +121,34 @@ const ContentResourcesTable = () => {
             {!isFormVisible ? (
                 <>
                     <div className="p-6 flex justify-between items-center">
-                        <h2 className="text-xl font-semibold text-white">All Resources</h2>
+                        <div className="flex items-center gap-4">
+                            <div className="relative">
+                                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <input
+                                    type="text"
+                                    placeholder="Search resources..."
+                                    value={searchTerm}
+                                    onChange={(e) => setSearchTerm(e.target.value)}
+                                    aria-label="Search resources"
+                                    className="pl-10 pr-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors"
+                                />
+                            </div>
+                            <div className="relative">
+                                <FiFilter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                                <select
+                                    value={selectedType}
+                                    onChange={(e) => setSelectedType(e.target.value)}
+                                    title="Filter by type"
+                                    aria-label="Filter by type"
+                                    className="pl-10 pr-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors"
+                                >
+                                    <option value="">All Types</option>
+                                    {resourceTypes.map(type => (
+                                        <option key={type} value={type}>{type}</option>
+                                    ))}
+                                </select>
+                            </div>
+                        </div>
                         <Button onClick={handleAddNew} className="inline-flex items-center px-4 py-2 bg-[#FFCA40] hover:bg-[#ffda63] text-black rounded-lg text-sm font-medium transition-colors">
                             <FiPlus className="mr-2" />
                             Add New
@@ -92,10 +158,16 @@ const ContentResourcesTable = () => {
                         <table className="min-w-full divide-y divide-white/20">
                             <thead className="bg-white/5">
                                 <tr>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Title</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Type</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('title')}>
+                                        Title {sortBy === 'title' && (sortOrder === 'asc' ? <FiChevronUp className="inline" /> : <FiChevronDown className="inline" />)}
+                                    </th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('type')}>
+                                        Type {sortBy === 'type' && (sortOrder === 'asc' ? <FiChevronUp className="inline" /> : <FiChevronDown className="inline" />)}
+                                    </th>
                                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Source</th>
-                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Created At</th>
+                                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider cursor-pointer" onClick={() => handleSort('created_at')}>
+                                        Created At {sortBy === 'created_at' && (sortOrder === 'asc' ? <FiChevronUp className="inline" /> : <FiChevronDown className="inline" />)}
+                                    </th>
                                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
                                 </tr>
                             </thead>
@@ -107,6 +179,7 @@ const ContentResourcesTable = () => {
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{resource.source}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-300">{new Date(resource.created_at).toLocaleDateString()}</td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                                            <button onClick={() => setViewingResource(resource)} className="text-green-400 hover:text-green-300 mr-4"><FiEye /></button>
                                             <button onClick={() => handleEdit(resource)} className="text-blue-400 hover:text-blue-300 mr-4"><FiEdit /></button>
                                             <DeleteResourceButton resourceId={resource.id} onSuccess={fetchResources} />
                                         </td>
@@ -143,6 +216,23 @@ const ContentResourcesTable = () => {
                     </h2>
                     <ContentResourceForm resource={selectedResource} onSuccess={handleFormSuccess} />
                     <Button onClick={() => setIsFormVisible(false)} className="mt-4 bg-white/10 hover:bg-white/20 text-white">Cancel</Button>
+                </div>
+            )}
+            {viewingResource && (
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4 z-50" onClick={() => setViewingResource(null)}>
+                    <div className="bg-slate-800/80 backdrop-blur-lg rounded-xl border border-white/20 shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+                        <div className="px-6 py-4 border-b border-white/20">
+                            <h3 className="text-lg font-medium text-white">{viewingResource.title}</h3>
+                        </div>
+                        <div className="p-6">
+                            <div className="bg-black/20 p-4 rounded-lg text-gray-200 whitespace-pre-wrap max-h-96 overflow-y-auto">
+                                {viewingResource.content}
+                            </div>
+                        </div>
+                        <div className="px-6 py-3 bg-black/20 border-t border-white/20 text-right">
+                            <Button onClick={() => setViewingResource(null)} className="bg-white/20 hover:bg-white/30 text-white">Close</Button>
+                        </div>
+                    </div>
                 </div>
             )}
         </div>

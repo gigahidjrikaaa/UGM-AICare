@@ -4,7 +4,26 @@ from fastapi import FastAPI, Request as FastAPIRequest # type: ignore
 from datetime import datetime, timezone
 from app.database import init_db, close_db
 from sqlalchemy import text
-from app.routes import auth, email, chat, feedback, link_did, internal, journal, journal_prompts, summary, profile, session_events, appointments, admin, agents, surveys, cbt_modules
+from app.routes import (
+    auth,
+    email,
+    chat,
+    feedback,
+    link_did,
+    internal,
+    journal,
+    journal_prompts,
+    summary,
+    profile,
+    session_events,
+    appointments,
+    admin,
+    agents,
+    surveys,
+    cbt_modules,
+    triage,
+    langgraph,
+)
 from contextlib import asynccontextmanager
 from app.core.scheduler import start_scheduler, shutdown_scheduler
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
@@ -128,6 +147,8 @@ app.include_router(summary.user_data_router)  # This will have prefix /api/v1/us
 app.include_router(profile.router)
 app.include_router(admin.router)  # Admin endpoints
 app.include_router(agents.router, prefix="/api/v1/agents", tags=["Agents"])
+app.include_router(triage.router, prefix="/api/v1", tags=["Triage"])
+app.include_router(langgraph.router, prefix="/api/v1/admin", tags=["Admin"])
 app.include_router(appointments.router, prefix="/api/v1/appointments", tags=["Appointments"])
 app.include_router(surveys.router, prefix="/api/v1/admin/surveys", tags=["Admin - Surveys"])
 app.include_router(surveys.user_router, prefix="/api/v1/surveys", tags=["Surveys"])

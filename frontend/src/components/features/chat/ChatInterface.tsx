@@ -22,7 +22,7 @@ export default function ChatInterface({ model }: { model: string }) {
     handleSendMessage,
     handleStartModule,
     setLiveTranscript, // Get the new function
-  } = useChat({ model });
+  } = useChat();
 
   const {
     isLiveTalkActive,

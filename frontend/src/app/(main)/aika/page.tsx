@@ -76,7 +76,7 @@ export default function AikaChatPage() {
           <div className="w-full max-w-5xl h-[85vh] flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
              {/* Chat Interface takes remaining space */}
              <div className="flex-1 overflow-hidden"> {/* Important for ChatWindow's scrolling */}
-                <ChatInterface model={model} />
+                <ChatInterface />
              </div>
           </div>
 
