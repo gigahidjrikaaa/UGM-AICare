@@ -121,3 +121,44 @@ if __name__ == '__main__':
             print(f"Output from node '{k}':")
             print(v)
             print("----")
+
+
+TRIAGE_GRAPH_SPEC = {
+    "id": "triage",
+    "name": "Triage Agent",
+    "nodes": [
+        {
+            "id": "incoming",
+            "label": "Incoming Message",
+            "description": "Wrap the user text as a LangChain message sequence.",
+            "column": 0,
+            "row": 0,
+        },
+        {
+            "id": "llm",
+            "label": "Classify Severity",
+            "description": "Gemini determines the crisis level for the message.",
+            "column": 1,
+            "row": 0,
+        },
+        {
+            "id": "lookup_resources",
+            "label": "Lookup Resources",
+            "description": "Fetch curated resources from the DB for medium/high cases (fallback to static list).",
+            "column": 2,
+            "row": 0,
+        },
+        {
+            "id": "end",
+            "label": "Return Classification",
+            "description": "Respond with severity label and recommended support assets.",
+            "column": 3,
+            "row": 0,
+        },
+    ],
+    "edges": [
+        {"source": "incoming", "target": "llm"},
+        {"source": "llm", "target": "lookup_resources"},
+        {"source": "lookup_resources", "target": "end"},
+    ],
+}

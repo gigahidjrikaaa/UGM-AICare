@@ -233,7 +233,10 @@ async def run_analytics_agent(
     try:
         agent = AnalyticsAgent(db)
         report = await agent.analyze_trends(timeframe_days=7)
-        return {"message": "Analytics report generated successfully", "report": report.dict()}
+        return {
+            "message": "Analytics report generated successfully",
+            "report": report.model_dump(),
+        }
     except Exception as e:
         logger.error(f"Error running analytics agent: {e}", exc_info=True)
         raise HTTPException(
