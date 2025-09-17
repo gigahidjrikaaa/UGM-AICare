@@ -1,4 +1,4 @@
-from datetime import date
+﻿from datetime import date
 from typing import Optional
 
 from pydantic import BaseModel
@@ -14,9 +14,7 @@ class AppointmentSummary(BaseModel):
 
 
 class FeedbackSummary(BaseModel):
-    total_feedback: int
-    positive_feedback: int
-    neutral_feedback: int
-    negative_feedback: int
-    avg_ratings: float
-    todays_feedback: int
+    window_days: int
+    count: int
+    avg_nps: Optional[float] = None
+    avg_felt_understood: Optional[float] = None

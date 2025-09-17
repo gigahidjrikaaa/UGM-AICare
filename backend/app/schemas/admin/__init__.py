@@ -1,5 +1,18 @@
-"""Aggregated admin schema exports."""
-from .users import UserDetailResponse, UserListItem, UserStats, UsersResponse
+﻿"""Aggregated admin schema exports."""
+from .appointments import (
+    AppointmentResponse,
+    AppointmentUpdate,
+    AppointmentUser,
+    PsychologistResponse,
+    TherapistScheduleCreate,
+    TherapistScheduleResponse,
+    TherapistScheduleUpdate,
+)
+from .content_resources import (
+    ContentResourceCreate,
+    ContentResourceItem,
+    ContentResourceResponse,
+)
 from .conversations import (
     ConversationDetailResponse,
     ConversationListItem,
@@ -10,6 +23,7 @@ from .conversations import (
     SessionListResponse,
     SessionUser,
 )
+from .dashboard import AppointmentSummary, FeedbackSummary
 from .flags import (
     FlagCreate,
     FlagResponse,
@@ -18,12 +32,19 @@ from .flags import (
     FlagsBulkTagRequest,
     FlagsSummary,
 )
+from .users import UserDetailResponse, UserListItem, UserStats, UsersResponse
 
 __all__ = [
-    "UserDetailResponse",
-    "UserListItem",
-    "UserStats",
-    "UsersResponse",
+    "AppointmentResponse",
+    "AppointmentUpdate",
+    "AppointmentUser",
+    "PsychologistResponse",
+    "TherapistScheduleCreate",
+    "TherapistScheduleResponse",
+    "TherapistScheduleUpdate",
+    "ContentResourceCreate",
+    "ContentResourceItem",
+    "ContentResourceResponse",
     "ConversationDetailResponse",
     "ConversationListItem",
     "ConversationStats",
@@ -32,10 +53,16 @@ __all__ = [
     "SessionListItem",
     "SessionListResponse",
     "SessionUser",
+    "AppointmentSummary",
+    "FeedbackSummary",
     "FlagCreate",
     "FlagResponse",
     "FlagUpdate",
     "FlagsBulkCloseRequest",
     "FlagsBulkTagRequest",
     "FlagsSummary",
+    "UserDetailResponse",
+    "UserListItem",
+    "UserStats",
+    "UsersResponse",
 ]
