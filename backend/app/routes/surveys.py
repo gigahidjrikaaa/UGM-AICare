@@ -320,7 +320,7 @@ async def get_survey_analytics(
         # Fetch answers for this question
         ares = await db.execute(
             select(SurveyAnswer.answer_text)
-            .join(SurveySurveyAnswer.response_id == SurveyResponse.id)
+            .join(SurveyAnswer.response_id == SurveyResponse.id)
             .filter(SurveyResponse.survey_id == survey_id, SurveyAnswer.question_id == q.id)
         )
         answers = [row[0] for row in ares.all()]

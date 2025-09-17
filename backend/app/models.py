@@ -1,4 +1,4 @@
-# app/models.py
+﻿# app/models.py
 from typing import Optional, List
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean, Date, UniqueConstraint
 from sqlalchemy.types import JSON
@@ -302,12 +302,32 @@ class CampaignExecution(Base):
     error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     engagement_score: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     trigger_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    is_manual: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
 
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     campaign: Mapped["InterventionCampaign"] = relationship("InterventionCampaign", back_populates="executions")
     user: Mapped["User"] = relationship("User")
+
+class InterventionAgentSettings(Base):
+    __tablename__ = "intervention_agent_settings"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    auto_mode_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    human_review_required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    risk_score_threshold: Mapped[float] = mapped_column(Float, default=0.7, nullable=False)
+    daily_send_limit: Mapped[int] = mapped_column(Integer, default=25, nullable=False)
+    channels_enabled: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
+    escalation_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
+    office_hours_start: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    office_hours_end: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
+    manual_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    updated_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+
+    updated_by_user: Mapped[Optional["User"]] = relationship("User")
 
 class TriageAssessment(Base):
     __tablename__ = "triage_assessments"
