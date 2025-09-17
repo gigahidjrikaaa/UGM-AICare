@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
+﻿from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, desc, asc, or_, select, update
 from sqlalchemy.orm import selectinload
@@ -8,7 +8,7 @@ from typing import List, Optional, Dict, Any, Set
 import logging
 
 from app.database import get_async_db
-from app.models import User, Survey, SurveyQuestion, SurveyResponse, SurveyAnswer
+from app.models import User, Survey, SurveyQuestion, SurveyAnswer
 from app.dependencies import get_current_active_user, get_admin_user
 
 logger = logging.getLogger(__name__)
@@ -131,7 +131,7 @@ async def update_survey(survey_id: int, survey_data: SurveyUpdate, db: AsyncSess
     survey_with_questions = result.scalar_one()
     return survey_with_questions
 
-@router.delete("/{survey_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/{survey_id}", status_code=status.HTTP_200_OK)
 async def delete_survey(survey_id: int, db: AsyncSession = Depends(get_async_db)):
     result = await db.execute(select(Survey).options(selectinload(Survey.questions)).filter(Survey.id == survey_id))
     db_survey = result.scalar_one_or_none()
@@ -140,6 +140,7 @@ async def delete_survey(survey_id: int, db: AsyncSession = Depends(get_async_db)
 
     await db.delete(db_survey)
     await db.commit()
+    return {"detail": "deleted"}
 
 class SurveyAnswerResponse(BaseModel):
     id: int
@@ -319,7 +320,7 @@ async def get_survey_analytics(
         # Fetch answers for this question
         ares = await db.execute(
             select(SurveyAnswer.answer_text)
-            .join(SurveyResponse, SurveyAnswer.response_id == SurveyResponse.id)
+            .join(SurveySurveyAnswer.response_id == SurveyResponse.id)
             .filter(SurveyResponse.survey_id == survey_id, SurveyAnswer.question_id == q.id)
         )
         answers = [row[0] for row in ares.all()]

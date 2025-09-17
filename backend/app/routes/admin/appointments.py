@@ -253,7 +253,7 @@ async def update_appointment(
     )
 
 
-@router.delete("/appointments/{appointment_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/appointments/{appointment_id}", status_code=status.HTTP_200_OK)
 async def delete_appointment(
     appointment_id: int,
     db: AsyncSession = Depends(get_async_db),
@@ -270,6 +270,7 @@ async def delete_appointment(
 
     await db.delete(db_appointment)
     await db.commit()
+    return {"detail": "deleted"}
 
 
 @router.get("/therapists/{therapist_id}/schedule", response_model=List[TherapistScheduleResponse])
@@ -356,7 +357,7 @@ async def update_therapist_schedule(
     return TherapistScheduleResponse.model_validate(db_schedule)
 
 
-@router.delete("/therapists/schedule/{schedule_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/therapists/schedule/{schedule_id}", status_code=status.HTTP_200_OK)
 async def delete_therapist_schedule(
     schedule_id: int,
     db: AsyncSession = Depends(get_async_db),
@@ -379,3 +380,9 @@ async def delete_therapist_schedule(
 
     await db.delete(db_schedule)
     await db.commit()
+    return {"detail": "deleted"}
+
+
+
+
+

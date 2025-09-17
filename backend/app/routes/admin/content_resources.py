@@ -279,7 +279,7 @@ async def update_content_resource(
     return ContentResourceItem.model_validate(db_resource)
 
 
-@router.delete("/content-resources/{resource_id}", status_code=status.HTTP_204_NO_CONTENT)
+@router.delete("/content-resources/{resource_id}", status_code=status.HTTP_200_OK)
 async def delete_content_resource(
     resource_id: int,
     db: AsyncSession = Depends(get_async_db),
@@ -296,3 +296,5 @@ async def delete_content_resource(
 
     await db.delete(db_resource)
     await db.commit()
+    return {"detail": "deleted"}
+
