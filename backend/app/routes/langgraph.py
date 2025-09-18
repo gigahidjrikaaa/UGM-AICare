@@ -4,6 +4,7 @@ from typing import Iterable, List
 from fastapi import APIRouter, Depends, Query
 
 from app.agents.analytics_agent import ANALYTICS_GRAPH_SPEC
+from app.agents.intervention_agent import INTERVENTION_GRAPH_SPEC
 from app.agents.triage_agent import TRIAGE_GRAPH_SPEC
 from app.dependencies import get_admin_user
 from app.models import User
@@ -16,6 +17,7 @@ GRAPH_SPECS = {
     for spec in (
         TRIAGE_GRAPH_SPEC,
         ANALYTICS_GRAPH_SPEC,
+        INTERVENTION_GRAPH_SPEC,
     )
 }
 

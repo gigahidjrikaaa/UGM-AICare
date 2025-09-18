@@ -42,6 +42,7 @@ type AgentNodeData = {
 const agentPalette: Record<string, string> = {
   triage: '#FFCA40',
   analytics: '#38BDF8',
+  intervention: '#A855F7',
 };
 
 const columnWidth = 220;
@@ -182,7 +183,7 @@ const LangGraphViewer = () => {
   if (isLoading) {
     return (
       <div className="flex h-[420px] items-center justify-center rounded-xl border border-white/10 bg-white/5">
-        <div className="animate-pulse text-sm text-gray-300">Loading agent graph…</div>
+        <div className="animate-pulse text-sm text-gray-300">Loading agent graph...</div>
       </div>
     );
   }
