@@ -18,7 +18,7 @@ const mainNavItems = [
   { name: 'Content Resources', icon: <FiFileText size={18}/>, href: '/admin/content-resources' },
   { name: 'CBT Modules', icon: <FiHeart size={18}/>, href: '/admin/cbt-modules' },
   { name: 'Survey Management', icon: <FiFileText size={18}/>, href: '/admin/surveys' },
-  { name: 'Analytics', icon: <FiBarChart2 size={18}/>, href: '/admin/analytics' },
+  { name: 'Analytics Panel', icon: <FiBarChart2 size={18}/>, href: '/admin/analytics' },
   { name: 'Agents Config', icon: <FiGitMerge size={18}/>, href: '/admin/agents-config' },
   { name: 'Triage Panel', icon: <FiActivity size={18}/>, href: '/admin/triage' },
   { name: 'Intervention Panel', icon: <FiLifeBuoy size={18}/>, href: '/admin/interventions' },
@@ -89,3 +89,4 @@ export default function AdminSidebar() {
     </aside>
   );
 }
+

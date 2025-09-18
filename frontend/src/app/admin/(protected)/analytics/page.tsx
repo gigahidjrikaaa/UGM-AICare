@@ -1,72 +1,392 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import Link from 'next/link';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
+import {
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  CartesianGrid,
+  XAxis,
+  YAxis,
+  Tooltip,
+  Legend,
+} from 'recharts';
+
+import {
+  FiActivity,
+  FiAlertTriangle,
+  FiBarChart2,
+  FiCheckCircle,
+  FiClock,
+  FiPieChart,
+  FiPlayCircle,
+  FiTrendingUp,
+  FiUsers,
+} from '@/icons';
 import { apiCall } from '@/utils/adminApi';
-import { FiActivity, FiBarChart2, FiPlayCircle } from '@/icons';
+import {
+  AnalyticsReport as AnalyticsReportType,
+  HeatmapCell,
+  SegmentImpact,
+  ThemeTrend,
+  TopicBreakdown,
+  HighRiskUser,
+  Insight,
+  Pattern,
+} from '@/types/admin/analytics';
 
-interface Insight {
-    title: string;
-    description: string;
-    severity: string;
-    data: Record<string, unknown>;
-}
+const TREND_COLORS = ['#38BDF8', '#FFCA40', '#F97316', '#A855F7'];
+const DAYS_ORDER = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const TIME_BUCKETS = ['00:00-05:59', '06:00-11:59', '12:00-17:59', '18:00-23:59'];
 
-interface Pattern {
-    name: string;
-    description: string;
-    count: number;
-}
+const severityOrder = ['High', 'Medium', 'Low'];
+const severityAccent: Record<string, string> = {
+  High: 'bg-rose-500/20 text-rose-200 border border-rose-400/30',
+  Medium: 'bg-amber-500/20 text-amber-200 border border-amber-400/30',
+  Low: 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30',
+};
+const severityText: Record<string, string> = {
+  High: 'text-rose-300',
+  Medium: 'text-amber-200',
+  Low: 'text-emerald-200',
+};
 
-interface AnalyticsReport {
-    id: number;
-    generated_at: string;
-    report_period: string;
-    insights: Insight[];
-    trends: { patterns: Pattern[] };
-    recommendations: string[];
-}
-
-interface StatCardProps {
+const StatCard = ({
+  title,
+  value,
+  description,
+  icon,
+  accentClass,
+}: {
   title: string;
-  value: string | number;
-  icon: React.ReactNode;
+  value: number | string;
   description: string;
-  color: string;
-}
-
-const StatCard: React.FC<StatCardProps> = ({ title, value, icon, description, color }) => (
+  icon: React.ReactNode;
+  accentClass: string;
+}) => (
   <motion.div
-    initial={{ opacity: 0, y: 20 }}
+    initial={{ opacity: 0, y: 16 }}
     animate={{ opacity: 1, y: 0 }}
-    className={`bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-6`}
+    transition={{ duration: 0.25 }}
+    className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-inner backdrop-blur"
   >
-    <div className="flex items-center justify-between">
+    <div className="flex items-start justify-between gap-3">
       <div>
-        <p className="text-sm font-medium text-gray-400">{title}</p>
-        <p className="text-2xl font-bold text-white">{value.toLocaleString()}</p>
+        <p className="text-xs uppercase tracking-wide text-white/50">{title}</p>
+        <p className="mt-2 text-2xl font-semibold text-white">
+          {typeof value === 'number' ? value.toLocaleString() : value}
+        </p>
+        <p className="mt-2 text-xs text-white/60">{description}</p>
       </div>
-      <div className={`p-3 bg-${color}-500/20 rounded-lg`}>
-        {icon}
-      </div>
+      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${accentClass}`}>{icon}</div>
     </div>
-    {description && <p className="text-xs text-gray-400 mt-2">{description}</p>}
   </motion.div>
 );
 
-export default function AnalyticsPage() {
-  const [report, setReport] = useState<AnalyticsReport | null>(null);
+const TopicBreakdownList = ({ topics }: { topics: TopicBreakdown[] }) => {
+  if (!topics.length) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+        No topical signals detected in this window.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {topics.map((topic) => {
+        const totalSentiment =
+          topic.sentiment_scores.positive + topic.sentiment_scores.negative + topic.sentiment_scores.neutral || 1;
+        return (
+          <div
+            key={topic.topic}
+            className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner"
+          >
+            <div className="flex items-center justify-between text-sm text-white/80">
+              <p className="font-semibold text-white">{topic.topic}</p>
+              <span className="text-white/60">{topic.total_mentions.toLocaleString()} mentions</span>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-3 text-xs text-white/70">
+              <div>
+                <p className="text-white/50">Negative</p>
+                <p className="font-medium text-rose-300">
+                  {topic.sentiment_scores.negative} ({Math.round((topic.sentiment_scores.negative / totalSentiment) * 100)}%)
+                </p>
+              </div>
+              <div>
+                <p className="text-white/50">Neutral</p>
+                <p className="font-medium text-white/80">
+                  {topic.sentiment_scores.neutral} ({Math.round((topic.sentiment_scores.neutral / totalSentiment) * 100)}%)
+                </p>
+              </div>
+              <div>
+                <p className="text-white/50">Positive</p>
+                <p className="font-medium text-emerald-200">
+                  {topic.sentiment_scores.positive} ({Math.round((topic.sentiment_scores.positive / totalSentiment) * 100)}%)
+                </p>
+              </div>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const ThemeTrendChart = ({
+  themeTrends,
+  selectedTopics,
+}: {
+  themeTrends: ThemeTrend[];
+  selectedTopics: string[];
+}) => {
+  if (!themeTrends.length || !selectedTopics.length) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+        Trend data will appear once enough signals are captured.
+      </div>
+    );
+  }
+
+  const topicSet = new Set(selectedTopics);
+  const trendMap = themeTrends.filter((trend) => topicSet.has(trend.topic));
+
+  const combined = new Map<string, Record<string, number>>();
+  trendMap.forEach((trend) => {
+    trend.data.forEach((point) => {
+      const row = combined.get(point.date) ?? { date: point.date };
+      row[`${trend.topic}-count`] = point.count;
+      row[`${trend.topic}-avg`] = point.rolling_average;
+      combined.set(point.date, row);
+    });
+  });
+
+  const chartData = Array.from(combined.entries())
+    .sort((a, b) => (a[0] > b[0] ? 1 : -1))
+    .map(([, row]) => row);
+
+  return (
+    <ResponsiveContainer height={320}>
+      <LineChart data={chartData} margin={{ left: 16, right: 24, top: 16, bottom: 8 }}>
+        <CartesianGrid stroke="rgba(255,255,255,0.1)" strokeDasharray="3 3" />
+        <XAxis dataKey="date" stroke="#CBD5F5" fontSize={12} tickLine={false} axisLine={false} />
+        <YAxis stroke="#CBD5F5" fontSize={12} tickLine={false} axisLine={false} allowDecimals />
+        <Tooltip
+          contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(148, 163, 184, 0.25)', borderRadius: 12 }}
+          cursor={{ strokeDasharray: '4 4', stroke: 'rgba(148, 163, 184, 0.3)' }}
+        />
+        <Legend wrapperStyle={{ color: '#CBD5F5' }} />
+        {trendMap.map((trend, index) => (
+          <>
+            <Line
+              key={`${trend.topic}-count`}
+              dataKey={`${trend.topic}-count`}
+              name={`${trend.topic} (daily)`}
+              stroke={TREND_COLORS[index % TREND_COLORS.length]}
+              strokeWidth={2.2}
+              dot={false}
+              type="monotone"
+              activeDot={{ r: 5 }}
+            />
+            <Line
+              key={`${trend.topic}-avg`}
+              dataKey={`${trend.topic}-avg`}
+              name={`${trend.topic} (rolling avg)`}
+              stroke={TREND_COLORS[index % TREND_COLORS.length]}
+              strokeDasharray="5 5"
+              strokeWidth={2}
+              dot={false}
+              type="monotone"
+            />
+          </>
+        ))}
+      </LineChart>
+    </ResponsiveContainer>
+  );
+};
+
+const DistressHeatmap = ({ data }: { data: HeatmapCell[] }) => {
+  if (!data.length) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+        Heatmap will populate once the analytics agent runs.
+      </div>
+    );
+  }
+
+  const maxCount = data.reduce((max, cell) => Math.max(max, cell.count), 0) || 1;
+  const cellMap = new Map<string, number>();
+  data.forEach((cell) => {
+    cellMap.set(`${cell.day}-${cell.block}`, cell.count);
+  });
+
+  const intensityToColor = (count: number) => {
+    const ratio = count / maxCount;
+    if (ratio === 0) return 'rgba(236, 72, 153, 0)';
+    return `rgba(236, 72, 153, ${0.25 + 0.65 * ratio})`;
+  };
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5 p-4">
+      <div className="grid grid-cols-[120px_repeat(7,1fr)] gap-px text-xs">
+        <div className="bg-slate-900/60 px-2 py-3 text-white/60">Time window</div>
+        {DAYS_ORDER.map((day) => (
+          <div key={day} className="bg-slate-900/60 px-2 py-3 text-center text-white/60">
+            {day.slice(0, 3)}
+          </div>
+        ))}
+        {TIME_BUCKETS.map((bucket) => (
+          <>
+            <div key={`${bucket}-label`} className="bg-slate-900/70 px-2 py-6 text-white/60">
+              {bucket}
+            </div>
+            {DAYS_ORDER.map((day) => {
+              const count = cellMap.get(`${day}-${bucket}`) ?? 0;
+              return (
+                <div
+                  key={`${day}-${bucket}`}
+                  className="flex h-16 items-center justify-center text-sm font-semibold text-white"
+                  style={{ background: intensityToColor(count) }}
+                >
+                  {count || ''}
+                </div>
+              );
+            })}
+          </>
+        ))}
+      </div>
+    </div>
+  );
+};
+
+const SegmentAlertList = ({ segments }: { segments: SegmentImpact[] }) => {
+  if (!segments.length) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+        No segments stand out for negative sentiment in this report.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {segments.map((segment) => (
+        <div
+          key={`${segment.segment}-${segment.group}`}
+          className="rounded-2xl border border-white/10 bg-white/5 p-4"
+        >
+          <div className="flex items-center justify-between text-sm text-white/70">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-white/50">{segment.segment}</p>
+              <p className="text-sm font-semibold text-white">{segment.group}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-lg font-semibold text-white">{segment.metric}</p>
+              <p className="text-xs text-white/50">{segment.percentage.toFixed(1)}% of negative signals</p>
+            </div>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const HighRiskList = ({ users }: { users: HighRiskUser[] }) => {
+  if (!users.length) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+        No students are currently flagged for sustained high-risk triage scores.
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-white/10 bg-white/5">
+      <table className="min-w-full divide-y divide-white/10 text-sm">
+        <thead>
+          <tr className="text-xs uppercase tracking-wide text-white/50">
+            <th className="px-4 py-3 text-left">Student</th>
+            <th className="px-4 py-3 text-left">Assessments</th>
+            <th className="px-4 py-3 text-left">Last severity</th>
+            <th className="px-4 py-3 text-left">Last assessed</th>
+            <th className="px-4 py-3 text-left">Action</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-white/5 text-white/80">
+          {users.map((user) => (
+            <tr key={user.user_id}>
+              <td className="px-4 py-3">
+                <div className="font-semibold text-white">{user.name || user.email || 'Unknown student'}</div>
+                {user.email && <p className="text-xs text-white/60">{user.email}</p>}
+              </td>
+              <td className="px-4 py-3">{user.recent_assessments}</td>
+              <td className="px-4 py-3 capitalize">{user.last_severity}</td>
+              <td className="px-4 py-3 text-white/60">
+                {new Date(user.last_assessed_at).toLocaleString()}
+              </td>
+              <td className="px-4 py-3">
+                <Link
+                  href={user.triage_link}
+                  className="inline-flex items-center gap-2 rounded-lg border border-white/10 bg-white/5 px-3 py-1.5 text-xs font-semibold text-white transition hover:border-white/30 hover:bg-white/10"
+                >
+                  <FiUsers className="h-3.5 w-3.5" /> Review triage
+                </Link>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
+const normalizeReport = (raw: any): AnalyticsReportType => {
+  if (!raw) {
+    return {
+      report_period: '7 days',
+      insights: [],
+      patterns: [],
+      recommendations: [],
+      metrics: {},
+      topic_breakdown: [],
+      theme_trends: [],
+      distress_heatmap: [],
+      segment_alerts: [],
+      high_risk_users: [],
+    };
+  }
+
+  const trends = raw.trends ?? {};
+  return {
+    id: raw.id,
+    generated_at: raw.generated_at,
+    report_period: raw.report_period ?? '7 days',
+    insights: (raw.insights ?? []) as Insight[],
+    patterns: (raw.patterns ?? trends.patterns ?? []) as Pattern[],
+    recommendations: (raw.recommendations ?? []) as string[],
+    metrics: (raw.metrics ?? trends.metrics ?? {}) as Record<string, unknown>,
+    topic_breakdown: (raw.topic_breakdown ?? trends.topic_breakdown ?? []) as TopicBreakdown[],
+    theme_trends: (raw.theme_trends ?? trends.theme_trends ?? []) as ThemeTrend[],
+    distress_heatmap: (raw.distress_heatmap ?? trends.distress_heatmap ?? []) as HeatmapCell[],
+    segment_alerts: (raw.segment_alerts ?? trends.segment_alerts ?? []) as SegmentImpact[],
+    high_risk_users: (raw.high_risk_users ?? trends.high_risk_users ?? []) as HighRiskUser[],
+  };
+};
+
+export default function AnalyticsPanelPage() {
+  const [report, setReport] = useState<AnalyticsReportType | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
 
-  const fetchReport = async () => {
+  const fetchReport = useCallback(async () => {
     try {
       setLoading(true);
-      const reportData = await apiCall<any>('/api/v1/admin/analytics');
-      // Backend may return a message when there's no report yet
-      if (reportData && typeof reportData === 'object' && 'id' in reportData) {
-        setReport(reportData as AnalyticsReport);
+      const response = await apiCall<any>('/api/v1/admin/analytics');
+      if (response && 'id' in response) {
+        setReport(normalizeReport(response));
       } else {
         setReport(null);
       }
@@ -76,161 +396,294 @@ export default function AnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
 
-  const runAgent = async () => {
+  const runAgent = useCallback(async () => {
     try {
       setRunning(true);
-      const result = await apiCall<{ message: string, report: AnalyticsReport }>('/api/v1/admin/analytics/run', { method: 'POST' });
-      toast.success(result.message);
-      setReport(result.report);
+      const result = await apiCall<{ message: string; report: AnalyticsReportType }>('/api/v1/admin/analytics/run', {
+        method: 'POST',
+      });
+      toast.success(result.message ?? 'Analytics report generated');
+      setReport(normalizeReport(result.report));
     } catch (error) {
       console.error('Error running analytics agent:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to run analytics agent');
     } finally {
       setRunning(false);
     }
-  };
+  }, []);
 
   useEffect(() => {
-    fetchReport();
-  }, []);
+    void fetchReport();
+  }, [fetchReport]);
+
+  const insightCounts = useMemo(() => {
+    if (!report) return { total: 0, high: 0 };
+    const total = report.insights.length;
+    const high = report.insights.filter((insight) => (insight.severity || '').toLowerCase() === 'high').length;
+    return { total, high };
+  }, [report]);
+
+  const topTopics = useMemo(() => {
+    if (!report) return [] as TopicBreakdown[];
+    return [...report.topic_breakdown].sort((a, b) => b.total_mentions - a.total_mentions).slice(0, 4);
+  }, [report]);
+
+  const topTrendsTopics = topTopics.length
+    ? topTopics.map((topic) => topic.topic)
+    : (report?.theme_trends ?? []).slice(0, 3).map((trend) => trend.topic);
+
+  const generatedAtLabel = report?.generated_at
+    ? new Date(report.generated_at).toLocaleString()
+    : undefined;
+
+  const topStats = useMemo(() => {
+    if (!report) return [];
+    return [
+      {
+        title: 'Tracked topics',
+        value: report.topic_breakdown.length,
+        description: 'Distinct wellbeing themes identified in this period.',
+        icon: <FiActivity className="h-5 w-5" />,
+        accentClass: 'bg-sky-500/20 text-sky-200 border border-sky-400/30',
+      },
+      {
+        title: 'Insights generated',
+        value: insightCounts.total,
+        description: `${insightCounts.high} high-severity alerts flagged by the agent.`,
+        icon: <FiAlertTriangle className="h-5 w-5" />,
+        accentClass: 'bg-rose-500/20 text-rose-200 border border-rose-400/30',
+      },
+      {
+        title: 'Recommendations',
+        value: report.recommendations.length,
+        description: 'Actionable steps for wellbeing and operations teams.',
+        icon: <FiCheckCircle className="h-5 w-5" />,
+        accentClass: 'bg-emerald-500/20 text-emerald-200 border border-emerald-400/30',
+      },
+      {
+        title: 'Report window',
+        value: report.report_period,
+        description: 'Timeframe analysed in this snapshot.',
+        icon: <FiClock className="h-5 w-5" />,
+        accentClass: 'bg-indigo-500/20 text-indigo-200 border border-indigo-400/30',
+      },
+    ];
+  }, [report, insightCounts]);
 
   if (loading) {
     return (
-      <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl 2xl:max-w-[100rem] space-y-6">
-        <div className="animate-pulse">
-          <div className="h-7 sm:h-8 bg-white/20 rounded mb-4 sm:mb-6 w-2/5 sm:w-1/4"></div>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
-            {[...Array(8)].map((_, i) => (
-              <div key={i} className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 p-4 sm:p-6 h-24 sm:h-28"></div>
+      <div className="container mx-auto max-w-7xl space-y-6 px-4 py-6">
+        <div className="animate-pulse space-y-5">
+          <div className="h-8 w-2/5 rounded bg-white/10" />
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {Array.from({ length: 4 }).map((_, index) => (
+              <div key={index} className="h-28 rounded-2xl border border-white/10 bg-white/5" />
             ))}
           </div>
+          <div className="h-64 rounded-2xl border border-white/10 bg-white/5" />
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-3 sm:px-4 py-4 sm:py-6 max-w-7xl 2xl:max-w-[100rem] space-y-6 sm:space-y-8">
-      <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3">
+    <div className="container mx-auto max-w-7xl space-y-6 px-4 py-6">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center">
-            <FiBarChart2 className="mr-2 sm:mr-3 text-[#FFCA40]" />
-            Analytics Dashboard
+          <h1 className="flex items-center text-3xl font-bold text-white">
+            <FiBarChart2 className="mr-3 text-[#FFCA40]" />
+            Analytics Panel
           </h1>
-          <p className="text-gray-400 mt-1 text-xs sm:text-sm">AI-powered insights into platform usage and user well-being.</p>
+          <p className="mt-1 text-sm text-white/70">
+            Monitor wellbeing trends, agent performance, and recommended actions surfaced by the analytics agent.
+          </p>
+          {generatedAtLabel && (
+            <p className="mt-1 text-xs text-white/50">Last generated {generatedAtLabel}</p>
+          )}
         </div>
         <button
           onClick={runAgent}
           disabled={running}
-          className="inline-flex items-center px-3 sm:px-4 py-2 bg-[#FFCA40] hover:bg-[#ffda63] text-black rounded-lg text-xs sm:text-sm font-medium transition-colors disabled:opacity-50 self-start"
+          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#FFCA40] px-4 py-2 text-sm font-semibold text-black transition hover:bg-[#ffd964] disabled:cursor-not-allowed disabled:opacity-70"
         >
-          <FiPlayCircle className={`h-4 w-4 mr-2 ${running ? 'animate-spin' : ''}`} />
-          {running ? 'Running Agent...' : 'Generate New Report'}
+          <FiPlayCircle className={running ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+          {running ? 'Generating report…' : 'Run analytics agent'}
         </button>
       </div>
 
-      {!report ? (
-        <div className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 p-8">
-          <div className="text-center">
-            <div className="mx-auto mb-4 h-12 w-12 rounded-full bg-[#FFCA40]/20 flex items-center justify-center">
-              <FiBarChart2 className="text-[#FFCA40]" />
-            </div>
-            <h2 className="text-2xl font-semibold text-white">No Analytics Yet</h2>
-            <p className="text-gray-300 mt-2">Generate your first AI-powered analytics report to see usage patterns, insights and recommendations.</p>
-            <p className="text-gray-400 mt-1">Click "Generate New Report" above to get started.</p>
-          </div>
-
-          {/* Preview of what will appear */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mt-6 sm:mt-8">
-            {/* Patterns preview */}
-            <div className="bg-white/5 rounded-lg border border-white/10 p-4 sm:p-5">
-              <h3 className="text-white font-semibold mb-3">Key Patterns (Preview)</h3>
-              <div className="grid grid-cols-1 gap-3">
-                {[1,2,3].map((i) => (
-                  <div key={i} className="flex items-center justify-between p-3 rounded-md bg-white/5 border border-white/10">
-                    <div>
-                      <div className="h-4 w-40 bg-white/10 rounded mb-2" />
-                      <div className="h-3 w-24 bg-white/10 rounded" />
-                    </div>
-                    <div className="h-6 w-12 bg-white/10 rounded" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Insights preview */}
-            <div className="bg-white/5 rounded-lg border border-white/10 p-4 sm:p-5">
-              <h3 className="text-white font-semibold mb-3">AI-Generated Insights (Preview)</h3>
-              <div className="space-y-3">
-                {[1,2].map((i) => (
-                  <div key={i} className="p-4 rounded-md bg-white/5 border border-white/10">
-                    <div className="h-4 w-48 bg-white/10 rounded mb-2" />
-                    <div className="h-3 w-full bg-white/10 rounded mb-1" />
-                    <div className="h-3 w-2/3 bg-white/10 rounded" />
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Recommendations preview */}
-            <div className="bg-white/5 rounded-lg border border-white/10 p-4 sm:p-5">
-              <h3 className="text-white font-semibold mb-3">Recommendations (Preview)</h3>
-              <ul className="space-y-2 text-gray-300">
-                <li className="flex items-center"><span className="h-2 w-2 rounded-full bg-white/30 mr-2"/> <span className="h-3 w-56 bg-white/10 rounded inline-block"/></li>
-                <li className="flex items-center"><span className="h-2 w-2 rounded-full bg-white/30 mr-2"/> <span className="h-3 w-48 bg-white/10 rounded inline-block"/></li>
-                <li className="flex items-center"><span className="h-2 w-2 rounded-full bg-white/30 mr-2"/> <span className="h-3 w-40 bg-white/10 rounded inline-block"/></li>
-              </ul>
-              <p className="text-xs text-gray-400 mt-3">These will be tailored based on your users’ recent activity.</p>
-            </div>
-          </div>
-        </div>
-      ) : (
+      {report ? (
         <>
-          <section>
-            <h2 className="text-xl font-semibold text-white mb-4">Key Patterns (Last {report.report_period})</h2>
-            {report.trends?.patterns?.length ? (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
-                {report.trends.patterns.map((pattern, index) => (
-                  <StatCard key={index} title={pattern.name} value={pattern.count} icon={<FiActivity className="h-6 w-6 text-blue-400" />} description={pattern.description} color="blue" />
-                ))}
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+            {topStats.map((stat) => (
+              <StatCard key={stat.title} {...stat} />
+            ))}
+          </div>
+
+          <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <div className="mb-3 flex items-center justify-between text-sm">
+                <h2 className="text-lg font-semibold text-white">
+                  Theme trends ({report.report_period})
+                </h2>
+                <span className="flex items-center gap-2 text-xs text-white/50">
+                  <FiTrendingUp className="h-3.5 w-3.5" /> Daily counts with rolling averages
+                </span>
+              </div>
+              <ThemeTrendChart themeTrends={report.theme_trends} selectedTopics={topTrendsTopics} />
+            </div>
+            <div>
+              <h2 className="mb-3 text-lg font-semibold text-white">Insight severity mix</h2>
+              <div className="space-y-3">
+                {severityOrder.map((severity) => {
+                  const count = report.insights.filter((insight) => insight.severity === severity).length;
+                  if (!count) return null;
+                  const total = report.insights.length || 1;
+                  const share = Math.round((count / total) * 100);
+                  return (
+                    <div
+                      key={severity}
+                      className={`rounded-2xl border border-white/10 bg-white/5 p-4 ${severityAccent[severity] ?? ''}`}
+                    >
+                      <p className={`text-xs uppercase tracking-wide ${severityText[severity] ?? 'text-white/60'}`}>
+                        {severity}
+                      </p>
+                      <p className="mt-2 text-2xl font-semibold text-white">{share}%</p>
+                      <p className="text-xs text-white/70">{count} insight{count === 1 ? '' : 's'}</p>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </section>
+
+          <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div>
+              <div className="flex items-center gap-2 text-lg font-semibold text-white">
+                <FiActivity className="text-sky-300" /> Topic breakdown
+              </div>
+              <p className="mt-1 text-xs text-white/60">
+                Mentions and sentiment mix for key wellbeing themes.
+              </p>
+              <div className="mt-4">
+                <TopicBreakdownList topics={report.topic_breakdown} />
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 text-lg font-semibold text-white">
+                <FiPieChart className="text-fuchsia-300" /> Distress heatmap
+              </div>
+              <p className="mt-1 text-xs text-white/60">
+                When students express elevated distress throughout the week.
+              </p>
+              <div className="mt-4">
+                <DistressHeatmap data={report.distress_heatmap} />
+              </div>
+            </div>
+          </section>
+
+          <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div>
+              <div className="flex items-center gap-2 text-lg font-semibold text-white">
+                <FiUsers className="text-amber-200" /> Segments contributing to negative trends
+              </div>
+              <p className="mt-1 text-xs text-white/60">
+                Cohorts whose messages most frequently contain negative sentiment.
+              </p>
+              <div className="mt-4">
+                <SegmentAlertList segments={report.segment_alerts} />
+              </div>
+            </div>
+            <div>
+              <div className="flex items-center gap-2 text-lg font-semibold text-white">
+                <FiAlertTriangle className="text-rose-300" /> High-risk students for follow-up
+              </div>
+              <p className="mt-1 text-xs text-white/60">
+                Individuals with repeated high triage scores who may need outreach.
+              </p>
+              <div className="mt-4">
+                <HighRiskList users={report.high_risk_users} />
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <div className="flex items-center gap-2 text-lg font-semibold text-white">
+              <FiPieChart className="text-[#38BDF8]" /> AI-generated insights
+            </div>
+            {report.insights.length ? (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {report.insights.map((insight) => {
+                  const severity = insight.severity || 'Low';
+                  const severityClass = severityText[severity] ?? 'text-white';
+                  return (
+                    <motion.div
+                      key={insight.title}
+                      initial={{ opacity: 0, y: 12 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.2 }}
+                      className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-inner"
+                    >
+                      <p className={`text-xs uppercase tracking-wide ${severityClass}`}>{severity}</p>
+                      <h3 className="mt-2 text-lg font-semibold text-white">{insight.title}</h3>
+                      <p className="mt-2 text-sm text-white/70">{insight.description}</p>
+                    </motion.div>
+                  );
+                })}
               </div>
             ) : (
-              <div className="text-gray-400 bg-white/5 border border-white/10 rounded-lg p-4 sm:p-6">No patterns detected for this period.</div>
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+                No insights available for this report.
+              </div>
             )}
           </section>
 
-          <section>
-            <h2 className="text-xl font-semibold text-white mb-4">AI-Generated Insights</h2>
-            {report.insights?.length ? (
-              <div className="space-y-3 sm:space-y-4">
-                {report.insights.map((insight, index) => (
-                  <motion.div key={index} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="bg-white/10 p-3 sm:p-4 rounded-lg">
-                    <h3 className={`font-bold ${insight.severity === 'High' ? 'text-red-400' : insight.severity === 'Medium' ? 'text-yellow-400' : 'text-green-400'}`}>{insight.title}</h3>
-                    <p className="text-gray-300">{insight.description}</p>
-                  </motion.div>
+          <section className="space-y-3">
+            <div className="flex items-center gap-2 text-lg font-semibold text-white">
+              <FiCheckCircle className="text-emerald-300" /> Recommended actions
+            </div>
+            {report.recommendations.length ? (
+              <ol className="space-y-3 text-sm text-white/80">
+                {report.recommendations.map((recommendation, index) => (
+                  <li
+                    key={`${recommendation}-${index}`}
+                    className="rounded-2xl border border-white/10 bg-white/5 p-4"
+                  >
+                    <span className="mr-3 inline-flex h-6 w-6 items-center justify-center rounded-full bg-[#FFCA40]/20 text-xs font-semibold text-[#FFCA40]">
+                      {index + 1}
+                    </span>
+                    {recommendation}
+                  </li>
                 ))}
+              </ol>
+            ) : (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+                No recommendations were generated in this run.
               </div>
-            ) : (
-              <div className="text-gray-400 bg-white/5 border border-white/10 rounded-lg p-4 sm:p-6">No insights generated for this report.</div>
-            )}
-          </section>
-
-          <section>
-            <h2 className="text-xl font-semibold text-white mb-4">Recommendations</h2>
-            {report.recommendations?.length ? (
-              <ul className="space-y-2 list-disc list-inside text-gray-300">
-                {report.recommendations.map((rec, index) => (
-                  <li key={index}>{rec}</li>
-                ))}
-              </ul>
-            ) : (
-              <div className="text-gray-400 bg-white/5 border border-white/10 rounded-lg p-4 sm:p-6">No recommendations available for this report.</div>
             )}
           </section>
         </>
+      ) : (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-10 text-center">
+          <div className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-full bg-[#FFCA40]/15">
+            <FiBarChart2 className="h-6 w-6 text-[#FFCA40]" />
+          </div>
+          <h2 className="text-2xl font-semibold text-white">No analytics report available yet</h2>
+          <p className="mt-2 text-sm text-white/70">
+            Run the analytics agent to generate your first snapshot of wellbeing trends and operational insights.
+          </p>
+          <p className="mt-4 text-xs text-white/60">
+            The dashboard will populate with behaviour patterns, AI-authored insights, and prioritized actions once a
+            report is generated.
+          </p>
+        </div>
       )}
     </div>
   );
 }
+
+
+
+
+

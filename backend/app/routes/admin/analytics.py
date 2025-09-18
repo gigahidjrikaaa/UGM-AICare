@@ -17,6 +17,24 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/analytics", tags=["Admin - Analytics"])
 
 
+def _serialize_report(model: AnalyticsReport) -> dict:
+    trends = model.trends or {}
+    return {
+        "id": model.id,
+        "generated_at": model.generated_at,
+        "report_period": model.report_period,
+        "insights": model.insights or [],
+        "patterns": trends.get("patterns", []),
+        "recommendations": model.recommendations or [],
+        "metrics": trends.get("metrics", {}),
+        "topic_breakdown": trends.get("topic_breakdown", []),
+        "theme_trends": trends.get("theme_trends", []),
+        "distress_heatmap": trends.get("distress_heatmap", []),
+        "segment_alerts": trends.get("segment_alerts", []),
+        "high_risk_users": trends.get("high_risk_users", []),
+    }
+
+
 @router.post("/run")
 async def run_analytics_agent(
     db: AsyncSession = Depends(get_async_db),
@@ -52,7 +70,7 @@ async def get_analytics(
         latest_report = result.scalars().first()
         if not latest_report:
             return {"message": "No analytics report found. Please run the agent first."}
-        return latest_report
+        return _serialize_report(latest_report)
     except Exception as exc:  # pragma: no cover - runtime safety
         logger.error("Error fetching analytics data for admin %s: %s", admin_user.id, exc, exc_info=True)
         raise HTTPException(

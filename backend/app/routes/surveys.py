@@ -1,14 +1,14 @@
-﻿from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
+from fastapi import APIRouter, Depends, HTTPException, Query, status, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, desc, asc, or_, select, update
 from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, Field
 from datetime import datetime, date, timedelta
-from typing import List, Optional, Dict, Any, Set
+from typing import List, Optional, Dict, Any, Set, Union, Union
 import logging
 
 from app.database import get_async_db
-from app.models import User, Survey, SurveyQuestion, SurveyAnswer
+from app.models import User, Survey, SurveyQuestion, SurveyAnswer, SurveyResponse
 from app.dependencies import get_current_active_user, get_admin_user
 
 logger = logging.getLogger(__name__)
@@ -19,10 +19,39 @@ router = APIRouter(
     dependencies=[Depends(get_admin_user)]
 )
 
+
+def _normalize_options(question_type: str, raw: Optional[Any]) -> Optional[dict]:
+    """Ensure options are stored as JSON-compatible dicts."""
+    if question_type == 'rating':
+        payload = raw or {}
+        scale = payload.get('scale', {}) if isinstance(payload, dict) else {}
+        min_v = scale.get('min', 1)
+        max_v = scale.get('max', 5)
+        if not isinstance(min_v, int) or not isinstance(max_v, int) or min_v >= max_v:
+            min_v, max_v = 1, 5
+        return {"scale": {"min": int(min_v), "max": int(max_v)}}
+
+    if question_type == 'multiple-choice':
+        if isinstance(raw, dict) and 'choices' in raw:
+            choices = raw.get('choices')
+        else:
+            choices = raw
+        if isinstance(choices, list):
+            cleaned = [str(choice) for choice in choices]
+        else:
+            cleaned = []
+        return {"choices": cleaned} if cleaned else None
+
+    if isinstance(raw, dict):
+        return raw
+
+    return None
+
+
 class SurveyQuestionCreate(BaseModel):
     question_text: str
     question_type: str
-    options: Optional[List[str]] = None
+    options: Optional[Union[List[str], Dict[str, Any]]] = None
 
 class SurveyCreate(BaseModel):
     title: str
@@ -38,13 +67,13 @@ class SurveyQuestionUpsert(BaseModel):
     id: Optional[int] = None
     question_text: str
     question_type: str
-    options: Optional[List[str]] = None
+    options: Optional[Union[List[str], Dict[str, Any]]] = None
 
 class SurveyQuestionResponse(BaseModel):
     id: int
     question_text: str
     question_type: str
-    options: Optional[List[str]] = None
+    options: Optional[Union[List[str], Dict[str, Any]]] = None
 
     class Config:
         from_attributes = True
@@ -75,12 +104,16 @@ async def create_survey(survey_data: SurveyCreate, db: AsyncSession = Depends(ge
     await db.refresh(db_survey)
 
     for question_data in survey_data.questions:
+        payload = question_data.dict()
+        options = _normalize_options(payload["question_type"], payload.get("options"))
         db_question = SurveyQuestion(
             survey_id=db_survey.id,
-            **question_data.dict()
+            question_text=payload["question_text"],
+            question_type=payload["question_type"],
+            options=options,
         )
         db.add(db_question)
-    
+
     await db.commit()
     # Re-fetch with questions eagerly loaded to avoid async lazy-load during serialization
     result = await db.execute(
@@ -257,38 +290,19 @@ async def upsert_survey_questions(
 
     # Upsert incoming
     for item in questions:
+        normalized_options = _normalize_options(item.question_type, item.options)
         if item.id and item.id in existing_by_id:
             db_q = existing_by_id[item.id]
             db_q.question_text = item.question_text
             db_q.question_type = item.question_type
-            # Normalize rating options
-            if item.question_type == 'rating':
-                opts = item.options or {}
-                scale = opts.get('scale', {}) if isinstance(opts, dict) else {}
-                min_v = scale.get('min', 1)
-                max_v = scale.get('max', 5)
-                if not isinstance(min_v, int) or not isinstance(max_v, int) or min_v >= max_v:
-                    min_v, max_v = 1, 5
-                db_q.options = {"scale": {"min": int(min_v), "max": int(max_v)}}
-            else:
-                db_q.options = item.options
+            db_q.options = normalized_options
             db.add(db_q)
         else:
-            # Normalize new records
-            opts_value = item.options
-            if item.question_type == 'rating':
-                opts = opts_value or {}
-                scale = opts.get('scale', {}) if isinstance(opts, dict) else {}
-                min_v = scale.get('min', 1)
-                max_v = scale.get('max', 5)
-                if not isinstance(min_v, int) or not isinstance(max_v, int) or min_v >= max_v:
-                    min_v, max_v = 1, 5
-                opts_value = {"scale": {"min": int(min_v), "max": int(max_v)}}
             db_q = SurveyQuestion(
                 survey_id=survey_id,
                 question_text=item.question_text,
                 question_type=item.question_type,
-                options=opts_value,
+                options=normalized_options,
             )
             db.add(db_q)
 
@@ -320,7 +334,7 @@ async def get_survey_analytics(
         # Fetch answers for this question
         ares = await db.execute(
             select(SurveyAnswer.answer_text)
-            .join(SurveyAnswer.response_id == SurveyResponse.id)
+            .join(SurveyResponse, SurveyAnswer.response_id == SurveyResponse.id)
             .filter(SurveyResponse.survey_id == survey_id, SurveyAnswer.question_id == q.id)
         )
         answers = [row[0] for row in ares.all()]
@@ -390,3 +404,7 @@ async def export_survey_responses_csv(
         "Content-Disposition": f"attachment; filename=survey_{survey_id}_responses.csv"
     }
     return Response(content=csv_text, media_type="text/csv", headers=headers)
+
+
+
+

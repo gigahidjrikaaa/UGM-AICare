@@ -12,6 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.models import Conversation, FlaggedSession
+from app.models import User
 from app.schemas.admin import (
     FlagCreate,
     FlagResponse,
@@ -80,13 +81,11 @@ async def update_flag(
     if not flag:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Flag not found")
 
-    if data.status is not None:
+    if hasattr(data, "status") and data.status is not None:
         flag.status = data.status
-    if data.reason is not None:
-        flag.reason = data.reason
-    if data.tags is not None:
+    if hasattr(data, "tags") and data.tags is not None:
         flag.tags = data.tags
-    if data.notes is not None:
+    if hasattr(data, "notes") and data.notes is not None:
         flag.notes = data.notes
 
     flag.updated_at = datetime.now()
@@ -113,8 +112,9 @@ async def get_flags_summary(
             select(FlaggedSession).order_by(desc(FlaggedSession.created_at)).limit(limit)
         )
     ).scalars().all()
-
-    return FlagsSummary(open_count=int(open_count), recent=recent_flags)
+    # Convert FlaggedSession objects to FlagResponse if needed
+    recent_flag_responses = [FlagResponse.from_orm(flag) for flag in recent_flags]
+    return FlagsSummary(open_count=int(open_count), recent=recent_flag_responses)
 
 
 @router.post("/flags/bulk-close", response_model=List[FlagResponse])
