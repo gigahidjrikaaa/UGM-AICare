@@ -167,9 +167,16 @@ export default function InterventionPanelPage() {
     [overview?.top_risk_cases],
   );
 
+
+  // Handler for manual escalation from ReviewQueue
+  const handleOpenManualFromExecution = useCallback((execution: QueueItem) => {
+    setDrawerContext(execution);
+    setDrawerOpen(true);
+  }, []);
+
   return (
     <div className="space-y-6">
-      <OverviewCards overview={overview} onRefresh={refreshAll} onCreateManual={() => handleOpenManual()} />
+      <OverviewCards overview={overview ?? undefined} onRefresh={refreshAll} onCreateManual={() => handleOpenManual()} />
 
       {!loading && (
         <HighRiskList items={triageOnlyItems} onCreateIntervention={handleOpenManual} />

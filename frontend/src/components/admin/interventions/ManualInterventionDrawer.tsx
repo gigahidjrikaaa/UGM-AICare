@@ -1,17 +1,15 @@
 ﻿"use client";
 
+import { useEffect, useState } from "react";
+import { FiSend, FiX } from "react-icons/fi";
+import { InterventionCampaign, ManualInterventionPayload, QueueItem } from "@/types/admin/interventions";
+import clsx from "clsx";
+
 const nowLocal = () => {
   const now = new Date();
   now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
   return now.toISOString().slice(0, 16);
 };
-
-
-
-import { useEffect, useState } from "react";
-import { FiSend, FiX } from "react-icons/fi";
-import { InterventionCampaign, ManualInterventionPayload, QueueItem } from "@/types/admin/interventions";
-import clsx from "clsx";
 
 interface ManualInterventionDrawerProps {
   open: boolean;
@@ -29,7 +27,15 @@ const DELIVERY_OPTIONS = [
 ];
 
 export function ManualInterventionDrawer({ open, onClose, campaigns, onSubmit, initialUser }: ManualInterventionDrawerProps) {
-  const [formState, setFormState] = useState<ManualInterventionPayload>({\n    user_id: initialUser?.user_id ?? 0,\n    campaign_id: initialUser?.campaign_id ?? undefined,\n    title: initialUser?.recommended_action ?? "",\n    message: "",\n    delivery_method: initialUser?.delivery_method ?? "email",\n    scheduled_at: nowLocal(),\n    notes: initialUser?.notes ?? "",\n  });
+  const [formState, setFormState] = useState<ManualInterventionPayload>({
+    user_id: initialUser?.user_id ?? 0,
+    campaign_id: initialUser?.campaign_id ?? undefined,
+    title: initialUser?.recommended_action ?? "",
+    message: "",
+    delivery_method: initialUser?.delivery_method ?? "email",
+    scheduled_at: nowLocal(),
+    notes: initialUser?.notes ?? "",
+  });
   const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
@@ -43,8 +49,7 @@ export function ManualInterventionDrawer({ open, onClose, campaigns, onSubmit, i
         scheduled_at: nowLocal(),
         notes: initialUser?.notes ?? prev.notes ?? "",
       }));
-    }
-  }, [open, initialUser]);
+    }  }, [open, initialUser]);
 
   const canSubmit = formState.user_id > 0 && (formState.campaign_id || formState.title);
 
@@ -56,6 +61,14 @@ export function ManualInterventionDrawer({ open, onClose, campaigns, onSubmit, i
       await onSubmit({
         ...formState,
         scheduled_at: formState.scheduled_at ? new Date(formState.scheduled_at).toISOString() : undefined,
+        ...(initialUser
+          ? {
+              risk_score: initialUser.risk_score,
+              severity_level: initialUser.severity_level,
+              recommended_action: initialUser.recommended_action,
+              source_status: initialUser.status,
+            }
+          : {}),
       });
       onClose();
     } finally {
@@ -78,7 +91,7 @@ export function ManualInterventionDrawer({ open, onClose, campaigns, onSubmit, i
       >
         <div className="mb-4 flex items-center justify-between">
           <h2 className="text-xl font-semibold text-white">Manual intervention</h2>
-          <button onClick={onClose} className="rounded-full border border-white/10 p-2 text-white/60 hover:border-white/40 hover:text-white">
+          <button onClick={onClose} className="rounded-full border border-white/10 p-2 text-white/60 hover:border-white/40 hover:text-white" title="Close drawer" aria-label="Close manual intervention drawer">
             <FiX className="h-4 w-4" />
           </button>
         </div>
@@ -88,8 +101,9 @@ export function ManualInterventionDrawer({ open, onClose, campaigns, onSubmit, i
 
         <form className="space-y-4" onSubmit={handleSubmit}>
           <div>
-            <label className="block text-xs uppercase tracking-wide text-white/50">User ID</label>
+            <label htmlFor="user-id" className="block text-xs uppercase tracking-wide text-white/50">User ID</label>
             <input
+              id="user-id"
               type="number"
               min={1}
               value={formState.user_id}
@@ -97,12 +111,14 @@ export function ManualInterventionDrawer({ open, onClose, campaigns, onSubmit, i
               className="mt-2 w-full rounded-lg border border-white/20 bg-transparent px-3 py-2 text-sm text-white focus:border-[#4C8BF5] focus:outline-none"
               placeholder="Enter user id"
               required
+              aria-label="User ID"
             />
           </div>
 
           <div>
-            <label className="block text-xs uppercase tracking-wide text-white/50">Use existing campaign</label>
+            <label htmlFor="campaign-select" className="block text-xs uppercase tracking-wide text-white/50">Use existing campaign</label>
             <select
+              id="campaign-select"
               value={formState.campaign_id ?? ""}
               onChange={(event) =>
                 setFormState((prev) => ({
@@ -111,6 +127,7 @@ export function ManualInterventionDrawer({ open, onClose, campaigns, onSubmit, i
                 }))
               }
               className="mt-2 w-full rounded-lg border border-white/20 bg-transparent px-3 py-2 text-sm text-white focus:border-[#4C8BF5] focus:outline-none"
+              aria-label="Use existing campaign"
             >
               <option value="" className="bg-[#00122F]">
                 -- Create ad-hoc intervention --
@@ -126,23 +143,27 @@ export function ManualInterventionDrawer({ open, onClose, campaigns, onSubmit, i
           {!formState.campaign_id && (
             <>
               <div>
-                <label className="block text-xs uppercase tracking-wide text-white/50">Subject / call-to-action</label>
+                <label htmlFor="subject-title" className="block text-xs uppercase tracking-wide text-white/50">Subject / call-to-action</label>
                 <input
+                  id="subject-title"
                   type="text"
                   value={formState.title ?? ""}
                   onChange={(event) => setFormState((prev) => ({ ...prev, title: event.target.value }))}
                   className="mt-2 w-full rounded-lg border border-white/20 bg-transparent px-3 py-2 text-sm text-white focus:border-[#4C8BF5] focus:outline-none"
                   placeholder="Invitation to counseling session"
+                  aria-label="Subject / call-to-action"
                 />
               </div>
               <div>
-                <label className="block text-xs uppercase tracking-wide text-white/50">Message</label>
+                <label htmlFor="intervention-message" className="block text-xs uppercase tracking-wide text-white/50">Message</label>
                 <textarea
+                  id="intervention-message"
                   value={formState.message ?? ""}
                   onChange={(event) => setFormState((prev) => ({ ...prev, message: event.target.value }))}
                   rows={4}
                   className="mt-2 w-full rounded-lg border border-white/20 bg-transparent px-3 py-2 text-sm text-white focus:border-[#4C8BF5] focus:outline-none"
                   placeholder="Hi {{first_name}}, we noticed ..."
+                  aria-label="Message"
                 />
               </div>
             </>
@@ -150,11 +171,13 @@ export function ManualInterventionDrawer({ open, onClose, campaigns, onSubmit, i
 
           <div className="grid gap-3 md:grid-cols-2">
             <div>
-              <label className="block text-xs uppercase tracking-wide text-white/50">Delivery method</label>
+              <label htmlFor="delivery-method" className="block text-xs uppercase tracking-wide text-white/50">Delivery method</label>
               <select
+                id="delivery-method"
                 value={formState.delivery_method ?? "email"}
                 onChange={(event) => setFormState((prev) => ({ ...prev, delivery_method: event.target.value }))}
                 className="mt-2 w-full rounded-lg border border-white/20 bg-transparent px-3 py-2 text-sm text-white focus:border-[#4C8BF5] focus:outline-none"
+                aria-label="Delivery method"
               >
                 {DELIVERY_OPTIONS.map((option) => (
                   <option key={option.value} value={option.value} className="bg-[#00122F]">
@@ -164,24 +187,28 @@ export function ManualInterventionDrawer({ open, onClose, campaigns, onSubmit, i
               </select>
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wide text-white/50">Schedule for</label>
+              <label htmlFor="schedule-for" className="block text-xs uppercase tracking-wide text-white/50">Schedule for</label>
               <input
+                id="schedule-for"
                 type="datetime-local"
                 value={formState.scheduled_at}
                 onChange={(event) => setFormState((prev) => ({ ...prev, scheduled_at: event.target.value }))}
                 className="mt-2 w-full rounded-lg border border-white/20 bg-transparent px-3 py-2 text-sm text-white focus:border-[#4C8BF5] focus:outline-none"
+                aria-label="Schedule for"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-xs uppercase tracking-wide text-white/50">Reviewer notes</label>
+            <label htmlFor="reviewer-notes" className="block text-xs uppercase tracking-wide text-white/50">Reviewer notes</label>
             <textarea
+              id="reviewer-notes"
               value={formState.notes ?? ""}
               onChange={(event) => setFormState((prev) => ({ ...prev, notes: event.target.value }))}
               rows={3}
               className="mt-2 w-full rounded-lg border border-white/20 bg-transparent px-3 py-2 text-sm text-white focus:border-[#4C8BF5] focus:outline-none"
               placeholder="Additional context for outreach owner"
+              aria-label="Reviewer notes"
             />
           </div>
 
@@ -212,6 +239,15 @@ export function ManualInterventionDrawer({ open, onClose, campaigns, onSubmit, i
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
 
 
 

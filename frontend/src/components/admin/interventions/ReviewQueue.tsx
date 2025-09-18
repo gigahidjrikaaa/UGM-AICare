@@ -5,8 +5,12 @@ import { FiCheck, FiClock, FiExternalLink, FiThumbsDown } from "react-icons/fi";
 import { InterventionExecution } from "@/types/admin/interventions";
 import clsx from "clsx";
 
-interface ReviewQueueProps {\n  executions: InterventionExecution[];\n  loading?: boolean;\n  onUpdate: (executionId: number, status: string, notes?: string) => Promise<void>;
-  onManual?: (execution: InterventionExecution) => void;\n}
+interface ReviewQueueProps {
+  executions: InterventionExecution[];
+  loading?: boolean;
+  onUpdate: (executionId: number, status: string, notes?: string) => Promise<void>;
+  onManual?: (execution: InterventionExecution) => void;
+}
 
 const ACTIONS: { label: string; status: string; icon: React.ComponentType<{ className?: string }>; tone: "approve" | "complete" | "fail" }[] = [
   { label: "Approve", status: "approved", icon: FiCheck, tone: "approve" },
@@ -68,12 +72,18 @@ export function ReviewQueue({ executions, loading, onUpdate, onManual }: ReviewQ
                 placeholder="Reviewer notes or escalation context"
                 rows={2}
                 className="mt-3 w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-xs text-white focus:border-[#4C8BF5] focus:outline-none"
-              />\n              <div className="mt-3 flex flex-wrap gap-2">\n                {onManual && (\n                  <button\n                    type="button"\n                    className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/70 transition hover:border-[#4CF5AC]/50"
+              />
+              <div className="mt-3 flex flex-wrap gap-2">
+                {onManual && (
+                  <button
+                    type="button"
+                    className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/70 transition hover:border-[#4CF5AC]/50"
                     onClick={() => onManual(execution)}
                   >
                     Escalate manually
                   </button>
-                )}\n                {ACTIONS.map(({ label, status, icon: Icon, tone }) => (
+                )}
+                {ACTIONS.map(({ label, status, icon: Icon, tone }) => (
                   <button
                     key={status}
                     type="button"

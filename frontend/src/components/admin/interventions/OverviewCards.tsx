@@ -2,10 +2,13 @@
 
 import { type ReactNode } from "react";
 import { FiActivity, FiAlertTriangle, FiRefreshCw, FiUsers } from "react-icons/fi";
-import { InterventionOverview } from "@/types/admin/interventions";
 import clsx from "clsx";
 
-interface OverviewCardsProps {\n  overview: InterventionOverview | null;\n  onRefresh: () => void;\n  onCreateManual?: () => void;\n}
+type OverviewCardsProps = {
+  overview?: import("@/types/admin/interventions").InterventionOverview;
+  onRefresh: () => void;
+  onCreateManual?: () => void;
+};
 
 const summaryCard = (
   title: string,
@@ -35,8 +38,8 @@ const summaryCard = (
 );
 
 export function OverviewCards({ overview, onRefresh, onCreateManual }: OverviewCardsProps) {
-  const campaignSummary = overview?.campaign_summary;
-  const executionSummary = overview?.execution_summary;
+  const campaignSummary = overview && overview.campaign_summary;
+  const executionSummary = overview && overview.execution_summary;
 
   return (
     <section className="mb-8">
@@ -47,7 +50,12 @@ export function OverviewCards({ overview, onRefresh, onCreateManual }: OverviewC
             Coordinate human-in-the-loop outreach and tune the intervention agent.
           </p>
         </div>
-        <div className="flex items-center gap-3">\n          {onCreateManual && (\n            <button\n              type="button"\n              onClick={onCreateManual}\n              className="inline-flex items-center gap-2 rounded-lg border border-[#4CF5AC]/50 bg-[#4CF5AC]/20 px-4 py-2 text-sm font-semibold text-[#4CF5AC] transition hover:border-[#4CF5AC]/70"
+        <div className="flex items-center gap-3">
+          {onCreateManual && (
+            <button
+              type="button"
+              onClick={onCreateManual}
+              className="inline-flex items-center gap-2 rounded-lg border border-[#4CF5AC]/50 bg-[#4CF5AC]/20 px-4 py-2 text-sm font-semibold text-[#4CF5AC] transition hover:border-[#4CF5AC]/70"
             >
               Create manual intervention
             </button>
