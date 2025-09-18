@@ -1,4 +1,4 @@
-﻿"""Aggregated admin schema exports."""
+"""Aggregated admin schema exports."""
 from .appointments import (
     AppointmentResponse,
     AppointmentUpdate,
@@ -55,6 +55,16 @@ from .flags import (
     FlagsSummary,
 )
 from .users import UserDetailResponse, UserListItem, UserStats, UsersResponse
+from .triage import (
+    SeverityBreakdown,
+    ProcessingMetrics,
+    TriageCasePreview,
+    TriageOverview,
+    TriageAssessmentItem,
+    TriageAssessmentListResponse,
+    TriageTestRequest,
+    TriageTestResponse,
+)
 
 __all__ = [
     "AppointmentResponse",
@@ -105,4 +115,12 @@ __all__ = [
     "UserListItem",
     "UserStats",
     "UsersResponse",
+    "SeverityBreakdown",
+    "ProcessingMetrics",
+    "TriageCasePreview",
+    "TriageOverview",
+    "TriageAssessmentItem",
+    "TriageAssessmentListResponse",
+    "TriageTestRequest",
+    "TriageTestResponse",
 ]
