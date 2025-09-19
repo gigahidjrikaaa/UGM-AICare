@@ -6,10 +6,11 @@ declare module "next-auth" {
    * Extend the built-in session types
    */
   interface Session extends DefaultSession {
+    accessToken?: string;
     user: {
       id: string; // Ensure ID is always present after authentication
       role?: string; // Role assigned during authentication
-      accessToken?: string; // Google access token (optional, for specific API calls)
+      accessToken?: string; // Session-scoped access token for backend calls
       wallet_address?: string | null;
       allow_email_checkins?: boolean; // For email check-in feature
       google_sub?: string; // Add google_sub to the user object
@@ -20,6 +21,7 @@ declare module "next-auth" {
   // Extend the User object returned by providers (e.g., Google)
   interface User extends DefaultUser {
     role?: string;
+    accessToken?: string;
     wallet_address?: string | null;
     google_sub?: string; // Add google_sub to the User object
   }

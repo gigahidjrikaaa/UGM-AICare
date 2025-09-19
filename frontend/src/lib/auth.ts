@@ -9,12 +9,14 @@ declare module "next-auth" {
     user: {
       id?: string | null;
       role?: string | null;
+      google_sub?: string | null;
     } & User;
   }
 
   interface User {
     role?: string | null;
     accessToken?: string;
+    google_sub?: string | null;
   }
 }
 
@@ -23,7 +25,67 @@ declare module "next-auth/jwt" {
     id?: string;
     role?: string;
     accessToken?: string;
+    google_sub?: string;
   }
+}
+
+type OAuthExchangeResponse = {
+  access_token: string;
+  token_type: string;
+  user?: {
+    id?: string;
+    email?: string | null;
+    name?: string | null;
+    role?: string | null;
+    google_sub?: string | null;
+  };
+};
+
+interface NextAuthUserInfo {
+  id?: string;
+  email?: string | null;
+  name?: string | null;
+  role?: string | null;
+  accessToken?: string;
+  image?: string | null;
+}
+
+const INTERNAL_API_URL = process.env.INTERNAL_API_URL;
+
+const determineRoleFromEmail = (email?: string | null) => {
+  if (email && email.toLowerCase().endsWith("@ugm.ac.id")) {
+    return "user";
+  }
+  return "guest";
+};
+
+async function exchangeGoogleAccountToken(
+  account: { provider: string; providerAccountId: string },
+  user: { email?: string | null; name?: string | null; role?: string | null; image?: string | null },
+): Promise<OAuthExchangeResponse> {
+  if (!INTERNAL_API_URL) {
+    throw new Error("INTERNAL_API_URL is not configured");
+  }
+
+  const response = await fetch(`${INTERNAL_API_URL}/api/v1/auth/oauth/token`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      provider: account.provider,
+      provider_account_id: account.providerAccountId,
+      email: user?.email ?? undefined,
+      name: user?.name ?? undefined,
+      picture: user?.image ?? undefined,
+      role: user?.role ?? determineRoleFromEmail(user?.email ?? undefined),
+    }),
+  });
+
+  if (!response.ok) {
+    const message = await response.text();
+    throw new Error(message || "Failed to exchange Google OAuth token");
+  }
+
+  return (await response.json()) as OAuthExchangeResponse;
 }
 
 export const authOptions: NextAuthOptions = {
@@ -33,38 +95,43 @@ export const authOptions: NextAuthOptions = {
       clientId: process.env.GOOGLE_CLIENT_ID as string,
       clientSecret: process.env.GOOGLE_CLIENT_SECRET as string,
       profile(profile) {
+        const role = determineRoleFromEmail(profile.email);
         return {
           id: profile.sub,
           email: profile.email,
           name: profile.name,
           image: profile.picture,
-          role: profile.email?.endsWith("@ugm.ac.id") ? "user" : "guest",
+          role,
+          google_sub: profile.sub,
         };
-      }
+      },
     }),
     CredentialsProvider({
       id: "credentials",
       name: "Email and Password",
       credentials: {
         email: { label: "Email", type: "email" },
-        password: { label: "Password", type: "password" }
+        password: { label: "Password", type: "password" },
       },
       async authorize(credentials) {
         const apiUrl = process.env.INTERNAL_API_URL;
+        if (!apiUrl) {
+          throw new Error("INTERNAL_API_URL is not configured");
+        }
 
         try {
           const res = await fetch(`${apiUrl}/api/v1/auth/token`, {
-            method: 'POST',
+            method: "POST",
             body: JSON.stringify({
               email: credentials?.email,
               password: credentials?.password,
             }),
-            headers: { "Content-Type": "application/json" }
+            headers: { "Content-Type": "application/json" },
           });
 
           if (!res.ok) {
             const text = await res.text();
-            throw new Error(text);
+            throw new Error(text || "Credentials sign in failed");
           }
 
           const data = await res.json();
@@ -76,39 +143,69 @@ export const authOptions: NextAuthOptions = {
             };
           }
           return null;
-        } catch (e) {
-          console.error("Authorize error:", e);
-          throw e;
+        } catch (error) {
+          console.error("Authorize error:", error);
+          throw error;
         }
-      }
+      },
     }),
   ],
   session: {
     strategy: "jwt",
     maxAge: 1 * 24 * 60 * 60, // 1 day
   },
-  
+
   callbacks: {
-    async jwt({ token, user }) {
-      if (user) {
-        token.id = user.id;
-        token.role = user.role ?? undefined;
-        token.accessToken = user.accessToken;
+    async jwt({ token, user, account }) {
+      const typedUser = (user ?? {}) as NextAuthUserInfo;
+
+      if (account?.provider === "google" && account?.providerAccountId) {
+        const exchange = await exchangeGoogleAccountToken(
+          { provider: account.provider, providerAccountId: account.providerAccountId },
+          {
+            email: typedUser.email,
+            name: typedUser.name,
+            role: typedUser.role,
+            image: typedUser.image,
+          },
+        );
+
+        token.accessToken = exchange?.access_token;
+        token.role = exchange?.user?.role ?? token.role;
+        token.id = exchange?.user?.id ?? token.id;
+        token.google_sub = exchange?.user?.google_sub ?? account.providerAccountId;
+        token.email = exchange?.user?.email ?? token.email;
+      } else if (account?.provider === "credentials" && user) {
+        token.id = typedUser.id ?? token.id;
+        token.role = typedUser.role ?? token.role;
+        token.accessToken = typedUser.accessToken ?? token.accessToken;
       }
+
       return token;
     },
     async session({ session, token }) {
-      if (token) {
-        session.user.id = token.id ?? '';
-        session.user.role = token.role ?? '';
+      if (session.user) {
+        if (token.id) {
+          session.user.id = token.id;
+        } else if (!session.user.id && typeof token.sub === "string") {
+          session.user.id = token.sub;
+        }
+        session.user.role = token.role ?? session.user.role ?? null;
+        session.user.google_sub = token.google_sub ?? session.user.google_sub ?? null;
+      }
+
+      if (token.accessToken) {
         session.accessToken = token.accessToken;
       }
+
       return session;
-   },
+    },
   },
   pages: {
-    signIn: '/signin',
-    error: '/signin',
+    signIn: "/signin",
+    error: "/signin",
   },
-  debug: process.env.NODE_ENV === 'development',
+  debug: process.env.NODE_ENV === "development",
 };
+
+

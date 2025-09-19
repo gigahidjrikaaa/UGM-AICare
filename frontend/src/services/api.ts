@@ -13,7 +13,7 @@ import type {
   Appointment
 } from '@/types/api'; // Import types
 import toast from 'react-hot-toast';
-import { signOut } from 'next-auth/react';
+import { getSession, signOut } from 'next-auth/react';
 
 // Define the base URL for your backend API
 const API_BASE_URL =
@@ -21,50 +21,26 @@ const API_BASE_URL =
     ? 'http://localhost:8000/api/v1' // Local development
     : process.env.INTERNAL_API_URL + '/api/v1'; // Docker or production
 
-console.log("API_BASE_URL:", API_BASE_URL); // Log the resolved URL
-
 
 const apiClient = axios.create({
   baseURL: API_BASE_URL,
   headers: { 'Content-Type': 'application/json', },
 });
 
-/// Function to get the JWT from our new API route
-async function getRawToken(): Promise<string | null> {
-  try {
-      // Make a request to your own API route
-      const response = await fetch('/api/auth/getToken');
-      if (!response.ok) {
-           console.error("Failed to fetch raw token:", response.statusText);
-           return null;
-      }
-      const data = await response.json();
-      return data.jwt || null;
-  } catch (error) {
-      console.error("Error fetching raw token:", error);
-      return null;
-  }
-}
-
 // Add request interceptor to attach JWT token to every request
 // This will be called before every request to the backend
 apiClient.interceptors.request.use(
-async (config) => {
-  const token = await getRawToken(); // Fetch the raw token string
+  async (config) => {
+    const session = await getSession();
+    const token = session?.accessToken;
 
-  if (token && config.headers) {
-     console.log("Attaching RAW JWT to request:", String(token).substring(0, 15) + "...");
-     config.headers.Authorization = `Bearer ${token}`;
-     console.log("Authorization header set:", config.headers.Authorization);
-     
-  } else {
-     console.log("No raw token found, request sent without Authorization header.");
-  }
-  return config;
-},
-(error) => {
-  return Promise.reject(error);
-}
+    if (token && config.headers) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    return config;
+  },
+  (error) => Promise.reject(error),
 );
 
 // Optional: Add response interceptor for global error handling (e.g., 401 redirect)
@@ -95,11 +71,7 @@ export default apiClient; // Export the configured client if needed elsewhere
  */
 export const sendMessage = async (payload: ChatRequestPayload): Promise<ChatResponsePayload> => {
   try {
-    // No need to explicitly omit google_sub/session_id here as the hook adds them
-    console.log("Sending to backend (/chat):", payload); // Log the final payload being sent
-    // Ensure the endpoint path is correct (includes /api/v1 prefix if needed by backend routes)
-    const response = await apiClient.post<ChatResponsePayload>('/chat', payload); // Endpoint adjusted if needed
-    console.log("Received from backend (/chat):", response.data);
+    const response = await apiClient.post<ChatResponsePayload>('/chat', payload);
     return response.data;
   } catch (error) {
     console.error('Error sending message to backend:', error);
@@ -109,7 +81,7 @@ export const sendMessage = async (payload: ChatRequestPayload): Promise<ChatResp
     } else if (error instanceof Error) {
       errorMessage = error.message;
     }
-    throw new Error(errorMessage); // Re-throw cleaned error
+    throw new Error(errorMessage);
   }
 };
 
@@ -299,3 +271,11 @@ export const loginUser = async (payload: LoginUserPayload): Promise<LoginUserRes
     throw new Error(errorMessage);
   }
 };
+
+
+
+
+
+
+
+
