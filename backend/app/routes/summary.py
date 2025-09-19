@@ -238,12 +238,11 @@ async def generate_greeting_hook_from_summary(
         greeting_hook_llm_history = [{"role": "user", "content": prompt_for_llm}]
         
         hook_text = await llm.generate_response(
-            history=greeting_hook_llm_history,
-            # provider="gemini", # Or your preferred provider for this task
-            # model="gemini-1.5-flash", # A fast model is good here
-            max_tokens=60, # Short response needed
-            temperature=0.6, # Allow some creativity but not too much
-            system_prompt=None # The main instruction is in the user prompt
+              history=greeting_hook_llm_history,
+              model="gemini_google", # Explicitly specify Gemini model
+              max_tokens=60, # Short response needed
+              temperature=0.6, # Allow some creativity but not too much
+              system_prompt=None # The main instruction is in the user prompt
         )
 
         if hook_text.startswith("Error:") or not hook_text.strip():

@@ -317,7 +317,7 @@ async def handle_chat_request(
                         # history_for_llm_api_message is the one to use here.
                         aika_response_text = await llm.generate_response(
                             history=history_for_llm_call, # Use the potentially augmented history
-                            model=request.model,
+                            model="gemini_google", # Explicitly specify Gemini model
                             max_tokens=request.max_tokens,
                             temperature=request.temperature,
                             system_prompt=request.system_prompt if not any(h['role'] == 'system' for h in history_for_llm_call) else None
@@ -461,8 +461,7 @@ Ringkasan singkat dan kasual:"""
 
             summary_text = await llm.generate_response(
                  history=summary_llm_history,
-                 provider=summary_provider,
-                 model= summary_model,
+                 model="gemini_google", # Explicitly specify Gemini model for summary
                  max_tokens=1024,
                  temperature=0.5
             )
