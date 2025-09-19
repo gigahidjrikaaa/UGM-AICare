@@ -258,7 +258,7 @@ async def delete_appointment(
     appointment_id: int,
     db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user),
-) -> None:
+) -> dict[str, str]:
     """Delete an appointment."""
 
     logger.info("Admin %s deleting appointment %s", admin_user.id, appointment_id)
@@ -362,7 +362,7 @@ async def delete_therapist_schedule(
     schedule_id: int,
     db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user),
-) -> None:
+) -> dict[str, str]:
     """Delete a therapist schedule entry."""
 
     logger.info(

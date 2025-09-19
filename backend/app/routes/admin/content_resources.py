@@ -284,7 +284,7 @@ async def delete_content_resource(
     resource_id: int,
     db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user),
-) -> None:
+) -> dict[str, str]:
     """Delete a content resource."""
 
     logger.info("Admin %s deleting content resource %s", admin_user.id, resource_id)

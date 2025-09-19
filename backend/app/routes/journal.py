@@ -50,7 +50,7 @@ Keep the reflection concise (1-2 sentences).
             # Consider a more powerful model if deeper analysis is needed, but be mindful of cost/latency.
             ai_reflection_text = await generate_response(
                 history=history,
-                provider="gemini",
+                model="gemini_google",
                 system_prompt=system_prompt_for_reflection,
                 max_tokens=150, # Adjust as needed
                 temperature=0.5 # Lower temperature for more focused, less "creative" reflections
@@ -132,9 +132,14 @@ async def create_or_update_journal_entry(
     # or you can re-query the entry with options.
     # Let's assume the relationship in JournalEntryResponse schema handles this if data is present.
     # To ensure it's fresh if the background task was very fast (unlikely but possible):
-    await db.refresh(saved_entry) # Refresh to potentially get newly added reflection points if any (though unlikely due to async)
-
-    return saved_entry # This will now include an empty reflection_points list initially
+    # Eagerly load reflection_points for robust serialization
+    from sqlalchemy.orm import selectinload
+    stmt = select(JournalEntry).options(selectinload(JournalEntry.reflection_points)).filter(
+        JournalEntry.id == saved_entry.id
+    )
+    result = await db.execute(stmt)
+    entry_with_reflections = result.scalar_one_or_none()
+    return entry_with_reflections
 
 
 @router.get("/", response_model=List[JournalEntryResponse])
@@ -145,7 +150,8 @@ async def get_all_journal_entries(
     current_user: User = Depends(get_current_active_user)
 ):
     """Retrieves all journal entries for the current user with pagination."""
-    stmt = select(JournalEntry).filter(
+    from sqlalchemy.orm import selectinload
+    stmt = select(JournalEntry).options(selectinload(JournalEntry.reflection_points)).filter(
         JournalEntry.user_id == current_user.id
     ).order_by(JournalEntry.entry_date.desc()).offset(skip).limit(limit)
     result = await db.execute(stmt)
@@ -159,14 +165,18 @@ async def get_journal_entry_by_date(
     current_user: User = Depends(get_current_active_user)
 ):
     """Retrieves a journal entry for the current user by date."""
-    stmt = select(JournalEntry).filter(
+    from sqlalchemy.orm import selectinload
+    stmt = select(JournalEntry).options(selectinload(JournalEntry.reflection_points)).filter(
         JournalEntry.user_id == current_user.id,
         JournalEntry.entry_date == entry_date
     )
     result = await db.execute(stmt)
     entry = result.scalar_one_or_none()
-    
     if not entry:
+        # Log for debugging and robustness
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Journal entry not found for user {current_user.id} on date {entry_date}")
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Journal entry not found for this date.")
     return entry
 

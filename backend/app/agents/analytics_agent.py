@@ -1,3 +1,9 @@
+def get_state_value(state, key, default=None):
+    # Safely get a value from a TypedDict or dict, with default fallback
+    try:
+        return state[key]
+    except (KeyError, TypeError):
+        return default
 import json
 import logging
 import os
@@ -266,8 +272,12 @@ class AnalyticsAgent:
         return report
 
     async def _collect_activity(self, state: AnalyticsState) -> AnalyticsState:
-        start_date = state["start_date"]
-        end_date = state["end_date"]
+        start_date = get_state_value(state, "start_date")
+        end_date = get_state_value(state, "end_date")
+        # Ensure start_date and end_date are not None
+        if not start_date or not end_date:
+            logger.warning("Missing start_date or end_date in state, skipping activity collection.")
+            return {"metrics": {}, "raw_texts": [], "message_records": []}
 
         conversations = await self._get_conversations(start_date, end_date)
         journal_entries = await self._get_journal_entries(start_date, end_date)
@@ -279,20 +289,17 @@ class AnalyticsAgent:
         total_journals = len(journal_entries)
         unique_users = conversation_users.union(journal_users)
 
+        timeframe_days = get_state_value(state, "timeframe_days", 0)
         metrics = {
             "conversation_count": total_messages,
             "journal_count": total_journals,
             "unique_users": len(unique_users),
-            "timeframe_days": state["timeframe_days"],
+            "timeframe_days": timeframe_days,
         }
 
-        if state["timeframe_days"] > 0:
-            metrics["avg_daily_conversations"] = round(
-                total_messages / state["timeframe_days"], 2
-            )
-            metrics["avg_daily_journals"] = round(
-                total_journals / state["timeframe_days"], 2
-            )
+        if timeframe_days and timeframe_days > 0:
+            metrics["avg_daily_conversations"] = round(total_messages / timeframe_days, 2)
+            metrics["avg_daily_journals"] = round(total_journals / timeframe_days, 2)
 
         records: List[MessageRecord] = []
         texts: List[str] = []
@@ -341,17 +348,17 @@ class AnalyticsAgent:
 
         metrics = dict(state.get("metrics", {}))
         metrics["sentiment_proxy"] = {
-            "positive": sentiment_counter.get("positive", 0),
-            "negative": sentiment_counter.get("negative", 0),
+            "positive": int(sentiment_counter.get("positive", 0)),
+            "negative": int(sentiment_counter.get("negative", 0)),
         }
 
         logger.debug("Identified %s patterns for analytics", len(patterns))
         return {"patterns": patterns, "metrics": metrics}
 
     async def _compute_enriched_metrics(self, state: AnalyticsState) -> AnalyticsState:
-        period_start = state.get("period_start", state.get("start_date"))
-        period_end = state.get("period_end", state.get("end_date"))
-        timeframe_days = int(state.get("timeframe_days", 0) or 0)
+        period_start = get_state_value(state, "period_start", get_state_value(state, "start_date"))
+        period_end = get_state_value(state, "period_end", get_state_value(state, "end_date"))
+        timeframe_days = int(get_state_value(state, "timeframe_days", 0) or 0)
 
         resource_engagement = await self._build_resource_engagement(period_start, period_end, timeframe_days)
         intervention_outcomes = await self._build_intervention_outcomes(period_start, period_end, timeframe_days)
@@ -549,7 +556,7 @@ class AnalyticsAgent:
 
     async def _prepare_report(self, state: AnalyticsState) -> AnalyticsState:
         report = AnalyticsReport(
-            report_period=f"{state['timeframe_days']} days",
+            report_period=f"{get_state_value(state, 'timeframe_days', 0)} days",
             period_start=state.get("period_start"),
             period_end=state.get("period_end"),
             insights=state.get("insights", []),

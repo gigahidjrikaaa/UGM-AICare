@@ -78,6 +78,17 @@ async def get_users(
 
     users: List[UserListItem] = []
     for user_obj, journal_count, conversation_count, badge_count, appointment_count in rows:
+        # Ensure last_activity_date is a Python date or None
+        lad = user_obj.last_activity_date
+        import datetime as dt
+        if lad is not None and not isinstance(lad, dt.date):
+            try:
+                if isinstance(lad, str):
+                    lad = dt.date.fromisoformat(lad)
+                else:
+                    lad = dt.date.fromisoformat(str(lad))
+            except Exception:
+                lad = None
         users.append(
             UserListItem(
                 id=user_obj.id,
@@ -87,7 +98,7 @@ async def get_users(
                 sentiment_score=user_obj.sentiment_score,
                 current_streak=user_obj.current_streak,
                 longest_streak=user_obj.longest_streak,
-                last_activity_date=user_obj.last_activity_date,
+                last_activity_date=lad,
                 allow_email_checkins=user_obj.allow_email_checkins,
                 role=getattr(user_obj, "role", "user"),
                 is_active=user_obj.is_active,
@@ -139,6 +150,16 @@ async def get_user_detail(
         await db.execute(select(Appointment).filter(Appointment.user_id == user_id))
     ).scalars().all()
 
+    lad = user.last_activity_date
+    import datetime as dt
+    if lad is not None and not isinstance(lad, dt.date):
+        try:
+            if isinstance(lad, str):
+                lad = dt.date.fromisoformat(lad)
+            else:
+                lad = dt.date.fromisoformat(str(lad))
+        except Exception:
+            lad = None
     return UserDetailResponse(
         id=user.id,
         email=decrypt_user_email(user.email),
@@ -147,7 +168,7 @@ async def get_user_detail(
         sentiment_score=user.sentiment_score,
         current_streak=user.current_streak,
         longest_streak=user.longest_streak,
-        last_activity_date=user.last_activity_date,
+        last_activity_date=lad,
         allow_email_checkins=user.allow_email_checkins,
         role=user.role,
         is_active=user.is_active,
