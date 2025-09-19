@@ -14,6 +14,7 @@ import {
 import { apiCall } from "@/utils/adminApi";
 import { OverviewCards } from "@/components/admin/interventions/OverviewCards";
 import { HighRiskList } from "@/components/admin/interventions/HighRiskList";
+import { ManualInterventionCandidates } from "@/components/admin/interventions/ManualInterventionCandidates";
 import { ReviewQueue } from "@/components/admin/interventions/ReviewQueue";
 import { CampaignTable } from "@/components/admin/interventions/CampaignTable";
 import { SettingsCard } from "@/components/admin/interventions/SettingsCard";
@@ -195,6 +196,27 @@ export default function InterventionPanelPage() {
     [overview?.top_risk_cases],
   );
 
+  const manualCandidates = useMemo(() => {
+    const list = triageOnlyItems;
+    if (!list.length) {
+      return [];
+    }
+    const manualKeywords = ['manual', 'human', 'call', 'phone', 'meeting', 'escalat'];
+    const keywordMatches = list.filter((item) => {
+      const action = item.recommended_action?.toLowerCase() ?? '';
+      return manualKeywords.some((keyword) => action.includes(keyword));
+    });
+    if (keywordMatches.length) {
+      return keywordMatches;
+    }
+    return list
+      .filter((item) => {
+        const severity = (item.severity_level ?? '').toLowerCase();
+        const risk = item.risk_score ?? 0;
+        return severity === 'critical' || risk >= 0.9;
+      })
+      .slice(0, 5);
+  }, [triageOnlyItems]);
 
   // Handler for manual escalation from ReviewQueue
   const handleOpenManualFromExecution = useCallback((execution: QueueItem) => {
@@ -205,6 +227,12 @@ export default function InterventionPanelPage() {
   return (
     <div className="space-y-6">
       <OverviewCards overview={overview ?? undefined} onRefresh={refreshAll} onCreateManual={() => handleOpenManual()} />
+
+      <ManualInterventionCandidates
+        items={manualCandidates}
+        loading={loading}
+        onSelect={handleOpenManual}
+      />
 
       {!loading && (
         <HighRiskList items={triageOnlyItems} onCreateIntervention={handleOpenManual} />

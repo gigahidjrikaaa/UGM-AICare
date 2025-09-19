@@ -21,8 +21,8 @@ export default function ChatInterface({ model }: { model: string }) {
     handleInputChange,
     handleSendMessage,
     handleStartModule,
-    setLiveTranscript, // Get the new function
-  } = useChat();
+    setLiveTranscript,
+  } = useChat({ model });
 
   const {
     isLiveTalkActive,

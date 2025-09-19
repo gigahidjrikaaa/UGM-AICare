@@ -131,7 +131,7 @@ export function useChat({ model }: { model: string }) {
       conversation_id: activeConversationId,
       model: model,
     });
-  }, [isLoading, messages, currentSessionId, processApiCall, setMessages]);
+  }, [isLoading, messages, currentSessionId, processApiCall, setMessages, model]);
 
   const handleInputChange = useCallback((value: string) => {
     setInputValue(value);
@@ -155,6 +155,4 @@ export function useChat({ model }: { model: string }) {
     setLiveTranscript,
   };
 }
-anscript,
-  };
-}
+// ...existing code...
