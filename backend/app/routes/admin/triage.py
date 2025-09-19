@@ -23,11 +23,11 @@ from app.schemas.admin import (
     TriageTestRequest,
     TriageTestResponse,
 )
+from app.services.triage_metrics import compute_triage_metrics
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/triage", tags=["Admin - Triage"])
-
 
 def _coerce_risk_factors(raw: object) -> list[str] | None:
     if raw is None:
@@ -57,7 +57,8 @@ async def get_triage_overview(
     """Return aggregated triage metrics for the requested timeframe."""
 
     logger.info("Admin %s requesting triage overview", admin_user.id)
-    since = datetime.utcnow() - timedelta(days=timeframe_days)
+    reference_date = datetime.utcnow().date()
+    since = datetime.combine(reference_date, datetime.min.time()) - timedelta(days=timeframe_days - 1)
 
     total_stmt = select(func.count()).select_from(TriageAssessment).where(TriageAssessment.created_at >= since)
     total = int(await db.scalar(total_stmt) or 0)
@@ -89,7 +90,9 @@ async def get_triage_overview(
     )
     high_count = int(await db.scalar(high_count_stmt) or 0)
 
-    latest_at = await db.scalar(select(func.max(TriageAssessment.created_at)))
+    latest_at = await db.scalar(
+        select(func.max(TriageAssessment.created_at)).where(TriageAssessment.created_at >= since)
+    )
 
     processing_row = await db.execute(
         select(
@@ -106,6 +109,13 @@ async def get_triage_overview(
             average_ms=float(avg_ms) if avg_ms is not None else None,
             max_ms=int(max_ms) if max_ms is not None else None,
         )
+
+    metrics_summary = await compute_triage_metrics(
+        db,
+        timeframe_days=timeframe_days,
+        since=since,
+        reference_date=reference_date,
+    )
 
     high_risk_stmt = (
         select(TriageAssessment, User)
@@ -142,9 +152,10 @@ async def get_triage_overview(
         high_severity_count=high_count,
         last_assessment_at=latest_at,
         processing=processing,
+        risk_trend=metrics_summary.risk_trend,
+        sla_metrics=metrics_summary.sla_metrics,
         recent_high_risk=recent_high_risk,
     )
-
 
 @router.get("/assessments", response_model=TriageAssessmentListResponse)
 async def list_triage_assessments(
@@ -236,6 +247,3 @@ async def classify_test_message(
         classification=classification,
         recommended_resources=[dict(item) if isinstance(item, dict) else {"value": item} for item in recommended_resources],
     )
-
-
-

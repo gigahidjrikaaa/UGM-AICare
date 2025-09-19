@@ -58,6 +58,8 @@ from .users import UserDetailResponse, UserListItem, UserStats, UsersResponse
 from .triage import (
     SeverityBreakdown,
     ProcessingMetrics,
+    RiskTrendPoint,
+    SlaMetrics,
     TriageCasePreview,
     TriageOverview,
     TriageAssessmentItem,
@@ -117,6 +119,8 @@ __all__ = [
     "UsersResponse",
     "SeverityBreakdown",
     "ProcessingMetrics",
+    "RiskTrendPoint",
+    "SlaMetrics",
     "TriageCasePreview",
     "TriageOverview",
     "TriageAssessmentItem",

@@ -21,6 +21,28 @@ class ProcessingMetrics(BaseModel):
     max_ms: Optional[int] = None
 
 
+class RiskTrendPoint(BaseModel):
+    """Daily risk trend summary."""
+
+    date: str
+    total: int
+    high: int
+    medium: int
+    low: int
+    average_risk_score: Optional[float] = None
+
+
+class SlaMetrics(BaseModel):
+    """Service-level performance for triage processing."""
+
+    target_ms: int
+    records: int
+    average_ms: Optional[float] = None
+    p90_ms: Optional[int] = None
+    p95_ms: Optional[int] = None
+    within_target_percent: Optional[float] = None
+
+
 class TriageCasePreview(BaseModel):
     """High-level view of a notable triage assessment."""
 
@@ -44,6 +66,8 @@ class TriageOverview(BaseModel):
     high_severity_count: int
     last_assessment_at: Optional[datetime] = None
     processing: Optional[ProcessingMetrics] = None
+    risk_trend: List[RiskTrendPoint] = Field(default_factory=list)
+    sla_metrics: Optional[SlaMetrics] = None
     recent_high_risk: List[TriageCasePreview] = Field(default_factory=list)
 
 
