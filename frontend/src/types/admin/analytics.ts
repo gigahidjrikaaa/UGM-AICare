@@ -66,6 +66,27 @@ export type TopicExcerptGroup = {
   samples: TopicExcerptSample[];
 };
 
+export type PredictiveSignal = {
+  metric: string;
+  topic?: string | null;
+  current_value: number;
+  moving_average: number;
+  forecast: number;
+  direction: string;
+  confidence: number;
+  window: string;
+};
+
+export type ThresholdAlert = {
+  name: string;
+  metric: string;
+  value: number;
+  threshold: number;
+  status: string;
+  severity: string;
+  description: string;
+};
+
 export type ResourceEngagementItem = {
   category: string;
   label: string;
@@ -176,4 +197,8 @@ export type AnalyticsReport = {
   intervention_outcomes?: InterventionOutcomes;
   comparison_snapshot?: ComparisonSnapshot;
   topic_excerpts?: TopicExcerptGroup[];
+  predictive_signals?: PredictiveSignal[];
+  threshold_alerts?: ThresholdAlert[];
 };
+
+

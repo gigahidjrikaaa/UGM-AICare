@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
@@ -25,8 +25,10 @@ import {
   FiPlayCircle,
   FiTrendingUp,
   FiUsers,
+  FiDownload,
+  FiFileText,
 } from '@/icons';
-import { apiCall } from '@/utils/adminApi';
+import { apiCall, authenticatedFetch } from '@/utils/adminApi';
 import {
   AnalyticsReport as AnalyticsReportType,
   ComparisonMetric,
@@ -36,9 +38,13 @@ import {
   Insight,
   InterventionOutcomeItem,
   Pattern,
+  PredictiveSignal,
   ReportHistoryItem,
+  ResourceEngagement,
   ResourceEngagementItem,
+  InterventionOutcomes,
   SegmentImpact,
+  ThresholdAlert,
   ThemeTrend,
   TopicBreakdown,
   TopicExcerptGroup,
@@ -161,7 +167,8 @@ const ThemeTrendChart = ({
   const topicSet = new Set(selectedTopics);
   const trendMap = themeTrends.filter((trend) => topicSet.has(trend.topic));
 
-  const combined = new Map<string, Record<string, number>>();
+  type ChartRow = { date: string } & { [key: string]: number | string };
+  const combined = new Map<string, ChartRow>();
   trendMap.forEach((trend) => {
     trend.data.forEach((point) => {
       const row = combined.get(point.date) ?? { date: point.date };
@@ -171,9 +178,8 @@ const ThemeTrendChart = ({
     });
   });
 
-  const chartData = Array.from(combined.entries())
-    .sort((a, b) => (a[0] > b[0] ? 1 : -1))
-    .map(([, row]) => row);
+  const chartData: ChartRow[] = Array.from(combined.values())
+    .sort((a, b) => (String(a.date) > String(b.date) ? 1 : -1));
 
   return (
     <ResponsiveContainer height={320}>
@@ -301,6 +307,114 @@ const SegmentAlertList = ({ segments }: { segments: SegmentImpact[] }) => {
   );
 };
 
+
+const PredictiveSignalList = ({ signals }: { signals: PredictiveSignal[] }) => {
+  if (!signals.length) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+        Predictive signals will appear after multiple trend points are collected.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {signals.map((signal) => {
+        const directionColor =
+          signal.direction === 'up'
+            ? 'text-emerald-300'
+            : signal.direction === 'down'
+            ? 'text-rose-300'
+            : 'text-white/60';
+        return (
+          <div
+            key={`${signal.metric}-${signal.topic ?? 'global'}`}
+            className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner"
+          >
+            <div className="flex items-center justify-between text-sm text-white">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-white/50">{signal.window}</p>
+                <p className="text-lg font-semibold text-white">{signal.topic ?? signal.metric}</p>
+              </div>
+              <span className={`text-xs font-semibold ${directionColor}`}>{signal.direction.toUpperCase()}</span>
+            </div>
+            <div className="mt-3 grid grid-cols-3 gap-3 text-xs text-white/70">
+              <div>
+                <p className="text-white/50">Current</p>
+                <p className="font-semibold text-white">{signal.current_value.toFixed(1)}</p>
+              </div>
+              <div>
+                <p className="text-white/50">Moving avg</p>
+                <p className="font-semibold text-white">{signal.moving_average.toFixed(1)}</p>
+              </div>
+              <div>
+                <p className="text-white/50">Forecast</p>
+                <p className="font-semibold text-white">{signal.forecast.toFixed(1)}</p>
+              </div>
+            </div>
+            <p className="mt-3 text-xs text-white/50">Confidence {Math.round(signal.confidence * 100)}%</p>
+          </div>
+        );
+      })}
+    </div>
+  );
+};
+
+const ThresholdAlertList = ({ alerts }: { alerts: ThresholdAlert[] }) => {
+  if (!alerts.length) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+        No threshold alerts triggered for this window.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-3">
+      {alerts.map((alert) => (
+        <div
+          key={`${alert.metric}-${alert.name}`}
+          className="rounded-2xl border border-white/10 bg-white/5 p-4"
+        >
+          <div className="flex items-center justify-between text-sm text-white">
+            <div>
+              <p className="text-xs uppercase tracking-wide text-white/50">{alert.metric}</p>
+              <p className="text-sm font-semibold text-white">{alert.name}</p>
+            </div>
+            <span className={`text-xs font-semibold ${severityText[alert.severity] ?? 'text-white/70'}`}>{alert.severity}</span>
+          </div>
+          <p className="mt-2 text-xs text-white/60">{alert.description}</p>
+          <div className="mt-2 text-xs text-white/50">Value {alert.value} / Threshold {alert.threshold}</div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+const HeatmapHotspotList = ({ hotspots }: { hotspots: Array<{ day: string; block: string; count: number }> }) => {
+  if (!hotspots.length) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/60">
+        No high-distress hotspots detected.
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-2">
+      {hotspots.map((spot) => (
+        <div
+          key={`${spot.day}-${spot.block}`}
+          className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/70"
+        >
+          <span className="font-semibold text-white">{spot.day} {spot.block}</span>
+          <span className="text-white/50">{spot.count} signals</span>
+        </div>
+      ))}
+    </div>
+  );
+};
+
 const HighRiskList = ({ users }: { users: HighRiskUser[] }) => {
   if (!users.length) {
     return (
@@ -350,6 +464,7 @@ const HighRiskList = ({ users }: { users: HighRiskUser[] }) => {
   );
 };
 
+
 const normalizeReport = (raw: any): AnalyticsReportType => {
   if (!raw) {
     return {
@@ -367,65 +482,109 @@ const normalizeReport = (raw: any): AnalyticsReportType => {
       intervention_outcomes: { timeframe: '7 days', items: [] },
       comparison_snapshot: {},
       topic_excerpts: [],
+      predictive_signals: [],
+      threshold_alerts: [],
     };
   }
 
-  const trends = raw.trends ?? {};
-  const resourceRaw = raw.resource_engagement ?? raw.resourceEngagement ?? trends.resource_engagement ?? {};
-  const resourceItems = Array.isArray(resourceRaw?.items)
-    ? resourceRaw.items
-    : Array.isArray(resourceRaw)
-      ? resourceRaw
-      : [];
+  const reportRaw = raw as AnalyticsReportType;
+  const trends = (raw?.trends ?? {}) as Partial<AnalyticsReportType>;
+
+  const resourceBaseline = (reportRaw.resource_engagement ?? trends.resource_engagement ?? {
+    items: [],
+    timeframe: reportRaw.report_period ?? '7 days',
+  }) as Partial<ResourceEngagement> & { items?: ResourceEngagementItem[] };
+
   const resource_engagement = {
-    timeframe: resourceRaw?.timeframe ?? raw.report_period ?? '7 days',
-    items: (resourceItems ?? []) as ResourceEngagementItem[],
+    timeframe: resourceBaseline.timeframe ?? reportRaw.report_period ?? '7 days',
+    items: Array.isArray(resourceBaseline.items) ? (resourceBaseline.items as ResourceEngagementItem[]) : [],
   };
 
-  const interventionRaw = raw.intervention_outcomes ?? raw.interventionOutcomes ?? {};
-  const interventionItems = Array.isArray(interventionRaw?.items)
-    ? interventionRaw.items
-    : Array.isArray(interventionRaw)
-      ? interventionRaw
-      : [];
+  const interventionBaseline = (reportRaw.intervention_outcomes ?? trends.intervention_outcomes ?? {
+    items: [],
+    timeframe: reportRaw.report_period ?? '7 days',
+  }) as Partial<InterventionOutcomes> & { items?: InterventionOutcomeItem[] };
+
   const intervention_outcomes = {
-    timeframe: interventionRaw?.timeframe ?? raw.report_period ?? '7 days',
-    items: (interventionItems ?? []) as InterventionOutcomeItem[],
+    timeframe: interventionBaseline.timeframe ?? reportRaw.report_period ?? '7 days',
+    items: Array.isArray(interventionBaseline.items)
+      ? (interventionBaseline.items as InterventionOutcomeItem[])
+      : [],
   };
 
-  const comparison_snapshot = (raw.comparison_snapshot ?? raw.baseline_snapshot ?? raw.comparisonSnapshot ?? raw.baselineSnapshot ?? {}) as Record<string, any>;
-  const topic_excerpts = (raw.topic_excerpts ?? raw.topicExcerpts ?? []) as TopicExcerptGroup[];
+  const comparison_snapshot = (
+    reportRaw.comparison_snapshot ??
+    raw.comparison_snapshot ??
+    raw.baseline_snapshot ??
+    raw.comparisonSnapshot ??
+    raw.baselineSnapshot ??
+    {}
+  ) as Record<string, unknown>;
+
+  const topic_excerpts = (
+    reportRaw.topic_excerpts ??
+    raw.topic_excerpts ??
+    raw.topicExcerpts ??
+    trends.topic_excerpts ??
+    []
+  ) as TopicExcerptGroup[];
+
+  const predictiveSignalsSource = (
+    reportRaw.predictive_signals ??
+    raw.predictive_signals ??
+    raw.predictiveSignals ??
+    trends.predictive_signals ??
+    []
+  );
+
+  const thresholdAlertsSource = (
+    reportRaw.threshold_alerts ??
+    raw.threshold_alerts ??
+    raw.thresholdAlerts ??
+    trends.threshold_alerts ??
+    []
+  );
+
+  const predictive_signals = Array.isArray(predictiveSignalsSource)
+    ? (predictiveSignalsSource as PredictiveSignal[])
+    : [];
+
+  const threshold_alerts = Array.isArray(thresholdAlertsSource)
+    ? (thresholdAlertsSource as ThresholdAlert[])
+    : [];
 
   return {
-    id: raw.id,
-    generated_at: raw.generated_at ?? raw.generatedAt,
-    report_period: raw.report_period ?? '7 days',
-    window_start: raw.window_start ?? raw.windowStart ?? null,
-    window_end: raw.window_end ?? raw.windowEnd ?? null,
-    insights: (raw.insights ?? []) as Insight[],
-    patterns: (raw.patterns ?? trends.patterns ?? []) as Pattern[],
-    recommendations: (raw.recommendations ?? []) as string[],
-    metrics: (raw.metrics ?? trends.metrics ?? {}) as Record<string, unknown>,
-    topic_breakdown: (raw.topic_breakdown ?? trends.topic_breakdown ?? []) as TopicBreakdown[],
-    theme_trends: (raw.theme_trends ?? trends.theme_trends ?? []) as ThemeTrend[],
-    distress_heatmap: (raw.distress_heatmap ?? trends.distress_heatmap ?? []) as HeatmapCell[],
-    segment_alerts: (raw.segment_alerts ?? trends.segment_alerts ?? []) as SegmentImpact[],
-    high_risk_users: (raw.high_risk_users ?? trends.high_risk_users ?? []) as HighRiskUser[],
+    id: reportRaw.id,
+    generated_at: reportRaw.generated_at ?? raw.generatedAt,
+    report_period: reportRaw.report_period ?? '7 days',
+    window_start: reportRaw.window_start ?? raw.windowStart ?? null,
+    window_end: reportRaw.window_end ?? raw.windowEnd ?? null,
+    insights: (reportRaw.insights ?? trends.insights ?? []) as Insight[],
+    patterns: (reportRaw.patterns ?? trends.patterns ?? []) as Pattern[],
+    recommendations: (reportRaw.recommendations ?? trends.recommendations ?? []) as string[],
+    metrics: (reportRaw.metrics ?? trends.metrics ?? {}) as Record<string, unknown>,
+    topic_breakdown: (reportRaw.topic_breakdown ?? trends.topic_breakdown ?? []) as TopicBreakdown[],
+    theme_trends: (reportRaw.theme_trends ?? trends.theme_trends ?? []) as ThemeTrend[],
+    distress_heatmap: (reportRaw.distress_heatmap ?? trends.distress_heatmap ?? []) as HeatmapCell[],
+    segment_alerts: (reportRaw.segment_alerts ?? trends.segment_alerts ?? []) as SegmentImpact[],
+    high_risk_users: (reportRaw.high_risk_users ?? trends.high_risk_users ?? []) as HighRiskUser[],
     resource_engagement,
     intervention_outcomes,
-    comparison_snapshot: comparison_snapshot as Record<string, any>,
+    comparison_snapshot: comparison_snapshot as Record<string, unknown>,
     topic_excerpts,
+    predictive_signals,
+    threshold_alerts,
   } as AnalyticsReportType;
 };
 
-export default function AnalyticsPanelPage() {
 
-};
+
 
 export default function AnalyticsPanelPage() {
   const [report, setReport] = useState<AnalyticsReportType | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [exportingFormat, setExportingFormat] = useState<'csv' | 'pdf' | null>(null);
   const [history, setHistory] = useState<ReportHistoryItem[]>([]);
   const [comparison, setComparison] = useState<ComparisonResponse | null>(null);
   const [topicExcerpts, setTopicExcerpts] = useState<TopicExcerptsResponse | null>(null);
@@ -433,7 +592,7 @@ export default function AnalyticsPanelPage() {
   const fetchReport = useCallback(async () => {
     try {
       setLoading(true);
-      const response = await apiCall<any>('/api/v1/admin/analytics');
+      const response = await apiCall<AnalyticsReportType>('/api/v1/admin/analytics');
       if (response && 'id' in response) {
         setReport(normalizeReport(response));
       } else {
@@ -491,6 +650,47 @@ export default function AnalyticsPanelPage() {
     }
   }, []);
 
+  const handleExport = useCallback(async (format: 'csv' | 'pdf') => {
+    if (!report?.id) {
+      toast.error('Generate a report before exporting.');
+      return;
+    }
+    const baseUrl = process.env.NEXT_PUBLIC_API_URL;
+    if (!baseUrl) {
+      toast.error('NEXT_PUBLIC_API_URL is not configured.');
+      return;
+    }
+    try {
+      setExportingFormat(format);
+      const response = await authenticatedFetch(`${baseUrl}/api/v1/admin/analytics/${report.id}/export.${format}`);
+      if (!response.ok) {
+        const message = await response.text();
+        throw new Error(message || 'Export failed');
+      }
+      const blob = await response.blob();
+      const disposition = response.headers.get('content-disposition') ?? '';
+      let filename = `analytics-report-${report.id}.${format}`;
+      const match = disposition.match(/filename="?([^";]+)"?/i);
+      if (match?.[1]) {
+        filename = match[1];
+      }
+      const url = window.URL.createObjectURL(blob);
+      const anchor = document.createElement('a');
+      anchor.href = url;
+      anchor.download = filename;
+      document.body.appendChild(anchor);
+      anchor.click();
+      anchor.remove();
+      window.URL.revokeObjectURL(url);
+      toast.success(`Exported ${format.toUpperCase()} successfully`);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to export report';
+      toast.error(message);
+    } finally {
+      setExportingFormat(null);
+    }
+  }, [report?.id]);
+
   useEffect(() => {
     void fetchReport();
   }, [fetchReport]);
@@ -521,6 +721,23 @@ export default function AnalyticsPanelPage() {
     return [...report.topic_breakdown].sort((a, b) => b.total_mentions - a.total_mentions).slice(0, 4);
   }, [report]);
 
+  const predictiveSignals = useMemo<PredictiveSignal[]>(() => {
+    const source = report?.predictive_signals ?? [];
+    return Array.isArray(source) ? (source as PredictiveSignal[]) : [];
+  }, [report]);
+
+  const thresholdAlerts = useMemo<ThresholdAlert[]>(() => {
+    const source = report?.threshold_alerts ?? [];
+    return Array.isArray(source) ? (source as ThresholdAlert[]) : [];
+  }, [report]);
+
+  const heatmapAlerts = useMemo<HeatmapCell[]>(() => {
+    const data = report?.distress_heatmap ?? [];
+    return Array.isArray(data)
+      ? [...data].filter((cell) => cell.count > 0).sort((a, b) => b.count - a.count).slice(0, 3)
+      : [];
+  }, [report]);
+
   const topTrendsTopics = topTopics.length
     ? topTopics.map((topic) => topic.topic)
     : (report?.theme_trends ?? []).slice(0, 3).map((trend) => trend.topic);
@@ -529,8 +746,16 @@ export default function AnalyticsPanelPage() {
     ? new Date(report.generated_at).toLocaleString()
     : undefined;
 
-  const resourceItems = useMemo(() => report?.resource_engagement?.items ?? [], [report]);
-  const interventionItems = useMemo(() => report?.intervention_outcomes?.items ?? [], [report]);
+  const resourceItems = useMemo<ResourceEngagementItem[]>(() => {
+    const items = report?.resource_engagement?.items ?? [];
+    return Array.isArray(items) ? (items as ResourceEngagementItem[]) : [];
+  }, [report]);
+  const interventionItems = useMemo<InterventionOutcomeItem[]>(() => {
+    const items = report?.intervention_outcomes?.items ?? [];
+    return Array.isArray(items) ? (items as InterventionOutcomeItem[]) : [];
+  }, [report]);
+  const predictiveSignalCount = predictiveSignals.length;
+  const thresholdAlertCount = thresholdAlerts.length;
   const comparisonSlices = useMemo(() => comparison?.comparisons ?? {}, [comparison]);
   const excerptGroups = useMemo<TopicExcerptGroup[]>(() => {
     if (topicExcerpts) {
@@ -556,8 +781,22 @@ export default function AnalyticsPanelPage() {
         title: 'Insights generated',
         value: insightCounts.total,
         description: `${insightCounts.high} high-severity alerts flagged by the agent.`,
+        icon: <FiBarChart2 className="h-5 w-5" />,
+        accentClass: 'bg-slate-500/20 text-slate-200 border border-slate-400/30',
+      },
+      {
+        title: 'Predictive signals',
+        value: predictiveSignalCount,
+        description: 'Themes with noticeable momentum over the selected window.',
+        icon: <FiTrendingUp className="h-5 w-5" />,
+        accentClass: 'bg-fuchsia-500/20 text-fuchsia-200 border border-fuchsia-400/30',
+      },
+      {
+        title: 'Active alerts',
+        value: thresholdAlertCount,
+        description: 'Threshold breaches needing review by the admin team.',
         icon: <FiAlertTriangle className="h-5 w-5" />,
-        accentClass: 'bg-rose-500/20 text-rose-200 border border-rose-400/30',
+        accentClass: 'bg-amber-500/20 text-amber-200 border border-amber-400/30',
       },
       {
         title: 'Recommendations',
@@ -574,15 +813,14 @@ export default function AnalyticsPanelPage() {
         accentClass: 'bg-indigo-500/20 text-indigo-200 border border-indigo-400/30',
       },
     ];
-  }, [report, insightCounts]);
-
+  }, [report, insightCounts, predictiveSignalCount, thresholdAlertCount]);
   if (loading) {
     return (
       <div className="container mx-auto max-w-7xl space-y-6 px-4 py-6">
         <div className="animate-pulse space-y-5">
           <div className="h-8 w-2/5 rounded bg-white/10" />
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-            {Array.from({ length: 4 }).map((_, index) => (
+            {Array.from({ length: 6 }).map((_, index) => (
               <div key={index} className="h-28 rounded-2xl border border-white/10 bg-white/5" />
             ))}
           </div>
@@ -607,14 +845,33 @@ export default function AnalyticsPanelPage() {
             <p className="mt-1 text-xs text-white/50">Last generated {generatedAtLabel}</p>
           )}
         </div>
-        <button
-          onClick={runAgent}
-          disabled={running}
-          className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#FFCA40] px-4 py-2 text-sm font-semibold text-black transition hover:bg-[#ffd964] disabled:cursor-not-allowed disabled:opacity-70"
-        >
-          <FiPlayCircle className={running ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
-          {running ? 'Generating report…' : 'Run analytics agent'}
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={runAgent}
+            disabled={running}
+            className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#FFCA40] px-4 py-2 text-sm font-semibold text-black transition hover:bg-[#ffd964] disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            <FiPlayCircle className={running ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+            {running ? 'Generating report...' : 'Run analytics agent'}
+          </button>
+          <button
+            onClick={() => handleExport('csv')}
+            disabled={!!exportingFormat || !report?.id}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/40 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <FiDownload className={exportingFormat === 'csv' ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+            {exportingFormat === 'csv' ? 'Exporting CSV...' : 'Export CSV'}
+          </button>
+          <button
+            onClick={() => handleExport('pdf')}
+            disabled={!!exportingFormat || !report?.id}
+            className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/5 px-4 py-2 text-sm font-semibold text-white transition hover:border-white/40 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <FiFileText className={exportingFormat === 'pdf' ? 'h-4 w-4 animate-spin' : 'h-4 w-4'} />
+            {exportingFormat === 'pdf' ? 'Exporting PDF...' : 'Export PDF'}
+          </button>
+        </div>
+
       </div>
 
       {report ? (
@@ -627,9 +884,28 @@ export default function AnalyticsPanelPage() {
 
           <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
+              <div className="flex items-center justify-between text-sm">
+                <h2 className="text-lg font-semibold text-white">Predictive signals</h2>
+                <span className="text-xs text-white/50">Simple moving averages for the busiest themes</span>
+              </div>
+              <div className="mt-3">
+                <PredictiveSignalList signals={predictiveSignals} />
+              </div>
+            </div>
+            <div>
+              <h2 className="text-lg font-semibold text-white">Threshold alerts</h2>
+              <p className="mt-1 text-xs text-white/60">Automated alerts when sentiment or interventions exceed configured limits.</p>
+              <div className="mt-3">
+                <ThresholdAlertList alerts={thresholdAlerts} />
+              </div>
+            </div>
+          </section>
+
+          <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2">
               <div className="mb-3 flex items-center justify-between text-sm">
                 <h2 className="text-lg font-semibold text-white">
-                  Theme trends ({report.report_period})
+                  Trend drill-down ({report.report_period})
                 </h2>
                 <span className="flex items-center gap-2 text-xs text-white/50">
                   <FiTrendingUp className="h-3.5 w-3.5" /> Daily counts with rolling averages
@@ -683,6 +959,9 @@ export default function AnalyticsPanelPage() {
               </p>
               <div className="mt-4">
                 <DistressHeatmap data={report.distress_heatmap} />
+              </div>
+              <div className="mt-4">
+                <HeatmapHotspotList hotspots={heatmapAlerts} />
               </div>
             </div>
           </section>
@@ -964,7 +1243,7 @@ export default function AnalyticsPanelPage() {
                           key={`${group.topic}-${index}`}
                           className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/80"
                         >
-                          <p className="italic">'{sample.excerpt}'</p>
+                          <p className="italic">&apos;{sample.excerpt}&apos;</p>
                           <div className="mt-2 flex items-center justify-between text-xs text-white/50">
                             <span>{sample.source ?? 'anonymous'}</span>
                             {sample.date && <span>{new Date(sample.date).toLocaleDateString()}</span>}
@@ -1043,8 +1322,3 @@ export default function AnalyticsPanelPage() {
     </div>
   );
 }
-
-
-
-
-

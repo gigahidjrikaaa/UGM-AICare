@@ -126,6 +126,27 @@ class TopicExcerpt(BaseModel):
     samples: List[TopicExcerptSample]
 
 
+class PredictiveSignal(BaseModel):
+    metric: str
+    topic: Optional[str] = None
+    current_value: float
+    moving_average: float
+    forecast: float
+    direction: str
+    confidence: float
+    window: str
+
+
+class ThresholdAlert(BaseModel):
+    name: str
+    metric: str
+    value: float
+    threshold: float
+    status: str
+    severity: str
+    description: str
+
+
 class HighRiskUser(BaseModel):
     user_id: int
     name: Optional[str]
@@ -152,6 +173,8 @@ class AnalyticsReport(BaseModel):
     resource_engagement: List[Dict[str, Any]] = Field(default_factory=list)
     intervention_outcomes: List[Dict[str, Any]] = Field(default_factory=list)
     topic_excerpts: List[TopicExcerpt] = Field(default_factory=list)
+    predictive_signals: List[PredictiveSignal] = Field(default_factory=list)
+    threshold_alerts: List[ThresholdAlert] = Field(default_factory=list)
     comparison_snapshot: Dict[str, Any] | None = None
 
 
@@ -175,6 +198,8 @@ class AnalyticsState(TypedDict, total=False):
     resource_engagement: List[Dict[str, Any]]
     intervention_outcomes: List[Dict[str, Any]]
     topic_excerpts: List[TopicExcerpt]
+    predictive_signals: List[PredictiveSignal]
+    threshold_alerts: List[ThresholdAlert]
     comparison_snapshot: Dict[str, Any]
     report: AnalyticsReport
 
@@ -346,6 +371,8 @@ class AnalyticsAgent:
                 "theme_trends": [],
                 "distress_heatmap": [],
                 "topic_excerpts": [],
+                "predictive_signals": [],
+                "threshold_alerts": [],
                 "segment_alerts": [],
                 "high_risk_users": high_risk_users,
                 "resource_engagement": resource_engagement,
@@ -476,11 +503,31 @@ class AnalyticsAgent:
         if intervention_outcomes:
             metrics["intervention_summary"] = intervention_outcomes
 
+        predictive_signals = self._build_predictive_signals(theme_trends, timeframe_days)
+        if predictive_signals:
+            metrics["predictive_topics"] = [
+                {"topic": signal.topic, "direction": signal.direction, "forecast": signal.forecast}
+                for signal in predictive_signals
+                if signal.topic
+            ][:3]
+
+        threshold_alerts = self._build_threshold_alerts(
+            metrics=metrics,
+            high_risk_users=high_risk_users,
+            intervention_outcomes=intervention_outcomes,
+            timeframe_days=timeframe_days,
+        )
+        if threshold_alerts:
+            metrics["alert_count"] = len(threshold_alerts)
+            metrics["alert_peak_severity"] = threshold_alerts[0].severity
+
         return {
             "topic_breakdown": topic_breakdown,
             "theme_trends": theme_trends,
             "distress_heatmap": heatmap_cells,
             "topic_excerpts": topic_excerpts,
+            "predictive_signals": predictive_signals,
+            "threshold_alerts": threshold_alerts,
             "segment_alerts": segment_alerts,
             "high_risk_users": high_risk_users,
             "resource_engagement": resource_engagement,
@@ -517,6 +564,8 @@ class AnalyticsAgent:
             resource_engagement=state.get("resource_engagement", []),
             intervention_outcomes=state.get("intervention_outcomes", []),
             topic_excerpts=state.get("topic_excerpts", []),
+            predictive_signals=state.get("predictive_signals", []),
+            threshold_alerts=state.get("threshold_alerts", []),
         )
         return {"report": report}
 
@@ -685,6 +734,8 @@ class AnalyticsAgent:
                 "distress_heatmap": [cell.model_dump() for cell in report.distress_heatmap],
                 "segment_alerts": [segment.model_dump() for segment in report.segment_alerts],
                 "high_risk_users": [user.model_dump() for user in report.high_risk_users],
+                "predictive_signals": [signal.model_dump() for signal in report.predictive_signals],
+                "threshold_alerts": [alert.model_dump() for alert in report.threshold_alerts],
             },
             baseline_snapshot=comparison_snapshot,
             resource_engagement={"timeframe": report.report_period, "items": report.resource_engagement},
@@ -986,6 +1037,147 @@ class AnalyticsAgent:
             comparisons["baseline"] = build_slice(baseline, "baseline")
 
         return comparisons or None
+
+    def _build_predictive_signals(self, theme_trends: List[ThemeTrend], timeframe_days: int) -> List[PredictiveSignal]:
+        if not theme_trends:
+            return []
+
+        window_label = f"{timeframe_days} days" if timeframe_days else "selected window"
+        signals: List[PredictiveSignal] = []
+        for trend in theme_trends:
+            data = trend.data
+            if len(data) < 2:
+                continue
+            last_point = data[-1]
+            prev_point = data[-2]
+            delta = last_point.count - prev_point.count
+            moving_average = last_point.rolling_average
+            direction = "up" if delta > 0 else "down" if delta < 0 else "flat"
+            forecast = max(last_point.count + delta, 0)
+            volatility = abs(delta) / max(1.0, moving_average or 1.0)
+            base_confidence = 0.5 + min(0.35, volatility * 0.25)
+            if direction == "flat":
+                base_confidence = max(0.4, base_confidence - 0.15)
+            confidence = round(min(0.95, max(0.35, base_confidence)), 2)
+            signals.append(
+                PredictiveSignal(
+                    metric="topic_mentions",
+                    topic=trend.topic,
+                    current_value=float(last_point.count),
+                    moving_average=float(moving_average),
+                    forecast=float(round(forecast, 2)),
+                    direction=direction,
+                    confidence=confidence,
+                    window=window_label,
+                )
+            )
+
+        signals.sort(key=lambda item: abs(item.forecast - item.current_value), reverse=True)
+        return signals[:6]
+
+    def _build_threshold_alerts(
+        self,
+        metrics: Dict[str, Any],
+        high_risk_users: Sequence[HighRiskUser],
+        intervention_outcomes: List[Dict[str, Any]],
+        timeframe_days: int,
+    ) -> List[ThresholdAlert]:
+        alerts: List[ThresholdAlert] = []
+        severity_rank = {"High": 0, "Medium": 1, "Low": 2}
+
+        sentiment = metrics.get("sentiment_proxy", {}) or {}
+        total_sentiment = float(sentiment.get("positive", 0) + sentiment.get("negative", 0) + sentiment.get("neutral", 0))
+        if total_sentiment:
+            negative_ratio = float(sentiment.get("negative", 0)) / total_sentiment
+            if negative_ratio >= 0.6:
+                alerts.append(
+                    ThresholdAlert(
+                        name="Negative sentiment spike",
+                        metric="sentiment_ratio",
+                        value=round(negative_ratio, 3),
+                        threshold=0.6,
+                        status="breached",
+                        severity="High",
+                        description="Negative sentiment exceeds 60% of tracked messages.",
+                    )
+                )
+            elif negative_ratio >= 0.5:
+                alerts.append(
+                    ThresholdAlert(
+                        name="Elevated negative sentiment",
+                        metric="sentiment_ratio",
+                        value=round(negative_ratio, 3),
+                        threshold=0.5,
+                        status="watch",
+                        severity="Medium",
+                        description="Negative sentiment is trending above half of recent messages.",
+                    )
+                )
+
+        high_risk_count = len(high_risk_users)
+        if high_risk_count >= 5:
+            alerts.append(
+                ThresholdAlert(
+                    name="High-risk student volume",
+                    metric="high_risk_users",
+                    value=float(high_risk_count),
+                    threshold=5.0,
+                    status="breached",
+                    severity="High",
+                    description="Five or more students flagged for repeated high triage scores this window.",
+                )
+            )
+        elif high_risk_count >= 3:
+            alerts.append(
+                ThresholdAlert(
+                    name="Monitor triage follow-ups",
+                    metric="high_risk_users",
+                    value=float(high_risk_count),
+                    threshold=3.0,
+                    status="watch",
+                    severity="Medium",
+                    description="Multiple students exceeded triage severity thresholds recently.",
+                )
+            )
+
+        total_interventions = sum(int(item.get("count", 0)) for item in intervention_outcomes)
+        if total_interventions:
+            failure_statuses = {"failed", "error", "cancelled"}
+            failure_count = sum(
+                int(item.get("count", 0))
+                for item in intervention_outcomes
+                if str(item.get("status", "")).lower() in failure_statuses
+            )
+            if failure_count:
+                failure_ratio = failure_count / total_interventions
+                if failure_ratio >= 0.25:
+                    alerts.append(
+                        ThresholdAlert(
+                            name="Intervention failure rate",
+                            metric="intervention_failure_ratio",
+                            value=round(failure_ratio, 3),
+                            threshold=0.25,
+                            status="breached",
+                            severity="High",
+                            description="More than a quarter of interventions failed or errored this window.",
+                        )
+                    )
+                elif failure_ratio >= 0.15:
+                    alerts.append(
+                        ThresholdAlert(
+                            name="Intervention delivery risk",
+                            metric="intervention_failure_ratio",
+                            value=round(failure_ratio, 3),
+                            threshold=0.15,
+                            status="watch",
+                            severity="Medium",
+                            description="Intervention errors exceed 15% of attempts; review delivery settings.",
+                        )
+                    )
+
+        alerts.sort(key=lambda alert: severity_rank.get(alert.severity, 3))
+        return alerts[:5]
+
     async def _build_segment_alerts(self, negative_records: List[MessageRecord]) -> List[SegmentImpact]:
         if not negative_records:
             return []
