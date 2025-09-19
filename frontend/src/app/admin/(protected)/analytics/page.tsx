@@ -29,13 +29,20 @@ import {
 import { apiCall } from '@/utils/adminApi';
 import {
   AnalyticsReport as AnalyticsReportType,
+  ComparisonMetric,
+  ComparisonResponse,
   HeatmapCell,
+  HighRiskUser,
+  Insight,
+  InterventionOutcomeItem,
+  Pattern,
+  ReportHistoryItem,
+  ResourceEngagementItem,
   SegmentImpact,
   ThemeTrend,
   TopicBreakdown,
-  HighRiskUser,
-  Insight,
-  Pattern,
+  TopicExcerptGroup,
+  TopicExcerptsResponse,
 } from '@/types/admin/analytics';
 
 const TREND_COLORS = ['#38BDF8', '#FFCA40', '#F97316', '#A855F7'];
@@ -356,14 +363,45 @@ const normalizeReport = (raw: any): AnalyticsReportType => {
       distress_heatmap: [],
       segment_alerts: [],
       high_risk_users: [],
+      resource_engagement: { timeframe: '7 days', items: [] },
+      intervention_outcomes: { timeframe: '7 days', items: [] },
+      comparison_snapshot: {},
+      topic_excerpts: [],
     };
   }
 
   const trends = raw.trends ?? {};
+  const resourceRaw = raw.resource_engagement ?? raw.resourceEngagement ?? trends.resource_engagement ?? {};
+  const resourceItems = Array.isArray(resourceRaw?.items)
+    ? resourceRaw.items
+    : Array.isArray(resourceRaw)
+      ? resourceRaw
+      : [];
+  const resource_engagement = {
+    timeframe: resourceRaw?.timeframe ?? raw.report_period ?? '7 days',
+    items: (resourceItems ?? []) as ResourceEngagementItem[],
+  };
+
+  const interventionRaw = raw.intervention_outcomes ?? raw.interventionOutcomes ?? {};
+  const interventionItems = Array.isArray(interventionRaw?.items)
+    ? interventionRaw.items
+    : Array.isArray(interventionRaw)
+      ? interventionRaw
+      : [];
+  const intervention_outcomes = {
+    timeframe: interventionRaw?.timeframe ?? raw.report_period ?? '7 days',
+    items: (interventionItems ?? []) as InterventionOutcomeItem[],
+  };
+
+  const comparison_snapshot = (raw.comparison_snapshot ?? raw.baseline_snapshot ?? raw.comparisonSnapshot ?? raw.baselineSnapshot ?? {}) as Record<string, any>;
+  const topic_excerpts = (raw.topic_excerpts ?? raw.topicExcerpts ?? []) as TopicExcerptGroup[];
+
   return {
     id: raw.id,
-    generated_at: raw.generated_at,
+    generated_at: raw.generated_at ?? raw.generatedAt,
     report_period: raw.report_period ?? '7 days',
+    window_start: raw.window_start ?? raw.windowStart ?? null,
+    window_end: raw.window_end ?? raw.windowEnd ?? null,
     insights: (raw.insights ?? []) as Insight[],
     patterns: (raw.patterns ?? trends.patterns ?? []) as Pattern[],
     recommendations: (raw.recommendations ?? []) as string[],
@@ -373,13 +411,24 @@ const normalizeReport = (raw: any): AnalyticsReportType => {
     distress_heatmap: (raw.distress_heatmap ?? trends.distress_heatmap ?? []) as HeatmapCell[],
     segment_alerts: (raw.segment_alerts ?? trends.segment_alerts ?? []) as SegmentImpact[],
     high_risk_users: (raw.high_risk_users ?? trends.high_risk_users ?? []) as HighRiskUser[],
-  };
+    resource_engagement,
+    intervention_outcomes,
+    comparison_snapshot: comparison_snapshot as Record<string, any>,
+    topic_excerpts,
+  } as AnalyticsReportType;
+};
+
+export default function AnalyticsPanelPage() {
+
 };
 
 export default function AnalyticsPanelPage() {
   const [report, setReport] = useState<AnalyticsReportType | null>(null);
   const [loading, setLoading] = useState(true);
   const [running, setRunning] = useState(false);
+  const [history, setHistory] = useState<ReportHistoryItem[]>([]);
+  const [comparison, setComparison] = useState<ComparisonResponse | null>(null);
+  const [topicExcerpts, setTopicExcerpts] = useState<TopicExcerptsResponse | null>(null);
 
   const fetchReport = useCallback(async () => {
     try {
@@ -414,9 +463,51 @@ export default function AnalyticsPanelPage() {
     }
   }, []);
 
+  const fetchHistory = useCallback(async () => {
+    try {
+      const response = await apiCall<{ items: ReportHistoryItem[] }>(`/api/v1/admin/analytics/history?limit=6`);
+      setHistory(response?.items ?? []);
+    } catch (error) {
+      console.error('Error fetching analytics history:', error);
+    }
+  }, []);
+
+  const fetchComparisons = useCallback(async (reportId: number) => {
+    try {
+      const response = await apiCall<ComparisonResponse>(`/api/v1/admin/analytics/${reportId}/comparisons`);
+      setComparison(response);
+    } catch (error) {
+      console.error('Error fetching comparison slices:', error);
+    }
+  }, []);
+
+  const fetchTopicExcerpts = useCallback(async (reportId: number) => {
+    try {
+      const response = await apiCall<TopicExcerptsResponse>(`/api/v1/admin/analytics/${reportId}/excerpts?limit=3`);
+      setTopicExcerpts(response);
+    } catch (error) {
+      console.error('Error fetching topic excerpts:', error);
+      setTopicExcerpts(null);
+    }
+  }, []);
+
   useEffect(() => {
     void fetchReport();
   }, [fetchReport]);
+
+  useEffect(() => {
+    void fetchHistory();
+  }, [fetchHistory]);
+
+  useEffect(() => {
+    if (report?.id) {
+      void fetchComparisons(report.id);
+      void fetchTopicExcerpts(report.id);
+    } else {
+      setComparison(null);
+      setTopicExcerpts(null);
+    }
+  }, [report?.id, fetchComparisons, fetchTopicExcerpts]);
 
   const insightCounts = useMemo(() => {
     if (!report) return { total: 0, high: 0 };
@@ -437,6 +528,19 @@ export default function AnalyticsPanelPage() {
   const generatedAtLabel = report?.generated_at
     ? new Date(report.generated_at).toLocaleString()
     : undefined;
+
+  const resourceItems = useMemo(() => report?.resource_engagement?.items ?? [], [report]);
+  const interventionItems = useMemo(() => report?.intervention_outcomes?.items ?? [], [report]);
+  const comparisonSlices = useMemo(() => comparison?.comparisons ?? {}, [comparison]);
+  const excerptGroups = useMemo<TopicExcerptGroup[]>(() => {
+    if (topicExcerpts) {
+      if ('topics' in topicExcerpts) {
+        return topicExcerpts.topics;
+      }
+      return [{ topic: topicExcerpts.topic, samples: topicExcerpts.samples }];
+    }
+    return report?.topic_excerpts ?? [];
+  }, [topicExcerpts, report]);
 
   const topStats = useMemo(() => {
     if (!report) return [];
@@ -608,6 +712,181 @@ export default function AnalyticsPanelPage() {
             </div>
           </section>
 
+          <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+            <div>
+              <div className="flex items-center gap-2 text-lg font-semibold text-white">
+                <FiTrendingUp className="text-sky-300" /> Resource engagement
+              </div>
+              <p className="mt-1 text-xs text-white/60">
+                Usage across journaling, surveys, and appointments within the selected window.
+              </p>
+              {resourceItems.length ? (
+                <div className="mt-4 space-y-3">
+                  {resourceItems.map((item) => (
+                    <div
+                      key={`${item.category}-${item.label}`}
+                      className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner"
+                    >
+                      <div className="flex items-center justify-between text-sm text-white">
+                        <div>
+                          <p className="text-xs uppercase tracking-wide text-white/50">{item.category}</p>
+                          <p className="text-lg font-semibold text-white">{item.label}</p>
+                        </div>
+                        <span className="rounded-full bg-white/10 px-3 py-1 text-xs text-white/70">
+                          {item.timeframe}
+                        </span>
+                      </div>
+                      <div className="mt-3 grid grid-cols-3 gap-3 text-xs text-white/70">
+                        <div>
+                          <p className="text-white/50">Total</p>
+                          <p className="font-semibold text-white">{item.total.toLocaleString()}</p>
+                        </div>
+                        <div>
+                          <p className="text-white/50">Unique users</p>
+                          <p className="font-semibold text-white">
+                            {item.unique_users != null ? item.unique_users.toLocaleString() : '--'}
+                          </p>
+                        </div>
+                        <div>
+                          <p className="text-white/50">Avg / user</p>
+                          <p className="font-semibold text-white">
+                            {item.avg_per_user != null ? item.avg_per_user.toFixed(2) : '--'}
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+                  Engagement summaries will populate once the analytics agent runs for this window.
+                </div>
+              )}
+            </div>
+            <div>
+              <div className="flex items-center gap-2 text-lg font-semibold text-white">
+                <FiCheckCircle className="text-emerald-300" /> Intervention outcomes
+              </div>
+              <p className="mt-1 text-xs text-white/60">
+                Delivery status and engagement rates for automated interventions.
+              </p>
+              {interventionItems.length ? (
+                <div className="mt-4 space-y-3">
+                  {interventionItems.map((item) => (
+                    <div
+                      key={item.status}
+                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/80"
+                    >
+                      <div>
+                        <p className="font-semibold text-white capitalize">{item.status}</p>
+                        <p className="text-xs text-white/50">{item.timeframe}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-white">{item.count.toLocaleString()}</p>
+                        <p className="text-xs text-white/60">
+                          {item.percentage != null ? `${item.percentage.toFixed(1)}% of total` : '--'}
+                        </p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+                  Intervention outcomes will appear once campaigns have been executed in this window.
+                </div>
+              )}
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <div className="flex items-center gap-2 text-lg font-semibold text-white">
+              <FiTrendingUp className="text-indigo-300" /> Comparison slices
+            </div>
+            {Object.keys(comparisonSlices).length ? (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {Object.entries(comparisonSlices).map(([key, slice]) => {
+                  const metrics = slice.metrics ?? {};
+                  const refSummary = slice.reference_summary;
+                  const formatNumber = (value: number) =>
+                    Math.abs(value) >= 1 ? value.toLocaleString(undefined, { maximumFractionDigits: 1 }) : value.toFixed(2);
+                  const formatMetric = (metricKey: string) => {
+                    const candidate = metrics[metricKey];
+                    if (!candidate || typeof candidate !== 'object' || !('current' in candidate)) {
+                      return null;
+                    }
+                    const metric = candidate as ComparisonMetric;
+                    const deltaClass =
+                      metric.delta > 0
+                        ? 'text-emerald-300'
+                        : metric.delta < 0
+                        ? 'text-rose-300'
+                        : 'text-white/60';
+                    const deltaLabel =
+                      metric.delta === 0
+                        ? '0'
+                        : `${metric.delta > 0 ? '+' : ''}${formatNumber(metric.delta)}`;
+                    const deltaPct =
+                      metric.delta_pct != null
+                        ? `${metric.delta_pct > 0 ? '+' : ''}${metric.delta_pct.toFixed(1)}%`
+                        : '--';
+                    return (
+                      <div key={metricKey} className="flex items-center justify-between text-xs text-white/70">
+                        <span className="uppercase tracking-wide text-white/50">
+                          {metricKey.replace(/_/g, ' ')}
+                        </span>
+                        <div className="text-right">
+                          <p className="text-white">{formatNumber(metric.current)}</p>
+                          <p className={deltaClass}>
+                            {deltaLabel}
+                            <span className="ml-1 text-white/50">({deltaPct})</span>
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  };
+
+                  return (
+                    <div
+                      key={key}
+                      className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-inner"
+                    >
+                      <div className="flex items-center justify-between text-sm text-white/70">
+                        <p className="text-white font-semibold capitalize">{slice.label || key}</p>
+                        {refSummary?.generated_at && (
+                          <span className="text-xs text-white/50">
+                            vs {new Date(refSummary.generated_at).toLocaleDateString()}
+                          </span>
+                        )}
+                      </div>
+                      <div className="mt-3 space-y-2">
+                        {['conversation_count', 'journal_count', 'unique_users'].map((metricKey) => formatMetric(metricKey))}
+                      </div>
+                      {slice.topics?.length ? (
+                        <div className="mt-4 space-y-1 text-xs text-white/70">
+                          <p className="text-white/50">Topic shifts</p>
+                          {slice.topics.slice(0, 3).map((topic) => (
+                            <div key={topic.topic} className="flex items-center justify-between">
+                              <span className="text-white">{topic.topic}</span>
+                              <span className="text-white/60">
+                                {topic.delta > 0 ? '+' : ''}
+                                {formatNumber(topic.delta)}
+                                {topic.delta_pct != null ? ` (${topic.delta_pct.toFixed(1)}%)` : ''}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+                Comparison data will appear once a prior report exists for this timeframe.
+              </div>
+            )}
+          </section>
+
           <section className="space-y-4">
             <div className="flex items-center gap-2 text-lg font-semibold text-white">
               <FiPieChart className="text-[#38BDF8]" /> AI-generated insights
@@ -660,6 +939,88 @@ export default function AnalyticsPanelPage() {
             ) : (
               <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
                 No recommendations were generated in this run.
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-4">
+            <div className="flex items-center gap-2 text-lg font-semibold text-white">
+              <FiPlayCircle className="text-purple-300" /> Topic excerpts
+            </div>
+            {excerptGroups.length ? (
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                {excerptGroups.map((group) => (
+                  <div
+                    key={group.topic}
+                    className="rounded-2xl border border-white/10 bg-white/5 p-5 shadow-inner"
+                  >
+                    <div className="flex items-center justify-between text-sm text-white/70">
+                      <p className="text-white font-semibold">{group.topic}</p>
+                      <span className="text-xs text-white/50">{group.samples.length} excerpts</span>
+                    </div>
+                    <div className="mt-3 space-y-3">
+                      {group.samples.slice(0, 3).map((sample, index) => (
+                        <blockquote
+                          key={`${group.topic}-${index}`}
+                          className="rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white/80"
+                        >
+                          <p className="italic">'{sample.excerpt}'</p>
+                          <div className="mt-2 flex items-center justify-between text-xs text-white/50">
+                            <span>{sample.source ?? 'anonymous'}</span>
+                            {sample.date && <span>{new Date(sample.date).toLocaleDateString()}</span>}
+                          </div>
+                        </blockquote>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+                Topic excerpts will appear once anonymised samples are captured for this report.
+              </div>
+            )}
+          </section>
+
+          <section className="space-y-4">
+            <div className="flex items-center gap-2 text-lg font-semibold text-white">
+              <FiClock className="text-indigo-300" /> Report history
+            </div>
+            {history.length ? (
+              <div className="overflow-x-auto rounded-2xl border border-white/10 bg-white/5">
+                <table className="min-w-full divide-y divide-white/10 text-xs text-white/70">
+                  <thead>
+                    <tr className="text-xs uppercase tracking-wide text-white/50">
+                      <th className="px-4 py-3 text-left">Generated at</th>
+                      <th className="px-4 py-3 text-left">Insights</th>
+                      <th className="px-4 py-3 text-left">Top topics</th>
+                      <th className="px-4 py-3 text-left">Comparisons</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-white/10 text-white/80">
+                    {history.map((item) => (
+                      <tr key={item.id}>
+                        <td className="px-4 py-3">
+                          <div className="font-semibold text-white">
+                            {new Date(item.generated_at).toLocaleString()}
+                          </div>
+                          <p className="text-xs text-white/50">{item.report_period}</p>
+                        </td>
+                        <td className="px-4 py-3">{item.insight_count}</td>
+                        <td className="px-4 py-3">
+                          {item.top_topics.length ? item.top_topics.join(', ') : '--'}
+                        </td>
+                        <td className="px-4 py-3">
+                          {item.comparison_keys.length ? item.comparison_keys.join(', ') : '--'}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+                History will populate once multiple analytics snapshots have been generated.
               </div>
             )}
           </section>

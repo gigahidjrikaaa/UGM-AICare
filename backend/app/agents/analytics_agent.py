@@ -1,9 +1,10 @@
 import json
 import logging
 import os
+import re
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
-from typing import Annotated, Any, Dict, List, Optional, Sequence, TypedDict
+from typing import Annotated, Any, Dict, List, Optional, Sequence, Tuple, TypedDict
 
 from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
@@ -14,8 +15,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import (
     AnalyticsReport as AnalyticsReportModel,
+    Appointment,
+    CampaignExecution,
     Conversation,
     JournalEntry,
+    SurveyResponse,
     TriageAssessment,
     User,
 )
@@ -111,6 +115,17 @@ class SegmentImpact(BaseModel):
     percentage: float
 
 
+class TopicExcerptSample(BaseModel):
+    excerpt: str
+    source: str
+    date: str
+
+
+class TopicExcerpt(BaseModel):
+    topic: str
+    samples: List[TopicExcerptSample]
+
+
 class HighRiskUser(BaseModel):
     user_id: int
     name: Optional[str]
@@ -123,21 +138,29 @@ class HighRiskUser(BaseModel):
 
 class AnalyticsReport(BaseModel):
     report_period: str
+    period_start: datetime | None = None
+    period_end: datetime | None = None
     insights: List[Insight]
     patterns: List[Pattern]
     recommendations: List[str]
-    metrics: Dict[str, Any] | None = None
+    metrics: Dict[str, Any] = Field(default_factory=dict)
     topic_breakdown: List[TopicBreakdown] = Field(default_factory=list)
     theme_trends: List[ThemeTrend] = Field(default_factory=list)
     distress_heatmap: List[HeatmapCell] = Field(default_factory=list)
     segment_alerts: List[SegmentImpact] = Field(default_factory=list)
     high_risk_users: List[HighRiskUser] = Field(default_factory=list)
+    resource_engagement: List[Dict[str, Any]] = Field(default_factory=list)
+    intervention_outcomes: List[Dict[str, Any]] = Field(default_factory=list)
+    topic_excerpts: List[TopicExcerpt] = Field(default_factory=list)
+    comparison_snapshot: Dict[str, Any] | None = None
 
 
 class AnalyticsState(TypedDict, total=False):
     timeframe_days: int
     start_date: datetime
     end_date: datetime
+    period_start: datetime
+    period_end: datetime
     metrics: Dict[str, Any]
     raw_texts: List[str]
     message_records: List[MessageRecord]
@@ -149,6 +172,10 @@ class AnalyticsState(TypedDict, total=False):
     distress_heatmap: List[HeatmapCell]
     segment_alerts: List[SegmentImpact]
     high_risk_users: List[HighRiskUser]
+    resource_engagement: List[Dict[str, Any]]
+    intervention_outcomes: List[Dict[str, Any]]
+    topic_excerpts: List[TopicExcerpt]
+    comparison_snapshot: Dict[str, Any]
     report: AnalyticsReport
 
 
@@ -297,14 +324,33 @@ class AnalyticsAgent:
         return {"patterns": patterns, "metrics": metrics}
 
     async def _compute_enriched_metrics(self, state: AnalyticsState) -> AnalyticsState:
+        period_start = state.get("period_start", state.get("start_date"))
+        period_end = state.get("period_end", state.get("end_date"))
+        timeframe_days = int(state.get("timeframe_days", 0) or 0)
+
+        resource_engagement = await self._build_resource_engagement(period_start, period_end, timeframe_days)
+        intervention_outcomes = await self._build_intervention_outcomes(period_start, period_end, timeframe_days)
+        high_risk_users = await self._fetch_high_risk_users(timeframe_days or 7)
+
         records = state.get("message_records", [])
+        topic_excerpt_map: Dict[str, List[Dict[str, str]]] = defaultdict(list)
+
         if not records:
+            metrics = dict(state.get("metrics", {}))
+            if resource_engagement:
+                metrics["resource_engagement_summary"] = resource_engagement
+            if intervention_outcomes:
+                metrics["intervention_summary"] = intervention_outcomes
             return {
                 "topic_breakdown": [],
                 "theme_trends": [],
                 "distress_heatmap": [],
+                "topic_excerpts": [],
                 "segment_alerts": [],
-                "high_risk_users": await self._fetch_high_risk_users(state["timeframe_days"]),
+                "high_risk_users": high_risk_users,
+                "resource_engagement": resource_engagement,
+                "intervention_outcomes": intervention_outcomes,
+                "metrics": metrics,
             }
 
         topic_stats: Dict[str, Dict[str, Any]] = {}
@@ -312,17 +358,20 @@ class AnalyticsAgent:
         negative_records: List[MessageRecord] = []
 
         for record in records:
-            text = record["text"].lower()
+            text_value = record["text"]
+            if not text_value:
+                continue
             timestamp = record["timestamp"]
+            lowered = text_value.lower()
             topics_hit = {
                 topic
                 for topic, keywords in TOPIC_KEYWORDS.items()
-                if any(keyword in text for keyword in keywords)
+                if any(keyword in lowered for keyword in keywords)
             }
             if not topics_hit:
                 topics_hit = {DEFAULT_TOPIC}
 
-            sentiment_label = self._classify_sentiment(text)
+            sentiment_label = self._classify_sentiment(lowered)
             date_key = timestamp.date().isoformat()
 
             for topic in topics_hit:
@@ -338,11 +387,25 @@ class AnalyticsAgent:
                 stats["sentiment"][sentiment_label] += 1
                 stats["daily"][date_key] += 1
 
+            sanitized_excerpt = self._sanitize_excerpt(text_value)
+            if sanitized_excerpt:
+                sample_payload = {
+                    "excerpt": sanitized_excerpt,
+                    "source": record.get("source", "unknown"),
+                    "date": date_key,
+                }
+                for topic in topics_hit:
+                    samples = topic_excerpt_map.setdefault(topic, [])
+                    if len(samples) >= 5:
+                        continue
+                    if all(existing["excerpt"] != sanitized_excerpt for existing in samples):
+                        samples.append(sample_payload.copy())
+
             day_name = timestamp.strftime("%A")
             bucket_label = self._time_bucket(timestamp.hour)
             heatmap_counter[(day_name, bucket_label)] += 1
 
-            if sentiment_label == "negative" and record["user_id"]:
+            if sentiment_label == "negative" and record.get("user_id"):
                 negative_records.append(record)
 
         topic_breakdown = [
@@ -389,23 +452,41 @@ class AnalyticsAgent:
         ]
 
         segment_alerts = await self._build_segment_alerts(negative_records)
-        high_risk_users = await self._fetch_high_risk_users(state["timeframe_days"])
+
+        topic_excerpts: List[TopicExcerpt] = []
+        if topic_excerpt_map:
+            topic_ranks = {tb.topic: idx for idx, tb in enumerate(topic_breakdown)}
+            for topic, samples in topic_excerpt_map.items():
+                trimmed = samples[:5]
+                topic_excerpts.append(
+                    TopicExcerpt(
+                        topic=topic,
+                        samples=[TopicExcerptSample(**sample) for sample in trimmed],
+                    )
+                )
+            topic_excerpts.sort(key=lambda item: topic_ranks.get(item.topic, len(topic_ranks)))
 
         metrics = dict(state.get("metrics", {}))
         if topic_breakdown:
             metrics["top_topics"] = [tb.topic for tb in topic_breakdown[:3]]
         if segment_alerts:
             metrics["leading_segments"] = [seg.model_dump() for seg in segment_alerts[:5]]
+        if resource_engagement:
+            metrics["resource_engagement_summary"] = resource_engagement
+        if intervention_outcomes:
+            metrics["intervention_summary"] = intervention_outcomes
 
         return {
             "topic_breakdown": topic_breakdown,
             "theme_trends": theme_trends,
             "distress_heatmap": heatmap_cells,
+            "topic_excerpts": topic_excerpts,
             "segment_alerts": segment_alerts,
             "high_risk_users": high_risk_users,
+            "resource_engagement": resource_engagement,
+            "intervention_outcomes": intervention_outcomes,
             "metrics": metrics,
         }
-
     async def _generate_insights_node(self, state: AnalyticsState) -> AnalyticsState:
         patterns = state.get("patterns", [])
         metrics = state.get("metrics", {})
@@ -422,15 +503,20 @@ class AnalyticsAgent:
     async def _prepare_report(self, state: AnalyticsState) -> AnalyticsState:
         report = AnalyticsReport(
             report_period=f"{state['timeframe_days']} days",
+            period_start=state.get("period_start"),
+            period_end=state.get("period_end"),
             insights=state.get("insights", []),
             patterns=state.get("patterns", []),
             recommendations=state.get("recommendations", []),
-            metrics=state.get("metrics"),
+            metrics=state.get("metrics", {}),
             topic_breakdown=state.get("topic_breakdown", []),
             theme_trends=state.get("theme_trends", []),
             distress_heatmap=state.get("distress_heatmap", []),
             segment_alerts=state.get("segment_alerts", []),
             high_risk_users=state.get("high_risk_users", []),
+            resource_engagement=state.get("resource_engagement", []),
+            intervention_outcomes=state.get("intervention_outcomes", []),
+            topic_excerpts=state.get("topic_excerpts", []),
         )
         return {"report": report}
 
@@ -579,7 +665,16 @@ class AnalyticsAgent:
         return recommendations
 
     async def _store_report(self, report: AnalyticsReport):
+        latest_stmt = select(AnalyticsReportModel).order_by(desc(AnalyticsReportModel.generated_at)).limit(1)
+        previous_model = (await self.db.execute(latest_stmt)).scalars().first()
+        baseline_stmt = select(AnalyticsReportModel).order_by(AnalyticsReportModel.generated_at).limit(1)
+        baseline_model = (await self.db.execute(baseline_stmt)).scalars().first()
+        comparison_snapshot = await self._build_comparison_snapshot(previous_model, baseline_model, report)
+        report.comparison_snapshot = comparison_snapshot
+
         report_model = AnalyticsReportModel(
+            window_start=report.period_start,
+            window_end=report.period_end,
             report_period=report.report_period,
             insights=[insight.model_dump() for insight in report.insights],
             trends={
@@ -591,12 +686,15 @@ class AnalyticsAgent:
                 "segment_alerts": [segment.model_dump() for segment in report.segment_alerts],
                 "high_risk_users": [user.model_dump() for user in report.high_risk_users],
             },
+            baseline_snapshot=comparison_snapshot,
+            resource_engagement={"timeframe": report.report_period, "items": report.resource_engagement},
+            intervention_outcomes={"timeframe": report.report_period, "items": report.intervention_outcomes},
+            topic_excerpts=[excerpt.model_dump() for excerpt in report.topic_excerpts],
             recommendations=report.recommendations,
             intervention_triggers=[],
         )
         self.db.add(report_model)
         await self.db.commit()
-
     def _classify_sentiment(self, text: str) -> str:
         positive_hits = sum(1 for term in POSITIVE_TERMS if term in text)
         negative_hits = sum(1 for term in NEGATIVE_TERMS if term in text)
@@ -606,12 +704,288 @@ class AnalyticsAgent:
             return "positive"
         return "neutral"
 
+    def _sanitize_excerpt(self, text: str) -> str:
+        if not text:
+            return ""
+        sanitized = re.sub(r"\b[\w\.-]+@[\w\.-]+\.\w+\b", "[email]", text)
+        sanitized = re.sub(r"\b\d{3}[-.\s]?\d{3}[-.\s]?\d{4}\b", "[phone]", sanitized)
+        sanitized = re.sub(r"@[A-Za-z0-9_]+", "@user", sanitized)
+        sanitized = re.sub(r"\s+", " ", sanitized).strip()
+        if len(sanitized) > 220:
+            snippet = sanitized[:220]
+            if " " in snippet:
+                snippet = snippet[: snippet.rfind(" ")]
+            sanitized = snippet.rstrip() + " ..."
+        return sanitized
+
     def _time_bucket(self, hour: int) -> str:
         for start, end, label in TIME_BUCKETS:
             if start <= hour < end:
                 return label
         return TIME_BUCKETS[-1][2]
 
+    async def _count_in_range(self, column, start: datetime | None, end: datetime | None):
+        if not start or not end:
+            return 0
+        stmt = select(func.count()).where(column.between(start, end))
+        result = await self.db.execute(stmt)
+        return int(result.scalar() or 0)
+
+    async def _count_total_and_unique(
+        self, time_column, user_column, start: datetime | None, end: datetime | None
+    ) -> tuple[int, int]:
+        if not start or not end:
+            return 0, 0
+        total_stmt = select(func.count()).where(time_column.between(start, end))
+        total = int((await self.db.execute(total_stmt)).scalar() or 0)
+        if user_column is None:
+            return total, 0
+        unique_stmt = (
+            select(func.count(func.distinct(user_column)))
+            .where(time_column.between(start, end))
+            .where(user_column.isnot(None))
+        )
+        unique = int((await self.db.execute(unique_stmt)).scalar() or 0)
+        return total, unique
+
+    async def _build_resource_engagement(self, start: datetime | None, end: datetime | None, timeframe_days: int) -> List[Dict[str, Any]]:
+        if not start or not end:
+            return []
+
+        window_label = f"last {timeframe_days} days" if timeframe_days else "selected window"
+        journal_total, journal_unique = await self._count_total_and_unique(JournalEntry.created_at, JournalEntry.user_id, start, end)
+        survey_total, survey_unique = await self._count_total_and_unique(SurveyResponse.created_at, SurveyResponse.user_id, start, end)
+        appointment_total, appointment_unique = await self._count_total_and_unique(Appointment.created_at, Appointment.user_id, start, end)
+
+        def _average(total: int, unique: int) -> float | None:
+            if not unique:
+                return None
+            return round(total / unique, 2)
+
+        return [
+            {
+                "category": "journaling",
+                "label": "Journal entries",
+                "total": journal_total,
+                "unique_users": journal_unique,
+                "avg_per_user": _average(journal_total, journal_unique),
+                "timeframe": window_label,
+            },
+            {
+                "category": "survey",
+                "label": "Survey responses",
+                "total": survey_total,
+                "unique_users": survey_unique,
+                "avg_per_user": _average(survey_total, survey_unique),
+                "timeframe": window_label,
+            },
+            {
+                "category": "appointments",
+                "label": "Appointments booked",
+                "total": appointment_total,
+                "unique_users": appointment_unique,
+                "avg_per_user": _average(appointment_total, appointment_unique),
+                "timeframe": window_label,
+            },
+        ]
+
+    async def _build_intervention_outcomes(self, start: datetime | None, end: datetime | None, timeframe_days: int) -> List[Dict[str, Any]]:
+        if not start or not end:
+            return []
+
+        window_label = f"last {timeframe_days} days" if timeframe_days else "selected window"
+        stmt = (
+            select(CampaignExecution.status, func.count())
+            .where(CampaignExecution.scheduled_at.between(start, end))
+            .group_by(CampaignExecution.status)
+        )
+        rows = await self.db.execute(stmt)
+        totals = [(status or "unknown", int(count or 0)) for status, count in rows.all()]
+        total_count = sum(count for _, count in totals)
+        results: List[Dict[str, Any]] = []
+        for status, count in sorted(totals, key=lambda item: item[1], reverse=True):
+            percentage = round((count / total_count) * 100, 1) if total_count else 0.0
+            results.append(
+                {
+                    "status": status,
+                    "count": count,
+                    "percentage": percentage,
+                    "timeframe": window_label,
+                }
+            )
+        return results
+
+    async def _build_comparison_snapshot(
+        self,
+        previous: AnalyticsReportModel | None,
+        baseline: AnalyticsReportModel | None,
+        current: AnalyticsReport,
+    ) -> Dict[str, Any] | None:
+        def to_float(value: Any) -> float:
+            if isinstance(value, (int, float)):
+                return float(value)
+            if value is None:
+                return 0.0
+            try:
+                return float(value)
+            except (TypeError, ValueError):
+                return 0.0
+
+        def render_value(value: float) -> int | float:
+            return int(value) if float(value).is_integer() else round(value, 2)
+
+        def compare_numeric(current_value: Any, reference_value: Any) -> Dict[str, Any]:
+            current_number = to_float(current_value)
+            reference_number = to_float(reference_value)
+            delta = current_number - reference_number
+            delta_pct = (delta / reference_number * 100) if reference_number else None
+            return {
+                "current": render_value(current_number),
+                "reference": render_value(reference_number),
+                "delta": render_value(delta),
+                "delta_pct": round(delta_pct, 2) if delta_pct is not None else None,
+            }
+
+        def extract_items(value: Any) -> List[Dict[str, Any]]:
+            if isinstance(value, dict):
+                return [item for item in value.get("items", []) if isinstance(item, dict)]
+            if isinstance(value, list):
+                return [item for item in value if isinstance(item, dict)]
+            return []
+
+        current_metrics = current.metrics or {}
+        current_topics = current.topic_breakdown or []
+        current_resource_items = [item for item in current.resource_engagement if isinstance(item, dict)]
+        current_intervention_items = [item for item in current.intervention_outcomes if isinstance(item, dict)]
+
+        current_resource_map = {
+            (item.get("label") or item.get("category")): item for item in current_resource_items if item.get("label") or item.get("category")
+        }
+        current_intervention_map = {
+            item.get("status"): item for item in current_intervention_items if item.get("status")
+        }
+
+        def build_metric_slice(reference_metrics: Dict[str, Any]) -> Dict[str, Any]:
+            metrics_snapshot: Dict[str, Any] = {}
+            metric_keys = {
+                "conversation_count",
+                "journal_count",
+                "unique_users",
+                "avg_daily_conversations",
+                "avg_daily_journals",
+            }
+            for key in metric_keys:
+                if key in current_metrics or key in reference_metrics:
+                    metrics_snapshot[key] = compare_numeric(current_metrics.get(key, 0), reference_metrics.get(key, 0))
+
+            sentiment_current = current_metrics.get("sentiment_proxy", {}) or {}
+            sentiment_reference = reference_metrics.get("sentiment_proxy", {}) or {}
+            if sentiment_current or sentiment_reference:
+                sentiment_comparison: Dict[str, Any] = {}
+                for sentiment_key in {"positive", "negative", "neutral"}:
+                    if sentiment_key in sentiment_current or sentiment_key in sentiment_reference:
+                        sentiment_comparison[sentiment_key] = compare_numeric(
+                            sentiment_current.get(sentiment_key, 0),
+                            sentiment_reference.get(sentiment_key, 0),
+                        )
+                if sentiment_comparison:
+                    metrics_snapshot["sentiment_proxy"] = sentiment_comparison
+            return metrics_snapshot
+
+        def build_topic_slice(reference_topics: Sequence[Any]) -> List[Dict[str, Any]]:
+            reference_map = {}
+            for item in reference_topics:
+                if isinstance(item, dict):
+                    topic_name = item.get("topic")
+                    if topic_name:
+                        reference_map[topic_name] = item.get("total_mentions", item.get("count", 0))
+            rows: List[Dict[str, Any]] = []
+            for entry in current_topics:
+                data = compare_numeric(entry.total_mentions, reference_map.get(entry.topic, 0))
+                payload = {"topic": entry.topic}
+                payload.update(data)
+                rows.append(payload)
+            rows.sort(key=lambda row: abs(row["delta"]), reverse=True)
+            return rows[:5]
+
+        def build_resource_slice(reference_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            reference_map = {
+                (item.get("label") or item.get("category")): item
+                for item in reference_items
+                if item.get("label") or item.get("category")
+            }
+            keys = set(reference_map.keys()).union(current_resource_map.keys())
+            rows: List[Dict[str, Any]] = []
+            for key in sorted(filter(None, keys)):
+                current_entry = current_resource_map.get(key, {})
+                reference_entry = reference_map.get(key, {})
+                row = {
+                    "label": key,
+                    "category": current_entry.get("category") or reference_entry.get("category"),
+                    "totals": compare_numeric(
+                        current_entry.get("total", current_entry.get("count", 0)),
+                        reference_entry.get("total", reference_entry.get("count", 0)),
+                    ),
+                }
+                for field in ("unique_users", "avg_per_user"):
+                    if current_entry.get(field) is not None or reference_entry.get(field) is not None:
+                        row[field] = compare_numeric(
+                            current_entry.get(field, 0),
+                            reference_entry.get(field, 0),
+                        )
+                rows.append(row)
+            rows.sort(key=lambda row: abs(row["totals"]["delta"]), reverse=True)
+            return rows
+
+        def build_intervention_slice(reference_items: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+            reference_map = {item.get("status"): item for item in reference_items if item.get("status")}
+            keys = set(reference_map.keys()).union(current_intervention_map.keys())
+            rows: List[Dict[str, Any]] = []
+            for key in sorted(filter(None, keys)):
+                current_entry = current_intervention_map.get(key, {})
+                reference_entry = reference_map.get(key, {})
+                row: Dict[str, Any] = {
+                    "status": key,
+                    "counts": compare_numeric(current_entry.get("count", 0), reference_entry.get("count", 0)),
+                }
+                if current_entry.get("percentage") is not None or reference_entry.get("percentage") is not None:
+                    row["percentage"] = compare_numeric(
+                        current_entry.get("percentage", 0.0),
+                        reference_entry.get("percentage", 0.0),
+                    )
+                rows.append(row)
+            rows.sort(key=lambda row: abs(row["counts"]["delta"]), reverse=True)
+            return rows
+
+        def build_slice(reference_model: AnalyticsReportModel, label: str) -> Dict[str, Any]:
+            reference_trends = reference_model.trends or {}
+            reference_metrics = reference_trends.get("metrics", {}) or {}
+            reference_topics = reference_trends.get("topic_breakdown", []) or []
+            resource_items = extract_items(reference_model.resource_engagement)
+            intervention_items = extract_items(reference_model.intervention_outcomes)
+            window_payload = {
+                "start": reference_model.window_start.isoformat() if reference_model.window_start else None,
+                "end": reference_model.window_end.isoformat() if reference_model.window_end else None,
+                "report_period": reference_model.report_period,
+            }
+            return {
+                "label": label,
+                "reference_report_id": reference_model.id,
+                "generated_at": reference_model.generated_at.isoformat() if reference_model.generated_at else None,
+                "window": window_payload,
+                "metrics": build_metric_slice(reference_metrics),
+                "topics": build_topic_slice(reference_topics),
+                "resource_engagement": build_resource_slice(resource_items),
+                "interventions": build_intervention_slice(intervention_items),
+            }
+
+        comparisons: Dict[str, Any] = {}
+        if previous:
+            comparisons["previous"] = build_slice(previous, "previous")
+        if baseline and (not previous or baseline.id != previous.id):
+            comparisons["baseline"] = build_slice(baseline, "baseline")
+
+        return comparisons or None
     async def _build_segment_alerts(self, negative_records: List[MessageRecord]) -> List[SegmentImpact]:
         if not negative_records:
             return []
@@ -758,3 +1132,7 @@ ANALYTICS_GRAPH_SPEC = {
         {"source": "generate_insights", "target": "prepare_report"},
     ],
 }
+
+
+
+
