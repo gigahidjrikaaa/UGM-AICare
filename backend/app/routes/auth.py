@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth_utils import create_access_token
 from app.database import get_async_db
 from app.models import User
+from app.services.user_service import async_get_user_by_plain_email
 from app.utils.security_utils import encrypt_data, decrypt_data
 
 logger = logging.getLogger(__name__)
@@ -222,6 +223,9 @@ async def login_for_access_token(
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
+    if not user:
+        user = await async_get_user_by_plain_email(db, request.email)
+
     if (
         not user
         or not user.password_hash
@@ -353,3 +357,5 @@ async def forgot_password(request: ForgotPasswordRequest) -> ForgotPasswordRespo
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during password reset",
         ) from exc
+
+

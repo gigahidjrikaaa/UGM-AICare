@@ -68,7 +68,17 @@ async def init_db():
     """Initialize database tables asynchronously"""
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+
     logger.info(f"Database initialized with asyncpg: {DATABASE_URL}")
+
+    from app.services.admin_bootstrap import ensure_default_admin
+
+    async with AsyncSessionLocal() as session:
+        try:
+            await ensure_default_admin(session)
+        except Exception as exc:
+            await session.rollback()
+            logger.error(f"Failed to ensure default admin user: {exc}")
 
 async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
     """Async database dependency for FastAPI"""
@@ -98,3 +108,4 @@ async def check_db_health() -> bool:
     except Exception as e:
         logger.error(f"Database health check failed: {e}")
         return False
+
