@@ -1,0 +1,171 @@
+# Insight Foundations – Technical Scope
+
+## 1. Metric Definitions & Acceptance Criteria
+
+### 1.1 Risk Trend
+- **Definition:** Daily aggregate of triage assessments over a configurable window (default 14 days).
+- **Computation:**
+  - Count assessments per day and per severity bucket (`low`, `medium`, `high`).
+  - Compute average `risk_score` per day.
+  - Window start is inclusive, aligned to midnight UTC.
+- **Acceptance Criteria:**
+  - Supports `timeframe_days` (7-90) and optional `reference_date` (defaults to today).
+  - Response latency < 500 ms for 90-day window.
+  - Empty window returns an empty array.
+
+### 1.2 Severity Delta
+- **Definition:** Change in severity distribution between the current window and the previous window of the same length.
+- **Computation:**
+  - Aggregate counts per severity for both windows.
+  - Delta = `current - previous`; delta_pct uses previous window as denominator (null when previous count = 0).
+- **Acceptance Criteria:**
+  - Same filters as risk trend.
+  - Returns baseline window metadata.
+
+### 1.3 Cohort Hotspots
+- **Definition:** Top-N user cohorts with the greatest increase in high-severity triage assessments.
+- **Supported Cohort Dimensions:** `major`, `year_of_study`, `gender`, `city`.
+- **Computation:**
+  - For each cohort value, compute high-severity count for current and previous windows.
+  - Score = delta count (ties resolved by delta_pct); include cohort size.
+  - Limit default 5, configurable.
+- **Acceptance Criteria:**
+  - Includes cohort label, counts, delta, delta_pct, cohort_population.
+  - Excludes cohorts with < 3 assessments in current window (noise filter).
+
+### 1.4 Predictive Scoring
+- **Definition:** Predict near-term escalation risk using existing LLM heuristic outputs.
+- **Inputs:** Latest triage assessments enriched with features (risk_score, severity, sentiment trend, prior interventions).
+- **Model:** Reuse `AnalyticsAgent._generate_predictive_signals` heuristics w/ Gemini fallback.
+- **Output:** Array of signals (metric/topic, forecast, direction, confidence, horizon).
+- **Acceptance Criteria:**
+  - Endpoint returns cached results (=1 hour) or recomputes on demand via agent.
+  - Includes trace id + computation timestamp.
+  - Handles LLM failures with graceful degradation (fallback heuristics, warning flag).
+
+### 1.5 SLA Metrics
+- **Definition:** Service-level stats for triage processing (already produced in `compute_triage_metrics`).
+- **Acceptance Criteria:**
+  - Reuse Risk Trend endpoint response; ensure target can be overridden via query param.
+  - Include `records`, `average_ms`, `p90_ms`, `p95_ms`, `within_target_percent`.
+
+### 1.6 Intervention Summary
+- **Definition:** Aggregated view of `CampaignExecution` outcomes over window.
+- **Metrics:** counts per status, success rate (executed / total), failure rate, average engagement score, top campaigns by delivery volume.
+- **Acceptance Criteria:**
+  - Supports `timeframe_days` and optional `campaign_type` filter.
+  - Returns totals and top campaigns (limit configurable, default 5).
+
+## 2. REST Endpoints
+
+| Path | Method | Description |
+|------|--------|-------------|
+| `/api/v1/admin/analytics/triage-metrics` | GET | Returns risk trend, severity deltas, SLA summary. |
+| `/api/v1/admin/analytics/cohort-hotspots` | GET | Returns cohort hotspot list. |
+| `/api/v1/admin/analytics/predictive-scores` | POST/GET | Returns predictive signals; POST triggers refresh. |
+| `/api/v1/admin/analytics/intervention-summary` | GET | Returns intervention KPIs. |
+
+### 2.1 Query Parameters
+- `timeframe_days` (int, 7-90)
+- `reference_date` (ISO date, optional)
+- `cohort_dimension` (`major` | `year_of_study` | `gender` | `city`)
+- `limit` (int, default 5)
+- `campaign_type` (string, optional)
+- `force_refresh` (bool, predictive endpoint only)
+
+### 2.2 Response Contracts
+
+#### `/triage-metrics`
+```
+{
+  "timeframe_days": 14,
+  "window": {"start": "2025-02-01", "end": "2025-02-14"},
+  "risk_trend": [RiskTrendPoint, ...],
+  "severity_delta": {
+    "current": {"high": 12, "medium": 25, "low": 41},
+    "previous": {"high": 8, "medium": 21, "low": 38},
+    "delta": {"high": 4, "medium": 4, "low": 3},
+    "delta_pct": {"high": 0.5, "medium": 0.19, "low": 0.079}
+  },
+  "sla_metrics": SlaMetrics | null
+}
+```
+
+#### `/cohort-hotspots`
+```
+{
+  "dimension": "major",
+  "timeframe_days": 14,
+  "items": [
+    {
+      "label": "Psychology",
+      "current_high": 9,
+      "previous_high": 3,
+      "delta": 6,
+      "delta_pct": 2.0,
+      "cohort_population": 120
+    }
+  ]
+}
+```
+
+#### `/predictive-scores`
+```
+{
+  "generated_at": "2025-02-14T09:15:30Z",
+  "trace_id": "...",
+  "signals": [PredictiveSignal, ...],
+  "source": "heuristic|llm",
+  "warning": "LLM fallback used"
+}
+```
+
+#### `/intervention-summary`
+```
+{
+  "timeframe_days": 14,
+  "window": {...},
+  "totals": {
+    "scheduled": 20,
+    "executed": 15,
+    "failed": 3,
+    "canceled": 2,
+    "success_rate": 0.75,
+    "failure_rate": 0.15,
+    "avg_engagement_score": 0.62
+  },
+  "top_campaigns": [
+    {
+      "campaign_id": 12,
+      "title": "Post-exam check-ins",
+      "executed": 8,
+      "failed": 1,
+      "success_rate": 0.89
+    }
+  ]
+}
+```
+
+## 3. Data Sources & Filters
+
+| Metric | Tables | Notes |
+|--------|--------|-------|
+| Risk Trend / Severity Delta / SLA | `triage_assessments` | Join `users` for cohort metadata when needed. |
+| Cohort Hotspots | `triage_assessments`, `users` | Filter out null cohort values. |
+| Predictive Scoring | `triage_assessments`, `campaign_executions`, `analytics_reports` | Reuse `AnalyticsAgent` heuristics. |
+| Intervention Summary | `campaign_executions`, `intervention_campaigns` | Join for campaign metadata. |
+
+## 4. Failure Modes & Monitoring
+- Log structured warnings when LLM predictive scoring fails; expose `source='heuristic'`.
+- Guard against long-running aggregation by adding 5s timeout to queries.
+- Emit Prometheus counters for endpoint latency and cache hits (future work).
+
+## 5. Testing Strategy
+- Unit tests for aggregation helpers (risk trend, severity delta, cohort hotspots, intervention summary).
+- Integration tests using in-memory SQLite for service modules.
+- Contract tests for FastAPI responses (snapshot style) with seeded data.
+
+## 6. Rollout & Ops
+- Backfill caches by running `/triage-metrics` and `/cohort-hotspots` endpoints for default windows post-deploy.
+- Feature flag predictive scoring refresh endpoint until confidence validated.
+- Document endpoints in `docs/api/admin-analytics.md` and update frontend types before GA.

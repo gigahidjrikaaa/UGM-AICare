@@ -1,7 +1,9 @@
 "use client";
 
+import Link from 'next/link';
 import clsx from "clsx";
 import { formatDistanceToNow } from "date-fns";
+import { FiExternalLink, FiPlus } from '@/icons';
 import { TriageAssessmentItem } from "@/types/admin/triage";
 
 type Props = {
@@ -9,6 +11,7 @@ type Props = {
   loading: boolean;
   onLoadMore?: () => void;
   canLoadMore?: boolean;
+  onEscalate?: (item: TriageAssessmentItem) => void;
 };
 
 const badgeStyles: Record<string, string> = {
@@ -18,9 +21,9 @@ const badgeStyles: Record<string, string> = {
   critical: "bg-rose-600/20 text-rose-100 border border-rose-400/40",
 };
 
-export function TriageAssessmentsTable({ items, loading, onLoadMore, canLoadMore }: Props) {
+export function TriageAssessmentsTable({ items, loading, onLoadMore, canLoadMore, onEscalate }: Props) {
   return (
-    <section className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur">
+    <section className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur" id="triage-assessments">
       <div className="mb-4 flex items-center justify-between gap-3">
         <div>
           <h3 className="text-lg font-semibold text-white">Recent assessments</h3>
@@ -38,6 +41,7 @@ export function TriageAssessmentsTable({ items, loading, onLoadMore, canLoadMore
               <th className="py-3 pr-4">Confidence</th>
               <th className="py-3 pr-4">Recommended action</th>
               <th className="py-3 pr-4">Assessed</th>
+              <th className="py-3 pr-4">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-white/5">
@@ -46,6 +50,9 @@ export function TriageAssessmentsTable({ items, loading, onLoadMore, canLoadMore
               const badgeClass = badgeStyles[severityKey] ?? "bg-white/10 text-white";
               const riskPercent = `${Math.round(item.risk_score * 100)}%`;
               const confidencePercent = `${Math.round(item.confidence_score * 100)}%`;
+              const assessmentUrl = item.conversation_id
+                ? `/admin/conversations/session/${item.conversation_id}`
+                : null;
               return (
                 <tr key={item.id} className="text-xs text-white/80">
                   <td className="py-3 pr-4">
@@ -68,10 +75,32 @@ export function TriageAssessmentsTable({ items, loading, onLoadMore, canLoadMore
                     )}
                   </td>
                   <td className="py-3 pr-4 text-white/80">{confidencePercent}</td>
-                  <td className="py-3 pr-4 text-white/70">{item.recommended_action ?? "�"}</td>
-                    <td className="py-3 pr-4 text-white/70">{item.recommended_action ?? "N/A"}</td>
+                  <td className="py-3 pr-4 text-white/70">{item.recommended_action ?? 'N/A'}</td>
                   <td className="py-3 pr-4 text-white/60">
                     {formatDistanceToNow(new Date(item.created_at), { addSuffix: true })}
+                  </td>
+                  <td className="py-3 pr-4">
+                    <div className="flex flex-wrap items-center gap-2">
+                      {assessmentUrl && (
+                        <Link
+                          href={assessmentUrl}
+                          className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 font-semibold text-white transition hover:border-white/40 hover:bg-white/20"
+                        >
+                          <FiExternalLink className="h-3.5 w-3.5" />
+                          View session
+                        </Link>
+                      )}
+                      {onEscalate && item.user_id && (
+                        <button
+                          type="button"
+                          onClick={() => onEscalate(item)}
+                          className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 font-semibold text-white transition hover:border-white/40 hover:bg-white/20"
+                        >
+                          <FiPlus className="h-3.5 w-3.5" />
+                          Queue intervention
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               );
@@ -79,7 +108,7 @@ export function TriageAssessmentsTable({ items, loading, onLoadMore, canLoadMore
 
             {!items.length && !loading && (
               <tr>
-                <td colSpan={6} className="py-12 text-center text-sm text-white/50">
+                <td colSpan={7} className="py-12 text-center text-sm text-white/50">
                   No triage assessments found for the selected filters.
                 </td>
               </tr>
@@ -87,7 +116,7 @@ export function TriageAssessmentsTable({ items, loading, onLoadMore, canLoadMore
 
             {loading && (
               <tr>
-                <td colSpan={6} className="py-10 text-center text-sm text-white/60">
+                <td colSpan={7} className="py-10 text-center text-sm text-white/60">
                   Loading assessments...
                 </td>
               </tr>

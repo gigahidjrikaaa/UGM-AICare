@@ -202,3 +202,88 @@ export type AnalyticsReport = {
 };
 
 
+
+
+export type RiskTrendPoint = {
+  date: string;
+  total: number;
+  high: number;
+  medium: number;
+  low: number;
+  average_risk_score: number | null;
+};
+
+export type SeverityDelta = {
+  current: Record<string, number>;
+  previous: Record<string, number>;
+  delta: Record<string, number>;
+  delta_pct: Record<string, number | null>;
+};
+
+export type SlaMetrics = {
+  target_ms: number;
+  records: number;
+  average_ms: number | null;
+  p90_ms: number | null;
+  p95_ms: number | null;
+  within_target_percent: number | null;
+};
+
+export type TriageMetricsInsight = {
+  timeframe_days: number;
+  window_start: string;
+  window_end: string;
+  risk_trend: RiskTrendPoint[];
+  severity_delta: SeverityDelta;
+  sla_metrics?: SlaMetrics | null;
+};
+
+export type CohortHotspot = {
+  label: string;
+  current_high: number;
+  previous_high: number;
+  delta: number;
+  delta_pct?: number | null;
+  cohort_population: number;
+};
+
+export type CohortHotspotsResponse = {
+  dimension: string;
+  timeframe_days: number;
+  window_start: string;
+  window_end: string;
+  items: CohortHotspot[];
+};
+
+export type PredictiveSignalsResponse = {
+  generated_at: string;
+  source: string;
+  timeframe_days: number;
+  trace_id: string;
+  signals: PredictiveSignal[];
+  warning?: string | null;
+};
+
+export type InterventionTotals = {
+  overall: number;
+  by_status: Record<string, number>;
+  success_rate?: number | null;
+  failure_rate?: number | null;
+  avg_engagement_score?: number | null;
+};
+
+export type TopCampaignSummary = {
+  campaign_id: number;
+  title: string;
+  executed: number;
+  failed: number;
+  success_rate?: number | null;
+};
+
+export type InterventionSummary = {
+  timeframe_days: number;
+  window_start: string;
+  window_end: string;
+  totals: InterventionTotals;
+  top_campaigns: TopCampaignSummary[];
+};

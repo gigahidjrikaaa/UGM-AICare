@@ -1,6 +1,7 @@
 ﻿"use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import toast from "react-hot-toast";
 import {
   InterventionCampaign,
@@ -31,7 +32,34 @@ export default function InterventionPanelPage() {
   const [settingsSaving, setSettingsSaving] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [drawerContext, setDrawerContext] = useState<QueueItem | null>(null);
+  const searchParams = useSearchParams();
+  const pathname = usePathname();
+  const router = useRouter();
 
+  useEffect(() => {
+    const userIdParam = searchParams.get('prefillUserId');
+    if (!userIdParam) {
+      return;
+    }
+
+    const context = {
+      user_id: Number(userIdParam) || undefined,
+      user_name: searchParams.get('prefillUserName') ?? undefined,
+      user_email: searchParams.get('prefillUserEmail') ?? undefined,
+      risk_score: parseFloat(searchParams.get('prefillRisk') ?? '0') || undefined,
+      severity_level: searchParams.get('prefillSeverity') ?? undefined,
+      recommended_action: searchParams.get('prefillAction') ?? undefined,
+      status: 'triage_escalation',
+      scheduled_at: new Date().toISOString(),
+    } as QueueItem;
+
+    setDrawerContext(context);
+    setDrawerOpen(true);
+
+    const nextParams = new URLSearchParams(searchParams.toString());
+    ['prefillUserId', 'prefillUserName', 'prefillUserEmail', 'prefillRisk', 'prefillSeverity', 'prefillAction'].forEach((key) => nextParams.delete(key));
+    router.replace(nextParams.toString() ? `${pathname}?${nextParams.toString()}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams]);
   const fetchOverview = useCallback(async () => {
     const data = await apiCall<InterventionOverview>("/api/v1/admin/interventions/overview");
     setOverview(data);
@@ -198,5 +226,3 @@ export default function InterventionPanelPage() {
     </div>
   );
 }
-
-

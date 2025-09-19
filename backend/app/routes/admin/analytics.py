@@ -4,7 +4,8 @@ from __future__ import annotations
 import logging
 import csv
 import json
-from datetime import datetime
+import uuid
+from datetime import date, datetime, timedelta
 from io import BytesIO, StringIO
 from typing import Any, Dict, List, Optional
 
@@ -17,6 +18,19 @@ from app.agents.analytics_agent import AnalyticsAgent
 from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.models import AnalyticsReport, User
+from app.schemas.admin import (
+    CohortHotspotsResponse,
+    InterventionSummary,
+    PredictiveSignalPayload,
+    PredictiveSignalsResponse,
+    TriageMetricsInsight,
+)
+from app.services.analytics_insights import (
+    compute_cohort_hotspots,
+    compute_intervention_summary,
+    compute_triage_insights,
+)
+from app.services.triage_metrics import SLA_TARGET_MS
 
 logger = logging.getLogger(__name__)
 
@@ -80,6 +94,168 @@ def _report_history_item(model: AnalyticsReport) -> dict:
         "comparison_keys": list(comparisons.keys()) if isinstance(comparisons, dict) else [],
     }
 
+
+
+
+def _coerce_predictive_payloads(raw: Any) -> List[PredictiveSignalPayload]:
+    payloads: List[PredictiveSignalPayload] = []
+    if not raw:
+        return payloads
+    for entry in raw:
+        if isinstance(entry, PredictiveSignalPayload):
+            payloads.append(entry)
+        elif isinstance(entry, dict):
+            try:
+                payloads.append(PredictiveSignalPayload.model_validate(entry))
+            except Exception:  # pragma: no cover - tolerant parsing
+                logger.debug("Skipping malformed predictive signal entry: %s", entry)
+    return payloads
+
+def _extract_predictive_signals(model: AnalyticsReport) -> List[PredictiveSignalPayload]:
+    trends = model.trends or {}
+    raw_signals = trends.get("predictive_signals") or []
+    return _coerce_predictive_payloads(raw_signals)
+
+@router.get("/triage-metrics", response_model=TriageMetricsInsight)
+async def get_triage_metrics_insight(
+    timeframe_days: int = Query(14, ge=7, le=90),
+    reference_date: Optional[date] = Query(None),
+    target_ms: int = Query(SLA_TARGET_MS, ge=1000, le=3_600_000),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user),
+) -> TriageMetricsInsight:
+    """Return risk trend, severity delta, and SLA metrics for triage."""
+    logger.info("Admin %s requesting triage metrics", admin_user.id)
+    try:
+        return await compute_triage_insights(
+            db,
+            timeframe_days,
+            reference_date=reference_date,
+            target_ms=target_ms,
+        )
+    except ValueError as exc:
+        logger.warning("Invalid triage metrics request by admin %s: %s", admin_user.id, exc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/cohort-hotspots", response_model=CohortHotspotsResponse)
+async def get_cohort_hotspots(
+    timeframe_days: int = Query(14, ge=7, le=90),
+    reference_date: Optional[date] = Query(None),
+    dimension: str = Query("major"),
+    limit: int = Query(5, ge=1, le=25),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user),
+) -> CohortHotspotsResponse:
+    """Return cohorts with the largest increase in high-severity triage counts."""
+    dimension_key = dimension.strip().lower()
+    allowed_dimensions = {"major", "year_of_study", "gender", "city"}
+    if dimension_key not in allowed_dimensions:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Unsupported cohort dimension; choose from major, year_of_study, gender, or city.",
+        )
+    logger.info(
+        "Admin %s requesting cohort hotspots (dimension=%s, limit=%s)",
+        admin_user.id,
+        dimension_key,
+        limit,
+    )
+    try:
+        return await compute_cohort_hotspots(
+            db,
+            timeframe_days,
+            reference_date=reference_date,
+            dimension=dimension_key,
+            limit=limit,
+        )
+    except ValueError as exc:
+        logger.warning("Invalid hotspot request by admin %s: %s", admin_user.id, exc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+
+
+@router.get("/predictive-scores", response_model=PredictiveSignalsResponse)
+async def get_predictive_scores(
+    timeframe_days: int = Query(14, ge=7, le=90),
+    force_refresh: bool = Query(False),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user),
+) -> PredictiveSignalsResponse:
+    """Return predictive risk signals, refreshing the analytics agent when required."""
+    logger.info(
+        "Admin %s requesting predictive scores (force_refresh=%s)",
+        admin_user.id,
+        force_refresh,
+    )
+    cutoff = datetime.utcnow() - timedelta(hours=1)
+    trace_id = uuid.uuid4().hex
+    signals: List[PredictiveSignalPayload] = []
+    generated_at_value = datetime.utcnow()
+    source = "cache"
+    warning: Optional[str] = None
+    if not force_refresh:
+        stmt = select(AnalyticsReport).order_by(desc(AnalyticsReport.generated_at)).limit(1)
+        existing = (await db.execute(stmt)).scalars().first()
+        if existing and existing.generated_at and existing.generated_at >= cutoff:
+            cached = _extract_predictive_signals(existing)
+            if cached:
+                signals = cached
+                generated_at_value = existing.generated_at
+            else:
+                warning = "No predictive signals stored for the cached analytics snapshot."
+    if not signals:
+        try:
+            agent = AnalyticsAgent(db)
+            report = await agent.analyze_trends(timeframe_days=timeframe_days)
+            generated_at_value = report.period_end or datetime.utcnow()
+            signals = [
+                PredictiveSignalPayload.model_validate(signal.model_dump())
+                for signal in report.predictive_signals
+            ]
+            source = "fresh"
+            if not signals:
+                warning = "No predictive signals generated for the requested window."
+        except Exception as exc:  # pragma: no cover - external dependencies
+            logger.error("Failed to refresh predictive scores: %s", exc, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Failed to compute predictive scores",
+            ) from exc
+    else:
+        source = "cache"
+    generated_at_str = generated_at_value.isoformat()
+    return PredictiveSignalsResponse(
+        generated_at=generated_at_str,
+        source=source,
+        timeframe_days=timeframe_days,
+        trace_id=trace_id,
+        signals=signals,
+        warning=warning,
+    )
+
+
+@router.get("/intervention-summary", response_model=InterventionSummary)
+async def get_intervention_summary(
+    timeframe_days: int = Query(14, ge=7, le=90),
+    reference_date: Optional[date] = Query(None),
+    campaign_type: Optional[str] = Query(None),
+    limit: int = Query(5, ge=1, le=25),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user),
+) -> InterventionSummary:
+    """Return aggregated intervention execution outcomes for the window."""
+    logger.info(
+        "Admin %s requesting intervention summary (campaign_type=%s)",
+        admin_user.id,
+        campaign_type,
+    )
+    return await compute_intervention_summary(
+        db,
+        timeframe_days,
+        reference_date=reference_date,
+        campaign_type=campaign_type,
+        limit=limit,
+    )
 
 
 @router.post("/run")
@@ -379,7 +555,7 @@ def _render_pdf_from_lines(lines: List[str]) -> bytes:
         text_rows = ['BT', '/F1 12 Tf']
         cursor = height - 60
         for line in page_lines:
-            sanitized = line.replace('\\', '\\').replace('(', '\(').replace(')', '\)')
+            sanitized = line.replace('\\', r'\\').replace('(', r'\(').replace(')', r'\)')
             text_rows.append(f'1 0 0 1 50 {cursor:.2f} Tm ({sanitized}) Tj')
             cursor -= 16
         text_rows.append('ET')
@@ -512,5 +688,8 @@ async def export_report_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=\"{filename}\""},
     )
+
+
+
 
 

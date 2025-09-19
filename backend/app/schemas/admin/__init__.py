@@ -1,4 +1,16 @@
 """Aggregated admin schema exports."""
+from .analytics import (
+    AnalyticsResponse,
+    CohortHotspot,
+    CohortHotspotsResponse,
+    InterventionSummary,
+    InterventionTotals,
+    PredictiveSignalPayload,
+    PredictiveSignalsResponse,
+    SeverityDelta,
+    TriageMetricsInsight,
+    TopCampaignSummary,
+)
 from .appointments import (
     AppointmentResponse,
     AppointmentUpdate,
@@ -69,6 +81,16 @@ from .triage import (
 )
 
 __all__ = [
+    "AnalyticsResponse",
+    "CohortHotspot",
+    "CohortHotspotsResponse",
+    "InterventionSummary",
+    "InterventionTotals",
+    "PredictiveSignalPayload",
+    "PredictiveSignalsResponse",
+    "SeverityDelta",
+    "TriageMetricsInsight",
+    "TopCampaignSummary",
     "AppointmentResponse",
     "AppointmentUpdate",
     "AppointmentUser",
@@ -128,3 +150,5 @@ __all__ = [
     "TriageTestRequest",
     "TriageTestResponse",
 ]
+
+

@@ -23,29 +23,41 @@ import {
   FiClock,
   FiPieChart,
   FiPlayCircle,
+  FiRefreshCw,
   FiTrendingUp,
   FiUsers,
   FiDownload,
   FiFileText,
 } from '@/icons';
 import { apiCall, authenticatedFetch } from '@/utils/adminApi';
+import { CohortDimension, getCohortHotspots, getInterventionSummary, getPredictiveSignals, getTriageMetrics } from '@/services/adminAnalytics';
 import {
   AnalyticsReport as AnalyticsReportType,
   ComparisonMetric,
   ComparisonResponse,
+  CohortHotspot,
+  CohortHotspotsResponse,
   HeatmapCell,
   HighRiskUser,
   Insight,
   InterventionOutcomeItem,
+  InterventionOutcomes,
+  InterventionSummary as InterventionSummaryResponse,
+  InterventionTotals,
+  TopCampaignSummary,
   Pattern,
   PredictiveSignal,
+  PredictiveSignalsResponse,
   ReportHistoryItem,
   ResourceEngagement,
   ResourceEngagementItem,
-  InterventionOutcomes,
+  RiskTrendPoint,
   SegmentImpact,
+  SeverityDelta,
+  SlaMetrics,
   ThresholdAlert,
   ThemeTrend,
+  TriageMetricsInsight,
   TopicBreakdown,
   TopicExcerptGroup,
   TopicExcerptsResponse,
@@ -66,6 +78,13 @@ const severityText: Record<string, string> = {
   Medium: 'text-amber-200',
   Low: 'text-emerald-200',
 };
+
+const COHORT_DIMENSIONS: Array<{ label: string; value: CohortDimension }> = [
+  { label: 'Major', value: 'major' },
+  { label: 'Year', value: 'year_of_study' },
+  { label: 'Gender', value: 'gender' },
+  { label: 'City', value: 'city' },
+];
 
 const StatCard = ({
   title,
@@ -261,8 +280,8 @@ const DistressHeatmap = ({ data }: { data: HeatmapCell[] }) => {
               return (
                 <div
                   key={`${day}-${bucket}`}
-                  className="flex h-16 items-center justify-center text-sm font-semibold text-white"
-                  style={{ background: intensityToColor(count) }}
+                  className={`flex h-16 items-center justify-center text-sm font-semibold text-white distress-cell-bg`}
+                  data-bg={intensityToColor(count)}
                 >
                   {count || ''}
                 </div>
@@ -308,54 +327,350 @@ const SegmentAlertList = ({ segments }: { segments: SegmentImpact[] }) => {
 };
 
 
-const PredictiveSignalList = ({ signals }: { signals: PredictiveSignal[] }) => {
-  if (!signals.length) {
+const RiskTrendChart = ({ data, loading = false }: { data: RiskTrendPoint[]; loading?: boolean }) => {
+  if (loading) {
+    return <div className="h-60 animate-pulse rounded-2xl border border-white/10 bg-white/5" />;
+  }
+  if (!data.length) {
     return (
       <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
-        Predictive signals will appear after multiple trend points are collected.
+        Risk trend data will appear once triage assessments are recorded for this window.
       </div>
     );
   }
-
+  const chartData = data.map((point) => ({
+    date: point.date.slice(5),
+    High: point.high,
+    Medium: point.medium,
+    Low: point.low,
+  }));
   return (
-    <div className="space-y-3">
-      {signals.map((signal) => {
-        const directionColor =
-          signal.direction === 'up'
-            ? 'text-emerald-300'
-            : signal.direction === 'down'
-            ? 'text-rose-300'
-            : 'text-white/60';
+    <ResponsiveContainer height={260}>
+      <LineChart data={chartData} margin={{ left: 12, right: 12, top: 12, bottom: 8 }}>
+        <CartesianGrid stroke="rgba(148, 163, 184, 0.15)" strokeDasharray="3 3" />
+        <XAxis dataKey="date" stroke="#CBD5F5" fontSize={12} tickLine={false} axisLine={false} />
+        <YAxis stroke="#CBD5F5" fontSize={12} tickLine={false} axisLine={false} allowDecimals />
+        <Tooltip
+          contentStyle={{ background: 'rgba(15, 23, 42, 0.9)', border: '1px solid rgba(148, 163, 184, 0.25)', borderRadius: 12 }}
+          cursor={{ strokeDasharray: '4 4', stroke: 'rgba(148, 163, 184, 0.3)' }}
+        />
+        <Legend wrapperStyle={{ color: '#CBD5F5' }} />
+        <Line type="monotone" dataKey="High" stroke="#f87171" strokeWidth={2.4} dot={false} />
+        <Line type="monotone" dataKey="Medium" stroke="#fb923c" strokeWidth={2.2} dot={false} />
+        <Line type="monotone" dataKey="Low" stroke="#34d399" strokeWidth={2} dot={false} />
+      </LineChart>
+    </ResponsiveContainer>
+  );
+};
+
+const SeverityDeltaList = ({ delta, loading = false }: { delta?: SeverityDelta; loading?: boolean }) => {
+  if (loading) {
+    return <div className="h-28 animate-pulse rounded-2xl border border-white/10 bg-white/5" />;
+  }
+  if (!delta) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+        Severity deltas will populate once a prior window is available.
+      </div>
+    );
+  }
+  const order: Array<'high' | 'medium' | 'low'> = ['high', 'medium', 'low'];
+  const labels: Record<'high' | 'medium' | 'low', string> = { high: 'High', medium: 'Medium', low: 'Low' };
+  return (
+    <div className="space-y-2">
+      {order.map((key) => {
+        const current = delta.current[key] ?? 0;
+        const change = delta.delta[key] ?? 0;
+        const pct = delta.delta_pct[key];
+        if (current === 0 && (delta.previous[key] ?? 0) === 0 && change === 0) {
+          return null;
+        }
+        const trendClass =
+          change > 0 ? 'text-emerald-300' : change < 0 ? 'text-rose-300' : 'text-white/70';
         return (
           <div
-            key={`${signal.metric}-${signal.topic ?? 'global'}`}
-            className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner"
+            key={key}
+            className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white/80"
           >
-            <div className="flex items-center justify-between text-sm text-white">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-white/50">{signal.window}</p>
-                <p className="text-lg font-semibold text-white">{signal.topic ?? signal.metric}</p>
-              </div>
-              <span className={`text-xs font-semibold ${directionColor}`}>{signal.direction.toUpperCase()}</span>
-            </div>
-            <div className="mt-3 grid grid-cols-3 gap-3 text-xs text-white/70">
-              <div>
-                <p className="text-white/50">Current</p>
-                <p className="font-semibold text-white">{signal.current_value.toFixed(1)}</p>
-              </div>
-              <div>
-                <p className="text-white/50">Moving avg</p>
-                <p className="font-semibold text-white">{signal.moving_average.toFixed(1)}</p>
-              </div>
-              <div>
-                <p className="text-white/50">Forecast</p>
-                <p className="font-semibold text-white">{signal.forecast.toFixed(1)}</p>
-              </div>
-            </div>
-            <p className="mt-3 text-xs text-white/50">Confidence {Math.round(signal.confidence * 100)}%</p>
+            <span className="font-semibold text-white">{labels[key]}</span>
+            <span className="text-white/50">{current.toLocaleString()} current</span>
+            <span className={`text-xs font-semibold ${trendClass}`}>{change > 0 ? '+' : ''}{change}</span>
+              <span className="text-white/50">{pct != null ? `${(pct * 100).toFixed(1)}%` : '--'}</span>
           </div>
         );
       })}
+    </div>
+  );
+};
+
+const SlaMetricsCard = ({ metrics, loading = false }: { metrics?: SlaMetrics | null; loading?: boolean }) => {
+  if (loading) {
+    return <div className="h-28 animate-pulse rounded-2xl border border-white/10 bg-white/5" />;
+  }
+  if (!metrics) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+        SLA metrics will appear once triage processing times are recorded.
+      </div>
+    );
+  }
+  const formatMs = (value: number | null | undefined) => {
+      if (value == null) return '--';
+    if (value >= 60000) {
+      return `${(value / 60000).toFixed(1)} min`;
+    }
+    return `${Math.round(value / 1000)} sec`;
+  };
+  return (
+    <div className="grid grid-cols-2 gap-3 text-xs text-white/70">
+      <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+        <p className="text-white/50">Average</p>
+        <p className="mt-1 text-sm font-semibold text-white">{formatMs(metrics.average_ms)}</p>
+      </div>
+      <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+        <p className="text-white/50">P90</p>
+        <p className="mt-1 text-sm font-semibold text-white">{formatMs(metrics.p90_ms)}</p>
+      </div>
+      <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+        <p className="text-white/50">P95</p>
+        <p className="mt-1 text-sm font-semibold text-white">{formatMs(metrics.p95_ms)}</p>
+      </div>
+      <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+        <p className="text-white/50">Within target</p>
+        <p className="mt-1 text-sm font-semibold text-white">
+          {metrics.within_target_percent != null ? `${metrics.within_target_percent.toFixed(1)}%` : '�'}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const CohortHotspotTable = ({
+  items,
+  loading = false,
+  dimension,
+  windowLabel,
+}: {
+  items: CohortHotspot[];
+  loading?: boolean;
+  dimension: string;
+  windowLabel?: string | null;
+}) => {
+  if (loading) {
+    return <div className="h-40 animate-pulse rounded-2xl border border-white/10 bg-white/5" />;
+  }
+  if (!items.length) {
+    return (
+      <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+        No significant hotspots detected for this cohort dimension.
+      </div>
+    );
+  }
+  const dimensionLabel = dimension.replace(/_/g, ' ');
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5">
+      <div className="flex items-center justify-between border-b border-white/5 px-4 py-3 text-xs text-white/60">
+        <span className="uppercase tracking-wide">{dimensionLabel}</span>
+        {windowLabel ? <span>{windowLabel}</span> : null}
+      </div>
+      <div className="divide-y divide-white/5 text-sm text-white/80">
+        {items.map((item) => {
+          const deltaClass =
+            item.delta > 0 ? 'text-emerald-300' : item.delta < 0 ? 'text-rose-300' : 'text-white/70';
+          return (
+            <div key={item.label} className="grid grid-cols-[2fr_repeat(3,1fr)] gap-3 px-4 py-3">
+              <div>
+                <p className="font-semibold text-white">{item.label}</p>
+                <p className="text-xs text-white/50">{item.cohort_population.toLocaleString()} students</p>
+              </div>
+              <div className="text-white/60">{item.current_high.toLocaleString()} now</div>
+              <div className="text-white/60">{item.previous_high.toLocaleString()} prev</div>
+              <div className={`text-right text-xs font-semibold ${deltaClass}`}>
+                {item.delta > 0 ? '+' : ''}{item.delta}{' '}
+                {item.delta_pct != null ? `(${(item.delta_pct * 100).toFixed(1)}%)` : ''}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+const InterventionSummaryPanel = ({
+  summary,
+  totals,
+  topCampaigns,
+  fallbackItems,
+  loading = false,
+}: {
+  summary: InterventionSummaryResponse | null;
+  totals: InterventionTotals | null;
+  topCampaigns: TopCampaignSummary[];
+  fallbackItems: InterventionOutcomeItem[];
+  loading?: boolean;
+}) => {
+  if (loading) {
+    return <div className="h-60 animate-pulse rounded-2xl border border-white/10 bg-white/5" />;
+  }
+  if (summary && totals) {
+    const statusEntries = Object.entries(totals.by_status ?? {}).sort((a, b) => b[1] - a[1]);
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-2 gap-3 text-xs text-white/70">
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <p className="text-white/50">Total executions</p>
+            <p className="mt-1 text-sm font-semibold text-white">{totals.overall.toLocaleString()}</p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <p className="text-white/50">Success rate</p>
+            <p className="mt-1 text-sm font-semibold text-white">
+                {totals.success_rate != null ? `${(totals.success_rate * 100).toFixed(1)}%` : '--'}
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <p className="text-white/50">Failure rate</p>
+            <p className="mt-1 text-sm font-semibold text-white">
+                {totals.failure_rate != null ? `${(totals.failure_rate * 100).toFixed(1)}%` : '--'}
+            </p>
+          </div>
+          <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+            <p className="text-white/50">Avg engagement score</p>
+            <p className="mt-1 text-sm font-semibold text-white">
+                {totals.avg_engagement_score != null ? totals.avg_engagement_score.toFixed(2) : '--'}
+            </p>
+          </div>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-white/50">Status breakdown</p>
+          <div className="mt-2 space-y-2 text-sm text-white/80">
+            {statusEntries.map(([status, count]) => (
+              <div key={status} className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                <span className="capitalize">{status}</span>
+                <span>{count.toLocaleString()}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+        <div>
+          <p className="text-xs uppercase tracking-wide text-white/50">Top campaigns</p>
+          {topCampaigns.length ? (
+            <div className="mt-2 space-y-2 text-sm text-white/80">
+              {topCampaigns.map((campaign) => (
+                <div key={campaign.campaign_id} className="rounded-xl border border-white/10 bg-white/5 px-3 py-2">
+                  <div className="flex items-center justify-between">
+                    <span className="font-semibold text-white">{campaign.title}</span>
+                    <span className="text-xs text-white/50">{campaign.executed.toLocaleString()} sent</span>
+                  </div>
+                  <p className="mt-1 text-xs text-white/60">
+                    Failures {campaign.failed.toLocaleString()} | Success rate
+                    {campaign.success_rate != null ? ` ${(campaign.success_rate * 100).toFixed(1)}%` : '--'}
+                  </p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-2 rounded-xl border border-white/10 bg-white/5 p-4 text-xs text-white/60">
+              No campaign executions recorded in this window.
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+  if (fallbackItems.length) {
+    return (
+      <div className="mt-4 space-y-3">
+        {fallbackItems.map((item) => (
+          <div
+            key={item.status}
+            className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/80"
+          >
+            <div>
+              <p className="font-semibold text-white capitalize">{item.status}</p>
+              <p className="text-xs text-white/50">{item.timeframe}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-white">{item.count.toLocaleString()}</p>
+              <p className="text-xs text-white/60">
+                {item.percentage != null ? `${item.percentage.toFixed(1)}% of total` : '--'}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
+  return (
+    <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+      Intervention outcomes will appear once campaigns have been executed in this window.
+    </div>
+  );
+};
+
+const PredictiveSignalList = ({ signals, meta, loading = false }: { signals: PredictiveSignal[]; meta?: { generatedAt?: string; source?: string; warning?: string | null }; loading?: boolean }) => {
+  if (loading) {
+    return <div className="h-48 animate-pulse rounded-2xl border border-white/10 bg-white/5" />;
+  }
+
+  const generatedLabel = meta?.generatedAt ? new Date(meta.generatedAt).toLocaleString() : null;
+
+  return (
+    <div className="space-y-3">
+      {meta && (generatedLabel || meta.source || meta?.warning) ? (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-4 text-xs text-white/70">
+          <div className="flex flex-col gap-1">
+            <span className="text-white">
+              Last updated {generatedLabel ?? 'n/a'}{meta.source ? ` � Source: ${meta.source}` : ''}
+            </span>
+            {meta.warning ? <span className="text-amber-200">{meta.warning}</span> : null}
+          </div>
+        </div>
+      ) : null}
+
+      {signals.length ? (
+        signals.map((signal) => {
+          const directionColor =
+            signal.direction === 'up'
+              ? 'text-emerald-300'
+              : signal.direction === 'down'
+              ? 'text-rose-300'
+              : 'text-white/60';
+          return (
+            <div
+              key={`${signal.metric}-${signal.topic ?? 'global'}`}
+              className="rounded-2xl border border-white/10 bg-white/5 p-4 shadow-inner"
+            >
+              <div className="flex items-center justify-between text-sm text-white">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-white/50">{signal.window}</p>
+                  <p className="text-lg font-semibold text-white">{signal.topic ?? signal.metric}</p>
+                </div>
+                <span className={`text-xs font-semibold ${directionColor}`}>{signal.direction.toUpperCase()}</span>
+              </div>
+              <div className="mt-3 grid grid-cols-3 gap-3 text-xs text-white/70">
+                <div>
+                  <p className="text-white/50">Current</p>
+                  <p className="font-semibold text-white">{signal.current_value.toFixed(1)}</p>
+                </div>
+                <div>
+                  <p className="text-white/50">Moving avg</p>
+                  <p className="font-semibold text-white">{signal.moving_average.toFixed(1)}</p>
+                </div>
+                <div>
+                  <p className="text-white/50">Forecast</p>
+                  <p className="font-semibold text-white">{signal.forecast.toFixed(1)}</p>
+                </div>
+              </div>
+              <p className="mt-3 text-xs text-white/50">Confidence {Math.round(signal.confidence * 100)}%</p>
+            </div>
+          );
+        })
+      ) : (
+        <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
+          Predictive signals will appear after multiple trend points are collected.
+        </div>
+      )}
     </div>
   );
 };
@@ -465,7 +780,7 @@ const HighRiskList = ({ users }: { users: HighRiskUser[] }) => {
 };
 
 
-const normalizeReport = (raw: any): AnalyticsReportType => {
+const normalizeReport = (raw: Partial<AnalyticsReportType> | Record<string, unknown> | null | undefined): AnalyticsReportType => {
   if (!raw) {
     return {
       report_period: '7 days',
@@ -487,23 +802,26 @@ const normalizeReport = (raw: any): AnalyticsReportType => {
     };
   }
 
-  const reportRaw = raw as AnalyticsReportType;
-  const trends = (raw?.trends ?? {}) as Partial<AnalyticsReportType>;
+  const loose = (raw ?? {}) as Record<string, unknown>;
+  const reportRaw = loose as Partial<AnalyticsReportType>;
+  // Defensive fallback for trends property (may not exist on all report types)
+  // Use only loose['trends'] for fallback, do not access reportRaw.trends directly
+  const trends = (loose['trends'] ?? {}) as Partial<AnalyticsReportType>;
 
-  const resourceBaseline = (reportRaw.resource_engagement ?? trends.resource_engagement ?? {
-    items: [],
-    timeframe: reportRaw.report_period ?? '7 days',
-  }) as Partial<ResourceEngagement> & { items?: ResourceEngagementItem[] };
+  const resourceBaseline = (reportRaw.resource_engagement
+    ?? trends.resource_engagement
+    ?? (loose['resource_engagement'] as ResourceEngagement | undefined)
+    ?? { items: [], timeframe: reportRaw.report_period ?? '7 days' }) as Partial<ResourceEngagement> & { items?: ResourceEngagementItem[] };
 
   const resource_engagement = {
     timeframe: resourceBaseline.timeframe ?? reportRaw.report_period ?? '7 days',
     items: Array.isArray(resourceBaseline.items) ? (resourceBaseline.items as ResourceEngagementItem[]) : [],
   };
 
-  const interventionBaseline = (reportRaw.intervention_outcomes ?? trends.intervention_outcomes ?? {
-    items: [],
-    timeframe: reportRaw.report_period ?? '7 days',
-  }) as Partial<InterventionOutcomes> & { items?: InterventionOutcomeItem[] };
+  const interventionBaseline = (reportRaw.intervention_outcomes
+    ?? trends.intervention_outcomes
+    ?? (loose['intervention_outcomes'] as InterventionOutcomes | undefined)
+    ?? { items: [], timeframe: reportRaw.report_period ?? '7 days' }) as Partial<InterventionOutcomes> & { items?: InterventionOutcomeItem[] };
 
   const intervention_outcomes = {
     timeframe: interventionBaseline.timeframe ?? reportRaw.report_period ?? '7 days',
@@ -513,37 +831,35 @@ const normalizeReport = (raw: any): AnalyticsReportType => {
   };
 
   const comparison_snapshot = (
-    reportRaw.comparison_snapshot ??
-    raw.comparison_snapshot ??
-    raw.baseline_snapshot ??
-    raw.comparisonSnapshot ??
-    raw.baselineSnapshot ??
-    {}
+    reportRaw.comparison_snapshot
+    ?? (loose['comparison_snapshot'] as Record<string, unknown> | undefined)
+    ?? (loose['baseline_snapshot'] as Record<string, unknown> | undefined)
+    ?? (loose['comparisonSnapshot'] as Record<string, unknown> | undefined)
+    ?? (loose['baselineSnapshot'] as Record<string, unknown> | undefined)
+    ?? {}
   ) as Record<string, unknown>;
 
   const topic_excerpts = (
-    reportRaw.topic_excerpts ??
-    raw.topic_excerpts ??
-    raw.topicExcerpts ??
-    trends.topic_excerpts ??
-    []
+    reportRaw.topic_excerpts
+    ?? (loose['topic_excerpts'] as TopicExcerptGroup[] | undefined)
+    ?? (loose['topicExcerpts'] as TopicExcerptGroup[] | undefined)
+    ?? trends.topic_excerpts
+    ?? []
   ) as TopicExcerptGroup[];
 
-  const predictiveSignalsSource = (
-    reportRaw.predictive_signals ??
-    raw.predictive_signals ??
-    raw.predictiveSignals ??
-    trends.predictive_signals ??
-    []
-  );
+  const predictiveSignalsSource =
+    reportRaw.predictive_signals
+    ?? (loose['predictive_signals'] as PredictiveSignal[] | undefined)
+    ?? (loose['predictiveSignals'] as PredictiveSignal[] | undefined)
+    ?? trends.predictive_signals
+    ?? [];
 
-  const thresholdAlertsSource = (
-    reportRaw.threshold_alerts ??
-    raw.threshold_alerts ??
-    raw.thresholdAlerts ??
-    trends.threshold_alerts ??
-    []
-  );
+  const thresholdAlertsSource =
+    reportRaw.threshold_alerts
+    ?? (loose['threshold_alerts'] as ThresholdAlert[] | undefined)
+    ?? (loose['thresholdAlerts'] as ThresholdAlert[] | undefined)
+    ?? trends.threshold_alerts
+    ?? [];
 
   const predictive_signals = Array.isArray(predictiveSignalsSource)
     ? (predictiveSignalsSource as PredictiveSignal[])
@@ -555,10 +871,10 @@ const normalizeReport = (raw: any): AnalyticsReportType => {
 
   return {
     id: reportRaw.id,
-    generated_at: reportRaw.generated_at ?? raw.generatedAt,
+    generated_at: reportRaw.generated_at ?? (loose['generatedAt'] as string | undefined),
     report_period: reportRaw.report_period ?? '7 days',
-    window_start: reportRaw.window_start ?? raw.windowStart ?? null,
-    window_end: reportRaw.window_end ?? raw.windowEnd ?? null,
+    window_start: reportRaw.window_start ?? (loose['windowStart'] as string | null | undefined) ?? null,
+    window_end: reportRaw.window_end ?? (loose['windowEnd'] as string | null | undefined) ?? null,
     insights: (reportRaw.insights ?? trends.insights ?? []) as Insight[],
     patterns: (reportRaw.patterns ?? trends.patterns ?? []) as Pattern[],
     recommendations: (reportRaw.recommendations ?? trends.recommendations ?? []) as string[],
@@ -580,6 +896,7 @@ const normalizeReport = (raw: any): AnalyticsReportType => {
 
 
 
+
 export default function AnalyticsPanelPage() {
   const [report, setReport] = useState<AnalyticsReportType | null>(null);
   const [loading, setLoading] = useState(true);
@@ -588,6 +905,71 @@ export default function AnalyticsPanelPage() {
   const [history, setHistory] = useState<ReportHistoryItem[]>([]);
   const [comparison, setComparison] = useState<ComparisonResponse | null>(null);
   const [topicExcerpts, setTopicExcerpts] = useState<TopicExcerptsResponse | null>(null);
+  const [triageMetrics, setTriageMetrics] = useState<TriageMetricsInsight | null>(null);
+  const [triageMetricsLoading, setTriageMetricsLoading] = useState(true);
+  const [cohortDimension, setCohortDimension] = useState<CohortDimension>('major');
+  const [cohortHotspots, setCohortHotspots] = useState<CohortHotspotsResponse | null>(null);
+  const [cohortHotspotsLoading, setCohortHotspotsLoading] = useState(true);
+  const [predictiveSnapshot, setPredictiveSnapshot] = useState<PredictiveSignalsResponse | null>(null);
+  const [predictiveLoading, setPredictiveLoading] = useState(true);
+  const [interventionSummary, setInterventionSummary] = useState<InterventionSummaryResponse | null>(null);
+  const [interventionLoading, setInterventionLoading] = useState(true);
+
+  const fetchTriageMetrics = useCallback(async () => {
+    try {
+      setTriageMetricsLoading(true);
+      const response = await getTriageMetrics();
+      setTriageMetrics(response);
+    } catch (error) {
+      console.error('Error fetching triage metrics:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to load triage metrics');
+      setTriageMetrics(null);
+    } finally {
+      setTriageMetricsLoading(false);
+    }
+  }, []);
+
+  const fetchHotspots = useCallback(async () => {
+    try {
+      setCohortHotspotsLoading(true);
+      const response = await getCohortHotspots({ dimension: cohortDimension, limit: 6 });
+      setCohortHotspots(response);
+    } catch (error) {
+      console.error('Error fetching cohort hotspots:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to load cohort hotspots');
+      setCohortHotspots(null);
+    } finally {
+      setCohortHotspotsLoading(false);
+    }
+  }, [cohortDimension]);
+
+  const fetchPredictiveSnapshot = useCallback(async (forceRefresh = false) => {
+    try {
+      setPredictiveLoading(true);
+      const response = await getPredictiveSignals({ forceRefresh });
+      setPredictiveSnapshot(response);
+    } catch (error) {
+      console.error('Error fetching predictive scores:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to load predictive scores');
+      setPredictiveSnapshot(null);
+    } finally {
+      setPredictiveLoading(false);
+    }
+  }, []);
+
+  const fetchInterventionSummary = useCallback(async () => {
+    try {
+      setInterventionLoading(true);
+      const response = await getInterventionSummary({ limit: 5 });
+      setInterventionSummary(response);
+    } catch (error) {
+      console.error('Error fetching intervention summary:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to load intervention summary');
+      setInterventionSummary(null);
+    } finally {
+      setInterventionLoading(false);
+    }
+  }, []);
 
   const fetchReport = useCallback(async () => {
     try {
@@ -614,14 +996,17 @@ export default function AnalyticsPanelPage() {
       });
       toast.success(result.message ?? 'Analytics report generated');
       setReport(normalizeReport(result.report));
+      void fetchTriageMetrics();
+      void fetchHotspots();
+      void fetchPredictiveSnapshot(true);
+      void fetchInterventionSummary();
     } catch (error) {
       console.error('Error running analytics agent:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to run analytics agent');
     } finally {
       setRunning(false);
     }
-  }, []);
-
+  }, [fetchHotspots, fetchInterventionSummary, fetchPredictiveSnapshot, fetchTriageMetrics]);
   const fetchHistory = useCallback(async () => {
     try {
       const response = await apiCall<{ items: ReportHistoryItem[] }>(`/api/v1/admin/analytics/history?limit=6`);
@@ -698,6 +1083,21 @@ export default function AnalyticsPanelPage() {
   useEffect(() => {
     void fetchHistory();
   }, [fetchHistory]);
+  useEffect(() => {
+    void fetchTriageMetrics();
+  }, [fetchTriageMetrics]);
+
+  useEffect(() => {
+    void fetchHotspots();
+  }, [fetchHotspots]);
+
+  useEffect(() => {
+    void fetchPredictiveSnapshot();
+  }, [fetchPredictiveSnapshot]);
+
+  useEffect(() => {
+    void fetchInterventionSummary();
+  }, [fetchInterventionSummary]);
 
   useEffect(() => {
     if (report?.id) {
@@ -708,6 +1108,14 @@ export default function AnalyticsPanelPage() {
       setTopicExcerpts(null);
     }
   }, [report?.id, fetchComparisons, fetchTopicExcerpts]);
+
+  const handleCohortDimensionChange = useCallback((value: CohortDimension) => {
+    setCohortDimension(value);
+  }, []);
+
+  const handlePredictiveRefresh = useCallback(() => {
+    void fetchPredictiveSnapshot(true);
+  }, [fetchPredictiveSnapshot]);
 
   const insightCounts = useMemo(() => {
     if (!report) return { total: 0, high: 0 };
@@ -722,9 +1130,13 @@ export default function AnalyticsPanelPage() {
   }, [report]);
 
   const predictiveSignals = useMemo<PredictiveSignal[]>(() => {
-    const source = report?.predictive_signals ?? [];
-    return Array.isArray(source) ? (source as PredictiveSignal[]) : [];
-  }, [report]);
+    const snapshotSignals = predictiveSnapshot?.signals ?? [];
+    if (snapshotSignals.length) {
+      return snapshotSignals;
+    }
+    const fallback = report?.predictive_signals ?? [];
+    return Array.isArray(fallback) ? (fallback as PredictiveSignal[]) : [];
+  }, [predictiveSnapshot, report]);
 
   const thresholdAlerts = useMemo<ThresholdAlert[]>(() => {
     const source = report?.threshold_alerts ?? [];
@@ -737,6 +1149,24 @@ export default function AnalyticsPanelPage() {
       ? [...data].filter((cell) => cell.count > 0).sort((a, b) => b.count - a.count).slice(0, 3)
       : [];
   }, [report]);
+
+  const severityDelta = triageMetrics?.severity_delta;
+  const slaMetrics = triageMetrics?.sla_metrics ?? null;
+  const cohortItems = cohortHotspots?.items ?? [];
+  const cohortWindowLabel = cohortHotspots ? `${cohortHotspots.window_start} - ${cohortHotspots.window_end}` : null;
+  const predictiveMeta = useMemo(() => {
+    if (!predictiveSnapshot) {
+      return undefined;
+    }
+    return {
+      generatedAt: predictiveSnapshot.generated_at,
+      source: predictiveSnapshot.source,
+      warning: predictiveSnapshot.warning ?? null,
+    };
+  }, [predictiveSnapshot]);
+  const predictiveGeneratedLabel = predictiveMeta?.generatedAt ? new Date(predictiveMeta.generatedAt).toLocaleString() : null;
+  const interventionTotals = interventionSummary?.totals ?? null;
+  const topCampaignSummaries = interventionSummary?.top_campaigns ?? [];
 
   const topTrendsTopics = topTopics.length
     ? topTopics.map((topic) => topic.topic)
@@ -885,11 +1315,91 @@ export default function AnalyticsPanelPage() {
           <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
             <div className="lg:col-span-2">
               <div className="flex items-center justify-between text-sm">
-                <h2 className="text-lg font-semibold text-white">Predictive signals</h2>
-                <span className="text-xs text-white/50">Simple moving averages for the busiest themes</span>
+                <h2 className="text-lg font-semibold text-white">Triage risk trend</h2>
+                {triageMetrics ? (
+                  <span className="text-xs text-white/50">
+                    {triageMetrics.window_start} - {triageMetrics.window_end}
+                  </span>
+                ) : null}
               </div>
               <div className="mt-3">
-                <PredictiveSignalList signals={predictiveSignals} />
+                <RiskTrendChart data={triageMetrics?.risk_trend ?? []} loading={triageMetricsLoading} />
+              </div>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <h3 className="text-sm font-semibold text-white">Severity delta</h3>
+                <p className="mt-1 text-xs text-white/60">Change compared with the prior window.</p>
+                <div className="mt-3">
+                  <SeverityDeltaList delta={severityDelta} loading={triageMetricsLoading} />
+                </div>
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-white">Triage SLA</h3>
+                <p className="mt-1 text-xs text-white/60">Processing performance for automated assessments.</p>
+                <div className="mt-3">
+                  <SlaMetricsCard metrics={slaMetrics} loading={triageMetricsLoading} />
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-lg font-semibold text-white">
+                <FiUsers className="text-amber-200" /> Cohort hotspots
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {COHORT_DIMENSIONS.map((option) => {
+                  const active = option.value === cohortDimension;
+                  return (
+                    <button
+                      key={option.value}
+                      onClick={() => handleCohortDimensionChange(option.value)}
+                      className={
+                        active
+                          ? 'rounded-full border border-white/40 bg-white/15 px-3 py-1 text-xs font-semibold text-white'
+                          : 'rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/60 transition hover:border-white/30 hover:text-white'
+                      }
+                      type="button"
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <CohortHotspotTable
+              items={cohortItems}
+              loading={cohortHotspotsLoading}
+              dimension={cohortDimension}
+              windowLabel={cohortWindowLabel}
+            />
+          </section>
+
+          <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
+            <div className="lg:col-span-2">
+              <div className="flex flex-col gap-1 text-sm text-white/70 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-white">Predictive signals</h2>
+                  <span className="text-xs text-white/50">Momentum forecasts for emerging wellbeing themes.</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {predictiveGeneratedLabel && (
+                    <span className="text-xs text-white/50">Updated {predictiveGeneratedLabel}</span>
+                  )}
+                  <button
+                    onClick={handlePredictiveRefresh}
+                    disabled={predictiveLoading}
+                    className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1 text-xs font-semibold text-white transition hover:border-white/40 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <FiRefreshCw className={predictiveLoading ? 'h-3 w-3 animate-spin' : 'h-3 w-3'} />
+                    Refresh
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3">
+                <PredictiveSignalList signals={predictiveSignals} meta={predictiveMeta} loading={predictiveLoading} />
               </div>
             </div>
             <div>
@@ -899,6 +1409,39 @@ export default function AnalyticsPanelPage() {
                 <ThresholdAlertList alerts={thresholdAlerts} />
               </div>
             </div>
+          </section>
+
+          <section className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-lg font-semibold text-white">
+                <FiUsers className="text-amber-200" /> Cohort hotspots
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                {COHORT_DIMENSIONS.map((option) => {
+                  const active = option.value === cohortDimension;
+                  return (
+                    <button
+                      key={option.value}
+                      onClick={() => handleCohortDimensionChange(option.value)}
+                      className={
+                        active
+                          ? 'rounded-full border border-white/40 bg-white/15 px-3 py-1 text-xs font-semibold text-white'
+                          : 'rounded-full border border-white/10 bg-white/5 px-3 py-1 text-xs font-semibold text-white/60 transition hover:border-white/30 hover:text-white'
+                      }
+                      type="button"
+                    >
+                      {option.label}
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+            <CohortHotspotTable
+              items={cohortItems}
+              loading={cohortHotspotsLoading}
+              dimension={cohortDimension}
+              windowLabel={cohortWindowLabel}
+            />
           </section>
 
           <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
@@ -1044,36 +1587,25 @@ export default function AnalyticsPanelPage() {
             </div>
             <div>
               <div className="flex items-center gap-2 text-lg font-semibold text-white">
-                <FiCheckCircle className="text-emerald-300" /> Intervention outcomes
+                <FiCheckCircle className="text-emerald-300" /> Intervention summary
               </div>
               <p className="mt-1 text-xs text-white/60">
-                Delivery status and engagement rates for automated interventions.
+                Delivery status and campaign performance across the recent window.
+                {interventionSummary ? (
+                  <span className="ml-1 text-white/40">
+                    {interventionSummary.window_start} - {interventionSummary.window_end}
+                  </span>
+                ) : null}
               </p>
-              {interventionItems.length ? (
-                <div className="mt-4 space-y-3">
-                  {interventionItems.map((item) => (
-                    <div
-                      key={item.status}
-                      className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/5 p-4 text-sm text-white/80"
-                    >
-                      <div>
-                        <p className="font-semibold text-white capitalize">{item.status}</p>
-                        <p className="text-xs text-white/50">{item.timeframe}</p>
-                      </div>
-                      <div className="text-right">
-                        <p className="text-white">{item.count.toLocaleString()}</p>
-                        <p className="text-xs text-white/60">
-                          {item.percentage != null ? `${item.percentage.toFixed(1)}% of total` : '--'}
-                        </p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="mt-4 rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
-                  Intervention outcomes will appear once campaigns have been executed in this window.
-                </div>
-              )}
+              <div className="mt-4">
+                <InterventionSummaryPanel
+                  summary={interventionSummary}
+                  totals={interventionTotals}
+                  topCampaigns={topCampaignSummaries}
+                  fallbackItems={interventionItems}
+                  loading={interventionLoading}
+                />
+              </div>
             </div>
           </section>
 
