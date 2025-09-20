@@ -8,9 +8,9 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional, Sequence, TypedDict
 
 import httpx
-from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langgraph.graph import END, StateGraph
+from langchain_core.messages import HumanMessage, SystemMessage # type: ignore
+from langchain_google_genai import ChatGoogleGenerativeAI # type: ignore
+from langgraph.graph import END, StateGraph # type: ignore
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -129,7 +129,13 @@ class InterventionAgent:
     async def execute_intervention(
         self, insight: InterventionInsight | Dict[str, Any]
     ) -> InterventionResult:
-        initial_state: InterventionState = {"insight": insight}
+        # Convert insight to InterventionInsight if it's a dict
+        if isinstance(insight, dict):
+            insight_obj = InterventionInsight.model_validate(insight)
+        else:
+            insight_obj = insight
+
+        initial_state: InterventionState = {"insight": insight_obj}
         final_state = await self._graph.ainvoke(initial_state)
         campaign = final_state.get("campaign")
         strategy = final_state.get("strategy")
@@ -151,7 +157,7 @@ class InterventionAgent:
             campaign_status=getattr(campaign, "status", None),
             target_count=len(audience),
             requires_review=strategy.requires_human_review if strategy else True,
-            dispatch_status=dispatch_status,
+            dispatch_status=dispatch_status or "unknown",
             message=message or "Intervention pipeline completed.",
         )
 
