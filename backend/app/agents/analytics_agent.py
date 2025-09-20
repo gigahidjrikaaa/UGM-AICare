@@ -12,9 +12,9 @@ from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from typing import Annotated, Any, Dict, List, Optional, Sequence, Tuple, TypedDict
 
-from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langgraph.graph import END, StateGraph
+from langchain_core.messages import HumanMessage, SystemMessage # type: ignore
+from langchain_google_genai import ChatGoogleGenerativeAI # type: ignore
+from langgraph.graph import END, StateGraph # type: ignore
 from pydantic import BaseModel, Field
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -290,7 +290,7 @@ class AnalyticsAgent:
         unique_users = conversation_users.union(journal_users)
 
         timeframe_days = get_state_value(state, "timeframe_days", 0)
-        metrics = {
+        metrics: Dict[str, Any] = {
             "conversation_count": total_messages,
             "journal_count": total_journals,
             "unique_users": len(unique_users),
@@ -346,7 +346,7 @@ class AnalyticsAgent:
             sentiment_counter["positive"] += sum(lowered.count(term) for term in POSITIVE_TERMS)
             sentiment_counter["negative"] += sum(lowered.count(term) for term in NEGATIVE_TERMS)
 
-        metrics = dict(state.get("metrics", {}))
+        metrics: Dict[str, Any] = dict(state.get("metrics", {}))
         metrics["sentiment_proxy"] = {
             "positive": int(sentiment_counter.get("positive", 0)),
             "negative": int(sentiment_counter.get("negative", 0)),
@@ -368,7 +368,7 @@ class AnalyticsAgent:
         topic_excerpt_map: Dict[str, List[Dict[str, str]]] = defaultdict(list)
 
         if not records:
-            metrics = dict(state.get("metrics", {}))
+            metrics: Dict[str, Any] = dict(state.get("metrics", {}))
             if resource_engagement:
                 metrics["resource_engagement_summary"] = resource_engagement
             if intervention_outcomes:
@@ -500,7 +500,7 @@ class AnalyticsAgent:
                 )
             topic_excerpts.sort(key=lambda item: topic_ranks.get(item.topic, len(topic_ranks)))
 
-        metrics = dict(state.get("metrics", {}))
+        metrics: Dict[str, Any] = dict(state.get("metrics", {}))
         if topic_breakdown:
             metrics["top_topics"] = [tb.topic for tb in topic_breakdown[:3]]
         if segment_alerts:
@@ -543,7 +543,7 @@ class AnalyticsAgent:
         }
     async def _generate_insights_node(self, state: AnalyticsState) -> AnalyticsState:
         patterns = state.get("patterns", [])
-        metrics = state.get("metrics", {})
+        metrics: Dict[str, Any] = state.get("metrics", {})
 
         try:
             insights, recommendations = await self._llm_generate_insights(patterns, metrics)
