@@ -22,11 +22,29 @@ from app.core.cbt_module_logic import (
     # get_module_definition # if needed for descriptions, etc.
 )
 from app.core.cbt_module_types import CBTModuleData # For type hinting
+from app.services.personal_context import (
+    build_user_personal_context,
+    invalidate_user_personal_context,
+)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__) # Create a logger for this module
 
 router = APIRouter(prefix="/api/v1", tags=["Chat"])
+
+# --- Helpers ---
+
+def _compose_system_prompt(base_prompt: Optional[str], personal_context: str) -> Optional[str]:
+    base = (base_prompt or "").strip()
+    context = (personal_context or "").strip()
+
+    if base and context:
+        return f"{base}\n\n{context}"
+    if context:
+        return context
+    if base:
+        return base
+    return None
 
 # --- Constants for Summarization ---
 MIN_TURNS_FOR_SUMMARY = 2  # Minimum number of full conversation turns (user msg + AI response) to trigger a summary.
@@ -54,6 +72,8 @@ async def handle_chat_request(
     conversation_id = request.conversation_id # Define conversation_id early
     try:
         user_id = current_user.id
+        personal_context = await build_user_personal_context(db, current_user)
+        active_system_prompt = _compose_system_prompt(request.system_prompt, personal_context)
         aika_response_text: str = "" 
 
         #! --- Crucial Note on Frontend session_id Management ---
@@ -301,8 +321,8 @@ async def handle_chat_request(
                             summary_injection_message = {"role": "system", "content": summary_injection_text}
                             
                             temp_history_for_llm = []
-                            if request.system_prompt:
-                                 temp_history_for_llm.append({"role": "system", "content": request.system_prompt})
+                            if active_system_prompt:
+                                 temp_history_for_llm.append({"role": "system", "content": active_system_prompt})
                             temp_history_for_llm.append(summary_injection_message)
                             temp_history_for_llm.extend(history_for_llm_call) # Add the actual chat history
                             history_for_llm_call = temp_history_for_llm # Replace with augmented history
@@ -320,7 +340,7 @@ async def handle_chat_request(
                             model="gemini_google", # Explicitly specify Gemini model
                             max_tokens=request.max_tokens,
                             temperature=request.temperature,
-                            system_prompt=request.system_prompt if not any(h['role'] == 'system' for h in history_for_llm_call) else None
+                            system_prompt=active_system_prompt if not any(h['role'] == 'system' for h in history_for_llm_call) else None
                         )
                     except Exception as llm_err:
                         logger.error(f"LLM generation failed for standard chat session {session_id}: {llm_err}", exc_info=True)
@@ -481,6 +501,7 @@ Ringkasan singkat dan kasual:"""
             db.add(new_summary)
             await db.commit() # Commit within this background task's session
             logger.info(f"Background Task: Saved summary for user {user_id} from session {session_id_to_summarize}")
+            await invalidate_user_personal_context(user_id)
 
         except Exception as e:
             await db.rollback() # Rollback this background task's session on error

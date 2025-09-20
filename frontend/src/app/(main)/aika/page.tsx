@@ -67,16 +67,26 @@ export default function AikaChatPage() {
         <motion.div
           className="relative z-10 h-screen flex flex-col items-center justify-center p-2 md:p-4 lg:p-6" // Center content vertically/horizontally
         >
-          {/* Model Selector Dropdown */}
-          <div className="w-full max-w-5xl mb-4 flex justify-end">
-            <ModelSelector model={model} setModel={setModel} options={modelOptions} />
+          {/* Model Selector Dropdown & Memory Disclosure */}
+          <div className="w-full max-w-5xl mb-4 flex flex-col gap-3">
+            <div className="flex justify-end">
+              <ModelSelector model={model} setModel={setModel} options={modelOptions} />
+            </div>
+            <details className="rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white/80">
+              <summary className="cursor-pointer text-white font-semibold">
+                Why Aika remembers you
+              </summary>
+              <p className="mt-2 text-xs leading-relaxed text-white/70">
+                Aika automatically reviews ringkasan obrolan sebelumnya, sorotan jurnal terbaru, dan jadwal konsultasi yang kamu simpan di UGM AICare. Informasi ini digunakan supaya respons terasa lebih nyambung dan personal. Data tetap tersimpan aman di sistem UGM-AICare dan kamu selalu bisa mengubah isi jurnal atau janji temu kapan pun.
+              </p>
+            </details>
           </div>
 
           {/* Main chat container with Glassmorphism */}
           <div className="w-full max-w-5xl h-[85vh] flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
              {/* Chat Interface takes remaining space */}
              <div className="flex-1 overflow-hidden"> {/* Important for ChatWindow's scrolling */}
-                <ChatInterface />
+                <ChatInterface model={model} />
              </div>
           </div>
 

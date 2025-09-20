@@ -11,6 +11,7 @@ from app.models import User, JournalEntry, JournalReflectionPoint
 from app.schemas.journal import JournalEntryCreate, JournalEntryResponse, JournalReflectionPointCreate
 from app.core.llm import generate_response, LLMProvider
 from app.dependencies import get_current_active_user # Use your auth dependency
+from app.services.personal_context import invalidate_user_personal_context
 
 import logging
 logger = logging.getLogger(__name__)
@@ -99,6 +100,7 @@ async def create_or_update_journal_entry(
         await db.commit()
         await db.refresh(existing_entry)
         saved_entry = existing_entry
+        await invalidate_user_personal_context(current_user.id)
     else:
         # Create new entry
         new_entry_data = entry_data.dict()
@@ -113,6 +115,7 @@ async def create_or_update_journal_entry(
             await db.commit()
             await db.refresh(new_entry)
             saved_entry = new_entry
+            await invalidate_user_personal_context(current_user.id)
         except Exception as e:
              await db.rollback()
              raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Entry for this date might already exist or another error occurred.")

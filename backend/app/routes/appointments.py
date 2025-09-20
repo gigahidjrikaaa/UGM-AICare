@@ -6,6 +6,7 @@ from app import models
 from app.schemas.appointments import Appointment, AppointmentCreate, AppointmentType, Psychologist
 from app.database import get_async_db
 from app.services.user_service import async_get_user_by_google_sub
+from app.services.personal_context import invalidate_user_personal_context
 
 router = APIRouter(prefix="/api/v1/appointments", tags=["Appointments"])
 
@@ -45,4 +46,5 @@ async def create_appointment(appointment: AppointmentCreate, db: AsyncSession = 
     db.add(db_appointment)
     await db.commit()
     await db.refresh(db_appointment)
+    await invalidate_user_personal_context(user.id)
     return db_appointment
