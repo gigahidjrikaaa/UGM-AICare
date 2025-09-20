@@ -1,3 +1,5 @@
+import type { AdminPasswordChangePayload, AdminPasswordChangeResponse, AdminProfileResponse, AdminProfileUpdatePayload } from '@/types/admin/profile';
+
 // Helper utility for making authenticated API requests to the admin endpoints
 import { getSession } from 'next-auth/react';
 
@@ -64,4 +66,22 @@ export async function apiCall<T>(url: string, options: RequestOptions = {}): Pro
     
   const response = await authenticatedFetch(`${apiUrl}${url}`, options);
   return handleApiResponse<T>(response);
+}
+
+export async function fetchAdminProfile(): Promise<AdminProfileResponse> {
+  return apiCall<AdminProfileResponse>('/api/v1/admin/profile/me');
+}
+
+export async function updateAdminProfile(payload: AdminProfileUpdatePayload): Promise<AdminProfileResponse> {
+  return apiCall<AdminProfileResponse>('/api/v1/admin/profile/me', {
+    method: 'PUT',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function changeAdminPassword(payload: AdminPasswordChangePayload): Promise<AdminPasswordChangeResponse> {
+  return apiCall<AdminPasswordChangeResponse>('/api/v1/admin/profile/password', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
 }

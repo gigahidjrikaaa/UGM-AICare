@@ -66,6 +66,13 @@ from .flags import (
     FlagsBulkTagRequest,
     FlagsSummary,
 )
+
+from .profile import (
+    AdminProfileResponse,
+    AdminProfileUpdateRequest,
+    AdminPasswordChangeRequest,
+    AdminPasswordChangeResponse,
+)
 from .users import UserDetailResponse, UserListItem, UserStats, UsersResponse
 from .triage import (
     SeverityBreakdown,
@@ -135,6 +142,10 @@ __all__ = [
     "FlagsBulkCloseRequest",
     "FlagsBulkTagRequest",
     "FlagsSummary",
+    "AdminProfileResponse",
+    "AdminProfileUpdateRequest",
+    "AdminPasswordChangeRequest",
+    "AdminPasswordChangeResponse",
     "UserDetailResponse",
     "UserListItem",
     "UserStats",

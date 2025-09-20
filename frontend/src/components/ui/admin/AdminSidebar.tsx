@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { signOut } from 'next-auth/react'; // Import signOut
 import {
   FiGrid, FiUsers, FiMessageSquare, FiCalendar, FiBookOpen,
-  FiBarChart2, FiSettings, FiShield, FiLogOut, FiHelpCircle, FiFileText, FiHeart, FiGitMerge, FiLifeBuoy, FiActivity
+  FiBarChart2, FiSettings, FiShield, FiLogOut, FiHelpCircle, FiFileText, FiHeart, FiGitMerge, FiLifeBuoy, FiActivity, FiUser
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink'; // Assuming SidebarLink component exists
 
@@ -26,10 +26,10 @@ const mainNavItems = [
 ];
 
 const secondaryNavItems = [
+  { name: 'My Profile', icon: <FiUser size={18}/>, href: '/admin/profile' },
   { name: 'System Settings', icon: <FiSettings size={18}/>, href: '/admin/settings' },
   { name: 'Help & Support', icon: <FiHelpCircle size={18}/>, href: '/admin/support' },
 ];
-
 export default function AdminSidebar() {
   // useRouter is not needed here if signOut is used directly with callbackUrl
 
@@ -89,4 +89,5 @@ export default function AdminSidebar() {
     </aside>
   );
 }
+
 

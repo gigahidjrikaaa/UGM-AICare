@@ -1,7 +1,6 @@
 import logging
 import os
 from datetime import datetime
-from typing import Optional
 
 from passlib.context import CryptContext
 from sqlalchemy import select
@@ -9,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User
 from app.utils.security_utils import encrypt_data
-from app.services.user_service import async_get_user_by_plain_email
 
 logger = logging.getLogger(__name__)
 
@@ -20,16 +18,7 @@ def _hash_password(password: str) -> str:
     return _pwd_context.hash(password)
 
 
-def _password_matches(password: str, hashed: Optional[str]) -> bool:
-    if not hashed:
-        return False
-    try:
-        return _pwd_context.verify(password, hashed)
-    except Exception:
-        return False
-
-
-def _maybe_encrypt(value: Optional[str]) -> Optional[str]:
+def _maybe_encrypt(value: str | None) -> str | None:
     if value is None:
         return None
     encrypted = encrypt_data(value)
@@ -40,73 +29,45 @@ def _maybe_encrypt(value: Optional[str]) -> Optional[str]:
 
 
 async def ensure_default_admin(db: AsyncSession) -> None:
-    """Ensure the default admin account exists and matches configured credentials."""
+    """Ensure at least one admin account exists; bootstrap from env if missing."""
+    stmt_existing = select(User).where(User.role == "admin").limit(1)
+    result_existing = await db.execute(stmt_existing)
+    existing_admin = result_existing.scalar_one_or_none()
+    if existing_admin:
+        logger.info("Admin account already present; skipping bootstrap.")
+        return
+
     admin_email = os.getenv("ADMIN_EMAIL")
     admin_password = os.getenv("ADMIN_PASSWORD")
 
     if not admin_email or not admin_password:
-        logger.warning("ADMIN_EMAIL or ADMIN_PASSWORD not set; skipping default admin bootstrap.")
+        logger.warning("ADMIN_EMAIL or ADMIN_PASSWORD not set; cannot create default admin user.")
         return
 
     try:
         encrypted_email = _maybe_encrypt(admin_email)
+        encrypted_name = _maybe_encrypt("Administrator")
     except ValueError:
         return
 
-    stmt = select(User).where(User.email == encrypted_email)
-    result = await db.execute(stmt)
-    admin_user = result.scalar_one_or_none()
-
-    if admin_user is None:
-        admin_user = await async_get_user_by_plain_email(db, admin_email)
-
     password_hash = _hash_password(admin_password)
 
-    if admin_user is None:
-        admin_user = User(
-            email=encrypted_email,
-            password_hash=password_hash,
-            role="admin",
-            is_active=True,
-            email_verified=True,
-            name=_maybe_encrypt("Administrator"),
-            created_at=datetime.utcnow(),
-            last_login=None,
-        )
-        db.add(admin_user)
+    admin_user = User(
+        email=encrypted_email,
+        password_hash=password_hash,
+        role="admin",
+        is_active=True,
+        email_verified=True,
+        name=encrypted_name,
+        created_at=datetime.utcnow(),
+        last_login=None,
+    )
+
+    db.add(admin_user)
+    try:
         await db.commit()
         await db.refresh(admin_user)
         logger.info("Default admin user created from environment configuration.")
-        return
-
-    updates_made = False
-
-    if not _password_matches(admin_password, admin_user.password_hash):
-        admin_user.password_hash = password_hash
-        updates_made = True
-
-    if admin_user.role != "admin":
-        admin_user.role = "admin"
-        updates_made = True
-
-    if not admin_user.is_active:
-        admin_user.is_active = True
-        updates_made = True
-
-    if not admin_user.email_verified:
-        admin_user.email_verified = True
-        updates_made = True
-
-    if updates_made:
-        db.add(admin_user)
-        await db.commit()
-        await db.refresh(admin_user)
-        logger.info("Default admin user updated to match environment configuration.")
-    else:
-        logger.info("Default admin user already matches environment configuration.")
-
-
-
-
-
-
+    except Exception as exc:
+        await db.rollback()
+        logger.error(f"Failed to create default admin user: {exc}")
