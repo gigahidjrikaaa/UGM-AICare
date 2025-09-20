@@ -74,8 +74,8 @@ class CampaignDraft(BaseModel):
 
 
 class InterventionResult(BaseModel):
-    campaign_id: Optional[int]
-    campaign_status: Optional[str]
+    campaign_id: Optional[int] = None
+    campaign_status: Optional[str] = None
     target_count: int
     requires_review: bool
     dispatch_status: str
