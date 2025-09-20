@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { 
   FiSearch as Search, 
   FiFilter as Filter, 
@@ -41,6 +42,7 @@ interface User {
   phone?: string; // Added for therapist/admin
   date_of_birth?: string; // Added for therapist/admin
   specialization?: string; // Added for therapist
+  avatar_url?: string | null;
 }
 
 interface UserLog {
@@ -622,12 +624,20 @@ export default function UserManagementPage() {
                 >
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="flex-shrink-0 h-10 w-10">
-                        <div className="h-10 w-10 rounded-full bg-[#FFCA40]/20 flex items-center justify-center">
-                          <span className="text-sm font-medium text-[#FFCA40]">
+                      <div className="relative h-10 w-10 rounded-full overflow-hidden border border-white/15 bg-white/5 flex-shrink-0">
+                        {user.avatar_url ? (
+                          <Image
+                            src={user.avatar_url}
+                            alt={`Avatar for ${user.email || `user ${user.id}`}`}
+                            fill
+                            sizes="40px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-[#FFCA40]/10 text-sm font-medium text-[#FFCA40]">
                             {user.email?.charAt(0).toUpperCase() || 'U'}
-                          </span>
-                        </div>
+                          </div>
+                        )}
                       </div>
                       <div className="ml-4">
                         <div className="text-sm font-medium text-white">
@@ -922,8 +932,45 @@ export default function UserManagementPage() {
                         </button>
                       </div>
                     </div>
+                    <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
+                      <div className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-full overflow-hidden border border-white/20 bg-white/5 flex-shrink-0">
+                        {selectedUser.avatar_url ? (
+                          <Image
+                            src={selectedUser.avatar_url}
+                            alt={`Avatar for ${selectedUser.email || `user ${selectedUser.id}`}`}
+                            fill
+                            sizes="80px"
+                            className="object-cover"
+                          />
+                        ) : (
+                          <div className="flex h-full w-full items-center justify-center bg-[#FFCA40]/10 text-lg font-semibold text-[#FFCA40]">
+                            {(selectedUser.email || 'U').charAt(0).toUpperCase()}
+                          </div>
+                        )}
+                      </div>
+                      <div className="space-y-1 text-sm">
+                        <div className="text-white font-medium">
+                          {selectedUser.email || `User ${selectedUser.id}`}
+                        </div>
+                        <div className="text-white/60">User ID: {selectedUser.id}</div>
+                        <div className="inline-flex flex-wrap items-center gap-2 text-xs text-white/60">
+                          <span
+                            className={`inline-flex items-center px-2 py-1 rounded-full border ${
+                              selectedUser.role === 'admin'
+                                ? 'border-red-400 text-red-300'
+                                : selectedUser.role === 'therapist'
+                                ? 'border-blue-400 text-blue-300'
+                                : 'border-white/20 text-white/70'
+                            }`}
+                          >
+                            {selectedUser.role || 'user'}
+                          </span>
+                          <span>Status: {selectedUser.is_active ? 'Active' : 'Inactive'}</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                  
+
                   <div className="p-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                       <div>

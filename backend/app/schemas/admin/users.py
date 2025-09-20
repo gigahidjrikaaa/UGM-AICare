@@ -20,6 +20,7 @@ class UserListItem(BaseModel):
     role: Optional[str] = "user"
     is_active: Optional[bool] = True
     created_at: Optional[datetime] = None
+    avatar_url: Optional[str] = None
 
     # Aggregated counts
     total_journal_entries: int
@@ -61,6 +62,7 @@ class UserDetailResponse(BaseModel):
     role: Optional[str] = "user"
     is_active: Optional[bool] = True
     created_at: Optional[datetime] = None
+    avatar_url: Optional[str] = None
 
     journal_entries: List[Dict[str, Any]]
     recent_conversations: List[Dict[str, Any]]

@@ -2,7 +2,21 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FiCalendar, FiEye, FiEdit, FiTrash2 } from 'react-icons/fi';
+import Image from 'next/image';
+import {
+  FiEye,
+  FiEdit,
+  FiTrash2,
+  FiMail,
+  FiPhone,
+  FiCopy,
+  FiMessageCircle,
+  FiMessageSquare,
+  FiDownload,
+  FiChevronDown,
+  FiChevronUp,
+  FiSend,
+} from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { apiCall } from '@/utils/adminApi';
@@ -12,14 +26,7 @@ import Tooltip from '@/components/ui/Tooltip';
 interface User {
   id: number;
   email: string | null;
-}
-
-interface Psychologist {
-  id: number;
-  name: string;
-  specialization: string | null;
-  is_available: boolean;
-  schedules: TherapistSchedule[];
+  avatar_url?: string | null;
 }
 
 interface TherapistSchedule {
@@ -31,10 +38,40 @@ interface TherapistSchedule {
   reason: string | null;
 }
 
+interface TherapistApiResponse {
+  id: number;
+  email: string | null;
+  name: string | null;
+  first_name: string | null;
+  last_name: string | null;
+  phone: string | null;
+  specialization: string | null;
+  is_available: boolean;
+  allow_email_checkins: boolean;
+  total_appointments: number;
+  upcoming_schedules: TherapistSchedule[];
+  image_url?: string | null;
+  avatar_url?: string | null;
+}
+
+interface AppointmentTherapist {
+  id: number;
+  name: string;
+  specialization: string | null;
+  is_available: boolean;
+  image_url?: string | null;
+}
+
+interface Therapist extends TherapistApiResponse {
+  displayName: string;
+  upcoming_schedules: TherapistSchedule[];
+  schedules: TherapistSchedule[];
+}
+
 interface Appointment {
   id: number;
   user: User;
-  psychologist: Psychologist;
+  psychologist: AppointmentTherapist;
   appointment_type: string;
   appointment_datetime: string;
   notes: string | null;
@@ -42,11 +79,46 @@ interface Appointment {
   created_at: string;
 }
 
+const DAY_ORDER = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+
+const getDayPosition = (day: string) => {
+  const index = DAY_ORDER.indexOf(day);
+  return index === -1 ? DAY_ORDER.length : index;
+};
+
+const groupScheduleByDay = (schedule: TherapistSchedule[]) => {
+  const buckets = new Map<string, TherapistSchedule[]>();
+  schedule.forEach((slot) => {
+    const key = slot.day_of_week || 'Unspecified';
+    const existing = buckets.get(key) ?? [];
+    existing.push(slot);
+    buckets.set(key, existing);
+  });
+
+  return Array.from(buckets.entries())
+    .sort((a, b) => getDayPosition(a[0]) - getDayPosition(b[0]))
+    .map(([day, slots]) => ({
+      day,
+      slots: [...slots].sort((slotA, slotB) => slotA.start_time.localeCompare(slotB.start_time)),
+    }));
+};
+
+const getNextAvailableSlot = (schedule: TherapistSchedule[]) =>
+  schedule.find((slot) => slot.is_available) ?? schedule[0];
+
 export default function AppointmentManagementPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [psychologists, setPsychologists] = useState<Psychologist[]>([]);
+  const [psychologists, setPsychologists] = useState<Therapist[]>([]);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState('appointments');
   // Filters & selection
@@ -57,7 +129,7 @@ export default function AppointmentManagementPage() {
   const [quick, setQuick] = useState<'all' | 'today' | 'upcoming'>('all');
   const [selected, setSelected] = useState<Record<number, boolean>>({});
   const [viewAppt, setViewAppt] = useState<Appointment | null>(null);
-  const [selectedTherapist, setSelectedTherapist] = useState<Psychologist | null>(null);
+  const [selectedTherapist, setSelectedTherapist] = useState<Therapist | null>(null);
   const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
   const [newSchedule, setNewSchedule] = useState({
     day_of_week: 'Monday',
@@ -66,6 +138,9 @@ export default function AppointmentManagementPage() {
     is_available: true,
     reason: '',
   });
+  const [therapistSchedules, setTherapistSchedules] = useState<Record<number, TherapistSchedule[]>>({});
+  const [expandedTherapists, setExpandedTherapists] = useState<Record<number, boolean>>({});
+  const [scheduleLoadingMap, setScheduleLoadingMap] = useState<Record<number, boolean>>({});
 
   const fetchAppointments = useCallback(async () => {
     try {
@@ -84,11 +159,33 @@ export default function AppointmentManagementPage() {
   const fetchPsychologists = useCallback(async () => {
     try {
       setLoading(true);
-      const data = await apiCall<Psychologist[]>('/api/v1/admin/psychologists');
-      setPsychologists(data);
+      const data = await apiCall<TherapistApiResponse[]>('/api/v1/admin/psychologists');
+      const mapped: Therapist[] = data.map((item) => {
+        const nameFromParts = [item.first_name, item.last_name]
+          .filter((part) => part && part.trim().length)
+          .join(' ')
+          .trim();
+        const displayName =
+          (item.name && item.name.trim()) ||
+          nameFromParts ||
+          item.email ||
+          'Therapist';
+        const imageUrl = item.image_url ?? item.avatar_url ?? null;
+        const avatarUrl = item.avatar_url ?? imageUrl ?? null;
+
+        return {
+          ...item,
+          image_url: imageUrl,
+          avatar_url: avatarUrl,
+          displayName,
+          upcoming_schedules: item.upcoming_schedules ?? [],
+          schedules: item.upcoming_schedules ?? [],
+        };
+      });
+      setPsychologists(mapped);
     } catch (error) {
       console.error('Error fetching psychologists:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to load psychologists');
+      toast.error(error instanceof Error ? error.message : 'Failed to load therapists');
     } finally {
       setLoading(false);
     }
@@ -212,12 +309,152 @@ export default function AppointmentManagementPage() {
     URL.revokeObjectURL(url);
   };
 
+  const handleCopyToClipboard = async (value: string, successMessage: string) => {
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(value);
+      } else {
+        const textarea = document.createElement('textarea');
+        textarea.value = value;
+        textarea.style.position = 'fixed';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.select();
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
+      toast.success(successMessage);
+    } catch (err) {
+      console.error('Copy failed', err);
+      toast.error('Unable to copy value');
+    }
+  };
+
+  const sanitizePhoneNumber = (value: string) => value.replace(/[^+\d]/g, '');
+
+  const handleEmailTherapist = (email: string) => {
+    if (!email) {
+      toast.error('No email available for this therapist');
+      return;
+    }
+    window.open(`mailto:${email}`, '_blank', 'noopener');
+  };
+
+  const handleCallTherapist = (phone: string) => {
+    if (!phone) {
+      toast.error('No phone number available for this therapist');
+      return;
+    }
+    window.open(`tel:${sanitizePhoneNumber(phone)}`);
+  };
+
+  const handleWhatsAppTherapist = (phone: string) => {
+    const digits = sanitizePhoneNumber(phone);
+    if (!digits) {
+      toast.error('No valid phone number available for WhatsApp');
+      return;
+    }
+    window.open(`https://wa.me/${digits}`, '_blank', 'noopener');
+  };
+
+  const handleSmsTherapist = (phone: string) => {
+    const digits = sanitizePhoneNumber(phone);
+    if (!digits) {
+      toast.error('No valid phone number available for SMS');
+      return;
+    }
+    window.open(`sms:${digits}`);
+  };
+
+  const handleDownloadContactCard = (therapist: Therapist) => {
+    const lines = [
+      'BEGIN:VCARD',
+      'VERSION:3.0',
+      `FN:${therapist.displayName}`,
+    ];
+    if (therapist.last_name || therapist.first_name) {
+      lines.push(
+        `N:${therapist.last_name || ''};${therapist.first_name || ''};;;`
+      );
+    }
+    if (therapist.specialization) {
+      lines.push(`TITLE:${therapist.specialization}`);
+    }
+    if (therapist.email) {
+      lines.push(`EMAIL;TYPE=WORK:${therapist.email}`);
+    }
+    if (therapist.phone) {
+      lines.push(`TEL;TYPE=CELL:${sanitizePhoneNumber(therapist.phone)}`);
+    }
+    lines.push('END:VCARD');
+
+    const blob = new Blob([lines.join('\n')], { type: 'text/vcard;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${therapist.displayName.replace(/\s+/g, '_').toLowerCase()}_contact.vcf`;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+    toast.success('Downloaded contact card');
+  };
+
+  const handleCheckInEmail = (therapist: Therapist) => {
+    if (!therapist.email) {
+      toast.error('No email available for this therapist');
+      return;
+    }
+
+    const schedule = therapistSchedules[therapist.id] ?? therapist.upcoming_schedules ?? [];
+    const nextSlot = getNextAvailableSlot(schedule) ?? null;
+    const greeting = therapist.first_name || therapist.displayName || 'there';
+    const subject = encodeURIComponent('Quick availability check-in');
+    const slotDetails = nextSlot
+      ? `I noticed your next availability is listed as ${nextSlot.day_of_week} from ${nextSlot.start_time} to ${nextSlot.end_time}.`
+      : 'I wanted to make sure we have the latest view of your availability.';
+    const body = encodeURIComponent(
+      `Hi ${greeting},\n\n${slotDetails}\n\nLet me know if there are any updates or times that work best for you.\n\nThanks!\nAdmin Team`
+    );
+
+    window.open(`mailto:${therapist.email}?subject=${subject}&body=${body}`, '_blank', 'noopener');
+  };
+
+  const handleToggleSchedule = async (therapist: Therapist) => {
+    if (expandedTherapists[therapist.id]) {
+      setExpandedTherapists((prev) => ({ ...prev, [therapist.id]: false }));
+      return;
+    }
+
+    if (!therapistSchedules[therapist.id]) {
+      setScheduleLoadingMap((prev) => ({ ...prev, [therapist.id]: true }));
+      let loaded = false;
+      try {
+        const data = await apiCall<TherapistSchedule[]>(`/api/v1/admin/therapists/${therapist.id}/schedule`);
+        setTherapistSchedules((prev) => ({ ...prev, [therapist.id]: data }));
+        loaded = true;
+      } catch (error) {
+        console.error('Error fetching therapist schedule:', error);
+        toast.error(error instanceof Error ? error.message : 'Failed to load schedule');
+      } finally {
+        setScheduleLoadingMap((prev) => ({ ...prev, [therapist.id]: false }));
+      }
+
+      if (!loaded) {
+        return;
+      }
+    }
+
+    setExpandedTherapists((prev) => ({ ...prev, [therapist.id]: true }));
+  };
+
   const handleScheduleModalOpen = async (therapistId: number) => {
     try {
       const data = await apiCall<TherapistSchedule[]>(`/api/v1/admin/therapists/${therapistId}/schedule`);
+      setTherapistSchedules((prev) => ({ ...prev, [therapistId]: data }));
       const therapist = psychologists.find(p => p.id === therapistId);
       if (therapist) {
-        setSelectedTherapist({ ...therapist, schedules: data });
+        setSelectedTherapist({ ...therapist, schedules: data, upcoming_schedules: data });
         setIsScheduleModalOpen(true);
       }
     } catch (error) {
@@ -247,6 +484,7 @@ export default function AppointmentManagementPage() {
         body: JSON.stringify(newSchedule),
       });
       toast.success('Schedule created successfully');
+      await fetchPsychologists();
       handleScheduleModalOpen(selectedTherapist.id); // Refresh the schedule
     } catch (error) {
       console.error('Error creating schedule:', error);
@@ -262,6 +500,7 @@ export default function AppointmentManagementPage() {
         method: 'DELETE',
       });
       toast.success('Schedule deleted successfully');
+      await fetchPsychologists();
       handleScheduleModalOpen(selectedTherapist.id); // Refresh the schedule
     } catch (error) {
       console.error('Error deleting schedule:', error);
@@ -371,43 +610,130 @@ export default function AppointmentManagementPage() {
                     </tr>
                   </thead>
                   <tbody className="bg-transparent divide-y divide-white/20">
-                    {filteredAppointments.map((appointment) => (
-                      <tr key={appointment.id}>
-                        <td className="px-3 py-4 whitespace-nowrap text-sm">
-                          <input type="checkbox" checked={!!selected[appointment.id]} onChange={e=>setSelected(prev=>({...prev,[appointment.id]: e.target.checked}))} />
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{appointment.user.email}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{appointment.psychologist.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{new Date(appointment.appointment_datetime).toLocaleString()}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <select value={appointment.status} onChange={e=>updateStatus(appointment.id, e.target.value)} className="bg-white/10 border border-white/20 rounded px-2 py-1 text-sm">
-                            <option value="scheduled">Scheduled</option>
-                            <option value="completed">Completed</option>
-                            <option value="cancelled">Cancelled</option>
-                          </select>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 max-w-[240px]">
-                          {appointment.notes ? (
-                            <Tooltip title={appointment.notes}>
-                              <span className="line-clamp-1 inline-block align-middle">{appointment.notes}</span>
-                            </Tooltip>
-                          ) : (
-                            <span className="text-gray-500">—</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button title="View Details" onClick={()=>setViewAppt(appointment)} className="text-white hover:text-gray-300 transition-colors mr-4">
-                            <FiEye className="h-4 w-4" />
-                          </button>
-                          <button title="Edit Appointment" className="text-blue-400 hover:text-blue-300 transition-colors mr-4">
-                            <FiEdit className="h-4 w-4" />
-                          </button>
-                          <button title="Delete Appointment" onClick={async()=>{ if (confirm('Delete this appointment?')) { try { await apiCall(`/api/v1/admin/appointments/${appointment.id}`, { method: 'DELETE' }); toast.success('Deleted'); fetchAppointments(); } catch(e:any){ toast.error(e?.message || 'Delete failed'); } } }} className="text-red-400 hover:text-red-300 transition-colors">
-                            <FiTrash2 className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                    {filteredAppointments.map((appointment) => {
+                      const patientAvatar = appointment.user.avatar_url || null;
+                      const patientInitial = (appointment.user.email || 'U').charAt(0).toUpperCase();
+                      const therapistAvatar = appointment.psychologist.image_url || null;
+                      const therapistInitial = (appointment.psychologist.name || 'T').charAt(0).toUpperCase();
+
+                      return (
+                        <tr key={appointment.id}>
+                          <td className="px-3 py-4 whitespace-nowrap text-sm">
+                            <input
+                              type="checkbox"
+                              checked={!!selected[appointment.id]}
+                              onChange={(e) =>
+                                setSelected((prev) => ({ ...prev, [appointment.id]: e.target.checked }))
+                              }
+                            />
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <div className="flex items-center gap-3">
+                              <div className="relative h-10 w-10 rounded-full overflow-hidden border border-white/15 bg-white/5">
+                                {patientAvatar ? (
+                                  <Image
+                                    src={patientAvatar}
+                                    alt={`Avatar for ${appointment.user.email || 'user'}`}
+                                    fill
+                                    sizes="40px"
+                                    className="object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center bg-[#FFCA40]/10 text-sm font-semibold text-[#FFCA40]">
+                                    {patientInitial}
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium text-white">
+                                  {appointment.user.email || 'Unknown user'}
+                                </div>
+                                <div className="text-xs text-white/60">User #{appointment.user.id}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <div className="flex items-center gap-3 text-gray-400">
+                              <div className="relative h-10 w-10 rounded-full overflow-hidden border border-white/15 bg-white/5">
+                                {therapistAvatar ? (
+                                  <Image
+                                    src={therapistAvatar}
+                                    alt={`Avatar for ${appointment.psychologist.name}`}
+                                    fill
+                                    sizes="40px"
+                                    className="object-cover"
+                                  />
+                                ) : (
+                                  <div className="flex h-full w-full items-center justify-center bg-white/10 text-sm font-semibold text-white/70">
+                                    {therapistInitial}
+                                  </div>
+                                )}
+                              </div>
+                              <div>
+                                <div className="text-sm font-medium text-white">
+                                  {appointment.psychologist.name}
+                                </div>
+                                <div className="text-xs text-white/60">
+                                  {appointment.psychologist.specialization || 'General practice'}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
+                            {new Date(appointment.appointment_datetime).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <select
+                              value={appointment.status}
+                              onChange={(e) => updateStatus(appointment.id, e.target.value)}
+                              className="bg-white/10 border border-white/20 rounded px-2 py-1 text-sm"
+                            >
+                              <option value="scheduled">Scheduled</option>
+                              <option value="completed">Completed</option>
+                              <option value="cancelled">Cancelled</option>
+                            </select>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 max-w-[240px]">
+                            {appointment.notes ? (
+                              <Tooltip title={appointment.notes}>
+                                <span className="line-clamp-1 inline-block align-middle">{appointment.notes}</span>
+                              </Tooltip>
+                            ) : (
+                              <span className="text-gray-500">—</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                            <button
+                              title="View Details"
+                              onClick={() => setViewAppt(appointment)}
+                              className="text-white hover:text-gray-300 transition-colors mr-4"
+                            >
+                              <FiEye className="h-4 w-4" />
+                            </button>
+                            <button title="Edit Appointment" className="text-blue-400 hover:text-blue-300 transition-colors mr-4">
+                              <FiEdit className="h-4 w-4" />
+                            </button>
+                            <button
+                              title="Delete Appointment"
+                              onClick={async () => {
+                                if (confirm('Delete this appointment?')) {
+                                  try {
+                                    await apiCall(`/api/v1/admin/appointments/${appointment.id}`, { method: 'DELETE' });
+                                    toast.success('Deleted');
+                                    fetchAppointments();
+                                  } catch (e: any) {
+                                    toast.error(e?.message || 'Delete failed');
+                                  }
+                                }
+                              }}
+                              className="text-red-400 hover:text-red-300 transition-colors"
+                            >
+                              <FiTrash2 className="h-4 w-4" />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -415,43 +741,355 @@ export default function AppointmentManagementPage() {
           )}
 
           {activeTab === 'therapists' && (
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-white/20">
-                  <thead className="bg-white/5">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Name</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Specialization</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="bg-transparent divide-y divide-white/20">
-                    {psychologists.map((psychologist) => (
-                      <tr key={psychologist.id}>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{psychologist.name}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{psychologist.specialization}</td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          {psychologist.is_available ? (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
-                              Available
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400">
-                              Unavailable
-                            </span>
+            <div className="space-y-4">
+              {psychologists.length === 0 ? (
+                <div className="rounded-xl border border-white/15 bg-white/5 p-6 text-center text-sm text-white/60">
+                  No therapists found. Invite your therapists to create accounts with the therapist role to manage schedules here.
+                </div>
+              ) : (
+                psychologists.map((therapist) => {
+                  const cachedSchedule = therapistSchedules[therapist.id];
+                  const scheduleSource = cachedSchedule ?? therapist.upcoming_schedules ?? [];
+                  const previewSchedule = scheduleSource.slice(0, 5);
+                  const isExpanded = !!expandedTherapists[therapist.id];
+                  const isLoadingSchedule = !!scheduleLoadingMap[therapist.id];
+                  const groupedSchedule: ReturnType<typeof groupScheduleByDay> = isExpanded
+                    ? groupScheduleByDay(scheduleSource)
+                    : [];
+                  const nextSlot = getNextAvailableSlot(scheduleSource) ?? null;
+                  const sanitizedPhone = therapist.phone ? sanitizePhoneNumber(therapist.phone) : '';
+                  const therapistPhoto = therapist.image_url || therapist.avatar_url || null;
+                  const therapistInitial = therapist.displayName.charAt(0).toUpperCase();
+
+                  const quickActions: Array<{
+                    key: string;
+                    label: string;
+                    icon: JSX.Element;
+                    onClick: () => void;
+                    tone?: 'accent' | 'success';
+                  }> = [];
+
+                  if (therapist.email) {
+                    quickActions.push(
+                      {
+                        key: 'email',
+                        label: 'Email',
+                        icon: <FiMail className="h-4 w-4" />,
+                        onClick: () => handleEmailTherapist(therapist.email!),
+                        tone: 'accent',
+                      },
+                      {
+                        key: 'checkin-email',
+                        label: 'Check-in email',
+                        icon: <FiSend className="h-4 w-4" />,
+                        onClick: () => handleCheckInEmail(therapist),
+                        tone: 'accent',
+                      },
+                    );
+                  }
+
+                  if (therapist.phone) {
+                    quickActions.push(
+                      {
+                        key: 'call',
+                        label: 'Call',
+                        icon: <FiPhone className="h-4 w-4" />,
+                        onClick: () => handleCallTherapist(therapist.phone!),
+                      },
+                      {
+                        key: 'sms',
+                        label: 'SMS',
+                        icon: <FiMessageSquare className="h-4 w-4" />,
+                        onClick: () => handleSmsTherapist(therapist.phone!),
+                      },
+                      {
+                        key: 'whatsapp',
+                        label: 'WhatsApp',
+                        icon: <FiMessageCircle className="h-4 w-4" />,
+                        onClick: () => handleWhatsAppTherapist(therapist.phone!),
+                        tone: 'success',
+                      },
+                    );
+                  }
+
+                  if (therapist.phone || therapist.email) {
+                    quickActions.push({
+                      key: 'save-contact',
+                      label: 'Save contact',
+                      icon: <FiDownload className="h-4 w-4" />,
+                      onClick: () => handleDownloadContactCard(therapist),
+                    });
+                  }
+
+                  const actionClassName = (tone?: 'accent' | 'success') => {
+                    const base = 'inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors border text-center';
+                    if (tone === 'accent') {
+                      return `${base} border-[#FFCA40]/40 bg-[#FFCA40]/10 text-[#FFCA40] hover:bg-[#FFCA40]/20`;
+                    }
+                    if (tone === 'success') {
+                      return `${base} border-[#25D366]/50 text-[#25D366] hover:border-[#25D366]/70 hover:text-[#25D366]`;
+                    }
+                    return `${base} border-white/15 text-white/80 hover:border-white/40 hover:text-white`;
+                  };
+
+                  const contactRows = [
+                    {
+                      label: 'Email',
+                      value: therapist.email ?? 'No email on record',
+                      href: therapist.email ? `mailto:${therapist.email}` : undefined,
+                      canCopy: !!therapist.email,
+                      copyValue: therapist.email ?? '',
+                      copyMessage: 'Email copied to clipboard',
+                    },
+                    {
+                      label: 'Phone',
+                      value: therapist.phone ?? 'No phone on record',
+                      href: therapist.phone ? `tel:${sanitizedPhone}` : undefined,
+                      canCopy: !!therapist.phone,
+                      copyValue: therapist.phone ?? '',
+                      copyMessage: 'Phone number copied to clipboard',
+                    },
+                  ];
+
+                  return (
+                    <div
+                      key={therapist.id}
+                      className="rounded-xl border border-white/15 bg-white/5 p-6 text-white/90 shadow-sm backdrop-blur"
+                    >
+                      <div className="space-y-6">
+                        <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-8">
+                          <div className="flex items-start gap-4 md:gap-6">
+                            <div className="relative h-20 w-20 md:h-24 md:w-24 rounded-2xl overflow-hidden border border-white/15 bg-white/5 flex-shrink-0">
+                              {therapistPhoto ? (
+                                <Image
+                                  src={therapistPhoto}
+                                  alt={`${therapist.displayName} avatar`}
+                                  fill
+                                  sizes="(max-width: 768px) 80px, 96px"
+                                  className="object-cover"
+                                />
+                              ) : (
+                                <div className="flex h-full w-full items-center justify-center bg-[#FFCA40]/10 text-2xl font-semibold text-[#FFCA40]">
+                                  {therapistInitial}
+                                </div>
+                              )}
+                            </div>
+                            <div className="min-w-0 space-y-3">
+                              <div className="flex flex-wrap items-center gap-3">
+                                <h3 className="text-xl font-semibold text-white break-words leading-snug">
+                                  {therapist.displayName}
+                                </h3>
+                                <span
+                                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${therapist.is_available
+                                    ? 'bg-green-500/20 text-green-300'
+                                    : 'bg-gray-500/20 text-gray-300'}`}
+                                >
+                                  {therapist.is_available ? 'Available' : 'Unavailable'}
+                                </span>
+                              </div>
+                              <p className="text-sm text-white/60 break-words">
+                                {therapist.specialization || 'No specialization provided'}
+                              </p>
+                              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/60">
+                                <span className="inline-flex items-center rounded-full border border-white/15 px-2.5 py-1">
+                                  <span className="font-semibold text-white/80">{therapist.total_appointments}</span>
+                                  <span className="ml-2">appointments handled</span>
+                                </span>
+                                {therapist.allow_email_checkins ? (
+                                  <span className="inline-flex items-center rounded-full border border-[#FFCA40]/30 px-2.5 py-1 text-[#FFCA40]">
+                                    Email check-ins enabled
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center rounded-full border border-white/10 px-2.5 py-1 text-white/50">
+                                    Email check-ins disabled
+                                  </span>
+                                )}
+                              </div>
+                              {nextSlot && (
+                                <div className="mt-2 text-xs text-white/60">
+                                  Next slot:
+                                  <span className="ml-1 text-white/90 break-words">
+                                    {nextSlot.day_of_week} {nextSlot.start_time} - {nextSlot.end_time}
+                                  </span>
+                                  {!nextSlot.is_available && (
+                                    <span className="ml-1 text-red-300">
+                                      ({nextSlot.reason ? `Unavailable - ${nextSlot.reason}` : 'Unavailable'})
+                                    </span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+
+                          {quickActions.length > 0 && (
+                            <div className="w-full max-w-xl">
+                              <div className="text-xs font-semibold uppercase tracking-wide text-white/60">
+                                Reach out
+                              </div>
+                              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                                {quickActions.map((action) => (
+                                  <button
+                                    key={action.key}
+                                    type="button"
+                                    onClick={action.onClick}
+                                    className={actionClassName(action.tone)}
+                                  >
+                                    {action.icon}
+                                    <span>{action.label}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
                           )}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                          <button title="View Details" onClick={() => handleScheduleModalOpen(psychologist.id)} className="text-white hover:text-gray-300 transition-colors mr-4">
-                            <FiCalendar className="h-4 w-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
+                        </header>
+
+                        <div className="grid gap-4 md:grid-cols-3">
+                          <section className="space-y-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
+                            <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Contact details</div>
+                            <dl className="space-y-3">
+                              {contactRows.map((row) => (
+                                <div key={row.label} className="flex items-start justify-between gap-3">
+                                  <div className="min-w-0">
+                                    <dt className="text-xs uppercase tracking-wide text-white/40">{row.label}</dt>
+                                    <dd className="mt-1 text-sm">
+                                      {row.href ? (
+                                        <a href={row.href} className="text-white hover:text-[#FFCA40] break-words">
+                                          {row.value}
+                                        </a>
+                                      ) : (
+                                        <span className={`${row.canCopy ? 'text-white' : 'text-white/50'} break-words`}>
+                                          {row.value}
+                                        </span>
+                                      )}
+                                    </dd>
+                                  </div>
+                                  {row.canCopy && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleCopyToClipboard(row.copyValue, row.copyMessage)}
+                                      className="text-white/60 transition hover:text-white"
+                                      aria-label={`Copy ${row.label.toLowerCase()}`}
+                                    >
+                                      <FiCopy className="h-4 w-4" />
+                                    </button>
+                                  )}
+                                </div>
+                              ))}
+                            </dl>
+                          </section>
+
+                          <section className="space-y-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
+                            <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Notes</div>
+                            <p className="text-white/70">
+                              Use the quick actions to reach out and confirm availability changes before manually adjusting schedules.
+                            </p>
+                            {therapist.allow_email_checkins ? (
+                              <p className="rounded-md border border-[#FFCA40]/30 bg-[#FFCA40]/5 p-3 text-xs text-[#FFCA40]">
+                                This therapist has opted in to receive proactive check-in emails.
+                              </p>
+                            ) : (
+                              <p className="rounded-md border border-white/15 bg-black/30 p-3 text-xs text-white/60">
+                                Email check-ins are disabled for this therapist.
+                              </p>
+                            )}
+                          </section>
+
+                          <section className="space-y-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
+                            <div className="flex items-center justify-between">
+                              <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Availability</div>
+                              <button
+                                type="button"
+                                onClick={() => handleToggleSchedule(therapist)}
+                                className="inline-flex items-center gap-1 text-xs font-medium text-[#FFCA40] hover:text-[#ffda63]"
+                              >
+                                {isExpanded ? (
+                                  <>
+                                    <FiChevronUp className="h-3 w-3" />
+                                    Hide full schedule
+                                  </>
+                                ) : (
+                                  <>
+                                    <FiChevronDown className="h-3 w-3" />
+                                    View full schedule
+                                  </>
+                                )}
+                              </button>
+                            </div>
+                              <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                                {previewSchedule.length ? (
+                                  <ul className="space-y-1 text-white/80">
+                                    {previewSchedule.map((slot) => (
+                                      <li key={slot.id} className="flex flex-wrap items-center gap-2 text-sm">
+                                        <span className="font-medium text-white">{slot.day_of_week}</span>
+                                        <span className="text-white/60">&bull;</span>
+                                        <span>{slot.start_time} - {slot.end_time}</span>
+                                      {!slot.is_available && (
+                                        <span className="inline-flex items-center rounded-full bg-red-500/20 px-2 py-0.5 text-xs text-red-300">
+                                          Unavailable
+                                        </span>
+                                      )}
+                                    </li>
+                                  ))}
+                                </ul>
+                              ) : (
+                                <div className="text-white/60">No schedule published yet.</div>
+                              )}
+                            </div>
+                            {isExpanded && (
+                              <div className="rounded-lg border border-white/10 bg-black/30 px-3 py-3">
+                                {isLoadingSchedule ? (
+                                  <div className="text-white/60 text-sm">Loading full schedule...</div>
+                                ) : groupedSchedule.length ? (
+                                  <div className="space-y-3">
+                                    {groupedSchedule.map(({ day, slots }) => (
+                                      <div key={`${therapist.id}-${day}`}>
+                                        <div className="text-xs font-semibold uppercase tracking-wide text-white/60">{day}</div>
+                                        <ul className="mt-1 space-y-1 text-white/75">
+                                          {slots.map((slot) => (
+                                            <li key={slot.id} className="flex flex-wrap items-center gap-2 text-sm">
+                                              <span className="font-medium text-white">{slot.start_time} - {slot.end_time}</span>
+                                              <span
+                                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${slot.is_available
+                                                  ? 'bg-green-500/20 text-green-300'
+                                                  : 'bg-red-500/20 text-red-300'}`}
+                                              >
+                                                {slot.is_available ? 'Available' : 'Unavailable'}
+                                              </span>
+                                              {!slot.is_available && slot.reason && (
+                                                <span className="text-xs text-white/60">({slot.reason})</span>
+                                              )}
+                                            </li>
+                                          ))}
+                                        </ul>
+                                      </div>
+                                    ))}
+                                  </div>
+                                ) : (
+                                  <div className="text-white/60 text-sm">No schedule published yet.</div>
+                                )}
+                              </div>
+                            )}
+                          </section>
+                        </div>
+
+                        <footer className="flex flex-col gap-2 border-t border-white/10 pt-4 text-sm text-white/70 md:flex-row md:items-center md:justify-between">
+                          <div>
+                            Keep this record up to date by confirming changes with the therapist before editing availability.
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <Button variant="outline" size="sm" onClick={fetchPsychologists}>
+                              Refresh list
+                            </Button>
+                            <Button size="sm" onClick={() => handleScheduleModalOpen(therapist.id)}>
+                              Manage schedule
+                            </Button>
+                          </div>
+                        </footer>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
             </div>
           )}
         </>
@@ -474,7 +1112,7 @@ export default function AppointmentManagementPage() {
               onClick={(e) => e.stopPropagation()}
             >
               <div className="px-6 py-4 border-b border-white/20">
-                <h3 className="text-lg font-medium text-white">Schedule for {selectedTherapist.name}</h3>
+                <h3 className="text-lg font-medium text-white">Schedule for {selectedTherapist.displayName}</h3>
               </div>
               <div className="p-6">
                 <div className="space-y-4">
@@ -544,14 +1182,56 @@ export default function AppointmentManagementPage() {
               <h3 className="text-lg font-semibold">Appointment #{viewAppt.id}</h3>
               <Button variant="outline" size="sm" onClick={()=>setViewAppt(null)}>Close</Button>
             </div>
-            <div className="p-5 space-y-3 text-sm">
-              <div>
-                <div className="text-gray-500">Patient</div>
-                <div className="font-medium">{viewAppt.user.email || 'Unknown'}</div>
+            <div className="p-5 space-y-4 text-sm">
+              <div className="flex items-center gap-3">
+                <div className="text-gray-500 min-w-[70px]">Patient</div>
+                <div className="flex items-center gap-3">
+                  <div className="relative h-12 w-12 rounded-full overflow-hidden border border-white/15 bg-white/5">
+                    {viewAppt.user.avatar_url ? (
+                      <Image
+                        src={viewAppt.user.avatar_url}
+                        alt={`Avatar for ${viewAppt.user.email || 'user'}`}
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-[#FFCA40]/10 text-base font-semibold text-[#FFCA40]">
+                        {(viewAppt.user.email || 'U').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="font-medium text-white">{viewAppt.user.email || 'Unknown'}</div>
+                    <div className="text-xs text-gray-500">User #{viewAppt.user.id}</div>
+                  </div>
+                </div>
               </div>
-              <div>
-                <div className="text-gray-500">Therapist</div>
-                <div className="font-medium">{viewAppt.psychologist.name}</div>
+              <div className="flex items-center gap-3">
+                <div className="text-gray-500 min-w-[70px]">Therapist</div>
+                <div className="flex items-center gap-3">
+                  <div className="relative h-12 w-12 rounded-full overflow-hidden border border-white/15 bg-white/5">
+                    {viewAppt.psychologist.image_url ? (
+                      <Image
+                        src={viewAppt.psychologist.image_url}
+                        alt={`Avatar for ${viewAppt.psychologist.name}`}
+                        fill
+                        sizes="48px"
+                        className="object-cover"
+                      />
+                    ) : (
+                      <div className="flex h-full w-full items-center justify-center bg-white/10 text-base font-semibold text-white/70">
+                        {(viewAppt.psychologist.name || 'T').charAt(0).toUpperCase()}
+                      </div>
+                    )}
+                  </div>
+                  <div>
+                    <div className="font-medium text-white">{viewAppt.psychologist.name}</div>
+                    <div className="text-xs text-gray-500">
+                      {viewAppt.psychologist.specialization || 'General practice'}
+                    </div>
+                  </div>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

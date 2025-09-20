@@ -36,6 +36,12 @@ const nextConfig = {
       {
         hostname: 'gateway.pinata.cloud', // Pinata IPFS gateway (generic)
       },
+      {
+        hostname: 'www.gravatar.com',
+      },
+      {
+        hostname: 'api.dicebear.com',
+      },
     ],
     // Disable unoptimized images
     unoptimized: false,

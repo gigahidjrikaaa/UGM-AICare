@@ -1,8 +1,9 @@
-﻿"""Appointment and therapist management endpoints for the admin panel."""
+"""Appointment and therapist management endpoints for the admin panel."""
 from __future__ import annotations
 
 import logging
-from typing import List
+from collections import defaultdict
+from typing import Dict, List
 
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import desc, func, select
@@ -20,8 +21,11 @@ from app.models import (
     User,
     UserBadge,
 )
-from app.routes.admin.utils import decrypt_user_email
-from app.schemas.admin import UserListItem
+from app.routes.admin.utils import (
+    decrypt_user_email,
+    decrypt_user_field,
+    build_avatar_url,
+)
 from app.schemas.admin.appointments import (
     AppointmentResponse,
     AppointmentUpdate,
@@ -30,6 +34,7 @@ from app.schemas.admin.appointments import (
     TherapistScheduleCreate,
     TherapistScheduleResponse,
     TherapistScheduleUpdate,
+    TherapistSummary,
 )
 
 logger = logging.getLogger(__name__)
@@ -37,14 +42,14 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Admin - Appointments"])
 
 
-@router.get("/psychologists", response_model=List[UserListItem])
+@router.get("/psychologists", response_model=List[TherapistSummary])
 async def get_psychologists(
     db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user),
-) -> List[UserListItem]:
-    """Return therapist users enriched with engagement statistics."""
+) -> List[TherapistSummary]:
+    """Return therapist contacts enriched with engagement statistics and schedules."""
 
-    logger.info("Admin %s requesting psychologist list", admin_user.id)
+    logger.info("Admin %s requesting therapist directory", admin_user.id)
 
     journal_count_sq = (
         select(func.count(JournalEntry.id))
@@ -80,34 +85,91 @@ async def get_psychologists(
             appointment_count_sq.label("appointment_count"),
         )
         .where(User.role == "therapist")
+        .order_by(User.created_at.asc())
     )
 
     rows = await db.execute(base_query)
+    therapist_rows = rows.all()
 
-    users: List[UserListItem] = []
-    for user, journal_count, conversation_count, badge_count, appointment_count in rows.all():
-        users.append(
-            UserListItem(
+    if not therapist_rows:
+        return []
+
+    therapist_ids = [user.id for user, *_ in therapist_rows]
+
+    psychologist_rows = await db.execute(
+        select(Psychologist).where(Psychologist.id.in_(therapist_ids))
+    )
+    psychologist_map: Dict[int, Psychologist] = {
+        item.id: item for item in psychologist_rows.scalars().all()
+    }
+
+    schedule_rows = await db.execute(
+        select(TherapistSchedule).where(TherapistSchedule.therapist_id.in_(therapist_ids))
+    )
+    schedule_map: Dict[int, List[TherapistSchedule]] = defaultdict(list)
+    for schedule_entry in schedule_rows.scalars():
+        schedule_map[schedule_entry.therapist_id].append(schedule_entry)
+
+    day_order = {day: index for index, day in enumerate(
+        [
+            "Monday",
+            "Tuesday",
+            "Wednesday",
+            "Thursday",
+            "Friday",
+            "Saturday",
+            "Sunday",
+        ]
+    )}
+
+    def sort_key(entry: TherapistSchedule) -> tuple[int, str]:
+        return (day_order.get(entry.day_of_week, 99), entry.start_time)
+
+    therapists: List[TherapistSummary] = []
+    for user, _, _, _, appointment_count in therapist_rows:
+        psychologist = psychologist_map.get(user.id)
+        schedules = schedule_map.get(user.id, [])
+        schedules.sort(key=sort_key)
+
+        name_plain = decrypt_user_field(user.name)
+        first_name_plain = decrypt_user_field(user.first_name)
+        last_name_plain = decrypt_user_field(user.last_name)
+        phone_plain = decrypt_user_field(user.phone)
+        email_plain = decrypt_user_email(user.email)
+
+        display_name_candidates = [
+            name_plain,
+            " ".join(filter(None, [first_name_plain, last_name_plain])) or None,
+            psychologist.name if psychologist else None,
+            email_plain,
+        ]
+        display_name = next((value for value in display_name_candidates if value), "Therapist")
+
+        fallback_avatar = build_avatar_url(email_plain, user.id, size=192)
+        display_image = psychologist.image_url if psychologist and psychologist.image_url else fallback_avatar
+
+        therapists.append(
+            TherapistSummary(
                 id=user.id,
-                email=decrypt_user_email(user.email),
-                google_sub=user.google_sub,
-                wallet_address=user.wallet_address,
-                sentiment_score=user.sentiment_score,
-                current_streak=user.current_streak,
-                longest_streak=user.longest_streak,
-                last_activity_date=user.last_activity_date,
+                email=email_plain,
+                name=display_name,
+                first_name=first_name_plain,
+                last_name=last_name_plain,
+                phone=phone_plain,
+                specialization=psychologist.specialization if psychologist else None,
+                is_available=psychologist.is_available if psychologist else True,
                 allow_email_checkins=user.allow_email_checkins,
-                role=getattr(user, "role", "user"),
-                is_active=getattr(user, "is_active", True),
-                created_at=getattr(user, "created_at", None),
-                total_journal_entries=int(journal_count or 0),
-                total_conversations=int(conversation_count or 0),
-                total_badges=int(badge_count or 0),
                 total_appointments=int(appointment_count or 0),
-                last_login=getattr(user, "last_login", None),
+                upcoming_schedules=[
+                    TherapistScheduleResponse.model_validate(entry)
+                    for entry in schedules[:5]
+                ],
+                image_url=display_image,
+                avatar_url=fallback_avatar,
             )
         )
-    return users
+
+    return therapists
 
 
 def _map_psychologist(psychologist: Psychologist) -> PsychologistResponse:
@@ -121,9 +183,11 @@ def _map_psychologist(psychologist: Psychologist) -> PsychologistResponse:
 
 
 def _map_user(user: User) -> AppointmentUser:
+    email_plain = decrypt_user_email(user.email)
     return AppointmentUser(
         id=user.id,
-        email=decrypt_user_email(user.email),
+        email=email_plain,
+        avatar_url=build_avatar_url(email_plain, user.id, size=96),
     )
 
 
@@ -381,6 +445,9 @@ async def delete_therapist_schedule(
     await db.delete(db_schedule)
     await db.commit()
     return {"detail": "deleted"}
+
+
+
 
 
 

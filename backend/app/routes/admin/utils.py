@@ -16,6 +16,16 @@ from app.utils.security_utils import decrypt_data
 logger = logging.getLogger(__name__)
 
 
+def decrypt_user_field(encrypted_value: Optional[str]) -> Optional[str]:
+    if not encrypted_value:
+        return None
+    try:
+        return decrypt_data(encrypted_value)
+    except Exception as exc:
+        logger.warning("Failed to decrypt field: %s", exc)
+        return encrypted_value
+
+
 def decrypt_user_email(encrypted_email: Optional[str]) -> Optional[str]:
     """Safely decrypt an email address, returning a placeholder on failure."""
     if not encrypted_email:
@@ -30,6 +40,18 @@ def decrypt_user_email(encrypted_email: Optional[str]) -> Optional[str]:
 def hash_user_id(user_id: int) -> str:
     """Return a deterministic but anonymous hash for user identifiers."""
     return hashlib.md5(f"user_{user_id}_salt".encode()).hexdigest()[:8]
+
+
+def build_avatar_url(email: Optional[str], user_id: int, size: int = 128) -> str:
+    """Construct a deterministic avatar URL for a user."""
+    if email:
+        normalized = email.strip().lower()
+        if normalized:
+            email_hash = hashlib.md5(normalized.encode("utf-8")).hexdigest()
+            return f"https://www.gravatar.com/avatar/{email_hash}?s={size}&d=identicon"
+
+    seed = hash_user_id(user_id)
+    return f"https://api.dicebear.com/7.x/identicon/svg?seed={seed}&size={size}"
 
 
 async def get_user_stats(db: AsyncSession) -> UserStats:
@@ -71,3 +93,4 @@ async def get_user_stats(db: AsyncSession) -> UserStats:
         total_conversations=total_conversations,
         total_badges_awarded=total_badges,
     )
+

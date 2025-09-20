@@ -19,6 +19,8 @@ from .appointments import (
     TherapistScheduleCreate,
     TherapistScheduleResponse,
     TherapistScheduleUpdate,
+    TherapistSummary,
+    # removed unmatched closing parenthesis
 )
 from .content_resources import (
     ContentResourceCreate,
@@ -102,6 +104,8 @@ __all__ = [
     "AppointmentUpdate",
     "AppointmentUser",
     "PsychologistResponse",
+
+    "TherapistSummary",
     "TherapistScheduleCreate",
     "TherapistScheduleResponse",
     "TherapistScheduleUpdate",
@@ -161,5 +165,6 @@ __all__ = [
     "TriageTestRequest",
     "TriageTestResponse",
 ]
+
 
 

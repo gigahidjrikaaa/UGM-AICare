@@ -14,7 +14,7 @@ from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.models import Appointment, Conversation, JournalEntry, User, UserBadge
 from app.schemas.admin import UserDetailResponse, UserListItem, UsersResponse
-from .utils import decrypt_user_email, get_user_stats
+from .utils import decrypt_user_email, get_user_stats, build_avatar_url
 
 logger = logging.getLogger(__name__)
 
@@ -78,6 +78,8 @@ async def get_users(
 
     users: List[UserListItem] = []
     for user_obj, journal_count, conversation_count, badge_count, appointment_count in rows:
+        email_plain = decrypt_user_email(user_obj.email)
+        avatar_url = build_avatar_url(email_plain, user_obj.id)
         # Ensure last_activity_date is a Python date or None
         lad = user_obj.last_activity_date
         import datetime as dt
@@ -92,7 +94,7 @@ async def get_users(
         users.append(
             UserListItem(
                 id=user_obj.id,
-                email=decrypt_user_email(user_obj.email),
+                email=email_plain,
                 google_sub=user_obj.google_sub,
                 wallet_address=user_obj.wallet_address,
                 sentiment_score=user_obj.sentiment_score,
@@ -103,6 +105,7 @@ async def get_users(
                 role=getattr(user_obj, "role", "user"),
                 is_active=user_obj.is_active,
                 created_at=user_obj.created_at,
+                avatar_url=avatar_url,
                 total_journal_entries=journal_count or 0,
                 total_conversations=conversation_count or 0,
                 total_badges=badge_count or 0,
@@ -126,6 +129,9 @@ async def get_user_detail(
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    email_plain = decrypt_user_email(user.email)
+    avatar_url = build_avatar_url(email_plain, user.id, size=192)
 
     journals = (
         await db.execute(
@@ -162,7 +168,7 @@ async def get_user_detail(
             lad = None
     return UserDetailResponse(
         id=user.id,
-        email=decrypt_user_email(user.email),
+        email=email_plain,
         google_sub=user.google_sub,
         wallet_address=user.wallet_address,
         sentiment_score=user.sentiment_score,
@@ -173,6 +179,7 @@ async def get_user_detail(
         role=user.role,
         is_active=user.is_active,
         created_at=user.created_at,
+        avatar_url=avatar_url,
         journal_entries=[j.__dict__ for j in journals],
         recent_conversations=[c.__dict__ for c in conversations],
         badges=[b.__dict__ for b in badges],
