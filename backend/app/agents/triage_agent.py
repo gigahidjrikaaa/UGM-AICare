@@ -2,11 +2,12 @@
 import logging
 import operator
 import os
-from typing import Annotated, Sequence, TypedDict
+from typing import Annotated, Sequence, TypedDict, Any
 
-from langchain_core.messages import BaseMessage, HumanMessage
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langgraph.graph import END, StateGraph
+from langchain_core.messages import BaseMessage, HumanMessage # type: ignore
+from langchain_core.tools import BaseTool # type: ignore
+from langchain_google_genai import ChatGoogleGenerativeAI # type: ignore
+from langgraph.graph import END, StateGraph # type: ignore
 
 from app.agents.tools.resource_lookup import resource_lookup
 from app.agents.tools.db_resource_lookup import db_resource_lookup
@@ -14,7 +15,7 @@ from app.agents.tools.db_resource_lookup import db_resource_lookup
 logger = logging.getLogger(__name__)
 
 # 1. Define the tools for the agent to use
-tools = [db_resource_lookup, resource_lookup]
+tools: list[BaseTool] = [db_resource_lookup, resource_lookup]
 
 # 2. Define the agent state
 class AgentState(TypedDict):
@@ -61,7 +62,7 @@ def heuristic_classify(messages: Sequence[BaseMessage]) -> str:
     return "low"
 
 
-def call_model(state: AgentState):
+def call_model(state: AgentState) -> dict[str, Any]:
     """Calls the LLM to classify the conversation."""
     try:
         llm = get_llm()
@@ -73,13 +74,14 @@ def call_model(state: AgentState):
 
     return {"classification": classification}
 
-def call_resource_lookup(state: AgentState):
+def call_resource_lookup(state: AgentState) -> dict[str, Any]:
     """Looks up resources based on the classification."""
-    tool = next((t for t in tools if t.name == "db_resource_lookup"), None)
-    if tool:
-        resources = tool.invoke({"classification": state["classification"]})
+    # Get the tools with proper type checking
+    db_tool = next((t for t in tools if getattr(t, 'name', None) == "db_resource_lookup"), None)
+    if db_tool:
+        resources = db_tool.invoke({"classification": state["classification"]})
     else:
-        fallback_tool = next((t for t in tools if t.name == "resource_lookup"), None)
+        fallback_tool = next((t for t in tools if getattr(t, 'name', None) == "resource_lookup"), None)
         if fallback_tool:
             resources = fallback_tool.invoke({"classification": state["classification"]})
         else:
