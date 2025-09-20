@@ -224,7 +224,7 @@ def _get_llm() -> ChatGoogleGenerativeAI:
         raise RuntimeError("Missing Google Generative AI credentials")
 
     _llm_instance = ChatGoogleGenerativeAI(
-        model="gemini-pro",
+        model="gemini-2.5-flash",
         temperature=0.2,
         google_api_key=api_key,
     )

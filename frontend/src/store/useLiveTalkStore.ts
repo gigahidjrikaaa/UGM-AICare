@@ -25,6 +25,7 @@ type LiveTalkState = {
   selectedMicrophone: string | null;
   selectedSpeaker: string | null;
   selectedVoice: string | null;
+  spectrogramData: number[];
   toggleLiveTalk: () => void;
   setUserSpeaking: (status: boolean) => void;
   setAikaSpeaking: (status: boolean) => void;
@@ -35,6 +36,7 @@ type LiveTalkState = {
   setSelectedMicrophone: (deviceId: string) => void;
   setSelectedSpeaker: (deviceId: string) => void;
   setSelectedVoice: (voiceURI: string) => void;
+  setSpectrogramData: (data: number[]) => void;
 };
 
 export const useLiveTalkStore = create<LiveTalkState>((set) => ({
@@ -48,6 +50,7 @@ export const useLiveTalkStore = create<LiveTalkState>((set) => ({
   selectedMicrophone: null,
   selectedSpeaker: null,
   selectedVoice: null,
+  spectrogramData: Array(16).fill(0),
   toggleLiveTalk: () => set((state) => ({ isLiveTalkActive: !state.isLiveTalkActive })),
   setUserSpeaking: (status) => set({ isListening: status }),
   setAikaSpeaking: (status) => set({ isAikaSpeaking: status }),
@@ -58,4 +61,5 @@ export const useLiveTalkStore = create<LiveTalkState>((set) => ({
   setSelectedMicrophone: (deviceId) => set({ selectedMicrophone: deviceId }),
   setSelectedSpeaker: (deviceId) => set({ selectedSpeaker: deviceId }),
   setSelectedVoice: (voiceURI) => set({ selectedVoice: voiceURI }),
+  setSpectrogramData: (data) => set({ spectrogramData: data }),
 }));

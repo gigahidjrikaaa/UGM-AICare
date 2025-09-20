@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import {
@@ -271,7 +271,7 @@ const DistressHeatmap = ({ data }: { data: HeatmapCell[] }) => {
           </div>
         ))}
         {TIME_BUCKETS.map((bucket) => (
-          <>
+          <Fragment key={bucket}>
             <div key={`${bucket}-label`} className="bg-slate-900/70 px-2 py-6 text-white/60">
               {bucket}
             </div>
@@ -287,7 +287,7 @@ const DistressHeatmap = ({ data }: { data: HeatmapCell[] }) => {
                 </div>
               );
             })}
-          </>
+          </Fragment>
         ))}
       </div>
     </div>

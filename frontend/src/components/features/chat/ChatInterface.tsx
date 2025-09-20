@@ -28,6 +28,7 @@ export default function ChatInterface({ model }: { model: string }) {
     isLiveTalkActive,
     isListening,
     isAikaSpeaking,
+    spectrogramData,
     toggleLiveTalk,
   } = useLiveTalkStore();
 
@@ -62,7 +63,7 @@ export default function ChatInterface({ model }: { model: string }) {
               {inputValue}
             </div>
             <div className="flex items-center">
-              <SpectrogramBubble isActive={isListening || isAikaSpeaking} />
+              <SpectrogramBubble isActive={isListening || isAikaSpeaking} data={spectrogramData} />
               <button
                 onClick={toggleLiveTalk}
                 className="ml-4 px-6 py-3 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors shadow-lg"

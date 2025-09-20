@@ -35,7 +35,7 @@ def _get_llm() -> ChatGoogleGenerativeAI:
     if not api_key:
         raise RuntimeError("Missing Google Generative AI credentials")
     _llm = ChatGoogleGenerativeAI(
-        model="gemini-pro",
+        model="gemini-2.5-flash",
         temperature=0.15,
         google_api_key=api_key,
     )
@@ -168,7 +168,9 @@ class InterventionAgent:
         return {"insight": insight, "settings": settings}
 
     async def _score_insight(self, state: InterventionState) -> InterventionState:
-        insight = state["insight"]
+        insight = state.get("insight")
+        if insight is None:
+            raise ValueError("Insight is required for scoring")
         base = {"high": 0.88, "medium": 0.65, "low": 0.35}.get(
             insight.severity.lower(), 0.5
         )
@@ -186,10 +188,15 @@ class InterventionAgent:
         return {"risk_score": risk_score, "risk_level": risk_level}
 
     async def _choose_strategy(self, state: InterventionState) -> InterventionState:
-        insight = state["insight"]
-        settings = state["settings"]
-        risk_score = state["risk_score"]
-        risk_level = state["risk_level"]
+        insight = state.get("insight")
+        settings = state.get("settings")
+        risk_score = state.get("risk_score", 0.5)
+        risk_level = state.get("risk_level", "watch")
+
+        if insight is None:
+            raise ValueError("Insight is required for strategy selection")
+        if settings is None:
+            raise ValueError("Settings are required for strategy selection")
 
         severity = insight.severity.lower()
         title_lower = insight.title.lower()
@@ -235,8 +242,14 @@ class InterventionAgent:
         return {"strategy": strategy, "targeting": targeting}
 
     async def _select_audience(self, state: InterventionState) -> InterventionState:
-        targeting = state["targeting"]
-        settings = state["settings"]
+        targeting = state.get("targeting")
+        settings = state.get("settings")
+
+        if targeting is None:
+            raise ValueError("Targeting criteria are required for audience selection")
+        if settings is None:
+            raise ValueError("Settings are required for audience selection")
+
         lookback_days = int(targeting.get("lookback_days", 21))
         min_risk = self._safe_float(
             targeting.get("minimum_risk_score"), settings.risk_score_threshold
@@ -315,11 +328,20 @@ class InterventionAgent:
         return {"audience": candidates}
 
     async def _compose_messaging(self, state: InterventionState) -> InterventionState:
-        insight = state["insight"]
-        strategy = state["strategy"]
+        insight = state.get("insight")
+        strategy = state.get("strategy")
         audience = state.get("audience", [])
-        risk_score = state["risk_score"]
-        channels = state["settings"].channels_enabled or ["email"]
+        risk_score = state.get("risk_score", 0.5)
+        settings = state.get("settings")
+
+        if insight is None:
+            raise ValueError("Insight is required for message composition")
+        if strategy is None:
+            raise ValueError("Strategy is required for message composition")
+        if settings is None:
+            raise ValueError("Settings are required for message composition")
+
+        channels = settings.channels_enabled or ["email"]
         base_subject = f"{insight.title} - Support from AICare"
         base_body = self._build_heuristic_body(insight, audience, risk_score, channels)
         cta_text = "Schedule a counselling session"
@@ -386,11 +408,18 @@ class InterventionAgent:
         return {"campaign_draft": draft}
 
     async def _persist_campaign(self, state: InterventionState) -> InterventionState:
-        draft = state["campaign_draft"]
-        strategy = state["strategy"]
+        draft = state.get("campaign_draft")
+        strategy = state.get("strategy")
         targeting = state.get("targeting", {})
         audience = state.get("audience", [])
-        settings = state["settings"]
+        settings = state.get("settings")
+
+        if draft is None:
+            raise ValueError("Campaign draft is required for persistence")
+        if strategy is None:
+            raise ValueError("Strategy is required for persistence")
+        if settings is None:
+            raise ValueError("Settings are required for persistence")
 
         status = "draft"
         if audience:
@@ -429,7 +458,7 @@ class InterventionAgent:
                         "assessed_at": candidate.last_assessed_at.isoformat()
                         if candidate.last_assessed_at
                         else None,
-                        "insight_title": state["insight"].title,
+                        "insight_title": (state.get("insight") or InterventionInsight(title="Unknown Insight", description="", severity="low", data={})).title,
                     },
                 )
                 self.db.add(execution)
@@ -465,7 +494,7 @@ class InterventionAgent:
                 }
             }
 
-        if strategy.requires_human_review:
+        if strategy is None or strategy.requires_human_review:
             return {
                 "dispatch_result": {
                     "status": "pending_review",
@@ -474,7 +503,7 @@ class InterventionAgent:
                 }
             }
 
-        if not settings.auto_mode_enabled:
+        if settings is None or not settings.auto_mode_enabled:
             return {
                 "dispatch_result": {
                     "status": "skipped",
@@ -494,12 +523,12 @@ class InterventionAgent:
 
         payload = {
             "campaign_id": campaign.id,
-            "campaign_type": strategy.campaign_type,
-            "priority": strategy.priority,
+            "campaign_type": strategy.campaign_type if strategy else "unknown",
+            "priority": strategy.priority if strategy else "medium",
             "content": draft.content,
             "target_criteria": state.get("targeting", {}),
             "targets": [candidate.model_dump(mode="json") for candidate in audience],
-            "insight": state["insight"].model_dump(),
+            "insight": (state.get("insight") or InterventionInsight(title="Unknown Insight", description="", severity="low", data={})).model_dump(),
         }
         headers = {"Content-Type": "application/json"}
         if self._n8n_api_key:
