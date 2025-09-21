@@ -36,6 +36,7 @@ import { format } from "date-fns";
 
 import GlobalSkeleton from "@/components/ui/GlobalSkeleton";
 import ParticleBackground from "@/components/ui/ParticleBackground";
+import EarnedBadgesDisplay from "@/components/ui/EarnedBadgesDisplay";
 import apiClient, { fetchUserProfileOverview, updateUserProfileOverview } from "@/services/api";
 import type { TimelineEntry, UserProfileOverviewResponse, UserProfileOverviewUpdate } from "@/types/profile";
 
@@ -714,6 +715,27 @@ export default function ProfilePage() {
           </div>
         </header>
 
+        <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur">
+          <EarnedBadgesDisplay />
+        </section>
+
+        <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="flex items-center gap-2 text-xl font-semibold text-white">
+                <FiActivity className="h-5 w-5 text-[#FFCA40]" />
+                Activity timeline
+              </h2>
+              <p className="text-sm text-white/60">Review your latest appointments, conversations, and wellbeing milestones.</p>
+            </div>
+          </div>
+          <TimelineList
+            entries={profile.timeline}
+            isExpanded={showAllTimelineEntries}
+            onToggle={handleTimelineToggle}
+          />
+        </section>
+
         <div className="mt-10 grid gap-6 lg:grid-cols-3">
           <div className="space-y-6 lg:col-span-2">
             <SectionCard title="Contacts" icon={<FiPhone className="h-5 w-5" />}>
@@ -988,13 +1010,6 @@ export default function ProfilePage() {
                   )}
                 </div>
               </div>
-            </SectionCard>
-            <SectionCard title="Activity timeline" icon={<FiActivity className="h-5 w-5" />}>
-              <TimelineList
-                entries={profile.timeline}
-                isExpanded={showAllTimelineEntries}
-                onToggle={handleTimelineToggle}
-              />
             </SectionCard>
           </div>
 

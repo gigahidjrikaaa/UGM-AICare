@@ -1,152 +1,211 @@
-"use client"
+"use client";
 
-import { useState, useEffect } from "react"
-import { useSession } from "next-auth/react"
-import { ethers } from "ethers"
-import apiClient from "@/services/api"
-import { FiLink, FiCheckCircle, FiLoader, FiCopy } from 'react-icons/fi';
+import { useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
+import toast from "react-hot-toast";
+import { BrowserProvider, type Eip1193Provider } from "ethers";
+import { FiAlertTriangle, FiCheckCircle, FiCopy, FiInfo, FiLink, FiLoader } from "react-icons/fi";
+
+import apiClient from "@/services/api";
+
+declare global {
+  interface Window {
+    ethereum?: Eip1193Provider & { isMetaMask?: boolean };
+  }
+}
+
+type StatusState = {
+  tone: "success" | "error" | "info";
+  message: string;
+};
 
 export default function AccountLinker() {
-  const { data: session, status, update } = useSession()
-  const [linkStatus, setLinkStatus] = useState<string>("")
-  const [loading, setLoading] = useState<boolean>(false)
-  const [copySuccess, setCopySuccess] = useState<boolean>(false);
+  const { data: session, status, update } = useSession();
 
-  // Wallet address from session, updated via useEffect
-  const [linkedAddress, setLinkedAddress] = useState<string | null | undefined>(undefined);
+  const [linkStatus, setLinkStatus] = useState<StatusState | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [copySuccess, setCopySuccess] = useState(false);
+  const [linkedAddress, setLinkedAddress] = useState<string | null>(null);
 
-  // Update local state when session changes
   useEffect(() => {
-    setLinkedAddress(session?.user?.wallet_address);
-  }, [session?.user?.wallet_address]); // Depend on the specific session field
+    if (typeof session?.user?.wallet_address === "string") {
+      setLinkedAddress(session.user.wallet_address);
+    } else {
+      setLinkedAddress(null);
+    }
+  }, [session?.user?.wallet_address]);
+
+  const shortAddress = useMemo(() => {
+    if (!linkedAddress) return null;
+    return `${linkedAddress.slice(0, 6)}...${linkedAddress.slice(-4)}`;
+  }, [linkedAddress]);
 
   const linkWallet = async () => {
     if (status !== "authenticated") {
-      setLinkStatus("❌ Please log in first.");
+      setLinkStatus({ tone: "info", message: "Please sign in before linking a wallet." });
       return;
-   }
+    }
+
     if (!window.ethereum) {
-      setLinkStatus("❌ Wallet (like MetaMask) not detected.")
-      return
+      setLinkStatus({
+        tone: "error",
+        message: "We couldn't find a web3 wallet. Install MetaMask or another provider to continue.",
+      });
+      return;
     }
 
     try {
-      setLoading(true)
-      setLinkStatus("") // Reset status message
+      setLoading(true);
+      setLinkStatus(null);
 
-      const provider = new ethers.BrowserProvider(window.ethereum)
-      const signer = await provider.getSigner()
-      const address = await signer.getAddress()
+      const provider = new BrowserProvider(window.ethereum, "any");
+      await provider.send("eth_requestAccounts", []);
+      const signer = await provider.getSigner();
+      const address = await signer.getAddress();
+      const signature = await signer.signMessage("Linking DID to UGM-AICare");
 
-      // Optional: sign a message to prove ownership
-      const signature = await signer.signMessage("Linking DID to UGM-AICare")
-      
-      // Use the apiClient - Authorization header is now added automatically
-      const response = await apiClient.post( // Use relative path if baseURL is set
-          '/link-did', // apiClient automatically adds base URL
-          {
-            wallet_address: address,
-            signature: signature, // Send signature if backend expects it
-          }
-      );
-
-      // --- Update session after successful linking ---
-      await update({ wallet_address: response.data.address }); // Trigger session update
-      setLinkedAddress(response.data.address); // Update local state immediately
-      setLinkStatus(`✅ Wallet linked: ${response.data.address.substring(0, 6)}...${response.data.address.substring(response.data.address.length - 4)}`)
-    } catch (error: unknown) {
-      const errorObj = error as { response?: { data?: { detail?: string } }; message?: string };
-      const detail = errorObj.response?.data?.detail || errorObj.message || "An error occurred while linking wallet.";
-      if (detail.includes("already linked")) {
-        setLinkStatus(`⚠️ ${detail}`);
-      } else {
-        setLinkStatus(`❌ Failed to link: ${detail}`)
-      }
-      console.error("Linking error:", error);
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const copyToClipboard = () => {
-    if (linkedAddress) {
-      navigator.clipboard.writeText(linkedAddress).then(() => {
-        setCopySuccess(true);
-        setTimeout(() => setCopySuccess(false), 2000); // Reset after 2 seconds
-      }, (err) => {
-        console.error('Failed to copy address: ', err);
-        setLinkStatus("❌ Failed to copy address.");
+      const { data } = await apiClient.post("/link-did", {
+        wallet_address: address,
+        signature,
       });
+
+      const normalisedAddress = data?.address ?? address;
+      await update({ wallet_address: normalisedAddress });
+      setLinkedAddress(normalisedAddress);
+
+      setLinkStatus({
+        tone: "success",
+        message: `Wallet linked: ${normalisedAddress.slice(0, 6)}...${normalisedAddress.slice(-4)}`,
+      });
+      toast.success("Wallet linked successfully");
+    } catch (error) {
+      console.error("Failed to link wallet", error);
+
+      const detail =
+        (error as { response?: { data?: { detail?: string } }; message?: string }).response?.data?.detail ??
+        (error as Error).message ??
+        "Something went wrong while linking your wallet.";
+
+      if (detail.toLowerCase().includes("already linked")) {
+        setLinkStatus({ tone: "info", message: detail });
+        toast(detail);
+      } else if (detail.toLowerCase().includes("user rejected")) {
+        setLinkStatus({ tone: "info", message: "Wallet connection was cancelled." });
+      } else {
+        setLinkStatus({ tone: "error", message: detail });
+        toast.error(detail);
+      }
+    } finally {
+      setLoading(false);
     }
   };
 
+  const copyToClipboard = async () => {
+    if (!linkedAddress) return;
 
-  // Display loading state while session is checked
+    try {
+      await navigator.clipboard.writeText(linkedAddress);
+      setCopySuccess(true);
+      toast.success("Wallet address copied to clipboard");
+      setTimeout(() => setCopySuccess(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy address", err);
+      setLinkStatus({ tone: "error", message: "We couldn't copy the address. Please try manually." });
+    }
+  };
+
   if (status === "loading" || linkedAddress === undefined) {
-     return (
-       <div className="p-4 border border-gray-700 rounded-md max-w-md space-y-3 bg-gray-800/50 animate-pulse">
-          <div className="h-6 w-3/4 bg-gray-600 rounded"></div>
-          <div className="h-10 w-1/2 bg-gray-600 rounded"></div>
-       </div>
-     )
-   }
+    return (
+      <div className="w-full max-w-md animate-pulse rounded-2xl border border-white/10 bg-white/5 p-5 text-white">
+        <div className="h-5 w-32 rounded-full bg-white/10" />
+        <div className="mt-4 h-10 w-40 rounded-full bg-white/10" />
+      </div>
+    );
+  }
 
-   return (
-    <div className="p-4 border border-gray-700 rounded-md max-w-md space-y-3 bg-gray-800/50 text-white">
-      <h2 className="text-lg font-semibold flex items-center">
-         <FiLink className="mr-2 text-blue-400"/> Link Digital Identity (DID)
-      </h2>
+  return (
+    <div className="w-full max-w-md space-y-4 rounded-2xl border border-white/10 bg-white/5 p-5 text-white shadow-sm backdrop-blur">
+      <div>
+        <p className="text-xs uppercase tracking-wide text-white/50">Digital identity</p>
+        <h2 className="mt-1 flex items-center gap-2 text-lg font-semibold">
+          <FiLink className="h-5 w-5 text-[#FFCA40]" /> Wallet connection
+        </h2>
+        <p className="mt-1 text-sm text-white/60">Connect MetaMask to secure your decentralised identity.</p>
+      </div>
 
-       {status !== "authenticated" ? (
-         <p className="text-yellow-400 text-sm">Please log in to manage wallet linking.</p>
-       ) : linkedAddress ? (
-         // Wallet is linked - Display info
-         <div className="space-y-2">
-            <p className="text-sm text-green-400 flex items-center">
-                <FiCheckCircle className="mr-2"/> Wallet Linked
-            </p>
-            <div className="flex items-center justify-between bg-gray-700 p-2 rounded">
-                 <code className="text-xs text-gray-300 truncate">
-                     {linkedAddress}
-                 </code>
-                 <button
-                    onClick={copyToClipboard}
-                    className="ml-2 p-1 text-gray-400 hover:text-white transition"
-                    title="Copy address"
-                 >
-                    {copySuccess ? <FiCheckCircle className="text-green-400"/> : <FiCopy size={14} />}
-                 </button>
-            </div>
-            {/* Optional: Add an "Unlink" button here if needed */}
-         </div>
-       ) : (
-         // Wallet not linked - Show button
-         <>
-            <p className="text-sm text-gray-400">
-                Connect your blockchain wallet (e.g., MetaMask) to associate your DID.
-            </p>
+      {status !== "authenticated" ? (
+        <div className="rounded-xl border border-yellow-400/30 bg-yellow-400/10 px-4 py-3 text-sm text-yellow-100">
+          Please sign in to manage wallet connections.
+        </div>
+      ) : linkedAddress ? (
+        <div className="space-y-3">
+          <div className="flex items-center gap-2 text-sm text-emerald-300">
+            <FiCheckCircle className="h-4 w-4" />
+            Wallet linked
+          </div>
+          <div className="flex items-center justify-between rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs text-white/80">
+            <code className="truncate" title={linkedAddress}>
+              {shortAddress ?? linkedAddress}
+            </code>
             <button
-              onClick={linkWallet}
-              className="bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded disabled:opacity-50 flex items-center justify-center transition w-full sm:w-auto"
-              disabled={loading}
+              type="button"
+              onClick={copyToClipboard}
+              className="inline-flex items-center gap-1 rounded-full border border-white/10 px-2 py-1 text-[11px] uppercase tracking-wide text-white/70 transition hover:border-[#FFCA40] hover:text-[#FFCA40]"
             >
-              {loading ? (
-                 <>
-                    <FiLoader className="animate-spin mr-2"/> Linking...
-                 </>
+              {copySuccess ? (
+                <>
+                  <FiCheckCircle className="h-3 w-3" /> Copied
+                </>
               ) : (
-                 "Link Wallet"
+                <>
+                  <FiCopy className="h-3 w-3" /> Copy
+                </>
               )}
             </button>
-         </>
-       )}
-
-      {/* Display Status/Error Message */}
-      {linkStatus && (
-          <p className={`text-xs mt-2 ${linkStatus.startsWith('✅') || linkStatus.startsWith('⚠️') ? 'text-green-400' : 'text-red-400'}`}>
-            {linkStatus}
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3">
+          <p className="text-sm text-white/60">
+            Connect your MetaMask wallet to associate your DID with the AICare ecosystem.
           </p>
+          <button
+            type="button"
+            onClick={linkWallet}
+            disabled={loading}
+            className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#FFCA40] px-4 py-2 text-sm font-semibold text-[#001D58] transition hover:bg-[#ffd45c] disabled:cursor-not-allowed disabled:opacity-70"
+          >
+            {loading ? (
+              <>
+                <FiLoader className="h-4 w-4 animate-spin" /> Linking...
+              </>
+            ) : (
+              "Link MetaMask wallet"
+            )}
+          </button>
+        </div>
+      )}
+
+      {linkStatus && (
+        <div
+          className={`flex items-start gap-2 rounded-xl border px-3 py-2 text-xs ${
+            linkStatus.tone === "success"
+              ? "border-emerald-400/30 bg-emerald-400/10 text-emerald-100"
+              : linkStatus.tone === "info"
+              ? "border-white/20 bg-white/10 text-white/70"
+              : "border-red-400/40 bg-red-400/10 text-red-200"
+          }`}
+        >
+          {linkStatus.tone === "success" ? (
+            <FiCheckCircle className="mt-0.5 h-3.5 w-3.5" />
+          ) : linkStatus.tone === "info" ? (
+            <FiInfo className="mt-0.5 h-3.5 w-3.5" />
+          ) : (
+            <FiAlertTriangle className="mt-0.5 h-3.5 w-3.5" />
+          )}
+          <span>{linkStatus.message}</span>
+        </div>
       )}
     </div>
-  )
+  );
 }

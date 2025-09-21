@@ -1,266 +1,308 @@
 "use client";
-import React, { useState, useEffect, useCallback } from 'react';
-import apiClient from '@/services/api';
-import Image from 'next/image';
-import { FiLoader, FiAward, FiHelpCircle, FiRefreshCw } from '@/icons';
-import { Tooltip } from '@/components/ui/Tooltip';
-import toast from 'react-hot-toast';
 
-// Import from the new constants file
-import { getIpfsUrl, badgeMetadataMap, getBadgeMeta } from '@/lib/badgeConstants';
-import InteractiveBadgeCard from '@/components/ui/InteractiveBadgeCard';
+import { useCallback, useEffect, useMemo, useState } from "react";
+import Image from "next/image";
+import toast from "react-hot-toast";
+import { FiAward, FiExternalLink, FiHelpCircle, FiLoader, FiLock, FiRefreshCw } from "react-icons/fi";
 
-// --- Define EDUChain Testnet Explorer ---
+import apiClient from "@/services/api";
+import InteractiveBadgeCard from "@/components/ui/InteractiveBadgeCard";
+import { Tooltip } from "@/components/ui/Tooltip";
+import { badgeMetadataMap, getBadgeMeta, getIpfsUrl } from "@/lib/badgeConstants";
+
 const EDUCHAIN_TESTNET_EXPLORER_BASE_URL = "https://edu-chain-testnet.blockscout.com";
 
 interface EarnedBadge {
-    badge_id: number;
-    awarded_at: string;
-    transaction_hash: string;
-    contract_address: string;
-    name?: string;
-    description?: string;
-    image_url?: string;
-    attributes?: {
-        trait_type: string;
-        value: string | number;
-        display_type?: string;
-    }[];
+  badge_id: number;
+  awarded_at: string;
+  transaction_hash: string;
+  contract_address: string;
 }
 
-interface EarnedBadgeInfo { 
-    badge_id: number; 
-    awarded_at: string; 
-    transaction_hash: string; 
-    contract_address: string;
+interface EarnedBadgeInfo {
+  badge_id: number;
+  awarded_at: string;
+  transaction_hash: string;
+  contract_address: string;
 }
 
-interface SyncAchievementsResponse { 
-    message: string; 
-    newly_awarded_badges: EarnedBadgeInfo[]; 
+interface SyncAchievementsResponse {
+  message: string;
+  newly_awarded_badges: EarnedBadgeInfo[];
+}
+
+const skeletonCards = Array.from({ length: 6 });
+
+function formatAwardDate(iso: string | undefined) {
+  if (!iso) return null;
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
 }
 
 export default function EarnedBadgesDisplay() {
-    const [earnedBadges, setEarnedBadges] = useState<EarnedBadge[]>([]);    // State to hold the badges
-    const [earnedBadgeIds, setEarnedBadgeIds] = useState<Set<number>>(new Set()); // State to hold the IDs of the badges
-    const [isLoading, setIsLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
+  const [earnedBadges, setEarnedBadges] = useState<Record<number, EarnedBadge>>({});
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-    const [isSyncing, setIsSyncing] = useState(false);
-    const [syncError, setSyncError] = useState<string | null>(null);
+  const [isSyncing, setIsSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
-    // Function to fetch badges - now callable manually for refresh
-    const fetchBadges = useCallback(async () => {
-        setIsLoading(true);
-        setError(null);
-        try {
-            const response = await apiClient.get<EarnedBadge[]>('/profile/my-badges');
-            
-            const processedBadges: EarnedBadge[] = response.data.map(badgeInfo => {
-                const meta = getBadgeMeta(badgeInfo.badge_id);
-                return {
-                    ...badgeInfo,
-                    name: meta.name,
-                    description: meta.description,
-                    image_url: getIpfsUrl(meta.image), // Assuming meta.image is the CID
-                };
-            });
-            setEarnedBadges(processedBadges);
-            setEarnedBadgeIds(new Set(processedBadges.map(badge => badge.badge_id)));
-        } catch (err) {
-            console.error("Error fetching earned badges:", err);
-            setError("Could not load earned badges.");
-             // Clear badges on error
-            setEarnedBadges([]);
-            setEarnedBadgeIds(new Set());
-        } finally {
-            setIsLoading(false);
-        }
-    }, []);
+  const badgeCatalog = useMemo(() => {
+    return Object.keys(badgeMetadataMap)
+      .map((key) => Number(key))
+      .sort((a, b) => a - b);
+  }, []);
 
-    
-    // --- Sync Achievements function moved from ProfilePage ---
-    const handleSyncAchievements = useCallback(async () => {
-        if (isSyncing) return;
-        setIsSyncing(true);
-        setSyncError(null);
-        const toastId = toast.loading("Checking for new badges...");
-        
-        try {
-            const response = await apiClient.post<SyncAchievementsResponse>('/profile/sync-achievements'); // Use correct endpoint
-            toast.dismiss(toastId);
+  const earnedCount = useMemo(() => Object.keys(earnedBadges).length, [earnedBadges]);
+  const totalCount = badgeCatalog.length;
+  const progressPercent = totalCount ? Math.round((earnedCount / totalCount) * 100) : 0;
 
-            const newBadges = response.data.newly_awarded_badges || [];
-            if (newBadges.length > 0) {
-                toast.success(`Unlocked ${newBadges.length} new badge(s)!`, { duration: 4000 });
-                newBadges.forEach((badge, index) => {
-                    const meta = getBadgeMeta(badge.badge_id);
-                    setTimeout(() => {
-                         toast.success(<span>Badge Unlocked: <strong>{meta.name}</strong></span>, { icon: '🎉', duration: 5000 });
-                    }, index * 500);
-                });
-                // --- Trigger a refresh of the displayed badges ---
-                await fetchBadges(); // Re-fetch the badge list
-                // ----------------------------------------------
-            } else {
-                toast.success("Achievements up to date!", { icon: '👍' });
-            }
+  const fetchBadges = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        } catch (err: any) {
-            toast.dismiss(toastId);
-            const errorMsg = err.response?.data?.detail || "Failed to sync achievements.";
-            console.error("Error syncing achievements:", err);
-            setSyncError(errorMsg); // Store error to display if needed
-            toast.error(errorMsg);
-        } finally {
-            setIsSyncing(false);
-        }
-    }, [isSyncing, fetchBadges]); // Include fetchBadges in dependencies
-    
-    // Initial sync on component mount
-    useEffect(() => {
-        fetchBadges(); // Load current badges when component mounts
-        handleSyncAchievements(); // Sync achievements on mount
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [fetchBadges]); // Include fetchBadges as a dependency
-
-
-    // --- Loading and Error states ---
-    if (isLoading) {
-        // Improved skeleton for badges
-        return (
-            <div className="mt-6 p-4 bg-white/5 rounded-lg border border-white/10 animate-pulse">
-                 <h3 className="font-semibold mb-3 text-lg h-6 bg-gray-700 rounded w-1/3"></h3>
-                 <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4">
-                     {/* Render placeholders based on the total number of defined badges */}
-                     {Object.keys(badgeMetadataMap).map((id) => (
-                         <div key={`skel-${id}`} className="flex flex-col items-center p-2">
-                             <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full mb-1 bg-gray-700"></div>
-                             <div className="h-3 w-16 sm:w-20 bg-gray-700 rounded mt-1"></div>
-                         </div>
-                     ))}
-                 </div>
-             </div>
-        );
+    try {
+      const { data } = await apiClient.get<EarnedBadge[]>("/profile/my-badges");
+      const mapped = data.reduce<Record<number, EarnedBadge>>((acc, badge) => {
+        acc[badge.badge_id] = badge;
+        return acc;
+      }, {});
+      setEarnedBadges(mapped);
+    } catch (err) {
+      console.error("Error fetching earned badges", err);
+      setError("We couldn't load your badges just now. Please try again shortly.");
+      setEarnedBadges({});
+    } finally {
+      setIsLoading(false);
     }
-    if (error) return <div className="p-4 text-center text-red-400">{error}</div>;
+  }, []);
 
-    // --- Render All Badge Slots ---
-    return (
-        <div className="mt-6 p-4 bg-white/5 rounded-lg border border-white/10">
-            <div className='flex items-center justify-between mb-2'>
-                <h2 className="font-semibold text-xl text-white flex items-center">
-                    <FiAward className="mr-2 text-[#FFCA40]" /> My Badges
-                </h2>
-                <div className="text-sm text-gray-400 flex items-center">
-                    {/* Manual Sync Button */}
-                    <Tooltip title="Check for newly earned badges">
-                        <button
-                            onClick={handleSyncAchievements}
-                            disabled={isSyncing || isLoading} // Disable if loading badges or syncing
-                            className="text-sm p-1.5 rounded text-gray-400 hover:bg-white/10 hover:text-white disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1"
-                            aria-label="Sync Achievements"
-                        >
-                            {isSyncing ? <FiLoader className="animate-spin"/> : <FiRefreshCw />}
-                            Sync Now
-                        </button>
-                    </Tooltip>
-                    <span className="text-sm text-gray-400 ml-1">{earnedBadges.length} / {Object.keys(badgeMetadataMap).length}</span>
-                </div>
+  const handleSyncAchievements = useCallback(async () => {
+    if (isSyncing) return;
+
+    setIsSyncing(true);
+    setSyncError(null);
+    const toastId = toast.loading("Checking for new badges...");
+
+    try {
+      const { data } = await apiClient.post<SyncAchievementsResponse>("/profile/sync-achievements");
+      toast.dismiss(toastId);
+
+      const newlyAwarded = data.newly_awarded_badges ?? [];
+      if (newlyAwarded.length) {
+        toast.success(`Unlocked ${newlyAwarded.length} new badge${newlyAwarded.length > 1 ? "s" : ""}!`, {
+          duration: 4000,
+        });
+
+        newlyAwarded.forEach((item, index) => {
+          const meta = getBadgeMeta(item.badge_id);
+          setTimeout(() => {
+            toast.success(`Badge unlocked: ${meta.name}`, { duration: 4500 });
+          }, index * 350);
+        });
+
+        await fetchBadges();
+      } else {
+        toast.success("Achievements are already up to date!");
+      }
+    } catch (err) {
+      console.error("Error syncing achievements", err);
+      toast.dismiss(toastId);
+      const fallback = "We couldn't synchronise your badges. Please try again.";
+      setSyncError(fallback);
+      toast.error(fallback);
+    } finally {
+      setIsSyncing(false);
+    }
+  }, [fetchBadges, isSyncing]);
+
+  useEffect(() => {
+    fetchBadges();
+  }, [fetchBadges]);
+
+  useEffect(() => {
+    if (!isLoading) {
+      void handleSyncAchievements();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isLoading]);
+
+  const content = useMemo(() => {
+    if (isLoading) {
+      return (
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {skeletonCards.map((_, index) => (
+            <div
+              key={index}
+              className="flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur animate-pulse"
+            >
+              <div className="flex items-center justify-center">
+                <div className="h-20 w-20 rounded-full bg-white/10" />
+              </div>
+              <div className="mt-6 space-y-3">
+                <div className="h-3 w-3/4 rounded-full bg-white/10" />
+                <div className="h-3 w-1/2 rounded-full bg-white/10" />
+              </div>
             </div>
-            {/* If wallet is not linked, badges can't be earned. Link your Web3 EVM-compatible wallet now. */}
-            <p className="text-gray-400 text-xs mb-2 text-center sm:text-left">Link your Web3 EVM-compatible wallet to earn badges.</p>
-            {/* Loading spinner while syncing */}
-            {isSyncing && <p className="text-gray-400 text-xs mb-2 text-center sm:text-left"><FiLoader className="animate-spin" /> Syncing...</p>}
-            {/* Display message if no badges are earned yet */}
-            {earnedBadges.length === 0 && !isLoading && <p className="text-gray-400 text-xs mb-2 text-center sm:text-left">No badges earned yet.</p>}
-            {/* Display message if no badges are defined */}
-        
-            {/* Display sync error if it occurred */}
-            {syncError && <p className="text-red-400 text-xs mb-2 text-center sm:text-left">{syncError}</p>}
-            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 lg:grid-cols-6 gap-3 sm:gap-4">
-                {/* Iterate over ALL defined badges in the metadata map */}
-                {Object.entries(badgeMetadataMap).map(([idStr, meta]) => {
-                    const badgeId = parseInt(idStr, 10); // Convert key string to number
-                    const isEarned = earnedBadgeIds.has(badgeId); // Check if ID is in the earned set
-
-                    // Find the specific earned badge data to get awarded_at (if earned)
-                    const earnedData = isEarned ? earnedBadges.find(b => b.badge_id === badgeId) : undefined;
-                    const awardedDate = earnedData ? new Date(earnedData.awarded_at).toLocaleDateString('id-ID', { year: 'numeric', month: 'short', day: 'numeric' }) : null;
-                    const explorerUrl = earnedData ? `${EDUCHAIN_TESTNET_EXPLORER_BASE_URL}/token/${earnedData.contract_address}` : '#'; // Link only if earned
-
-                    let tooltipTitle = `${meta.name} - ${meta.description}`;
-                    if (isEarned && awardedDate) {
-                        tooltipTitle += ` (Awarded: ${awardedDate})`;
-                    } else {
-                        tooltipTitle += " (Locked)";
-                    }
-
-                    // Define base classes and conditional classes
-                    const baseCardClasses = "flex flex-col items-center text-center p-2 rounded-lg bg-white/10 transition-all duration-200 group relative overflow-hidden h-full";
-                    const lockedCardClasses = `${baseCardClasses} grayscale opacity-50 cursor-default`;
-                    const unlockedCardClasses = `${baseCardClasses} hover:bg-white/20 cursor-pointer focus:outline-none focus:ring-2 focus:ring-ugm-gold-light/50 aurora-border animate-aurora-flow`;
-
-                    const cardContent = (
-                        <>
-                            <Image
-                                src={getIpfsUrl(meta.image)}
-                                alt={meta.name}
-                                width={80}
-                                height={80}
-                                className="w-16 h-16 sm:w-20 sm:h-20 group-hover:shadow-ugm-gold group-hover:shadow-[0_0_10px_3px_var(--tw-shadow-color)] rounded-full mb-3 group-hover:scale-110 transition-all duration-200 bg-gray-700 relative z-[3]"
-                                onError={(e) => { e.currentTarget.src = '/badges/badge-placeholder.png'; }}
-                            />
-                            {/* Inner wrapper for text content for better readability */}
-                            <div className="relative z-[2] w-full mt-auto p-2 bg-black/40 rounded-md flex flex-col flex-grow min-h-[5.5rem]"> 
-                                <span
-                                    className="text-sm font-medium text-gray-50 group-hover:text-ugm-gold-light w-full min-w-0 relative whitespace-normal break-words text-center min-h-[2.8rem] flex items-center justify-center leading-tight mb-1" // text-sm, font-medium, brighter base text, adjusted min-h, leading-tight, mb-1
-                                    title={meta.name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                                >
-                                    {meta.name.split(' ').map(word => word.charAt(0).toUpperCase() + word.slice(1)).join(' ')}
-                                 </span>
-                                {isEarned && awardedDate && (
-                                    <span className="text-xs text-gray-300 group-hover:text-ugm-gold-light/80 relative mt-auto pt-1 block text-center text-opacity-80 group-hover:text-opacity-100 transition-opacity"> {/* Added opacity transition */}
-                                        {awardedDate}
-                                    </span>
-                                )}
-                            </div>
-                        </>
-                    );
-                    
-                    const lockedContent = (
-                         <>
-                            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-full mb-2 bg-gray-700/50 flex items-center justify-center text-gray-500 group-hover:bg-gray-600/70 relative z-[3]"> {/* Increased mb-2 */}
-                                <FiHelpCircle size={32} />
-                            </div>
-                            {/* Inner wrapper for text content */}
-                            <div className="relative z-[2] w-full mt-auto p-2 bg-black/40 rounded-md flex flex-col flex-grow min-h-[5.5rem]"> {/* Increased padding, darker scrim, flex properties, min-height, mt-auto */}
-                                <span 
-                                    className="text-sm font-medium text-gray-400 group-hover:text-gray-300 w-full min-w-0 relative whitespace-normal break-words text-center min-h-[2.8rem] flex items-center justify-center leading-tight mb-1" // text-sm, font-medium, adjusted min-h, leading-tight, mb-1
-                                    title={meta.name}
-                                >
-                                    {meta.name}
-                                </span>
-                                {/* No date for locked content */}
-                            </div>
-                        </>
-                    );
-
-                    return (
-                        <Tooltip title={tooltipTitle} placement="top" key={badgeId} className='relative z-[5]'>
-                            <InteractiveBadgeCard
-                                className={isEarned ? unlockedCardClasses : lockedCardClasses}
-                                href={isEarned ? explorerUrl : undefined}
-                                isEarned={isEarned}
-                                ariaLabel={isEarned ? `View details for earned badge: ${meta.name}` : `Locked badge: ${meta.name}`}
-                            >
-                                {isEarned ? cardContent : lockedContent}
-                            </InteractiveBadgeCard>
-                        </Tooltip>
-                    );
-                 })}
-            </div>
+          ))}
         </div>
+      );
+    }
+
+    return (
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+        {badgeCatalog.map((badgeId) => {
+          const meta = getBadgeMeta(badgeId);
+          const earnedBadge = earnedBadges[badgeId];
+          const isEarned = Boolean(earnedBadge);
+          const awardedDate = formatAwardDate(earnedBadge?.awarded_at);
+          const explorerUrl = earnedBadge?.transaction_hash
+            ? `${EDUCHAIN_TESTNET_EXPLORER_BASE_URL}/tx/${earnedBadge.transaction_hash}`
+            : undefined;
+
+          const tooltipTitle = meta.description || "";
+
+          const badgeBody = (
+            <div className="flex flex-1 flex-col">
+              <div className="flex items-center justify-between gap-3">
+                <span className="text-sm font-semibold text-white/90">{meta.name}</span>
+              </div>
+
+              <div className="mt-5 flex flex-1 items-center justify-center">
+                {isEarned ? (
+                  <Image
+                    src={getIpfsUrl(meta.image)}
+                    alt={meta.name}
+                    width={88}
+                    height={88}
+                    className="h-20 w-20 rounded-full border border-[#FFCA40]/40 bg-black/30 object-cover shadow-[0_0_24px_rgba(255,202,64,0.35)]"
+                    onError={(event) => {
+                      event.currentTarget.src = "/badges/badge-placeholder.png";
+                    }}
+                  />
+                ) : (
+                  <span className="flex h-20 w-20 items-center justify-center rounded-full border border-white/10 bg-white/5 text-white/40">
+                    <FiHelpCircle className="h-8 w-8" />
+                  </span>
+                )}
+              </div>
+
+              <div className="mt-5 flex flex-col items-center gap-2 text-xs text-white/60">
+                {isEarned ? (
+                  <div className="inline-flex items-center gap-2 rounded-full border border-[#FFCA40]/40 bg-[#FFCA40]/10 px-3 py-1 text-[#FFCA40]">
+                    <FiAward className="h-3.5 w-3.5" />
+                    <span>{awardedDate ?? "Recently earned"}</span>
+                    {explorerUrl && <FiExternalLink className="h-3.5 w-3.5" />}
+                  </div>
+                ) : (
+                  <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1">
+                    <FiLock className="h-3.5 w-3.5" />
+                    <span>Keep exploring AICare to unlock</span>
+                  </div>
+                )}
+              </div>
+            </div>
+          );
+
+          return tooltipTitle ? (
+            <Tooltip key={badgeId} title={tooltipTitle} placement="top">
+              <InteractiveBadgeCard
+                className={`relative flex h-full flex-col rounded-2xl border p-6 transition duration-200 ${
+                  isEarned
+                    ? "border-[#FFCA40]/50 bg-gradient-to-br from-[#FFCA40]/15 via-white/10 to-white/5 hover:border-[#FFCA40]/80 hover:shadow-[0_0_25px_rgba(255,202,64,0.35)]"
+                    : "border-white/10 bg-white/5 opacity-80"
+                }`}
+                href={isEarned ? explorerUrl : undefined}
+                isEarned={isEarned}
+                ariaLabel={isEarned ? `View blockchain details for ${meta.name}` : `${meta.name} is locked`}
+              >
+                {badgeBody}
+              </InteractiveBadgeCard>
+            </Tooltip>
+          ) : (
+            <InteractiveBadgeCard
+              key={badgeId}
+              className={`relative flex h-full flex-col rounded-2xl border p-6 transition duration-200 ${
+                isEarned
+                  ? "border-[#FFCA40]/50 bg-gradient-to-br from-[#FFCA40]/15 via-white/10 to-white/5 hover:border-[#FFCA40]/80 hover:shadow-[0_0_25px_rgba(255,202,64,0.35)]"
+                  : "border-white/10 bg-white/5 opacity-80"
+              }`}
+              href={isEarned ? explorerUrl : undefined}
+              isEarned={isEarned}
+              ariaLabel={isEarned ? `View blockchain details for ${meta.name}` : `${meta.name} is locked`}
+            >
+              {badgeBody}
+            </InteractiveBadgeCard>
+          );
+        })}
+      </div>
     );
+  }, [badgeCatalog, earnedBadges, isLoading]);
+
+  return (
+    <div className="w-full space-y-6 text-white">
+      <div className="flex flex-wrap items-center justify-between gap-6">
+        <div className="space-y-2">
+          <p className="text-xs uppercase tracking-wide text-white/50">Achievements</p>
+          <h3 className="flex items-center gap-2 text-xl font-semibold">
+            <FiAward className="h-5 w-5 text-[#FFCA40]" />
+            {earnedCount ? `You have earned ${earnedCount} badge${earnedCount > 1 ? "s" : ""}` : "Start unlocking badges"}
+          </h3>
+          <p className="text-sm text-white/60">{totalCount} badges available across the AICare experience.</p>
+        </div>
+
+        <div className="flex flex-col items-stretch gap-3 text-sm text-white/70 sm:flex-row sm:items-center">
+          <div className="w-full min-w-[200px] sm:w-60">
+            <div className="flex items-center justify-between text-xs uppercase tracking-wide text-white/50">
+              <span>Progress</span>
+              <span>{progressPercent}%</span>
+            </div>
+            <div className="mt-2 h-2 w-full rounded-full bg-white/10">
+              <div
+                className="h-full rounded-full bg-[#FFCA40]"
+                style={{ width: `${progressPercent}%` }}
+              />
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleSyncAchievements}
+            disabled={isSyncing}
+            className="inline-flex items-center justify-center gap-2 rounded-full border border-white/20 px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:border-[#FFCA40] hover:text-[#FFCA40] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {isSyncing ? (
+              <>
+                <FiLoader className="h-4 w-4 animate-spin" />
+                Syncing...
+              </>
+            ) : (
+              <>
+                <FiRefreshCw className="h-4 w-4" />
+                Sync badges
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {error && (
+        <div className="rounded-2xl border border-red-400/40 bg-red-400/10 px-4 py-3 text-sm text-red-200">
+          {error}
+        </div>
+      )}
+
+      {syncError && !error && (
+        <div className="rounded-2xl border border-yellow-400/40 bg-yellow-400/10 px-4 py-3 text-sm text-yellow-100">
+          {syncError}
+        </div>
+      )}
+
+      {content}
+    </div>
+  );
 }
