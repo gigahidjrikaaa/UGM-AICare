@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { FiRefreshCw, FiSave, FiShield, FiKey } from "react-icons/fi";
+import { FiEdit, FiKey, FiRefreshCw, FiSave, FiShield } from "react-icons/fi";
 import { toast } from "react-hot-toast";
 
 import {
@@ -23,13 +23,17 @@ const initialProfileForm = {
   allowEmailCheckins: true,
 };
 
+type ProfileForm = typeof initialProfileForm;
+
+const PRIMARY_KEY_FIELDS: Array<keyof ProfileForm> = ["email"];
+
 const initialPasswordForm = {
   currentPassword: "",
   newPassword: "",
   confirmPassword: "",
 };
 
-function mapResponseToForm(profile: AdminProfileResponse) {
+function mapResponseToForm(profile: AdminProfileResponse): ProfileForm {
   return {
     email: profile.email ?? "",
     name: profile.name ?? "",
@@ -41,7 +45,9 @@ function mapResponseToForm(profile: AdminProfileResponse) {
 }
 
 export default function AdminProfilePage() {
-  const [profile, setProfile] = useState({ ...initialProfileForm });
+  const [profile, setProfile] = useState<ProfileForm>({ ...initialProfileForm });
+  const [originalProfile, setOriginalProfile] = useState<ProfileForm>({ ...initialProfileForm });
+  const [isEditing, setIsEditing] = useState(false);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileSaving, setProfileSaving] = useState(false);
 
@@ -54,7 +60,9 @@ export default function AdminProfilePage() {
     async function load() {
       try {
         const data = await fetchAdminProfile();
-        setProfile(mapResponseToForm(data));
+        const mappedProfile = mapResponseToForm(data);
+        setProfile(mappedProfile);
+        setOriginalProfile(mappedProfile);
         setTimestamps({ createdAt: data.created_at, updatedAt: data.updated_at });
       } catch (error) {
         console.error("Failed to load admin profile", error);
@@ -68,10 +76,14 @@ export default function AdminProfilePage() {
   }, []);
 
   const hasProfileChanges = useMemo(() => {
-    return JSON.stringify(profile) !== JSON.stringify(initialProfileForm);
-  }, [profile]);
+    return JSON.stringify(profile) !== JSON.stringify(originalProfile);
+  }, [profile, originalProfile]);
 
-  const handleProfileChange = (field: keyof typeof profile, value: string | boolean) => {
+  const isFieldDisabled = (field: keyof ProfileForm) => {
+    return !isEditing || PRIMARY_KEY_FIELDS.includes(field);
+  };
+
+  const handleProfileChange = (field: keyof ProfileForm, value: string | boolean) => {
     setProfile((prev) => ({
       ...prev,
       [field]: value,
@@ -82,8 +94,10 @@ export default function AdminProfilePage() {
     event.preventDefault();
     if (!hasProfileChanges) {
       toast.success("Profile is already up to date");
+      setIsEditing(false);
       return;
     }
+
     setProfileSaving(true);
 
     const payload: AdminProfileUpdatePayload = {
@@ -97,8 +111,11 @@ export default function AdminProfilePage() {
 
     try {
       const updated = await updateAdminProfile(payload);
-      setProfile(mapResponseToForm(updated));
+      const mappedProfile = mapResponseToForm(updated);
+      setProfile(mappedProfile);
+      setOriginalProfile(mappedProfile);
       setTimestamps({ createdAt: updated.created_at, updatedAt: updated.updated_at });
+      setIsEditing(false);
       toast.success("Profile updated successfully");
     } catch (error) {
       console.error("Failed to update admin profile", error);
@@ -139,6 +156,13 @@ export default function AdminProfilePage() {
     }
   };
 
+  const handleActionButtonClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+    if (!isEditing) {
+      event.preventDefault();
+      setIsEditing(true);
+    }
+  };
+
   if (profileLoading) {
     return (
       <div className="flex min-h-[60vh] items-center justify-center text-white/70">
@@ -163,7 +187,41 @@ export default function AdminProfilePage() {
       </header>
 
       <section className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-        <form className="space-y-6" onSubmit={handleProfileSubmit}>
+        <div className="mb-6 flex items-center justify-between">
+          <h2 className="text-xl font-semibold text-white">Profile details</h2>
+          <button
+            type={isEditing ? "submit" : "button"}
+            form={isEditing ? "admin-profile-form" : undefined}
+            onClick={handleActionButtonClick}
+            disabled={profileSaving}
+            className={`${
+              isEditing
+                ? "inline-flex items-center gap-2 rounded-lg bg-[#FFCA40] px-4 py-2 text-sm font-semibold text-[#001D58] transition hover:bg-[#ffd45c]"
+                : "inline-flex items-center gap-2 rounded-lg border border-white/20 bg-transparent px-4 py-2 text-sm font-semibold text-white transition hover:border-[#FFCA40] hover:text-[#FFCA40]"
+            } disabled:cursor-not-allowed disabled:opacity-70`}
+          >
+            {isEditing ? (
+              profileSaving ? (
+                <>
+                  <FiRefreshCw className="h-4 w-4 animate-spin" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <FiSave className="h-4 w-4" />
+                  Save
+                </>
+              )
+            ) : (
+              <>
+                <FiEdit className="h-4 w-4" />
+                Edit
+              </>
+            )}
+          </button>
+        </div>
+
+        <form id="admin-profile-form" className="space-y-6" onSubmit={handleProfileSubmit}>
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             <div className="space-y-2">
               <label className="text-sm font-medium text-white/80">Email address</label>
@@ -173,8 +231,9 @@ export default function AdminProfilePage() {
                 value={profile.email}
                 onChange={(event) => handleProfileChange("email", event.target.value)}
                 placeholder="Enter your email address"
-                title="Email address"
-                className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/40"
+                title="Email address (locked)"
+                disabled={isFieldDisabled("email")}
+                className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/40 disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
 
@@ -186,7 +245,8 @@ export default function AdminProfilePage() {
                 onChange={(event) => handleProfileChange("name", event.target.value)}
                 placeholder="Display name"
                 title="Display name"
-                className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/40"
+                disabled={isFieldDisabled("name")}
+                className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/40 disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
 
@@ -198,7 +258,8 @@ export default function AdminProfilePage() {
                 onChange={(event) => handleProfileChange("firstName", event.target.value)}
                 placeholder="First name"
                 title="First name"
-                className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/40"
+                disabled={isFieldDisabled("firstName")}
+                className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/40 disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
 
@@ -210,19 +271,21 @@ export default function AdminProfilePage() {
                 onChange={(event) => handleProfileChange("lastName", event.target.value)}
                 placeholder="Last name"
                 title="Last name"
-                className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/40"
+                disabled={isFieldDisabled("lastName")}
+                className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/40 disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
 
             <div className="space-y-2 md:col-span-2">
-              <label className="text-sm font-medium text-white/80">Phone</label>
+              <label className="text-sm font-medium text-white/80">Phone number</label>
               <input
                 type="tel"
                 value={profile.phone}
                 onChange={(event) => handleProfileChange("phone", event.target.value)}
                 placeholder="Phone number"
                 title="Phone number"
-                className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/40"
+                disabled={isFieldDisabled("phone")}
+                className="w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/40 disabled:cursor-not-allowed disabled:opacity-60"
               />
             </div>
           </div>
@@ -242,32 +305,14 @@ export default function AdminProfilePage() {
                 checked={profile.allowEmailCheckins}
                 onChange={(event) => handleProfileChange("allowEmailCheckins", event.target.checked)}
                 title="Enable email check-ins"
+                disabled={isFieldDisabled("allowEmailCheckins")}
               />
             </label>
           </div>
 
-          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-4 text-sm text-white/60">
-            <div className="space-y-0.5">
-              <p>Created: {timestamps.createdAt ? new Date(timestamps.createdAt).toLocaleString() : "�"}</p>
-              <p>Last updated: {timestamps.updatedAt ? new Date(timestamps.updatedAt).toLocaleString() : "�"}</p>
-            </div>
-            <button
-              type="submit"
-              disabled={profileSaving || !hasProfileChanges}
-              className="inline-flex items-center gap-2 rounded-lg bg-[#FFCA40] px-4 py-2 text-sm font-semibold text-[#001D58] transition hover:bg-[#ffd45c] disabled:cursor-not-allowed disabled:opacity-70"
-            >
-              {profileSaving ? (
-                <>
-                  <FiRefreshCw className="h-4 w-4 animate-spin" />
-                  Saving...
-                </>
-              ) : (
-                <>
-                  <FiSave className="h-4 w-4" />
-                  Save changes
-                </>
-              )}
-            </button>
+          <div className="border-t border-white/10 pt-4 text-sm text-white/60">
+            <p>Created: {timestamps.createdAt ? new Date(timestamps.createdAt).toLocaleString() : "--"}</p>
+            <p>Last updated: {timestamps.updatedAt ? new Date(timestamps.updatedAt).toLocaleString() : "--"}</p>
           </div>
         </form>
       </section>
@@ -344,7 +389,3 @@ export default function AdminProfilePage() {
     </div>
   );
 }
-
-
-
-
