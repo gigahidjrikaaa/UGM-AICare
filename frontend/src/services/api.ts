@@ -13,6 +13,7 @@ import type {
   Appointment
 } from '@/types/api'; // Import types
 import toast from 'react-hot-toast';
+import type { UserProfileOverviewResponse, UserProfileOverviewUpdate } from '@/types/profile';
 import { getSession, signOut } from 'next-auth/react';
 
 // Define the base URL for your backend API
@@ -272,10 +273,12 @@ export const loginUser = async (payload: LoginUserPayload): Promise<LoginUserRes
   }
 };
 
+export async function fetchUserProfileOverview(): Promise<UserProfileOverviewResponse> {
+  const response = await apiClient.get<UserProfileOverviewResponse>('/profile/overview');
+  return response.data;
+}
 
-
-
-
-
-
-
+export async function updateUserProfileOverview(payload: UserProfileOverviewUpdate): Promise<UserProfileOverviewResponse> {
+  const response = await apiClient.put<UserProfileOverviewResponse>('/profile/overview', payload);
+  return response.data;
+}

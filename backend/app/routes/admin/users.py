@@ -14,7 +14,7 @@ from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.models import Appointment, Conversation, JournalEntry, User, UserBadge
 from app.schemas.admin import UserDetailResponse, UserListItem, UsersResponse
-from .utils import decrypt_user_email, get_user_stats, build_avatar_url
+from .utils import decrypt_user_email, get_user_stats, build_avatar_url, decrypt_user_field
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +106,7 @@ async def get_users(
                 is_active=user_obj.is_active,
                 created_at=user_obj.created_at,
                 avatar_url=avatar_url,
+                check_in_code=user_obj.check_in_code,
                 total_journal_entries=journal_count or 0,
                 total_conversations=conversation_count or 0,
                 total_badges=badge_count or 0,
@@ -180,6 +181,33 @@ async def get_user_detail(
         is_active=user.is_active,
         created_at=user.created_at,
         avatar_url=avatar_url,
+        check_in_code=user.check_in_code,
+        preferred_name=decrypt_user_field(user.preferred_name),
+        pronouns=decrypt_user_field(user.pronouns),
+        alternate_phone=decrypt_user_field(user.alternate_phone),
+        emergency_contact_name=decrypt_user_field(user.emergency_contact_name),
+        emergency_contact_relationship=decrypt_user_field(user.emergency_contact_relationship),
+        emergency_contact_phone=decrypt_user_field(user.emergency_contact_phone),
+        emergency_contact_email=decrypt_user_field(user.emergency_contact_email),
+        risk_level=decrypt_user_field(user.risk_level),
+        clinical_summary=decrypt_user_field(user.clinical_summary),
+        primary_concerns=decrypt_user_field(user.primary_concerns),
+        safety_plan_notes=decrypt_user_field(user.safety_plan_notes),
+        current_therapist_name=decrypt_user_field(user.current_therapist_name),
+        current_therapist_contact=decrypt_user_field(user.current_therapist_contact),
+        therapy_modality=decrypt_user_field(user.therapy_modality),
+        therapy_frequency=decrypt_user_field(user.therapy_frequency),
+        therapy_notes=decrypt_user_field(user.therapy_notes),
+        consent_data_sharing=user.consent_data_sharing,
+        consent_research=user.consent_research,
+        consent_emergency_contact=user.consent_emergency_contact,
+        consent_marketing=user.consent_marketing,
+        preferred_language=decrypt_user_field(user.preferred_language),
+        preferred_timezone=decrypt_user_field(user.preferred_timezone),
+        accessibility_needs=decrypt_user_field(user.accessibility_needs),
+        communication_preferences=decrypt_user_field(user.communication_preferences),
+        interface_preferences=decrypt_user_field(user.interface_preferences),
+        aicare_team_notes=decrypt_user_field(user.aicare_team_notes),
         journal_entries=[j.__dict__ for j in journals],
         recent_conversations=[c.__dict__ for c in conversations],
         badges=[b.__dict__ for b in badges],

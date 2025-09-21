@@ -21,6 +21,7 @@ class UserListItem(BaseModel):
     is_active: Optional[bool] = True
     created_at: Optional[datetime] = None
     avatar_url: Optional[str] = None
+    check_in_code: Optional[str] = None
 
     # Aggregated counts
     total_journal_entries: int
@@ -63,6 +64,33 @@ class UserDetailResponse(BaseModel):
     is_active: Optional[bool] = True
     created_at: Optional[datetime] = None
     avatar_url: Optional[str] = None
+    check_in_code: Optional[str] = None
+    preferred_name: Optional[str] = None
+    pronouns: Optional[str] = None
+    alternate_phone: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_relationship: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+    emergency_contact_email: Optional[str] = None
+    risk_level: Optional[str] = None
+    clinical_summary: Optional[str] = None
+    primary_concerns: Optional[str] = None
+    safety_plan_notes: Optional[str] = None
+    current_therapist_name: Optional[str] = None
+    current_therapist_contact: Optional[str] = None
+    therapy_modality: Optional[str] = None
+    therapy_frequency: Optional[str] = None
+    therapy_notes: Optional[str] = None
+    consent_data_sharing: Optional[bool] = None
+    consent_research: Optional[bool] = None
+    consent_emergency_contact: Optional[bool] = None
+    consent_marketing: Optional[bool] = None
+    preferred_language: Optional[str] = None
+    preferred_timezone: Optional[str] = None
+    accessibility_needs: Optional[str] = None
+    communication_preferences: Optional[str] = None
+    interface_preferences: Optional[str] = None
+    aicare_team_notes: Optional[str] = None
 
     journal_entries: List[Dict[str, Any]]
     recent_conversations: List[Dict[str, Any]]

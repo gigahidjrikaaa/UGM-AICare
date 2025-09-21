@@ -1,55 +1,179 @@
-# backend/app/schemas/user.py
-from pydantic import BaseModel, EmailStr
-from typing import List, Optional
-from datetime import datetime
+from __future__ import annotations
 
-#? --- Link DID Schemas ---
+from datetime import date, datetime
+from typing import Any, List, Optional
+
+from pydantic import BaseModel, EmailStr
+
+
 class LinkDIDRequest(BaseModel):
     wallet_address: str
 
-#? --- Pydantic Model for Earned Badge Response ---
+
 class EarnedBadgeInfo(BaseModel):
     badge_id: int
     awarded_at: datetime
     transaction_hash: str
     contract_address: str
-    # You can add more fields here later if needed, e.g., fetching metadata from DB/IPFS
     name: Optional[str] = None
     image_url: Optional[str] = None
 
     class Config:
-        from_attributes = True # or orm_mode = True for Pydantic v2
+        from_attributes = True
 
-#? --- Pydantic Model for User Profile Response ---
+
+class EmergencyContact(BaseModel):
+    name: Optional[str] = None
+    relationship: Optional[str] = None
+    phone: Optional[str] = None
+    email: Optional[str] = None
+
+
+class ContactInfo(BaseModel):
+    primary_email: Optional[str] = None
+    phone: Optional[str] = None
+    alternate_phone: Optional[str] = None
+    emergency_contact: Optional[EmergencyContact] = None
+
+
+class SafetyAndClinicalBasics(BaseModel):
+    risk_level: Optional[str] = None
+    clinical_summary: Optional[str] = None
+    primary_concerns: Optional[str] = None
+    safety_plan_notes: Optional[str] = None
+
+
+class TherapyAssignment(BaseModel):
+    current_therapist_name: Optional[str] = None
+    current_therapist_contact: Optional[str] = None
+    therapy_modality: Optional[str] = None
+    therapy_frequency: Optional[str] = None
+    therapy_notes: Optional[str] = None
+
+
+class ConsentAndPrivacySettings(BaseModel):
+    allow_email_checkins: bool = True
+    consent_data_sharing: bool = False
+    consent_research: bool = False
+    consent_emergency_contact: bool = False
+    consent_marketing: bool = False
+
+
+class LocalizationAndAccessibility(BaseModel):
+    preferred_language: Optional[str] = None
+    preferred_timezone: Optional[str] = None
+    accessibility_needs: Optional[str] = None
+    communication_preferences: Optional[str] = None
+    interface_preferences: Optional[str] = None
+
+
+class TimelineEntry(BaseModel):
+    kind: str
+    title: str
+    description: Optional[str] = None
+    timestamp: datetime
+    metadata: Optional[dict[str, Any]] = None
+
+
+class ProfileHeaderSummary(BaseModel):
+    user_id: int
+    full_name: Optional[str] = None
+    preferred_name: Optional[str] = None
+    pronouns: Optional[str] = None
+    avatar_url: Optional[str] = None
+    profile_photo_url: Optional[str] = None
+    wallet_address: Optional[str] = None
+    google_sub: Optional[str] = None
+    date_of_birth: Optional[date] = None
+    age: Optional[int] = None
+    sentiment_score: float = 0.0
+    current_streak: int = 0
+    longest_streak: int = 0
+    last_activity_date: Optional[date] = None
+    city: Optional[str] = None
+    university: Optional[str] = None
+    major: Optional[str] = None
+    year_of_study: Optional[str] = None
+    created_at: Optional[datetime] = None
+    check_in_code: str
+
+
+class UserProfileOverviewResponse(BaseModel):
+    header: ProfileHeaderSummary
+    contact: ContactInfo
+    safety: SafetyAndClinicalBasics
+    therapy: TherapyAssignment
+    timeline: List[TimelineEntry]
+    consent: ConsentAndPrivacySettings
+    localization: LocalizationAndAccessibility
+    aicare_team_notes: Optional[str] = None
+
+
+class UserProfileOverviewUpdate(BaseModel):
+    preferred_name: Optional[str] = None
+    pronouns: Optional[str] = None
+    profile_photo_url: Optional[str] = None
+    phone: Optional[str] = None
+    alternate_phone: Optional[str] = None
+    emergency_contact_name: Optional[str] = None
+    emergency_contact_relationship: Optional[str] = None
+    emergency_contact_phone: Optional[str] = None
+    emergency_contact_email: Optional[str] = None
+    risk_level: Optional[str] = None
+    clinical_summary: Optional[str] = None
+    primary_concerns: Optional[str] = None
+    safety_plan_notes: Optional[str] = None
+    current_therapist_name: Optional[str] = None
+    current_therapist_contact: Optional[str] = None
+    therapy_modality: Optional[str] = None
+    therapy_frequency: Optional[str] = None
+    therapy_notes: Optional[str] = None
+    consent_data_sharing: Optional[bool] = None
+    consent_research: Optional[bool] = None
+    consent_emergency_contact: Optional[bool] = None
+    consent_marketing: Optional[bool] = None
+    preferred_language: Optional[str] = None
+    preferred_timezone: Optional[str] = None
+    accessibility_needs: Optional[str] = None
+    communication_preferences: Optional[str] = None
+    interface_preferences: Optional[str] = None
+    city: Optional[str] = None
+    university: Optional[str] = None
+    major: Optional[str] = None
+    year_of_study: Optional[str] = None
+
+    class Config:
+        extra = 'ignore'
+
+
 class UserProfileResponse(BaseModel):
     id: int
     google_sub: str
-    email: Optional[str] = None # Encrypted email, can be decrypted if needed
-    wallet_address: str | None = None
-    current_streak: int = 0 # Current streak count. At least 1 day of activity is needed to count as a streak.
-    longest_streak: int = 0 # Longest streak count. At least 1 day of activity is needed to count as a streak.
-    allow_email_checkins: bool = True # Whether user wants email check-ins
+    email: Optional[str] = None
+    wallet_address: Optional[str] = None
+    current_streak: int = 0
+    longest_streak: int = 0
+    allow_email_checkins: bool = True
 
     class Config:
-        from_attributes = True # Or orm_mode = True for Pydantic v2
-    
-#? --- Pydantic Model for Check-in Settings ---
-# Check-in settings model for updating user preferences
+        from_attributes = True
+
+
 class CheckinSettingsUpdate(BaseModel):
     allow_email_checkins: bool
+
 
 class CheckinSettingsResponse(BaseModel):
     allow_email_checkins: bool
     message: str = "Settings updated successfully"
 
-#? --- Pydantic Model for Email Payload ---
-# Email payload model for sending test emails
+
 class TestEmailPayload(BaseModel):
     recipient_email: EmailStr
     subject: str = "UGM-AICare Test Email"
     message: str = "This is a test message from the UGM-AICare email utility."
 
-#? --- Pydantic Model for Sync Achievements Response in profile.py ---
+
 class SyncAchievementsResponse(BaseModel):
     message: str
-    newly_awarded_badges: List[EarnedBadgeInfo] = [] # Return info about newly minted badges
+    newly_awarded_badges: List[EarnedBadgeInfo] = []

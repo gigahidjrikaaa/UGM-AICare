@@ -147,6 +147,7 @@ async def exchange_oauth_token(
                 is_active=True,
                 email_verified=True,
                 created_at=datetime.utcnow(),
+                check_in_code=uuid.uuid4().hex,
             )
             db.add(user)
         else:
@@ -321,6 +322,7 @@ async def register_user(
             year_of_study=request.yearOfStudy,
             allow_email_checkins=request.allowEmailCheckins,
             role="user",
+            check_in_code=uuid.uuid4().hex,
         )
 
         db.add(new_user)
