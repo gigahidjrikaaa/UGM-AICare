@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Image from 'next/image';
 import {
@@ -204,7 +204,7 @@ export default function AppointmentManagementPage() {
       const current = new URLSearchParams(searchParams?.toString());
       current.set('tab', tab);
       router.replace(`/admin/appointments?${current.toString()}`);
-    } catch (e) {
+    } catch {
       // no-op
     }
   };
@@ -261,13 +261,22 @@ export default function AppointmentManagementPage() {
   };
   const selectedIds = useMemo(() => Object.entries(selected).filter(([,v])=>v).map(([k]) => Number(k)), [selected]);
 
+  const getErrorMessage = (err: unknown, fallback: string) => {
+    if (err instanceof Error) return err.message;
+    if (typeof err === 'object' && err && 'message' in err) {
+      const m = (err as { message?: unknown }).message;
+      if (typeof m === 'string') return m;
+    }
+    return fallback;
+  };
+
   const updateStatus = async (id: number, status: string) => {
     try {
       await apiCall(`/api/v1/admin/appointments/${id}`, { method: 'PUT', body: JSON.stringify({ status }) });
       toast.success('Status updated');
       fetchAppointments();
-    } catch (e:any) {
-      toast.error(e?.message || 'Failed to update status');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Failed to update status'));
     }
   };
 
@@ -277,8 +286,8 @@ export default function AppointmentManagementPage() {
       await Promise.all(selectedIds.map(id => apiCall(`/api/v1/admin/appointments/${id}`, { method: 'PUT', body: JSON.stringify({ status }) })));
       toast.success(`Updated ${selectedIds.length} appointments`);
       fetchAppointments();
-    } catch (e:any) {
-      toast.error(e?.message || 'Bulk update failed');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Bulk update failed'));
     }
   };
 
@@ -289,8 +298,8 @@ export default function AppointmentManagementPage() {
       await Promise.all(selectedIds.map(id => apiCall(`/api/v1/admin/appointments/${id}`, { method: 'DELETE' })));
       toast.success('Deleted selected');
       fetchAppointments();
-    } catch (e:any) {
-      toast.error(e?.message || 'Bulk delete failed');
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, 'Bulk delete failed'));
     }
   };
 
@@ -546,8 +555,8 @@ export default function AppointmentManagementPage() {
               <input value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} placeholder="Email, therapist, type" className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-sm" />
             </div>
             <div>
-              <label className="block text-xs text-gray-300 mb-1">Status</label>
-              <select value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-sm">
+              <label htmlFor="filter-status" className="block text-xs text-gray-300 mb-1">Status</label>
+              <select id="filter-status" value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-sm">
                 <option value="">All</option>
                 <option value="scheduled">Scheduled</option>
                 <option value="completed">Completed</option>
@@ -555,12 +564,12 @@ export default function AppointmentManagementPage() {
               </select>
             </div>
             <div>
-              <label className="block text-xs text-gray-300 mb-1">From</label>
-              <input type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-sm" />
+              <label htmlFor="filter-from" className="block text-xs text-gray-300 mb-1">From</label>
+              <input id="filter-from" aria-label="From date" type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-sm" />
             </div>
             <div>
-              <label className="block text-xs text-gray-300 mb-1">To</label>
-              <input type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-sm" />
+              <label htmlFor="filter-to" className="block text-xs text-gray-300 mb-1">To</label>
+              <input id="filter-to" aria-label="To date" type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-sm" />
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -599,7 +608,7 @@ export default function AppointmentManagementPage() {
                   <thead className="bg-white/5">
                     <tr>
                       <th className="px-3 py-3">
-                        <input type="checkbox" checked={allSelected} onChange={e=>toggleSelectAll(e.target.checked)} />
+                        <input aria-label="Select all appointments" type="checkbox" checked={allSelected} onChange={e=>toggleSelectAll(e.target.checked)} />
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Patient</th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Therapist</th>
@@ -620,6 +629,7 @@ export default function AppointmentManagementPage() {
                         <tr key={appointment.id}>
                           <td className="px-3 py-4 whitespace-nowrap text-sm">
                             <input
+                              aria-label={`Select appointment ${appointment.id}`}
                               type="checkbox"
                               checked={!!selected[appointment.id]}
                               onChange={(e) =>
@@ -683,7 +693,10 @@ export default function AppointmentManagementPage() {
                             {new Date(appointment.appointment_datetime).toLocaleString()}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm">
+                            <label htmlFor={`appt-status-${appointment.id}`} className="sr-only">Update status</label>
                             <select
+                              id={`appt-status-${appointment.id}`}
+                              aria-label="Appointment status"
                               value={appointment.status}
                               onChange={(e) => updateStatus(appointment.id, e.target.value)}
                               className="bg-white/10 border border-white/20 rounded px-2 py-1 text-sm"
@@ -721,8 +734,8 @@ export default function AppointmentManagementPage() {
                                     await apiCall(`/api/v1/admin/appointments/${appointment.id}`, { method: 'DELETE' });
                                     toast.success('Deleted');
                                     fetchAppointments();
-                                  } catch (e: any) {
-                                    toast.error(e?.message || 'Delete failed');
+                                  } catch (err: unknown) {
+                                    toast.error(getErrorMessage(err, 'Delete failed'));
                                   }
                                 }
                               }}
@@ -764,7 +777,7 @@ export default function AppointmentManagementPage() {
                   const quickActions: Array<{
                     key: string;
                     label: string;
-                    icon: JSX.Element;
+                    icon: React.JSX.Element;
                     onClick: () => void;
                     tone?: 'accent' | 'success';
                   }> = [];
@@ -854,238 +867,235 @@ export default function AppointmentManagementPage() {
                   return (
                     <div
                       key={therapist.id}
-                      className="rounded-xl border border-white/15 bg-white/5 p-6 text-white/90 shadow-sm backdrop-blur"
+                      className="rounded-xl border border-white/15 bg-white/5 p-6 text-white/90 shadow-sm backdrop-blur space-y-6"
                     >
-                      <div className="space-y-6">
-                        <header className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between md:gap-8">
-                          <div className="flex items-start gap-4 md:gap-6">
-                            <div className="relative h-20 w-20 md:h-24 md:w-24 rounded-2xl overflow-hidden border border-white/15 bg-white/5 flex-shrink-0">
-                              {therapistPhoto ? (
-                                <Image
-                                  src={therapistPhoto}
-                                  alt={`${therapist.displayName} avatar`}
-                                  fill
-                                  sizes="(max-width: 768px) 80px, 96px"
-                                  className="object-cover"
-                                />
+                      <div className="flex flex-col gap-6 md:flex-row md:items-start">
+                        <div className="flex flex-1 items-start gap-4">
+                          <div className="relative h-20 w-20 overflow-hidden rounded-xl border border-white/15 bg-white/10 flex-shrink-0">
+                            {therapistPhoto ? (
+                              <Image
+                                src={therapistPhoto}
+                                alt={`Photo of ${therapist.displayName}`}
+                                fill
+                                sizes="80px"
+                                className="object-cover"
+                              />
+                            ) : (
+                              <div className="flex h-full w-full items-center justify-center bg-[#FFCA40]/10 text-2xl font-semibold text-[#FFCA40]">
+                                {therapistInitial}
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0 space-y-3">
+                            <div className="flex flex-wrap items-center gap-3">
+                              <h3 className="text-xl font-semibold leading-snug break-words text-white">
+                                {therapist.displayName}
+                              </h3>
+                              <span
+                                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
+                                  therapist.is_available
+                                    ? 'bg-green-500/20 text-green-300'
+                                    : 'bg-gray-500/20 text-gray-300'
+                                }`}
+                              >
+                                {therapist.is_available ? 'Available' : 'Unavailable'}
+                              </span>
+                            </div>
+                            <p className="break-words text-sm text-white/60">
+                              {therapist.specialization || 'No specialization provided'}
+                            </p>
+                            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/60">
+                              <span className="inline-flex items-center rounded-full border border-white/15 px-2.5 py-1">
+                                <span className="font-semibold text-white/80">{therapist.total_appointments}</span>
+                                <span className="ml-2">appointments handled</span>
+                              </span>
+                              {therapist.allow_email_checkins ? (
+                                <span className="inline-flex items-center rounded-full border border-[#FFCA40]/30 px-2.5 py-1 text-[#FFCA40]">
+                                  Email check-ins enabled
+                                </span>
                               ) : (
-                                <div className="flex h-full w-full items-center justify-center bg-[#FFCA40]/10 text-2xl font-semibold text-[#FFCA40]">
-                                  {therapistInitial}
-                                </div>
+                                <span className="inline-flex items-center rounded-full border border-white/10 px-2.5 py-1 text-white/50">
+                                  Email check-ins disabled
+                                </span>
                               )}
                             </div>
-                            <div className="min-w-0 space-y-3">
-                              <div className="flex flex-wrap items-center gap-3">
-                                <h3 className="text-xl font-semibold text-white break-words leading-snug">
-                                  {therapist.displayName}
-                                </h3>
-                                <span
-                                  className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${therapist.is_available
-                                    ? 'bg-green-500/20 text-green-300'
-                                    : 'bg-gray-500/20 text-gray-300'}`}
-                                >
-                                  {therapist.is_available ? 'Available' : 'Unavailable'}
+                            {nextSlot && (
+                              <div className="mt-2 text-xs text-white/60">
+                                Next slot:
+                                <span className="ml-1 break-words text-white/90">
+                                  {nextSlot.day_of_week} {nextSlot.start_time} - {nextSlot.end_time}
                                 </span>
-                              </div>
-                              <p className="text-sm text-white/60 break-words">
-                                {therapist.specialization || 'No specialization provided'}
-                              </p>
-                              <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/60">
-                                <span className="inline-flex items-center rounded-full border border-white/15 px-2.5 py-1">
-                                  <span className="font-semibold text-white/80">{therapist.total_appointments}</span>
-                                  <span className="ml-2">appointments handled</span>
-                                </span>
-                                {therapist.allow_email_checkins ? (
-                                  <span className="inline-flex items-center rounded-full border border-[#FFCA40]/30 px-2.5 py-1 text-[#FFCA40]">
-                                    Email check-ins enabled
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center rounded-full border border-white/10 px-2.5 py-1 text-white/50">
-                                    Email check-ins disabled
+                                {!nextSlot.is_available && (
+                                  <span className="ml-1 text-red-300">
+                                    ({nextSlot.reason ? `Unavailable - ${nextSlot.reason}` : 'Unavailable'})
                                   </span>
                                 )}
                               </div>
-                              {nextSlot && (
-                                <div className="mt-2 text-xs text-white/60">
-                                  Next slot:
-                                  <span className="ml-1 text-white/90 break-words">
-                                    {nextSlot.day_of_week} {nextSlot.start_time} - {nextSlot.end_time}
-                                  </span>
-                                  {!nextSlot.is_available && (
-                                    <span className="ml-1 text-red-300">
-                                      ({nextSlot.reason ? `Unavailable - ${nextSlot.reason}` : 'Unavailable'})
-                                    </span>
-                                  )}
-                                </div>
-                              )}
+                            )}
+                          </div>
+                        </div>
+                        {quickActions.length > 0 && (
+                          <div className="w-full max-w-xl md:w-auto">
+                            <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Reach out</div>
+                            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
+                              {quickActions.map((action) => (
+                                <button
+                                  key={action.key}
+                                  type="button"
+                                  onClick={action.onClick}
+                                  className={actionClassName(action.tone)}
+                                >
+                                  {action.icon}
+                                  <span>{action.label}</span>
+                                </button>
+                              ))}
                             </div>
                           </div>
-
-                          {quickActions.length > 0 && (
-                            <div className="w-full max-w-xl">
-                              <div className="text-xs font-semibold uppercase tracking-wide text-white/60">
-                                Reach out
-                              </div>
-                              <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                                {quickActions.map((action) => (
-                                  <button
-                                    key={action.key}
-                                    type="button"
-                                    onClick={action.onClick}
-                                    className={actionClassName(action.tone)}
-                                  >
-                                    {action.icon}
-                                    <span>{action.label}</span>
-                                  </button>
-                                ))}
-                              </div>
-                            </div>
-                          )}
-                        </header>
-
-                        <div className="grid gap-4 md:grid-cols-3">
-                          <section className="space-y-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
-                            <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Contact details</div>
-                            <dl className="space-y-3">
-                              {contactRows.map((row) => (
-                                <div key={row.label} className="flex items-start justify-between gap-3">
+                        )}
+                      </div>
+                      <div className="grid gap-4 md:grid-cols-3">
+                        <section className="space-y-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Contact details</div>
+                          <dl className="space-y-3">
+                            {contactRows.map((row) => (
+                              <Fragment key={row.label}>
+                                <dt className="text-xs uppercase tracking-wide text-white/40">{row.label}</dt>
+                                <dd className="mt-1 text-sm flex items-start justify-between gap-3">
                                   <div className="min-w-0">
-                                    <dt className="text-xs uppercase tracking-wide text-white/40">{row.label}</dt>
-                                    <dd className="mt-1 text-sm">
-                                      {row.href ? (
-                                        <a href={row.href} className="text-white hover:text-[#FFCA40] break-words">
-                                          {row.value}
-                                        </a>
-                                      ) : (
-                                        <span className={`${row.canCopy ? 'text-white' : 'text-white/50'} break-words`}>
-                                          {row.value}
-                                        </span>
-                                      )}
-                                    </dd>
+                                    {row.href ? (
+                                      <a href={row.href} className="break-words text-white hover:text-[#FFCA40]">
+                                        {row.value}
+                                      </a>
+                                    ) : (
+                                      <span className={`${row.canCopy ? 'text-white' : 'text-white/50'} break-words`}>{row.value}</span>
+                                    )}
                                   </div>
                                   {row.canCopy && (
                                     <button
                                       type="button"
                                       onClick={() => handleCopyToClipboard(row.copyValue, row.copyMessage)}
-                                      className="text-white/60 transition hover:text-white"
+                                      className="flex-shrink-0 text-white/60 transition hover:text-white"
                                       aria-label={`Copy ${row.label.toLowerCase()}`}
                                     >
                                       <FiCopy className="h-4 w-4" />
                                     </button>
                                   )}
-                                </div>
-                              ))}
-                            </dl>
-                          </section>
-
-                          <section className="space-y-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
-                            <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Notes</div>
-                            <p className="text-white/70">
-                              Use the quick actions to reach out and confirm availability changes before manually adjusting schedules.
+                                </dd>
+                              </Fragment>
+                            ))}
+                          </dl>
+                        </section>
+                        <section className="space-y-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
+                          <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Notes</div>
+                          <p className="text-white/70">
+                            Use the quick actions to reach out and confirm availability changes before manually adjusting
+                            schedules.
+                          </p>
+                          {therapist.allow_email_checkins ? (
+                            <p className="rounded-md border border-[#FFCA40]/30 bg-[#FFCA40]/5 p-3 text-xs text-[#FFCA40]">
+                              This therapist has opted in to receive proactive check-in emails.
                             </p>
-                            {therapist.allow_email_checkins ? (
-                              <p className="rounded-md border border-[#FFCA40]/30 bg-[#FFCA40]/5 p-3 text-xs text-[#FFCA40]">
-                                This therapist has opted in to receive proactive check-in emails.
-                              </p>
-                            ) : (
-                              <p className="rounded-md border border-white/15 bg-black/30 p-3 text-xs text-white/60">
-                                Email check-ins are disabled for this therapist.
-                              </p>
-                            )}
-                          </section>
-
-                          <section className="space-y-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
-                            <div className="flex items-center justify-between">
-                              <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Availability</div>
-                              <button
-                                type="button"
-                                onClick={() => handleToggleSchedule(therapist)}
-                                className="inline-flex items-center gap-1 text-xs font-medium text-[#FFCA40] hover:text-[#ffda63]"
-                              >
-                                {isExpanded ? (
-                                  <>
-                                    <FiChevronUp className="h-3 w-3" />
-                                    Hide full schedule
-                                  </>
-                                ) : (
-                                  <>
-                                    <FiChevronDown className="h-3 w-3" />
-                                    View full schedule
-                                  </>
-                                )}
-                              </button>
-                            </div>
-                              <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                                {previewSchedule.length ? (
-                                  <ul className="space-y-1 text-white/80">
-                                    {previewSchedule.map((slot) => (
-                                      <li key={slot.id} className="flex flex-wrap items-center gap-2 text-sm">
-                                        <span className="font-medium text-white">{slot.day_of_week}</span>
-                                        <span className="text-white/60">&bull;</span>
-                                        <span>{slot.start_time} - {slot.end_time}</span>
-                                      {!slot.is_available && (
-                                        <span className="inline-flex items-center rounded-full bg-red-500/20 px-2 py-0.5 text-xs text-red-300">
-                                          Unavailable
-                                        </span>
-                                      )}
-                                    </li>
-                                  ))}
-                                </ul>
+                          ) : (
+                            <p className="rounded-md border border-white/15 bg-black/30 p-3 text-xs text-white/60">
+                              Email check-ins are disabled for this therapist.
+                            </p>
+                          )}
+                        </section>
+                        <section className="space-y-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
+                          <div className="flex items-center justify-between">
+                            <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Availability</div>
+                            <button
+                              type="button"
+                              onClick={() => handleToggleSchedule(therapist)}
+                              className="inline-flex items-center gap-1 text-xs font-medium text-[#FFCA40] hover:text-[#ffda63]"
+                            >
+                              {isExpanded ? (
+                                <>
+                                  <FiChevronUp className="h-3 w-3" /> Hide full schedule
+                                </>
                               ) : (
-                                <div className="text-white/60">No schedule published yet.</div>
+                                <>
+                                  <FiChevronDown className="h-3 w-3" /> View full schedule
+                                </>
+                              )}
+                            </button>
+                          </div>
+                          <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
+                            {previewSchedule.length ? (
+                              <ul className="space-y-1 text-white/80">
+                                {previewSchedule.map((slot) => (
+                                  <li key={slot.id} className="flex flex-wrap items-center gap-2 text-sm">
+                                    <span className="font-medium text-white">{slot.day_of_week}</span>
+                                    <span className="text-white/60">&bull;</span>
+                                    <span>
+                                      {slot.start_time} - {slot.end_time}
+                                    </span>
+                                    {!slot.is_available && (
+                                      <span className="inline-flex items-center rounded-full bg-red-500/20 px-2 py-0.5 text-xs text-red-300">
+                                        Unavailable
+                                      </span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            ) : (
+                              <div className="text-white/60">No schedule published yet.</div>
+                            )}
+                          </div>
+                          {isExpanded && (
+                            <div className="rounded-lg border border-white/10 bg-black/30 px-3 py-3">
+                              {isLoadingSchedule ? (
+                                <div className="text-sm text-white/60">Loading full schedule...</div>
+                              ) : groupedSchedule.length ? (
+                                <div className="space-y-3">
+                                  {groupedSchedule.map(({ day, slots }) => (
+                                    <div key={`${therapist.id}-${day}`}>
+                                      <div className="text-xs font-semibold uppercase tracking-wide text-white/60">{day}</div>
+                                      <ul className="mt-1 space-y-1 text-white/75">
+                                        {slots.map((slot) => (
+                                          <li key={slot.id} className="flex flex-wrap items-center gap-2 text-sm">
+                                            <span className="font-medium text-white">
+                                              {slot.start_time} - {slot.end_time}
+                                            </span>
+                                            <span
+                                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${
+                                                slot.is_available
+                                                  ? 'bg-green-500/20 text-green-300'
+                                                  : 'bg-red-500/20 text-red-300'
+                                              }`}
+                                            >
+                                              {slot.is_available ? 'Available' : 'Unavailable'}
+                                            </span>
+                                            {!slot.is_available && slot.reason && (
+                                              <span className="text-xs text-white/60">({slot.reason})</span>
+                                            )}
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  ))}
+                                </div>
+                              ) : (
+                                <div className="text-sm text-white/60">No schedule published yet.</div>
                               )}
                             </div>
-                            {isExpanded && (
-                              <div className="rounded-lg border border-white/10 bg-black/30 px-3 py-3">
-                                {isLoadingSchedule ? (
-                                  <div className="text-white/60 text-sm">Loading full schedule...</div>
-                                ) : groupedSchedule.length ? (
-                                  <div className="space-y-3">
-                                    {groupedSchedule.map(({ day, slots }) => (
-                                      <div key={`${therapist.id}-${day}`}>
-                                        <div className="text-xs font-semibold uppercase tracking-wide text-white/60">{day}</div>
-                                        <ul className="mt-1 space-y-1 text-white/75">
-                                          {slots.map((slot) => (
-                                            <li key={slot.id} className="flex flex-wrap items-center gap-2 text-sm">
-                                              <span className="font-medium text-white">{slot.start_time} - {slot.end_time}</span>
-                                              <span
-                                                className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${slot.is_available
-                                                  ? 'bg-green-500/20 text-green-300'
-                                                  : 'bg-red-500/20 text-red-300'}`}
-                                              >
-                                                {slot.is_available ? 'Available' : 'Unavailable'}
-                                              </span>
-                                              {!slot.is_available && slot.reason && (
-                                                <span className="text-xs text-white/60">({slot.reason})</span>
-                                              )}
-                                            </li>
-                                          ))}
-                                        </ul>
-                                      </div>
-                                    ))}
-                                  </div>
-                                ) : (
-                                  <div className="text-white/60 text-sm">No schedule published yet.</div>
-                                )}
-                              </div>
-                            )}
-                          </section>
-                        </div>
-
-                        <footer className="flex flex-col gap-2 border-t border-white/10 pt-4 text-sm text-white/70 md:flex-row md:items-center md:justify-between">
-                          <div>
-                            Keep this record up to date by confirming changes with the therapist before editing availability.
-                          </div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <Button variant="outline" size="sm" onClick={fetchPsychologists}>
-                              Refresh list
-                            </Button>
-                            <Button size="sm" onClick={() => handleScheduleModalOpen(therapist.id)}>
-                              Manage schedule
-                            </Button>
-                          </div>
-                        </footer>
+                          )}
+                        </section>
                       </div>
+                      <footer className="flex flex-col gap-2 border-t border-white/10 pt-4 text-sm text-white/70 md:flex-row md:items-center md:justify-between">
+                        <div>
+                          Keep this record up to date by confirming changes with the therapist before editing
+                          availability.
+                        </div>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Button variant="outline" size="sm" onClick={fetchPsychologists}>
+                            Refresh list
+                          </Button>
+                          <Button size="sm" onClick={() => handleScheduleModalOpen(therapist.id)}>
+                            Manage schedule
+                          </Button>
+                        </div>
+                      </footer>
                     </div>
                   );
                 })

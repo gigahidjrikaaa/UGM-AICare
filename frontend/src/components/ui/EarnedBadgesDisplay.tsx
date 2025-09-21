@@ -44,6 +44,34 @@ function formatAwardDate(iso: string | undefined) {
   });
 }
 
+function formatRelativeTimestamp(date: Date | null) {
+  if (!date) {
+    return "not synced yet";
+  }
+
+  const diffMs = Date.now() - date.getTime();
+  if (diffMs < 60_000) {
+    return "just now";
+  }
+
+  const diffMinutes = Math.floor(diffMs / 60_000);
+  if (diffMinutes < 60) {
+    return `${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`;
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+  }
+
+  const diffDays = Math.floor(diffHours / 24);
+  if (diffDays < 7) {
+    return `${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+  }
+
+  return date.toLocaleDateString();
+}
+
 export default function EarnedBadgesDisplay() {
   const [earnedBadges, setEarnedBadges] = useState<Record<number, EarnedBadge>>({});
   const [isLoading, setIsLoading] = useState(true);
@@ -51,6 +79,8 @@ export default function EarnedBadgesDisplay() {
 
   const [isSyncing, setIsSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+
+  const [lastSyncedAt, setLastSyncedAt] = useState<Date | null>(null);
 
   const badgeCatalog = useMemo(() => {
     return Object.keys(badgeMetadataMap)
@@ -61,6 +91,8 @@ export default function EarnedBadgesDisplay() {
   const earnedCount = useMemo(() => Object.keys(earnedBadges).length, [earnedBadges]);
   const totalCount = badgeCatalog.length;
   const progressPercent = totalCount ? Math.round((earnedCount / totalCount) * 100) : 0;
+
+  const lastSyncedLabel = useMemo(() => formatRelativeTimestamp(lastSyncedAt), [lastSyncedAt]);
 
   const fetchBadges = useCallback(async () => {
     setIsLoading(true);
@@ -73,6 +105,7 @@ export default function EarnedBadgesDisplay() {
         return acc;
       }, {});
       setEarnedBadges(mapped);
+      setLastSyncedAt(new Date());
     } catch (err) {
       console.error("Error fetching earned badges", err);
       setError("We couldn't load your badges just now. Please try again shortly.");
@@ -110,6 +143,7 @@ export default function EarnedBadgesDisplay() {
       } else {
         toast.success("Achievements are already up to date!");
       }
+      setLastSyncedAt(new Date());
     } catch (err) {
       console.error("Error syncing achievements", err);
       toast.dismiss(toastId);
@@ -172,6 +206,9 @@ export default function EarnedBadgesDisplay() {
               <div className="flex items-center justify-between gap-3">
                 <span className="text-sm font-semibold text-white/90">{meta.name}</span>
               </div>
+              {meta.description && (
+                <p className="mt-2 text-xs text-white/60 line-clamp-2">{meta.description}</p>
+              )}
 
               <div className="mt-5 flex flex-1 items-center justify-center">
                 {isEarned ? (
@@ -269,6 +306,7 @@ export default function EarnedBadgesDisplay() {
               />
             </div>
           </div>
+          <p className="text-xs text-white/50">Last synced {lastSyncedLabel}.</p>
           <button
             type="button"
             onClick={handleSyncAchievements}

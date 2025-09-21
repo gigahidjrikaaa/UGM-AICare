@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Set, cast
 from urllib.parse import quote
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.blockchain_utils import mint_nft_badge
@@ -127,21 +127,46 @@ async def _build_timeline(user_id: int, db: AsyncSession) -> List[TimelineEntry]
             )
         )
 
-    conversation_stmt = (
-        select(Conversation)
+    session_starts_subquery = (
+        select(
+            Conversation.session_id,
+            func.min(Conversation.timestamp).label("started_at"),
+        )
         .where(Conversation.user_id == user_id)
-        .order_by(Conversation.timestamp.desc())
+        .group_by(Conversation.session_id)
+        .subquery()
+    )
+
+    conversation_stmt = (
+        select(Conversation, session_starts_subquery.c.started_at)
+        .join(
+            session_starts_subquery,
+            and_(
+                Conversation.session_id == session_starts_subquery.c.session_id,
+                Conversation.timestamp == session_starts_subquery.c.started_at,
+            ),
+        )
+        .order_by(session_starts_subquery.c.started_at.desc())
         .limit(10)
     )
-    conversations = (await db.execute(conversation_stmt)).scalars().all()
-    for convo in conversations:
-        snippet = (convo.message[:140] + "...") if len(convo.message) > 140 else convo.message
+    conversation_rows = await db.execute(conversation_stmt)
+    for convo, started_at in conversation_rows.all():
+        raw_message = (convo.message or "").strip()
+        normalized = " ".join(raw_message.split())
+        if normalized:
+            topic = normalized[:80]
+            if len(normalized) > 80:
+                topic = topic.rstrip() + "..."
+            title = f"Opened a session with Aika about {topic}"
+        else:
+            title = "Opened a session with Aika"
+
         timeline.append(
             TimelineEntry(
                 kind="conversation",
-                title="Live chat with Aika",
-                description=snippet,
-                timestamp=convo.timestamp,
+                title=title,
+                description=None,
+                timestamp=started_at,
                 metadata={"session_id": convo.session_id},
             )
         )
@@ -509,3 +534,4 @@ async def get_my_earned_badges(
     except Exception as exc:  # pragma: no cover - defensive logging
         logger.error("Error fetching badges for user %s", current_user.id, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not retrieve earned badges.") from exc
+

@@ -1,9 +1,9 @@
 "use client";
 
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useCallback, useEffect, useMemo, useState } from "react";
 import QRCode from "react-qr-code";
 import { Switch } from "@headlessui/react";
 import {
@@ -13,10 +13,8 @@ import {
   FiCalendar,
   FiCheckCircle,
   FiCopy,
-  FiCreditCard,
   FiEdit3,
   FiGlobe,
-  FiKey,
   FiMapPin,
   FiMessageCircle,
   FiPhone,
@@ -28,7 +26,6 @@ import {
   FiUsers,
   FiX,
   FiXCircle,
-  FiMail,
 } from "react-icons/fi";
 import { toast } from "react-hot-toast";
 import clsx from "clsx";
@@ -41,6 +38,8 @@ import apiClient, { fetchUserProfileOverview, updateUserProfileOverview } from "
 import type { TimelineEntry, UserProfileOverviewResponse, UserProfileOverviewUpdate } from "@/types/profile";
 
 
+
+type TimelineFilter = "all" | "journal" | "conversation" | "appointment" | "badge";
 
 type ProfileFormState = {
   preferred_name: string;
@@ -76,7 +75,7 @@ type ProfileFormState = {
   consent_marketing: boolean;
 };
 
-const timelineIcons: Record<string, JSX.Element> = {
+const timelineIcons: Record<string, React.JSX.Element> = {
   journal: <FiBookOpen className="h-4 w-4" />,
   conversation: <FiMessageCircle className="h-4 w-4" />,
   appointment: <FiCalendar className="h-4 w-4" />,
@@ -88,6 +87,14 @@ const timelineLabels: Record<string, string> = {
   appointment: "Appointment",
   badge: "Badge achieved",
 };
+
+const TIMELINE_FILTER_OPTIONS: Array<{ value: TimelineFilter; label: string }> = [
+  { value: "all", label: "All" },
+  { value: "journal", label: "Journal" },
+  { value: "conversation", label: "Conversations" },
+  { value: "appointment", label: "Appointments" },
+  { value: "badge", label: "Badges" },
+];
 const inputBaseClass =
   "w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/40";
 const textareaBaseClass =
@@ -95,46 +102,23 @@ const textareaBaseClass =
 
 const TIMELINE_PREVIEW_COUNT = 5;
 
-function SectionCard({
-  title,
-  icon,
-  children,
-  action,
-}: {
-  title: string;
-  icon: JSX.Element;
-  children: React.ReactNode;
-  action?: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur">
-      <div className="mb-4 flex items-center justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-[#FFCA40]">{icon}</span>
-          <h2 className="text-lg font-semibold text-white">{title}</h2>
-        </div>
-        {action}
-      </div>
-      <div className="space-y-4 text-sm text-white/80">{children}</div>
-    </section>
-  );
-}
-
 function TimelineList({
   entries,
   isExpanded,
   onToggle,
   initialCount = TIMELINE_PREVIEW_COUNT,
+  emptyMessage,
 }: {
   entries: TimelineEntry[];
   isExpanded: boolean;
   onToggle: () => void;
   initialCount?: number;
+  emptyMessage?: string;
 }) {
   if (!entries.length) {
     return (
       <p className="text-white/60">
-        No activity recorded yet. Your first journal entry or conversation will appear here.
+        {emptyMessage ?? "No activity recorded yet. Your first journal entry or conversation will appear here."}
       </p>
     );
   }
@@ -182,7 +166,6 @@ function TimelineList({
     </div>
   );
 }
-
 
 function mapProfileToForm(profile: UserProfileOverviewResponse): ProfileFormState {
   return {
@@ -273,6 +256,14 @@ export default function ProfilePage() {
   const [checkinSettingError, setCheckinSettingError] = useState<string | null>(null);
 
   const [showQr, setShowQr] = useState(false);
+  const [timelineFilter, setTimelineFilter] = useState<TimelineFilter>("all");
+  const [showProfileDetails, setShowProfileDetails] = useState(false);
+  const filteredTimeline = useMemo(() => {
+    const entries = profile?.timeline ?? [];
+    return timelineFilter === "all"
+      ? entries
+      : entries.filter((entry) => entry.kind === timelineFilter);
+  }, [profile, timelineFilter]);
 
   const [isEditing, setIsEditing] = useState(false);
   const [isSavingProfile, setIsSavingProfile] = useState(false);
@@ -292,6 +283,10 @@ export default function ProfilePage() {
       );
     }
   }, [profile, session?.user]);
+
+  useEffect(() => {
+    setShowAllTimelineEntries(false);
+  }, [timelineFilter]);
 
   const fetchProfile = useCallback(async () => {
     setProfileLoading(true);
@@ -435,7 +430,7 @@ export default function ProfilePage() {
 
   const headerMetrics = useMemo(() => {
     if (!profile)
-      return [] as Array<{ label: string; value: string; icon: JSX.Element }>;
+      return [] as Array<{ label: string; value: string; icon: React.JSX.Element }>;
     return [
       {
         label: "Current Streak",
@@ -488,6 +483,9 @@ export default function ProfilePage() {
     return null;
   }
 
+  const timelineEmptyMessage =
+    timelineFilter === "all" ? undefined : "No activity matches this filter yet.";
+
   const firstName = (isEditing ? form.preferred_name : profile.header.preferred_name) ?? profile.header.full_name ?? "Friend";
 
   return (
@@ -509,6 +507,18 @@ export default function ProfilePage() {
                 </span>
               )}
               <div className="flex flex-wrap items-center justify-end gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowProfileDetails((prev) => !prev)}
+                  className={clsx(
+                    "inline-flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition",
+                    showProfileDetails
+                      ? "border-[#FFCA40] text-[#FFCA40]"
+                      : "border-white/20 text-white hover:border-[#FFCA40] hover:text-[#FFCA40]"
+                  )}
+                >
+                  {showProfileDetails ? "Hide details" : "Show details"}
+                </button>
                 {isEditing ? (
                   <>
                     <button
@@ -713,168 +723,121 @@ export default function ProfilePage() {
               </div>
             ))}
           </div>
-        </header>
-
-        <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur">
-          <EarnedBadgesDisplay />
-        </section>
-
-        <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur">
-          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h2 className="flex items-center gap-2 text-xl font-semibold text-white">
-                <FiActivity className="h-5 w-5 text-[#FFCA40]" />
-                Activity timeline
-              </h2>
-              <p className="text-sm text-white/60">Review your latest appointments, conversations, and wellbeing milestones.</p>
-            </div>
-          </div>
-          <TimelineList
-            entries={profile.timeline}
-            isExpanded={showAllTimelineEntries}
-            onToggle={handleTimelineToggle}
-          />
-        </section>
-
-        <div className="mt-10 grid gap-6 lg:grid-cols-3">
-          <div className="space-y-6 lg:col-span-2">
-            <SectionCard title="Contacts" icon={<FiPhone className="h-5 w-5" />}>
-              <div className="grid gap-4 text-sm text-white/80 md:grid-cols-2">
-                <div className="flex items-start gap-3">
-                  <span className="mt-1 text-[#FFCA40]">
-                    <FiMail className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-white/50">Primary email</p>
-                    <p>{profile.contact.primary_email ?? "Not provided"}</p>
-                  </div>
+          {showProfileDetails && (
+            <div className="mt-8 grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 backdrop-blur md:col-span-2">
+              <div className="flex items-center gap-2 text-white">
+                <FiPhone className="h-5 w-5 text-[#FFCA40]" />
+                <h3 className="text-base font-semibold">Contact information</h3>
+              </div>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
+                <div className="space-y-1">
+                  <p className="text-xs uppercase tracking-wide text-white/50">Primary email</p>
+                  <p>{profile.contact.primary_email ?? "Not provided"}</p>
                 </div>
-                <div className="flex items-start gap-3">
-                  <span className="mt-1 text-[#FFCA40]">
-                    <FiPhone className="h-4 w-4" />
-                  </span>
-                  <div className="w-full">
-                    <p className="text-xs uppercase tracking-wide text-white/50">Primary phone</p>
-                    {isEditing ? (
-                      <input
-                        value={form.phone}
-                        onChange={(event) => updateFormField("phone", event.target.value)}
-                        className={inputBaseClass}
-                        placeholder="Primary phone"
-                      />
-                    ) : (
-                      <p>{profile.contact.phone ?? "Not provided"}</p>
-                    )}
-                  </div>
+                <div className="space-y-1">
+                  <p className="text-xs uppercase tracking-wide text-white/50">Primary phone</p>
+                  {isEditing ? (
+                    <input
+                      value={form.phone}
+                      onChange={(event) => updateFormField("phone", event.target.value)}
+                      className={inputBaseClass}
+                      placeholder="Primary phone"
+                    />
+                  ) : (
+                    <p>{profile.contact.phone ?? "Not provided"}</p>
+                  )}
                 </div>
-                <div className="flex items-start gap-3">
-                  <span className="mt-1 text-[#FFCA40]">
-                    <FiPhone className="h-4 w-4" />
-                  </span>
-                  <div className="w-full">
-                    <p className="text-xs uppercase tracking-wide text-white/50">Alternate phone</p>
-                    {isEditing ? (
-                      <input
-                        value={form.alternate_phone}
-                        onChange={(event) => updateFormField("alternate_phone", event.target.value)}
-                        className={inputBaseClass}
-                        placeholder="Alternate phone"
-                      />
-                    ) : (
-                      <p>{profile.contact.alternate_phone ?? "Not provided"}</p>
-                    )}
-                  </div>
+                <div className="space-y-1">
+                  <p className="text-xs uppercase tracking-wide text-white/50">Alternate phone</p>
+                  {isEditing ? (
+                    <input
+                      value={form.alternate_phone}
+                      onChange={(event) => updateFormField("alternate_phone", event.target.value)}
+                      className={inputBaseClass}
+                      placeholder="Alternate phone"
+                    />
+                  ) : (
+                    <p>{profile.contact.alternate_phone ?? "Not provided"}</p>
+                  )}
                 </div>
-                <div className="flex items-start gap-3">
-                  <span className="mt-1 text-[#FFCA40]">
-                    <FiCreditCard className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-white/50">Wallet address</p>
-                    <p>
-                      {profile.header.wallet_address
-                        ? `${profile.header.wallet_address.slice(0, 6)}...${profile.header.wallet_address.slice(-4)}`
-                        : "Not linked"}
-                    </p>
-                  </div>
+                <div className="space-y-1">
+                  <p className="text-xs uppercase tracking-wide text-white/50">Wallet address</p>
+                  <p>
+                    {profile.header.wallet_address
+                      ? `${profile.header.wallet_address.slice(0, 6)}...${profile.header.wallet_address.slice(-4)}`
+                      : "Not linked"}
+                  </p>
                 </div>
-                <div className="flex items-start gap-3">
-                  <span className="mt-1 text-[#FFCA40]">
-                    <FiKey className="h-4 w-4" />
-                  </span>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-white/50">Digital ID</p>
-                    <p>{profile.header.google_sub ?? "Not linked"}</p>
-                  </div>
+                <div className="space-y-1">
+                  <p className="text-xs uppercase tracking-wide text-white/50">Digital ID</p>
+                  <p>{profile.header.google_sub ?? "Not linked"}</p>
                 </div>
-                <div className="flex items-start gap-3 md:col-span-2">
-                  <span className="mt-1 text-[#FFCA40]">
-                    <FiUsers className="h-4 w-4" />
-                  </span>
-                  <div className="w-full">
-                    <p className="text-xs uppercase tracking-wide text-white/50">Emergency contact</p>
-                    {isEditing ? (
-                      <div className="mt-2 grid gap-3 md:grid-cols-2">
-                        <div className="space-y-2">
-                          <label className="text-xs uppercase tracking-wide text-white/50">Name</label>
-                          <input
-                            value={form.emergency_contact_name}
-                            onChange={(event) => updateFormField("emergency_contact_name", event.target.value)}
-                            className={inputBaseClass}
-                            placeholder="Contact name"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-xs uppercase tracking-wide text-white/50">Relationship</label>
-                          <input
-                            value={form.emergency_contact_relationship}
-                            onChange={(event) =>
-                              updateFormField("emergency_contact_relationship", event.target.value)
-                            }
-                            className={inputBaseClass}
-                            placeholder="Relationship"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-xs uppercase tracking-wide text-white/50">Phone</label>
-                          <input
-                            value={form.emergency_contact_phone}
-                            onChange={(event) => updateFormField("emergency_contact_phone", event.target.value)}
-                            className={inputBaseClass}
-                            placeholder="Phone number"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <label className="text-xs uppercase tracking-wide text-white/50">Email</label>
-                          <input
-                            type="email"
-                            value={form.emergency_contact_email}
-                            onChange={(event) => updateFormField("emergency_contact_email", event.target.value)}
-                            className={inputBaseClass}
-                            placeholder="Email address"
-                          />
-                        </div>
+                <div className="space-y-3 md:col-span-2">
+                  <p className="text-xs uppercase tracking-wide text-white/50">Emergency contact</p>
+                  {isEditing ? (
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div className="space-y-2">
+                        <label className="text-xs uppercase tracking-wide text-white/50">Name</label>
+                        <input
+                          value={form.emergency_contact_name}
+                          onChange={(event) => updateFormField("emergency_contact_name", event.target.value)}
+                          className={inputBaseClass}
+                          placeholder="Contact name"
+                        />
                       </div>
-                    ) : profile.contact.emergency_contact ? (
-                      <ul className="space-y-1 text-sm">
-                        <li>{profile.contact.emergency_contact.name}</li>
-                        <li className="text-white/60">{profile.contact.emergency_contact.relationship}</li>
-                        {profile.contact.emergency_contact.phone && (
-                          <li>{profile.contact.emergency_contact.phone}</li>
-                        )}
-                        {profile.contact.emergency_contact.email && (
-                          <li>{profile.contact.emergency_contact.email}</li>
-                        )}
-                      </ul>
-                    ) : (
-                      <p>No emergency contact on file.</p>
-                    )}
-                  </div>
+                      <div className="space-y-2">
+                        <label className="text-xs uppercase tracking-wide text-white/50">Relationship</label>
+                        <input
+                          value={form.emergency_contact_relationship}
+                          onChange={(event) => updateFormField("emergency_contact_relationship", event.target.value)}
+                          className={inputBaseClass}
+                          placeholder="Relationship"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs uppercase tracking-wide text-white/50">Phone</label>
+                        <input
+                          value={form.emergency_contact_phone}
+                          onChange={(event) => updateFormField("emergency_contact_phone", event.target.value)}
+                          className={inputBaseClass}
+                          placeholder="Phone number"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <label className="text-xs uppercase tracking-wide text-white/50">Email</label>
+                        <input
+                          type="email"
+                          value={form.emergency_contact_email}
+                          onChange={(event) => updateFormField("emergency_contact_email", event.target.value)}
+                          className={inputBaseClass}
+                          placeholder="Email address"
+                        />
+                      </div>
+                    </div>
+                  ) : profile.contact.emergency_contact ? (
+                    <ul className="space-y-1 text-sm">
+                      <li>{profile.contact.emergency_contact.name}</li>
+                      <li className="text-white/60">{profile.contact.emergency_contact.relationship}</li>
+                      {profile.contact.emergency_contact.phone && (
+                        <li>{profile.contact.emergency_contact.phone}</li>
+                      )}
+                      {profile.contact.emergency_contact.email && (
+                        <li>{profile.contact.emergency_contact.email}</li>
+                      )}
+                    </ul>
+                  ) : (
+                    <p>No emergency contact on file.</p>
+                  )}
                 </div>
               </div>
-            </SectionCard>
-            <SectionCard title="Safety & Clinical Basics" icon={<FiShield className="h-5 w-5" />}>
-              <div className="grid gap-4 md:grid-cols-2">
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 backdrop-blur">
+              <div className="flex items-center gap-2 text-white">
+                <FiShield className="h-5 w-5 text-[#FFCA40]" />
+                <h3 className="text-base font-semibold">Safety & clinical basics</h3>
+              </div>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-white/50">Risk level</p>
                   {isEditing ? (
@@ -902,7 +865,7 @@ export default function ProfilePage() {
                     <p>{profile.safety.primary_concerns ?? "Add the areas you want to focus on"}</p>
                   )}
                 </div>
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 space-y-2">
                   <p className="text-xs uppercase tracking-wide text-white/50">Clinical summary</p>
                   {isEditing ? (
                     <textarea
@@ -919,7 +882,7 @@ export default function ProfilePage() {
                     </p>
                   )}
                 </div>
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 space-y-2">
                   <p className="text-xs uppercase tracking-wide text-white/50">Safety plan notes</p>
                   {isEditing ? (
                     <textarea
@@ -937,9 +900,158 @@ export default function ProfilePage() {
                   )}
                 </div>
               </div>
-            </SectionCard>
-            <SectionCard title="Previous & Assigned Therapy" icon={<FiUsers className="h-5 w-5" />}>
-              <div className="grid gap-4 md:grid-cols-2">
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 backdrop-blur">
+              <div className="flex items-center gap-2 text-white">
+                <FiCheckCircle className="h-5 w-5 text-[#FFCA40]" />
+                <h3 className="text-base font-semibold">Consent & privacy</h3>
+              </div>
+              <div className="mt-4 space-y-4">
+                <div className="flex items-center justify-between text-xs text-white/60">
+                  <span>Email check-ins</span>
+                  <Switch
+                    checked={allowCheckins}
+                    onChange={handleCheckinToggle}
+                    disabled={isSavingCheckinSetting}
+                    className={clsx(
+                      "relative inline-flex h-6 w-11 items-center rounded-full transition focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/80 focus:ring-offset-2 focus:ring-offset-gray-900",
+                      allowCheckins ? "bg-[#FFCA40]" : "bg-gray-600",
+                      isSavingCheckinSetting && "opacity-70",
+                    )}
+                  >
+                    <span className="sr-only">Toggle email check-ins</span>
+                    <span
+                      className={clsx(
+                        "inline-block h-4 w-4 transform rounded-full bg-white transition",
+                        allowCheckins ? "translate-x-6" : "translate-x-1",
+                      )}
+                    />
+                  </Switch>
+                </div>
+                {checkinSettingError && (
+                  <p className="text-xs text-red-400">{checkinSettingError}</p>
+                )}
+                <ul className="space-y-2 text-sm text-white/80">
+                  <li className="flex items-center gap-2">
+                    {profile.consent.consent_data_sharing ? (
+                      <FiCheckCircle className="text-emerald-400" />
+                    ) : (
+                      <FiXCircle className="text-red-400" />
+                    )}
+                    <span>Share anonymised insights to improve AICare</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    {profile.consent.consent_research ? (
+                      <FiCheckCircle className="text-emerald-400" />
+                    ) : (
+                      <FiXCircle className="text-red-400" />
+                    )}
+                    <span>Participate in wellbeing research studies</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    {profile.consent.consent_emergency_contact ? (
+                      <FiCheckCircle className="text-emerald-400" />
+                    ) : (
+                      <FiXCircle className="text-red-400" />
+                    )}
+                    <span>Allow AICare to reach your emergency contact when needed</span>
+                  </li>
+                  <li className="flex items-center gap-2">
+                    {profile.consent.consent_marketing ? (
+                      <FiCheckCircle className="text-emerald-400" />
+                    ) : (
+                      <FiXCircle className="text-red-400" />
+                    )}
+                    <span>Receive wellbeing updates and programme invitations</span>
+                  </li>
+                </ul>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 backdrop-blur">
+              <div className="flex items-center gap-2 text-white">
+                <FiGlobe className="h-5 w-5 text-[#FFCA40]" />
+                <h3 className="text-base font-semibold">Personal preferences</h3>
+              </div>
+              <div className="mt-4 space-y-3">
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-white/50">Preferred language</p>
+                  {isEditing ? (
+                    <input
+                      value={form.preferred_language}
+                      onChange={(event) => updateFormField("preferred_language", event.target.value)}
+                      className={inputBaseClass}
+                      placeholder="Preferred language"
+                    />
+                  ) : (
+                    <p>{profile.localization.preferred_language ?? "English"}</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-white/50">Timezone</p>
+                  {isEditing ? (
+                    <input
+                      value={form.preferred_timezone}
+                      onChange={(event) => updateFormField("preferred_timezone", event.target.value)}
+                      className={inputBaseClass}
+                      placeholder="Timezone (e.g. Asia/Jakarta)"
+                    />
+                  ) : (
+                    <p>{profile.localization.preferred_timezone ?? "Asia/Jakarta"}</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-white/50">Accessibility notes</p>
+                  {isEditing ? (
+                    <textarea
+                      value={form.accessibility_needs}
+                      onChange={(event) => updateFormField("accessibility_needs", event.target.value)}
+                      className={textareaBaseClass}
+                      rows={3}
+                      placeholder="Tell us what helps you engage comfortably"
+                    />
+                  ) : (
+                    <p>
+                      {profile.localization.accessibility_needs ??
+                        "Let us know what helps you engage comfortably."}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-white/50">Preferred communication</p>
+                  {isEditing ? (
+                    <textarea
+                      value={form.communication_preferences}
+                      onChange={(event) => updateFormField("communication_preferences", event.target.value)}
+                      className={textareaBaseClass}
+                      rows={3}
+                      placeholder="How should we reach you?"
+                    />
+                  ) : (
+                    <p>{profile.localization.communication_preferences ?? "Email & in-app messages"}</p>
+                  )}
+                </div>
+                <div>
+                  <p className="text-xs uppercase tracking-wide text-white/50">Interface preferences</p>
+                  {isEditing ? (
+                    <textarea
+                      value={form.interface_preferences}
+                      onChange={(event) => updateFormField("interface_preferences", event.target.value)}
+                      className={textareaBaseClass}
+                      rows={3}
+                      placeholder="UI adjustments that work best for you"
+                    />
+                  ) : (
+                    <p>{profile.localization.interface_preferences ?? "Standard experience"}</p>
+                  )}
+                </div>
+              </div>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/80 backdrop-blur md:col-span-2">
+              <div className="flex items-center gap-2 text-white">
+                <FiUsers className="h-5 w-5 text-[#FFCA40]" />
+                <h3 className="text-base font-semibold">Therapy overview</h3>
+              </div>
+              <div className="mt-4 grid gap-4 md:grid-cols-2">
                 <div>
                   <p className="text-xs uppercase tracking-wide text-white/50">Therapist</p>
                   {isEditing ? (
@@ -992,7 +1104,7 @@ export default function ProfilePage() {
                     <p>{profile.therapy.therapy_frequency ?? "Not set"}</p>
                   )}
                 </div>
-                <div className="md:col-span-2">
+                <div className="md:col-span-2 space-y-2">
                   <p className="text-xs uppercase tracking-wide text-white/50">Notes</p>
                   {isEditing ? (
                     <textarea
@@ -1010,205 +1122,65 @@ export default function ProfilePage() {
                   )}
                 </div>
               </div>
-            </SectionCard>
-          </div>
+            </div>
+            </div>
+          )}
+        </header>
 
-          <div className="space-y-6">
-            <SectionCard
-              title="Consent & Privacy"
-              icon={<FiCheckCircle className="h-5 w-5" />}
-              action={
-                <div className="flex items-center gap-2 text-xs text-white/60">
-                  <span>Email check-ins</span>
-                  <Switch
-                    checked={allowCheckins}
-                    onChange={handleCheckinToggle}
-                    disabled={isSavingCheckinSetting}
+        <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur">
+          <EarnedBadgesDisplay />
+        </section>
+
+        <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur">
+          <div className="mb-6 flex flex-wrap items-center justify-between gap-4">
+            <div>
+              <h2 className="flex items-center gap-2 text-xl font-semibold text-white">
+                <FiActivity className="h-5 w-5 text-[#FFCA40]" />
+                Activity timeline
+              </h2>
+              <p className="text-sm text-white/60">Review your latest appointments, conversations, and wellbeing milestones.</p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2 text-xs">
+              {TIMELINE_FILTER_OPTIONS.map((option) => {
+                const isActive = timelineFilter === option.value;
+                const ariaCurrent = isActive ? 'true' : undefined;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    aria-current={ariaCurrent}
+                    onClick={() => setTimelineFilter(option.value)}
                     className={clsx(
-                      "relative inline-flex h-6 w-11 items-center rounded-full transition focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/80 focus:ring-offset-2 focus:ring-offset-gray-900",
-                      allowCheckins ? "bg-[#FFCA40]" : "bg-gray-600",
-                      isSavingCheckinSetting && "opacity-70",
+                      "inline-flex items-center gap-2 rounded-full border px-3 py-1 font-semibold uppercase tracking-wide transition",
+                      isActive
+                        ? "border-[#FFCA40] bg-[#FFCA40] text-[#001D58]"
+                        : "border-white/15 text-white/60 hover:border-[#FFCA40] hover:text-[#FFCA40]"
                     )}
                   >
-                    <span className="sr-only">Toggle email check-ins</span>
-                    <span
-                      className={clsx(
-                        "inline-block h-4 w-4 transform rounded-full bg-white transition",
-                        allowCheckins ? "translate-x-6" : "translate-x-1",
-                      )}
-                    />
-                  </Switch>
-                </div>
-              }
-            >
-              {checkinSettingError && <p className="text-xs text-red-400">{checkinSettingError}</p>}
-              {isEditing ? (
-                <div className="space-y-3 text-sm text-white/80">
-                  <label className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-4 w-4"
-                      checked={form.consent_data_sharing}
-                      onChange={(event) => updateFormField("consent_data_sharing", event.target.checked)}
-                    />
-                    <span>Share anonymised insights to improve AICare</span>
-                  </label>
-                  <label className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-4 w-4"
-                      checked={form.consent_research}
-                      onChange={(event) => updateFormField("consent_research", event.target.checked)}
-                    />
-                    <span>Participate in wellbeing research studies</span>
-                  </label>
-                  <label className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-4 w-4"
-                      checked={form.consent_emergency_contact}
-                      onChange={(event) => updateFormField("consent_emergency_contact", event.target.checked)}
-                    />
-                    <span>Allow AICare to reach your emergency contact when needed</span>
-                  </label>
-                  <label className="flex items-start gap-3">
-                    <input
-                      type="checkbox"
-                      className="mt-1 h-4 w-4"
-                      checked={form.consent_marketing}
-                      onChange={(event) => updateFormField("consent_marketing", event.target.checked)}
-                    />
-                    <span>Receive wellbeing updates and programme invitations</span>
-                  </label>
-                </div>
-              ) : (
-                <ul className="space-y-2 text-sm text-white/80">
-                  <li className="flex items-center gap-2">
-                    {profile.consent.consent_data_sharing ? (
-                      <FiCheckCircle className="text-emerald-400" />
-                    ) : (
-                      <FiXCircle className="text-red-400" />
-                    )}
-                    <span>Share anonymised insights to improve AICare</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    {profile.consent.consent_research ? (
-                      <FiCheckCircle className="text-emerald-400" />
-                    ) : (
-                      <FiXCircle className="text-red-400" />
-                    )}
-                    <span>Participate in wellbeing research studies</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    {profile.consent.consent_emergency_contact ? (
-                      <FiCheckCircle className="text-emerald-400" />
-                    ) : (
-                      <FiXCircle className="text-red-400" />
-                    )}
-                    <span>Allow AICare to reach your emergency contact when needed</span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    {profile.consent.consent_marketing ? (
-                      <FiCheckCircle className="text-emerald-400" />
-                    ) : (
-                      <FiXCircle className="text-red-400" />
-                    )}
-                    <span>Receive wellbeing updates and programme invitations</span>
-                  </li>
-                </ul>
-              )}
-            </SectionCard>
-            <SectionCard
-              title="Localization & accessibility"
-              icon={<FiGlobe className="h-5 w-5" />}
-            >
-              {isEditing ? (
-                <div className="space-y-3 text-sm text-white/80">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-white/50">Preferred language</p>
-                    <input
-                      value={form.preferred_language}
-                      onChange={(event) => updateFormField("preferred_language", event.target.value)}
-                      className={inputBaseClass}
-                      placeholder="Preferred language"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-white/50">Timezone</p>
-                    <input
-                      value={form.preferred_timezone}
-                      onChange={(event) => updateFormField("preferred_timezone", event.target.value)}
-                      className={inputBaseClass}
-                      placeholder="Timezone (e.g. Asia/Jakarta)"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-white/50">Accessibility notes</p>
-                    <textarea
-                      value={form.accessibility_needs}
-                      onChange={(event) => updateFormField("accessibility_needs", event.target.value)}
-                      className={textareaBaseClass}
-                      rows={3}
-                      placeholder="Tell us what helps you engage comfortably"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-white/50">Preferred communication</p>
-                    <textarea
-                      value={form.communication_preferences}
-                      onChange={(event) => updateFormField("communication_preferences", event.target.value)}
-                      className={textareaBaseClass}
-                      rows={3}
-                      placeholder="How should we reach you?"
-                    />
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-white/50">Interface preferences</p>
-                    <textarea
-                      value={form.interface_preferences}
-                      onChange={(event) => updateFormField("interface_preferences", event.target.value)}
-                      className={textareaBaseClass}
-                      rows={3}
-                      placeholder="UI adjustments that work best for you"
-                    />
-                  </div>
-                </div>
-              ) : (
-                <div className="space-y-3 text-sm text-white/80">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-white/50">Preferred language</p>
-                    <p>{profile.localization.preferred_language ?? "English"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-white/50">Timezone</p>
-                    <p>{profile.localization.preferred_timezone ?? "Asia/Jakarta"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-white/50">Accessibility notes</p>
-                    <p>
-                      {profile.localization.accessibility_needs ??
-                        "Let us know what helps you engage comfortably."}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-white/50">Preferred communication</p>
-                    <p>{profile.localization.communication_preferences ?? "Email & in-app messages"}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-white/50">Interface preferences</p>
-                    <p>{profile.localization.interface_preferences ?? "Standard experience"}</p>
-                  </div>
-                </div>
-              )}
-            </SectionCard>
-            <SectionCard title="AICare team notes" icon={<FiSliders className="h-5 w-5" />}>
-              <p className="leading-relaxed text-white/80">
-                {profile.aicare_team_notes ??
-                  "Internal reflections and next steps from the AICare support team will appear here. These stay private to the clinical team."}
-              </p>
-            </SectionCard>
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
-        </div>
+          <TimelineList
+            entries={filteredTimeline}
+            isExpanded={showAllTimelineEntries}
+            onToggle={handleTimelineToggle}
+            emptyMessage={timelineEmptyMessage}
+          />
+        </section>
+
+        <section className="mt-6 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur">
+          <h2 className="flex items-center gap-2 text-xl font-semibold text-white">
+            <FiSliders className="h-5 w-5 text-[#FFCA40]" />
+            Notes for the AICare team
+          </h2>
+          <p className="mt-3 leading-relaxed text-white/80">
+            {profile.aicare_team_notes ??
+              "Share anything you would like the AICare support team to keep in mind for future sessions."}
+          </p>
+        </section>
       </div>
     </div>
   );
