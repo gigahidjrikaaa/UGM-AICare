@@ -7,15 +7,20 @@ import { useEffect, useRef, RefObject } from 'react';
  */
 export function useModalA11y(open: boolean, ref: RefObject<HTMLElement | null>, onClose: () => void) {
   const lastFocusedRef = useRef<HTMLElement | null>(null);
+  const hasInitializedFocus = useRef(false);
 
   useEffect(() => {
-    if (open) {
+    if (open && !hasInitializedFocus.current) {
+      hasInitializedFocus.current = true;
       lastFocusedRef.current = document.activeElement as HTMLElement;
       const container = ref.current;
       if (container) {
         const focusable = container.querySelector<HTMLElement>('button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])');
         (focusable || container).focus();
       }
+    }
+    if (!open) {
+      hasInitializedFocus.current = false;
     }
   }, [open, ref]);
 

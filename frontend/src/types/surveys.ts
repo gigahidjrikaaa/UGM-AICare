@@ -7,4 +7,6 @@ export type MultipleChoiceQuestionDraft = BaseQuestion & { question_type: 'multi
 export type RatingQuestionDraft = BaseQuestion & { question_type: 'rating'; options: { scale: { min: number; max: number } } };
 export type QuestionDraft = TextQuestionDraft | MultipleChoiceQuestionDraft | RatingQuestionDraft;
 
-export const createEmptyQuestion = (): TextQuestionDraft => ({ question_text: '', question_type: 'text', options: [] });
+// Local negative id generator to ensure stable keys before persistence assigns real IDs
+let tempQuestionId = -1;
+export const createEmptyQuestion = (): TextQuestionDraft => ({ id: tempQuestionId--, question_text: '', question_type: 'text', options: [] });

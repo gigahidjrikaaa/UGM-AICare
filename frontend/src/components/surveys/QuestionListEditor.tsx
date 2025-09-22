@@ -1,5 +1,5 @@
-import React from 'react';
-import { TextQuestionDraft, MultipleChoiceQuestionDraft, RatingQuestionDraft, QuestionDraft } from '@/types/surveys';
+import React, { useState, useEffect, useCallback } from 'react';
+import { RatingQuestionDraft, QuestionDraft } from '@/types/surveys';
 
 export interface QuestionListEditorProps {
   questions: QuestionDraft[];
@@ -31,27 +31,81 @@ export const QuestionListEditor: React.FC<QuestionListEditorProps> = ({
   onOptionInputsChange,
   renderControls,
 }) => {
-  const handleQuestionField = (index: number, field: string, value: string) => {
-    onQuestionsChange(questions.map((q, i) => {
-      if (i !== index) return q;
-      if (field === 'question_type') {
-        if (value === 'text') return { id: q.id, question_text: q.question_text, question_type: 'text', options: [] } as TextQuestionDraft;
-        if (value === 'multiple-choice') return { id: q.id, question_text: q.question_text, question_type: 'multiple-choice', options: [] } as MultipleChoiceQuestionDraft;
-        return { id: q.id, question_text: q.question_text, question_type: 'rating', options: { scale: { min: 1, max: 5 } } } as RatingQuestionDraft;
+  // Local buffered text values to avoid parent state churn on every keystroke
+  const [localTexts, setLocalTexts] = useState<string[]>(() => questions.map(q => q.question_text));
+  const [dirty, setDirty] = useState<boolean[]>(() => questions.map(() => false));
+
+  // Sync when questions array shape changes (add/remove) or when upstream changes replace objects
+  useEffect(() => {
+    setLocalTexts(prev => {
+      const next: string[] = [];
+      for (let i = 0; i < questions.length; i++) {
+        // Preserve in-progress edits (dirty) else reflect upstream text
+        if (dirty[i]) {
+          next[i] = prev[i] ?? questions[i].question_text;
+        } else {
+          next[i] = questions[i].question_text;
+        }
       }
-      return { ...q, [field]: value } as QuestionDraft;
-    }));
+      return next;
+    });
+    setDirty(prev => {
+      if (prev.length === questions.length) return prev; // keep existing flags if same length
+      const next = [...prev];
+      while (next.length < questions.length) next.push(false);
+      if (next.length > questions.length) next.length = questions.length;
+      return next;
+    });
+  }, [questions, dirty]);
+
+  const commitQuestionText = useCallback((index: number) => {
+    const current = questions[index];
+    if (!current) return;
+    if (!dirty[index]) return; // nothing pending
+    const newValue = localTexts[index];
+    if (newValue === current.question_text) {
+      // Reset dirty flag only
+      setDirty(d => d.map((v,i)=> i===index ? false : v));
+      return;
+    }
+    const updated = [...questions];
+    updated[index] = { ...current, question_text: newValue } as QuestionDraft;
+    onQuestionsChange(updated);
+    setDirty(d => d.map((v,i)=> i===index ? false : v));
+  }, [questions, localTexts, dirty, onQuestionsChange]);
+
+  const handleQuestionField = (index: number, field: string, value: string) => {
+    const target = questions[index];
+    if (!target) return;
+    if (field === 'question_type') {
+      let nextQuestion: QuestionDraft;
+      if (value === 'text') nextQuestion = { id: target.id, question_text: target.question_text, question_type: 'text', options: [] };
+      else if (value === 'multiple-choice') nextQuestion = { id: target.id, question_text: target.question_text, question_type: 'multiple-choice', options: [] };
+      else nextQuestion = { id: target.id, question_text: target.question_text, question_type: 'rating', options: { scale: { min: 1, max: 5 } } };
+      if (nextQuestion.question_type !== target.question_type) {
+        const updated = [...questions];
+        updated[index] = nextQuestion;
+        onQuestionsChange(updated);
+      }
+      return;
+    }
+    if (field === 'question_text') {
+      setLocalTexts(prev => prev.map((t,i)=> i===index ? value : t));
+      setDirty(prev => prev.map((f,i)=> i===index ? true : f));
+      return;
+    }
   };
 
   const handleRatingScale = (index: number, key: 'min'|'max', value: number) => {
-    onQuestionsChange(questions.map((q, i) => {
-      if (i !== index) return q;
-      if (q.question_type !== 'rating') return q; // safeguard
-      return {
-        ...q,
-        options: { scale: { ...q.options.scale, [key]: value } }
-      } as RatingQuestionDraft;
-    }));
+    const prev = questions;
+    const target = prev[index];
+    if (!target || target.question_type !== 'rating') return;
+    const existing = target.options.scale;
+    if (existing[key] === value) return;
+    const updated: RatingQuestionDraft = { ...target, options: { scale: { ...existing, [key]: value } } };
+    const newArr = [...prev];
+    newArr[index] = updated;
+    onQuestionsChange(newArr);
   };
 
   return (
@@ -71,10 +125,13 @@ export const QuestionListEditor: React.FC<QuestionListEditorProps> = ({
             )}
           </div>
           <input
-            value={q.question_text}
+            value={localTexts[i] ?? ''}
             onChange={(e) => handleQuestionField(i, 'question_text', e.target.value)}
+            onBlur={() => commitQuestionText(i)}
+            onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitQuestionText(i); } }}
             placeholder="Question text"
             className="w-full mb-2 px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none"
+            data-dirty={dirty[i] ? 'true' : 'false'}
           />
           <select
             value={q.question_type}

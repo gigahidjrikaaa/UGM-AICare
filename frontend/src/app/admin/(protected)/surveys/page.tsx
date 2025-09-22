@@ -12,7 +12,7 @@ import Input from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/TextArea';
 import Tooltip from '@/components/ui/Tooltip';
 import { QuestionListEditor } from '@/components/surveys/QuestionListEditor';
-import { TextQuestionDraft, MultipleChoiceQuestionDraft, RatingQuestionDraft, QuestionDraft, createEmptyQuestion } from '@/types/surveys';
+import { MultipleChoiceQuestionDraft, QuestionDraft, createEmptyQuestion } from '@/types/surveys';
 
 // Draft & response types now come from surveyApi service (transformed to union locally)
 
@@ -26,11 +26,19 @@ const toServiceDraft = (q: QuestionDraft): ServiceQuestionDraft => {
 };
 
 export default function SurveyManagementPage() {
+  // Debug counters (temporary instrumentation)
+  const renderCountRef = useRef(0);
+  renderCountRef.current += 1;
+  if (process.env.NODE_ENV !== 'production') {
+    console.debug('[SurveyManagementPage] render', renderCountRef.current);
+  }
   const [surveys, setSurveys] = useState<Survey[]>([]);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isResultsModalOpen, setIsResultsModalOpen] = useState(false);
   const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null);
+  // Local buffered meta edits for the edit modal (avoid re-creating survey object each keystroke)
+  const [editMeta, setEditMeta] = useState<{ title: string; description: string; is_active: boolean }>({ title: '', description: '', is_active: false });
   const [surveyResults, setSurveyResults] = useState<SurveyResponse[]>([]);
   const [newSurvey, setNewSurvey] = useState<NewSurveyState>({
     title: '',
@@ -51,6 +59,8 @@ export default function SurveyManagementPage() {
   const createModalRef = useRef<HTMLDivElement>(null);
   const editModalRef = useRef<HTMLDivElement>(null);
   const resultsModalRef = useRef<HTMLDivElement>(null);
+  const editTitleRef = useRef<HTMLInputElement>(null);
+  const editDescRef = useRef<HTMLTextAreaElement>(null);
 
   const fetchSurveys = useCallback(async () => {
     try {
@@ -67,12 +77,73 @@ export default function SurveyManagementPage() {
     fetchSurveys();
   }, [fetchSurveys]);
 
+  // Preserve caret position in title during rapid re-renders
+  const lastTitleCaret = useRef<number | null>(null);
+  const prevTitle = useRef<string>('');
+  const lastDescCaret = useRef<number | null>(null);
+  useEffect(() => {
+    if (!isEditModalOpen) { lastTitleCaret.current = null; prevTitle.current=''; return; }
+    const input = editTitleRef.current;
+    if (!input) return;
+    // Record caret before paint on change
+    const handleInput = () => {
+      try { lastTitleCaret.current = input.selectionStart ?? null; } catch {}
+    };
+    input.addEventListener('input', handleInput, { capture: true });
+  return () => { input.removeEventListener('input', handleInput, { capture: true }); };
+  }, [isEditModalOpen]);
+
+  useEffect(() => {
+    if (!isEditModalOpen) return;
+    const input = editTitleRef.current;
+    if (!input) return;
+    if (document.activeElement !== input && lastTitleCaret.current !== null) {
+      // Restore focus + caret
+      requestAnimationFrame(() => {
+        try {
+          input.focus({ preventScroll: true });
+          const pos = Math.min(lastTitleCaret.current ?? input.value.length, input.value.length);
+          input.setSelectionRange(pos, pos);
+        } catch {}
+      });
+    }
+  }, [editMeta.title, isEditModalOpen]);
+
+  // Capture description caret
+  useEffect(() => {
+    if (!isEditModalOpen) { lastDescCaret.current = null; return; }
+    const ta = editDescRef.current;
+    if (!ta) return;
+    const handleInput = () => {
+      try { lastDescCaret.current = ta.selectionStart ?? null; } catch {}
+    };
+    ta.addEventListener('input', handleInput, { capture: true });
+    return () => { ta.removeEventListener('input', handleInput, { capture: true }); };
+  }, [isEditModalOpen]);
+
+  useEffect(() => {
+    if (!isEditModalOpen) return;
+    const ta = editDescRef.current;
+    if (!ta) return;
+    if (document.activeElement !== ta && lastDescCaret.current !== null) {
+      requestAnimationFrame(() => {
+        try {
+          ta.focus({ preventScroll: true });
+          const pos = Math.min(lastDescCaret.current ?? ta.value.length, ta.value.length);
+          ta.setSelectionRange(pos, pos);
+        } catch {}
+      });
+    }
+  }, [editMeta.description, isEditModalOpen]);
+
   const handleCreateModalOpen = () => setIsCreateModalOpen(true);
   const handleCreateModalClose = () => setIsCreateModalOpen(false);
 
   const handleEditModalOpen = (survey: Survey) => {
     setSelectedSurvey(survey);
     setIsEditModalOpen(true);
+    // Initialize buffered meta fields
+    setEditMeta({ title: survey.title, description: survey.description || '', is_active: survey.is_active });
     const cloned: QuestionDraft[] = survey.questions.map(q => {
       if (q.question_type === 'text') {
         return { id: q.id, question_text: q.question_text, question_type: 'text', options: [] };
@@ -91,6 +162,8 @@ export default function SurveyManagementPage() {
   const handleEditModalClose = () => {
     setSelectedSurvey(null);
     setIsEditModalOpen(false);
+    // Reset buffered meta
+    setEditMeta({ title: '', description: '', is_active: false });
   };
 
   const handleResultsModalOpen = async (surveyId: number) => {
@@ -121,7 +194,7 @@ export default function SurveyManagementPage() {
   const handleAddQuestion = () => {
     setNewSurvey((prev) => ({
       ...prev,
-      questions: [...prev.questions, { question_text: '', question_type: 'text', options: [] }]
+      questions: [...prev.questions, createEmptyQuestion()]
     }));
     setOptionInputs((prev) => [...prev, '']);
     setCreateErrors(prev => ({ ...prev, [newSurvey.questions.length]: 'Question text is required' }));
@@ -205,9 +278,10 @@ export default function SurveyManagementPage() {
     setEditErrors(errors);
     if (Object.values(errors).some(Boolean)) { toast.error('Fix validation errors'); return; }
     const original = selectedSurvey;
-    setSurveys(prev => prev.map(s => s.id === original.id ? { ...s, title: original.title, description: original.description, updated_at: new Date().toISOString() } : s));
+    // Optimistic meta update using buffered values
+    setSurveys(prev => prev.map(s => s.id === original.id ? { ...s, title: editMeta.title, description: editMeta.description, is_active: editMeta.is_active, updated_at: new Date().toISOString() } : s));
     try {
-      await surveyApi.updateMeta(original.id, { title: original.title, description: original.description, is_active: original.is_active });
+      await surveyApi.updateMeta(original.id, { title: editMeta.title, description: editMeta.description, is_active: editMeta.is_active });
       await surveyApi.bulkUpsertQuestions(original.id, editQuestions.map(toServiceDraft));
       toast.success('Survey updated');
       handleEditModalClose();
@@ -223,7 +297,7 @@ export default function SurveyManagementPage() {
   // handleEditQuestionChange removed; handled via <QuestionListEditor />
 
   const handleEditAddQuestion = () => {
-    setEditQuestions(prev => [...prev, { question_text: '', question_type: 'text', options: [] }]);
+    setEditQuestions(prev => [...prev, createEmptyQuestion()]);
     setEditOptionInputs(prev => [...prev, '']);
     setEditErrors(prev => ({ ...prev, [editQuestions.length]: 'Question text is required' }));
   };
@@ -457,14 +531,8 @@ export default function SurveyManagementPage() {
                     errors={createErrors}
                     mode="create"
                     onQuestionsChange={(updated) => {
-                      setNewSurvey(prev => ({
-                        ...prev,
-                        questions: updated.map(q => {
-                          if (q.question_type === 'text') return { question_text: q.question_text, question_type: 'text', options: [] } as TextQuestionDraft;
-                          if (q.question_type === 'multiple-choice') return { question_text: q.question_text, question_type: 'multiple-choice', options: [...q.options] } as MultipleChoiceQuestionDraft;
-                          return { question_text: q.question_text, question_type: 'rating', options: { scale: { ...q.options.scale } } } as RatingQuestionDraft;
-                        })
-                      }));
+                      // Directly adopt updated array to preserve object identity for unaffected questions
+                      setNewSurvey(prev => ({ ...prev, questions: updated }));
                       setCreateErrors(() => {
                         const errs: QuestionErrorMap = {};
                         updated.forEach((q,i)=>{ if(!q.question_text.trim()) errs[i] = 'Question text is required'; });
@@ -476,7 +544,6 @@ export default function SurveyManagementPage() {
                     onRemoveQuestion={handleRemoveQuestion}
                     onAddOption={handleAddOption}
                     onRemoveOption={handleRemoveOption}
-                    // rating scale handled internally
                   />
                 </div>
               </div>
@@ -518,16 +585,22 @@ export default function SurveyManagementPage() {
                 <Input
                   name="title"
                   label="Title"
-                  value={selectedSurvey.title}
-                  onChange={(e) => setSelectedSurvey({ ...selectedSurvey, title: e.target.value })}
+                  value={editMeta.title}
+                  onChange={(e) => setEditMeta(meta => ({ ...meta, title: e.target.value }))}
+                  onFocus={() => { if (process.env.NODE_ENV !== 'production') console.debug('Title input focus'); }}
+                  onBlur={() => { if (process.env.NODE_ENV !== 'production') console.debug('Title input blur'); }}
                   required
+                  ref={editTitleRef}
                   className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
                 />
                 <div className="space-y-1">
                   <label className="block text-sm font-medium text-gray-300">Description</label>
                   <Textarea
-                    value={selectedSurvey.description || ''}
-                    onChange={(e) => setSelectedSurvey({ ...selectedSurvey, description: e.target.value })}
+                    value={editMeta.description}
+                    onChange={(e) => setEditMeta(meta => ({ ...meta, description: e.target.value }))}
+                    onFocus={() => { if (process.env.NODE_ENV !== 'production') console.debug('Description focus'); }}
+                    onBlur={() => { if (process.env.NODE_ENV !== 'production') console.debug('Description blur'); }}
+                    ref={editDescRef}
                     className="w-full min-h-[120px] p-3 bg-white/8 border border-white/15 rounded-xl text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
                   />
                 </div>
@@ -535,8 +608,8 @@ export default function SurveyManagementPage() {
                   <label className="flex items-center">
                     <input
                       type="checkbox"
-                      checked={selectedSurvey.is_active}
-                      onChange={(e) => setSelectedSurvey({ ...selectedSurvey, is_active: e.target.checked })}
+                      checked={editMeta.is_active}
+                      onChange={(e) => setEditMeta(meta => ({ ...meta, is_active: e.target.checked }))}
                       className="h-4 w-4 text-[#FFCA40] focus:ring-[#FFCA40] bg-white/10 border-white/20 rounded"
                     />
                     <span className="ml-2 text-sm text-gray-300">Active</span>
@@ -550,11 +623,7 @@ export default function SurveyManagementPage() {
                     errors={editErrors}
                     mode="edit"
                     onQuestionsChange={(updated) => {
-                      setEditQuestions(updated.map(q => {
-                        if (q.question_type === 'text') return { question_text: q.question_text, question_type: 'text', options: [], id: q.id } as TextQuestionDraft;
-                        if (q.question_type === 'multiple-choice') return { question_text: q.question_text, question_type: 'multiple-choice', options: [...q.options], id: q.id } as MultipleChoiceQuestionDraft;
-                        return { question_text: q.question_text, question_type: 'rating', options: { scale: { ...q.options.scale } }, id: q.id } as RatingQuestionDraft;
-                      }));
+                      setEditQuestions(updated);
                       setEditErrors(() => {
                         const errs: QuestionErrorMap = {};
                         updated.forEach((q,i)=>{ if(!q.question_text.trim()) errs[i] = 'Question text is required'; });
@@ -566,7 +635,6 @@ export default function SurveyManagementPage() {
                     onRemoveQuestion={handleEditRemoveQuestion}
                     onAddOption={handleEditAddOption}
                     onRemoveOption={handleEditRemoveOption}
-                    // rating scale handled internally
                   />
                 </div>
               </div>
