@@ -263,11 +263,18 @@ async def get_latest_user_summary(
     current_user: User = Depends(get_current_active_user)
 ):
     logger.info(f"Fetching latest summary for user ID: {current_user.id}")
-    stmt = select(UserSummary)\
-        .where(UserSummary.user_id == current_user.id)\
-        .order_by(UserSummary.timestamp.desc())
-    result = await db.execute(stmt)
-    latest_summary_instance: Optional[UserSummary] = result.scalar_one_or_none()
+    stmt = (
+        select(UserSummary)
+        .where(UserSummary.user_id == current_user.id)
+        .order_by(UserSummary.timestamp.desc(), UserSummary.id.desc())
+        .limit(1)
+    )
+    try:
+        result = await db.execute(stmt)
+        latest_summary_instance: Optional[UserSummary] = result.scalars().first()
+    except Exception as e:
+        logger.error(f"Failed fetching latest summary for user {current_user.id}: {e}")
+        latest_summary_instance = None
 
     if not latest_summary_instance:
         logger.info(f"No summary found for user ID: {current_user.id}")

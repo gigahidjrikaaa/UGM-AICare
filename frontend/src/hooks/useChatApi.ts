@@ -1,5 +1,5 @@
 // src/hooks/useChatApi.ts
-import { useState, useCallback, Dispatch, SetStateAction } from 'react';
+import { useState, useCallback, Dispatch, SetStateAction, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-hot-toast';
 import apiClient from '@/services/api';
@@ -59,6 +59,8 @@ export function useChatApi(
   const { data: session } = useSession();
   const [isLoading, setIsLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const currentLoaderIdRef = useRef<string | null>(null);
 
   const processApiCall = useCallback(async (params: ProcessApiCallParams) => {
     if (!session?.user?.id) {
@@ -69,6 +71,13 @@ export function useChatApi(
 
     setIsLoading(true);
     setError(null);
+
+    // Abort any previous (should normally be none if guarded by isLoading, but defensive)
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     const conversationIdToUse = params.conversation_id || uuidv4();
 
@@ -85,6 +94,7 @@ export function useChatApi(
       updated_at: new Date().toISOString(),
     };
     setMessages((prev: Message[]) => [...prev, loaderMessage]);
+    currentLoaderIdRef.current = initialLoaderId;
 
     const fullPayload: ChatRequestPayload = {
       message: params.messageContent,
@@ -98,7 +108,7 @@ export function useChatApi(
     };
 
     try {
-      const data: ChatResponsePayload = await apiClient.post<ChatResponsePayload>('/chat', fullPayload).then(res => res.data);
+  const data: ChatResponsePayload = await apiClient.post<ChatResponsePayload>('/chat', fullPayload, { signal: controller.signal }).then(res => res.data);
 
       await addAssistantChunksSequentially(
         data.response,
@@ -113,6 +123,17 @@ export function useChatApi(
       }
 
     } catch (err: unknown) {
+      const aborted = (err instanceof DOMException && err.name === 'AbortError') || (typeof err === 'object' && err !== null && 'name' in err && (err as { name?: string }).name === 'CanceledError');
+      if (aborted) {
+        setMessages((prev: Message[]) => prev.map((msg: Message) => {
+          if (msg.id === currentLoaderIdRef.current) {
+            return { ...msg, content: '⛔ Respons dibatalkan.', isLoading: false };
+          }
+          return msg;
+        }));
+        setIsLoading(false);
+        return;
+      }
       console.error("API Error:", err);
       let errorMessageText: string;
       if (err instanceof Error) {
@@ -140,8 +161,16 @@ export function useChatApi(
       }));
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
+      currentLoaderIdRef.current = null;
     }
   }, [session, currentSessionId, addAssistantChunksSequentially, currentMode, setMessages]);
 
-  return { isLoading, error, processApiCall };
+  const cancelCurrent = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+  }, []);
+
+  return { isLoading, error, processApiCall, cancelCurrent };
 }
