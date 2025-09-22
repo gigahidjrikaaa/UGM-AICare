@@ -393,7 +393,9 @@ class AgentMessage(Base):
     role: Mapped[str] = mapped_column(String(32), nullable=False, default="system")  # system|user|agent|tool|error
     message_type: Mapped[str] = mapped_column(String(32), nullable=False, default="event")  # event|token|chunk|final|error
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    metadata: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    # 'metadata' is a reserved name in SQLAlchemy Declarative (Model.metadata). Use attribute 'meta' but keep
+    # underlying column name 'metadata' for backward compatibility.
+    meta: Mapped[Optional[dict]] = mapped_column("metadata", JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False, index=True)
 
     run: Mapped["AgentRun"] = relationship("AgentRun", back_populates="messages")

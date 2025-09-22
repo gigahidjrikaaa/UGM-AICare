@@ -93,11 +93,12 @@ class AgentMessage(BaseModel):
     role: str
     message_type: str
     content: str
-    metadata: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None  # Will map from ORM attribute 'meta'
     created_at: datetime
 
     class Config:
         from_attributes = True
+        fields = {"metadata": {"alias": "meta"}}
 
 
 class AgentStreamEvent(BaseModel):

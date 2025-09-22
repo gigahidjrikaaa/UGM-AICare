@@ -120,7 +120,7 @@ async def list_run_messages(
             "role": m.role,
             "type": m.message_type,
             "content": m.content,
-            "metadata": m.metadata,
+            "metadata": m.meta,
             "createdAt": m.created_at.isoformat() if m.created_at else None,
         }
         for m in msgs
