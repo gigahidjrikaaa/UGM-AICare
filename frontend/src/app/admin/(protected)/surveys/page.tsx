@@ -1,66 +1,28 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
+import { useModalA11y } from '@/hooks/useModalA11y';
 import { FiPlus, FiEdit, FiTrash2, FiEye, FiToggleLeft, FiToggleRight, FiExternalLink, FiBarChart2 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
-import { apiCall } from '@/utils/adminApi';
+import { surveyApi, Survey, SurveyResponse, SurveyQuestionDraft as ServiceQuestionDraft } from '@/services/surveyApi';
 import { Button } from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
-import Select from '@/components/ui/Select';
+// Select component no longer used after extracting QuestionListEditor
 import { Textarea } from '@/components/ui/TextArea';
 import Tooltip from '@/components/ui/Tooltip';
+import { QuestionListEditor } from '@/components/surveys/QuestionListEditor';
+import { TextQuestionDraft, MultipleChoiceQuestionDraft, RatingQuestionDraft, QuestionDraft, createEmptyQuestion } from '@/types/surveys';
 
-type QuestionType = 'text' | 'multiple-choice' | 'rating';
+// Draft & response types now come from surveyApi service (transformed to union locally)
 
-interface RatingOptions { scale: { min: number; max: number }; }
-type QuestionOptions = string[] | RatingOptions | [];
+interface NewSurveyState { title: string; description: string; questions: QuestionDraft[] }
+type QuestionErrorMap = Record<number, string | undefined>;
 
-interface SurveyQuestion {
-  id: number;
-  question_text: string;
-  question_type: QuestionType;
-  options: QuestionOptions;
-}
-
-interface SurveyQuestionDraft {
-  id?: number;
-  question_text: string;
-  question_type: QuestionType;
-  options: QuestionOptions;
-}
-
-interface Survey {
-  id: number;
-  title: string;
-  description: string | null;
-  is_active: boolean;
-  created_at: string;
-  updated_at: string;
-  questions: SurveyQuestion[];
-}
-
-interface SurveyAnswer { id: number; question_text: string; answer_text: string; }
-interface SurveyResponse { id: number; user_id: number; created_at: string; answers: SurveyAnswer[]; }
-
-interface NewSurveyState {
-  title: string;
-  description: string;
-  questions: SurveyQuestionDraft[];
-}
-
-const createEmptyQuestion = (): SurveyQuestionDraft => ({ question_text: '', question_type: 'text', options: [] });
-function isRatingOptions(opts: QuestionOptions): opts is RatingOptions {
-  if (!opts || typeof opts !== 'object') return false;
-  const candidate: unknown = (opts as { scale?: unknown }).scale;
-  if (!candidate || typeof candidate !== 'object') return false;
-  const maybe = candidate as { min?: unknown; max?: unknown };
-  const minValid = typeof maybe.min === 'number' || typeof maybe.min === 'string';
-  const maxValid = typeof maybe.max === 'number' || typeof maybe.max === 'string';
-  if (!minValid || !maxValid) return false;
-  const minNum = Number(maybe.min);
-  const maxNum = Number(maybe.max);
-  return Number.isFinite(minNum) && Number.isFinite(maxNum) && minNum < maxNum;
+const toServiceDraft = (q: QuestionDraft): ServiceQuestionDraft => {
+  if (q.question_type === 'rating') return { id: q.id, question_text: q.question_text, question_type: 'rating', options: { scale: { ...q.options.scale } } };
+  if (q.question_type === 'multiple-choice') return { id: q.id, question_text: q.question_text, question_type: 'multiple-choice', options: [...q.options] };
+  return { id: q.id, question_text: q.question_text, question_type: 'text', options: [] };
 };
 
 export default function SurveyManagementPage() {
@@ -76,21 +38,28 @@ export default function SurveyManagementPage() {
     questions: [createEmptyQuestion()]
   });
   const [optionInputs, setOptionInputs] = useState<string[]>(['']);
+  const [createErrors, setCreateErrors] = useState<QuestionErrorMap>({});
   // Edit modal question state
-  const [editQuestions, setEditQuestions] = useState<SurveyQuestionDraft[]>([]);
+  const [editQuestions, setEditQuestions] = useState<QuestionDraft[]>([]);
   const [editOptionInputs, setEditOptionInputs] = useState<string[]>([]);
+  const [editErrors, setEditErrors] = useState<QuestionErrorMap>({});
   // Search + pagination
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
+  // Modal a11y refs (generic HTMLElement for hook compatibility)
+  const createModalRef = useRef<HTMLDivElement>(null);
+  const editModalRef = useRef<HTMLDivElement>(null);
+  const resultsModalRef = useRef<HTMLDivElement>(null);
 
   const fetchSurveys = useCallback(async () => {
     try {
-      const data = await apiCall<Survey[]>('/api/v1/admin/surveys');
+      const data = await surveyApi.list();
       setSurveys(data);
     } catch (error) {
+      const err = surveyApi.normalizeError(error, 'Failed to load surveys');
       console.error('Error fetching surveys:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to load surveys');
+      toast.error(`Load failed: ${err.message}`);
     }
   }, []);
 
@@ -104,10 +73,17 @@ export default function SurveyManagementPage() {
   const handleEditModalOpen = (survey: Survey) => {
     setSelectedSurvey(survey);
     setIsEditModalOpen(true);
-    const cloned: SurveyQuestionDraft[] = survey.questions.map(q => {
-      if (Array.isArray(q.options)) return { ...q, options: [...q.options] };
-      if (isRatingOptions(q.options)) return { ...q, options: { scale: { ...q.options.scale } } };
-      return { ...q, options: [] };
+    const cloned: QuestionDraft[] = survey.questions.map(q => {
+      if (q.question_type === 'text') {
+        return { id: q.id, question_text: q.question_text, question_type: 'text', options: [] };
+      }
+      if (q.question_type === 'multiple-choice') {
+        return { id: q.id, question_text: q.question_text, question_type: 'multiple-choice', options: Array.isArray(q.options) ? [...q.options] : [] };
+      }
+      const raw = q.options as { scale?: { min?: number; max?: number } } | undefined;
+      const min = raw?.scale?.min ?? 1;
+      const max = raw?.scale?.max ?? 5;
+      return { id: q.id, question_text: q.question_text, question_type: 'rating', options: { scale: { min, max } } };
     });
     setEditQuestions(cloned);
     setEditOptionInputs(new Array(cloned.length).fill(''));
@@ -119,27 +95,28 @@ export default function SurveyManagementPage() {
 
   const handleResultsModalOpen = async (surveyId: number) => {
     try {
-      const data = await apiCall<SurveyResponse[]>(`/api/v1/admin/surveys/${surveyId}/responses`);
+      const data = await surveyApi.responses(surveyId);
       setSurveyResults(data);
       setIsResultsModalOpen(true);
     } catch (error) {
+      const err = surveyApi.normalizeError(error, 'Failed to load survey results');
       console.error('Error fetching survey results:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to load survey results');
+      toast.error(`Results failed: ${err.message}`);
     }
   };
   const handleResultsModalClose = () => setIsResultsModalOpen(false);
+
+  // Invoke modal accessibility hook AFTER handlers are defined
+  useModalA11y(isCreateModalOpen, createModalRef, handleCreateModalClose);
+  useModalA11y(isEditModalOpen, editModalRef, handleEditModalClose);
+  useModalA11y(isResultsModalOpen, resultsModalRef, handleResultsModalClose);
 
   const handleNewSurveyChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setNewSurvey((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleNewQuestionChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    const questions = [...newSurvey.questions];
-    questions[index] = { ...questions[index], [name]: value };
-    setNewSurvey((prev) => ({ ...prev, questions }));
-  };
+  // handleNewQuestionChange removed; handled via <QuestionListEditor />
 
   const handleAddQuestion = () => {
     setNewSurvey((prev) => ({
@@ -147,6 +124,7 @@ export default function SurveyManagementPage() {
       questions: [...prev.questions, { question_text: '', question_type: 'text', options: [] }]
     }));
     setOptionInputs((prev) => [...prev, '']);
+    setCreateErrors(prev => ({ ...prev, [newSurvey.questions.length]: 'Question text is required' }));
   };
 
   const handleRemoveQuestion = (index: number) => {
@@ -154,6 +132,12 @@ export default function SurveyManagementPage() {
     questions.splice(index, 1);
     setNewSurvey((prev) => ({ ...prev, questions }));
     setOptionInputs(prev => prev.filter((_, i) => i !== index));
+    setCreateErrors(prev => {
+      const clone = { ...prev }; delete clone[index];
+      const remapped: QuestionErrorMap = {};
+      questions.forEach((_, i) => { if (clone[i]) remapped[i] = clone[i]; });
+      return remapped;
+    });
   };
 
   // Create modal: option handlers
@@ -179,49 +163,36 @@ export default function SurveyManagementPage() {
     setNewSurvey(prev => ({ ...prev, questions }));
   };
 
-  // Rating scale handlers (create modal)
-  const setRatingScale = (index: number, key: 'min'|'max', value: number) => {
-    setNewSurvey(prev => {
-      const questions = [...prev.questions];
-      const current = questions[index];
-      const base = isRatingOptions(current.options) ? current.options : { scale: { min: 1, max: 5 } };
-      const updated: RatingOptions = { scale: { ...base.scale, [key]: value } };
-      questions[index] = { ...current, options: updated };
-      return { ...prev, questions };
-    });
-  };
-  const getRatingScale = (q: SurveyQuestionDraft | SurveyQuestion) => {
-    if (isRatingOptions(q.options)) return { min: q.options.scale.min ?? 1, max: q.options.scale.max ?? 5 };
-    return { min: 1, max: 5 };
+  // Rating scale handled inside QuestionListEditor component
+
+  const validateQuestion = (q: QuestionDraft): string | undefined => {
+    if (!q.question_text.trim()) return 'Question text is required';
+    if (q.question_type === 'multiple-choice' && q.options.length < 2) return 'At least 2 options required';
+    if (q.question_type === 'rating') {
+      const { min, max } = q.options.scale;
+      if (!(Number.isFinite(min) && Number.isFinite(max) && min < max)) return 'Rating scale invalid';
+    }
+    return undefined;
   };
 
   const handleCreateSurvey = async () => {
+    const errors: QuestionErrorMap = {};
+    newSurvey.questions.forEach((q, i) => { const err = validateQuestion(q); if (err) errors[i] = err; });
+    setCreateErrors(errors);
+    if (Object.values(errors).some(Boolean)) { toast.error('Fix validation errors'); return; }
+    const tempId = Math.random();
+    const optimistic: Survey = { id: tempId, title: newSurvey.title, description: newSurvey.description, is_active: false, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), questions: [] };
+    setSurveys(prev => [optimistic, ...prev]);
     try {
-      // Validate multiple-choice questions
-      for (const q of newSurvey.questions) {
-        if (q.question_type === 'multiple-choice') {
-          const opts = Array.isArray(q.options) ? q.options : [];
-          if (opts.length < 2) {
-            toast.error('Multiple-choice questions need at least 2 options.');
-            return;
-          }
-        }
-        if (q.question_type === 'rating') {
-          const { min, max } = getRatingScale(q);
-          if (!(Number.isFinite(min) && Number.isFinite(max) && min < max)) {
-            toast.error('Rating questions need a valid scale (min < max).');
-            return;
-          }
-        }
-      }
-      await apiCall('/api/v1/admin/surveys', {
-        method: 'POST',
-        body: JSON.stringify(newSurvey),
-      });
-      toast.success('Survey created successfully');
+      const created = await surveyApi.create({ title: newSurvey.title, description: newSurvey.description, questions: newSurvey.questions.map(toServiceDraft) });
+      setSurveys(prev => prev.map(s => s.id === tempId ? created : s));
+      toast.success('Survey created');
       handleCreateModalClose();
-      fetchSurveys();
+      setNewSurvey({ title: '', description: '', questions: [createEmptyQuestion()] });
+      setOptionInputs(['']);
+      setCreateErrors({});
     } catch (error) {
+      setSurveys(prev => prev.filter(s => s.id !== tempId));
       console.error('Error creating survey:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to create survey');
     }
@@ -229,62 +200,44 @@ export default function SurveyManagementPage() {
 
   const handleUpdateSurvey = async () => {
     if (!selectedSurvey) return;
+    const errors: QuestionErrorMap = {};
+    editQuestions.forEach((q, i) => { const err = validateQuestion(q); if (err) errors[i] = err; });
+    setEditErrors(errors);
+    if (Object.values(errors).some(Boolean)) { toast.error('Fix validation errors'); return; }
+    const original = selectedSurvey;
+    setSurveys(prev => prev.map(s => s.id === original.id ? { ...s, title: original.title, description: original.description, updated_at: new Date().toISOString() } : s));
     try {
-      // Validate edit questions
-      for (const q of editQuestions) {
-        if (q.question_type === 'multiple-choice') {
-          const opts = Array.isArray(q.options) ? q.options : [];
-          if (opts.length < 2) {
-            toast.error('Multiple-choice questions need at least 2 options.');
-            return;
-          }
-        }
-        if (q.question_type === 'rating') {
-          const { min, max } = getEditRatingScale(q as SurveyQuestionDraft);
-          if (!(Number.isFinite(min) && Number.isFinite(max) && min < max)) {
-            toast.error('Rating questions need a valid scale (min < max).');
-            return;
-          }
-        }
-      }
-      await apiCall(`/api/v1/admin/surveys/${selectedSurvey.id}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify({
-            title: selectedSurvey.title,
-            description: selectedSurvey.description,
-            is_active: selectedSurvey.is_active,
-          }),
-        }
-      );
-      // Bulk upsert questions
-      await apiCall(`/api/v1/admin/surveys/${selectedSurvey.id}/questions/bulk`, {
-        method: 'PUT',
-        body: JSON.stringify(editQuestions.map(q => ({ id: q.id, question_text: q.question_text, question_type: q.question_type, options: q.options || [] })))
-      });
-      toast.success('Survey updated successfully');
+      await surveyApi.updateMeta(original.id, { title: original.title, description: original.description, is_active: original.is_active });
+      await surveyApi.bulkUpsertQuestions(original.id, editQuestions.map(toServiceDraft));
+      toast.success('Survey updated');
       handleEditModalClose();
-      fetchSurveys();
+      setEditErrors({});
     } catch (error) {
       console.error('Error updating survey:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to update survey');
+      fetchSurveys();
     }
   };
 
   // Edit modal question handlers
-  const handleEditQuestionChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value } = e.target;
-    setEditQuestions(prev => prev.map((q, i) => (i === index ? ({ ...q, [name]: value } as SurveyQuestionDraft) : q)));
-  };
+  // handleEditQuestionChange removed; handled via <QuestionListEditor />
 
   const handleEditAddQuestion = () => {
     setEditQuestions(prev => [...prev, { question_text: '', question_type: 'text', options: [] }]);
     setEditOptionInputs(prev => [...prev, '']);
+    setEditErrors(prev => ({ ...prev, [editQuestions.length]: 'Question text is required' }));
   };
 
   const handleEditRemoveQuestion = (index: number) => {
     setEditQuestions(prev => prev.filter((_, i) => i !== index));
     setEditOptionInputs(prev => prev.filter((_, i) => i !== index));
+    setEditErrors(prev => {
+      const clone = { ...prev }; delete clone[index];
+      const remapped: QuestionErrorMap = {};
+      const remaining = editQuestions.filter((_, i) => i !== index);
+      remaining.forEach((_, i) => { if (clone[i]) remapped[i] = clone[i]; });
+      return remapped;
+    });
   };
 
   const handleEditOptionInputChange = (index: number, value: string) => {
@@ -296,9 +249,10 @@ export default function SurveyManagementPage() {
     if (!value) return;
     setEditQuestions(prev => prev.map((q, i) => {
       if (i !== index) return q;
-      const opts = Array.isArray(q.options) ? [...q.options] : [];
+      if (q.question_type !== 'multiple-choice') return q;
+      const opts = [...q.options];
       if (!opts.includes(value)) opts.push(value);
-      return { ...q, options: opts };
+      return { ...q, options: opts } as MultipleChoiceQuestionDraft;
     }));
     handleEditOptionInputChange(index, '');
   };
@@ -306,23 +260,13 @@ export default function SurveyManagementPage() {
   const handleEditRemoveOption = (qIdx: number, optValue: string) => {
     setEditQuestions(prev => prev.map((q, i) => {
       if (i !== qIdx) return q;
-      const opts = Array.isArray(q.options) ? q.options.filter(o => o !== optValue) : [];
-      return { ...q, options: opts };
+      if (q.question_type !== 'multiple-choice') return q;
+      const opts = q.options.filter(o => o !== optValue);
+      return { ...q, options: opts } as MultipleChoiceQuestionDraft;
     }));
   };
 
-  const setEditRatingScale = (index: number, key: 'min'|'max', value: number) => {
-    setEditQuestions(prev => prev.map((q, i) => {
-      if (i !== index) return q;
-      const base = isRatingOptions(q.options) ? q.options : { scale: { min: 1, max: 5 } };
-      const updated: RatingOptions = { scale: { ...base.scale, [key]: value } };
-      return { ...q, options: updated };
-    }));
-  };
-  const getEditRatingScale = (q: SurveyQuestionDraft) => {
-    if (isRatingOptions(q.options)) return { min: q.options.scale.min ?? 1, max: q.options.scale.max ?? 5 };
-    return { min: 1, max: 5 };
-  };
+  // Edit rating scale handled inside QuestionListEditor component
 
   // Derived lists for search and pagination
   const filtered = surveys.filter(s => (
@@ -334,30 +278,32 @@ export default function SurveyManagementPage() {
   const paginated = filtered.slice(start, start + ITEMS_PER_PAGE);
 
   const handleDeleteSurvey = async (surveyId: number) => {
-    if (!confirm('Are you sure you want to delete this survey?')) return;
+    if (!confirm('Delete this survey permanently?')) return;
+    const previous = surveys;
+    setSurveys(s => s.filter(sv => sv.id !== surveyId));
     try {
-      await apiCall(`/api/v1/admin/surveys/${surveyId}`, { method: 'DELETE' });
-      toast.success('Survey deleted successfully');
-      fetchSurveys();
+      await surveyApi.remove(surveyId);
+      toast.success('Survey deleted');
     } catch (error) {
+      setSurveys(previous);
+      const err = surveyApi.normalizeError(error, 'Failed to delete survey');
       console.error('Error deleting survey:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to delete survey');
+      toast.error(`Delete failed: ${err.message}`);
     }
   };
 
   const handleToggleSurveyActive = async (survey: Survey) => {
+    const previous = surveys;
+    const next = !survey.is_active;
+    setSurveys(s => s.map(sv => sv.id === survey.id ? { ...sv, is_active: next } : sv));
     try {
-      await apiCall(`/api/v1/admin/surveys/${survey.id}`,
-        {
-          method: 'PUT',
-          body: JSON.stringify({ is_active: !survey.is_active })
-        }
-      );
-      toast.success(`Survey ${!survey.is_active ? 'activated' : 'deactivated'} successfully`);
-      fetchSurveys();
+      await surveyApi.toggleActive(survey.id, next);
+      toast.success(`Survey ${next ? 'activated' : 'deactivated'}`);
     } catch (error) {
+      setSurveys(previous);
+      const err = surveyApi.normalizeError(error, 'Failed to update status');
       console.error('Error toggling survey status:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to update survey status');
+      toast.error(`Status update failed: ${err.message}`);
     }
   };
 
@@ -468,6 +414,7 @@ export default function SurveyManagementPage() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
             onClick={handleCreateModalClose}
+            role="presentation"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -475,9 +422,14 @@ export default function SurveyManagementPage() {
               exit={{ scale: 0.95, opacity: 0 }}
               className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="create-survey-title"
+              ref={createModalRef}
+              tabIndex={-1}
             >
               <div className="px-6 py-4 border-b border-white/20">
-                <h3 className="text-lg font-medium text-white">Create New Survey</h3>
+                <h3 id="create-survey-title" className="text-lg font-medium text-white">Create New Survey</h3>
               </div>
               <div className="p-6 space-y-4">
                 <Input
@@ -499,84 +451,33 @@ export default function SurveyManagementPage() {
                 </div>
                 <div>
                   <h4 className="text-md font-medium text-white mb-2">Questions</h4>
-                  {newSurvey.questions.map((q, i) => (
-                    <div key={i} className="p-4 border border-white/20 rounded-lg mb-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <label className="block text-sm font-medium text-gray-300">Question {i + 1}</label>
-                        <button aria-label={`Remove question ${i+1}`} title="Remove question" onClick={() => handleRemoveQuestion(i)} className="text-red-400 hover:text-red-300" type="button">
-                          <FiTrash2 />
-                        </button>
-                      </div>
-                      <Input
-                        name="question_text"
-                        label="Question text"
-                        value={q.question_text}
-                        onChange={(e) => handleNewQuestionChange(i, e)}
-                        required
-                        className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm mb-2"
-                      />
-                      <Select
-                        name="question_type"
-                        label="Question type"
-                        value={q.question_type}
-                        onChange={(e) => handleNewQuestionChange(i, e)}
-                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors"
-                      >
-                        <option value="text" className="bg-gray-800">Text</option>
-                        <option value="multiple-choice" className="bg-gray-800">Multiple Choice</option>
-                        <option value="rating" className="bg-gray-800">Rating (1-5)</option>
-                      </Select>
-
-                      {q.question_type === 'multiple-choice' && (
-                        <div className="mt-3 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={optionInputs[i] || ''}
-                              onChange={(e) => handleOptionInputChange(i, e.target.value)}
-                              placeholder="Add an option"
-                              className="flex-1 px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
-                            />
-                            <Button type="button" variant="outline" onClick={() => handleAddOption(i)}>Add</Button>
-                          </div>
-                          {Array.isArray(q.options) && q.options.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              {q.options.map((opt: string) => (
-                                <span key={opt} className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-white/10 border border-white/20 text-white">
-                                  {opt}
-                                  <button aria-label={`Remove option ${opt}`} title="Remove option" type="button" onClick={() => handleRemoveOption(i, opt)} className="text-red-400 hover:text-red-300">×</button>
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {q.question_type === 'rating' && (
-                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <Input
-                            name="rating_min"
-                            label="Scale min"
-                            type="number"
-                            value={getRatingScale(q).min}
-                            onChange={(e) => setRatingScale(i, 'min', Number(e.target.value))}
-                            className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white"
-                          />
-                          <Input
-                            name="rating_max"
-                            label="Scale max"
-                            type="number"
-                            value={getRatingScale(q).max}
-                            onChange={(e) => setRatingScale(i, 'max', Number(e.target.value))}
-                            className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  <Button onClick={handleAddQuestion} type="button" variant="outline" className="inline-flex items-center">
-                    <FiPlus className="h-4 w-4 mr-2" />
-                    Add Question
-                  </Button>
+                  <QuestionListEditor
+                    questions={newSurvey.questions}
+                    optionInputs={optionInputs}
+                    errors={createErrors}
+                    mode="create"
+                    onQuestionsChange={(updated) => {
+                      setNewSurvey(prev => ({
+                        ...prev,
+                        questions: updated.map(q => {
+                          if (q.question_type === 'text') return { question_text: q.question_text, question_type: 'text', options: [] } as TextQuestionDraft;
+                          if (q.question_type === 'multiple-choice') return { question_text: q.question_text, question_type: 'multiple-choice', options: [...q.options] } as MultipleChoiceQuestionDraft;
+                          return { question_text: q.question_text, question_type: 'rating', options: { scale: { ...q.options.scale } } } as RatingQuestionDraft;
+                        })
+                      }));
+                      setCreateErrors(() => {
+                        const errs: QuestionErrorMap = {};
+                        updated.forEach((q,i)=>{ if(!q.question_text.trim()) errs[i] = 'Question text is required'; });
+                        return errs;
+                      });
+                    }}
+                    onOptionInputsChange={setOptionInputs}
+                    onAddQuestion={handleAddQuestion}
+                    onRemoveQuestion={handleRemoveQuestion}
+                    onAddOption={handleAddOption}
+                    onRemoveOption={handleRemoveOption}
+                    // rating scale handled internally
+                  />
                 </div>
               </div>
               <div className="px-6 py-4 border-t border-white/20 flex justify-end space-x-3">
@@ -596,6 +497,7 @@ export default function SurveyManagementPage() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
             onClick={handleEditModalClose}
+            role="presentation"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -603,9 +505,14 @@ export default function SurveyManagementPage() {
               exit={{ scale: 0.95, opacity: 0 }}
               className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="edit-survey-title"
+              ref={editModalRef}
+              tabIndex={-1}
             >
               <div className="px-6 py-4 border-b border-white/20">
-                <h3 className="text-lg font-medium text-white">Edit Survey</h3>
+                <h3 id="edit-survey-title" className="text-lg font-medium text-white">Edit Survey</h3>
               </div>
               <div className="p-6 space-y-4">
                 <Input
@@ -637,83 +544,30 @@ export default function SurveyManagementPage() {
                 </div>
                 <div>
                   <h4 className="text-md font-medium text-white mb-2">Questions</h4>
-                  {editQuestions.map((q, i) => (
-                    <div key={q.id ?? `new-${i}`} className="p-4 border border-white/20 rounded-lg mb-4">
-                      <div className="flex justify-between items-center mb-2">
-                        <label className="block text-sm font-medium text-gray-300">Question {i + 1}</label>
-                        <button aria-label={`Remove question ${i+1}`} title="Remove question" onClick={() => handleEditRemoveQuestion(i)} className="text-red-400 hover:text-red-300" type="button">
-                          <FiTrash2 />
-                        </button>
-                      </div>
-                      <Input
-                        name="question_text"
-                        label="Question text"
-                        value={q.question_text}
-                        onChange={(e) => handleEditQuestionChange(i, e)}
-                        required
-                        className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm mb-2"
-                      />
-                      <Select
-                        name="question_type"
-                        label="Question type"
-                        value={q.question_type}
-                        onChange={(e) => handleEditQuestionChange(i, e)}
-                        className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors"
-                      >
-                        <option value="text" className="bg-gray-800">Text</option>
-                        <option value="multiple-choice" className="bg-gray-800">Multiple Choice</option>
-                        <option value="rating" className="bg-gray-800">Rating (1-5)</option>
-                      </Select>
-                      {q.question_type === 'multiple-choice' && (
-                        <div className="mt-3 space-y-2">
-                          <div className="flex items-center gap-2">
-                            <input
-                              type="text"
-                              value={editOptionInputs[i] || ''}
-                              onChange={(e) => handleEditOptionInputChange(i, e.target.value)}
-                              placeholder="Add an option"
-                              className="flex-1 px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
-                            />
-                            <Button type="button" variant="outline" onClick={() => handleEditAddOption(i)}>Add</Button>
-                          </div>
-                          {Array.isArray(q.options) && q.options.length > 0 && (
-                            <div className="flex flex-wrap gap-2">
-                              {q.options.map((opt: string) => (
-                                <span key={opt} className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-white/10 border border-white/20 text-white">
-                                  {opt}
-                                  <button aria-label={`Remove option ${opt}`} title="Remove option" type="button" onClick={() => handleEditRemoveOption(i, opt)} className="text-red-400 hover:text-red-300">×</button>
-                                </span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )}
-                      {q.question_type === 'rating' && (
-                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <Input
-                            name="edit_rating_min"
-                            label="Scale min"
-                            type="number"
-                            value={getEditRatingScale(q).min}
-                            onChange={(e) => setEditRatingScale(i, 'min', Number(e.target.value))}
-                            className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white"
-                          />
-                          <Input
-                            name="edit_rating_max"
-                            label="Scale max"
-                            type="number"
-                            value={getEditRatingScale(q).max}
-                            onChange={(e) => setEditRatingScale(i, 'max', Number(e.target.value))}
-                            className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white"
-                          />
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                  <Button onClick={handleEditAddQuestion} type="button" variant="outline" className="inline-flex items-center">
-                    <FiPlus className="h-4 w-4 mr-2" />
-                    Add Question
-                  </Button>
+                  <QuestionListEditor
+                    questions={editQuestions}
+                    optionInputs={editOptionInputs}
+                    errors={editErrors}
+                    mode="edit"
+                    onQuestionsChange={(updated) => {
+                      setEditQuestions(updated.map(q => {
+                        if (q.question_type === 'text') return { question_text: q.question_text, question_type: 'text', options: [], id: q.id } as TextQuestionDraft;
+                        if (q.question_type === 'multiple-choice') return { question_text: q.question_text, question_type: 'multiple-choice', options: [...q.options], id: q.id } as MultipleChoiceQuestionDraft;
+                        return { question_text: q.question_text, question_type: 'rating', options: { scale: { ...q.options.scale } }, id: q.id } as RatingQuestionDraft;
+                      }));
+                      setEditErrors(() => {
+                        const errs: QuestionErrorMap = {};
+                        updated.forEach((q,i)=>{ if(!q.question_text.trim()) errs[i] = 'Question text is required'; });
+                        return errs;
+                      });
+                    }}
+                    onOptionInputsChange={setEditOptionInputs}
+                    onAddQuestion={handleEditAddQuestion}
+                    onRemoveQuestion={handleEditRemoveQuestion}
+                    onAddOption={handleEditAddOption}
+                    onRemoveOption={handleEditRemoveOption}
+                    // rating scale handled internally
+                  />
                 </div>
               </div>
               <div className="px-6 py-4 border-t border-white/20 flex justify-end space-x-3">
@@ -733,6 +587,7 @@ export default function SurveyManagementPage() {
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
             onClick={handleResultsModalClose}
+            role="presentation"
           >
             <motion.div
               initial={{ scale: 0.95, opacity: 0 }}
@@ -740,9 +595,14 @@ export default function SurveyManagementPage() {
               exit={{ scale: 0.95, opacity: 0 }}
               className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
               onClick={(e) => e.stopPropagation()}
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="results-survey-title"
+              ref={resultsModalRef}
+              tabIndex={-1}
             >
               <div className="px-6 py-4 border-b border-white/20">
-                <h3 className="text-lg font-medium text-white">Survey Results</h3>
+                <h3 id="results-survey-title" className="text-lg font-medium text-white">Survey Results</h3>
               </div>
               <div className="p-6">
                 {surveyResults.length > 0 ? (
@@ -754,7 +614,7 @@ export default function SurveyManagementPage() {
                           <p className="text-xs text-gray-400">{new Date(response.created_at).toLocaleString()}</p>
                         </div>
                         <div className="space-y-2">
-                          {response.answers.map((answer: SurveyAnswer) => (
+                          {response.answers.map((answer) => (
                             <div key={answer.id}>
                               <p className="text-sm font-medium text-gray-300">{answer.question_text}</p>
                               <p className="text-sm text-white">{answer.answer_text}</p>
