@@ -2,6 +2,7 @@ import logging
 import uuid
 from datetime import datetime
 from typing import Optional
+from fastapi import Header, Cookie
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from passlib.context import CryptContext
@@ -202,8 +203,8 @@ async def exchange_oauth_token(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=False,  # TODO: set True in production behind TLS
-        samesite="lax",
+        secure=True,
+        samesite="none",
         max_age=60*60*24,
         path="/",
     )
@@ -286,8 +287,8 @@ async def login_for_access_token(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=False,  # TODO: set True in production behind TLS
-        samesite="lax",
+        secure=True,
+        samesite="none",
         max_age=60*60*24,
         path="/",
     )
@@ -392,13 +393,18 @@ async def get_current_user_info(request: Request, db: AsyncSession = Depends(get
     Tries Authorization: Bearer <token> header first, then falls back to common cookie keys.
     This is consumed by the frontend AccessGuard. Returns 401 if credentials are missing/invalid.
     """
-    # Extract token from Authorization header or fallback cookies
-    auth_header = request.headers.get("Authorization")
+    authorization: str | None = Header(default=None)
+    access_token: str | None = Cookie(default=None)
+    token_cookie: str | None = Cookie(default=None, alias="token")
+    auth_cookie: str | None = Cookie(default=None, alias="auth")
+    session_token: str | None = Cookie(default=None, alias="next-auth.session-token")
     token: str | None = None
-    if auth_header and auth_header.lower().startswith("bearer "):
-        token = auth_header.split(" ", 1)[1].strip()
+    if authorization and authorization.lower().startswith("bearer "):
+        parts = authorization.split(" ", 1)
+        if len(parts) == 2 and parts[1].strip():
+            token = parts[1].strip()
     if not token:
-        token = request.cookies.get("access_token") or request.cookies.get("token") or request.cookies.get("auth" )
+        token = access_token or token_cookie or auth_cookie or session_token
     if not token:
         logger.warning("/auth/me missing credentials (no header/cookies)")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing credentials")
@@ -423,5 +429,26 @@ async def get_current_user_info(request: Request, db: AsyncSession = Depends(get
     logger.debug("/auth/me success user_id=%s role=%s", user.id, user.role)
 
     return serialize_user(user)
+
+
+@router.get("/debug-cookies")
+async def debug_cookies(request: Request):
+    """Return auth-related cookies (names and first 8 chars of value) for debugging.
+
+    Do NOT expose in production unless gated; kept lightweight here.
+    """
+    interesting = [
+        "access_token",
+        "token",
+        "auth",
+        "next-auth.session-token",
+        "__Secure-next-auth.session-token",
+    ]
+    found = {}
+    for name in interesting:
+        if name in request.cookies:
+            val = request.cookies.get(name) or ""
+            found[name] = val[:8] + ("..." if len(val) > 8 else "")
+    return {"cookies": found, "count": len(found)}
 
 

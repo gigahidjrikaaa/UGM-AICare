@@ -15,8 +15,8 @@ interface RunMessage { id: string; role: string; type: string; content: string |
 
 const backendHttpBase = (process.env.NEXT_PUBLIC_BACKEND_BASE || process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
 const backendWsBase = (process.env.NEXT_PUBLIC_BACKEND_WS_BASE || backendHttpBase.replace(/^http/, 'ws') || '').replace(/\/$/, '');
-const API_BASE = backendHttpBase ? backendHttpBase + '/api/v1/agents' : '';
-const WS_URL = backendWsBase ? backendWsBase + '/api/v1/agents/ws' : '';
+const API_BASE = backendHttpBase ? backendHttpBase + '/api/v1/admin/agents' : '';
+const WS_URL = backendWsBase ? backendWsBase + '/api/v1/admin/agents/ws' : '';
 
 const AgentsCommandCenterClient: React.FC = () => {
   const [connectionState, setConnectionState] = useState<'connecting' | 'open' | 'closed' | 'error'>('connecting');

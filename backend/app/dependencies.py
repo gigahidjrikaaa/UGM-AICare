@@ -15,6 +15,7 @@ def get_token_from_request(
     access_token: str | None = Cookie(default=None),
     token_cookie: str | None = Cookie(default=None, alias="token"),
     auth_cookie: str | None = Cookie(default=None, alias="auth"),
+    nextauth_session: str | None = Cookie(default=None, alias="next-auth.session-token"),
 ) -> str:
     """Obtain bearer token from Authorization header or known cookies.
 
@@ -26,7 +27,7 @@ def get_token_from_request(
         if len(parts) == 2 and parts[1].strip():
             candidate = parts[1].strip()
     if not candidate:
-        candidate = access_token or token_cookie or auth_cookie
+        candidate = access_token or token_cookie or auth_cookie or nextauth_session
     if not candidate:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

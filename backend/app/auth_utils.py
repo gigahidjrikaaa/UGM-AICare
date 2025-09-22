@@ -7,12 +7,13 @@ from typing import Any, Dict, Optional
 from fastapi import HTTPException, status
 
 from hkdf import Hkdf  # type: ignore
-from jose import jwe, jwt, exceptions as jose_exceptions, JWTError # type: ignore
+from jose import jwe, jwt, JWTError  # type: ignore
 from pydantic import BaseModel, ValidationError
 
 # Load environment variables
 JWT_SECRET = os.environ.get("JWT_SECRET_KEY")
 ALGORITHM = "HS256"
+NEXTAUTH_SECRET = os.environ.get("NEXTAUTH_SECRET")  # If set, enables JWE (NextAuth) session token support
 ACCESS_TOKEN_EXPIRE_MINUTES = int(os.environ.get("ACCESS_TOKEN_EXPIRE_MINUTES", 60 * 24))
 
 
@@ -83,8 +84,47 @@ def _derive_encryption_key(secret: str) -> bytes:
         logger.error(f"Failed to derive encryption key using HKDF: {e}")
         raise RuntimeError("Could not derive necessary encryption key.")
 
+def _try_decode_jwt(token: str) -> TokenPayload | None:
+    if not JWT_SECRET:
+        return None
+    try:
+        payload_dict = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
+        return TokenPayload(**payload_dict)
+    except Exception:
+        return None
+
+
+def _try_decrypt_nextauth_jwe(token: str) -> TokenPayload | None:
+    """Attempt to decrypt a NextAuth style JWE (5 segments) using HKDF derived key."""
+    if not (NEXTAUTH_SECRET or JWT_SECRET):
+        return None
+    secret_source = NEXTAUTH_SECRET or JWT_SECRET  # fallback so deploys with one secret still work
+    if not secret_source:
+        return None
+    try:
+        key = _derive_encryption_key(secret_source)  # 32 bytes
+        plaintext = jwe.decrypt(token, key)  # bytes
+        # NextAuth encodes JSON string
+        try:
+            payload_dict = json.loads(plaintext.decode("utf-8"))  # type: ignore[arg-type]
+        except Exception:
+            return None
+        # Some NextAuth payloads nest user inside 'user' key; flatten important fields
+        if isinstance(payload_dict, dict):
+            # Promote nested user fields if present
+            user_section = payload_dict.get("user")
+            if isinstance(user_section, dict):
+                for k in ["id", "name", "email", "role", "google_sub", "allow_email_checkins"]:
+                    if k in user_section and k not in payload_dict:
+                        payload_dict[k] = user_section[k]
+        return TokenPayload(**payload_dict)
+    except Exception as e:
+        logger.debug("NextAuth JWE decryption failed: %s", e)
+        return None
+
+
 def decrypt_and_validate_token(token: str) -> TokenPayload:
-    """Decrypts the JWE token and validates the resulting payload."""
+    """Validate HS256 JWT or (if configured) decrypt NextAuth JWE session token."""
     if not JWT_SECRET:
          # Should not happen if checked at startup, but safeguard anyway
          logger.error("JWT Secret Key is missing, cannot decrypt token.")
@@ -93,22 +133,23 @@ def decrypt_and_validate_token(token: str) -> TokenPayload:
              detail="Authentication configuration error.",
          )
 
-    try:
-        payload_dict = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
-        payload = TokenPayload(**payload_dict)
-        return payload
+    parts = token.split(".")
+    payload: TokenPayload | None = None
+    if len(parts) == 3:
+        # HS256 JWT
+        payload = _try_decode_jwt(token)
+    elif len(parts) == 5:
+        # Likely NextAuth JWE
+        payload = _try_decrypt_nextauth_jwe(token)
+    else:
+        logger.warning("Unsupported token format with %s segments", len(parts))
 
-    except JWTError as e:
-        logger.error(f"JWE/JWT Decryption/Validation Error: {e}")
+    if not payload:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials: Invalid or malformed token",
-            headers={"WWW-Authenticate": "Bearer error=\"invalid_token\""},
+            detail="Could not validate credentials: invalid token",
+            headers={"WWW-Authenticate": 'Bearer error="invalid_token"'},
         )
-    except ValidationError as e:
-        logger.error(f"Token payload validation error: {e}")
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials: Unexpected token payload structure",
-            headers={"WWW-Authenticate": "Bearer error=\"invalid_token\""},
-        )
+    return payload
+
+    # (Legacy error paths consolidated above.)

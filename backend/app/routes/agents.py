@@ -25,7 +25,7 @@ RUN_TASKS: Dict[int, asyncio.Task] = {}
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/api/v1/agents", tags=["Agents"])
+router = APIRouter(prefix="/api/v1/admin/agents", tags=["Admin - Agents"])
 
 @router.get("/status", summary="Get the status of the agent system")
 async def get_agent_system_status():
@@ -73,10 +73,11 @@ async def agent_metrics(
     counts_stmt = select(AgentRun.agent_name, AgentRun.status, func.count(AgentRun.id)).group_by(AgentRun.agent_name, AgentRun.status)
     counts_rows = (await db.execute(counts_stmt)).all()
     # Last completed (succeeded or failed) per agent
+    # AgentRun has no updated_at; use max(completed_at) for finished runs.
     last_completed_subq = (
         select(
             AgentRun.agent_name.label("agent_name"),
-            func.max(AgentRun.updated_at).label("last_completed")
+            func.max(AgentRun.completed_at).label("last_completed")
         )
         .where(AgentRun.status.in_(["succeeded", "failed", "cancelled"]))
         .group_by(AgentRun.agent_name)
@@ -316,17 +317,17 @@ async def cancel_run(
 async def agent_events_ws(
     websocket: WebSocket,
     token: Optional[str] = Query(default=None),
-    session_token: Optional[str] = Cookie(default=None, alias="next-auth.session-token"),
     access_token: Optional[str] = Cookie(default=None),
     generic_token: Optional[str] = Cookie(default=None, alias="token"),
     auth_cookie: Optional[str] = Cookie(default=None, alias="auth"),
+    session_token: Optional[str] = Cookie(default=None, alias="next-auth.session-token"),
 ):
-    # Attempt to authenticate: precedence query token > session cookie > access_token > token > auth
-    candidate = token or session_token or access_token or generic_token or auth_cookie
+    # Attempt to authenticate: precedence query token > access_token > next-auth session > token > auth
+    candidate = token or access_token or session_token or generic_token or auth_cookie
     if not candidate:
         await websocket.close(code=4401)
         return
-    # Validate JWT
+    # Validate JWT or NextAuth session token
     try:
         payload = decrypt_and_validate_token(candidate)
     except HTTPException:
