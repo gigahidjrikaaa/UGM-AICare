@@ -5,6 +5,19 @@ interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(({ label, name, className = '', ...props }, ref) => {
+  if (process.env.NODE_ENV !== 'production') {
+    console.debug('[Input] render', name);
+  }
+  React.useEffect(() => {
+    if (process.env.NODE_ENV !== 'production') {
+      console.debug('[Input] mount', name);
+    }
+    return () => {
+      if (process.env.NODE_ENV !== 'production') {
+        console.debug('[Input] unmount', name);
+      }
+    };
+  }, [name]);
   return (
     <div className="space-y-1">
       <label htmlFor={name} className="block text-sm font-medium text-gray-700 dark:text-gray-300">

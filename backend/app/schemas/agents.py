@@ -57,3 +57,58 @@ class LangGraphState(BaseModel):
     """Full LangGraph state including nodes and edges."""
     nodes: List[LangGraphNode]
     edges: List[LangGraphEdge]
+
+
+# --- Command Center Schemas ---
+
+from datetime import datetime
+from typing import Optional
+
+
+class AgentRunBase(BaseModel):
+    agent_name: str
+    action: str
+    status: str
+    correlation_id: str
+
+
+class AgentRun(BaseModel):
+    id: int
+    agent_name: str
+    action: str
+    status: str
+    correlation_id: str
+    started_at: datetime
+    completed_at: Optional[datetime] = None
+    error_message: Optional[str] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AgentMessage(BaseModel):
+    id: int
+    run_id: int
+    agent_name: str
+    role: str
+    message_type: str
+    content: str
+    metadata: Optional[Dict[str, Any]] = None
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class AgentStreamEvent(BaseModel):
+    type: str
+    correlationId: Optional[str] = None
+    runId: Optional[int] = None
+    agent: Optional[str] = None
+    action: Optional[str] = None
+    status: Optional[str] = None
+    token: Optional[str] = None
+    content: Optional[str] = None
+    ts: Optional[str] = None
+    error: Optional[str] = None
+    meta: Optional[Dict[str, Any]] = None

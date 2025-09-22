@@ -1,8 +1,9 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { useModalA11y } from '@/hooks/useModalA11y';
-import { FiPlus, FiEdit, FiTrash2, FiEye, FiToggleLeft, FiToggleRight, FiExternalLink, FiBarChart2 } from 'react-icons/fi';
+import { FiPlus } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { surveyApi, Survey, SurveyResponse, SurveyQuestionDraft as ServiceQuestionDraft } from '@/services/surveyApi';
@@ -10,7 +11,8 @@ import { Button } from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
 // Select component no longer used after extracting QuestionListEditor
 import { Textarea } from '@/components/ui/TextArea';
-import Tooltip from '@/components/ui/Tooltip';
+// Tooltip removed; actions consolidated into SurveyRowActions
+import SurveyRowActions from '@/components/surveys/SurveyRowActions';
 import { QuestionListEditor } from '@/components/surveys/QuestionListEditor';
 import { MultipleChoiceQuestionDraft, QuestionDraft, createEmptyQuestion } from '@/types/surveys';
 
@@ -25,14 +27,26 @@ const toServiceDraft = (q: QuestionDraft): ServiceQuestionDraft => {
   return { id: q.id, question_text: q.question_text, question_type: 'text', options: [] };
 };
 
+const formatTimestamp = (ts?: string | null) => {
+  if (!ts) return '-';
+  const d = new Date(ts);
+  if (isNaN(d.getTime())) return '-';
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mi = String(d.getMinutes()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+};
+
 export default function SurveyManagementPage() {
   // Debug counters (temporary instrumentation)
   const renderCountRef = useRef(0);
   renderCountRef.current += 1;
-  if (process.env.NODE_ENV !== 'production') {
-    console.debug('[SurveyManagementPage] render', renderCountRef.current);
-  }
+  // Debug log removed after stabilization
   const [surveys, setSurveys] = useState<Survey[]>([]);
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isResultsModalOpen, setIsResultsModalOpen] = useState(false);
@@ -55,6 +69,28 @@ export default function SurveyManagementPage() {
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
+  // Sorting: key can be 'index' (default), 'title', 'description', 'created', 'updated'
+  const [sort, setSort] = useState<{ key: 'index' | 'title' | 'description' | 'created' | 'updated'; direction: 'asc' | 'desc' }>(() => ({ key: 'index', direction: 'asc' }));
+  // Expanded description ids
+  const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
+
+  // Initialize from URL (once)
+  useEffect(() => {
+    try {
+      const keyParam = searchParams.get('sortKey');
+      const dirParam = searchParams.get('sortDir');
+      if (keyParam && ['index','title','description','created','updated'].includes(keyParam)) {
+        const typedKey = keyParam as 'index' | 'title' | 'description' | 'created' | 'updated';
+        setSort({ key: typedKey, direction: dirParam === 'desc' ? 'desc' : 'asc' });
+      }
+      const exp = searchParams.get('exp');
+      if (exp) {
+        const ids = exp.split(',').map(v=>parseInt(v,10)).filter(n=>!isNaN(n));
+        setExpanded(new Set(ids));
+      }
+    } catch {}
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   // Modal a11y refs (generic HTMLElement for hook compatibility)
   const createModalRef = useRef<HTMLDivElement>(null);
   const editModalRef = useRef<HTMLDivElement>(null);
@@ -347,9 +383,95 @@ export default function SurveyManagementPage() {
     s.title.toLowerCase().includes(search.toLowerCase()) ||
     (s.description || '').toLowerCase().includes(search.toLowerCase())
   ));
-  const totalPages = Math.max(1, Math.ceil(filtered.length / ITEMS_PER_PAGE));
+  // Maintain a frozen sorted snapshot while editing to avoid reordering on each keystroke
+  const frozenSortedRef = useRef<Survey[] | null>(null);
+  useEffect(() => {
+    if (isEditModalOpen && frozenSortedRef.current == null) {
+      const base = [...filtered];
+      if (sort.key !== 'index') {
+        base.sort((a,b) => {
+          let av: string | number = '';
+          let bv: string | number = '';
+          if (sort.key === 'title') { av = a.title.toLowerCase(); bv = b.title.toLowerCase(); }
+          else if (sort.key === 'description') { av = (a.description || '').toLowerCase(); bv = (b.description || '').toLowerCase(); }
+          else if (sort.key === 'created') { av = new Date(a.created_at).getTime(); bv = new Date(b.created_at).getTime(); }
+          else if (sort.key === 'updated') { av = new Date(a.updated_at).getTime(); bv = new Date(b.updated_at).getTime(); }
+          if (av < bv) return sort.direction === 'asc' ? -1 : 1;
+          if (av > bv) return sort.direction === 'asc' ? 1 : -1;
+          return 0;
+        });
+      }
+      frozenSortedRef.current = base;
+    }
+    if (!isEditModalOpen) {
+      frozenSortedRef.current = null; // release snapshot when closing
+    }
+  }, [isEditModalOpen, filtered, sort]);
+
+  const sorted = (() => {
+    if (isEditModalOpen && frozenSortedRef.current) return frozenSortedRef.current;
+    const arr = [...filtered];
+    if (sort.key !== 'index') {
+      arr.sort((a,b) => {
+        let av: string | number = '';
+        let bv: string | number = '';
+        if (sort.key === 'title') { av = a.title.toLowerCase(); bv = b.title.toLowerCase(); }
+        else if (sort.key === 'description') { av = (a.description || '').toLowerCase(); bv = (b.description || '').toLowerCase(); }
+        else if (sort.key === 'created') { av = new Date(a.created_at).getTime(); bv = new Date(b.created_at).getTime(); }
+        else if (sort.key === 'updated') { av = new Date(a.updated_at).getTime(); bv = new Date(b.updated_at).getTime(); }
+        if (av < bv) return sort.direction === 'asc' ? -1 : 1;
+        if (av > bv) return sort.direction === 'asc' ? 1 : -1;
+        return 0;
+      });
+    }
+    return arr;
+  })();
+  const totalPages = Math.max(1, Math.ceil(sorted.length / ITEMS_PER_PAGE));
   const start = (currentPage - 1) * ITEMS_PER_PAGE;
-  const paginated = filtered.slice(start, start + ITEMS_PER_PAGE);
+  const paginated = sorted.slice(start, start + ITEMS_PER_PAGE);
+
+  // Track pending sync state instead of mutating router during render cycle
+  const pendingSortRef = useRef(sort);
+  const pendingExpandedRef = useRef(expanded);
+  useEffect(() => { pendingSortRef.current = sort; }, [sort]);
+  useEffect(() => { pendingExpandedRef.current = expanded; }, [expanded]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (isEditModalOpen) return; // defer while editing
+    const handle = window.setTimeout(() => {
+      const params = new URLSearchParams(window.location.search);
+      params.set('sortKey', pendingSortRef.current.key);
+      params.set('sortDir', pendingSortRef.current.direction);
+      if (pendingExpandedRef.current.size) params.set('exp', [...pendingExpandedRef.current].join(',')); else params.delete('exp');
+      const newQs = params.toString();
+      const target = `?${newQs}`;
+      // Avoid redundant router calls
+      if (window.location.search !== target.replace(/^\?/, '?')) {
+        router.replace(target);
+      }
+    }, 50); // small debounce to collapse rapid interactions
+    return () => window.clearTimeout(handle);
+  }, [sort, expanded, isEditModalOpen, router]);
+
+  const cycleSort = (key: 'index' | 'title' | 'description' | 'created' | 'updated') => {
+    setCurrentPage(1);
+    setSort(prev => {
+      let next: { key: typeof key | 'index'; direction: 'asc' | 'desc' };
+      if (prev.key !== key) next = { key, direction: 'asc' };
+      else if (prev.direction === 'asc') next = { key, direction: 'desc' };
+      else next = { key: 'index', direction: 'asc' };
+      return next;
+    });
+  };
+
+  const toggleExpanded = (id: number) => {
+    setExpanded(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
 
   const handleDeleteSurvey = async (surveyId: number) => {
     if (!confirm('Delete this survey permanently?')) return;
@@ -406,69 +528,171 @@ export default function SurveyManagementPage() {
             />
           </div>
         </div>
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-white/20">
-            <thead className="bg-white/5">
+        {/* Mobile / small screen card list */}
+        <div className="md:hidden px-4 pb-4 space-y-3">
+          {paginated.length === 0 && (
+            <div className="text-center text-sm text-gray-400 py-6">No surveys found.</div>
+          )}
+          {paginated.map((survey, idx) => (
+            <div
+              key={survey.id}
+              className="bg-white/5 border border-white/15 rounded-lg p-4 shadow-sm hover:shadow transition-shadow focus-within:ring-2 focus-within:ring-[#FFCA40]/40"
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-[10px] font-mono text-gray-500 bg-white/10 px-1.5 py-0.5 rounded">{start + idx + 1}</span>
+                    <h3 className="text-sm font-semibold text-white break-words" title={survey.title}>{survey.title}</h3>
+                  </div>
+                  {survey.description && (
+                    <p className="text-xs text-gray-400 mt-1 break-words whitespace-pre-wrap" title={survey.description}>{survey.description}</p>
+                  )}
+                  <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[10px] uppercase tracking-wide text-gray-400">
+                    <span>{survey.questions.length} q</span>
+                    <span className="w-1 h-1 rounded-full bg-gray-500" />
+                    <span>{survey.is_active ? 'Active' : 'Inactive'}</span>
+                  </div>
+                </div>
+                <div className="shrink-0 mt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => handleToggleSurveyActive(survey)}
+                    className={`inline-flex items-center px-2 py-1 text-[10px] rounded-md border transition-colors ${survey.is_active ? 'bg-green-700/25 border-green-500/50 text-green-200' : 'bg-gray-700/25 border-gray-500/50 text-gray-300'}`}
+                    aria-label={survey.is_active ? 'Set survey inactive' : 'Set survey active'}
+                  >
+                    {survey.is_active ? 'Active' : 'Inactive'}
+                  </button>
+                </div>
+              </div>
+              <div className="mt-3 flex justify-end">
+                <div className="scale-90 origin-top-right">
+                  <SurveyRowActions
+                    isActive={survey.is_active}
+                    onToggleActive={() => handleToggleSurveyActive(survey)}
+                    onEdit={() => handleEditModalOpen(survey)}
+                    onViewResponses={() => handleResultsModalOpen(survey.id)}
+                    onOpenFullEditor={() => window.location.assign(`/admin/surveys/${survey.id}/edit`)}
+                    onAnalytics={() => window.location.assign(`/admin/surveys/${survey.id}/analytics`)}
+                    onDelete={() => handleDeleteSurvey(survey.id)}
+                    hideToggle
+                  />
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop table */}
+        <div className="hidden md:block overflow-x-auto max-h-[60vh]">
+          <table className="min-w-full divide-y divide-white/20 table-fixed relative">
+            <thead className="bg-white/5 sticky top-0 z-10 backdrop-blur-sm">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Title</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Description</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-[4%]">
+                  <button type="button" onClick={() => cycleSort('index')} className="flex items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1 -mx-1">
+                    #
+                    {sort.key === 'index' ? null : (
+                      <span className="text-[9px] text-gray-400 group-hover:text-gray-300">×</span>
+                    )}
+                  </button>
+                </th>
+                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-[24%]">
+                  <button type="button" onClick={() => cycleSort('title')} className="flex items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1 -mx-1">
+                    Title
+                    {sort.key === 'title' && <span className="text-[9px] text-gray-400 group-hover:text-gray-300">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
+                  </button>
+                </th>
+                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  <button type="button" onClick={() => cycleSort('description')} className="flex items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1 -mx-1">
+                    Description
+                    {sort.key === 'description' && <span className="text-[9px] text-gray-400 group-hover:text-gray-300">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
+                  </button>
+                </th>
+                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-[13%]">
+                  <button type="button" onClick={() => cycleSort('created')} className="flex items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1 -mx-1">
+                    Created
+                    {sort.key === 'created' && <span className="text-[9px] text-gray-400 group-hover:text-gray-300">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
+                  </button>
+                </th>
+                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-[13%]">
+                  <button type="button" onClick={() => cycleSort('updated')} className="flex items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1 -mx-1">
+                    Updated
+                    {sort.key === 'updated' && <span className="text-[9px] text-gray-400 group-hover:text-gray-300">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
+                  </button>
+                </th>
+                <th className="px-3 lg:px-4 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider w-[17%]">Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-transparent divide-y divide-white/20">
-              {paginated.map((survey) => (
-                <tr key={survey.id}>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-white">{survey.title}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">{survey.description}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    {survey.is_active ? (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
-                        Active
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400">
-                        Inactive
-                      </span>
+             <tbody className="bg-transparent divide-y divide-white/20">
+               {paginated.length === 0 && (
+                 <tr>
+                   <td colSpan={7} className="px-6 py-10 text-center text-sm text-gray-400">No surveys found. Adjust your search or create a new survey.</td>
+                 </tr>
+               )}
+               {paginated.map((survey, idx) => {
+                 const isExpanded = expanded.has(survey.id);
+                 const long = (survey.description || '').length > 240;
+                 const displayDesc = long && !isExpanded ? (survey.description || '').slice(0,240) + '…' : (survey.description || '');
+                 return (
+                 <tr key={survey.id} className="align-top">
+                  <td className="px-3 lg:px-4 py-4 text-[11px] text-gray-400 font-mono">
+                    <button
+                      type="button"
+                      onClick={() => cycleSort('index')}
+                      className="focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1 -mx-1"
+                      aria-label={`Row number ${start + 1 + idx}`}
+                    >
+                      {start + 1 + idx}
+                    </button>
+                  </td>
+                  <td className="px-3 lg:px-4 py-4 text-sm font-medium text-white">
+                    <div className="pr-2 break-words leading-snug">{survey.title}</div>
+                  </td>
+                  <td className="px-3 lg:px-4 py-4 text-sm text-gray-300">
+                    <div className="prose prose-invert max-w-none whitespace-pre-wrap break-words leading-snug text-[13px]">
+                      {displayDesc ? displayDesc : <span className="italic text-gray-500">No description</span>}
+                    </div>
+                    {long && (
+                      <button
+                        type="button"
+                        onClick={() => toggleExpanded(survey.id)}
+                        className="mt-1 text-[11px] text-[#FFCA40] hover:underline focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1"
+                        aria-expanded={!!isExpanded}
+                        aria-label={isExpanded ? 'Collapse full description' : 'Expand full description'}
+                      >
+                        {isExpanded ? 'Show less' : 'Show more'}
+                      </button>
                     )}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <Tooltip title={survey.is_active ? 'Deactivate survey' : 'Activate survey'}>
-                      <button
-                        onClick={() => handleToggleSurveyActive(survey)}
-                        className={`mr-4 transition-colors ${survey.is_active ? 'text-green-400 hover:text-green-300' : 'text-gray-400 hover:text-gray-300'}`}
-                      >
-                        {survey.is_active ? <FiToggleRight className="h-5 w-5" /> : <FiToggleLeft className="h-5 w-5" />}
-                      </button>
-                    </Tooltip>
-                    <Tooltip title="View responses">
-                      <button aria-label="View survey responses" title="View responses" onClick={() => handleResultsModalOpen(survey.id)} className="text-white hover:text-gray-300 transition-colors mr-4">
-                        <FiEye className="h-4 w-4" />
-                      </button>
-                    </Tooltip>
-                    <Tooltip title="Edit survey (modal)">
-                      <button aria-label="Edit survey" title="Edit survey" onClick={() => handleEditModalOpen(survey)} className="text-blue-400 hover:text-blue-300 transition-colors mr-4">
-                        <FiEdit className="h-4 w-4" />
-                      </button>
-                    </Tooltip>
-                    <Tooltip title="Open full editor">
-                      <button aria-label="Open full editor" title="Open full editor" onClick={() => window.location.assign(`/admin/surveys/${survey.id}/edit`)} className="text-blue-300 hover:text-blue-200 transition-colors mr-4">
-                        <FiExternalLink className="h-4 w-4" />
-                      </button>
-                    </Tooltip>
-                    <Tooltip title="Analytics">
-                      <button aria-label="Analytics" title="Analytics" onClick={() => window.location.assign(`/admin/surveys/${survey.id}/analytics`)} className="text-yellow-300 hover:text-yellow-200 transition-colors mr-4">
-                        <FiBarChart2 className="h-4 w-4" />
-                      </button>
-                    </Tooltip>
-                    <Tooltip title="Delete survey">
-                      <button aria-label="Delete survey" title="Delete survey" onClick={() => handleDeleteSurvey(survey.id)} className="text-red-400 hover:text-red-300 transition-colors">
-                        <FiTrash2 className="h-4 w-4" />
-                      </button>
-                    </Tooltip>
+                  <td className="px-3 lg:px-4 py-4 text-xs text-gray-400 whitespace-nowrap align-top">{formatTimestamp(survey.created_at as unknown as string)}</td>
+                  <td className="px-3 lg:px-4 py-4 text-xs text-gray-400 whitespace-nowrap align-top">{formatTimestamp(survey.updated_at as unknown as string)}</td>
+                  <td className="px-3 lg:px-4 py-4 text-right text-sm font-medium">
+                    <div className="flex items-start justify-end gap-2">
+                      <div className="mr-1">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleSurveyActive(survey)}
+                          className={`inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md border transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-[#FFCA40]/60 focus:ring-offset-[#1c1f26] ${survey.is_active ? 'bg-green-700/25 border-green-500/50 text-green-200 hover:bg-green-700/35' : 'bg-gray-700/25 border-gray-500/50 text-gray-300 hover:bg-gray-700/35'}`}
+                          data-state={survey.is_active ? 'on' : 'off'}
+                          aria-label={survey.is_active ? 'Set survey inactive' : 'Set survey active'}
+                        >
+                          {survey.is_active ? 'Active' : 'Inactive'}
+                        </button>
+                      </div>
+                      <div className="w-px h-8 bg-white/10" aria-hidden="true" />
+                      <SurveyRowActions
+                        isActive={survey.is_active}
+                        onToggleActive={() => handleToggleSurveyActive(survey)}
+                        onEdit={() => handleEditModalOpen(survey)}
+                        onViewResponses={() => handleResultsModalOpen(survey.id)}
+                        onOpenFullEditor={() => window.location.assign(`/admin/surveys/${survey.id}/edit`)}
+                        onAnalytics={() => window.location.assign(`/admin/surveys/${survey.id}/analytics`)}
+                        onDelete={() => handleDeleteSurvey(survey.id)}
+                        hideToggle
+                      />
+                    </div>
                   </td>
                 </tr>
-              ))}
+                );})}
             </tbody>
           </table>
         </div>
@@ -587,8 +811,7 @@ export default function SurveyManagementPage() {
                   label="Title"
                   value={editMeta.title}
                   onChange={(e) => setEditMeta(meta => ({ ...meta, title: e.target.value }))}
-                  onFocus={() => { if (process.env.NODE_ENV !== 'production') console.debug('Title input focus'); }}
-                  onBlur={() => { if (process.env.NODE_ENV !== 'production') console.debug('Title input blur'); }}
+                  // debug handlers removed
                   required
                   ref={editTitleRef}
                   className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
@@ -598,8 +821,7 @@ export default function SurveyManagementPage() {
                   <Textarea
                     value={editMeta.description}
                     onChange={(e) => setEditMeta(meta => ({ ...meta, description: e.target.value }))}
-                    onFocus={() => { if (process.env.NODE_ENV !== 'production') console.debug('Description focus'); }}
-                    onBlur={() => { if (process.env.NODE_ENV !== 'production') console.debug('Description blur'); }}
+                    // debug handlers removed
                     ref={editDescRef}
                     className="w-full min-h-[120px] p-3 bg-white/8 border border-white/15 rounded-xl text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
                   />
