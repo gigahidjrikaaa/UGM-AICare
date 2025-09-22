@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/TextArea';
-import { SendHorizonal, BrainCircuit, X, Mic, Settings, ChevronDown, Info, SlidersHorizontal } from 'lucide-react';
+import { SendHorizonal, BrainCircuit, X, Mic, Settings, ChevronDown, SlidersHorizontal } from 'lucide-react';
 import { ChatMode, AvailableModule as ChatModule } from '@/types/chat';
 import { cn } from '@/lib/utils';
 import SettingsModal from './SettingsModal';
@@ -22,7 +22,6 @@ interface ChatInputProps {
   model?: string;
   setModel?: (m: string) => void;
   modelOptions?: Array<{ value: string; label: string }>;
-  memoryNote?: string;
   mergeWindowMs?: number;
   setMergeWindowMs?: (ms: number) => void;
 }
@@ -41,37 +40,13 @@ export function ChatInput({
   model,
   setModel,
   modelOptions,
-  memoryNote,
   mergeWindowMs,
   setMergeWindowMs,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const memoryBtnRef = useRef<HTMLButtonElement | null>(null);
-  const popoverRef = useRef<HTMLDivElement | null>(null);
-  const [memoryOpen, setMemoryOpen] = useState(false);
+  // memory popover moved to header
   const behaviorBtnRef = useRef<HTMLButtonElement | null>(null);
   const behaviorPopoverRef = useRef<HTMLDivElement | null>(null);
-  // Close popover on outside click
-  useEffect(() => {
-    if (!memoryOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (popoverRef.current && !popoverRef.current.contains(e.target as Node) && !memoryBtnRef.current?.contains(e.target as Node)) {
-        setMemoryOpen(false);
-      }
-    };
-    window.addEventListener('mousedown', handler);
-    return () => window.removeEventListener('mousedown', handler);
-  }, [memoryOpen]);
-
-  // ESC to close
-  useEffect(() => {
-    if (!memoryOpen) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') setMemoryOpen(false);
-    };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [memoryOpen]);
 
   const [showModules, setShowModules] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
@@ -145,16 +120,6 @@ export function ChatInput({
     setShowModules(false);
   };
 
-  // Restore focus to memory trigger when popover closes (for keyboard users)
-  useEffect(() => {
-    if (!memoryOpen && memoryBtnRef.current) {
-      const active = document.activeElement as HTMLElement | null;
-      const withinPopover = active && (popoverRef.current?.contains(active) || popoverRef.current === active);
-      if (!withinPopover && document.hasFocus()) {
-        memoryBtnRef.current.focus({ preventScroll: true });
-      }
-    }
-  }, [memoryOpen]);
 
   const isStandardMode = currentMode === 'standard';
 
@@ -192,7 +157,7 @@ export function ChatInput({
   return (
     <div className="w-full border-t border-white/10 bg-gradient-to-b from-black/30 to-black/50 backdrop-blur-xl px-3 py-3 md:px-4 md:py-4 space-y-3">
       {/* Meta Toolbar */}
-      {(modelOptions?.length || memoryNote || true) && (
+  {(modelOptions?.length || true) && (
         <div className="flex flex-wrap items-center gap-2 md:gap-3">
           {modelOptions?.length ? (
             <div className="flex items-center gap-2">
@@ -355,49 +320,7 @@ export function ChatInput({
           {showModules ? <X className="h-4 w-4" /> : <BrainCircuit className="h-4 w-4" />}
         </Button>
 
-        {memoryNote && (
-          <div className="relative" ref={popoverRef}>
-            <button
-              ref={memoryBtnRef}
-              type="button"
-              onClick={() => setMemoryOpen(o => !o)}
-              aria-expanded={memoryOpen}
-              aria-controls="memory-popover"
-              className="inline-flex items-center gap-1.5 text-[11px] md:text-xs font-medium text-white/80 hover:text-white bg-white/5 border border-white/10 rounded-md px-2 py-1 focus:outline-none focus:ring-2 focus:ring-ugm-gold/50 transition"
-            >
-              <Info className="h-3.5 w-3.5" />
-              <span className="hidden sm:inline">Memori</span>
-              <ChevronDown className={`h-3 w-3 transition-transform ${memoryOpen ? 'rotate-180' : ''}`} />
-            </button>
-            {memoryOpen && (
-              <div
-                id="memory-popover"
-                role="dialog"
-                aria-label="Penjelasan memori"
-                className={cn(
-                  'absolute left-0 top-full mt-2 z-[60] w-72 md:w-80 rounded-lg border border-white/15 bg-[#0d2f6b]/95 backdrop-blur-xl p-4 pt-5 text-[11px] md:text-xs leading-relaxed text-white/70 shadow-2xl will-change-transform',
-                  'animate-in fade-in slide-in-from-top-2'
-                )}
-              >
-                <span
-                  aria-hidden="true"
-                  className='pointer-events-none absolute left-6 -top-1.5 h-3 w-3 rotate-45 rounded-sm border border-white/15 bg-[#0d2f6b]/95 backdrop-blur'
-                />
-                <p className="font-semibold text-white mb-1 text-xs">Mengapa Aika mengingatmu?</p>
-                <p>{memoryNote}</p>
-                <div className="mt-3 flex justify-end">
-                  <button
-                    type="button"
-                    onClick={() => setMemoryOpen(false)}
-                    className="text-[11px] px-2 py-1 rounded-md bg-white/10 hover:bg-white/20 text-white border border-white/15 focus:outline-none focus:ring-2 focus:ring-ugm-gold/40"
-                  >
-                    Tutup
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
+        {/* memory popover moved to header */}
 
         <div className="flex-1 min-w-0 relative">
           <Textarea
