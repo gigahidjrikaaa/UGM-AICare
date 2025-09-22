@@ -1,14 +1,15 @@
 import logging
+import uuid
 from datetime import datetime
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
 from passlib.context import CryptContext
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.auth_utils import create_access_token
+from app.auth_utils import create_access_token, decrypt_and_validate_token
 from app.database import get_async_db
 from app.models import User
 from app.services.user_service import async_get_user_by_plain_email
@@ -109,6 +110,7 @@ def build_token_payload(user: User) -> dict[str, str]:
 @router.post("/oauth/token", response_model=Token)
 async def exchange_oauth_token(
     payload: OAuthTokenRequest,
+    response: Response,
     db: AsyncSession = Depends(get_async_db),
 ) -> dict:
     """Upsert a user coming from an OAuth provider and issue an internal token."""
@@ -186,7 +188,7 @@ async def exchange_oauth_token(
 
     access_token = create_access_token(build_token_payload(user))
 
-    return {
+    body = {
         "access_token": access_token,
         "token_type": "bearer",
         "user": serialize_user(
@@ -195,6 +197,17 @@ async def exchange_oauth_token(
             fallback_name=payload.name,
         ),
     }
+    # Set cookie for browser-based access (HttpOnly, secure configurable)
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False,  # TODO: set True in production behind TLS
+        samesite="lax",
+        max_age=60*60*24,
+        path="/",
+    )
+    return body
 
 
 def verify_password(plain_password: str, hashed_password: Optional[str]) -> bool:
@@ -208,6 +221,7 @@ def get_password_hash(password: str) -> str:
 @router.post("/token", response_model=Token)
 async def login_for_access_token(
     request: UserLoginRequest,
+    response: Response,
     db: AsyncSession = Depends(get_async_db),
 ) -> dict:
     logger.info("Login attempt for: %s", request.email)
@@ -263,11 +277,21 @@ async def login_for_access_token(
     access_token = create_access_token(build_token_payload(user))
 
     logger.info("Login successful for user: %s, role: %s", user.email, user.role)
-    return {
+    body = {
         "access_token": access_token,
         "token_type": "bearer",
         "user": serialize_user(user, fallback_email=request.email),
     }
+    response.set_cookie(
+        key="access_token",
+        value=access_token,
+        httponly=True,
+        secure=False,  # TODO: set True in production behind TLS
+        samesite="lax",
+        max_age=60*60*24,
+        path="/",
+    )
+    return body
 
 
 @router.post("/register", response_model=RegisterResponse)
@@ -359,5 +383,45 @@ async def forgot_password(request: ForgotPasswordRequest) -> ForgotPasswordRespo
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during password reset",
         ) from exc
+
+
+@router.get("/me")
+async def get_current_user_info(request: Request, db: AsyncSession = Depends(get_async_db)) -> dict:
+    """Return the currently authenticated user's public info (role, id, email, name).
+
+    Tries Authorization: Bearer <token> header first, then falls back to common cookie keys.
+    This is consumed by the frontend AccessGuard. Returns 401 if credentials are missing/invalid.
+    """
+    # Extract token from Authorization header or fallback cookies
+    auth_header = request.headers.get("Authorization")
+    token: str | None = None
+    if auth_header and auth_header.lower().startswith("bearer "):
+        token = auth_header.split(" ", 1)[1].strip()
+    if not token:
+        token = request.cookies.get("access_token") or request.cookies.get("token") or request.cookies.get("auth" )
+    if not token:
+        logger.warning("/auth/me missing credentials (no header/cookies)")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing credentials")
+
+    payload = decrypt_and_validate_token(token)
+    if not payload.sub:
+        logger.warning("/auth/me token missing subject claim")
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token subject")
+
+    try:
+        user_id = int(payload.sub)
+    except ValueError:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token subject")
+
+    stmt = select(User).where(User.id == user_id)
+    result = await db.execute(stmt)
+    user = result.scalar_one_or_none()
+    if not user:
+        logger.warning("/auth/me user id %s not found", payload.sub)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    logger.debug("/auth/me success user_id=%s role=%s", user.id, user.role)
+
+    return serialize_user(user)
 
 

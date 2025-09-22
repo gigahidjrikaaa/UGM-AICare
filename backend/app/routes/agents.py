@@ -313,9 +313,16 @@ async def cancel_run(
 
 
 @router.websocket("/ws")
-async def agent_events_ws(websocket: WebSocket, token: Optional[str] = Query(default=None), session_token: Optional[str] = Cookie(default=None, alias="next-auth.session-token")):
-    # Attempt to authenticate: priority order query token > cookie > header (header not accessible directly in ws accept stage via FastAPI)
-    candidate = token or session_token
+async def agent_events_ws(
+    websocket: WebSocket,
+    token: Optional[str] = Query(default=None),
+    session_token: Optional[str] = Cookie(default=None, alias="next-auth.session-token"),
+    access_token: Optional[str] = Cookie(default=None),
+    generic_token: Optional[str] = Cookie(default=None, alias="token"),
+    auth_cookie: Optional[str] = Cookie(default=None, alias="auth"),
+):
+    # Attempt to authenticate: precedence query token > session cookie > access_token > token > auth
+    candidate = token or session_token or access_token or generic_token or auth_cookie
     if not candidate:
         await websocket.close(code=4401)
         return

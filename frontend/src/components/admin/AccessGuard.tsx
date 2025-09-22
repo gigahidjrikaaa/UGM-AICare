@@ -14,7 +14,9 @@ export const AccessGuard: React.FC<AccessGuardProps> = ({
   children,
   requiredRoles = ["admin", "therapist"],
   fallback = <div className="text-red-400 text-sm">Access denied.</div>,
-  introspectUrl = process.env.NEXT_PUBLIC_BACKEND_BASE?.replace(/\/$/, '') + '/api/v1/auth/me'
+  introspectUrl = (process.env.NEXT_PUBLIC_BACKEND_BASE || process.env.NEXT_PUBLIC_API_URL || '')
+    ? (process.env.NEXT_PUBLIC_BACKEND_BASE || process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '') + '/api/v1/auth/me'
+    : undefined
 }) => {
   const [allowed, setAllowed] = useState<boolean | null>(null);
 
@@ -22,7 +24,7 @@ export const AccessGuard: React.FC<AccessGuardProps> = ({
     let cancelled = false;
     const run = async () => {
       if(!introspectUrl){
-        console.warn('AccessGuard: no introspect URL configured. Rendering children by default.');
+        console.warn('AccessGuard: introspect URL not configured (missing NEXT_PUBLIC_BACKEND_BASE or NEXT_PUBLIC_API_URL). Allowing access for development.');
         setAllowed(true);
         return;
       }

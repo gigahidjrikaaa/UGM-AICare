@@ -286,3 +286,121 @@ async def get_triage_history(user_id: int, limit: int = 50):
 ---
 
 *This architecture ensures comprehensive mental health support through intelligent automation while maintaining human oversight and professional integration.*
+
+---
+
+## Agents Command Center (Operational Console)
+
+### Purpose
+
+Provides real-time operational visibility and control over agent executions (Triage, Intervention, Analytics). Admin and therapist roles can dispatch commands, observe streaming token output, cancel or retry runs, and inspect historical context and metrics.
+
+### Core Capabilities
+
+- **Real-time Streaming:** WebSocket channel broadcasts lifecycle events (`run_started`, `token`, `run_completed`, `run_cancelled`, `error`). Token events are aggregated client-side by correlationId for efficient rendering.
+- **Command Dispatch:** POST `/api/v1/agents/command` creates an `AgentRun` and emits an immediate `run_started` event.
+- **Cancellation:** POST `/api/v1/agents/runs/{id}/cancel` transitions status to `cancelled`, emits `run_cancelled`.
+- **Retry:** UI reconstructs prior agent/action into a new dispatch preserving historical correlation grouping semantics (new correlationId generated).
+- **Metrics:** GET `/api/v1/agents/metrics` supplies per-agent counts (total, running, succeeded, failed, cancelled) and `lastCompleted` timestamp plus global totals.
+- **History Hydration:** GET `/api/v1/agents/runs?limit=N` and `/api/v1/agents/runs/{id}/messages` for panel hydration and run message drill‑down.
+
+### Slash Command Composer
+
+The multiline composer introduces a compact, reproducible syntax for manual dispatch and structured experimentation.
+
+#### Syntax
+
+```text
+/agent action {JSON_PAYLOAD}
+```
+
+Components:
+
+- `/` prefix: Signals parsing mode.
+- `agent`: One of `triage | intervention | analytics` (optional – if omitted, retains last selected agent).
+- `action`: Arbitrary action verb understood by the target agent (optional in slash form; retains last value if omitted).
+- `{JSON_PAYLOAD}`: Optional JSON object providing structured `data` (must be valid JSON if present). If absent, previous draft payload is cleared.
+
+#### Examples
+
+```text
+/triage classify {"text":"Feeling overwhelmed by exams"}
+/analytics summarize {"days":7}
+/intervention schedule_campaign {"theme":"sleep_hygiene"}
+/ classify {"text":"Quick recheck"}   # Reuses prior agent
+/ triage                                   # Only switch agent (keeps previous action)
+```
+
+#### Parsing & Validation Rules
+
+- Invalid agent → inline error: `Unknown agent: <name>`
+- Malformed JSON → `Invalid JSON payload`
+- Partial entries allowed: `/triage` updates only agent; `/ classify {..}` updates only action+payload.
+- Composer maintains a `draft.raw` string plus derived `draft.agent`, `draft.action`, `draft.data`.
+
+#### Interaction Model
+
+- **Keyboard Shortcut:** `Ctrl+Enter` / `⌘+Enter` dispatch when no validation errors.
+- **Auto-Resize:** Textarea grows up to a capped height for multi-line payload prototyping.
+- **Clear:** Resets to empty raw draft while retaining current agent/action context.
+- **Accessibility:** Labeled textarea (`aria-label="Command composer multiline input"`) + status preview line (agent/action) for screen readers.
+
+### Event & Correlation Model
+
+- Each dispatch gets a `correlationId` (UUID unless provided by client) used to group: `run_started`, subsequent `token` chunks, final `run_completed` / `run_cancelled`.
+- UI groups events by correlationId; first token event renders an aggregated token stream assembled incrementally.
+
+### Persistence & Selection Behavior
+
+- Recent runs (default 25) hydrate on mount.
+- Last selected run persisted in `localStorage (agents:lastRunId)` and auto-selected if still present.
+- Run messages loaded lazily on selection (ordered ascending by creation time).
+
+### Cancellation Semantics
+
+- Cancellation allowed only while status = `running`.
+- Background simulation task (for triage demo) checks DB status before emitting further tokens, respecting user cancellation.
+
+### Metrics Semantics
+
+- Counts reflect table aggregates; `lastCompleted` derives from max `updated_at` over status in {`succeeded`,`failed`,`cancelled`} per agent.
+- Running count is instantaneous (status = `running`).
+
+### Security & Access Control
+
+- **Viewer Roles:** `admin`, `therapist` (enforced in websocket handshake & HTTP dependencies).
+- **Authentication:** WebSocket query `token` (or cookie) validated via `decrypt_and_validate_token`; non-admin roles rejected with code `4403`.
+- **Rate Limiting:** Per-user: max 30 commands/min (HTTP 429 on exceed).
+
+### Failure & Retry UX
+
+- Errors produce an `error` event object with message surfaced in stream group.
+- Retry reconstructs agent/action only (fresh correlation & run entry) to preserve audit boundaries.
+
+### Extensibility Notes
+
+- Additional agents require only: support in `AGENTS` list (frontend), backend acceptance in dispatch handler, streaming task implementation, optional metrics enrichment.
+- Slash parser tolerant to future subcommands: could extend grammar to `/agent action --flag value {json}` with a lightweight tokenizer.
+
+### Observability Hooks (Planned Enhancements)
+
+- Latency metrics: dispatch → first token, dispatch → completion.
+- Error taxonomy: classify failure root causes for analytics.
+- WebSocket ping/pong latency sampling.
+
+### Data Model Alignment
+
+- `AgentRun`: correlation, status transitions (running → succeeded/failed/cancelled), timestamps, input/output payloads.
+- `AgentMessage`: token & final messages (token stream aggregated in UI; all stored individually for full fidelity replay if needed).
+
+### Quick Operational FAQ
+
+| Action | Result |
+|--------|--------|
+| `/triage classify {"text":"Hi"}` | Starts triage classification run |
+| Cancel button during running | Emits `run_cancelled`, stops token emission |
+| Retry on failed run | New run with new correlationId |
+| Malformed JSON in composer | Inline error; dispatch disabled |
+| Omit agent in slash (`/ classify {..}`) | Uses last agent |
+
+---
