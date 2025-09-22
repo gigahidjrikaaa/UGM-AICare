@@ -14,9 +14,10 @@ interface ModelSelectorProps {
   model: string;
   setModel: (model: string) => void;
   options: ModelOption[];
+  className?: string;
 }
 
-export default function ModelSelector({ model, setModel, options }: ModelSelectorProps) {
+export default function ModelSelector({ model, setModel, options, className }: ModelSelectorProps) {
   const [isOpen, setIsOpen] = useState(false);
 
   const selectedOption = options.find(opt => opt.value === model);
@@ -33,12 +34,12 @@ export default function ModelSelector({ model, setModel, options }: ModelSelecto
   };
 
   return (
-    <div className="relative inline-block text-left">
+    <div className={cn("relative inline-block w-full text-left sm:w-auto", className)}>
       {/* Button */}
       <button
         onClick={() => setIsOpen(!isOpen)}
         className={cn(
-          "flex items-center justify-between w-48 px-3 py-2 text-sm font-medium text-white",
+          "flex w-full items-center justify-between px-3 py-2 text-sm font-medium text-white sm:w-56",
           "bg-white/10 backdrop-blur-md border border-white/20 rounded-lg shadow-sm",
           "hover:bg-white/20 transition-colors focus:outline-none focus:ring-2 focus:ring-ugm-gold/50"
         )}
@@ -61,7 +62,7 @@ export default function ModelSelector({ model, setModel, options }: ModelSelecto
             animate="visible"
             exit="exit"
             className={cn(
-              "absolute right-0 mt-2 w-48 origin-top-right overflow-hidden",
+              "absolute right-0 mt-2 w-full origin-top-right overflow-hidden sm:w-56",
               "bg-black/50 backdrop-blur-xl border border-white/10 rounded-lg shadow-lg z-20"
             )}
           >

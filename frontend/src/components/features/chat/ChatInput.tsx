@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/Button';
 import { Textarea } from '@/components/ui/TextArea';
-import { SendHorizonal, BrainCircuit, X, Mic, Settings } from 'lucide-react';
+import { SendHorizonal, BrainCircuit, X, Mic, Settings, ChevronDown } from 'lucide-react';
 import { ChatMode, AvailableModule as ChatModule } from '@/types/chat';
 import { cn } from '@/lib/utils';
 import SettingsModal from './SettingsModal';
@@ -17,6 +17,10 @@ interface ChatInputProps {
   availableModules: ChatModule[];
   isLiveTalkActive: boolean;
   toggleLiveTalk: () => void;
+  model?: string;
+  setModel?: (m: string) => void;
+  modelOptions?: Array<{ value: string; label: string }>;
+  memoryNote?: string;
 }
 
 export function ChatInput({
@@ -29,6 +33,10 @@ export function ChatInput({
   availableModules,
   isLiveTalkActive,
   toggleLiveTalk,
+  model,
+  setModel,
+  modelOptions,
+  memoryNote,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [showModules, setShowModules] = useState(false);
@@ -66,7 +74,45 @@ export function ChatInput({
   const isStandardMode = currentMode === 'standard';
 
   return (
-    <div className="w-full p-3 md:p-4 border-t border-white/10 bg-black/10 backdrop-blur-sm">
+    <div className="w-full p-3 md:p-4 border-t border-white/10 bg-black/20 backdrop-blur-md">
+      {(modelOptions?.length || memoryNote) && (
+        <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-start md:justify-between">
+          {modelOptions?.length ? (
+            <div className="flex items-center gap-2">
+              <label htmlFor="chat-model" className="text-xs font-medium uppercase tracking-wide text-white/60">
+                Model
+              </label>
+              <div className="relative">
+                <select
+                  id="chat-model"
+                  value={model}
+                  onChange={(e) => setModel?.(e.target.value)}
+                  className="appearance-none pr-8 text-sm rounded-lg bg-white/10 border border-white/20 text-white px-3 py-2 focus:outline-none focus:ring-2 focus:ring-ugm-gold/40 focus:border-ugm-gold/40"
+                >
+                  {modelOptions.map(opt => (
+                    <option key={opt.value} value={opt.value} className="bg-slate-900 text-white">
+                      {opt.label}
+                    </option>
+                  ))}
+                </select>
+                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" />
+              </div>
+            </div>
+          ) : null}
+          {memoryNote && (
+            <details className="group max-w-md md:max-w-lg text-xs text-white/70">
+              <summary className="cursor-pointer select-none list-none inline-flex items-center gap-2 text-[11px] md:text-xs font-medium text-white/80 hover:text-white">
+                <span className="px-2 py-0.5 rounded-md bg-white/10 border border-white/15">Memori</span>
+                <span className="hidden sm:inline">Mengapa Aika mengingatmu?</span>
+                <ChevronDown className="h-3 w-3 transition-transform group-open:rotate-180" />
+              </summary>
+              <p className="mt-2 leading-relaxed bg-slate-900/60 border border-white/10 rounded-md p-3 backdrop-blur">
+                {memoryNote}
+              </p>
+            </details>
+          )}
+        </div>
+      )}
       {showModules && (
         <div className="mb-3 p-3 border border-white/10 rounded-lg bg-black/20 backdrop-blur-sm shadow-md max-h-48 overflow-y-auto">
           <h4 className="text-sm font-semibold text-ugm-gold mb-2">Pilih Latihan:</h4>
@@ -100,7 +146,7 @@ export function ChatInput({
         <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} />
       </div>
 
-      <div className="flex items-end space-x-2">
+      <div className="flex flex-wrap items-end gap-2">
         <Button
           variant="outline"
           size="icon"

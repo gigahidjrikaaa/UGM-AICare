@@ -8,7 +8,7 @@ import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import ModelSelector from '@/components/features/chat/ModelSelector';
+// Model selector now integrated inside ChatInterface footer
 
 // Loading Component (Keep as before)
 const LoadingIndicator = () => (
@@ -67,27 +67,20 @@ export default function AikaChatPage() {
         <motion.div
           className="relative z-10 h-screen flex flex-col items-center justify-center p-2 md:p-4 lg:p-6" // Center content vertically/horizontally
         >
-          {/* Model Selector Dropdown & Memory Disclosure */}
-          <div className="w-full max-w-5xl mb-4 flex flex-col gap-3">
-            <div className="flex justify-end">
-              <ModelSelector model={model} setModel={setModel} options={modelOptions} />
-            </div>
-            <details className="rounded-xl border border-white/15 bg-white/10 px-4 py-3 text-sm text-white/80">
-              <summary className="cursor-pointer text-white font-semibold">
-                Why Aika remembers you
-              </summary>
-              <p className="mt-2 text-xs leading-relaxed text-white/70">
-                Aika automatically reviews ringkasan obrolan sebelumnya, sorotan jurnal terbaru, dan jadwal konsultasi yang kamu simpan di UGM AICare. Informasi ini digunakan supaya respons terasa lebih nyambung dan personal. Data tetap tersimpan aman di sistem UGM-AICare dan kamu selalu bisa mengubah isi jurnal atau janji temu kapan pun.
-              </p>
-            </details>
-          </div>
-
-          {/* Main chat container with Glassmorphism */}
+          {/* Unified Chat Container (header simplified, controls moved to footer bar) */}
           <div className="w-full max-w-5xl h-[85vh] flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
-             {/* Chat Interface takes remaining space */}
-             <div className="flex-1 overflow-hidden"> {/* Important for ChatWindow's scrolling */}
-                <ChatInterface model={model} />
-             </div>
+            <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
+              <h1 className="text-base sm:text-lg font-semibold tracking-wide text-white">Aika Chat</h1>
+              <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-[#FFCA40]/15 text-[#FFCA40] border border-[#FFCA40]/30">Beta</span>
+            </div>
+            <div className="flex-1 overflow-hidden">
+              <ChatInterface
+                model={model}
+                setModel={setModel}
+                modelOptions={modelOptions}
+                memoryNote="Aika meninjau ringkasan obrolan, sorotan jurnal, dan jadwal konsultasi untuk menjaga konteks personal. Kamu bisa mengubah atau hapus data kapan saja; data aman di sistem UGM AICare."
+              />
+            </div>
           </div>
 
           {/* Footer credit - Moved outside main container for centering */}

@@ -59,15 +59,19 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
             {status === "authenticated" && (
                 <motion.button
                   onClick={onToggleSidebar} // Call the handler from props
-                  whileHover={{ 
-                    scale: 1.02, 
-                    backgroundColor: "rgba(255,255,255,0.08)"
+                  whileHover={{
+                    scale: 1.05,
+                    boxShadow: "0 0 0 6px rgba(255,202,64,0.25)"
                   }}
-                  whileTap={{ scale: 0.98 }}
-                  className="p-2.5 rounded-xl bg-white/4 hover:bg-white/8 backdrop-blur-sm border border-white/8 hover:border-white/15 transition-all duration-300 text-white/70 hover:text-white/90"
+                  whileTap={{ scale: 0.97 }}
+                  className="relative inline-flex items-center gap-2 overflow-hidden rounded-full border border-[#FFD772] bg-[#FFCA40] px-4 py-2 text-sm font-semibold text-[#001D58] shadow-[0_12px_30px_rgba(255,202,64,0.35)] transition-all duration-300 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FFCA40]/70 focus-visible:ring-offset-2 focus-visible:ring-offset-[#00112e] group"
                   aria-label="Toggle navigation menu"
                 >
-                  <HiMenu size={16} />
+                  <span className="pointer-events-none absolute -inset-1 rounded-full bg-white/50 opacity-0 blur-lg transition-opacity duration-300 group-hover:opacity-30" aria-hidden="true" />
+                  <span className="relative z-10 flex items-center gap-2">
+                    <HiMenu size={18} />
+                    <span className="hidden sm:inline-block">Menu</span>
+                  </span>
                 </motion.button>
             )}
             {/* Logo Section with Animation */}

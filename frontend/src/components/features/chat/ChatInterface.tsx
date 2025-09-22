@@ -9,7 +9,14 @@ import { useLiveTalk } from '@/hooks/useLiveTalk';
 import SpectrogramBubble from '@/components/SpectrogramBubble';
 
 
-export default function ChatInterface({ model }: { model: string }) {
+interface ChatInterfaceProps {
+  model: string;
+  setModel?: (m: string) => void;
+  modelOptions?: Array<{ value: string; label: string }>;
+  memoryNote?: string;
+}
+
+export default function ChatInterface({ model, setModel, modelOptions, memoryNote }: ChatInterfaceProps) {
   const {
     messages,
     inputValue,
@@ -85,6 +92,10 @@ export default function ChatInterface({ model }: { model: string }) {
               isLoading={isLoading}
               currentMode={currentMode}
               availableModules={availableModules}
+              model={model}
+              setModel={setModel}
+              modelOptions={modelOptions}
+              memoryNote={memoryNote}
             />
           </div>
         )}

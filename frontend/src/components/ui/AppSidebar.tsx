@@ -15,6 +15,7 @@ import {
   FiSettings, 
   FiBookOpen, 
   FiUser,
+  FiGrid,
   HiX
 } from '@/icons';
 import AccountLinker from '@/components/AccountLinker';
@@ -29,10 +30,11 @@ interface NavItem {
 
 // Define Navigation Items (Combine user and admin, mark admin ones)
 const sidebarNavItems: NavItem[] = [
+  { href: "/dashboard", label: "Dashboard", icon: <FiGrid size={18} /> },
   { href: "/aika", label: "Talk to Aika", icon: <BsChatDots size={18} /> },
   { href: "/journaling", label: "Journaling", icon: <FiActivity size={18} /> },
   { href: "/appointment", label: "Book Appointment", icon: <BsCalendar size={18} /> },
-  { href: "/profile", label: "Profile", icon: <FiUser size={18} /> }, // Added Profile link
+  { href: "/profile", label: "Profile", icon: <FiUser size={18} /> },
   { href: "/resources", label: "Resources", icon: <FiBookOpen size={18} /> },
   // --- Admin Specific Links ---
   { href: "/admin/dashboard", label: "Admin Dashboard", icon: <FiPieChart size={18} />, adminOnly: true },
