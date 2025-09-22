@@ -5,24 +5,41 @@ import Link from 'next/link';
 import { signOut } from 'next-auth/react'; // Import signOut
 import {
   FiGrid, FiUsers, FiMessageSquare, FiCalendar, FiBookOpen,
-  FiBarChart2, FiSettings, FiShield, FiLogOut, FiHelpCircle, FiFileText, FiHeart, FiGitMerge, FiLifeBuoy, FiActivity, FiUser
+  FiBarChart2, FiSettings, FiShield, FiLogOut, FiHelpCircle, FiFileText, FiHeart, FiGitMerge, FiLifeBuoy, FiActivity, FiUser, FiCpu
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink'; // Assuming SidebarLink component exists
 
-const mainNavItems = [
-  { name: 'Dashboard', icon: <FiGrid size={18}/>, href: '/admin/dashboard' },
-  { name: 'User Management', icon: <FiUsers size={18}/>, href: '/admin/users' },
-  { name: 'AI Conversations', icon: <FiMessageSquare size={18}/>, href: '/admin/conversations' },
-  { name: 'Appointments', icon: <FiCalendar size={18}/>, href: '/admin/appointments' },
-  { name: 'Journal Insights', icon: <FiBookOpen size={18}/>, href: '/admin/journals' },
-  { name: 'Content Resources', icon: <FiFileText size={18}/>, href: '/admin/content-resources' },
-  { name: 'CBT Modules', icon: <FiHeart size={18}/>, href: '/admin/cbt-modules' },
-  { name: 'Survey Management', icon: <FiFileText size={18}/>, href: '/admin/surveys' },
-  { name: 'Analytics Panel', icon: <FiBarChart2 size={18}/>, href: '/admin/analytics' },
-  { name: 'Agents Config', icon: <FiGitMerge size={18}/>, href: '/admin/agents-config' },
-  { name: 'Triage Panel', icon: <FiActivity size={18}/>, href: '/admin/triage' },
-  { name: 'Intervention Panel', icon: <FiLifeBuoy size={18}/>, href: '/admin/interventions' },
-  { name: 'Flags', icon: <FiShield size={18}/>, href: '/admin/flags' },
+// Grouped navigation structure for improved UX
+const navGroups = [
+  {
+    label: 'Overview',
+    items: [
+      { name: 'Dashboard', icon: <FiGrid size={18}/>, href: '/admin/dashboard' },
+      { name: 'Analytics', icon: <FiBarChart2 size={18}/>, href: '/admin/analytics' },
+      { name: 'Flags & Reviews', icon: <FiShield size={18}/>, href: '/admin/flags' },
+    ]
+  },
+  {
+    label: 'People & Content',
+    items: [
+      { name: 'Users', icon: <FiUsers size={18}/>, href: '/admin/users' },
+      { name: 'Appointments', icon: <FiCalendar size={18}/>, href: '/admin/appointments' },
+      { name: 'Conversations', icon: <FiMessageSquare size={18}/>, href: '/admin/conversations' },
+      { name: 'Journals', icon: <FiBookOpen size={18}/>, href: '/admin/journals' },
+      { name: 'Content Resources', icon: <FiFileText size={18}/>, href: '/admin/content-resources' },
+      { name: 'Surveys', icon: <FiFileText size={18}/>, href: '/admin/surveys' },
+      { name: 'CBT Modules', icon: <FiHeart size={18}/>, href: '/admin/cbt-modules' },
+    ]
+  },
+  {
+    label: 'Agents & Intelligence',
+    items: [
+      { name: 'Agents Command Center', icon: <FiCpu size={18}/>, href: '/admin/agents-command-center' },
+      { name: 'Agents Config', icon: <FiGitMerge size={18}/>, href: '/admin/agents-config' },
+      { name: 'Triage', icon: <FiActivity size={18}/>, href: '/admin/triage' },
+      { name: 'Interventions', icon: <FiLifeBuoy size={18}/>, href: '/admin/interventions' },
+    ]
+  }
 ];
 
 const secondaryNavItems = [
@@ -56,24 +73,36 @@ export default function AdminSidebar() {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 p-3 space-y-1.5 overflow-y-auto">
-        {mainNavItems.map((item) => (
-          <SidebarLink
-            key={item.href}
-            href={item.href}
-            icon={item.icon}
-            label={item.name}
-          />
+      <nav className="flex-1 p-3 space-y-4 overflow-y-auto">
+        {navGroups.map(group => (
+          <div key={group.label}>
+            <p className="px-2 mb-1 text-[10px] uppercase tracking-wider text-white/40 font-medium">{group.label}</p>
+            <div className="space-y-1.5">
+              {group.items.map(item => (
+                <SidebarLink
+                  key={item.href}
+                  href={item.href}
+                  icon={item.icon}
+                  label={item.name}
+                />
+              ))}
+            </div>
+          </div>
         ))}
         <hr className="my-3 border-white/10" />
-        {secondaryNavItems.map((item) => (
-          <SidebarLink
-            key={item.href}
-            href={item.href}
-            icon={item.icon}
-            label={item.name}
-          />
-        ))}
+        <div>
+          <p className="px-2 mb-1 text-[10px] uppercase tracking-wider text-white/40 font-medium">Account & System</p>
+          <div className="space-y-1.5">
+            {secondaryNavItems.map(item => (
+              <SidebarLink
+                key={item.href}
+                href={item.href}
+                icon={item.icon}
+                label={item.name}
+              />
+            ))}
+          </div>
+        </div>
       </nav>
 
       {/* Footer / Sign Out */}
