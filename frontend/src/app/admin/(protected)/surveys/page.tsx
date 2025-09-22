@@ -11,11 +11,23 @@ import Select from '@/components/ui/Select';
 import { Textarea } from '@/components/ui/TextArea';
 import Tooltip from '@/components/ui/Tooltip';
 
+type QuestionType = 'text' | 'multiple-choice' | 'rating';
+
+interface RatingOptions { scale: { min: number; max: number }; }
+type QuestionOptions = string[] | RatingOptions | [];
+
 interface SurveyQuestion {
   id: number;
   question_text: string;
-  question_type: string;
-  options: any; // can be array (multiple-choice) or object (rating scale)
+  question_type: QuestionType;
+  options: QuestionOptions;
+}
+
+interface SurveyQuestionDraft {
+  id?: number;
+  question_text: string;
+  question_type: QuestionType;
+  options: QuestionOptions;
 }
 
 interface Survey {
@@ -28,22 +40,44 @@ interface Survey {
   questions: SurveyQuestion[];
 }
 
+interface SurveyAnswer { id: number; question_text: string; answer_text: string; }
+interface SurveyResponse { id: number; user_id: number; created_at: string; answers: SurveyAnswer[]; }
+
+interface NewSurveyState {
+  title: string;
+  description: string;
+  questions: SurveyQuestionDraft[];
+}
+
+const createEmptyQuestion = (): SurveyQuestionDraft => ({ question_text: '', question_type: 'text', options: [] });
+function isRatingOptions(opts: QuestionOptions): opts is RatingOptions {
+  if (!opts || typeof opts !== 'object') return false;
+  const candidate: unknown = (opts as { scale?: unknown }).scale;
+  if (!candidate || typeof candidate !== 'object') return false;
+  const maybe = candidate as { min?: unknown; max?: unknown };
+  const minValid = typeof maybe.min === 'number' || typeof maybe.min === 'string';
+  const maxValid = typeof maybe.max === 'number' || typeof maybe.max === 'string';
+  if (!minValid || !maxValid) return false;
+  const minNum = Number(maybe.min);
+  const maxNum = Number(maybe.max);
+  return Number.isFinite(minNum) && Number.isFinite(maxNum) && minNum < maxNum;
+};
+
 export default function SurveyManagementPage() {
   const [surveys, setSurveys] = useState<Survey[]>([]);
-  const [loading, setLoading] = useState(true);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isResultsModalOpen, setIsResultsModalOpen] = useState(false);
   const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null);
-  const [surveyResults, setSurveyResults] = useState<any[]>([]);
-  const [newSurvey, setNewSurvey] = useState({
+  const [surveyResults, setSurveyResults] = useState<SurveyResponse[]>([]);
+  const [newSurvey, setNewSurvey] = useState<NewSurveyState>({
     title: '',
     description: '',
-    questions: [{ question_text: '', question_type: 'text', options: [] }]
+    questions: [createEmptyQuestion()]
   });
   const [optionInputs, setOptionInputs] = useState<string[]>(['']);
   // Edit modal question state
-  const [editQuestions, setEditQuestions] = useState<SurveyQuestion[]>([]);
+  const [editQuestions, setEditQuestions] = useState<SurveyQuestionDraft[]>([]);
   const [editOptionInputs, setEditOptionInputs] = useState<string[]>([]);
   // Search + pagination
   const [search, setSearch] = useState('');
@@ -52,14 +86,11 @@ export default function SurveyManagementPage() {
 
   const fetchSurveys = useCallback(async () => {
     try {
-      setLoading(true);
       const data = await apiCall<Survey[]>('/api/v1/admin/surveys');
       setSurveys(data);
     } catch (error) {
       console.error('Error fetching surveys:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to load surveys');
-    } finally {
-      setLoading(false);
     }
   }, []);
 
@@ -73,7 +104,11 @@ export default function SurveyManagementPage() {
   const handleEditModalOpen = (survey: Survey) => {
     setSelectedSurvey(survey);
     setIsEditModalOpen(true);
-    const cloned = survey.questions.map(q => ({ ...q, options: q.options ? [...q.options] : [] }));
+    const cloned: SurveyQuestionDraft[] = survey.questions.map(q => {
+      if (Array.isArray(q.options)) return { ...q, options: [...q.options] };
+      if (isRatingOptions(q.options)) return { ...q, options: { scale: { ...q.options.scale } } };
+      return { ...q, options: [] };
+    });
     setEditQuestions(cloned);
     setEditOptionInputs(new Array(cloned.length).fill(''));
   };
@@ -84,7 +119,7 @@ export default function SurveyManagementPage() {
 
   const handleResultsModalOpen = async (surveyId: number) => {
     try {
-      const data = await apiCall<any[]>(`/api/v1/admin/surveys/${surveyId}/responses`);
+      const data = await apiCall<SurveyResponse[]>(`/api/v1/admin/surveys/${surveyId}/responses`);
       setSurveyResults(data);
       setIsResultsModalOpen(true);
     } catch (error) {
@@ -146,18 +181,18 @@ export default function SurveyManagementPage() {
 
   // Rating scale handlers (create modal)
   const setRatingScale = (index: number, key: 'min'|'max', value: number) => {
-    const questions = [...newSurvey.questions];
-    const cfg = (questions[index].options && typeof questions[index].options === 'object') ? questions[index].options : {};
-    const scale = cfg.scale || {};
-    scale[key] = value;
-    cfg.scale = scale;
-    questions[index].options = cfg;
-    setNewSurvey(prev => ({ ...prev, questions }));
+    setNewSurvey(prev => {
+      const questions = [...prev.questions];
+      const current = questions[index];
+      const base = isRatingOptions(current.options) ? current.options : { scale: { min: 1, max: 5 } };
+      const updated: RatingOptions = { scale: { ...base.scale, [key]: value } };
+      questions[index] = { ...current, options: updated };
+      return { ...prev, questions };
+    });
   };
-  const getRatingScale = (q: any) => {
-    const cfg = q.options && typeof q.options === 'object' ? q.options : {};
-    const scale = cfg.scale || {};
-    return { min: scale.min ?? 1, max: scale.max ?? 5 };
+  const getRatingScale = (q: SurveyQuestionDraft | SurveyQuestion) => {
+    if (isRatingOptions(q.options)) return { min: q.options.scale.min ?? 1, max: q.options.scale.max ?? 5 };
+    return { min: 1, max: 5 };
   };
 
   const handleCreateSurvey = async () => {
@@ -205,10 +240,7 @@ export default function SurveyManagementPage() {
           }
         }
         if (q.question_type === 'rating') {
-          const cfg = q.options && typeof q.options === 'object' ? q.options : {};
-          const scale = cfg.scale || {};
-          const min = Number(scale.min ?? 1);
-          const max = Number(scale.max ?? 5);
+          const { min, max } = getEditRatingScale(q as SurveyQuestionDraft);
           if (!(Number.isFinite(min) && Number.isFinite(max) && min < max)) {
             toast.error('Rating questions need a valid scale (min < max).');
             return;
@@ -242,11 +274,11 @@ export default function SurveyManagementPage() {
   // Edit modal question handlers
   const handleEditQuestionChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setEditQuestions(prev => prev.map((q, i) => (i === index ? ({ ...q, [name]: value } as any) : q)));
+    setEditQuestions(prev => prev.map((q, i) => (i === index ? ({ ...q, [name]: value } as SurveyQuestionDraft) : q)));
   };
 
   const handleEditAddQuestion = () => {
-    setEditQuestions(prev => [...prev, { id: undefined as any, question_text: '', question_type: 'text', options: [] } as any]);
+    setEditQuestions(prev => [...prev, { question_text: '', question_type: 'text', options: [] }]);
     setEditOptionInputs(prev => [...prev, '']);
   };
 
@@ -266,7 +298,7 @@ export default function SurveyManagementPage() {
       if (i !== index) return q;
       const opts = Array.isArray(q.options) ? [...q.options] : [];
       if (!opts.includes(value)) opts.push(value);
-      return { ...q, options: opts } as any;
+      return { ...q, options: opts };
     }));
     handleEditOptionInputChange(index, '');
   };
@@ -275,24 +307,21 @@ export default function SurveyManagementPage() {
     setEditQuestions(prev => prev.map((q, i) => {
       if (i !== qIdx) return q;
       const opts = Array.isArray(q.options) ? q.options.filter(o => o !== optValue) : [];
-      return { ...q, options: opts } as any;
+      return { ...q, options: opts };
     }));
   };
 
   const setEditRatingScale = (index: number, key: 'min'|'max', value: number) => {
     setEditQuestions(prev => prev.map((q, i) => {
       if (i !== index) return q;
-      const cfg = q.options && typeof q.options === 'object' ? { ...q.options } : {};
-      const scale = cfg.scale || {};
-      scale[key] = value;
-      cfg.scale = scale;
-      return { ...q, options: cfg } as any;
+      const base = isRatingOptions(q.options) ? q.options : { scale: { min: 1, max: 5 } };
+      const updated: RatingOptions = { scale: { ...base.scale, [key]: value } };
+      return { ...q, options: updated };
     }));
   };
-  const getEditRatingScale = (q: any) => {
-    const cfg = q.options && typeof q.options === 'object' ? q.options : {};
-    const scale = cfg.scale || {};
-    return { min: scale.min ?? 1, max: scale.max ?? 5 };
+  const getEditRatingScale = (q: SurveyQuestionDraft) => {
+    if (isRatingOptions(q.options)) return { min: q.options.scale.min ?? 1, max: q.options.scale.max ?? 5 };
+    return { min: 1, max: 5 };
   };
 
   // Derived lists for search and pagination
@@ -393,27 +422,27 @@ export default function SurveyManagementPage() {
                       </button>
                     </Tooltip>
                     <Tooltip title="View responses">
-                      <button onClick={() => handleResultsModalOpen(survey.id)} className="text-white hover:text-gray-300 transition-colors mr-4">
+                      <button aria-label="View survey responses" title="View responses" onClick={() => handleResultsModalOpen(survey.id)} className="text-white hover:text-gray-300 transition-colors mr-4">
                         <FiEye className="h-4 w-4" />
                       </button>
                     </Tooltip>
                     <Tooltip title="Edit survey (modal)">
-                      <button onClick={() => handleEditModalOpen(survey)} className="text-blue-400 hover:text-blue-300 transition-colors mr-4">
+                      <button aria-label="Edit survey" title="Edit survey" onClick={() => handleEditModalOpen(survey)} className="text-blue-400 hover:text-blue-300 transition-colors mr-4">
                         <FiEdit className="h-4 w-4" />
                       </button>
                     </Tooltip>
                     <Tooltip title="Open full editor">
-                      <button onClick={() => window.location.assign(`/admin/surveys/${survey.id}/edit`)} className="text-blue-300 hover:text-blue-200 transition-colors mr-4">
+                      <button aria-label="Open full editor" title="Open full editor" onClick={() => window.location.assign(`/admin/surveys/${survey.id}/edit`)} className="text-blue-300 hover:text-blue-200 transition-colors mr-4">
                         <FiExternalLink className="h-4 w-4" />
                       </button>
                     </Tooltip>
                     <Tooltip title="Analytics">
-                      <button onClick={() => window.location.assign(`/admin/surveys/${survey.id}/analytics`)} className="text-yellow-300 hover:text-yellow-200 transition-colors mr-4">
+                      <button aria-label="Analytics" title="Analytics" onClick={() => window.location.assign(`/admin/surveys/${survey.id}/analytics`)} className="text-yellow-300 hover:text-yellow-200 transition-colors mr-4">
                         <FiBarChart2 className="h-4 w-4" />
                       </button>
                     </Tooltip>
                     <Tooltip title="Delete survey">
-                      <button onClick={() => handleDeleteSurvey(survey.id)} className="text-red-400 hover:text-red-300 transition-colors">
+                      <button aria-label="Delete survey" title="Delete survey" onClick={() => handleDeleteSurvey(survey.id)} className="text-red-400 hover:text-red-300 transition-colors">
                         <FiTrash2 className="h-4 w-4" />
                       </button>
                     </Tooltip>
@@ -474,7 +503,7 @@ export default function SurveyManagementPage() {
                     <div key={i} className="p-4 border border-white/20 rounded-lg mb-4">
                       <div className="flex justify-between items-center mb-2">
                         <label className="block text-sm font-medium text-gray-300">Question {i + 1}</label>
-                        <button onClick={() => handleRemoveQuestion(i)} className="text-red-400 hover:text-red-300" type="button">
+                        <button aria-label={`Remove question ${i+1}`} title="Remove question" onClick={() => handleRemoveQuestion(i)} className="text-red-400 hover:text-red-300" type="button">
                           <FiTrash2 />
                         </button>
                       </div>
@@ -515,7 +544,7 @@ export default function SurveyManagementPage() {
                               {q.options.map((opt: string) => (
                                 <span key={opt} className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-white/10 border border-white/20 text-white">
                                   {opt}
-                                  <button type="button" onClick={() => handleRemoveOption(i, opt)} className="text-red-400 hover:text-red-300">×</button>
+                                  <button aria-label={`Remove option ${opt}`} title="Remove option" type="button" onClick={() => handleRemoveOption(i, opt)} className="text-red-400 hover:text-red-300">×</button>
                                 </span>
                               ))}
                             </div>
@@ -612,7 +641,7 @@ export default function SurveyManagementPage() {
                     <div key={q.id ?? `new-${i}`} className="p-4 border border-white/20 rounded-lg mb-4">
                       <div className="flex justify-between items-center mb-2">
                         <label className="block text-sm font-medium text-gray-300">Question {i + 1}</label>
-                        <button onClick={() => handleEditRemoveQuestion(i)} className="text-red-400 hover:text-red-300" type="button">
+                        <button aria-label={`Remove question ${i+1}`} title="Remove question" onClick={() => handleEditRemoveQuestion(i)} className="text-red-400 hover:text-red-300" type="button">
                           <FiTrash2 />
                         </button>
                       </div>
@@ -652,11 +681,31 @@ export default function SurveyManagementPage() {
                               {q.options.map((opt: string) => (
                                 <span key={opt} className="inline-flex items-center gap-1 px-2 py-1 text-xs rounded-md bg-white/10 border border-white/20 text-white">
                                   {opt}
-                                  <button type="button" onClick={() => handleEditRemoveOption(i, opt)} className="text-red-400 hover:text-red-300">×</button>
+                                  <button aria-label={`Remove option ${opt}`} title="Remove option" type="button" onClick={() => handleEditRemoveOption(i, opt)} className="text-red-400 hover:text-red-300">×</button>
                                 </span>
                               ))}
                             </div>
                           )}
+                        </div>
+                      )}
+                      {q.question_type === 'rating' && (
+                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <Input
+                            name="edit_rating_min"
+                            label="Scale min"
+                            type="number"
+                            value={getEditRatingScale(q).min}
+                            onChange={(e) => setEditRatingScale(i, 'min', Number(e.target.value))}
+                            className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white"
+                          />
+                          <Input
+                            name="edit_rating_max"
+                            label="Scale max"
+                            type="number"
+                            value={getEditRatingScale(q).max}
+                            onChange={(e) => setEditRatingScale(i, 'max', Number(e.target.value))}
+                            className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white"
+                          />
                         </div>
                       )}
                     </div>
@@ -705,7 +754,7 @@ export default function SurveyManagementPage() {
                           <p className="text-xs text-gray-400">{new Date(response.created_at).toLocaleString()}</p>
                         </div>
                         <div className="space-y-2">
-                          {response.answers.map((answer: any) => (
+                          {response.answers.map((answer: SurveyAnswer) => (
                             <div key={answer.id}>
                               <p className="text-sm font-medium text-gray-300">{answer.question_text}</p>
                               <p className="text-sm text-white">{answer.answer_text}</p>
