@@ -310,23 +310,26 @@ async def handle_chat_request(
                     if is_new_session:
                         stmt = select(UserSummary).where(UserSummary.user_id == user_id).order_by(UserSummary.timestamp.desc())
                         result = await db.execute(stmt)
-                        past_summary = result.first()
+                        past_summary = result.scalars().first()  # Get model instance directly
 
-                        if past_summary:
+                        if past_summary and getattr(past_summary, 'summary_text', None):
                             summary_injection_text = (
                                 "Untuk membantumu mengingat, ini ringkasan singkat dari percakapan kita sebelumnya:\n"
                                 f"{past_summary.summary_text}\n"
                                 "--- Akhir dari ringkasan ---\n\nSekarang, mari kita lanjutkan. Ada apa?"
                             )
                             summary_injection_message = {"role": "system", "content": summary_injection_text}
-                            
-                            temp_history_for_llm = []
+                            temp_history_for_llm: List[Dict[str, str]] = []
                             if active_system_prompt:
-                                 temp_history_for_llm.append({"role": "system", "content": active_system_prompt})
+                                temp_history_for_llm.append({"role": "system", "content": active_system_prompt})
                             temp_history_for_llm.append(summary_injection_message)
-                            temp_history_for_llm.extend(history_for_llm_call) # Add the actual chat history
-                            history_for_llm_call = temp_history_for_llm # Replace with augmented history
+                            temp_history_for_llm.extend(history_for_llm_call)
+                            history_for_llm_call = temp_history_for_llm
                             logger.info(f"STANDARD_CHAT: Injected previous summary for user {user_id} into LLM context for new session.")
+                        else:
+                            logger.info(
+                                f"STANDARD_CHAT: No previous summary found to inject for user {user_id} (is_new_session={is_new_session})."
+                            )
 
                     history_for_llm_call.append({"role": "user", "content": user_message_content})
 

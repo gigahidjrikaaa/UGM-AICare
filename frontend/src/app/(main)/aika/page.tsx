@@ -36,6 +36,24 @@ export default function AikaChatPage() {
   const router = useRouter();
   const [model, setModel] = useState('gemini_google');
 
+  // Persist model choice in localStorage
+  useEffect(() => {
+    try {
+      const saved = window.localStorage.getItem('aika:selectedModel');
+      if (saved) setModel(saved);
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem('aika:selectedModel', model);
+    } catch {
+      // ignore
+    }
+  }, [model]);
+
   useEffect(() => {
     setMounted(true);
   }, []);
