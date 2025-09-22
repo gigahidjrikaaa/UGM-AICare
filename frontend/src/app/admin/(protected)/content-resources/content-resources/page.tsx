@@ -14,7 +14,7 @@ const ContentResourcesPage = () => {
         <div className="flex h-screen bg-[#001D58]">
             <AdminSidebar />
             <div className="flex-1 flex flex-col overflow-hidden">
-                <AdminHeader title="Content Resources" />
+                <AdminHeader />
                 <main className="flex-1 overflow-x-hidden overflow-y-auto bg-[#001D58] p-6">
                     <div className="container mx-auto">
                         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
