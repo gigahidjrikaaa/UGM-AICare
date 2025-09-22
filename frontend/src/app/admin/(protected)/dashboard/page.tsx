@@ -50,34 +50,31 @@ export default function AdminDashboardPage() {
 
   // The AdminLayout (from layout.tsx) now primarily handles authentication and role checks.
   // This useEffect can be a secondary check or removed if AdminLayout is robust.
+  // Secondary guard (AdminLayout should normally handle this)
   useEffect(() => {
-    if (status === "authenticated" && session?.user?.role !== 'admin') {
+    if (status === 'authenticated' && session?.user?.role !== 'admin') {
       router.push('/access-denied');
     }
   }, [status, session, router]);
-  
-  // Loading and unauthenticated states are handled by AdminLayout (layout.tsx)
-  if (status === "loading" || (status === "authenticated" && session?.user?.role !== 'admin')) {
-    // AdminLayout will show its own loading/redirecting state.
-    return null; 
-  }
 
   // Load flags summary
   useEffect(() => {
+    if (status !== 'authenticated' || session?.user?.role !== 'admin') return;
     const loadFlags = async () => {
       try {
         const data = await apiCall<{ open_count: number; recent: { id: number; session_id: string; status: string; created_at: string; reason?: string | null; tags?: string[] | null; }[] }>(`/api/v1/admin/flags/summary?limit=5`);
         setFlagsOpenCount(data.open_count);
         setRecentFlags(data.recent);
-      } catch (e) {
-        // ignore summary failures in dashboard
+      } catch {
+        // ignore summary failures
       }
     };
     loadFlags();
-  }, []);
+  }, [status, session]);
 
   // Load user stats and conversation stats
   useEffect(() => {
+    if (status !== 'authenticated' || session?.user?.role !== 'admin') return;
     const loadCore = async () => {
       try {
         const u = await apiCall<UserStats>(`/api/v1/admin/stats`);
@@ -89,10 +86,11 @@ export default function AdminDashboardPage() {
       } catch {}
     };
     loadCore();
-  }, []);
+  }, [status, session]);
 
   // Load appointment + feedback summaries and today's appointments
   useEffect(() => {
+    if (status !== 'authenticated' || session?.user?.role !== 'admin') return;
     const loadDash = async () => {
       try {
         const a = await apiCall<AppointmentSummary>(`/api/v1/admin/appointments/summary`);
@@ -111,7 +109,10 @@ export default function AdminDashboardPage() {
       } catch {}
     };
     loadDash();
-  }, []);
+  }, [status, session]);
+
+  const blocking = status === 'loading' || (status === 'authenticated' && session?.user?.role !== 'admin');
+  if (blocking) return null;
 
   // Remove the <AdminLayout> wrapper from here
   return (

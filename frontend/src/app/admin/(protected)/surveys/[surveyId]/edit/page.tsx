@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import Input from '@/components/ui/Input';
@@ -33,20 +33,20 @@ export default function SurveyEditorPage() {
   const [loading, setLoading] = useState(true);
   const [optionInputs, setOptionInputs] = useState<string[]>([]);
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       const s = await apiCall<Survey>(`/api/v1/admin/surveys/${surveyId}`);
       setSurvey({ ...s, questions: s.questions.map(q => ({ ...q, options: q.options || [] })) });
       setOptionInputs(new Array(s.questions.length).fill(''));
-    } catch (e) {
+    } catch {
       toast.error('Failed to load survey');
     } finally {
       setLoading(false);
     }
-  };
+  }, [surveyId]);
 
-  useEffect(() => { if (!isNaN(surveyId)) load(); }, [surveyId]);
+  useEffect(() => { if (!isNaN(surveyId)) load(); }, [surveyId, load]);
 
   const addQuestion = () => {
     if (!survey) return;
@@ -62,9 +62,10 @@ export default function SurveyEditorPage() {
     setOptionInputs(prev => prev.filter((_, i) => i !== idx));
   };
 
-  const updateQuestion = (idx: number, name: string, value: string) => {
+  type EditableQuestionField = 'question_text' | 'question_type';
+  const updateQuestion = (idx: number, field: EditableQuestionField, value: string) => {
     if (!survey) return;
-    const qs = survey.questions.map((q, i) => i === idx ? ({ ...q, [name]: value } as any) : q);
+    const qs = survey.questions.map((q, i) => i === idx ? { ...q, [field]: value } : q);
     setSurvey({ ...survey, questions: qs });
   };
 
@@ -154,7 +155,7 @@ export default function SurveyEditorPage() {
             <div key={q.id ?? `new-${i}`} className="p-4 border border-white/20 rounded-lg mb-4">
               <div className="flex justify-between items-center mb-2">
                 <label className="block text-sm font-medium text-gray-300">Question {i + 1}</label>
-                <button onClick={() => removeQuestion(i)} className="text-red-400 hover:text-red-300" type="button"><FiTrash2 /></button>
+                <button onClick={() => removeQuestion(i)} className="text-red-400 hover:text-red-300" type="button" aria-label={`Remove question ${i + 1}`} title={`Remove question ${i + 1}`}><FiTrash2 /></button>
               </div>
               <Input name="question_text" label="Question text" value={q.question_text} onChange={(e) => updateQuestion(i, 'question_text', e.target.value)} className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white mb-2" />
               <Select name="question_type" label="Question type" value={q.question_type} onChange={(e) => updateQuestion(i, 'question_type', e.target.value)} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white">
@@ -184,7 +185,7 @@ export default function SurveyEditorPage() {
                 <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <Input name="rating_min" label="Scale min" type="number" placeholder="1" onChange={() => {}} value={''} className="hidden" />
                   <Input name="rating_max" label="Scale max" type="number" placeholder="5" onChange={() => {}} value={''} className="hidden" />
-                  <div className="text-xs text-gray-300">Tip: Rating scale will be interpreted from answers; you can guide users in the question text (e.g., "1 = Sangat Tidak Setuju, 5 = Sangat Setuju").</div>
+                  <div className="text-xs text-gray-300">Tip: Rating scale will be interpreted from answers; you can guide users in the question text (e.g., &quot;1 = Sangat Tidak Setuju, 5 = Sangat Setuju&quot;).</div>
                 </div>
               )}
             </div>
