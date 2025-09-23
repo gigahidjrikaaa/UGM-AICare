@@ -64,7 +64,7 @@ const CommandComposer: React.FC<Props> = ({ connectionState, draft, onChange, on
 
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/10">
+      <div className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10">
         <div className="text-sm text-gray-300 font-medium flex items-center gap-4">
           <span className="flex items-center gap-2">
             ⚙️ <span className="text-white font-semibold">{draft.agent}</span>
@@ -80,9 +80,9 @@ const CommandComposer: React.FC<Props> = ({ connectionState, draft, onChange, on
       <div className="relative">
         <textarea
           ref={textareaRef}
-          className={`w-full resize-none leading-relaxed bg-black/30 backdrop-blur-sm border ${
-            draft.error ? 'border-red-400' : 'border-white/20'
-          } rounded-xl px-4 py-3 text-white font-mono placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent min-h-[80px] max-h-[200px] transition-all duration-200`}
+          className={`w-full resize-none leading-relaxed bg-white/5 backdrop-blur-md border ${
+            draft.error ? 'border-red-400' : 'border-white/10'
+          } rounded-xl px-4 py-3 text-white font-mono placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#FFCA40] focus:border-transparent min-h-[80px] max-h-[200px] transition-all duration-200`}
           placeholder={`⚡ Slash Command Format:\n/triage classify {"text":"Hello"}\n/analytics summarize {"days":7}\n\nType / to start...`}
           value={draft.raw || ''}
           onChange={handleInput}
@@ -101,20 +101,20 @@ const CommandComposer: React.FC<Props> = ({ connectionState, draft, onChange, on
           <button
             onClick={() => { if(!draft.error) void onSubmit(); }}
             disabled={connectionState !== 'open' || !!draft.error || !(draft.raw && draft.raw.trim())}
-            className="px-6 py-3 rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:from-green-400 hover:to-emerald-400 focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200 shadow-lg flex items-center gap-2"
+            className="px-6 py-3 rounded-lg bg-[#FFCA40] text-[#001D58] text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:bg-[#FFCA40]/90 focus:outline-none focus:ring-2 focus:ring-[#FFCA40] transition-all duration-200 shadow-lg flex items-center gap-2"
           >
             🚀 Dispatch Command
           </button>
           <button
             onClick={() => onChange({ agent: draft.agent, action: draft.action, data: undefined, raw: '', error: null })}
-            className="px-4 py-3 rounded-lg bg-white/10 text-gray-300 hover:bg-white/20 hover:text-white border border-white/20 transition-all duration-200 flex items-center gap-2"
+            className="px-4 py-3 rounded-lg bg-white/5 text-gray-300 hover:bg-white/10 hover:text-white border border-white/10 transition-all duration-200 flex items-center gap-2"
           >
             🗑️ Clear
           </button>
         </div>
         
-        <div className="text-xs text-gray-400 p-2 bg-blue-500/10 rounded border border-blue-500/20">
-          💡 Format: <code className="text-blue-300">/agent action &#123;json&#125;</code>
+        <div className="text-xs text-gray-400 p-2 bg-white/5 rounded border border-white/10">
+          💡 Format: <code className="text-[#FFCA40]">/agent action &#123;json&#125;</code>
         </div>
       </div>
     </div>

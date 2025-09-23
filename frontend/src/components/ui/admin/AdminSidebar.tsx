@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { signOut } from 'next-auth/react'; // Import signOut
 import {
   FiGrid, FiUsers, FiMessageSquare, FiCalendar, FiBookOpen,
-  FiBarChart2, FiSettings, FiShield, FiLogOut, FiHelpCircle, FiFileText, FiHeart, FiGitMerge, FiLifeBuoy, FiActivity, FiUser, FiCpu
+  FiBarChart2, FiSettings, FiShield, FiLogOut, FiHelpCircle, FiFileText, FiHeart, FiLifeBuoy, FiActivity, FiUser, FiCpu
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink'; // Assuming SidebarLink component exists
 
@@ -35,7 +35,6 @@ const navGroups = [
     label: 'Agents & Intelligence',
     items: [
       { name: 'Agents Command Center', icon: <FiCpu size={18}/>, href: '/admin/agents-command-center' },
-      { name: 'Agents Config', icon: <FiGitMerge size={18}/>, href: '/admin/agents-config' },
       { name: 'Triage', icon: <FiActivity size={18}/>, href: '/admin/triage' },
       { name: 'Interventions', icon: <FiLifeBuoy size={18}/>, href: '/admin/interventions' },
     ]

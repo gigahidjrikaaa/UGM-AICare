@@ -19,9 +19,9 @@ interface Props {
 }
 
 const pillColor: Record<string, string> = {
-  triage: "bg-amber-500/20 text-amber-300 border border-amber-400/40 backdrop-blur-sm",
-  analytics: "bg-violet-500/20 text-violet-300 border border-violet-400/40 backdrop-blur-sm",
-  intervention: "bg-teal-500/20 text-teal-300 border border-teal-400/40 backdrop-blur-sm",
+  triage: "bg-[#FFCA40]/20 text-[#FFCA40] border border-[#FFCA40]/40 backdrop-blur-sm",
+  analytics: "bg-blue-500/20 text-blue-300 border border-blue-400/40 backdrop-blur-sm",
+  intervention: "bg-green-500/20 text-green-300 border border-green-400/40 backdrop-blur-sm",
 };
 
 const OrchestrateChat: React.FC<Props> = ({ messages, isLoading }) => {
@@ -34,7 +34,7 @@ const OrchestrateChat: React.FC<Props> = ({ messages, isLoading }) => {
   }, [messages]);
 
   return (
-    <div className="flex flex-col h-[540px] rounded-xl border border-white/20 bg-black/20 backdrop-blur-sm shadow-2xl">
+    <div className="flex flex-col h-[540px] rounded-xl border border-white/10 bg-white/5 backdrop-blur-md shadow-2xl">
       <div
         ref={scrollerRef}
         className="flex-1 overflow-auto p-6 space-y-4"
@@ -55,10 +55,10 @@ const OrchestrateChat: React.FC<Props> = ({ messages, isLoading }) => {
             <div key={m.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
               <div className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-lg ${
                 isUser ? 
-                "bg-gradient-to-r from-purple-500 to-pink-500 text-white" : 
-                "bg-white/10 backdrop-blur-md border border-white/20 text-gray-100"
+                "bg-[#FFCA40] text-[#001D58]" : 
+                "bg-white/10 backdrop-blur-md border border-white/10 text-gray-100"
               }`}>
-                <div className="text-xs text-gray-300 mb-2 flex items-center gap-2">
+                <div className={`text-xs mb-2 flex items-center gap-2 ${isUser ? "text-[#001D58]/70" : "text-gray-300"}`}>
                   <span>{isUser ? "👤 You" : "🤖 Assistant"}</span>
                   <span>•</span>
                   <span>{new Date(m.ts).toLocaleTimeString()}</span>
@@ -76,15 +76,15 @@ const OrchestrateChat: React.FC<Props> = ({ messages, isLoading }) => {
                       </span>
                     )}
                     {m.pending && (
-                      <span className="text-xs text-purple-300 flex items-center gap-2 bg-purple-500/20 px-3 py-1 rounded-full border border-purple-500/30">
-                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                      <span className="text-xs text-[#FFCA40] flex items-center gap-2 bg-[#FFCA40]/20 px-3 py-1 rounded-full border border-[#FFCA40]/30">
+                        <div className="w-2 h-2 bg-[#FFCA40] rounded-full animate-pulse"></div>
                         Processing...
                       </span>
                     )}
                   </div>
                 )}
                 {isAssistant && m.metrics && typeof m.metrics === "object" && (
-                  <div className="mt-3 grid grid-cols-2 gap-2 p-3 bg-black/20 rounded-lg border border-white/10">
+                  <div className="mt-3 grid grid-cols-2 gap-2 p-3 bg-white/10 rounded-lg border border-white/10">
                     {Object.entries(m.metrics)
                       .filter(([, v]) => ["string", "number", "boolean"].includes(typeof v))
                       .map(([k, v]) => (
@@ -92,7 +92,7 @@ const OrchestrateChat: React.FC<Props> = ({ messages, isLoading }) => {
                           <span className="text-gray-400 truncate font-medium" title={k}>
                             {k}
                           </span>
-                          <span className="text-purple-300 truncate font-mono" title={String(v)}>
+                          <span className="text-[#FFCA40] truncate font-mono" title={String(v)}>
                             {String(v)}
                           </span>
                         </div>
@@ -105,14 +105,14 @@ const OrchestrateChat: React.FC<Props> = ({ messages, isLoading }) => {
         })}
       </div>
       {isLoading && (
-        <div className="p-4 border-t border-white/20 bg-gradient-to-r from-purple-500/10 to-blue-500/10 backdrop-blur-sm">
+        <div className="p-4 border-t border-white/10 bg-white/5 backdrop-blur-md">
           <div className="flex items-center gap-3">
             <div className="flex gap-1">
-              <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></div>
-              <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce delay-75"></div>
-              <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce delay-150"></div>
+              <div className="w-2 h-2 bg-[#FFCA40] rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-[#FFCA40] rounded-full animate-bounce delay-75"></div>
+              <div className="w-2 h-2 bg-[#FFCA40] rounded-full animate-bounce delay-150"></div>
             </div>
-            <span className="text-sm text-purple-300 font-medium">AI is thinking and routing your question...</span>
+            <span className="text-sm text-[#FFCA40] font-medium">AI is thinking and routing your question...</span>
           </div>
         </div>
       )}
