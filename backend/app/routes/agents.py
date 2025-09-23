@@ -7,98 +7,16 @@ from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func
 import asyncio
-import re
 from app.database import get_async_db
 from app.models import AgentRun, AgentMessage, User
-
-def _extract_timeframe_days(question: str, default: int = 7) -> int:
-    if not question:
-        return default
-    match = re.search(r"(?:last|past)\s+(\d{1,3})\s+day", question, re.IGNORECASE)
-    if match:
-        try:
-            val = int(match.group(1))
-            if 1 <= val <= 365:
-                return val
-        except ValueError:
-            pass
-    if re.search(r"last\s+week", question, re.IGNORECASE):
-        return 7
-    if re.search(r"last\s+month", question, re.IGNORECASE):
-        return 30
-    return default
-
-async def _answer_triage_question(db: AsyncSession, question: str) -> dict:
-    from app.models import TriageAssessment
-    days = _extract_timeframe_days(question, 7)
-    cutoff = datetime.utcnow() - timedelta(days=days)
-    high_severity_stmt = select(func.count(TriageAssessment.id)).where(
-        TriageAssessment.created_at >= cutoff,
-    ).where(
-        func.lower(TriageAssessment.severity_level).in_(["high", "critical", "severe"])
-        | (TriageAssessment.risk_score >= 0.85)
-    )
-    total_stmt = select(func.count(TriageAssessment.id)).where(TriageAssessment.created_at >= cutoff)
-    high_count = (await db.execute(high_severity_stmt)).scalar() or 0
-    total_count = (await db.execute(total_stmt)).scalar() or 0
-    pct = (high_count / total_count * 100.0) if total_count else 0.0
-    answer = (
-        f"There were {high_count} high-risk triage assessments (out of {total_count}, "
-        f"{pct:.1f}% ) in the last {days} days."
-    )
-    return {
-        "answer": answer,
-        "metrics": {
-            "high_risk_count": high_count,
-            "total": total_count,
-            "percentage_high": round(pct, 2),
-            "timeframe_days": days,
-        },
-    }
-
-async def _answer_analytics_question(db: AsyncSession, question: str) -> dict:
-    from app.models import TriageAssessment, User
-    days = _extract_timeframe_days(question, 30)
-    cutoff = datetime.utcnow() - timedelta(days=days)
-    stmt = (
-        select(
-            TriageAssessment.user_id,
-            func.count(TriageAssessment.id).label("cnt"),
-            func.max(TriageAssessment.created_at).label("last_at"),
-        )
-        .where(TriageAssessment.user_id.isnot(None))
-        .where(TriageAssessment.created_at >= cutoff)
-        .where(
-            func.lower(TriageAssessment.severity_level).in_(["high", "critical", "severe", "medium"])
-            | (TriageAssessment.risk_score >= 0.75)
-        )
-        .group_by(TriageAssessment.user_id)
-        .order_by(func.count(TriageAssessment.id).desc())
-        .limit(1)
-    )
-    row = (await db.execute(stmt)).first()
-    if not row:
-        return {
-            "answer": f"No flagged behaviours detected in the last {days} days.",
-            "metrics": {"timeframe_days": days, "flagged_users": 0},
-        }
-    user_id, count, last_at = row
-    user_stmt = select(User).where(User.id == user_id)
-    user = (await db.execute(user_stmt)).scalar_one_or_none()
-    identifier = (user.name or user.email or f"user:{user_id}") if user else f"user:{user_id}"
-    answer = (
-        f"The user with the most flagged behaviours in the last {days} days is {identifier} "
-        f"with {count} concerning assessments (last at {last_at:%Y-%m-%d %H:%M UTC})."
-    )
-    return {
-        "answer": answer,
-        "metrics": {
-            "user_id": user_id,
-            "count": count,
-            "last_at": last_at.isoformat() if last_at else None,
-            "timeframe_days": days,
-        },
-    }
+from app.agents.qa_handlers import answer_triage_question, answer_analytics_question
+from app.schemas.analytics import AnalyticsQuerySpec, AnalyticsRunResult
+from app.services.analytics_service import (
+    interpret_question_to_spec,
+    run_analytics_spec,
+    explain_analytics_result,
+)
+from app.agents.orchestrator import AdminOrchestrator
 
 router = APIRouter(prefix="/api/v1/admin/agents", tags=["Admin - Agents"])
 
@@ -147,9 +65,9 @@ async def ask_agent(payload: Dict[str, Any], db: AsyncSession = Depends(get_asyn
 
     try:
         if agent == "triage":
-            result = await _answer_triage_question(db, question)
+            result = await answer_triage_question(db, question)
         elif agent == "analytics":
-            result = await _answer_analytics_question(db, question)
+            result = await answer_analytics_question(db, question)
         else:
             raise HTTPException(status_code=400, detail="Unsupported agent for /ask")
         answer_text = result["answer"]
@@ -501,6 +419,118 @@ async def cancel_run(
         "ts": datetime.utcnow().isoformat(),
     })
     return {"runId": run_obj.id, "status": run_obj.status}
+
+_orchestrator = AdminOrchestrator()
+
+@router.post("/orchestrate", summary="Natural language orchestrator (Phase 1 routing)")
+async def orchestrate_question(payload: Dict[str, Any], db: AsyncSession = Depends(get_async_db)):
+    question = (payload.get("question") or payload.get("q") or "").strip()
+    explicit_agent = (payload.get("agent") or payload.get("targetAgent") or None)
+    if not question:
+        raise HTTPException(status_code=400, detail="Field 'question' is required")
+    correlation_id = str(uuid.uuid4())
+    # Decide route
+    try:
+        result = await _orchestrator.route(db, question, explicit_agent)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    run = AgentRun(
+        agent_name="orchestrator",
+        action="orchestrate",
+        status="running",
+        correlation_id=correlation_id,
+        input_payload={"question": question, "resolved_agent": result.agent},
+        triggered_by_user_id=None,
+    )
+    db.add(run)
+    await db.flush()
+    start_msg = AgentMessage(
+        run_id=run.id,
+        agent_name="orchestrator",
+        role="system",
+        message_type="event",
+        content=f"Routing question to {result.agent} agent",
+        metadata={"correlation_id": correlation_id, "question": question, "route": result.route},
+    )
+    db.add(start_msg)
+    await db.commit()
+    await db.refresh(run)
+    await _emit_event({
+        "type": "run_started",
+        "runId": run.id,
+        "correlationId": correlation_id,
+        "agent": "orchestrator",
+        "action": "orchestrate",
+        "status": run.status,
+        "question": question,
+        "resolvedAgent": result.agent,
+        "timestamp": datetime.utcnow().isoformat(),
+    })
+
+    # Complete immediately (Phase 1 is single-step)
+    final_msg = AgentMessage(
+        run_id=run.id,
+        agent_name="orchestrator",
+        role="agent",
+        message_type="final",
+        content=result.answer,
+        metadata={"correlation_id": correlation_id, "metrics": result.metrics, "routed_agent": result.agent},
+    )
+    db.add(final_msg)
+    run.status = "succeeded"
+    run.completed_at = datetime.utcnow()
+    # Compute metrics hash for traceability
+    import hashlib, json
+    metrics_hash = hashlib.sha256(json.dumps(result.metrics, sort_keys=True, default=str).encode('utf-8')).hexdigest()
+    run.output_payload = {"answer": result.answer, "metrics": result.metrics, "agent": result.agent, "route": result.route, "metricsHash": metrics_hash}
+    await db.commit()
+    await _emit_event({
+        "type": "run_completed",
+        "runId": run.id,
+        "correlationId": correlation_id,
+        "agent": "orchestrator",
+        "action": "orchestrate",
+        "status": run.status,
+        "result": {"answer": result.answer, "metrics": result.metrics, "agent": result.agent, "route": result.route, "metricsHash": metrics_hash},
+        "ts": datetime.utcnow().isoformat(),
+    })
+    return {"runId": run.id, "answer": result.answer, "metrics": result.metrics, "agent": result.agent, "route": result.route, "metricsHash": metrics_hash}
+
+# --- Analytics Structured Pipeline Endpoints ---
+
+@router.post("/analytics/interpret", summary="Interpret analytics question into structured spec")
+async def interpret_analytics_question(payload: Dict[str, Any]):
+    question = (payload.get("question") or payload.get("q") or "").strip()
+    if not question:
+        raise HTTPException(status_code=400, detail="Field 'question' is required")
+    spec = await interpret_question_to_spec(question)
+    return {"spec": spec.dict(), "hash": spec.hash()}
+
+@router.post("/analytics/run", summary="Execute analytics spec deterministically")
+async def run_analytics(payload: Dict[str, Any], db: AsyncSession = Depends(get_async_db)):
+    try:
+        spec = AnalyticsQuerySpec(**payload.get("spec", {}))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid spec: {e}") from e
+    result = await run_analytics_spec(db, spec)
+    # Hash metrics (excluding answer) for traceability
+    import hashlib, json
+    metrics_hash = hashlib.sha256(json.dumps(result.metrics, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+    return {"spec": spec.dict(), "metrics": result.metrics, "empty": result.empty, "metricsHash": metrics_hash}
+
+@router.post("/analytics/explain", summary="Generate natural language explanation for analytics result")
+async def explain_analytics(payload: Dict[str, Any]):
+    try:
+        spec = AnalyticsQuerySpec(**payload.get("spec", {}))
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid spec: {e}") from e
+    metrics = payload.get("metrics") or {}
+    result = AnalyticsRunResult(spec=spec, metrics=metrics, empty=bool(payload.get("empty")))
+    explained = await explain_analytics_result(result)
+    import hashlib, json
+    metrics_hash = hashlib.sha256(json.dumps(metrics, sort_keys=True, default=str).encode("utf-8")).hexdigest()
+    return {"spec": spec.dict(), "answer": explained.answer, "metrics": metrics, "empty": explained.empty, "metricsHash": metrics_hash}
 
 
 @router.websocket("/ws")
