@@ -393,18 +393,21 @@ async def get_current_user_info(request: Request, db: AsyncSession = Depends(get
     Tries Authorization: Bearer <token> header first, then falls back to common cookie keys.
     This is consumed by the frontend AccessGuard. Returns 401 if credentials are missing/invalid.
     """
-    authorization: str | None = Header(default=None)
-    access_token: str | None = Cookie(default=None)
-    token_cookie: str | None = Cookie(default=None, alias="token")
-    auth_cookie: str | None = Cookie(default=None, alias="auth")
-    session_token: str | None = Cookie(default=None, alias="next-auth.session-token")
+    # Extract Authorization header safely (case-insensitive) and fall back to cookies
+    auth_header = request.headers.get("authorization")
     token: str | None = None
-    if authorization and authorization.lower().startswith("bearer "):
-        parts = authorization.split(" ", 1)
+    if auth_header and isinstance(auth_header, str) and auth_header.lower().startswith("bearer "):
+        parts = auth_header.split(" ", 1)
         if len(parts) == 2 and parts[1].strip():
             token = parts[1].strip()
     if not token:
-        token = access_token or token_cookie or auth_cookie or session_token
+        cookies = request.cookies or {}
+        token = (
+            cookies.get("access_token")
+            or cookies.get("token")
+            or cookies.get("auth")
+            or cookies.get("next-auth.session-token")
+        )
     if not token:
         logger.warning("/auth/me missing credentials (no header/cookies)")
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Missing credentials")

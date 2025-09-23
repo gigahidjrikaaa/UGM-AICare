@@ -1,5 +1,5 @@
 import logging
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Depends, HTTPException, Query, Cookie
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Query, Depends
 from typing import Dict, Any, Optional
 import json
 import uuid
@@ -8,9 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 import asyncio
 from app.database import get_async_db
-from app.dependencies import get_admin_user
 from app.models import AgentRun, AgentMessage, User
-from app.auth_utils import decrypt_and_validate_token
 
 ACTIVE_CONNECTIONS: Dict[str, WebSocket] = {}
 RATE_LIMIT: Dict[int, list[float]] = {}  # user_id -> timestamps
@@ -41,7 +39,6 @@ async def list_agent_runs(
     limit: int = 25,
     agent: Optional[str] = None,
     db: AsyncSession = Depends(get_async_db),
-    admin_user: User = Depends(get_admin_user),
 ):
     q = select(AgentRun).order_by(AgentRun.started_at.desc()).limit(min(limit, 100))
     if agent:
@@ -65,7 +62,6 @@ async def list_agent_runs(
 @router.get("/metrics", summary="Aggregated agent run metrics")
 async def agent_metrics(
     db: AsyncSession = Depends(get_async_db),
-    admin_user: User = Depends(get_admin_user),
 ):
     # Aggregate counts grouped by agent and status
     from sqlalchemy import func, and_
@@ -110,7 +106,6 @@ async def agent_metrics(
 async def list_run_messages(
     run_id: int,
     db: AsyncSession = Depends(get_async_db),
-    admin_user: User = Depends(get_admin_user),
 ):
     q = select(AgentMessage).where(AgentMessage.run_id == run_id).order_by(AgentMessage.created_at.asc())
     result = await db.execute(q)
@@ -205,7 +200,6 @@ async def _simulate_triage_run(run_id: int, correlation_id: str, agent_name: str
 @router.post("/command", summary="Dispatch an agent command")
 async def dispatch_agent_command(
     payload: Dict[str, Any],
-    admin_user: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_async_db),
 ):
     required = {"agent", "action"}
@@ -221,12 +215,13 @@ async def dispatch_agent_command(
     import time
     now = time.time()
     window_start = now - 60
-    user_events = RATE_LIMIT.setdefault(admin_user.id, [])
+    # Previously rate-limited per user; now global anonymized rate limiting disabled.
+    user_events = RATE_LIMIT.setdefault(0, [])
     # prune old
-    RATE_LIMIT[admin_user.id] = [t for t in user_events if t >= window_start]
-    if len(RATE_LIMIT[admin_user.id]) >= MAX_COMMANDS_PER_MINUTE:
+    RATE_LIMIT[0] = [t for t in user_events if t >= window_start]
+    if len(RATE_LIMIT[0]) >= MAX_COMMANDS_PER_MINUTE:
         raise HTTPException(status_code=429, detail="Rate limit exceeded (30 commands/minute)")
-    RATE_LIMIT[admin_user.id].append(now)
+    RATE_LIMIT[0].append(now)
 
     run = AgentRun(
         agent_name=agent_name,
@@ -234,7 +229,7 @@ async def dispatch_agent_command(
         status="running",
         correlation_id=correlation_id,
         input_payload=input_payload,
-        triggered_by_user_id=admin_user.id,
+        triggered_by_user_id=None,
     )
     db.add(run)
     await db.flush()
@@ -275,7 +270,6 @@ async def dispatch_agent_command(
 @router.post("/runs/{run_id}/cancel", summary="Cancel a running agent run")
 async def cancel_run(
     run_id: int,
-    admin_user: User = Depends(get_admin_user),
     db: AsyncSession = Depends(get_async_db),
 ):
     result = await db.execute(select(AgentRun).where(AgentRun.id == run_id))
@@ -314,34 +308,13 @@ async def cancel_run(
 
 
 @router.websocket("/ws")
-async def agent_events_ws(
-    websocket: WebSocket,
-    token: Optional[str] = Query(default=None),
-    access_token: Optional[str] = Cookie(default=None),
-    generic_token: Optional[str] = Cookie(default=None, alias="token"),
-    auth_cookie: Optional[str] = Cookie(default=None, alias="auth"),
-    session_token: Optional[str] = Cookie(default=None, alias="next-auth.session-token"),
-):
-    # Attempt to authenticate: precedence query token > access_token > next-auth session > token > auth
-    candidate = token or access_token or session_token or generic_token or auth_cookie
-    if not candidate:
-        await websocket.close(code=4401)
-        return
-    # Validate JWT or NextAuth session token
-    try:
-        payload = decrypt_and_validate_token(candidate)
-    except HTTPException:
-        await websocket.close(code=4401)
-        return
-    # Basic role check (admin / therapist only for viewing)
-    if payload.role not in {"admin", "therapist"}:
-        await websocket.close(code=4403)
-        return
+async def agent_events_ws(websocket: WebSocket):
+    # Unauthenticated public websocket (use cautiously)
     await websocket.accept()
     connection_id = str(uuid.uuid4())
     ACTIVE_CONNECTIONS[connection_id] = websocket
     try:
-        await websocket.send_text(json.dumps({"type": "welcome", "connectionId": connection_id, "userRole": payload.role}))
+        await websocket.send_text(json.dumps({"type": "welcome", "connectionId": connection_id}))
         while True:
             data = await websocket.receive_text()
             try:
