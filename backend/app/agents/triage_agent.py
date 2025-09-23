@@ -62,12 +62,30 @@ def heuristic_classify(messages: Sequence[BaseMessage]) -> str:
     return "low"
 
 
+def normalize_classification(raw: str, messages: Sequence[BaseMessage]) -> str:
+    """Normalize raw model output to one of: high|medium|low.
+
+    Strategy:
+    1. Lowercase and search for severity keywords.
+    2. If multiple found (rare), choose highest severity order high > medium > low.
+    3. If none found, fallback to heuristic classifier.
+    """
+    if not isinstance(raw, str) or not raw.strip():
+        return heuristic_classify(messages)
+    lowered = raw.lower()
+    severity_order = ["high", "medium", "low"]
+    detected = [level for level in severity_order if level in lowered]
+    if detected:
+        return detected[0]
+    return heuristic_classify(messages)
+
+
 def call_model(state: AgentState) -> dict[str, Any]:
     """Calls the LLM to classify the conversation."""
     try:
         llm = get_llm()
         response = llm.invoke(state["messages"])
-        classification = response.content
+        classification = normalize_classification(getattr(response, "content", ""), state["messages"])
     except Exception as exc:  # pragma: no cover - depends on external service
         logger.warning("Falling back to heuristic triage classification: %s", exc)
         classification = heuristic_classify(state["messages"])
@@ -160,7 +178,10 @@ TRIAGE_GRAPH_SPEC = {
     ],
     "edges": [
         {"source": "incoming", "target": "llm"},
-        {"source": "llm", "target": "lookup_resources"},
+        # Conditional edge: llm -> lookup_resources when classification in (medium, high)
+        {"source": "llm", "target": "lookup_resources", "condition": "classification in ['medium','high']"},
+        # Conditional edge: llm -> end when classification is low
+        {"source": "llm", "target": "end", "condition": "classification == 'low'"},
         {"source": "lookup_resources", "target": "end"},
     ],
 }

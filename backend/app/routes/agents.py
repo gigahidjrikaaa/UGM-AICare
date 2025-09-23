@@ -3,12 +3,208 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Qu
 from typing import Dict, Any, Optional
 import json
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, func
 import asyncio
+import re
 from app.database import get_async_db
 from app.models import AgentRun, AgentMessage, User
+
+def _extract_timeframe_days(question: str, default: int = 7) -> int:
+    if not question:
+        return default
+    match = re.search(r"(?:last|past)\s+(\d{1,3})\s+day", question, re.IGNORECASE)
+    if match:
+        try:
+            val = int(match.group(1))
+            if 1 <= val <= 365:
+                return val
+        except ValueError:
+            pass
+    if re.search(r"last\s+week", question, re.IGNORECASE):
+        return 7
+    if re.search(r"last\s+month", question, re.IGNORECASE):
+        return 30
+    return default
+
+async def _answer_triage_question(db: AsyncSession, question: str) -> dict:
+    from app.models import TriageAssessment
+    days = _extract_timeframe_days(question, 7)
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    high_severity_stmt = select(func.count(TriageAssessment.id)).where(
+        TriageAssessment.created_at >= cutoff,
+    ).where(
+        func.lower(TriageAssessment.severity_level).in_(["high", "critical", "severe"])
+        | (TriageAssessment.risk_score >= 0.85)
+    )
+    total_stmt = select(func.count(TriageAssessment.id)).where(TriageAssessment.created_at >= cutoff)
+    high_count = (await db.execute(high_severity_stmt)).scalar() or 0
+    total_count = (await db.execute(total_stmt)).scalar() or 0
+    pct = (high_count / total_count * 100.0) if total_count else 0.0
+    answer = (
+        f"There were {high_count} high-risk triage assessments (out of {total_count}, "
+        f"{pct:.1f}% ) in the last {days} days."
+    )
+    return {
+        "answer": answer,
+        "metrics": {
+            "high_risk_count": high_count,
+            "total": total_count,
+            "percentage_high": round(pct, 2),
+            "timeframe_days": days,
+        },
+    }
+
+async def _answer_analytics_question(db: AsyncSession, question: str) -> dict:
+    from app.models import TriageAssessment, User
+    days = _extract_timeframe_days(question, 30)
+    cutoff = datetime.utcnow() - timedelta(days=days)
+    stmt = (
+        select(
+            TriageAssessment.user_id,
+            func.count(TriageAssessment.id).label("cnt"),
+            func.max(TriageAssessment.created_at).label("last_at"),
+        )
+        .where(TriageAssessment.user_id.isnot(None))
+        .where(TriageAssessment.created_at >= cutoff)
+        .where(
+            func.lower(TriageAssessment.severity_level).in_(["high", "critical", "severe", "medium"])
+            | (TriageAssessment.risk_score >= 0.75)
+        )
+        .group_by(TriageAssessment.user_id)
+        .order_by(func.count(TriageAssessment.id).desc())
+        .limit(1)
+    )
+    row = (await db.execute(stmt)).first()
+    if not row:
+        return {
+            "answer": f"No flagged behaviours detected in the last {days} days.",
+            "metrics": {"timeframe_days": days, "flagged_users": 0},
+        }
+    user_id, count, last_at = row
+    user_stmt = select(User).where(User.id == user_id)
+    user = (await db.execute(user_stmt)).scalar_one_or_none()
+    identifier = (user.name or user.email or f"user:{user_id}") if user else f"user:{user_id}"
+    answer = (
+        f"The user with the most flagged behaviours in the last {days} days is {identifier} "
+        f"with {count} concerning assessments (last at {last_at:%Y-%m-%d %H:%M UTC})."
+    )
+    return {
+        "answer": answer,
+        "metrics": {
+            "user_id": user_id,
+            "count": count,
+            "last_at": last_at.isoformat() if last_at else None,
+            "timeframe_days": days,
+        },
+    }
+
+router = APIRouter(prefix="/api/v1/admin/agents", tags=["Admin - Agents"])
+
+@router.post("/ask", summary="Ask an agent a natural language question")
+async def ask_agent(payload: Dict[str, Any], db: AsyncSession = Depends(get_async_db)):
+    agent = (payload.get("agent") or "").lower().strip()
+    question = (payload.get("question") or payload.get("q") or "").strip()
+    if not agent or not question:
+        raise HTTPException(status_code=400, detail="Fields 'agent' and 'question' are required")
+
+    correlation_id = str(uuid.uuid4())
+    run = AgentRun(
+        agent_name=agent,
+        action="ask",
+        status="running",
+        correlation_id=correlation_id,
+        input_payload={"question": question},
+        triggered_by_user_id=None,
+    )
+    db.add(run)
+    await db.flush()
+
+    # Initial message (system)
+    start_msg = AgentMessage(
+        run_id=run.id,
+        agent_name=agent,
+        role="system",
+        message_type="event",
+        content=f"Question received for {agent}: {question}",
+        metadata={"correlation_id": correlation_id},
+    )
+    db.add(start_msg)
+    await db.commit()
+    await db.refresh(run)
+
+    await _emit_event({
+        "type": "run_started",
+        "runId": run.id,
+        "correlationId": correlation_id,
+        "agent": agent,
+        "action": "ask",
+        "status": run.status,
+        "question": question,
+        "timestamp": datetime.utcnow().isoformat(),
+    })
+
+    try:
+        if agent == "triage":
+            result = await _answer_triage_question(db, question)
+        elif agent == "analytics":
+            result = await _answer_analytics_question(db, question)
+        else:
+            raise HTTPException(status_code=400, detail="Unsupported agent for /ask")
+        answer_text = result["answer"]
+        final_msg = AgentMessage(
+            run_id=run.id,
+            agent_name=agent,
+            role="agent",
+            message_type="final",
+            content=answer_text,
+            metadata={"correlation_id": correlation_id, "metrics": result.get("metrics")},
+        )
+        db.add(final_msg)
+        run.status = "succeeded"
+        run.completed_at = datetime.utcnow()
+        run.output_payload = result
+        await db.commit()
+        await _emit_event({
+            "type": "run_completed",
+            "runId": run.id,
+            "correlationId": correlation_id,
+            "agent": agent,
+            "action": "ask",
+            "status": run.status,
+            "result": result,
+            "ts": datetime.utcnow().isoformat(),
+        })
+        return {"runId": run.id, "answer": answer_text, "metrics": result.get("metrics")}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.exception("/ask failure: %s", exc)
+        run.status = "failed"
+        run.completed_at = datetime.utcnow()
+        run.output_payload = {"error": str(exc)}
+        fail_msg = AgentMessage(
+            run_id=run.id,
+            agent_name=agent,
+            role="agent",
+            message_type="error",
+            content="Error processing question",
+            metadata={"correlation_id": correlation_id, "error": str(exc)},
+        )
+        db.add(fail_msg)
+        await db.commit()
+        await _emit_event({
+            "type": "run_completed",
+            "runId": run.id,
+            "correlationId": correlation_id,
+            "agent": agent,
+            "action": "ask",
+            "status": run.status,
+            "error": str(exc),
+            "ts": datetime.utcnow().isoformat(),
+        })
+        raise HTTPException(status_code=500, detail="Agent failed to answer question")
 
 ACTIVE_CONNECTIONS: Dict[str, WebSocket] = {}
 RATE_LIMIT: Dict[int, list[float]] = {}  # user_id -> timestamps
