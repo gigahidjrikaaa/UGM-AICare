@@ -63,40 +63,59 @@ const CommandComposer: React.FC<Props> = ({ connectionState, draft, onChange, on
   }, [draft.raw]);
 
   return (
-    <div className="flex flex-col gap-2 mb-3">
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-gray-400 font-mono">
-          Agent: <span className="text-white">{draft.agent}</span> • Action: <span className="text-white">{draft.action}</span>
+    <div className="flex flex-col gap-4">
+      <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/10">
+        <div className="text-sm text-gray-300 font-medium flex items-center gap-4">
+          <span className="flex items-center gap-2">
+            ⚙️ <span className="text-white font-semibold">{draft.agent}</span>
+          </span>
+          <span className="text-gray-500">•</span>
+          <span className="flex items-center gap-2">
+            🎯 <span className="text-white font-semibold">{draft.action}</span>
+          </span>
         </div>
-        <div className="text-[10px] text-gray-500">Ctrl/⌘ + Enter to dispatch</div>
+        <div className="text-xs text-gray-400">⌘ + Enter to dispatch</div>
       </div>
+      
       <div className="relative">
         <textarea
           ref={textareaRef}
-          className={`w-full resize-none leading-relaxed bg-[#1E1F25] border ${draft.error ? 'border-red-500' : 'border-[#2A2C33]'} rounded px-3 py-2 text-sm text-white font-mono focus:outline-none focus:ring-2 focus:ring-[#FFCA40] min-h-[70px] max-h-[180px]`}
-          placeholder={'/triage classify {"text":"Hello"}\nType / to start a slash command...'}
+          className={`w-full resize-none leading-relaxed bg-black/30 backdrop-blur-sm border ${
+            draft.error ? 'border-red-400' : 'border-white/20'
+          } rounded-xl px-4 py-3 text-white font-mono placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent min-h-[80px] max-h-[200px] transition-all duration-200`}
+          placeholder={`⚡ Slash Command Format:\n/triage classify {"text":"Hello"}\n/analytics summarize {"days":7}\n\nType / to start...`}
           value={draft.raw || ''}
           onChange={handleInput}
           onKeyDown={handleKeyDown}
           aria-label="Command composer multiline input"
         />
-        {draft.error && <div className="absolute -bottom-5 left-0 text-[10px] text-red-400">{draft.error}</div>}
+        {draft.error && (
+          <div className="absolute -bottom-6 left-0 text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded border border-red-500/20">
+            ❌ {draft.error}
+          </div>
+        )}
       </div>
-      <div className="flex items-center gap-2">
-        <button
-          onClick={() => { if(!draft.error) void onSubmit(); }}
-          disabled={connectionState !== 'open' || !!draft.error || !(draft.raw && draft.raw.trim())}
-          className="px-4 py-2 rounded bg-[#FFCA40] text-black text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#FFCA40]"
-        >
-          Dispatch
-        </button>
-        <button
-          onClick={() => onChange({ agent: draft.agent, action: draft.action, data: undefined, raw: '', error: null })}
-          className="px-3 py-2 rounded bg-[#2A2C33] text-xs text-gray-300 hover:bg-[#34363F]"
-        >
-          Clear
-        </button>
-        <div className="text-[10px] text-gray-500">Format: /agent action {`{json}`}</div>
+      
+      <div className="flex items-center justify-between">
+        <div className="flex gap-3">
+          <button
+            onClick={() => { if(!draft.error) void onSubmit(); }}
+            disabled={connectionState !== 'open' || !!draft.error || !(draft.raw && draft.raw.trim())}
+            className="px-6 py-3 rounded-lg bg-gradient-to-r from-green-500 to-emerald-500 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:from-green-400 hover:to-emerald-400 focus:outline-none focus:ring-2 focus:ring-green-400 transition-all duration-200 shadow-lg flex items-center gap-2"
+          >
+            🚀 Dispatch Command
+          </button>
+          <button
+            onClick={() => onChange({ agent: draft.agent, action: draft.action, data: undefined, raw: '', error: null })}
+            className="px-4 py-3 rounded-lg bg-white/10 text-gray-300 hover:bg-white/20 hover:text-white border border-white/20 transition-all duration-200 flex items-center gap-2"
+          >
+            🗑️ Clear
+          </button>
+        </div>
+        
+        <div className="text-xs text-gray-400 p-2 bg-blue-500/10 rounded border border-blue-500/20">
+          💡 Format: <code className="text-blue-300">/agent action &#123;json&#125;</code>
+        </div>
       </div>
     </div>
   );

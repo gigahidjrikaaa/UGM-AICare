@@ -2,7 +2,12 @@
 
 import React, { useEffect, useRef, useState, useCallback, useMemo } from 'react';
 import AccessGuard from '@/components/admin/AccessGuard';
-import { FiCommand, FiActivity, FiWifiOff, FiGitMerge } from 'react-icons/fi';
+import { 
+  FiCommand, 
+  FiActivity, 
+  FiWifiOff, 
+  FiGitMerge
+} from 'react-icons/fi';
 import dynamic from 'next/dynamic';
 import CommandComposer from './CommandComposer';
 import OrchestrateComposer, { OrchestrateDraft } from './OrchestrateComposer';
@@ -335,32 +340,44 @@ const AgentsCommandCenterClient: React.FC = () => {
 
   return (
     <AccessGuard requiredRoles={["admin","therapist"]}>
-      <div className="flex flex-col gap-6">
-        <header>
-          <h1 className="text-3xl font-bold text-white flex items-center">
-            <FiCommand className="mr-3 text-[#FFCA40]" />
-            Agents Command Center
-          </h1>
-          <p className="text-gray-400 mt-1">Dispatch commands, ask natural language questions, and monitor real-time agent events.</p>
-        </header>
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900">
+        <div className="flex flex-col gap-6 p-6">
+          <header className="relative">
+            <div className="absolute inset-0 bg-gradient-to-r from-purple-600/20 to-blue-600/20 rounded-2xl blur-xl"></div>
+            <div className="relative bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6">
+              <h1 className="text-4xl font-bold bg-gradient-to-r from-purple-400 to-pink-400 bg-clip-text text-transparent flex items-center">
+                <FiCommand className="mr-4 text-yellow-400 text-5xl drop-shadow-lg" />
+                Agents Command Center
+              </h1>
+              <p className="text-gray-300 mt-2 text-lg">Dispatch commands, ask natural language questions, and monitor real-time agent events.</p>
+            </div>
+          </header>
 
-  <section className="grid md:grid-cols-4 gap-4">
-          <div className="p-4 rounded-lg bg-[#1E1F25] border border-[#2A2C33] flex items-center justify-between">
-            <div className="text-sm text-gray-300">Connection</div>
-            <div className="flex items-center gap-2">
-              {connectionState === 'open' ? <FiActivity className="text-green-400" /> : <FiWifiOff className="text-red-400" />}
-              <span className={`text-sm ${connectionState === 'open' ? 'text-green-400' : 'text-red-400'}`}>{connectionState}</span>
+  <section className="grid md:grid-cols-4 gap-6">
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-6 hover:bg-white/15 transition-all duration-300">
+            <div className="flex items-center justify-between">
+              <div className="text-gray-200 font-medium">Connection Status</div>
+              <div className="flex items-center gap-3">
+                {connectionState === 'open' ? 
+                  <FiActivity className="text-green-400 text-xl animate-pulse" /> : 
+                  <FiWifiOff className="text-red-400 text-xl" />
+                }
+                <span className={`text-sm font-semibold px-3 py-1 rounded-full ${connectionState === 'open' ? 'text-green-400 bg-green-400/20' : 'text-red-400 bg-red-400/20'}`}>
+                  {connectionState}
+                </span>
+              </div>
             </div>
           </div>
-          <div className="p-4 rounded-lg bg-[#1E1F25] border border-[#2A2C33]">
-            <div className="text-sm text-gray-300 mb-1">Agent Filter</div>
+          
+          <div className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl p-6 hover:bg-white/15 transition-all duration-300">
+            <div className="text-gray-200 font-medium mb-3">Agent Filter</div>
             <select
               aria-label="Agent filter"
-              className="w-full bg-[#0F1013] border border-[#2A2C33] rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#FFCA40]"
+              className="w-full bg-black/30 border border-white/20 rounded-lg px-4 py-2 text-white focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent backdrop-blur-sm"
               value={agentFilter}
               onChange={e=> setAgentFilter(e.target.value)}
             >
-              <option value="all">All</option>
+              <option value="all">All Agents</option>
               <option value="orchestrator">Orchestrator</option>
               <option value="triage">Triage</option>
               <option value="intervention">Intervention</option>
@@ -370,56 +387,80 @@ const AgentsCommandCenterClient: React.FC = () => {
           {['triage','intervention','analytics'].map(agentName => {
             const m = agentMetrics[agentName] || { total:0, running:0, succeeded:0, cancelled:0, failed:0 };
             const statusLabel = m.running>0 ? 'Running' : m.failed>0 ? 'Attention' : 'Idle';
-            const statusColor = m.running>0 ? 'text-blue-400' : m.failed>0 ? 'text-red-400' : 'text-green-400';
+            const statusColor = m.running>0 ? 'text-blue-400 bg-blue-400/20' : m.failed>0 ? 'text-red-400 bg-red-400/20' : 'text-green-400 bg-green-400/20';
+            const agentGradient = agentName === 'triage' ? 'from-amber-500/20 to-orange-500/20' :
+                                  agentName === 'intervention' ? 'from-teal-500/20 to-cyan-500/20' :
+                                  'from-violet-500/20 to-purple-500/20';
+            
             return (
-              <div key={agentName} className="p-4 rounded-lg bg-[#1E1F25] border border-[#2A2C33]">
-                <div className="flex items-center justify-between mb-1">
-                  <div className="text-sm text-gray-300 capitalize">{agentName} Agent</div>
-                  <span className={`text-xs font-medium ${statusColor}`}>{statusLabel}</span>
+              <div key={agentName} className={`bg-gradient-to-br ${agentGradient} backdrop-blur-md border border-white/20 rounded-xl p-6 hover:bg-white/15 transition-all duration-300 group`}>
+                <div className="flex items-center justify-between mb-4">
+                  <div className="text-white font-semibold text-lg capitalize">{agentName} Agent</div>
+                  <span className={`text-xs font-bold px-3 py-1 rounded-full ${statusColor}`}>{statusLabel}</span>
                 </div>
-                <div className="grid grid-cols-4 gap-2 mt-2 text-center">
-                  <div>
-                    <div className="text-[10px] text-gray-500">Total</div>
-                    <div className="text-sm text-white font-semibold">{m.total}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-gray-500">Run</div>
-                    <div className="text-sm text-blue-300 font-semibold">{m.running}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-gray-500">OK</div>
-                    <div className="text-sm text-green-300 font-semibold">{m.succeeded}</div>
-                  </div>
-                  <div>
-                    <div className="text-[10px] text-gray-500">Fail</div>
-                    <div className="text-sm text-red-300 font-semibold">{m.failed}</div>
-                  </div>
+                
+                <div className="grid grid-cols-4 gap-4 mb-4">
+                  {[
+                    { label: 'Total', value: m.total, color: 'text-gray-300' },
+                    { label: 'Active', value: m.running, color: 'text-blue-400' },
+                    { label: 'Success', value: m.succeeded, color: 'text-green-400' },
+                    { label: 'Failed', value: m.failed, color: 'text-red-400' }
+                  ].map(stat => (
+                    <div key={stat.label} className="text-center">
+                      <div className="text-xs text-gray-400 mb-1">{stat.label}</div>
+                      <div className={`text-xl font-bold ${stat.color}`}>{stat.value}</div>
+                    </div>
+                  ))}
                 </div>
+                
                 {m.lastCompleted && (
-                  <div className="mt-1 text-[10px] text-gray-500 text-right">Last: {new Date(m.lastCompleted).toLocaleTimeString()}</div>
+                  <div className="text-xs text-gray-400 mb-4 text-center">
+                    Last: {new Date(m.lastCompleted).toLocaleTimeString()}
+                  </div>
                 )}
-                <div className="mt-2 flex gap-2">
-                  <button onClick={()=> setDraft(d=> ({ ...d, agent: agentName }))} className="flex-1 py-1 text-[11px] rounded bg-[#2A2C33] hover:bg-[#34363F] text-gray-300">Select</button>
-                  <button disabled={m.running>0} onClick={()=> { setDraft({ agent: agentName, action: 'classify' }); void sendCommand(); }} className="flex-1 py-1 text-[11px] rounded bg-[#FFCA40] text-black font-medium disabled:opacity-40">Quick Run</button>
+                
+                <div className="flex gap-3">
+                  <button 
+                    onClick={()=> setDraft(d=> ({ ...d, agent: agentName }))} 
+                    className="flex-1 py-2 text-sm rounded-lg bg-white/10 hover:bg-white/20 text-gray-300 hover:text-white border border-white/20 transition-all duration-200"
+                  >
+                    Select
+                  </button>
+                  <button 
+                    disabled={m.running>0} 
+                    onClick={()=> { setDraft({ agent: agentName, action: 'classify' }); void sendCommand(); }} 
+                    className="flex-1 py-2 text-sm rounded-lg bg-gradient-to-r from-yellow-500 to-amber-500 text-black font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:from-yellow-400 hover:to-amber-400 transition-all duration-200 shadow-lg"
+                  >
+                    Quick Run
+                  </button>
                 </div>
               </div>
             );
           })}
         </section>
 
-  <section className="flex flex-col gap-6" aria-label="Agents command and streaming section">
-    <div className="w-full flex flex-col h-[600px]">
-            <div className="flex items-center gap-2 mb-1" aria-label="Interaction mode selector">
+  <section className="grid lg:grid-cols-3 gap-8" aria-label="Main control panel">
+    <div className="lg:col-span-2 bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-6">
+            <div className="flex items-center gap-4 mb-6" aria-label="Interaction mode selector">
               {['manual','orchestrate'].map(m => (
                 <button
                   key={m}
                   type="button"
                   onClick={()=> setMode(m as typeof mode)}
-                  className={`px-3 py-1.5 rounded text-xs font-semibold border ${mode===m ? 'bg-[#FFCA40] text-black border-[#FFCA40]' : 'bg-[#1E1F25] text-gray-300 border-[#2A2C33] hover:bg-[#2A2C33]'}`}
-                >{m === 'manual' ? 'Manual Commands' : 'Orchestrate Q&A'}</button>
+                  className={`px-6 py-3 rounded-xl text-sm font-semibold transition-all duration-300 ${
+                    mode===m ? 
+                    'bg-gradient-to-r from-purple-500 to-pink-500 text-white shadow-lg transform scale-105' : 
+                    'bg-white/10 text-gray-300 border border-white/20 hover:bg-white/20 hover:text-white'
+                  }`}
+                >
+                  {m === 'manual' ? 'Manual Commands' : 'Orchestrate Q&A'}
+                </button>
               ))}
             </div>
-            <div className="text-[11px] text-gray-500 mb-2">Manual = low-level commands. Orchestrate = natural-language questions routed to agents.</div>
+            
+            <div className="text-sm text-gray-400 mb-6 p-4 bg-black/20 rounded-lg border border-white/10">
+              💡 <strong>Manual:</strong> Low-level agent commands • <strong>Orchestrate:</strong> Natural language questions with smart routing
+            </div>
             {mode === 'manual' ? (
               <CommandComposer
                 connectionState={connectionState}
@@ -428,49 +469,53 @@ const AgentsCommandCenterClient: React.FC = () => {
                 onSubmit={sendCommand}
               />
             ) : (
-              <div className="flex flex-col gap-3">
-                <div className="text-xs text-gray-400">
-                  Ask questions naturally. The orchestrator auto-routes to the best agent (or respects your override).
+              <div className="flex flex-col gap-6">
+                <div className="text-gray-300 p-4 bg-gradient-to-r from-blue-500/10 to-purple-500/10 rounded-xl border border-white/20">
+                  🤖 Ask questions naturally. The orchestrator intelligently routes to the best agent or respects your override selection.
                 </div>
                 <OrchestrateChat messages={chatMessages} isLoading={!!orchestrateDraft.loading} />
-                <div className="relative">
+                <div className="space-y-4">
                   <OrchestrateComposer
                     disabled={connectionState !== 'open'}
                     draft={orchestrateDraft}
                     onChange={setOrchestrateDraft}
                     onSubmit={askOrchestrator}
                   />
-                  <div className="flex flex-wrap gap-2 -mt-2 mb-2" aria-label="Suggested questions">
-                    {[
-                      'How many high risk triage assessments last 7 days?',
-                      'Which user has most concerning assessments last month?',
-                      'High risk percentage past 30 days?',
-                      'Show triage high risk count last week'
-                    ].map(s => (
-                      <button
-                        key={s}
-                        type="button"
-                        onClick={() => setOrchestrateDraft(d => ({ ...d, question: s }))}
-                        className="px-2 py-1 rounded bg-[#1E1F25] border border-[#2A2C33] text-[11px] text-gray-300 hover:bg-[#2A2C33] focus:outline-none focus:ring-1 focus:ring-[#FFCA40]"
-                      >{s}</button>
-                    ))}
+                  <div className="space-y-3">
+                    <div className="text-sm font-medium text-gray-300">💡 Suggested Questions</div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3" aria-label="Suggested questions">
+                      {[
+                        'How many high risk triage assessments last 7 days?',
+                        'Which user has most concerning assessments last month?',
+                        'High risk percentage past 30 days?',
+                        'Show triage high risk count last week'
+                      ].map(s => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setOrchestrateDraft(d => ({ ...d, question: s }))}
+                          className="p-3 rounded-lg bg-white/5 border border-white/20 text-sm text-gray-300 hover:bg-white/10 hover:text-white hover:border-purple-400/50 transition-all duration-200 text-left"
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
                   </div>
                 </div>
               </div>
             )}
             {mode === 'manual' && (
-            <div ref={listRef} className="flex-1 overflow-auto rounded border border-[#2A2C33] bg-[#0F1013] p-3 space-y-4 text-sm" aria-label="Agent event stream grouped by correlation">
+            <div ref={listRef} className="flex-1 overflow-auto rounded-xl border border-white/20 bg-black/20 backdrop-blur-sm p-4 space-y-4 text-sm min-h-[400px]" aria-label="Agent event stream grouped by correlation">
               {Object.entries(grouped).map(([cid, evs]) => (
-                <div key={cid} className="border border-[#2A2C33] rounded p-2 bg-[#14161B]">
-                  <div className="flex items-center justify-between mb-1">
-                    <div className="text-xs text-gray-400 font-mono">Correlation: {cid}</div>
-                    <div className="flex gap-2">
-                      {(() => {
+                <div key={cid} className="border border-white/20 rounded-xl p-4 bg-white/5 backdrop-blur-sm">
+                  <div className="flex items-center justify-between mb-3">
+                    <div className="text-xs text-gray-400 font-mono bg-black/30 px-3 py-1 rounded-full">Correlation: {cid}</div>
+                    <div className="flex gap-2">{(() => {
                         const runStart = evs.find(e=> e.type==='run_started');
                         if(runStart && typeof runStart.runId === 'number'){
                           const runMeta = runs.find(r=> Number(r.id) === runStart.runId);
                           if(runMeta && runMeta.status === 'running'){
-                            return <button onClick={()=> cancelRun(runStart.runId as number)} className="px-2 py-0.5 text-[10px] rounded bg-red-600 text-white hover:bg-red-500">Cancel</button>;
+                            return <button onClick={()=> cancelRun(runStart.runId as number)} className="px-3 py-1 text-xs rounded-lg bg-red-500 text-white hover:bg-red-600 transition-colors">Cancel</button>;
                           }
                         }
                         return null;
@@ -487,25 +532,33 @@ const AgentsCommandCenterClient: React.FC = () => {
                     const answer = (fe as OrchestratorAnswerEvent).answer || fe.result?.answer;
                     const metrics = (fe as OrchestratorAnswerEvent).metrics || fe.result?.metrics;
                     if(!answer) return null;
-                    const colorMap: Record<string,string> = { triage: 'text-amber-300 border-amber-400/40', analytics: 'text-violet-300 border-violet-400/40', intervention: 'text-teal-300 border-teal-400/40' };
+                    const colorMap: Record<string,string> = { 
+                      triage: 'text-amber-300 bg-amber-400/20 border-amber-400/40', 
+                      analytics: 'text-violet-300 bg-violet-400/20 border-violet-400/40', 
+                      intervention: 'text-teal-300 bg-teal-400/20 border-teal-400/40' 
+                    };
                     return (
-                      <div className="mb-2 rounded bg-[#1A2028] border border-[#2A2C33] p-3" role="region" aria-label="Orchestrator answer summary">
-                        <div className="flex items-center justify-between mb-1">
-                          <span className="text-xs text-gray-400 font-semibold">Orchestrator Answer</span>
+                      <div className="mb-4 rounded-xl bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-white/20 p-4 backdrop-blur-sm" role="region" aria-label="Orchestrator answer summary">
+                        <div className="flex items-center justify-between mb-3">
+                          <span className="text-sm text-purple-300 font-semibold flex items-center">
+                            🤖 Orchestrator Response
+                          </span>
                           {resolved ? (
-                            <span className={`px-2 py-0.5 rounded text-[10px] border ${(resolved in colorMap ? colorMap[resolved] : 'text-gray-300 border-gray-500/40')} capitalize`}>Resolved: {resolved}</span>
+                            <span className={`px-3 py-1 rounded-full text-xs font-semibold border ${(resolved in colorMap ? colorMap[resolved] : 'text-gray-300 bg-gray-500/20 border-gray-500/40')} capitalize`}>
+                              {resolved}
+                            </span>
                           ) : null}
                         </div>
-                        <p className="text-sm text-gray-200 whitespace-pre-wrap mb-2">{answer}</p>
+                        <p className="text-sm text-gray-200 whitespace-pre-wrap mb-3 p-3 bg-black/20 rounded-lg">{answer}</p>
                         {metrics && typeof metrics === 'object' && (
-                          <dl className="grid grid-cols-2 gap-x-4 gap-y-1 text-[10px]">
+                          <div className="grid grid-cols-2 gap-3 text-xs">
                             {Object.entries(metrics).filter((entry) => ['string','number','boolean'].includes(typeof entry[1])).map(([k,v]) => (
-                              <React.Fragment key={k}>
-                                <dt className="text-gray-500 truncate" title={k}>{k}</dt>
-                                <dd className="text-gray-300 truncate" title={String(v)}>{String(v)}</dd>
-                              </React.Fragment>
+                              <div key={k} className="flex justify-between p-2 bg-black/20 rounded">
+                                <span className="text-gray-400 truncate font-medium" title={k}>{k}</span>
+                                <span className="text-purple-300 truncate font-mono" title={String(v)}>{String(v)}</span>
+                              </div>
                             ))}
-                          </dl>
+                          </div>
                         )}
                       </div>
                     );
@@ -514,160 +567,288 @@ const AgentsCommandCenterClient: React.FC = () => {
                     const firstTokenIndex = evs.findIndex(ev => ev.type==='token');
                     const showAggregated = e.type==='token' && i===firstTokenIndex && typeof e.correlationId==='string';
                     return (
-                      <div key={i} className="flex gap-2 items-start py-0.5">
-                        <span className="text-[10px] text-gray-500 mt-0.5">{typeof e.ts==='string'? e.ts: ''}</span>
+                      <div key={i} className="flex gap-3 items-start py-2 border-b border-white/10 last:border-b-0">
+                        <span className="text-xs text-gray-500 mt-1 font-mono bg-black/30 px-2 py-1 rounded">{typeof e.ts==='string'? new Date(e.ts).toLocaleTimeString(): ''}</span>
                         {showAggregated ? (
-                          <pre className="flex-1 whitespace-pre-wrap break-words font-mono text-[11px] text-purple-300">{e.correlationId ? aggregatedTokens[String(e.correlationId)] || '' : ''}</pre>
+                          <pre className="flex-1 whitespace-pre-wrap break-words font-mono text-xs text-purple-300 bg-purple-500/10 p-3 rounded-lg border border-purple-500/20">{e.correlationId ? aggregatedTokens[String(e.correlationId)] || '' : ''}</pre>
                         ) : e.type==='token' ? null : (
-                          <pre className={`flex-1 whitespace-pre-wrap break-words font-mono text-[11px] ${e.type === 'error' ? 'text-red-400' : e.type === 'run_started' ? 'text-green-400' : e.type === 'run_completed' ? 'text-blue-300' : e.type === 'run_cancelled' ? 'text-yellow-400' : 'text-gray-200'}`}>{JSON.stringify(e, null, 2)}</pre>
+                          <pre className={`flex-1 whitespace-pre-wrap break-words font-mono text-xs p-3 rounded-lg border ${
+                            e.type === 'error' ? 'text-red-300 bg-red-500/10 border-red-500/20' : 
+                            e.type === 'run_started' ? 'text-green-300 bg-green-500/10 border-green-500/20' : 
+                            e.type === 'run_completed' ? 'text-blue-300 bg-blue-500/10 border-blue-500/20' : 
+                            e.type === 'run_cancelled' ? 'text-yellow-300 bg-yellow-500/10 border-yellow-500/20' : 
+                            'text-gray-300 bg-white/5 border-white/10'
+                          }`}>{JSON.stringify(e, null, 2)}</pre>
                         )}
                         {e.type==='run_completed' && evs.some(ev=> ev.type==='run_started' && typeof ev.runId==='number' && runs.find(r=> Number(r.id)===ev.runId && r.status==='failed')) && (
                           <button onClick={()=> {
                             const rs = evs.find(ev=> ev.type==='run_started');
                             if(rs && typeof rs.runId==='number') retryRun(rs.runId);
-                          }} className="ml-2 px-1.5 py-0.5 text-[10px] rounded bg-yellow-600 text-white hover:bg-yellow-500">Retry</button>
+                          }} className="ml-3 px-3 py-1 text-xs rounded-lg bg-yellow-500 text-black hover:bg-yellow-400 transition-colors font-medium">Retry</button>
                         )}
                       </div>
                     );
                   })}
                 </div>
               ))}
-              {events.length===0 && <div className="text-gray-500 text-sm">No events yet. Dispatch a command to begin.</div>}
+              {events.length===0 && (
+                <div className="text-center py-12">
+                  <div className="text-6xl mb-4">🚀</div>
+                  <div className="text-gray-400 text-lg">No events yet</div>
+                  <div className="text-gray-500 text-sm mt-2">Dispatch a command to begin monitoring agent activity</div>
+                </div>
+              )}
             </div>
             )}
           </div>
-          <aside className="space-y-4 w-full">
-            <div className="p-4 rounded-lg bg-[#1E1F25] border border-[#2A2C33]">
-              <h2 className="text-sm font-semibold text-white mb-2">Instructions</h2>
-              <ul className="text-xs text-gray-400 space-y-1 list-disc pl-4">
-                <li>Select an agent and action.</li>
-                <li>Optional: provide JSON payload.</li>
-                <li>Click Dispatch to create a run.</li>
-                <li>Events will stream in real time.</li>
+          
+          <aside className="space-y-6">
+            <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-6">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
+                📋 Quick Instructions
+              </h2>
+              <ul className="text-sm text-gray-300 space-y-3">
+                <li className="flex items-start gap-3">
+                  <span className="w-2 h-2 bg-purple-400 rounded-full mt-2 flex-shrink-0"></span>
+                  Select an agent and action from the dropdown menus
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="w-2 h-2 bg-purple-400 rounded-full mt-2 flex-shrink-0"></span>
+                  Optionally provide JSON payload for complex operations
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="w-2 h-2 bg-purple-400 rounded-full mt-2 flex-shrink-0"></span>
+                  Click Dispatch to create and monitor the run
+                </li>
+                <li className="flex items-start gap-3">
+                  <span className="w-2 h-2 bg-purple-400 rounded-full mt-2 flex-shrink-0"></span>
+                  Real-time events will stream automatically
+                </li>
               </ul>
             </div>
             {/* Orchestrate primer */}
-            <div className="p-4 rounded-lg bg-[#1E1F25] border border-[#2A2C33]">
-              <h2 className="text-sm font-semibold text-white mb-2">Orchestrate — What is this?</h2>
-              <p className="text-xs text-gray-400">
-                Ask questions in natural language, like you would with a data analyst. The orchestrator auto-selects the right agent based on your request (or use Route to force an agent).
+            <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 backdrop-blur-lg border border-white/10 rounded-xl p-6">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
+                🤖 About Orchestrate Mode
+              </h2>
+              <p className="text-sm text-gray-300 mb-4">
+                Ask questions in natural language, like chatting with a data analyst. The orchestrator intelligently selects the right agent based on your request.
               </p>
-              <ul className="mt-2 text-xs text-gray-400 space-y-1 list-disc pl-4">
-                <li><span className="text-gray-300">Triage</span> — risk classification and assessment stats.</li>
-                <li><span className="text-gray-300">Analytics</span> — aggregations, trends, and summaries.</li>
-                <li><span className="text-gray-300">Intervention</span> — follow-ups and suggested actions.</li>
-              </ul>
-            </div>
-            <div className="p-4 rounded-lg bg-[#1E1F25] border border-[#2A2C33] flex flex-col gap-2">
-              <div className="flex items-center justify-between">
-                <h2 className="text-sm font-semibold text-white">Recent Runs</h2>
-                <button onClick={()=> refreshRuns()} className="text-xs text-gray-400 hover:text-white">↻</button>
+              <div className="space-y-3">
+                <div className="flex items-center gap-3 p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
+                  <div className="w-3 h-3 bg-amber-400 rounded-full flex-shrink-0"></div>
+                  <div>
+                    <span className="text-amber-300 font-medium">Triage</span>
+                    <span className="text-gray-400 ml-2">Risk classification & assessment statistics</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-violet-500/10 rounded-lg border border-violet-500/20">
+                  <div className="w-3 h-3 bg-violet-400 rounded-full flex-shrink-0"></div>
+                  <div>
+                    <span className="text-violet-300 font-medium">Analytics</span>
+                    <span className="text-gray-400 ml-2">Data aggregations, trends & summaries</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3 p-3 bg-teal-500/10 rounded-lg border border-teal-500/20">
+                  <div className="w-3 h-3 bg-teal-400 rounded-full flex-shrink-0"></div>
+                  <div>
+                    <span className="text-teal-300 font-medium">Intervention</span>
+                    <span className="text-gray-400 ml-2">Follow-ups & recommended actions</span>
+                  </div>
+                </div>
               </div>
-              <ul className="space-y-1 max-h-56 overflow-auto text-[11px] font-mono">
+            </div>
+            <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-white flex items-center">
+                  🔄 Recent Runs
+                </h2>
+                <button onClick={()=> refreshRuns()} className="text-gray-400 hover:text-white transition-colors p-2 hover:bg-white/10 rounded-lg">
+                  ↻
+                </button>
+              </div>
+              <div className="space-y-2 max-h-64 overflow-auto">
                 {runs.filter(r => agentFilter==='all' || r.agent === agentFilter).map(r => {
-                  const badgeColor = r.status==='succeeded' ? 'bg-green-600/30 text-green-300 border-green-600/40' : r.status==='running' ? 'bg-blue-600/20 text-blue-300 border-blue-500/40 animate-pulse' : r.status==='cancelled' ? 'bg-yellow-700/20 text-yellow-400 border-yellow-600/40' : 'bg-gray-600/20 text-gray-300 border-gray-600/40';
+                  const badgeStyles = {
+                    succeeded: 'bg-green-500/20 text-green-300 border-green-500/40',
+                    running: 'bg-blue-500/20 text-blue-300 border-blue-500/40 animate-pulse',
+                    cancelled: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/40',
+                    failed: 'bg-red-500/20 text-red-300 border-red-500/40'
+                  };
+                  const badgeColor = badgeStyles[r.status as keyof typeof badgeStyles] || 'bg-gray-500/20 text-gray-300 border-gray-500/40';
                   const active = selectedRunId === Number(r.id);
                   return (
-                    <li key={r.id}>
-                      <button onClick={()=> { setSelectedRunId(Number(r.id)); void loadMessages(Number(r.id)); }} className={`w-full text-left flex justify-between items-center gap-2 px-2 py-1 rounded border ${active ? 'border-[#FFCA40] bg-[#2A2C33]' : 'border-transparent hover:bg-[#2A2C33]/60'}`}>
-                        <span className="truncate">{r.agent}.{r.action}</span>
-                        <span className={`px-1.5 py-0.5 rounded border text-[10px] uppercase tracking-wide ${badgeColor}`}>{r.status}</span>
-                      </button>
-                    </li>
+                    <button 
+                      key={r.id}
+                      onClick={()=> { setSelectedRunId(Number(r.id)); void loadMessages(Number(r.id)); }} 
+                      className={`w-full text-left flex justify-between items-center gap-3 p-3 rounded-lg border transition-all duration-200 ${
+                        active ? 
+                        'border-purple-400/60 bg-purple-500/10 shadow-lg' : 
+                        'border-white/10 hover:bg-white/10 hover:border-white/20'
+                      }`}
+                    >
+                      <span className="text-gray-300 font-mono text-sm truncate">{r.agent}.{r.action}</span>
+                      <span className={`px-2 py-1 rounded-full border text-xs font-semibold tracking-wide ${badgeColor}`}>
+                        {r.status}
+                      </span>
+                    </button>
                   );
                 })}
-                {runs.length===0 && <li className="text-gray-500">No history</li>}
-              </ul>
-              {selectedRunId && (
-                <div className="mt-2 border-t border-[#2A2C33] pt-2">
-                  <div className="flex items-center justify-between mb-1">
-                    <h3 className="text-xs font-semibold text-gray-300">Run Messages</h3>
-                    {loadingMessages && <span className="text-[10px] text-gray-500">loading…</span>}
+                {runs.length===0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="text-2xl mb-2">📝</div>
+                    <div className="text-sm">No run history</div>
                   </div>
-                  <div className="max-h-40 overflow-auto space-y-1 text-[11px] font-mono">
+                )}
+              </div>
+              {selectedRunId && (
+                <div className="mt-4 border-t border-white/20 pt-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <h3 className="text-sm font-semibold text-gray-300">📨 Run Messages</h3>
+                    {loadingMessages && <span className="text-xs text-gray-500 animate-pulse">Loading...</span>}
+                  </div>
+                  <div className="max-h-40 overflow-auto space-y-2">
                     {selectedRunMessages.map(m => (
-                      <div key={m.id} className="flex gap-1">
-                        <span className="text-gray-500">{m.type}</span>
-                        <span className="truncate flex-1">{m.content}</span>
+                      <div key={m.id} className="flex gap-3 p-2 bg-black/20 rounded-lg border border-white/10">
+                        <span className="text-xs text-purple-400 font-medium bg-purple-500/20 px-2 py-1 rounded">{m.type}</span>
+                        <span className="text-xs text-gray-300 flex-1 break-words font-mono">{m.content}</span>
                       </div>
                     ))}
-                    {selectedRunMessages.length===0 && !loadingMessages && <div className="text-gray-500">No messages</div>}
+                    {selectedRunMessages.length===0 && !loadingMessages && (
+                      <div className="text-center py-4 text-gray-500">
+                        <div className="text-xl mb-1">💬</div>
+                        <div className="text-xs">No messages</div>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
             </div>
             {/* Orchestrator Q&A History */}
-            <div className="p-4 rounded-lg bg-[#1E1F25] border border-[#2A2C33]">
-              <h2 className="text-sm font-semibold text-white mb-2">Orchestrator Q&A History</h2>
-              <ul className="space-y-2 max-h-64 overflow-auto text-[11px]">
-                {orchestratorHistory.length === 0 && <li className="text-gray-500">No Q&A yet</li>}
+            <div className="bg-gradient-to-br from-green-500/10 to-blue-500/10 backdrop-blur-lg border border-white/10 rounded-xl p-6">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
+                💬 Q&A History
+              </h2>
+              <div className="space-y-3 max-h-64 overflow-auto">
+                {orchestratorHistory.length === 0 && (
+                  <div className="text-center py-8 text-gray-500">
+                    <div className="text-2xl mb-2">🤖</div>
+                    <div className="text-sm">No conversations yet</div>
+                    <div className="text-xs mt-1">Start asking questions to see history</div>
+                  </div>
+                )}
                 {orchestratorHistory.map((h,i) => (
-                  <li key={(h.runId || i) + String(h.correlationId)} className="border border-[#2A2C33] rounded p-2 bg-[#14161B]">
-                    <div className="flex items-center justify-between mb-1">
-                      <span className="text-[10px] text-gray-500">{new Date(h.createdAt).toLocaleTimeString()}</span>
-                      {h.resolvedAgent && <span className="text-[10px] uppercase text-gray-400">{h.resolvedAgent}</span>}
+                  <div key={(h.runId || i) + String(h.correlationId)} className="border border-white/20 rounded-lg p-4 bg-white/5 backdrop-blur-sm">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-xs text-gray-400 font-mono bg-black/30 px-2 py-1 rounded">
+                        {new Date(h.createdAt).toLocaleTimeString()}
+                      </span>
+                      {h.resolvedAgent && (
+                        <span className="text-xs font-semibold text-purple-300 bg-purple-500/20 px-2 py-1 rounded-full">
+                          {h.resolvedAgent}
+                        </span>
+                      )}
                     </div>
-                    {h.question && <p className="text-[11px] text-gray-300 mb-1 line-clamp-3 break-words">Q: {h.question}</p>}
-                    {h.answer && <p className="text-[11px] text-gray-200 line-clamp-4 break-words">A: {h.answer}</p>}
-                  </li>
-                ))}
-              </ul>
-            </div>
-            {/* Correlation Mapping */}
-            <div className="p-4 rounded-lg bg-[#1E1F25] border border-[#2A2C33]">
-              <h2 className="text-sm font-semibold text-white mb-2">Correlation Mapping</h2>
-              <div className="max-h-48 overflow-auto">
-                <table className="w-full text-[10px] text-left">
-                  <thead className="text-gray-500">
-                    <tr>
-                      <th className="py-1 pr-2 font-medium">RunId</th>
-                      <th className="py-1 pr-2 font-medium">Correlation</th>
-                      <th className="py-1 pr-2 font-medium">Resolved</th>
-                      <th className="py-1 pr-2 font-medium">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {correlationRows.length === 0 && (
-                      <tr><td colSpan={4} className="py-2 text-gray-500">No mappings</td></tr>
+                    {h.question && (
+                      <div className="mb-3">
+                        <div className="text-xs text-gray-400 mb-1">Question:</div>
+                        <p className="text-sm text-gray-300 bg-black/20 p-2 rounded border border-white/10">{h.question}</p>
+                      </div>
                     )}
-                    {correlationRows.map((r,i) => (
-                      <tr key={(r.runId || i) + (r.correlationId || '')} className="border-t border-[#2A2C33]">
-                        <td className="py-1 pr-2 text-gray-300">{r.runId ?? '-'}</td>
-                        <td className="py-1 pr-2 text-gray-400 font-mono truncate max-w-[90px]" title={r.correlationId}>{r.correlationId || '-'}</td>
-                        <td className="py-1 pr-2 text-gray-300">{r.resolvedAgent || '-'}</td>
-                        <td className="py-1 pr-2 text-gray-300">{r.status || '-'}</td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    {h.answer && (
+                      <div>
+                        <div className="text-xs text-gray-400 mb-1">Answer:</div>
+                        <p className="text-sm text-gray-200 bg-gradient-to-r from-blue-500/10 to-purple-500/10 p-2 rounded border border-white/10">{h.answer}</p>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
-            <div className="p-4 rounded-lg bg-[#1E1F25] border border-[#2A2C33]">
-              <h2 className="text-sm font-semibold text-white mb-2">Next Steps (Planned)</h2>
-              <ul className="text-xs text-gray-400 space-y-1 list-disc pl-4">
-                <li>Token streaming</li>
-                <li>Per-agent status panels</li>
-                <li>Run history & persistence</li>
-                <li>Cancellation & retries</li>
-              </ul>
+            {/* Correlation Mapping */}
+            <div className="bg-white/5 backdrop-blur-lg border border-white/10 rounded-xl p-6">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
+                🔗 Correlation Mapping
+              </h2>
+              <div className="max-h-48 overflow-auto">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className="text-gray-400 border-b border-white/20">
+                      <tr>
+                        <th className="py-2 pr-4 font-medium text-left">Run ID</th>
+                        <th className="py-2 pr-4 font-medium text-left">Correlation</th>
+                        <th className="py-2 pr-4 font-medium text-left">Agent</th>
+                        <th className="py-2 pr-4 font-medium text-left">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {correlationRows.length === 0 && (
+                        <tr>
+                          <td colSpan={4} className="py-8 text-center text-gray-500">
+                            <div className="text-2xl mb-2">🔄</div>
+                            <div className="text-sm">No correlations yet</div>
+                          </td>
+                        </tr>
+                      )}
+                      {correlationRows.map((r,i) => (
+                        <tr key={(r.runId || i) + (r.correlationId || '')} className="border-b border-white/10 hover:bg-white/5">
+                          <td className="py-2 pr-4 text-gray-300 font-mono">{r.runId ?? '-'}</td>
+                          <td className="py-2 pr-4 text-gray-400 font-mono truncate max-w-[120px]" title={r.correlationId}>
+                            {r.correlationId ? (
+                              <span className="bg-black/30 px-2 py-1 rounded text-xs">{r.correlationId.slice(0, 8)}...</span>
+                            ) : '-'}
+                          </td>
+                          <td className="py-2 pr-4 text-gray-300">
+                            {r.resolvedAgent ? (
+                              <span className="bg-purple-500/20 text-purple-300 px-2 py-1 rounded text-xs font-medium">
+                                {r.resolvedAgent}
+                              </span>
+                            ) : '-'}
+                          </td>
+                          <td className="py-2 pr-4 text-gray-300">{r.status || '-'}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gradient-to-br from-yellow-500/10 to-orange-500/10 backdrop-blur-lg border border-white/10 rounded-xl p-6">
+              <h2 className="text-lg font-semibold text-white mb-4 flex items-center">
+                🚀 Roadmap
+              </h2>
+              <div className="space-y-3">
+                {[
+                  { icon: '⚡', text: 'Enhanced token streaming performance' },
+                  { icon: '📊', text: 'Advanced agent status dashboards' },
+                  { icon: '💾', text: 'Persistent run history & analytics' },
+                  { icon: '🔄', text: 'Improved cancellation & retry logic' }
+                ].map((item, index) => (
+                  <div key={index} className="flex items-center gap-3 p-3 bg-black/20 rounded-lg border border-white/10">
+                    <span className="text-lg">{item.icon}</span>
+                    <span className="text-sm text-gray-300">{item.text}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </aside>
         </section>
 
-        <section className="mt-4" aria-label="Agents configuration visualization">
-          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4">
+        <section className="mt-8 bg-white/5 backdrop-blur-lg border border-white/10 rounded-2xl p-8" aria-label="Agents configuration visualization">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-6 mb-6">
             <div>
-              <h2 className="text-2xl font-bold text-white flex items-center">
-                <FiGitMerge className="mr-3 text-[#FFCA40]" />
+              <h2 className="text-3xl font-bold bg-gradient-to-r from-green-400 to-blue-400 bg-clip-text text-transparent flex items-center">
+                <FiGitMerge className="mr-4 text-green-400 text-4xl" />
                 Agents Configuration
               </h2>
-              <p className="text-gray-400 mt-1 text-sm">Visualize and inspect LangGraph agent flows.</p>
+              <p className="text-gray-300 mt-2 text-lg">Visualize and inspect LangGraph agent flows and dependencies.</p>
             </div>
           </div>
-          <div className="rounded-lg border border-[#2A2C33] bg-[#0F1013] p-4">
+          <div className="rounded-xl border border-white/20 bg-black/20 backdrop-blur-sm p-6">
             <LangGraphViewer />
           </div>
         </section>
+        </div>
       </div>
     </AccessGuard>
   );

@@ -36,17 +36,22 @@ const OrchestrateComposer: React.FC<Props> = ({ disabled, draft, onChange, onSub
   }, [draft.question]);
 
   return (
-    <div className="flex flex-col gap-2 mb-3" aria-label="Natural language orchestrator input section">
-      <div className="flex items-center justify-between">
-        <div className="text-xs text-gray-400 font-mono">Mode: <span className="text-white">Orchestrate</span></div>
-        <div className="text-[10px] text-gray-500">Enter to submit • Shift+Enter newline</div>
+    <div className="flex flex-col gap-4" aria-label="Natural language orchestrator input section">
+      <div className="flex items-center justify-between p-3 bg-black/20 rounded-lg border border-white/10">
+        <div className="text-sm text-purple-300 font-medium flex items-center gap-2">
+          🤖 <span>Orchestrate Mode</span>
+        </div>
+        <div className="text-xs text-gray-400">Enter to submit • Shift+Enter for newline</div>
       </div>
-      <div className="flex gap-2 items-start">
+      
+      <div className="flex gap-4 items-start">
         <div className="flex-1 relative">
           <textarea
             ref={taRef}
-            className={`w-full resize-none leading-relaxed bg-[#1E1F25] border ${draft.error ? 'border-red-500' : 'border-[#2A2C33]'} rounded px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#FFCA40] min-h-[70px] max-h-[200px]`}
-            placeholder="Ask a question... e.g. How many high risk triage assessments last week?"
+            className={`w-full resize-none leading-relaxed bg-black/30 backdrop-blur-sm border ${
+              draft.error ? 'border-red-400' : 'border-white/20'
+            } rounded-xl px-4 py-3 text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent min-h-[80px] max-h-[200px] transition-all duration-200`}
+            placeholder="💬 Ask a question... e.g., How many high risk triage assessments last week?"
             value={draft.question}
             onChange={e=> setQuestion(e.target.value.slice(0,500))}
             onKeyDown={e=> {
@@ -54,31 +59,40 @@ const OrchestrateComposer: React.FC<Props> = ({ disabled, draft, onChange, onSub
             }}
             aria-label="Orchestrator natural language question input"
           />
-          {draft.error && <div className="absolute -bottom-5 left-0 text-[10px] text-red-400">{draft.error}</div>}
+          {draft.error && (
+            <div className="absolute -bottom-6 left-0 text-xs text-red-400 bg-red-500/10 px-2 py-1 rounded border border-red-500/20">
+              {draft.error}
+            </div>
+          )}
         </div>
-        <div className="w-40 flex flex-col gap-1" aria-label="Agent override selector">
-          <label className="text-[10px] uppercase tracking-wide text-gray-500">Route</label>
+        
+        <div className="w-48 bg-white/5 backdrop-blur-sm border border-white/20 rounded-xl p-4" aria-label="Agent override selector">
+          <label className="text-xs font-medium text-gray-300 mb-2 block">🎯 Route Control</label>
           <select
-            className="bg-[#1E1F25] border border-[#2A2C33] rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 focus:ring-[#FFCA40]"
+            className="w-full bg-black/30 border border-white/20 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:ring-2 focus:ring-purple-400 focus:border-transparent mb-3"
             value={draft.agentOverride}
             onChange={e=> onChange({ ...draft, agentOverride: e.target.value as OrchestrateDraft['agentOverride'] })}
             aria-label="Agent override"
           >
-            <option value="auto">Auto</option>
-            <option value="triage">Triage</option>
-            <option value="analytics">Analytics</option>
-            <option value="intervention" disabled>Intervention (soon)</option>
+            <option value="auto">🤖 Auto-Route</option>
+            <option value="triage">🏥 Triage</option>
+            <option value="analytics">📊 Analytics</option>
+            <option value="intervention" disabled>🎯 Intervention (soon)</option>
           </select>
+          
           <button
             onClick={handleSubmit}
             disabled={disabled || draft.loading}
-            className="mt-2 px-3 py-2 rounded bg-[#FFCA40] text-black text-xs font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:brightness-110 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-[#FFCA40]"
+            className="w-full px-4 py-3 rounded-lg bg-gradient-to-r from-purple-500 to-pink-500 text-white text-sm font-semibold disabled:opacity-40 disabled:cursor-not-allowed hover:from-purple-400 hover:to-pink-400 focus:outline-none focus:ring-2 focus:ring-purple-400 transition-all duration-200 shadow-lg"
           >
-            {draft.loading ? 'Asking…' : 'Ask Orchestrator'}
+            {draft.loading ? '🔄 Processing...' : '🚀 Ask Orchestrator'}
           </button>
         </div>
       </div>
-      <div className="text-[10px] text-gray-500">The orchestrator will auto-route or use your selected agent.</div>
+      
+      <div className="text-sm text-gray-400 p-3 bg-blue-500/10 rounded-lg border border-blue-500/20">
+        💡 The orchestrator intelligently routes questions to the most suitable agent or uses your manual selection.
+      </div>
     </div>
   );
 };

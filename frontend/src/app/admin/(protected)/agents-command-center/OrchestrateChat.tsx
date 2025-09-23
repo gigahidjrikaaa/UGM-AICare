@@ -19,9 +19,9 @@ interface Props {
 }
 
 const pillColor: Record<string, string> = {
-  triage: "bg-amber-500/15 text-amber-300 border border-amber-400/30",
-  analytics: "bg-violet-500/15 text-violet-300 border border-violet-400/30",
-  intervention: "bg-teal-500/15 text-teal-300 border border-teal-400/30",
+  triage: "bg-amber-500/20 text-amber-300 border border-amber-400/40 backdrop-blur-sm",
+  analytics: "bg-violet-500/20 text-violet-300 border border-violet-400/40 backdrop-blur-sm",
+  intervention: "bg-teal-500/20 text-teal-300 border border-teal-400/40 backdrop-blur-sm",
 };
 
 const OrchestrateChat: React.FC<Props> = ({ messages, isLoading }) => {
@@ -34,15 +34,17 @@ const OrchestrateChat: React.FC<Props> = ({ messages, isLoading }) => {
   }, [messages]);
 
   return (
-    <div className="flex flex-col h-[540px] rounded border border-[#2A2C33] bg-[#0F1013]">
+    <div className="flex flex-col h-[540px] rounded-xl border border-white/20 bg-black/20 backdrop-blur-sm shadow-2xl">
       <div
         ref={scrollerRef}
-        className="flex-1 overflow-auto p-3 space-y-3"
+        className="flex-1 overflow-auto p-6 space-y-4"
         aria-label="Orchestrator chat transcript"
       >
         {messages.length === 0 && (
-          <div className="text-gray-500 text-sm">
-            Ask a question to get started.
+          <div className="text-center py-12">
+            <div className="text-6xl mb-4">💬</div>
+            <div className="text-gray-400 text-lg">Ready to chat!</div>
+            <div className="text-gray-500 text-sm mt-2">Ask a question to get started with the AI orchestrator</div>
           </div>
         )}
         {messages.map((m) => {
@@ -51,40 +53,49 @@ const OrchestrateChat: React.FC<Props> = ({ messages, isLoading }) => {
           const resolved = typeof m.resolvedAgent === "string" ? m.resolvedAgent : undefined;
           return (
             <div key={m.id} className={`flex ${isUser ? "justify-end" : "justify-start"}`}>
-              <div className={`max-w-[85%] rounded-lg px-3 py-2 ${isUser ? "bg-[#1E1F25] text-white" : "bg-[#14161B] text-gray-100"}`}>
-                <div className="text-[10px] text-gray-500 mb-0.5">
-                  {new Date(m.ts).toLocaleTimeString()}
+              <div className={`max-w-[85%] rounded-2xl px-4 py-3 shadow-lg ${
+                isUser ? 
+                "bg-gradient-to-r from-purple-500 to-pink-500 text-white" : 
+                "bg-white/10 backdrop-blur-md border border-white/20 text-gray-100"
+              }`}>
+                <div className="text-xs text-gray-300 mb-2 flex items-center gap-2">
+                  <span>{isUser ? "👤 You" : "🤖 Assistant"}</span>
+                  <span>•</span>
+                  <span>{new Date(m.ts).toLocaleTimeString()}</span>
                 </div>
-                <div className="whitespace-pre-wrap break-words text-sm">
+                <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
                   {m.content}
                 </div>
                 {isAssistant && (
-                  <div className="mt-2 flex items-center gap-2">
+                  <div className="mt-3 flex items-center gap-2 flex-wrap">
                     {resolved && (
-                      <span className={`text-[10px] px-2 py-0.5 rounded ${pillColor[resolved] || "bg-gray-700/40 text-gray-300 border border-gray-600/40"}`}
+                      <span className={`text-xs px-3 py-1 rounded-full ${pillColor[resolved] || "bg-gray-500/20 text-gray-300 border border-gray-600/40"} font-medium`}
                         title="Agent selected by orchestrator"
                       >
-                        Resolved: {resolved}
+                        🎯 {resolved}
                       </span>
                     )}
                     {m.pending && (
-                      <span className="text-[10px] text-gray-400">thinking…</span>
+                      <span className="text-xs text-purple-300 flex items-center gap-2 bg-purple-500/20 px-3 py-1 rounded-full border border-purple-500/30">
+                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
+                        Processing...
+                      </span>
                     )}
                   </div>
                 )}
                 {isAssistant && m.metrics && typeof m.metrics === "object" && (
-                  <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1 text-[10px] text-gray-300">
+                  <div className="mt-3 grid grid-cols-2 gap-2 p-3 bg-black/20 rounded-lg border border-white/10">
                     {Object.entries(m.metrics)
                       .filter(([, v]) => ["string", "number", "boolean"].includes(typeof v))
                       .map(([k, v]) => (
-                        <React.Fragment key={k}>
-                          <div className="text-gray-500 truncate" title={k}>
+                        <div key={k} className="flex justify-between text-xs">
+                          <span className="text-gray-400 truncate font-medium" title={k}>
                             {k}
-                          </div>
-                          <div className="truncate" title={String(v)}>
+                          </span>
+                          <span className="text-purple-300 truncate font-mono" title={String(v)}>
                             {String(v)}
-                          </div>
-                        </React.Fragment>
+                          </span>
+                        </div>
                       ))}
                   </div>
                 )}
@@ -94,9 +105,15 @@ const OrchestrateChat: React.FC<Props> = ({ messages, isLoading }) => {
         })}
       </div>
       {isLoading && (
-        <div className="p-2 border-t border-[#2A2C33] bg-black/30 text-xs text-gray-400 flex items-center gap-2">
-          <div className="h-4 w-4 border-2 border-[#FFCA40] border-t-transparent rounded-full animate-spin" />
-          Routing & analyzing…
+        <div className="p-4 border-t border-white/20 bg-gradient-to-r from-purple-500/10 to-blue-500/10 backdrop-blur-sm">
+          <div className="flex items-center gap-3">
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce"></div>
+              <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce delay-75"></div>
+              <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce delay-150"></div>
+            </div>
+            <span className="text-sm text-purple-300 font-medium">AI is thinking and routing your question...</span>
+          </div>
         </div>
       )}
     </div>
