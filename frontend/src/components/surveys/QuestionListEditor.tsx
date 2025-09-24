@@ -34,6 +34,12 @@ export const QuestionListEditor: React.FC<QuestionListEditorProps> = ({
   // Local buffered text values to avoid parent state churn on every keystroke
   const [localTexts, setLocalTexts] = useState<string[]>(() => questions.map(q => q.question_text));
   const [dirty, setDirty] = useState<boolean[]>(() => questions.map(() => false));
+  
+  // Local buffered option inputs to avoid focus loss on every keystroke
+  const [localOptionInputs, setLocalOptionInputs] = useState<string[]>(() => [...optionInputs]);
+  
+  // Local buffered rating values to avoid focus loss
+  const [localRatingValues, setLocalRatingValues] = useState<Record<string, string>>({});
 
   // Sync when questions array shape changes (add/remove) or when upstream changes replace objects
   useEffect(() => {
@@ -57,6 +63,16 @@ export const QuestionListEditor: React.FC<QuestionListEditorProps> = ({
       return next;
     });
   }, [questions, dirty]);
+
+  // Sync local option inputs with parent when optionInputs changes
+  useEffect(() => {
+    setLocalOptionInputs(prev => {
+      if (prev.length === optionInputs.length && prev.every((v, i) => v === optionInputs[i])) {
+        return prev; // no change needed
+      }
+      return [...optionInputs];
+    });
+  }, [optionInputs]);
 
   const commitQuestionText = useCallback((index: number) => {
     const current = questions[index];
@@ -96,17 +112,69 @@ export const QuestionListEditor: React.FC<QuestionListEditorProps> = ({
     }
   };
 
-  const handleRatingScale = (index: number, key: 'min'|'max', value: number) => {
+  // Handle option input changes with local buffering
+  const handleOptionInputChange = useCallback((index: number, value: string) => {
+    setLocalOptionInputs(prev => prev.map((v, i) => i === index ? value : v));
+  }, []);
+
+  // Commit option input to parent (on blur or enter)
+  const commitOptionInput = useCallback((index: number) => {
+    const localValue = localOptionInputs[index];
+    if (localValue === optionInputs[index]) return; // no change
+    onOptionInputsChange(localOptionInputs.map((v, i) => i === index ? localValue : v));
+  }, [localOptionInputs, optionInputs, onOptionInputsChange]);
+
+  // Handle rating scale changes with local buffering
+  const handleRatingInputChange = useCallback((index: number, key: 'min'|'max', value: string) => {
+    const ratingKey = `${index}-${key}`;
+    setLocalRatingValues(prev => ({ ...prev, [ratingKey]: value }));
+  }, []);
+
+  // Commit rating value to parent (on blur or enter)
+  const commitRatingValue = useCallback((index: number, key: 'min'|'max') => {
+    const ratingKey = `${index}-${key}`;
+    const localValue = localRatingValues[ratingKey];
+    if (localValue === undefined) return; // no local edit in progress
+    
+    const numValue = Number(localValue);
+    if (isNaN(numValue)) {
+      // Invalid number, revert to original value
+      setLocalRatingValues(prev => {
+        const next = { ...prev };
+        delete next[ratingKey];
+        return next;
+      });
+      return;
+    }
+
     const prev = questions;
     const target = prev[index];
     if (!target || target.question_type !== 'rating') return;
     const existing = target.options.scale;
-    if (existing[key] === value) return;
-    const updated: RatingQuestionDraft = { ...target, options: { scale: { ...existing, [key]: value } } };
+    if (existing[key] === numValue) {
+      // No change, just clear local state
+      setLocalRatingValues(prev => {
+        const next = { ...prev };
+        delete next[ratingKey];
+        return next;
+      });
+      return;
+    }
+    
+    const updated: RatingQuestionDraft = { ...target, options: { scale: { ...existing, [key]: numValue } } };
     const newArr = [...prev];
     newArr[index] = updated;
     onQuestionsChange(newArr);
-  };
+    
+    // Clear local value after commit
+    setLocalRatingValues(prev => {
+      const next = { ...prev };
+      delete next[ratingKey];
+      return next;
+    });
+  }, [localRatingValues, questions, onQuestionsChange]);
+
+
 
   return (
     <div>
@@ -148,8 +216,10 @@ export const QuestionListEditor: React.FC<QuestionListEditorProps> = ({
               <div className="flex items-center gap-2">
                 <input
                   type="text"
-                  value={optionInputs[i] || ''}
-                  onChange={(e) => onOptionInputsChange(optionInputs.map((v, idx) => idx === i ? e.target.value : v))}
+                  value={localOptionInputs[i] || ''}
+                  onChange={(e) => handleOptionInputChange(i, e.target.value)}
+                  onBlur={() => commitOptionInput(i)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitOptionInput(i); } }}
                   placeholder="Add an option"
                   className="flex-1 px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none"
                 />
@@ -171,16 +241,20 @@ export const QuestionListEditor: React.FC<QuestionListEditorProps> = ({
             <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
               <input
                 type="number"
-                value={q.options.scale.min}
-                onChange={(e) => handleRatingScale(i, 'min', Number(e.target.value))}
+                value={localRatingValues[`${i}-min`] ?? q.options.scale.min}
+                onChange={(e) => handleRatingInputChange(i, 'min', e.target.value)}
+                onBlur={() => commitRatingValue(i, 'min')}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitRatingValue(i, 'min'); } }}
                 className="w-full px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white"
                 aria-label="Rating scale minimum"
                 placeholder="Min"
               />
               <input
                 type="number"
-                value={q.options.scale.max}
-                onChange={(e) => handleRatingScale(i, 'max', Number(e.target.value))}
+                value={localRatingValues[`${i}-max`] ?? q.options.scale.max}
+                onChange={(e) => handleRatingInputChange(i, 'max', e.target.value)}
+                onBlur={() => commitRatingValue(i, 'max')}
+                onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); commitRatingValue(i, 'max'); } }}
                 className="w-full px-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white"
                 aria-label="Rating scale maximum"
                 placeholder="Max"

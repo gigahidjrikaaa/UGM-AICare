@@ -56,11 +56,13 @@ class SurveyQuestionCreate(BaseModel):
 class SurveyCreate(BaseModel):
     title: str
     description: Optional[str] = None
+    category: Optional[str] = None
     questions: List[SurveyQuestionCreate]
 
 class SurveyUpdate(BaseModel):
     title: Optional[str] = None
     description: Optional[str] = None
+    category: Optional[str] = None
     is_active: Optional[bool] = None
 
 class SurveyQuestionUpsert(BaseModel):
@@ -82,6 +84,7 @@ class SurveyResponseModel(BaseModel):
     id: int
     title: str
     description: Optional[str] = None
+    category: Optional[str] = None
     is_active: bool
     created_at: datetime
     updated_at: datetime
@@ -98,7 +101,7 @@ async def get_surveys(db: AsyncSession = Depends(get_async_db)):
 
 @router.post("", response_model=SurveyResponseModel, status_code=status.HTTP_201_CREATED)
 async def create_survey(survey_data: SurveyCreate, db: AsyncSession = Depends(get_async_db)):
-    db_survey = Survey(title=survey_data.title, description=survey_data.description)
+    db_survey = Survey(title=survey_data.title, description=survey_data.description, category=survey_data.category)
     db.add(db_survey)
     await db.commit()
     await db.refresh(db_survey)

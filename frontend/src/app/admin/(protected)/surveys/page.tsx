@@ -8,7 +8,6 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { surveyApi, Survey, SurveyResponse, SurveyQuestionDraft as ServiceQuestionDraft } from '@/services/surveyApi';
 import { Button } from '@/components/ui/Button';
-import Input from '@/components/ui/Input';
 // Select component no longer used after extracting QuestionListEditor
 import { Textarea } from '@/components/ui/TextArea';
 // Tooltip removed; actions consolidated into SurveyRowActions
@@ -18,7 +17,7 @@ import { MultipleChoiceQuestionDraft, QuestionDraft, createEmptyQuestion } from 
 
 // Draft & response types now come from surveyApi service (transformed to union locally)
 
-interface NewSurveyState { title: string; description: string; questions: QuestionDraft[] }
+interface NewSurveyState { title: string; description: string; category: string; questions: QuestionDraft[] }
 type QuestionErrorMap = Record<number, string | undefined>;
 
 const toServiceDraft = (q: QuestionDraft): ServiceQuestionDraft => {
@@ -52,11 +51,12 @@ export default function SurveyManagementPage() {
   const [isResultsModalOpen, setIsResultsModalOpen] = useState(false);
   const [selectedSurvey, setSelectedSurvey] = useState<Survey | null>(null);
   // Local buffered meta edits for the edit modal (avoid re-creating survey object each keystroke)
-  const [editMeta, setEditMeta] = useState<{ title: string; description: string; is_active: boolean }>({ title: '', description: '', is_active: false });
+  const [editMeta, setEditMeta] = useState<{ title: string; description: string; category: string; is_active: boolean }>({ title: '', description: '', category: '', is_active: false });
   const [surveyResults, setSurveyResults] = useState<SurveyResponse[]>([]);
   const [newSurvey, setNewSurvey] = useState<NewSurveyState>({
     title: '',
     description: '',
+    category: '',
     questions: [createEmptyQuestion()]
   });
   const [optionInputs, setOptionInputs] = useState<string[]>(['']);
@@ -69,8 +69,8 @@ export default function SurveyManagementPage() {
   const [search, setSearch] = useState('');
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 10;
-  // Sorting: key can be 'index' (default), 'title', 'description', 'created', 'updated'
-  const [sort, setSort] = useState<{ key: 'index' | 'title' | 'description' | 'created' | 'updated'; direction: 'asc' | 'desc' }>(() => ({ key: 'index', direction: 'asc' }));
+  // Sorting: key can be 'index' (default), 'title', 'category', 'description', 'created', 'updated'
+  const [sort, setSort] = useState<{ key: 'index' | 'title' | 'category' | 'description' | 'created' | 'updated'; direction: 'asc' | 'desc' }>(() => ({ key: 'index', direction: 'asc' }));
   // Expanded description ids
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
 
@@ -79,8 +79,8 @@ export default function SurveyManagementPage() {
     try {
       const keyParam = searchParams.get('sortKey');
       const dirParam = searchParams.get('sortDir');
-      if (keyParam && ['index','title','description','created','updated'].includes(keyParam)) {
-        const typedKey = keyParam as 'index' | 'title' | 'description' | 'created' | 'updated';
+      if (keyParam && ['index','title','category','description','created','updated'].includes(keyParam)) {
+        const typedKey = keyParam as 'index' | 'title' | 'category' | 'description' | 'created' | 'updated';
         setSort({ key: typedKey, direction: dirParam === 'desc' ? 'desc' : 'asc' });
       }
       const exp = searchParams.get('exp');
@@ -95,6 +95,8 @@ export default function SurveyManagementPage() {
   const createModalRef = useRef<HTMLDivElement>(null);
   const editModalRef = useRef<HTMLDivElement>(null);
   const resultsModalRef = useRef<HTMLDivElement>(null);
+  const createTitleRef = useRef<HTMLInputElement>(null);
+  const createDescRef = useRef<HTMLTextAreaElement>(null);
   const editTitleRef = useRef<HTMLInputElement>(null);
   const editDescRef = useRef<HTMLTextAreaElement>(null);
 
@@ -172,6 +174,62 @@ export default function SurveyManagementPage() {
     }
   }, [editMeta.description, isEditModalOpen]);
 
+  // Focus preservation for create modal - similar to edit modal
+  const createTitleCaret = useRef<number | null>(null);
+  const createDescCaret = useRef<number | null>(null);
+
+  useEffect(() => {
+    if (!isCreateModalOpen) { createTitleCaret.current = null; return; }
+    const input = createTitleRef.current;
+    if (!input) return;
+    const handleInput = () => {
+      try { createTitleCaret.current = input.selectionStart ?? null; } catch {}
+    };
+    input.addEventListener('input', handleInput, { capture: true });
+    return () => { input.removeEventListener('input', handleInput, { capture: true }); };
+  }, [isCreateModalOpen]);
+
+  useEffect(() => {
+    if (!isCreateModalOpen) return;
+    const input = createTitleRef.current;
+    if (!input) return;
+    if (document.activeElement !== input && createTitleCaret.current !== null) {
+      requestAnimationFrame(() => {
+        try {
+          input.focus({ preventScroll: true });
+          const pos = Math.min(createTitleCaret.current ?? input.value.length, input.value.length);
+          input.setSelectionRange(pos, pos);
+        } catch {}
+      });
+    }
+  }, [newSurvey.title, isCreateModalOpen]);
+
+  useEffect(() => {
+    if (!isCreateModalOpen) { createDescCaret.current = null; return; }
+    const ta = createDescRef.current;
+    if (!ta) return;
+    const handleInput = () => {
+      try { createDescCaret.current = ta.selectionStart ?? null; } catch {}
+    };
+    ta.addEventListener('input', handleInput, { capture: true });
+    return () => { ta.removeEventListener('input', handleInput, { capture: true }); };
+  }, [isCreateModalOpen]);
+
+  useEffect(() => {
+    if (!isCreateModalOpen) return;
+    const ta = createDescRef.current;
+    if (!ta) return;
+    if (document.activeElement !== ta && createDescCaret.current !== null) {
+      requestAnimationFrame(() => {
+        try {
+          ta.focus({ preventScroll: true });
+          const pos = Math.min(createDescCaret.current ?? ta.value.length, ta.value.length);
+          ta.setSelectionRange(pos, pos);
+        } catch {}
+      });
+    }
+  }, [newSurvey.description, isCreateModalOpen]);
+
   const handleCreateModalOpen = () => setIsCreateModalOpen(true);
   const handleCreateModalClose = () => setIsCreateModalOpen(false);
 
@@ -179,7 +237,7 @@ export default function SurveyManagementPage() {
     setSelectedSurvey(survey);
     setIsEditModalOpen(true);
     // Initialize buffered meta fields
-    setEditMeta({ title: survey.title, description: survey.description || '', is_active: survey.is_active });
+    setEditMeta({ title: survey.title, description: survey.description || '', category: survey.category || '', is_active: survey.is_active });
     const cloned: QuestionDraft[] = survey.questions.map(q => {
       if (q.question_type === 'text') {
         return { id: q.id, question_text: q.question_text, question_type: 'text', options: [] };
@@ -199,7 +257,7 @@ export default function SurveyManagementPage() {
     setSelectedSurvey(null);
     setIsEditModalOpen(false);
     // Reset buffered meta
-    setEditMeta({ title: '', description: '', is_active: false });
+    setEditMeta({ title: '', description: '', category: '', is_active: false });
   };
 
   const handleResultsModalOpen = async (surveyId: number) => {
@@ -220,10 +278,22 @@ export default function SurveyManagementPage() {
   useModalA11y(isEditModalOpen, editModalRef, handleEditModalClose);
   useModalA11y(isResultsModalOpen, resultsModalRef, handleResultsModalClose);
 
-  const handleNewSurveyChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleNewSurveyChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
     setNewSurvey((prev) => ({ ...prev, [name]: value }));
-  };
+  }, []);
+
+  const handleEditTitleChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditMeta(meta => ({ ...meta, title: e.target.value }));
+  }, []);
+
+  const handleEditDescriptionChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setEditMeta(meta => ({ ...meta, description: e.target.value }));
+  }, []);
+
+  const handleEditCategoryChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditMeta(meta => ({ ...meta, category: e.target.value }));
+  }, []);
 
   // handleNewQuestionChange removed; handled via <QuestionListEditor />
 
@@ -290,14 +360,14 @@ export default function SurveyManagementPage() {
     setCreateErrors(errors);
     if (Object.values(errors).some(Boolean)) { toast.error('Fix validation errors'); return; }
     const tempId = Math.random();
-    const optimistic: Survey = { id: tempId, title: newSurvey.title, description: newSurvey.description, is_active: false, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), questions: [] };
+    const optimistic: Survey = { id: tempId, title: newSurvey.title, description: newSurvey.description, category: newSurvey.category, is_active: false, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), questions: [] };
     setSurveys(prev => [optimistic, ...prev]);
     try {
       const created = await surveyApi.create({ title: newSurvey.title, description: newSurvey.description, questions: newSurvey.questions.map(toServiceDraft) });
       setSurveys(prev => prev.map(s => s.id === tempId ? created : s));
       toast.success('Survey created');
       handleCreateModalClose();
-      setNewSurvey({ title: '', description: '', questions: [createEmptyQuestion()] });
+      setNewSurvey({ title: '', description: '', category: '', questions: [createEmptyQuestion()] });
       setOptionInputs(['']);
       setCreateErrors({});
     } catch (error) {
@@ -393,6 +463,7 @@ export default function SurveyManagementPage() {
           let av: string | number = '';
           let bv: string | number = '';
           if (sort.key === 'title') { av = a.title.toLowerCase(); bv = b.title.toLowerCase(); }
+          else if (sort.key === 'category') { av = (a.category || '').toLowerCase(); bv = (b.category || '').toLowerCase(); }
           else if (sort.key === 'description') { av = (a.description || '').toLowerCase(); bv = (b.description || '').toLowerCase(); }
           else if (sort.key === 'created') { av = new Date(a.created_at).getTime(); bv = new Date(b.created_at).getTime(); }
           else if (sort.key === 'updated') { av = new Date(a.updated_at).getTime(); bv = new Date(b.updated_at).getTime(); }
@@ -416,6 +487,7 @@ export default function SurveyManagementPage() {
         let av: string | number = '';
         let bv: string | number = '';
         if (sort.key === 'title') { av = a.title.toLowerCase(); bv = b.title.toLowerCase(); }
+        else if (sort.key === 'category') { av = (a.category || '').toLowerCase(); bv = (b.category || '').toLowerCase(); }
         else if (sort.key === 'description') { av = (a.description || '').toLowerCase(); bv = (b.description || '').toLowerCase(); }
         else if (sort.key === 'created') { av = new Date(a.created_at).getTime(); bv = new Date(b.created_at).getTime(); }
         else if (sort.key === 'updated') { av = new Date(a.updated_at).getTime(); bv = new Date(b.updated_at).getTime(); }
@@ -454,7 +526,7 @@ export default function SurveyManagementPage() {
     return () => window.clearTimeout(handle);
   }, [sort, expanded, isEditModalOpen, router]);
 
-  const cycleSort = (key: 'index' | 'title' | 'description' | 'created' | 'updated') => {
+  const cycleSort = (key: 'index' | 'title' | 'category' | 'description' | 'created' | 'updated') => {
     setCurrentPage(1);
     setSort(prev => {
       let next: { key: typeof key | 'index'; direction: 'asc' | 'desc' };
@@ -583,9 +655,9 @@ export default function SurveyManagementPage() {
         </div>
 
         {/* Desktop table */}
-        <div className="hidden md:block overflow-x-auto max-h-[60vh]">
-          <table className="min-w-full divide-y divide-white/20 table-fixed relative">
-            <thead className="bg-white/5 sticky top-0 z-10 backdrop-blur-sm">
+        <div className="hidden md:block overflow-x-auto max-h-[60vh] bg-white/5 rounded-lg border border-white/10">
+          <table className="min-w-full divide-y divide-white/20 table-fixed">
+            <thead className="bg-white/10 sticky top-0 z-20 backdrop-blur-md border-b border-white/20">
               <tr>
                 <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-[4%]">
                   <button type="button" onClick={() => cycleSort('index')} className="flex items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1 -mx-1">
@@ -595,10 +667,16 @@ export default function SurveyManagementPage() {
                     )}
                   </button>
                 </th>
-                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-[24%]">
+                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-[20%]">
                   <button type="button" onClick={() => cycleSort('title')} className="flex items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1 -mx-1">
                     Title
                     {sort.key === 'title' && <span className="text-[9px] text-gray-400 group-hover:text-gray-300">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
+                  </button>
+                </th>
+                <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider w-[15%]">
+                  <button type="button" onClick={() => cycleSort('category')} className="flex items-center gap-1 group focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1 -mx-1">
+                    Category
+                    {sort.key === 'category' && <span className="text-[9px] text-gray-400 group-hover:text-gray-300">{sort.direction === 'asc' ? '▲' : '▼'}</span>}
                   </button>
                 </th>
                 <th className="px-3 lg:px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
@@ -622,10 +700,10 @@ export default function SurveyManagementPage() {
                 <th className="px-3 lg:px-4 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider w-[17%]">Actions</th>
               </tr>
             </thead>
-             <tbody className="bg-transparent divide-y divide-white/20">
+             <tbody className="bg-white/[0.02] divide-y divide-white/10 relative z-0">
                {paginated.length === 0 && (
                  <tr>
-                   <td colSpan={7} className="px-6 py-10 text-center text-sm text-gray-400">No surveys found. Adjust your search or create a new survey.</td>
+                   <td colSpan={8} className="px-6 py-10 text-center text-sm text-gray-400">No surveys found. Adjust your search or create a new survey.</td>
                  </tr>
                )}
                {paginated.map((survey, idx) => {
@@ -633,7 +711,7 @@ export default function SurveyManagementPage() {
                  const long = (survey.description || '').length > 240;
                  const displayDesc = long && !isExpanded ? (survey.description || '').slice(0,240) + '…' : (survey.description || '');
                  return (
-                 <tr key={survey.id} className="align-top">
+                 <tr key={survey.id} className="align-top hover:bg-white/5 transition-colors relative">
                   <td className="px-3 lg:px-4 py-4 text-[11px] text-gray-400 font-mono">
                     <button
                       type="button"
@@ -646,6 +724,17 @@ export default function SurveyManagementPage() {
                   </td>
                   <td className="px-3 lg:px-4 py-4 text-sm font-medium text-white">
                     <div className="pr-2 break-words leading-snug">{survey.title}</div>
+                  </td>
+                  <td className="px-3 lg:px-4 py-4 text-sm text-gray-300">
+                    <div className="pr-2 break-words leading-snug">
+                      {survey.category ? (
+                        <span className="inline-flex items-center px-2 py-1 text-xs rounded-md bg-blue-500/20 text-blue-200 border border-blue-500/30">
+                          {survey.category}
+                        </span>
+                      ) : (
+                        <span className="italic text-gray-500 text-xs">No category</span>
+                      )}
+                    </div>
                   </td>
                   <td className="px-3 lg:px-4 py-4 text-sm text-gray-300">
                     <div className="prose prose-invert max-w-none whitespace-pre-wrap break-words leading-snug text-[13px]">
@@ -730,20 +819,40 @@ export default function SurveyManagementPage() {
                 <h3 id="create-survey-title" className="text-lg font-medium text-white">Create New Survey</h3>
               </div>
               <div className="p-6 space-y-4">
-                <Input
-                  name="title"
-                  label="Title"
-                  value={newSurvey.title}
-                  onChange={handleNewSurveyChange}
-                  required
-                  className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
-                />
                 <div className="space-y-1">
-                  <label className="block text-sm font-medium text-gray-300">Description</label>
-                  <Textarea
+                  <label htmlFor="title" className="block text-sm font-medium text-gray-300">Title</label>
+                  <input
+                    id="title"
+                    name="title"
+                    type="text"
+                    value={newSurvey.title}
+                    onChange={handleNewSurveyChange}
+                    ref={createTitleRef}
+                    required
+                    className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="category" className="block text-sm font-medium text-gray-300">Category</label>
+                  <input
+                    key="create-category-input"
+                    id="category"
+                    name="category"
+                    type="text"
+                    value={newSurvey.category}
+                    onChange={handleNewSurveyChange}
+                    placeholder="e.g., Mental Health, Wellness, Assessment"
+                    className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="description" className="block text-sm font-medium text-gray-300">Description</label>
+                  <textarea
+                    id="description"
                     name="description"
                     value={newSurvey.description}
                     onChange={handleNewSurveyChange}
+                    ref={createDescRef}
                     className="w-full min-h-[120px] p-3 bg-white/8 border border-white/15 rounded-xl text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
                   />
                 </div>
@@ -806,21 +915,39 @@ export default function SurveyManagementPage() {
                 <h3 id="edit-survey-title" className="text-lg font-medium text-white">Edit Survey</h3>
               </div>
               <div className="p-6 space-y-4">
-                <Input
-                  name="title"
-                  label="Title"
-                  value={editMeta.title}
-                  onChange={(e) => setEditMeta(meta => ({ ...meta, title: e.target.value }))}
-                  // debug handlers removed
-                  required
-                  ref={editTitleRef}
-                  className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
-                />
+                <div className="space-y-1">
+                  <label htmlFor="edit-title" className="block text-sm font-medium text-gray-300">Title</label>
+                  <input
+                    key="edit-title-input"
+                    id="edit-title"
+                    name="title"
+                    type="text"
+                    value={editMeta.title}
+                    onChange={handleEditTitleChange}
+                    required
+                    ref={editTitleRef}
+                    className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label htmlFor="edit-category" className="block text-sm font-medium text-gray-300">Category</label>
+                  <input
+                    key="edit-category-input"
+                    id="edit-category"
+                    name="category"
+                    type="text"
+                    value={editMeta.category}
+                    onChange={handleEditCategoryChange}
+                    placeholder="e.g., Mental Health, Wellness, Assessment"
+                    className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
+                  />
+                </div>
                 <div className="space-y-1">
                   <label className="block text-sm font-medium text-gray-300">Description</label>
                   <Textarea
+                    key="edit-description-textarea"
                     value={editMeta.description}
-                    onChange={(e) => setEditMeta(meta => ({ ...meta, description: e.target.value }))}
+                    onChange={handleEditDescriptionChange}
                     // debug handlers removed
                     ref={editDescRef}
                     className="w-full min-h-[120px] p-3 bg-white/8 border border-white/15 rounded-xl text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"

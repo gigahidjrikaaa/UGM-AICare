@@ -77,22 +77,80 @@ const agentPalette: Record<string, string> = {
 };
 
 const agentDisplayOrder = ['orchestrator', 'triage', 'analytics', 'intervention'];
-const columnWidth = 220;
-const agentOffset = 520;
-const rowHeight = 170;
+// Improved spacing for better visual organization
+const columnWidth = 280; // Increased from 220
+const agentOffset = 680; // Increased from 520  
+const rowHeight = 200; // Increased from 170
 
 const AgentNode = ({ data }: NodeProps<AgentNodeData>) => {
   const color = agentPalette[data.agentId] ?? '#FFCA40';
+  const executionState = data.executionState;
+  const isRunning = executionState?.status === 'running';
+  const hasFailed = executionState?.status === 'failed';
+  const isCompleted = executionState?.status === 'completed';
+  
+  // Enhanced styling with better visual hierarchy
+  const nodeClasses = `
+    relative rounded-2xl border-2 transition-all duration-300 ease-in-out
+    ${isRunning ? 'border-orange-400 bg-orange-50/10 shadow-orange-400/20' : 
+      hasFailed ? 'border-red-400 bg-red-50/10 shadow-red-400/20' :
+      isCompleted ? 'border-green-400 bg-green-50/10 shadow-green-400/20' :
+      'border-white/30 bg-slate-900/90'} 
+    shadow-xl backdrop-blur-md hover:shadow-2xl hover:scale-105
+    px-5 py-4 text-left min-w-[240px] max-w-[280px]
+  `.trim().replace(/\s+/g, ' ');
+
   return (
-    <div className="rounded-xl border border-white/20 bg-slate-900/80 shadow-xl backdrop-blur-md px-4 py-3 text-left">
-      <p className="text-[11px] uppercase tracking-wide" style={{ color }}>
+    <div className={nodeClasses}>
+      {/* Status indicator dot */}
+      <div className="absolute top-3 right-3 w-3 h-3 rounded-full flex items-center justify-center">
+        {isRunning && <div className="w-full h-full bg-orange-400 rounded-full animate-pulse" />}
+        {hasFailed && <div className="w-full h-full bg-red-400 rounded-full" />}
+        {isCompleted && <div className="w-full h-full bg-green-400 rounded-full" />}
+      </div>
+      
+      {/* Agent type badge */}
+      <div 
+        className="inline-block px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest mb-2"
+        style={{ 
+          backgroundColor: `${color}20`, 
+          color: color,
+          borderColor: color 
+        }}
+      >
         {data.agent}
-      </p>
-      <p className="text-sm font-semibold text-white">{data.label}</p>
+      </div>
+      
+      {/* Node label */}
+      <h3 className="text-base font-bold text-white mb-1 leading-tight">
+        {data.label}
+      </h3>
+      
+      {/* Description */}
       {data.description && (
-        <p className="mt-1 text-xs text-gray-300 leading-snug max-w-[220px]">
+        <p className="text-xs text-gray-300 leading-relaxed line-clamp-3">
           {data.description}
         </p>
+      )}
+      
+      {/* Execution info */}
+      {executionState && (
+        <div className="mt-3 pt-2 border-t border-white/10">
+          <div className="flex items-center justify-between text-xs">
+            <span className="text-gray-400">
+              {executionState.execution_time_ms ? 
+                `${executionState.execution_time_ms}ms` : 
+                executionState.status
+              }
+            </span>
+            {executionState.error_message && (
+              <span className="text-red-400 text-[10px] truncate max-w-[100px]" 
+                    title={executionState.error_message}>
+                Error
+              </span>
+            )}
+          </div>
+        </div>
       )}
     </div>
   );
@@ -129,16 +187,36 @@ const LangGraphViewer = () => {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
       wsRef.current = new WebSocket(`${protocol}//${window.location.host}/api/v1/admin/agents-config/ws`);
       
+      wsRef.current.onopen = () => {
+        console.log('WebSocket connection established');
+      };
+
       wsRef.current.onmessage = (event: MessageEvent) => {
         try {
-          const data = JSON.parse(event.data) as GraphState;
-          setGraphState(data);
+          const message = JSON.parse(event.data);
+          // Handle different message types from the WebSocket
+          if (message.event && message.data) {
+            // This is an execution state update
+            console.log('Received execution update:', message.event);
+            // Only refresh on specific events that affect the graph structure
+            if (message.event === 'graph_structure_changed' || message.event === 'nodes_updated') {
+              fetchGraphState();
+            }
+            // For execution state updates, we could update individual nodes without full refresh
+            // but for now, we'll avoid constant refreshing
+          } else if (message.nodes && message.edges) {
+            // This is a full graph state update
+            setGraphState(message as GraphState);
+          } else {
+            console.log('Received WebSocket message:', message);
+          }
         } catch (err) {
-          console.error('Failed to parse WebSocket message:', err);
+          console.error('Failed to parse WebSocket message:', err, 'Raw data:', event.data);
         }
       };
 
-      wsRef.current.onclose = () => {
+      wsRef.current.onclose = (event: CloseEvent) => {
+        console.log(`WebSocket connection closed: ${event.code} - ${event.reason}`);
         // Reconnect after 5 seconds if real-time updates are still enabled
         if (realTimeUpdates) {
           setTimeout(connectWebSocket, 5000);
@@ -146,22 +224,26 @@ const LangGraphViewer = () => {
       };
 
       wsRef.current.onerror = (error: Event) => {
-        console.error('WebSocket error:', error);
+        console.error('WebSocket error occurred:', {
+          type: error.type,
+          target: error.target,
+          timeStamp: error.timeStamp
+        });
       };
     } catch (err) {
       console.error('Failed to connect WebSocket:', err);
     }
-  }, [realTimeUpdates]);
+  }, [realTimeUpdates, fetchGraphState]);
 
+  // Initial load effect - runs once on mount
   useEffect(() => {
     fetchGraphState();
-    
+  }, [fetchGraphState]);
+
+  // WebSocket connection effect - only manages WebSocket, no polling
+  useEffect(() => {
     if (realTimeUpdates) {
       connectWebSocket();
-    } else {
-      // Set up polling for updates when real-time is not available
-      const interval = setInterval(fetchGraphState, 5000);
-      return () => clearInterval(interval);
     }
 
     return () => {
@@ -170,7 +252,7 @@ const LangGraphViewer = () => {
         wsRef.current = null;
       }
     };
-  }, [fetchGraphState, realTimeUpdates, connectWebSocket]);
+  }, [realTimeUpdates, connectWebSocket]);
 
   const apiNodeMap = useMemo(() => {
     const map = new Map<string, ApiNode>();
@@ -228,26 +310,36 @@ const LangGraphViewer = () => {
       return idx === -1 ? agentOrder.length : idx;
     };
 
+    // Enhanced positioning with better vertical distribution
+    const nodesByAgent = new Map<string, typeof sortedNodes>();
+    sortedNodes.forEach(node => {
+      const agentId: string = (node.data?.agentId as string) ?? 'agent';
+      if (!nodesByAgent.has(agentId)) {
+        nodesByAgent.set(agentId, []);
+      }
+      nodesByAgent.get(agentId)!.push(node);
+    });
+
     return sortedNodes.map((node) => {
       const agentId: string = (node.data?.agentId as string) ?? 'agent';
       const column = Number(node.data?.column ?? 0);
       const row = Number(node.data?.row ?? 0);
-
+      
+      // Enhanced positioning calculation with better spacing
+      const baseX = laneIndex(agentId) * agentOffset;
+      const baseY = 100; // Add top margin
+      
+      // Stagger nodes vertically within the same agent lane to reduce clustering
+      const agentNodes = nodesByAgent.get(agentId) || [];
+      const nodeIndexInAgent = agentNodes.indexOf(node);
+      const verticalOffset = nodeIndexInAgent * 50; // Add slight vertical stagger
+      
       const position = {
-        x: laneIndex(agentId) * agentOffset + column * columnWidth,
-        y: row * rowHeight,
+        x: baseX + column * columnWidth + (column > 0 ? 50 : 0), // Extra spacing for subsequent columns
+        y: baseY + row * rowHeight + verticalOffset,
       };
 
-      // Determine node color based on execution state
       const executionState = node.execution_state;
-      const isRunning = executionState?.status === 'running';
-      const hasFailed = executionState?.status === 'failed';
-      const isCompleted = executionState?.status === 'completed';
-      
-      let nodeColor = agentPalette[agentId] ?? '#FFCA40';
-      if (isRunning) nodeColor = '#FFA500'; // Orange for running
-      if (hasFailed) nodeColor = '#FF4444'; // Red for failed
-      if (isCompleted) nodeColor = '#44FF44'; // Green for completed
 
       return {
         id: node.id,
@@ -262,11 +354,8 @@ const LangGraphViewer = () => {
         },
         sourcePosition: Position.Right,
         targetPosition: Position.Left,
-        style: {
-          borderRadius: 16,
-          border: `2px solid ${nodeColor}`,
-          backgroundColor: isRunning ? `${nodeColor}20` : undefined,
-        },
+        // Remove inline styles to let the AgentNode component handle all styling
+        style: {},
       } satisfies FlowNode<AgentNodeData>;
     });
   }, [sortedNodes, agentOrder, graphState]);
@@ -311,23 +400,51 @@ const LangGraphViewer = () => {
           (edge.data?.agentId as string) ?? (apiNodeMap.get(edge.source)?.data?.agentId as string) ?? 'agent';
         const color = agentPalette[agentId] ?? '#FFCA40';
         
-        // Style conditional edges differently
+        // Enhanced edge styling for better visual hierarchy
         const isConditional = edge.edge_type === 'conditional' || edge.condition;
-        const strokeDasharray = isConditional ? '5,5' : undefined;
+        const executionState = edge.execution_state;
+        const wasTriggered = executionState?.triggered;
+        
+        // Dynamic edge styling based on state
+        let edgeColor = color;
+        let strokeWidth = 2;
+        let opacity = 0.6;
+        
+        if (wasTriggered) {
+          opacity = 1.0;
+          strokeWidth = 3;
+          edgeColor = '#10B981'; // Green for triggered edges
+        } else if (isConditional) {
+          opacity = 0.4;
+          strokeWidth = 2;
+          edgeColor = '#F59E0B'; // Yellow for conditional edges
+        }
         
         return {
           id: `${edge.source}->${edge.target}`,
           source: edge.source,
           target: edge.target,
           type: 'smoothstep',
-          animated: true,
+          animated: wasTriggered,
           style: { 
-            stroke: color, 
-            strokeWidth: isConditional ? 3 : 2,
-            strokeDasharray 
+            stroke: edgeColor,
+            strokeWidth,
+            strokeDasharray: isConditional ? '8,4' : undefined,
+            opacity
           },
-          label: (edge.data?.label as string) || (edge.condition ? `if ${edge.condition}` : undefined),
-          labelStyle: { fill: '#CBD5F5', fontSize: 12 },
+          label: (edge.data?.label as string) || (edge.condition ? `${edge.condition}` : undefined),
+          labelStyle: { 
+            fill: '#E2E8F0', 
+            fontSize: 11,
+            fontWeight: 500,
+            backgroundColor: 'rgba(15, 23, 42, 0.8)',
+            padding: '2px 6px',
+            borderRadius: '4px'
+          },
+          labelBgStyle: {
+            fill: 'rgba(15, 23, 42, 0.9)',
+            fillOpacity: 0.9
+          }
         } satisfies FlowEdge;
       });
   }, [graphState, apiNodeMap, agentOrder]);
@@ -379,32 +496,74 @@ const LangGraphViewer = () => {
           </div>
         ))}
         <button
+          onClick={fetchGraphState}
+          disabled={isLoading}
+          className="flex items-center gap-2 rounded-lg bg-blue-500/20 px-3 py-1.5 text-xs font-medium text-blue-300 transition-colors hover:bg-blue-500/30 disabled:opacity-50"
+        >
+          <svg className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+          </svg>
+          {isLoading ? 'Refreshing...' : 'Refresh'}
+        </button>
+        <button
           onClick={() => setRealTimeUpdates(!realTimeUpdates)}
-          className={`ml-auto flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
+          className={`flex items-center gap-2 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors ${
             realTimeUpdates
               ? 'bg-green-500/20 text-green-300 hover:bg-green-500/30'
               : 'bg-white/10 text-gray-300 hover:bg-white/20'
           }`}
         >
           <div className={`h-2 w-2 rounded-full ${realTimeUpdates ? 'bg-green-400' : 'bg-gray-400'}`} />
-          {realTimeUpdates ? 'Live Updates' : 'Polling Mode'}
+          {realTimeUpdates ? 'Live Updates' : 'Manual Mode'}
         </button>
       </div>
 
-      <div className="h-[560px] overflow-hidden rounded-xl border border-white/15 bg-slate-950/60">
+      <div className="h-[700px] overflow-hidden rounded-xl border border-white/15 bg-slate-950/60">
         <ReactFlow
           nodes={reactFlowNodes}
           edges={reactFlowEdges}
           nodeTypes={nodeTypes}
           fitView
-          defaultViewport={{ x: 0, y: 0, zoom: 0.9 }}
+          defaultViewport={{ x: 0, y: 0, zoom: 0.75 }}
           onNodeClick={handleNodeClick}
           onPaneClick={() => setSelectedNode(null)}
           proOptions={{ hideAttribution: true }}
-          fitViewOptions={{ padding: 0.2 }}
+          fitViewOptions={{ 
+            padding: 0.3,
+            minZoom: 0.5,
+            maxZoom: 1.5,
+            includeHiddenNodes: false
+          }}
+          minZoom={0.4}
+          maxZoom={2}
+          panOnDrag={true}
+          zoomOnScroll={true}
+          zoomOnDoubleClick={true}
+          selectNodesOnDrag={false}
+          nodesDraggable={false}
+          nodesConnectable={false}
+          elementsSelectable={true}
         >
-          <Background color="rgba(255,255,255,0.08)" gap={24} />
-          <MiniMap pannable zoomable maskColor="rgba(2,6,23,0.85)" />
+          <Background 
+            color="rgba(255,255,255,0.05)" 
+            gap={32} 
+            size={1}
+          />
+          <MiniMap 
+            pannable 
+            zoomable 
+            maskColor="rgba(2,6,23,0.9)" 
+            nodeColor={(node) => {
+              const agentId = node.data?.agentId as string;
+              return agentPalette[agentId] ?? '#FFCA40';
+            }}
+            nodeStrokeWidth={2}
+            nodeBorderRadius={8}
+            style={{
+              backgroundColor: 'rgba(15, 23, 42, 0.8)',
+              border: '1px solid rgba(255,255,255,0.1)'
+            }}
+          />
           <Controls />
 
           {selectedNode && (

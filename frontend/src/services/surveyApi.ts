@@ -6,7 +6,7 @@ export interface RatingOptions { scale: { min: number; max: number } }
 export type QuestionOptions = string[] | RatingOptions | [];
 export interface SurveyQuestion { id: number; question_text: string; question_type: QuestionType; options: QuestionOptions }
 export interface SurveyQuestionDraft { id?: number; question_text: string; question_type: QuestionType; options: QuestionOptions }
-export interface Survey { id: number; title: string; description: string | null; is_active: boolean; created_at: string; updated_at: string; questions: SurveyQuestion[] }
+export interface Survey { id: number; title: string; description: string | null; category: string | null; is_active: boolean; created_at: string; updated_at: string; questions: SurveyQuestion[] }
 export interface SurveyAnswer { id: number; question_text: string; answer_text: string }
 export interface SurveyResponse { id: number; user_id: number; created_at: string; answers: SurveyAnswer[] }
 
@@ -37,9 +37,9 @@ function normalizeError(e: unknown, fallback: string): ApiErrorDescriptor {
 // CRUD operations
 export const surveyApi = {
   list: () => withRetry(() => apiCall<Survey[]>('/api/v1/admin/surveys')),
-  create: (payload: { title: string; description: string; questions: SurveyQuestionDraft[] }) =>
+  create: (payload: { title: string; description: string; category?: string; questions: SurveyQuestionDraft[] }) =>
     apiCall<Survey>('/api/v1/admin/surveys', { method: 'POST', body: JSON.stringify(payload) }),
-  updateMeta: (id: number, payload: { title?: string; description?: string | null; is_active?: boolean }) =>
+  updateMeta: (id: number, payload: { title?: string; description?: string | null; category?: string | null; is_active?: boolean }) =>
     apiCall(`/api/v1/admin/surveys/${id}`, { method: 'PUT', body: JSON.stringify(payload) }),
   bulkUpsertQuestions: (id: number, questions: SurveyQuestionDraft[]) =>
     apiCall(`/api/v1/admin/surveys/${id}/questions/bulk`, { method: 'PUT', body: JSON.stringify(
