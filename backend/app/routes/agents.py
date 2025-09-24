@@ -249,9 +249,16 @@ async def _emit_event(payload: dict):
         ACTIVE_CONNECTIONS.pop(cid, None)
 
 
-async def _simulate_triage_run(run_id: int, correlation_id: str, agent_name: str, action: str, db_factory):
+async def _simulate_triage_run(run_id: int, correlation_id: str, agent_name: str, action: str, db_factory, execution_id: str):
     token_chunks = ["Assessing", " risk", " factors", " and", " severity..."]
+    
+    # Phase 2: Execution tracking integration
+    from app.agents.execution_tracker import execution_tracker
+    
     try:
+        # Start triage node execution
+        execution_tracker.start_node(execution_id, "triage_assessment", agent_name, {"action": action})
+        
         async with db_factory() as session:  # type: ignore
             for chunk in token_chunks:
                 await asyncio.sleep(0.4)
@@ -297,6 +304,13 @@ async def _simulate_triage_run(run_id: int, correlation_id: str, agent_name: str
                 run_obj.completed_at = datetime.utcnow()
                 run_obj.output_payload = {"classification": "low_risk"}
                 await session.commit()
+                
+                # Phase 2: Complete node execution tracking
+                execution_tracker.complete_node(execution_id, "triage_assessment", 
+                                              {"classification": "low_risk"}, 
+                                              {"classification": "low_risk"})
+                execution_tracker.complete_execution(execution_id, success=True)
+                
                 await _emit_event({
                     "type": "run_completed",
                     "runId": run_id,
@@ -305,8 +319,38 @@ async def _simulate_triage_run(run_id: int, correlation_id: str, agent_name: str
                     "action": action,
                     "status": "succeeded",
                     "result": {"classification": "low_risk"},
+                    "executionId": execution_id,
                     "ts": datetime.utcnow().isoformat(),
                 })
+    except Exception as e:
+        # Phase 2: Handle execution failures
+        execution_tracker.fail_node(execution_id, "triage_assessment", str(e))
+        execution_tracker.complete_execution(execution_id, success=False)
+        
+        # Update run status in database
+        try:
+            async with db_factory() as session:
+                result = await session.execute(select(AgentRun).where(AgentRun.id == run_id))
+                run_obj = result.scalar_one_or_none()
+                if run_obj:
+                    run_obj.status = "failed"
+                    run_obj.completed_at = datetime.utcnow()
+                    run_obj.output_payload = {"error": str(e)}
+                    await session.commit()
+        except Exception as db_error:
+            print(f"Error updating run status: {db_error}")
+            
+        await _emit_event({
+            "type": "run_completed",
+            "runId": run_id,
+            "correlationId": correlation_id,
+            "agent": agent_name,
+            "action": action,
+            "status": "failed",
+            "error": str(e),
+            "executionId": execution_id,
+            "ts": datetime.utcnow().isoformat(),
+        })
     finally:
         RUN_TASKS.pop(run_id, None)
 
@@ -373,12 +417,23 @@ async def dispatch_agent_command(
     }
     await _emit_event(event)
 
+    # Phase 2: Start execution tracking
+    from app.agents.execution_tracker import execution_tracker
+    execution_id = execution_tracker.start_execution(
+        graph_id=f"{agent_name}_graph",
+        agent_name=agent_name,
+        agent_run_id=run.id,
+        input_data=input_payload
+    )
+
     if agent_name == "triage" and action in {"classify", "run", "execute"}:
         from app.database import AsyncSessionLocal
-        task = asyncio.create_task(_simulate_triage_run(run.id, correlation_id, agent_name, action, AsyncSessionLocal))
+        task = asyncio.create_task(_simulate_triage_run(
+            run.id, correlation_id, agent_name, action, AsyncSessionLocal, execution_id
+        ))
         RUN_TASKS[run.id] = task
 
-    return {"runId": run.id, "correlationId": correlation_id, "status": run.status}
+    return {"runId": run.id, "correlationId": correlation_id, "status": run.status, "executionId": execution_id}
 
 
 @router.post("/runs/{run_id}/cancel", summary="Cancel a running agent run")

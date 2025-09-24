@@ -23,6 +23,7 @@ from app.routes import (
     cbt_modules,
     triage,
     langgraph,
+    langgraph_analytics,
 )
 from contextlib import asynccontextmanager
 from app.core.scheduler import start_scheduler, shutdown_scheduler
@@ -149,6 +150,7 @@ app.include_router(admin.router)  # Admin endpoints
 app.include_router(agents.router)
 app.include_router(triage.router)
 app.include_router(langgraph.router)
+app.include_router(langgraph_analytics.router)
 app.include_router(appointments.router)
 app.include_router(surveys.router)
 app.include_router(surveys.user_router)
