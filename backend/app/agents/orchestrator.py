@@ -13,6 +13,7 @@ from app.services.analytics_service import (
     run_analytics_spec,
     explain_analytics_result,
 )
+from app.agents.orchestrator_graph_spec import ORCHESTRATOR_GRAPH_SPEC
 
 @dataclass
 class OrchestratorResult:
@@ -66,4 +67,4 @@ class AdminOrchestrator:
             raise ValueError(f"Unsupported agent '{agent}' in orchestrator")
         return OrchestratorResult(agent=agent, answer=result["answer"], metrics=result.get("metrics", {}), route=route)
 
-__all__ = ["AdminOrchestrator", "OrchestratorResult"]
+__all__ = ["AdminOrchestrator", "OrchestratorResult", "ORCHESTRATOR_GRAPH_SPEC"]

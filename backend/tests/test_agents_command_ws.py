@@ -1,6 +1,6 @@
 import json
 import asyncio
-import pytest
+import pytest # type: ignore
 from httpx import AsyncClient
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
@@ -9,12 +9,13 @@ from app.main import app
 from app.database import get_async_db, AsyncSessionLocal
 from app.models import User
 from sqlalchemy.ext.asyncio import AsyncSession
+from typing import AsyncGenerator  # <-- Add this import
 
 # NOTE: Assuming a dependency override for get_admin_user similar to existing tests pattern.
 from app.dependencies import get_admin_user
 
 @pytest.fixture()
-async def session() -> AsyncSession:
+async def session() -> AsyncGenerator[AsyncSession, None]:  # <-- Fix return type
     async with AsyncSessionLocal() as s:  # type: ignore
         yield s
 
@@ -36,8 +37,10 @@ async def test_dispatch_command_creates_run_and_streams_tokens(monkeypatch):
     # Prepare fake token for websocket auth: monkeypatch decrypt_and_validate_token
     from app import auth_utils
     def fake_decrypt(token: str):
-        class P: pass
-        p = P(); p.role = 'admin'; return p
+        class P:
+            role = 'admin'
+            email = 'admin@example.com'
+        return P()
     monkeypatch.setattr(auth_utils, 'decrypt_and_validate_token', fake_decrypt)
 
     async with AsyncClient(app=app, base_url="http://test") as client:
@@ -74,8 +77,10 @@ async def test_dispatch_command_creates_run_and_streams_tokens(monkeypatch):
 async def test_cancellation_flow(monkeypatch):
     from app import auth_utils
     def fake_decrypt(token: str):
-        class P: pass
-        p = P(); p.role = 'admin'; return p
+        class P:
+            role = 'admin'
+            email = 'admin@example.com'
+        return P()
     monkeypatch.setattr(auth_utils, 'decrypt_and_validate_token', fake_decrypt)
 
     from fastapi.testclient import TestClient as SyncClient
