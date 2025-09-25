@@ -1,12 +1,13 @@
 """Social media and gamification models."""
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, UniqueConstraint
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 from datetime import datetime
 
-from backend.app.models.user import User
+if TYPE_CHECKING:
+    from .user import User
 
 class Tweet(Base):
     """Social media tweets for sentiment analysis."""

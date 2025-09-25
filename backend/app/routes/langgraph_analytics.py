@@ -321,7 +321,7 @@ async def get_alerts(
                 "title": alert.title,
                 "message": alert.message,
                 "created_at": alert.created_at.isoformat(),
-                "resolved_at": alert.resolved_at.isoformat() if alert.resolved_at else None,
+                "resolved_at": alert.resolved_at.isoformat() if alert.resolved_at and isinstance(alert.resolved_at, datetime) else None,
                 "status": alert.status,
                 "threshold_value": alert.threshold_value,
                 "actual_value": alert.actual_value,
@@ -371,7 +371,7 @@ async def resolve_alert(
             "success": True,
             "message": "Alert resolved successfully",
             "alert_id": alert_id,
-            "resolved_at": alert.resolved_at.isoformat()
+            "resolved_at": alert.resolved_at.isoformat() if alert.resolved_at and isinstance(alert.resolved_at, datetime) else None
         }
         
     except HTTPException:

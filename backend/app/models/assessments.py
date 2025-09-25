@@ -1,14 +1,15 @@
 """Assessment and triage models."""
 
-from typing import Optional
+from typing import Optional, TYPE_CHECKING
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 from datetime import datetime
 
-from backend.app.models.conversations import Conversation
-from backend.app.models.user import User
+if TYPE_CHECKING:
+    from .conversations import Conversation
+    from .user import User
 
 class TriageAssessment(Base):
     """Risk assessment and triage results."""

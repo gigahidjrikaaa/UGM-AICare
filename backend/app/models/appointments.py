@@ -1,12 +1,13 @@
 """Appointment and psychologist management models."""
 
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 from datetime import datetime
 
-from backend.app.models.user import User
+if TYPE_CHECKING:
+    from .user import User
 
 class Psychologist(Base):
     """Licensed psychologists available for appointments."""

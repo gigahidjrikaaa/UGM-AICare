@@ -1,16 +1,17 @@
 """User authentication and profile models."""
 
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Date, Float, Text
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 from datetime import datetime
 
-from backend.app.models.appointments import Appointment
-from backend.app.models.conversations import Conversation
-from backend.app.models.journal import JournalEntry
-from backend.app.models.social import UserBadge
+if TYPE_CHECKING:
+    from .appointments import Appointment
+    from .conversations import Conversation
+    from .journal import JournalEntry
+    from .social import UserBadge
 
 class User(Base):
     """User model for authentication and profile management."""

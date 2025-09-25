@@ -1,12 +1,13 @@
 """Conversation and user summary models."""
 
-from typing import Optional, List
+from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 from datetime import datetime
 
-from backend.app.models.user import User
+if TYPE_CHECKING:
+    from .user import User
 
 class Conversation(Base):
     """User conversation history."""
