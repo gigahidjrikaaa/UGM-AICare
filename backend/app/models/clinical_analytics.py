@@ -16,7 +16,7 @@ class ValidatedAssessment(Base):
     
     # Primary identification
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # Clinical assessment details
     instrument_type = Column(String(20), nullable=False)  # PHQ9, GAD7, PSS, DASS21
@@ -26,7 +26,7 @@ class ValidatedAssessment(Base):
     
     # Administration metadata
     administration_date = Column(DateTime, nullable=False, default=datetime.utcnow)
-    administered_by = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"))
+    administered_by = Column(Integer, ForeignKey("users.id"))
     administration_context = Column(String(50))  # intake, followup, crisis, routine
     
     # Privacy and consent - CRITICAL for ethical analytics
@@ -100,13 +100,13 @@ class ServiceUtilization(Base):
     __tablename__ = "service_utilization"
     
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # Service details
     service_type = Column(String(50), nullable=False)  # counseling, group_therapy, crisis, assessment
     appointment_date = Column(DateTime, nullable=False)
     duration_minutes = Column(Integer)
-    service_provider_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"))
+    service_provider_id = Column(Integer, ForeignKey("users.id"))
     
     # Access and quality metrics
     request_date = Column(DateTime)  # When service was requested
@@ -142,7 +142,7 @@ class InterventionOutcome(Base):
     __tablename__ = "intervention_outcomes"
     
     id = Column(PG_UUID(as_uuid=True), primary_key=True, default=uuid4)
-    user_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # Intervention details
     intervention_type = Column(String(50), nullable=False)  # CBT, DBT, mindfulness, psychoeducation
@@ -241,7 +241,7 @@ class ClinicalInsight(Base):
     insight_type = Column(String(50), nullable=False)  # population_trend, service_optimization, outcome_analysis
     
     # Clinical professional who generated/validated the insight
-    clinician_id = Column(PG_UUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
+    clinician_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     
     # Insight content
     title = Column(String(200), nullable=False)
