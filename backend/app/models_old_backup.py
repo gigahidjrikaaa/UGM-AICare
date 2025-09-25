@@ -694,3 +694,14 @@ class LangGraphAlert(Base):
     affected_nodes: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     alert_context: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
+
+# Import clinical analytics models for privacy-preserving mental health analytics
+from .models.clinical_analytics import (
+    ValidatedAssessment,
+    ClinicalOutcome, 
+    ServiceUtilization,
+    InterventionOutcome,
+    SystemPerformanceMetric,
+    ClinicalInsight
+)
+

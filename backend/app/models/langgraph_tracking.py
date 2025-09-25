@@ -1,197 +1,159 @@
-"""
-Database models for LangGraph execution tracking and analytics.
-Phase 2 enhancement for historical data persistence.
-"""
+"""LangGraph execution tracking models for monitoring and analytics."""
 
-from sqlalchemy import Column, Integer, String, DateTime, Float, Text, JSON, Boolean, ForeignKey
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
-from datetime import datetime
-from typing import Dict, Any, Optional
-
+from typing import Optional, List
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Float, Boolean
+from sqlalchemy.types import JSON
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
+from datetime import datetime
 
 class LangGraphExecution(Base):
-    """
-    Records for complete LangGraph execution sessions.
-    Tracks overall graph execution with performance metrics.
-    """
+    """Records for complete LangGraph execution sessions."""
     __tablename__ = "langgraph_executions"
     
-    id = Column(Integer, primary_key=True, index=True)
-    execution_id = Column(String, unique=True, index=True)  # UUID for this execution
-    agent_run_id = Column(Integer, ForeignKey("agent_runs.id"), nullable=True)  # Link to AgentRun
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    execution_id: Mapped[str] = mapped_column(String, unique=True, index=True)
+    agent_run_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("agent_runs.id"), nullable=True)
     
     # Execution metadata
-    graph_name = Column(String, index=True)
-    started_at = Column(DateTime, default=datetime.utcnow)
-    completed_at = Column(DateTime, nullable=True)
-    status = Column(String, default="running")  # running, completed, failed, cancelled
+    graph_name: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True)
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    status: Mapped[str] = mapped_column(String, default="running")
     
     # Performance metrics
-    total_execution_time_ms = Column(Float, nullable=True)
-    total_nodes_executed = Column(Integer, default=0)
-    failed_nodes = Column(Integer, default=0)
-    success_rate = Column(Float, nullable=True)
+    total_execution_time_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    total_nodes_executed: Mapped[int] = mapped_column(Integer, default=0)
+    failed_nodes: Mapped[int] = mapped_column(Integer, default=0)
+    success_rate: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     
     # Context and metadata
-    input_data = Column(JSON, nullable=True)
-    output_data = Column(JSON, nullable=True)
-    error_message = Column(Text, nullable=True)
-    execution_context = Column(JSON, nullable=True)  # Additional context data
+    input_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    output_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    execution_context: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     
     # Relationships
-    node_executions = relationship("LangGraphNodeExecution", back_populates="execution")
-    edge_executions = relationship("LangGraphEdgeExecution", back_populates="execution")
-    performance_metrics = relationship("LangGraphPerformanceMetric", back_populates="execution")
-    
-    def __repr__(self):
-        return f"<LangGraphExecution(id={self.id}, graph={self.graph_name}, status={self.status})>"
-
+    node_executions: Mapped[List["LangGraphNodeExecution"]] = relationship("LangGraphNodeExecution", back_populates="execution")
+    edge_executions: Mapped[List["LangGraphEdgeExecution"]] = relationship("LangGraphEdgeExecution", back_populates="execution")
+    performance_metrics: Mapped[List["LangGraphPerformanceMetric"]] = relationship("LangGraphPerformanceMetric", back_populates="execution")
 
 class LangGraphNodeExecution(Base):
-    """
-    Individual node execution records within a graph execution.
-    Tracks detailed node-level performance and state changes.
-    """
+    """Individual node execution records within a graph execution."""
     __tablename__ = "langgraph_node_executions"
     
-    id = Column(Integer, primary_key=True, index=True)
-    execution_id = Column(String, ForeignKey("langgraph_executions.execution_id"))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    execution_id: Mapped[str] = mapped_column(String, ForeignKey("langgraph_executions.execution_id"))
     
     # Node identification
-    node_id = Column(String, index=True)
-    agent_id = Column(String, index=True)
-    node_type = Column(String)  # agent, tool, condition, etc.
+    node_id: Mapped[str] = mapped_column(String, index=True)
+    agent_id: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True)
+    node_type: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     
     # Execution tracking
-    started_at = Column(DateTime, default=datetime.utcnow)
-    completed_at = Column(DateTime, nullable=True)
-    status = Column(String, default="running")  # running, completed, failed, cancelled, skipped
+    started_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    status: Mapped[str] = mapped_column(String, default="running")
     
     # Performance data
-    execution_time_ms = Column(Float, nullable=True)
-    memory_usage_mb = Column(Float, nullable=True)
-    cpu_usage_percent = Column(Float, nullable=True)
+    execution_time_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    memory_usage_mb: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    cpu_usage_percent: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     
     # Input/Output tracking
-    input_data = Column(JSON, nullable=True)
-    output_data = Column(JSON, nullable=True)
-    error_message = Column(Text, nullable=True)
-    error_stack_trace = Column(Text, nullable=True)
+    input_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    output_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    error_stack_trace: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
     # Execution context
-    retry_count = Column(Integer, default=0)
-    execution_order = Column(Integer, nullable=True)  # Order in which nodes were executed
-    parent_node_id = Column(String, nullable=True)  # For nested executions
+    retry_count: Mapped[int] = mapped_column(Integer, default=0)
+    execution_order: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    parent_node_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     
     # Custom metrics
-    custom_metrics = Column(JSON, nullable=True)
+    custom_metrics: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     
     # Relationships
-    execution = relationship("LangGraphExecution", back_populates="node_executions")
-    
-    def __repr__(self):
-        return f"<NodeExecution(node={self.node_id}, agent={self.agent_id}, status={self.status})>"
-
+    execution: Mapped["LangGraphExecution"] = relationship("LangGraphExecution", back_populates="node_executions")
 
 class LangGraphEdgeExecution(Base):
-    """
-    Edge execution tracking for conditional flows and routing decisions.
-    Records when edges are traversed and evaluation results.
-    """
+    """Edge execution tracking for conditional flows and routing decisions."""
     __tablename__ = "langgraph_edge_executions"
     
-    id = Column(Integer, primary_key=True, index=True)
-    execution_id = Column(String, ForeignKey("langgraph_executions.execution_id"))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    execution_id: Mapped[str] = mapped_column(String, ForeignKey("langgraph_executions.execution_id"))
     
     # Edge identification
-    edge_id = Column(String, index=True)
-    source_node_id = Column(String)
-    target_node_id = Column(String)
-    edge_type = Column(String, default="normal")  # normal, conditional
+    edge_id: Mapped[str] = mapped_column(String, index=True)
+    source_node_id: Mapped[str] = mapped_column(String)
+    target_node_id: Mapped[str] = mapped_column(String)
+    edge_type: Mapped[str] = mapped_column(String, default="normal")
     
     # Execution tracking
-    triggered_at = Column(DateTime, default=datetime.utcnow)
-    evaluation_result = Column(Boolean, nullable=True)  # For conditional edges
+    triggered_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    evaluation_result: Mapped[Optional[bool]] = mapped_column(Boolean, nullable=True)
     
     # Conditional edge data
-    condition_expression = Column(Text, nullable=True)
-    condition_context = Column(JSON, nullable=True)
-    evaluation_time_ms = Column(Float, nullable=True)
+    condition_expression: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    condition_context: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    evaluation_time_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     
     # Flow data
-    data_passed = Column(JSON, nullable=True)  # Data passed through the edge
-    execution_order = Column(Integer, nullable=True)
+    data_passed: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    execution_order: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     
     # Relationships
-    execution = relationship("LangGraphExecution", back_populates="edge_executions")
-    
-    def __repr__(self):
-        return f"<EdgeExecution(edge={self.edge_id}, type={self.edge_type}, result={self.evaluation_result})>"
-
+    execution: Mapped["LangGraphExecution"] = relationship("LangGraphExecution", back_populates="edge_executions")
 
 class LangGraphPerformanceMetric(Base):
-    """
-    Custom performance metrics and KPIs for graph executions.
-    Extensible system for tracking domain-specific metrics.
-    """
+    """Custom performance metrics and KPIs for graph executions."""
     __tablename__ = "langgraph_performance_metrics"
     
-    id = Column(Integer, primary_key=True, index=True)
-    execution_id = Column(String, ForeignKey("langgraph_executions.execution_id"))
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    execution_id: Mapped[str] = mapped_column(String, ForeignKey("langgraph_executions.execution_id"))
     
     # Metric identification
-    metric_name = Column(String, index=True)
-    metric_category = Column(String, index=True)  # performance, business, quality, etc.
+    metric_name: Mapped[str] = mapped_column(String, index=True)
+    metric_category: Mapped[Optional[str]] = mapped_column(String, index=True, nullable=True)
     
     # Metric data
-    metric_value = Column(Float)
-    metric_unit = Column(String, nullable=True)  # ms, MB, percent, count, etc.
+    metric_value: Mapped[float] = mapped_column(Float)
+    metric_unit: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     
     # Context
-    recorded_at = Column(DateTime, default=datetime.utcnow)
-    node_id = Column(String, nullable=True)  # If metric is node-specific
-    tags = Column(JSON, nullable=True)  # Additional tagging for filtering
+    recorded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    node_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    tags: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     
     # Relationships
-    execution = relationship("LangGraphExecution", back_populates="performance_metrics")
-    
-    def __repr__(self):
-        return f"<PerformanceMetric(name={self.metric_name}, value={self.metric_value}, unit={self.metric_unit})>"
-
+    execution: Mapped["LangGraphExecution"] = relationship("LangGraphExecution", back_populates="performance_metrics")
 
 class LangGraphAlert(Base):
-    """
-    Alert records for performance issues, failures, and anomalies.
-    Phase 2 alerting system for proactive monitoring.
-    """
+    """Alert records for performance issues, failures, and anomalies."""
     __tablename__ = "langgraph_alerts"
     
-    id = Column(Integer, primary_key=True, index=True)
-    execution_id = Column(String, ForeignKey("langgraph_executions.execution_id"), nullable=True)
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    execution_id: Mapped[Optional[str]] = mapped_column(String, ForeignKey("langgraph_executions.execution_id"), nullable=True)
     
     # Alert identification
-    alert_type = Column(String, index=True)  # performance, error, anomaly, threshold
-    severity = Column(String, index=True)  # low, medium, high, critical
+    alert_type: Mapped[str] = mapped_column(String, index=True)
+    severity: Mapped[str] = mapped_column(String, index=True)
     
     # Alert content
-    title = Column(String)
-    message = Column(Text)
+    title: Mapped[str] = mapped_column(String)
+    message: Mapped[str] = mapped_column(Text)
     
     # Context
-    created_at = Column(DateTime, default=datetime.utcnow)
-    resolved_at = Column(DateTime, nullable=True)
-    status = Column(String, default="active")  # active, resolved, suppressed
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    resolved_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    status: Mapped[str] = mapped_column(String, default="active")
     
     # Alert data
-    threshold_value = Column(Float, nullable=True)
-    actual_value = Column(Float, nullable=True)
-    metric_name = Column(String, nullable=True)
+    threshold_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    actual_value: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    metric_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     
     # Additional context
-    affected_nodes = Column(JSON, nullable=True)  # List of affected node IDs
-    alert_context = Column(JSON, nullable=True)  # Additional context data
-    
-    def __repr__(self):
-        return f"<LangGraphAlert(type={self.alert_type}, severity={self.severity}, status={self.status})>"
+    affected_nodes: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    alert_context: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)

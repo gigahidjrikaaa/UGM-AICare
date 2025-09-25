@@ -24,6 +24,7 @@ from app.routes import (
     triage,
     langgraph,
     langgraph_analytics,
+    clinical_analytics_routes,
 )
 from contextlib import asynccontextmanager
 from app.core.scheduler import start_scheduler, shutdown_scheduler
@@ -155,6 +156,7 @@ app.include_router(appointments.router)
 app.include_router(surveys.router)
 app.include_router(surveys.user_router)
 app.include_router(cbt_modules.router)
+app.include_router(clinical_analytics_routes.router)  # New clinical analytics endpoints
 # logger.info(f"List of routers (/api/v1): {app.routes}")
 logger.info(f"Allowed origins: {origins}")
 
