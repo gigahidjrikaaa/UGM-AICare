@@ -7,6 +7,8 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 from datetime import datetime
 
+from backend.app.models.user import User
+
 class TherapistSchedule(Base):
     """Therapist availability schedules."""
     __tablename__ = "therapist_schedules"

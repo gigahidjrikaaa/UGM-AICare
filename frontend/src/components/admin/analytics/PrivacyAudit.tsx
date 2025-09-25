@@ -27,9 +27,9 @@ import {
 } from 'react-icons/fi';
 
 import { 
-  getPrivacyAudit,
+  getPrivacyAuditStatus,
   getPrivacyLevelColor,
-  type PrivacyAuditReport 
+  type PrivacyAuditStatus 
 } from '@/services/clinicalAnalytics';
 
 interface PrivacyAuditProps {
@@ -37,7 +37,7 @@ interface PrivacyAuditProps {
 }
 
 export function PrivacyAudit({ className = '' }: PrivacyAuditProps) {
-  const [auditReport, setAuditReport] = useState<PrivacyAuditReport | null>(null);
+  const [auditReport, setAuditReport] = useState<PrivacyAuditStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -50,7 +50,7 @@ export function PrivacyAudit({ className = '' }: PrivacyAuditProps) {
       setLoading(true);
       setError(null);
 
-      const response = await getPrivacyAudit();
+      const response = await getPrivacyAuditStatus();
 
       if (response.success) {
         setAuditReport(response.data);
@@ -80,13 +80,7 @@ export function PrivacyAudit({ className = '' }: PrivacyAuditProps) {
 
 
 
-  const formatEpsilon = (epsilon: number) => {
-    return `ε = ${epsilon.toFixed(4)}`;
-  };
 
-  const formatDelta = (delta: number) => {
-    return `δ = ${delta.toExponential(2)}`;
-  };
 
   if (loading) {
     return (
@@ -145,9 +139,9 @@ export function PrivacyAudit({ className = '' }: PrivacyAuditProps) {
             <h3 className="text-lg font-semibold text-gray-900">Privacy Protection Status</h3>
           </div>
           <div className="flex items-center space-x-2">
-            {getPrivacyStatusIcon(auditReport.overall_status)}
-            <span className={`px-3 py-1 text-sm font-medium rounded-full ${getPrivacyLevelColor(auditReport.overall_status)}`}>
-              {auditReport.overall_status.toUpperCase()}
+            {getPrivacyStatusIcon(auditReport.budget_status.budget_status)}
+            <span className={`px-3 py-1 text-sm font-medium rounded-full ${getPrivacyLevelColor(auditReport.budget_status.budget_status)}`}>
+              {auditReport.budget_status.budget_status.toUpperCase()}
             </span>
           </div>
         </div>
@@ -156,12 +150,13 @@ export function PrivacyAudit({ className = '' }: PrivacyAuditProps) {
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center space-x-2 mb-2">
               <FiLock className="h-4 w-4 text-blue-600" />
-              <div className="text-sm font-medium text-gray-900">Data Anonymization</div>
+              <div className="text-sm font-medium text-gray-900">Budget Status</div>
             </div>
             <div className="text-2xl font-bold text-gray-900">
-              {auditReport.anonymization_compliance.k_anonymity_level}
+              {auditReport.budget_status.budget_status === 'healthy' ? 'Good' : 
+               auditReport.budget_status.budget_status === 'warning' ? 'Warning' : 'Critical'}
             </div>
-            <div className="text-xs text-gray-600">K-anonymity level</div>
+            <div className="text-xs text-gray-600">Overall budget health</div>
           </div>
 
           <div className="bg-gray-50 rounded-lg p-4">
@@ -170,7 +165,7 @@ export function PrivacyAudit({ className = '' }: PrivacyAuditProps) {
               <div className="text-sm font-medium text-gray-900">Privacy Budget</div>
             </div>
             <div className="text-2xl font-bold text-gray-900">
-              {Math.round(auditReport.privacy_budget.used_percentage)}%
+              {Math.round(auditReport.budget_status.budget_used_percentage)}%
             </div>
             <div className="text-xs text-gray-600">Budget utilized</div>
           </div>
@@ -178,12 +173,12 @@ export function PrivacyAudit({ className = '' }: PrivacyAuditProps) {
           <div className="bg-gray-50 rounded-lg p-4">
             <div className="flex items-center space-x-2 mb-2">
               <FiActivity className="h-4 w-4 text-purple-600" />
-              <div className="text-sm font-medium text-gray-900">Data Queries</div>
+              <div className="text-sm font-medium text-gray-900">Analyses</div>
             </div>
             <div className="text-2xl font-bold text-gray-900">
-              {auditReport.query_audit.total_queries}
+              {auditReport.budget_status.analysis_count}
             </div>
-            <div className="text-xs text-gray-600">Total this period</div>
+            <div className="text-xs text-gray-600">Total analyses</div>
           </div>
         </div>
       </div>
@@ -199,21 +194,21 @@ export function PrivacyAudit({ className = '' }: PrivacyAuditProps) {
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-600">Total Budget</span>
             <span className="text-sm font-medium text-gray-900">
-              {formatEpsilon(auditReport.privacy_budget.total_epsilon)} / {formatDelta(auditReport.privacy_budget.total_delta)}
+              {auditReport.budget_status.total_budget}
             </span>
           </div>
 
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-600">Used Budget</span>
             <span className="text-sm font-medium text-gray-900">
-              {formatEpsilon(auditReport.privacy_budget.used_epsilon)} / {formatDelta(auditReport.privacy_budget.used_delta)}
+              {auditReport.budget_status.used_budget}
             </span>
           </div>
 
           <div className="flex justify-between items-center">
             <span className="text-sm text-gray-600">Remaining Budget</span>
             <span className="text-sm font-medium text-gray-900">
-              {formatEpsilon(auditReport.privacy_budget.remaining_epsilon)} / {formatDelta(auditReport.privacy_budget.remaining_delta)}
+              {auditReport.budget_status.remaining_budget}
             </span>
           </div>
 
@@ -221,23 +216,23 @@ export function PrivacyAudit({ className = '' }: PrivacyAuditProps) {
           <div className="mt-4">
             <div className="flex justify-between text-xs text-gray-600 mb-1">
               <span>Budget Usage</span>
-              <span>{Math.round(auditReport.privacy_budget.used_percentage)}%</span>
+              <span>{Math.round(auditReport.budget_status.budget_used_percentage)}%</span>
             </div>
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div 
                 className={`h-2 rounded-full transition-all duration-300 ${
-                  auditReport.privacy_budget.used_percentage <= 70 ? 'bg-green-600' :
-                  auditReport.privacy_budget.used_percentage <= 85 ? 'bg-yellow-600' : 'bg-red-600'
+                  auditReport.budget_status.budget_used_percentage <= 70 ? 'bg-green-600' :
+                  auditReport.budget_status.budget_used_percentage <= 85 ? 'bg-yellow-600' : 'bg-red-600'
                 } ${
-                  auditReport.privacy_budget.used_percentage <= 25 ? 'w-1/4' :
-                  auditReport.privacy_budget.used_percentage <= 50 ? 'w-1/2' :
-                  auditReport.privacy_budget.used_percentage <= 75 ? 'w-3/4' : 'w-full'
+                  auditReport.budget_status.budget_used_percentage <= 25 ? 'w-1/4' :
+                  auditReport.budget_status.budget_used_percentage <= 50 ? 'w-1/2' :
+                  auditReport.budget_status.budget_used_percentage <= 75 ? 'w-3/4' : 'w-full'
                 }`}
               ></div>
             </div>
           </div>
 
-          {auditReport.privacy_budget.used_percentage > 85 && (
+          {auditReport.budget_status.budget_used_percentage > 85 && (
             <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mt-4">
               <div className="flex items-center space-x-2">
                 <FiAlertCircle className="h-4 w-4 text-yellow-600" />
@@ -251,69 +246,62 @@ export function PrivacyAudit({ className = '' }: PrivacyAuditProps) {
         </div>
       </div>
 
-      {/* Anonymization Compliance */}
+      {/* Compliance Indicators */}
       <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
         <div className="flex items-center space-x-2 mb-4">
           <FiEyeOff className="h-5 w-5 text-gray-600" />
-          <h4 className="font-medium text-gray-900">Anonymization Compliance</h4>
+          <h4 className="font-medium text-gray-900">Compliance Indicators</h4>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
-            <h5 className="text-sm font-medium text-gray-900 mb-3">K-Anonymity Status</h5>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Current K-Level</span>
-                <span className="text-sm font-medium text-gray-900">
-                  {auditReport.anonymization_compliance.k_anonymity_level}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Minimum Required</span>
-                <span className="text-sm font-medium text-gray-900">
-                  {auditReport.anonymization_compliance.minimum_k_required}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Compliance Status</span>
-                <div className="flex items-center space-x-1">
-                  {auditReport.anonymization_compliance.k_anonymity_compliant ? (
-                    <>
-                      <FiCheckCircle className="h-3 w-3 text-green-500" />
-                      <span className="text-sm text-green-600">Compliant</span>
-                    </>
-                  ) : (
-                    <>
-                      <FiAlertCircle className="h-3 w-3 text-red-500" />
-                      <span className="text-sm text-red-600">Non-compliant</span>
-                    </>
-                  )}
-                </div>
-              </div>
+            <h5 className="text-sm font-medium text-gray-900 mb-3">Budget Health</h5>
+            <div className="flex items-center space-x-2">
+              {auditReport.compliance_indicators.budget_healthy ? (
+                <>
+                  <FiCheckCircle className="h-4 w-4 text-green-500" />
+                  <span className="text-sm text-green-600">Healthy</span>
+                </>
+              ) : (
+                <>
+                  <FiAlertCircle className="h-4 w-4 text-red-500" />
+                  <span className="text-sm text-red-600">Unhealthy</span>
+                </>
+              )}
             </div>
           </div>
 
           <div>
-            <h5 className="text-sm font-medium text-gray-900 mb-3">Data Suppression</h5>
-            <div className="space-y-2">
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Records Suppressed</span>
-                <span className="text-sm font-medium text-gray-900">
-                  {auditReport.anonymization_compliance.suppressed_records}
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Suppression Rate</span>
-                <span className="text-sm font-medium text-gray-900">
-                  {(auditReport.anonymization_compliance.suppression_rate * 100).toFixed(1)}%
-                </span>
-              </div>
-              <div className="flex justify-between items-center">
-                <span className="text-sm text-gray-600">Quasi-identifiers</span>
-                <span className="text-sm font-medium text-gray-900">
-                  {auditReport.anonymization_compliance.quasi_identifiers.join(', ')}
-                </span>
-              </div>
+            <h5 className="text-sm font-medium text-gray-900 mb-3">Analysis Count</h5>
+            <div className="flex items-center space-x-2">
+              {auditReport.compliance_indicators.analysis_count_reasonable ? (
+                <>
+                  <FiCheckCircle className="h-4 w-4 text-green-500" />
+                  <span className="text-sm text-green-600">Reasonable</span>
+                </>
+              ) : (
+                <>
+                  <FiAlertCircle className="h-4 w-4 text-yellow-500" />
+                  <span className="text-sm text-yellow-600">High</span>
+                </>
+              )}
+            </div>
+          </div>
+
+          <div>
+            <h5 className="text-sm font-medium text-gray-900 mb-3">Recent Activity</h5>
+            <div className="flex items-center space-x-2">
+              {auditReport.compliance_indicators.recent_activity ? (
+                <>
+                  <FiCheckCircle className="h-4 w-4 text-green-500" />
+                  <span className="text-sm text-green-600">Active</span>
+                </>
+              ) : (
+                <>
+                  <FiAlertCircle className="h-4 w-4 text-gray-500" />
+                  <span className="text-sm text-gray-600">Inactive</span>
+                </>
+              )}
             </div>
           </div>
         </div>
@@ -332,14 +320,7 @@ export function PrivacyAudit({ className = '' }: PrivacyAuditProps) {
         </div>
 
         <div className="space-y-3">
-          {auditReport.query_audit.recent_queries.slice(0, 5).map((query: unknown, index: number) => {
-            const q = query as {
-              query_type: string;
-              epsilon_used: number;
-              timestamp: string;
-              privacy_level: string;
-              compliant: boolean;
-            };
+          {auditReport.budget_status.recent_analyses.slice(0, 5).map((analysis: string, index: number) => {
             return (
             <motion.div
               key={index}
@@ -351,28 +332,24 @@ export function PrivacyAudit({ className = '' }: PrivacyAuditProps) {
               <div className="flex items-center space-x-3">
                 <div className="w-2 h-2 rounded-full bg-blue-400"></div>
                 <div>
-                  <div className="text-sm font-medium text-gray-900">{q.query_type}</div>
+                  <div className="text-sm font-medium text-gray-900">{analysis}</div>
                   <div className="text-xs text-gray-600">
-                    {formatEpsilon(q.epsilon_used)} • {new Date(q.timestamp).toLocaleString()}
+                    Recent analysis activity
                   </div>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
-                <span className={`px-2 py-1 text-xs font-medium rounded ${getPrivacyLevelColor(q.privacy_level)}`}>
-                  {q.privacy_level}
+                <span className={`px-2 py-1 text-xs font-medium rounded ${getPrivacyLevelColor(auditReport.budget_status.budget_status)}`}>
+                  {auditReport.budget_status.budget_status}
                 </span>
-                {q.compliant ? (
-                  <FiCheckCircle className="h-4 w-4 text-green-500" />
-                ) : (
-                  <FiAlertCircle className="h-4 w-4 text-red-500" />
-                )}
+                <FiCheckCircle className="h-4 w-4 text-green-500" />
               </div>
             </motion.div>
             );
           })}
         </div>
 
-        {auditReport.query_audit.recent_queries.length === 0 && (
+        {auditReport.budget_status.recent_analyses.length === 0 && (
           <div className="text-center py-8">
             <FiInfo className="h-6 w-6 text-gray-400 mx-auto mb-2" />
             <p className="text-gray-600 text-sm">No recent query activity</p>
@@ -381,15 +358,21 @@ export function PrivacyAudit({ className = '' }: PrivacyAuditProps) {
       </div>
 
       {/* Privacy Recommendations */}
-      {auditReport.recommendations && auditReport.recommendations.length > 0 && (
+      {(auditReport.budget_status.recommendations.length > 0 || auditReport.recommendations.length > 0) && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
           <div className="flex items-center space-x-2 mb-3">
             <FiInfo className="h-5 w-5 text-blue-600" />
             <h4 className="font-medium text-blue-900">Privacy Recommendations</h4>
           </div>
           <ul className="space-y-2">
+            {auditReport.budget_status.recommendations.map((rec: string, idx: number) => (
+              <li key={`budget-${idx}`} className="flex items-start space-x-2 text-sm text-blue-800">
+                <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-2 flex-shrink-0"></div>
+                <span>{rec}</span>
+              </li>
+            ))}
             {auditReport.recommendations.map((rec: string, idx: number) => (
-              <li key={idx} className="flex items-start space-x-2 text-sm text-blue-800">
+              <li key={`general-${idx}`} className="flex items-start space-x-2 text-sm text-blue-800">
                 <div className="w-1.5 h-1.5 rounded-full bg-blue-400 mt-2 flex-shrink-0"></div>
                 <span>{rec}</span>
               </li>

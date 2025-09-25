@@ -45,8 +45,21 @@ export function ClinicalAnalyticsOverview({ className = '' }: ClinicalOverviewPr
   const [clinicalReport, setClinicalReport] = useState<ClinicalIntelligenceReport | null>(null);
   const [treatmentOutcomes, setTreatmentOutcomes] = useState<Record<string, TreatmentOutcome>>({});
   const [privacyAudit, setPrivacyAudit] = useState<PrivacyAuditStatus | null>(null);
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['clinical-intelligence-summary']));
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+
+  const handleToggleSection = (id: string) => {
+    setExpandedSections(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) {
+        newSet.delete(id);
+      } else {
+        newSet.add(id);
+      }
+      return newSet;
+    });
+  };
 
   useEffect(() => {
     loadClinicalData();
@@ -162,7 +175,7 @@ export function ClinicalAnalyticsOverview({ className = '' }: ClinicalOverviewPr
           change={`${clinicalReport?.quality_assurance.consent_compliance_rate 
             ? (clinicalReport.quality_assurance.consent_compliance_rate * 100).toFixed(1) + '% consent compliance'
             : 'No consent data'}`}
-          trend={clinicalReport?.quality_assurance.data_quality_score > 0.8 ? "up" : "down"}
+          trend={(clinicalReport?.quality_assurance.data_quality_score ?? 0) > 0.8 ? "up" : "down"}
           icon={<FiCheckCircle className="h-5 w-5" />}
           color="purple"
         />
@@ -180,9 +193,10 @@ export function ClinicalAnalyticsOverview({ className = '' }: ClinicalOverviewPr
       {/* Clinical Intelligence Summary */}
       {clinicalReport && (
         <CollapsibleSection 
-          title="Clinical Intelligence Summary" 
-          defaultOpen={true}
-          className="bg-white rounded-lg shadow-sm"
+          id="clinical-intelligence-summary"
+          title="Clinical Intelligence Summary"
+          expandedSections={expandedSections}
+          onToggle={handleToggleSection}
         >
           <div className="space-y-6">
             {/* Analysis Period */}
@@ -266,9 +280,10 @@ export function ClinicalAnalyticsOverview({ className = '' }: ClinicalOverviewPr
       {/* Treatment Outcomes Detail */}
       {Object.keys(treatmentOutcomes).length > 0 && (
         <CollapsibleSection 
+          id="treatment-outcomes-analysis"
           title="Treatment Outcomes Analysis" 
-          defaultOpen={false}
-          className="bg-white rounded-lg shadow-sm"
+          expandedSections={expandedSections}
+          onToggle={handleToggleSection}
         >
           <div className="space-y-4">
             {Object.entries(treatmentOutcomes).slice(0, 5).map(([key, outcome]) => (
@@ -344,9 +359,10 @@ export function ClinicalAnalyticsOverview({ className = '' }: ClinicalOverviewPr
       {/* Privacy & Compliance Status */}
       {privacyAudit && (
         <CollapsibleSection 
-          title="Privacy & Compliance Status" 
-          defaultOpen={false}
-          className="bg-white rounded-lg shadow-sm"
+          id="privacy-compliance-status"
+          title="Privacy & Compliance Status"
+          expandedSections={expandedSections}
+          onToggle={handleToggleSection}
         >
           <div className="space-y-4">
             {/* Privacy Budget Status */}

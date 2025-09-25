@@ -7,6 +7,8 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 from datetime import datetime
 
+from backend.app.models.user import User
+
 class Feedback(Base):
     """User feedback on platform experience."""
     __tablename__ = "feedback"

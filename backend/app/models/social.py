@@ -6,6 +6,8 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 from datetime import datetime
 
+from backend.app.models.user import User
+
 class Tweet(Base):
     """Social media tweets for sentiment analysis."""
     __tablename__ = "tweets"

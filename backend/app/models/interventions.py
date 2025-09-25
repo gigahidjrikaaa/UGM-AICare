@@ -7,6 +7,8 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 from datetime import datetime
 
+from backend.app.models.user import User
+
 class InterventionCampaign(Base):
     """Automated intervention campaigns."""
     __tablename__ = "intervention_campaigns"

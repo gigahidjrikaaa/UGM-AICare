@@ -5,16 +5,22 @@ import { motion } from 'framer-motion';
 export interface StatCardProps {
   title: string;
   value: number | string;
-  description: string;
+  description?: string;
+  change?: string;
+  trend?: 'up' | 'down' | 'neutral';
   icon: React.ReactNode;
-  accentClass: string;
+  color?: string;
+  accentClass?: string;
 }
 
 export const StatCard: React.FC<StatCardProps> = ({
   title,
   value,
   description,
+  change,
+  trend = 'neutral',
   icon,
+  color = 'blue',
   accentClass,
 }) => (
   <motion.div
@@ -29,9 +35,17 @@ export const StatCard: React.FC<StatCardProps> = ({
         <p className="mt-2 text-2xl font-semibold text-white">
           {typeof value === 'number' ? value.toLocaleString() : value}
         </p>
-        <p className="mt-2 text-xs text-white/60">{description}</p>
+        {(description || change) && (
+          <p className={`mt-2 text-xs ${
+            trend === 'up' ? 'text-green-400' :
+            trend === 'down' ? 'text-red-400' :
+            'text-white/60'
+          }`}>
+            {description || change}
+          </p>
+        )}
       </div>
-      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${accentClass}`}>{icon}</div>
+      <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${accentClass || `bg-${color}-500/20 text-${color}-400`}`}>{icon}</div>
     </div>
   </motion.div>
 );

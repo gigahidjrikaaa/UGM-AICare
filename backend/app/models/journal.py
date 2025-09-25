@@ -6,6 +6,8 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 from datetime import datetime
 
+from backend.app.models.user import User
+
 class JournalPrompt(Base):
     """Journal writing prompts."""
     __tablename__ = "journal_prompts"

@@ -7,6 +7,11 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 from datetime import datetime
 
+from backend.app.models.appointments import Appointment
+from backend.app.models.conversations import Conversation
+from backend.app.models.journal import JournalEntry
+from backend.app.models.social import UserBadge
+
 class User(Base):
     """User model for authentication and profile management."""
     __tablename__ = "users"

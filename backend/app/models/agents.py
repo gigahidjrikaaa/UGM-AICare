@@ -7,6 +7,8 @@ from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 from datetime import datetime
 
+from backend.app.models.user import User
+
 class AgentRun(Base):
     """Agent execution tracking."""
     __tablename__ = "agent_runs"
