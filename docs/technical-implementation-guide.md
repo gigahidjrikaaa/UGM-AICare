@@ -1,4 +1,5 @@
 # Technical Implementation Guide
+
 ## Analytics Agent Redesign - Code Changes
 
 **Date**: September 25, 2025  
@@ -14,6 +15,7 @@
 #### **1.1 Update `analytics_agent.py`**
 
 **Current Problematic Code**:
+
 ```python
 # REMOVE THESE METHODS - They violate privacy
 async def _get_conversations(self, start_date: datetime, end_date: datetime):
@@ -34,6 +36,7 @@ async def _build_segment_alerts(self, negative_records):
 ```
 
 **Replace With**:
+
 ```python
 # NEW: Clinical assessment focused analytics
 from app.models import ValidatedAssessment, ClinicalOutcome, ServiceUtilization
@@ -86,6 +89,7 @@ class ClinicalAnalyticsAgent:
 #### **1.2 Create New Clinical Models**
 
 **File**: `backend/app/models/clinical_analytics.py`
+
 ```python
 from sqlalchemy import Column, String, Integer, Float, DateTime, Boolean, ForeignKey, UUID
 from sqlalchemy.dialects.postgresql import UUID as PG_UUID
@@ -157,6 +161,7 @@ class ClinicalOutcome(Base):
 #### **2.1 Create Statistical Analysis Service**
 
 **File**: `backend/app/services/statistical_analysis.py`
+
 ```python
 from typing import List, Tuple, Optional, Dict, Any
 from dataclasses import dataclass
@@ -265,6 +270,7 @@ class StatisticalAnalysisEngine:
 #### **3.1 Create Privacy Engine**
 
 **File**: `backend/app/services/privacy_engine.py`
+
 ```python
 import hashlib
 import hmac
@@ -327,6 +333,7 @@ class PrivacyPreservingAnalyzer:
 #### **4.1 New Analytics Dashboard Component**
 
 **File**: `frontend/src/components/admin/analytics/ClinicalOutcomesDashboard.tsx`
+
 ```typescript
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
@@ -560,30 +567,35 @@ export const ClinicalOutcomesDashboard: React.FC<ClinicalOutcomesDashboardProps>
 ## 📋 **Implementation Checklist**
 
 ### **Phase 1: Remove Harmful Components (Week 1-2)**
+
 - [ ] Disable private content analysis in `analytics_agent.py`
 - [ ] Remove surveillance dashboards from frontend
 - [ ] Update database to remove privacy-violating tables
 - [ ] Implement consent verification system
 
 ### **Phase 2: Clinical Foundation (Week 3-4)**
+
 - [ ] Create new clinical analytics models
 - [ ] Implement statistical analysis engine
 - [ ] Build validated assessment integration
 - [ ] Create clinical outcome tracking
 
 ### **Phase 3: Privacy & Security (Week 5-6)**
+
 - [ ] Implement differential privacy engine
 - [ ] Add k-anonymity for cohort analysis
 - [ ] Create consent management system
 - [ ] Build audit and compliance framework
 
 ### **Phase 4: New Dashboards (Week 7-8)**
+
 - [ ] Create clinical outcomes dashboard
 - [ ] Build service utilization monitor
 - [ ] Implement intervention effectiveness tracker
 - [ ] Add privacy status indicators
 
 ### **Phase 5: Testing & Validation (Week 9-10)**
+
 - [ ] Clinical advisory board review
 - [ ] Privacy impact assessment
 - [ ] Statistical validation testing

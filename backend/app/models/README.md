@@ -29,10 +29,12 @@ backend/app/models/
 ## Model Categories
 
 ### Core Models
+
 - **user.py**: User authentication, profiles, preferences, and clinical data
   - `User`: Complete user profile with auth, clinical, and preference fields
 
 ### Communication Models
+
 - **conversations.py**: Chat history and summaries
   - `Conversation`: User-AI chat interactions
   - `UserSummary`: Conversation summaries and insights
@@ -43,6 +45,7 @@ backend/app/models/
   - `JournalReflectionPoint`: Reflection points within entries
 
 ### Service Models
+
 - **appointments.py**: Professional mental health services
   - `Psychologist`: Licensed professionals
   - `AppointmentType`: Types of appointments available
@@ -56,6 +59,7 @@ backend/app/models/
   - `SurveyAnswer`: Individual question answers
 
 ### Content Models
+
 - **content.py**: Educational and therapeutic resources
   - `ContentResource`: Educational materials and resources
   - `CbtModule`: Cognitive Behavioral Therapy modules
@@ -68,11 +72,13 @@ backend/app/models/
   - `EmailLog`: Email sending history
 
 ### Engagement Models
+
 - **social.py**: Gamification and social features
   - `Tweet`: Social media sentiment analysis
   - `UserBadge`: Achievement badges and rewards
 
 ### Analytics Models
+
 - **analytics.py**: System performance and insights
   - `AnalyticsReport`: System analytics and performance reports
 
@@ -82,6 +88,7 @@ backend/app/models/
   - `InterventionAgentSettings`: Automation settings
 
 ### System Models
+
 - **agents.py**: AI agent execution tracking
   - `AgentRun`: Agent execution sessions
   - `AgentMessage`: Agent communication logs
@@ -94,6 +101,7 @@ backend/app/models/
   - `FlaggedSession`: Sessions requiring review
 
 ### Phase 2 Analytics Models
+
 - **clinical_analytics.py**: Privacy-preserving clinical intelligence
   - `ValidatedAssessment`: Validated clinical assessments
   - `ClinicalOutcome`: Treatment outcome tracking
@@ -112,6 +120,7 @@ backend/app/models/
 ## Import Strategy
 
 ### Centralized Imports
+
 All models are imported and exported through `models/__init__.py`, providing a single import point:
 
 ```python
@@ -119,11 +128,13 @@ from app.models import User, Conversation, JournalEntry
 ```
 
 ### Relationship Management
+
 - Uses string references for relationships to avoid circular imports
 - Maintains proper foreign key relationships between domains
 - Supports complex many-to-many and one-to-many relationships
 
 ### Backward Compatibility
+
 - All existing import statements continue to work unchanged
 - Model names and table structures remain identical
 - Database migrations not required
@@ -131,21 +142,25 @@ from app.models import User, Conversation, JournalEntry
 ## Benefits
 
 ### Maintainability
+
 - **Single Responsibility**: Each file focuses on one domain
 - **Reduced Complexity**: Smaller, focused files are easier to understand
 - **Easier Navigation**: Logical organization makes finding models intuitive
 
 ### Development Efficiency
+
 - **Parallel Development**: Multiple developers can work on different domains
 - **Reduced Merge Conflicts**: Changes isolated to specific domains
 - **Clear Ownership**: Domain experts can own specific model files
 
 ### Code Quality
+
 - **Better Testing**: Domain-specific model tests
 - **Improved Documentation**: Focused documentation per domain
 - **Reduced Coupling**: Clear separation of concerns
 
 ### Scalability
+
 - **Easy Extension**: New domains can be added as separate files
 - **Modular Deployment**: Could support domain-specific deployments
 - **Performance**: Smaller import footprint for domain-specific operations
@@ -153,6 +168,7 @@ from app.models import User, Conversation, JournalEntry
 ## Usage Examples
 
 ### Standard Import
+
 ```python
 from app.models import User, Conversation, JournalEntry
 
@@ -169,6 +185,7 @@ conversation = Conversation(
 ```
 
 ### Domain-Specific Import
+
 ```python
 # For appointment scheduling system
 from app.models import Psychologist, Appointment, AppointmentType
@@ -183,16 +200,19 @@ from app.models import InterventionCampaign, CampaignExecution
 ## Migration Notes
 
 ### No Database Changes Required
+
 - All table names and structures remain identical
 - Foreign key relationships preserved
 - Existing data unaffected
 
 ### Code Changes Required
+
 - None for basic imports from `app.models`
 - Update any direct imports from `app.models` (rare)
 - Service layer code remains unchanged
 
 ### Testing
+
 - All existing tests should pass without modification
 - Consider adding domain-specific model tests
 - Verify relationship integrity across domains
@@ -200,12 +220,14 @@ from app.models import InterventionCampaign, CampaignExecution
 ## Future Enhancements
 
 ### Potential Additions
+
 - **notifications.py**: Push notification models
 - **integration.py**: Third-party integration models
 - **reporting.py**: Advanced reporting and dashboard models
 - **security.py**: Security audit and access control models
 
 ### Architecture Evolution
+
 - Consider domain-driven design (DDD) principles
 - Potential microservice boundaries align with model domains
 - Support for domain-specific validation and business rules
