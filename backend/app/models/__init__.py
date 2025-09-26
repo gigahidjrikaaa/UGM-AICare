@@ -16,6 +16,7 @@ This package contains database models organized by domain:
 - scheduling: Therapist scheduling and session management
 - clinical_analytics: Privacy-preserving clinical analytics models
 - langgraph_tracking: LangGraph execution tracking models
+- events/messages/cases/resources/consents/users: Safety agent telemetry and RBAC
 """
 
 # Core models
@@ -46,7 +47,7 @@ from .clinical_analytics import (
     ServiceUtilization,
     InterventionOutcome,
     SystemPerformanceMetric,
-    ClinicalInsight
+    ClinicalInsight,
 )
 
 # LangGraph tracking models (Phase 2)
@@ -55,80 +56,102 @@ from .langgraph_tracking import (
     LangGraphNodeExecution,
     LangGraphEdgeExecution,
     LangGraphPerformanceMetric,
-    LangGraphAlert
+    LangGraphAlert,
 )
+
+# Safety agent data models
+from .events import Event, AgentNameEnum
+from .messages import Message, MessageRoleEnum
+from .consents import Consent, ConsentScopeEnum
+from .cases import Case, CaseStatusEnum, CaseSeverityEnum
+from .resources import Resource
+from .users import AgentUser, AgentRoleEnum
 
 __all__ = [
     # Core Models
     "User",
-    
+
     # Conversation Models
     "Conversation",
     "UserSummary",
-    
+
     # Journal Models
     "JournalPrompt",
-    "JournalEntry", 
+    "JournalEntry",
     "JournalReflectionPoint",
-    
+
     # Appointment Models
     "Psychologist",
     "AppointmentType",
     "Appointment",
-    
+
     # Feedback Models
     "Feedback",
     "Survey",
     "SurveyQuestion",
     "SurveyResponse",
     "SurveyAnswer",
-    
+
     # Content Models
     "ContentResource",
     "CbtModule",
     "CbtModuleStep",
-    
+
     # Email Models
     "EmailTemplate",
     "EmailGroup",
     "EmailRecipient",
     "EmailLog",
-    
+
     # Social Models
     "Tweet",
     "UserBadge",
-    
+
     # Analytics Models
     "AnalyticsReport",
-    
+
     # Intervention Models
     "InterventionCampaign",
     "CampaignExecution",
     "InterventionAgentSettings",
-    
+
     # Agent Models
     "AgentRun",
     "AgentMessage",
-    
+
     # Assessment Models
     "TriageAssessment",
-    
+
     # Scheduling Models
     "TherapistSchedule",
     "FlaggedSession",
-    
+
     # Clinical Analytics Models (Phase 2)
     "ValidatedAssessment",
-    "ClinicalOutcome", 
+    "ClinicalOutcome",
     "ServiceUtilization",
     "InterventionOutcome",
     "SystemPerformanceMetric",
     "ClinicalInsight",
-    
+
     # LangGraph Tracking Models (Phase 2)
     "LangGraphExecution",
     "LangGraphNodeExecution",
     "LangGraphEdgeExecution",
     "LangGraphPerformanceMetric",
-    "LangGraphAlert"
+    "LangGraphAlert",
+
+    # Safety Agent Data Models
+    "Event",
+    "Message",
+    "Consent",
+    "Case",
+    "Resource",
+    "AgentUser",
+    "AgentNameEnum",
+    "MessageRoleEnum",
+    "ConsentScopeEnum",
+    "CaseStatusEnum",
+    "CaseSeverityEnum",
+    "AgentRoleEnum",
 ]

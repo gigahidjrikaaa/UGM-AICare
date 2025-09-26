@@ -36,6 +36,8 @@ class User(Base):
     wallet_address: Mapped[Optional[str]] = mapped_column(String, unique=True, index=True, nullable=True)
     role: Mapped[str] = mapped_column(String, default="user", nullable=False)
     password_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    password_reset_token: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    password_reset_expires: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
     created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.now, nullable=True)

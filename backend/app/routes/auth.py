@@ -370,14 +370,138 @@ async def register_user(
 
 
 @router.post("/forgot-password", response_model=ForgotPasswordResponse)
-async def forgot_password(request: ForgotPasswordRequest) -> ForgotPasswordResponse:
+async def forgot_password(
+    request: ForgotPasswordRequest,
+    db: AsyncSession = Depends(get_async_db)
+) -> ForgotPasswordResponse:
+    """Initiate password reset process."""
     try:
         logger.info("Password reset request for: %s", request.email)
 
-        # TODO: Implement password reset email dispatch
+        from app.utils.password_reset import create_password_reset_token
+        
+        # Create password reset token and send email
+        await create_password_reset_token(db, request.email)
+
+        # Always return the same message for security (don't reveal if email exists)
         return ForgotPasswordResponse(
             message="If an account with this email exists, a password reset link has been sent."
         )
+    except Exception as exc:
+        logger.error("Password reset error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during password reset",
+        ) from exc
+
+
+@router.post("/validate-reset-token")
+async def validate_reset_token(
+    request: dict,
+    db: AsyncSession = Depends(get_async_db)
+) -> dict:
+    """Validate a password reset token."""
+    try:
+        token = request.get("token")
+        if not token or not isinstance(token, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Valid token is required"
+            )
+
+        from app.utils.password_reset import is_token_expired
+        from sqlalchemy import select
+        from app.models.user import User
+        
+        # Find user by reset token
+        result = await db.execute(
+            select(User).where(User.password_reset_token == token)
+        )
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            return {
+                "valid": False,
+                "message": "Invalid reset token"
+            }
+            
+        # Check if token is expired
+        if is_token_expired(user.password_reset_expires):
+            return {
+                "valid": False,
+                "message": "Reset token has expired"
+            }
+            
+        from app.utils.security_utils import decrypt_data
+        email = decrypt_data(user.email) if user.email else None
+            
+        return {
+            "valid": True,
+            "message": "Token is valid",
+            "email": email
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error("Token validation error: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Internal server error during token validation",
+        ) from exc
+
+
+@router.post("/reset-password")
+async def reset_password(
+    request: dict,
+    db: AsyncSession = Depends(get_async_db)
+) -> dict:
+    """Reset password using a valid reset token."""
+    try:
+        token = request.get("token")
+        new_password = request.get("new_password")
+        confirm_password = request.get("confirm_password")
+        
+        if not all([token, new_password, confirm_password]):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Token, new password, and confirmation password are required"
+            )
+            
+        # Type validation
+        if not isinstance(token, str) or not isinstance(new_password, str) or not isinstance(confirm_password, str):
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Invalid data types provided"
+            )
+            
+        if new_password != confirm_password:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password confirmation does not match"
+            )
+            
+        if len(new_password) < 8:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="Password must be at least 8 characters long"
+            )
+
+        from app.utils.password_reset import reset_password_with_token
+        
+        # Reset the password
+        result = await reset_password_with_token(db, token, new_password)
+        
+        if not result["success"]:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=result["message"]
+            )
+            
+        return result
+        
+    except HTTPException:
+        raise
     except Exception as exc:
         logger.error("Password reset error: %s", exc)
         raise HTTPException(
