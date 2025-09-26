@@ -26,6 +26,10 @@ from app.routes import (
     langgraph_analytics,
     clinical_analytics_routes,
 )
+from app.agents.sta import router as sta_router
+from app.agents.sca import router as sca_router
+from app.agents.sda import router as sda_router
+from app.agents.ia import router as ia_router
 from contextlib import asynccontextmanager
 from app.core.scheduler import start_scheduler, shutdown_scheduler
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
@@ -150,6 +154,11 @@ app.include_router(profile.router)
 app.include_router(admin.router)  # Admin endpoints
 app.include_router(agents.router)
 app.include_router(triage.router)
+# TODO: wire new agent routers once services are implemented
+app.include_router(sta_router)
+app.include_router(sca_router)
+app.include_router(sda_router)
+app.include_router(ia_router)
 app.include_router(langgraph.router)
 app.include_router(langgraph_analytics.router)
 app.include_router(appointments.router)
