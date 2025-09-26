@@ -112,23 +112,25 @@ export function ClinicalAnalyticsDashboard() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-6 shadow-2xl">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 flex items-center space-x-3">
-              <FiBarChart className="h-7 w-7 text-blue-600" />
+            <h1 className="text-2xl font-bold text-white flex items-center space-x-3">
+              <div className="bg-[#FFCA40]/20 rounded-full p-2">
+                <FiBarChart className="h-7 w-7 text-[#FFCA40]" />
+              </div>
               <span>Clinical Analytics</span>
             </h1>
-            <p className="text-gray-600 mt-1">
+            <p className="text-white/70 mt-1">
               Privacy-preserving clinical intelligence and treatment outcome analysis
             </p>
           </div>
           <div className="flex items-center space-x-2">
-            <div className="flex items-center space-x-1 text-sm text-green-600 bg-green-50 px-3 py-1 rounded-full">
+            <div className="flex items-center space-x-1 text-sm text-green-400 bg-green-500/20 px-3 py-1 rounded-full backdrop-blur-sm border border-green-400/30">
               <FiCheckCircle className="h-4 w-4" />
               <span>Privacy Compliant</span>
             </div>
-            <div className="flex items-center space-x-1 text-sm text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+            <div className="flex items-center space-x-1 text-sm text-[#FFCA40] bg-[#FFCA40]/20 px-3 py-1 rounded-full backdrop-blur-sm border border-[#FFCA40]/30">
               <FiShield className="h-4 w-4" />
               <span>Differential Privacy</span>
             </div>
@@ -137,11 +139,13 @@ export function ClinicalAnalyticsDashboard() {
       </div>
 
       {/* Ethics Notice */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+      <div className="bg-ugm-blue/20 backdrop-blur-md border border-ugm-blue/30 rounded-xl p-4">
         <div className="flex items-start space-x-3">
-          <FiInfo className="h-5 w-5 text-blue-600 mt-0.5" />
-          <div className="text-sm text-blue-800">
-            <div className="font-medium mb-1">Clinical Intelligence Platform</div>
+          <div className="bg-[#FFCA40]/20 rounded-full p-1.5 mt-0.5">
+            <FiInfo className="h-4 w-4 text-[#FFCA40]" />
+          </div>
+          <div className="text-sm text-white/90">
+            <div className="font-semibold mb-2 text-[#FFCA40]">Clinical Intelligence Platform</div>
             <p>
               This system has been redesigned to replace surveillance-based analytics with privacy-preserving 
               clinical intelligence. All data is protected through differential privacy (ε-δ), k-anonymity, 
@@ -153,8 +157,8 @@ export function ClinicalAnalyticsDashboard() {
       </div>
 
       {/* Tab Navigation */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200">
-        <div className="border-b border-gray-200">
+      <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 shadow-2xl">
+        <div className="border-b border-white/20">
           <nav className="flex space-x-0" aria-label="Analytics tabs">
             {tabs.map((tab) => {
               const Icon = tab.icon;
@@ -164,18 +168,18 @@ export function ClinicalAnalyticsDashboard() {
                 <button
                   key={tab.id}
                   onClick={() => setActiveTab(tab.id)}
-                  className={`relative flex-1 py-4 px-6 text-sm font-medium transition-colors duration-200 ${
+                  className={`relative flex-1 py-4 px-6 text-sm font-medium transition-all duration-300 ${
                     isActive
-                      ? 'text-blue-600 bg-blue-50 border-b-2 border-blue-600'
-                      : 'text-gray-600 hover:text-gray-900 hover:bg-gray-50'
+                      ? 'text-[#FFCA40] bg-ugm-blue/30 border-b-2 border-[#FFCA40]'
+                      : 'text-white/70 hover:text-white hover:bg-white/5'
                   }`}
                   aria-current={isActive ? 'page' : undefined}
                 >
                   <div className="flex items-center justify-center space-x-2">
-                    <Icon className={`h-4 w-4 ${isActive ? 'text-blue-600' : 'text-gray-400'}`} />
+                    <Icon className={`h-4 w-4 ${isActive ? 'text-[#FFCA40]' : 'text-white/60'}`} />
                     <span>{tab.label}</span>
                   </div>
-                  <div className={`text-xs mt-1 ${isActive ? 'text-blue-600' : 'text-gray-500'}`}>
+                  <div className={`text-xs mt-1 ${isActive ? 'text-[#FFCA40]/80' : 'text-white/50'}`}>
                     {tab.description}
                   </div>
                 </button>
@@ -197,39 +201,84 @@ export function ClinicalAnalyticsDashboard() {
       </div>
 
       {/* Footer Information */}
-      <div className="bg-gray-50 rounded-lg p-4 text-sm text-gray-600">
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 p-6 text-sm text-white/70">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div>
-            <div className="font-medium text-gray-900 mb-1">Privacy Protection</div>
-            <ul className="space-y-1 text-xs">
-              <li>• Differential privacy with ε-δ parameters</li>
-              <li>• K-anonymity protection (k≥5)</li>
-              <li>• Privacy budget monitoring</li>
-              <li>• Consent-aware data processing</li>
+            <div className="font-semibold text-[#FFCA40] mb-3 flex items-center space-x-2">
+              <FiShield className="h-4 w-4" />
+              <span>Privacy Protection</span>
+            </div>
+            <ul className="space-y-2 text-xs text-white/60">
+              <li className="flex items-center space-x-2">
+                <div className="w-1 h-1 bg-[#FFCA40]/60 rounded-full"></div>
+                <span>Differential privacy with ε-δ parameters</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <div className="w-1 h-1 bg-[#FFCA40]/60 rounded-full"></div>
+                <span>K-anonymity protection (k≥5)</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <div className="w-1 h-1 bg-[#FFCA40]/60 rounded-full"></div>
+                <span>Privacy budget monitoring</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <div className="w-1 h-1 bg-[#FFCA40]/60 rounded-full"></div>
+                <span>Consent-aware data processing</span>
+              </li>
             </ul>
           </div>
           <div>
-            <div className="font-medium text-gray-900 mb-1">Clinical Standards</div>
-            <ul className="space-y-1 text-xs">
-              <li>• Evidence-based outcome analysis</li>
-              <li>• Clinical significance testing (MCID, RCI)</li>
-              <li>• Professional validation required</li>
-              <li>• Standardized assessment instruments</li>
+            <div className="font-semibold text-[#FFCA40] mb-3 flex items-center space-x-2">
+              <FiActivity className="h-4 w-4" />
+              <span>Clinical Standards</span>
+            </div>
+            <ul className="space-y-2 text-xs text-white/60">
+              <li className="flex items-center space-x-2">
+                <div className="w-1 h-1 bg-[#FFCA40]/60 rounded-full"></div>
+                <span>Evidence-based outcome analysis</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <div className="w-1 h-1 bg-[#FFCA40]/60 rounded-full"></div>
+                <span>Clinical significance testing (MCID, RCI)</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <div className="w-1 h-1 bg-[#FFCA40]/60 rounded-full"></div>
+                <span>Professional validation required</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <div className="w-1 h-1 bg-[#FFCA40]/60 rounded-full"></div>
+                <span>Standardized assessment instruments</span>
+              </li>
             </ul>
           </div>
           <div>
-            <div className="font-medium text-gray-900 mb-1">System Compliance</div>
-            <ul className="space-y-1 text-xs">
-              <li>• HIPAA privacy compliance</li>
-              <li>• Audit trail maintenance</li>
-              <li>• Regular compliance monitoring</li>
-              <li>• Transparent methodology</li>
+            <div className="font-semibold text-[#FFCA40] mb-3 flex items-center space-x-2">
+              <FiCheckCircle className="h-4 w-4" />
+              <span>System Compliance</span>
+            </div>
+            <ul className="space-y-2 text-xs text-white/60">
+              <li className="flex items-center space-x-2">
+                <div className="w-1 h-1 bg-[#FFCA40]/60 rounded-full"></div>
+                <span>HIPAA privacy compliance</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <div className="w-1 h-1 bg-[#FFCA40]/60 rounded-full"></div>
+                <span>Audit trail maintenance</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <div className="w-1 h-1 bg-[#FFCA40]/60 rounded-full"></div>
+                <span>Regular compliance monitoring</span>
+              </li>
+              <li className="flex items-center space-x-2">
+                <div className="w-1 h-1 bg-[#FFCA40]/60 rounded-full"></div>
+                <span>Transparent methodology</span>
+              </li>
             </ul>
           </div>
         </div>
         
-        <div className="mt-4 pt-4 border-t border-gray-200 text-center">
-          <p className="text-xs text-gray-500">
+        <div className="mt-6 pt-4 border-t border-white/10 text-center">
+          <p className="text-xs text-white/50">
             Last system update: {new Date().toLocaleDateString()} • 
             Privacy framework: Differential Privacy v2.1 • 
             Clinical validation: Evidence-based standards

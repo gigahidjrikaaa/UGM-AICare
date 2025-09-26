@@ -264,9 +264,9 @@ export function ClinicalOversight({ className = '' }: ClinicalOversightProps) {
     return (
       <div className={`space-y-6 ${className}`}>
         <div className="animate-pulse space-y-4">
-          <div className="bg-gray-200 rounded-lg h-12 w-full"></div>
+          <div className="bg-white/10 rounded-xl h-16 w-full border border-white/20 backdrop-blur-md"></div>
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="bg-gray-200 rounded-lg h-32 w-full"></div>
+            <div key={i} className="bg-white/5 rounded-xl h-40 w-full border border-white/10 backdrop-blur-md"></div>
           ))}
         </div>
       </div>
@@ -276,19 +276,23 @@ export function ClinicalOversight({ className = '' }: ClinicalOversightProps) {
   if (error) {
     return (
       <div className={`${className}`}>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+        <div className="bg-red-500/10 backdrop-blur-md border border-red-400/50 rounded-xl p-6 shadow-lg">
           <div className="flex items-center space-x-3">
-            <FiAlertTriangle className="h-5 w-5 text-red-500" />
+            <div className="bg-red-500/20 rounded-full p-2">
+              <FiAlertTriangle className="h-5 w-5 text-red-400" />
+            </div>
             <div>
-              <h3 className="text-red-800 font-medium">Error Loading Clinical Oversight</h3>
-              <p className="text-red-600 text-sm mt-1">{error}</p>
-              <button 
+              <h3 className="text-red-300 font-semibold">Error Loading Clinical Oversight</h3>
+              <p className="text-red-400/80 text-sm mt-1">{error}</p>
+              <motion.button 
                 onClick={loadPendingInsights}
-                className="mt-3 text-red-700 hover:text-red-800 text-sm font-medium flex items-center space-x-1"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="mt-3 bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-red-200 text-sm font-medium flex items-center space-x-2 px-4 py-2 rounded-lg border border-red-400/30 transition-all duration-300"
               >
                 <FiRefreshCw className="h-4 w-4" />
                 <span>Retry</span>
-              </button>
+              </motion.button>
             </div>
           </div>
         </div>
@@ -299,25 +303,29 @@ export function ClinicalOversight({ className = '' }: ClinicalOversightProps) {
   return (
     <div className={`space-y-6 ${className}`}>
       {/* Header */}
-      <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
+      <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-6 shadow-2xl">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-xl font-semibold text-gray-900 flex items-center space-x-2">
-              <FiUser className="h-5 w-5 text-blue-600" />
+            <h2 className="text-xl font-bold text-white flex items-center space-x-3">
+              <div className="bg-[#FFCA40]/20 rounded-full p-2">
+                <FiUser className="h-5 w-5 text-[#FFCA40]" />
+              </div>
               <span>Clinical Oversight</span>
             </h2>
-            <p className="text-gray-600 text-sm mt-1">
+            <p className="text-white/70 text-sm mt-2">
               Review and validate AI-generated clinical insights before implementation
             </p>
           </div>
           <div className="flex items-center space-x-3">
-            <button
+            <motion.button
               onClick={loadPendingInsights}
-              className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+              whileHover={{ scale: 1.05, backgroundColor: "rgba(255, 202, 64, 0.2)" }}
+              whileTap={{ scale: 0.95 }}
+              className="flex items-center space-x-2 px-4 py-2 text-sm font-medium text-white bg-white/10 border border-white/30 rounded-lg hover:border-[#FFCA40]/50 transition-all duration-300 backdrop-blur-sm"
             >
               <FiRefreshCw className="h-4 w-4" />
               <span>Refresh</span>
-            </button>
+            </motion.button>
           </div>
         </div>
       </div>

@@ -111,7 +111,12 @@ export function ClinicalAnalyticsOverview({ className = '' }: ClinicalOverviewPr
         <div className="animate-pulse">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="bg-gray-200 rounded-lg h-32"></div>
+              <div key={i} className="bg-white/10 rounded-2xl h-32 border border-white/20 backdrop-blur-md"></div>
+            ))}
+          </div>
+          <div className="space-y-4 mt-8">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className="bg-white/5 rounded-2xl h-24 border border-white/10 backdrop-blur-md"></div>
             ))}
           </div>
         </div>
@@ -122,18 +127,22 @@ export function ClinicalAnalyticsOverview({ className = '' }: ClinicalOverviewPr
   if (error) {
     return (
       <div className={`${className}`}>
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+        <div className="bg-red-500/10 backdrop-blur-md border border-red-400/50 rounded-2xl p-6 shadow-lg">
           <div className="flex items-center space-x-3">
-            <FiAlertTriangle className="h-5 w-5 text-red-500" />
+            <div className="bg-red-500/20 rounded-full p-2">
+              <FiAlertTriangle className="h-5 w-5 text-red-400" />
+            </div>
             <div>
-              <h3 className="text-red-800 font-medium">Error Loading Clinical Data</h3>
-              <p className="text-red-600 text-sm mt-1">{error}</p>
-              <button 
+              <h3 className="text-red-300 font-semibold">Error Loading Clinical Data</h3>
+              <p className="text-red-400/80 text-sm mt-1">{error}</p>
+              <motion.button 
                 onClick={loadClinicalData}
-                className="mt-3 text-red-700 hover:text-red-800 text-sm font-medium"
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                className="mt-3 bg-red-500/20 hover:bg-red-500/30 text-red-300 hover:text-red-200 text-sm font-medium px-4 py-2 rounded-lg border border-red-400/30 transition-all duration-300"
               >
                 Try Again
-              </button>
+              </motion.button>
             </div>
           </div>
         </div>
@@ -200,78 +209,112 @@ export function ClinicalAnalyticsOverview({ className = '' }: ClinicalOverviewPr
         >
           <div className="space-y-6">
             {/* Analysis Period */}
-            <div className="bg-blue-50 rounded-lg p-4">
-              <div className="flex items-center space-x-2 mb-2">
-                <FiInfo className="h-4 w-4 text-blue-600" />
-                <h4 className="font-medium text-blue-900">Analysis Period</h4>
+            <div className="bg-ugm-blue/10 backdrop-blur-sm border border-ugm-blue/20 rounded-xl p-5">
+              <div className="flex items-center space-x-2 mb-3">
+                <div className="bg-[#FFCA40]/20 rounded-full p-1.5">
+                  <FiInfo className="h-4 w-4 text-[#FFCA40]" />
+                </div>
+                <h4 className="font-semibold text-white">Analysis Period</h4>
               </div>
-              <p className="text-blue-800 text-sm">
+              <p className="text-white/90 text-sm">
                 {new Date(clinicalReport.analysis_period.start_date).toLocaleDateString()} - {' '}
                 {new Date(clinicalReport.analysis_period.end_date).toLocaleDateString()} 
                 ({clinicalReport.analysis_period.duration_days} days)
               </p>
-              <p className="text-blue-700 text-xs mt-1">
-                Privacy Level: <span className="font-medium capitalize">{clinicalReport.privacy_level}</span>
+              <p className="text-white/70 text-xs mt-2">
+                Privacy Level: <span className="font-medium capitalize text-[#FFCA40]">{clinicalReport.privacy_level}</span>
               </p>
             </div>
 
             {/* Treatment Outcomes Summary */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="bg-green-50 rounded-lg p-4">
-                <h4 className="font-medium text-green-900 mb-2">High Effectiveness</h4>
-                <div className="text-2xl font-bold text-green-800">
+              <motion.div 
+                whileHover={{ scale: 1.02, y: -2 }}
+                className="bg-green-500/10 backdrop-blur-sm border border-green-400/30 rounded-xl p-5 shadow-lg"
+              >
+                <h4 className="font-semibold text-green-400 mb-3 flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-green-400 rounded-full"></div>
+                  <span>High Effectiveness</span>
+                </h4>
+                <div className="text-3xl font-bold text-white mb-2">
                   {clinicalReport.treatment_outcomes_summary.high_effectiveness_count}
                 </div>
-                <p className="text-green-700 text-sm">Interventions showing strong clinical significance</p>
-              </div>
+                <p className="text-white/70 text-sm">Interventions showing strong clinical significance</p>
+              </motion.div>
 
-              <div className="bg-blue-50 rounded-lg p-4">
-                <h4 className="font-medium text-blue-900 mb-2">Moderate Effectiveness</h4>
-                <div className="text-2xl font-bold text-blue-800">
+              <motion.div 
+                whileHover={{ scale: 1.02, y: -2 }}
+                className="bg-ugm-blue/10 backdrop-blur-sm border border-ugm-blue/30 rounded-xl p-5 shadow-lg"
+              >
+                <h4 className="font-semibold text-ugm-blue-light mb-3 flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-ugm-blue-light rounded-full"></div>
+                  <span>Moderate Effectiveness</span>
+                </h4>
+                <div className="text-3xl font-bold text-white mb-2">
                   {clinicalReport.treatment_outcomes_summary.moderate_effectiveness_count}
                 </div>
-                <p className="text-blue-700 text-sm">Interventions showing moderate clinical benefit</p>
-              </div>
+                <p className="text-white/70 text-sm">Interventions showing moderate clinical benefit</p>
+              </motion.div>
 
-              <div className="bg-purple-50 rounded-lg p-4">
-                <h4 className="font-medium text-purple-900 mb-2">Total Analyses</h4>
-                <div className="text-2xl font-bold text-purple-800">
+              <motion.div 
+                whileHover={{ scale: 1.02, y: -2 }}
+                className="bg-[#FFCA40]/10 backdrop-blur-sm border border-[#FFCA40]/30 rounded-xl p-5 shadow-lg"
+              >
+                <h4 className="font-semibold text-[#FFCA40] mb-3 flex items-center space-x-2">
+                  <div className="w-2 h-2 bg-[#FFCA40] rounded-full"></div>
+                  <span>Total Analyses</span>
+                </h4>
+                <div className="text-3xl font-bold text-white mb-2">
                   {clinicalReport.treatment_outcomes_summary.total_analyses}
                 </div>
-                <p className="text-purple-700 text-sm">Evidence-based outcome measurements</p>
-              </div>
+                <p className="text-white/70 text-sm">Evidence-based outcome measurements</p>
+              </motion.div>
             </div>
 
             {/* Service Optimization Recommendations */}
             {clinicalReport.service_optimization.recommendations.length > 0 && (
-              <div className="bg-yellow-50 rounded-lg p-4">
-                <div className="flex items-center space-x-2 mb-3">
-                  <FiTrendingUp className="h-4 w-4 text-yellow-600" />
-                  <h4 className="font-medium text-yellow-900">
-                    Service Optimization Recommendations 
-                    <span className={`ml-2 px-2 py-1 text-xs rounded-full ${
-                      clinicalReport.service_optimization.priority_level === 'high' 
-                        ? 'bg-red-100 text-red-700' 
-                        : 'bg-blue-100 text-blue-700'
-                    }`}>
-                      {clinicalReport.service_optimization.priority_level} priority
-                    </span>
-                  </h4>
+              <motion.div 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-[#FFCA40]/10 backdrop-blur-sm border border-[#FFCA40]/30 rounded-xl p-5 shadow-lg"
+              >
+                <div className="flex items-center justify-between mb-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="bg-[#FFCA40]/20 rounded-full p-2">
+                      <FiTrendingUp className="h-4 w-4 text-[#FFCA40]" />
+                    </div>
+                    <h4 className="font-semibold text-white">
+                      Service Optimization Recommendations
+                    </h4>
+                  </div>
+                  <span className={`px-3 py-1 text-xs rounded-full font-medium backdrop-blur-sm border ${
+                    clinicalReport.service_optimization.priority_level === 'high' 
+                      ? 'bg-red-500/20 text-red-400 border-red-400/30' 
+                      : 'bg-ugm-blue/20 text-ugm-blue-light border-ugm-blue/30'
+                  }`}>
+                    {clinicalReport.service_optimization.priority_level} priority
+                  </span>
                 </div>
-                <ul className="space-y-2">
+                <div className="space-y-3">
                   {clinicalReport.service_optimization.recommendations.slice(0, 5).map((rec, index) => (
-                    <li key={index} className="flex items-start space-x-2 text-sm text-yellow-800">
-                      <div className="w-2 h-2 rounded-full bg-yellow-400 mt-2 flex-shrink-0"></div>
+                    <motion.div 
+                      key={index} 
+                      initial={{ opacity: 0, x: -10 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="flex items-start space-x-3 text-sm text-white/90"
+                    >
+                      <div className="w-2 h-2 rounded-full bg-[#FFCA40] mt-2 flex-shrink-0"></div>
                       <span>{rec}</span>
-                    </li>
+                    </motion.div>
                   ))}
-                </ul>
+                </div>
                 {clinicalReport.service_optimization.recommendations.length > 5 && (
-                  <p className="text-yellow-700 text-xs mt-2">
-                    +{clinicalReport.service_optimization.recommendations.length - 5} more recommendations
+                  <p className="text-white/60 text-xs mt-3 italic">
+                    +{clinicalReport.service_optimization.recommendations.length - 5} more recommendations available
                   </p>
                 )}
-              </div>
+              </motion.div>
             )}
           </div>
         </CollapsibleSection>
@@ -286,24 +329,29 @@ export function ClinicalAnalyticsOverview({ className = '' }: ClinicalOverviewPr
           onToggle={handleToggleSection}
         >
           <div className="space-y-4">
-            {Object.entries(treatmentOutcomes).slice(0, 5).map(([key, outcome]) => (
+            {Object.entries(treatmentOutcomes).slice(0, 5).map(([key, outcome], index) => (
               <motion.div
                 key={key}
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="border border-gray-200 rounded-lg p-4"
+                transition={{ delay: index * 0.1 }}
+                whileHover={{ scale: 1.01, y: -2 }}
+                className="border border-white/20 bg-white/5 backdrop-blur-md rounded-xl p-6 shadow-lg hover:bg-white/10"
               >
-                <div className="flex justify-between items-start mb-3">
+                <div className="flex justify-between items-start mb-4">
                   <div>
-                    <h4 className="font-medium text-gray-900">
+                    <h4 className="font-semibold text-white text-lg mb-2">
                       {outcome.intervention_type} + {outcome.instrument_type}
                     </h4>
-                    <p className="text-sm text-gray-600">
-                      Sample size: {outcome.sample_size} participants
+                    <p className="text-sm text-white/70 flex items-center space-x-2">
+                      <span>Sample size:</span>
+                      <span className="bg-ugm-blue/20 text-ugm-blue-light px-2 py-1 rounded-full text-xs font-medium">
+                        {outcome.sample_size} participants
+                      </span>
                     </p>
                   </div>
                   <div className="flex space-x-2">
-                    <span className={`px-2 py-1 text-xs rounded-full ${getClinicalSignificanceColor(outcome.clinical_significance.rating)}`}>
+                    <span className={`px-3 py-1 text-xs rounded-full font-medium backdrop-blur-sm border ${getClinicalSignificanceColor(outcome.clinical_significance.rating)}`}>
                       {outcome.clinical_significance.rating} significance
                     </span>
                     <span className={`px-2 py-1 text-xs rounded-full ${getEvidenceQualityColor(outcome.evidence_quality)}`}>
