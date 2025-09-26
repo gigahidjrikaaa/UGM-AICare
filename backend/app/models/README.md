@@ -6,7 +6,7 @@ The UGM-AICare backend models have been completely modularized from a single lar
 
 ## File Structure
 
-```
+```bash
 backend/app/models/
 ├── __init__.py                 # Central imports and exports
 ├── user.py                    # User authentication and profiles
