@@ -158,7 +158,7 @@ class ClinicalOutcome(Base):
 
 ## 🔧 **Step 2: Implement Statistical Analysis Engine**
 
-#### **2.1 Create Statistical Analysis Service**
+### **2.1 Create Statistical Analysis Service**
 
 **File**: `backend/app/services/statistical_analysis.py`
 
@@ -267,7 +267,7 @@ class StatisticalAnalysisEngine:
 
 ## 🔧 **Step 3: Implement Privacy-Preserving Analytics**
 
-#### **3.1 Create Privacy Engine**
+### **3.1 Create Privacy Engine**
 
 **File**: `backend/app/services/privacy_engine.py`
 
@@ -330,7 +330,7 @@ class PrivacyPreservingAnalyzer:
 
 ## 🎨 **Step 4: Update Frontend Dashboard**
 
-#### **4.1 New Analytics Dashboard Component**
+### **4.1 New Analytics Dashboard Component**
 
 **File**: `frontend/src/components/admin/analytics/ClinicalOutcomesDashboard.tsx`
 

@@ -1,6 +1,7 @@
 # Safety Agent Refactor Plan
 
 ## Files/Directories To Remove Or Retire
+
 - `backend/app/agents/triage_agent.py` -> replace with `agents/sta/*`
 - `backend/app/agents/intervention_agent.py` -> replace with `agents/sca/*`
 - `backend/app/agents/analytics_agent.py` -> replace with `agents/ia/*`
@@ -12,6 +13,7 @@
 - User chat UI extras directly invoking legacy analytics/triage endpoints (search for `/triage`, `/analytics`, `/interventions`) -> update to new STA/SCA flows
 
 ## New Modules To Add
+
 - `backend/app/agents/sta/{router.py,service.py,classifiers.py,schemas.py}`
 - `backend/app/agents/sca/{router.py,service.py,modules/__init__.py,resources.py,schemas.py}`
 - `backend/app/agents/sda/{router.py,service.py,sla.py,schemas.py}`
@@ -25,6 +27,7 @@
 - Documentation: `docs/agent_contracts.md`, `docs/privacy_safeguards.md`, `DEPRECATED.md`
 
 ## Alembic & Data Migration Steps
+
 - Create revision `introduce_sda_ia_schema_and_events_overhaul` adding new tables (`events`, `messages`, `consents`, `cases`, `resources`, `users` minimal) with required indexes and enums
 - Ensure downgrade drops new objects without disturbing legacy tables (document data loss implications)
 - Implement backfill script to transform legacy event/message data into new structures with PII redaction before insert
@@ -35,6 +38,7 @@
 - Added backfill routine `backend/scripts/backfill_agent_data.py` as migration dependency.
 
 ## Risk Areas & TODOs
+
 - PII redaction: need deterministic hashing for `user_hash` and robust `prelog_redact`; validate against existing logging paths
 - RBAC changes: ensure existing auth dependencies integrate with new `core/rbac.py` and do not break non-agent routes
 - Feature flag enforcement: audit all experiment toggles to avoid crisis flow exposure
@@ -44,6 +48,7 @@
 - Operational rollout: coordinate migration order (DB first, backend deployment, then frontend) and provide rollback guidance
 
 ## Next Steps
+
 1. Scaffold new backend agent packages and core utilities while stubbing dependencies
 2. Design SQLAlchemy models + alembic revision to support new data model
 3. Implement redaction/policy utilities and integrate into agent services
