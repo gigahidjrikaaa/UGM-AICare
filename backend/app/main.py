@@ -26,10 +26,10 @@ from app.routes import (
     langgraph_analytics,
     clinical_analytics_routes,
 )
-from app.agents.sta import router as sta_router
-from app.agents.sca import router as sca_router
-from app.agents.sda import router as sda_router
-from app.agents.ia import router as ia_router
+from app.agents.sta.router import router as sta_router
+from app.agents.sca.router import router as sca_router
+from app.agents.sda.router import router as sda_router
+from app.agents.ia.router import router as ia_router
 from contextlib import asynccontextmanager
 from app.core.scheduler import start_scheduler, shutdown_scheduler
 from fastapi.middleware.cors import CORSMiddleware # type: ignore

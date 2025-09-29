@@ -1,7 +1,7 @@
 """Performance tracking middleware for FastAPI."""
 
 import time
-from typing import Callable
+from typing import Callable, Optional
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -10,7 +10,7 @@ from app.services.api_performance import get_performance_service
 class PerformanceTrackingMiddleware(BaseHTTPMiddleware):
     """Middleware to track API request performance metrics."""
     
-    def __init__(self, app, exclude_paths: list = None):
+    def __init__(self, app, exclude_paths: Optional[list] = None):
         super().__init__(app)
         self.exclude_paths = exclude_paths or [
             "/docs",
