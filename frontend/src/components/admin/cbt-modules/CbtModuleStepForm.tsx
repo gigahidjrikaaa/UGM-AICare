@@ -7,7 +7,10 @@ import Input from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/TextArea';
 import Select from '@/components/ui/Select';
 
-interface CbtModuleStep {
+type JsonValue = string | number | boolean | null | JsonValue[] | { [key: string]: JsonValue };
+type JsonObject = Record<string, JsonValue>;
+
+export interface CbtModuleStep {
     id: number;
     module_id: number;
     step_order: number;
@@ -16,12 +19,28 @@ interface CbtModuleStep {
     user_input_type: string | null;
     user_input_variable: string | null;
     feedback_prompt: string | null;
-    options: any;
+    options: JsonObject | null;
     tool_to_run: string | null;
     is_skippable: boolean;
     delay_after_ms: number;
     parent_id: number | null;
-    extra_data: any;
+    extra_data: JsonObject | null;
+}
+
+interface CbtModuleStepFormState {
+    module_id: number;
+    step_order: number;
+    step_type: string;
+    content: string;
+    user_input_type: string;
+    user_input_variable: string;
+    feedback_prompt: string;
+    options: JsonObject;
+    tool_to_run: string;
+    is_skippable: boolean;
+    delay_after_ms: number;
+    parent_id: number | null;
+    extra_data: JsonObject;
 }
 
 interface CbtModuleStepFormProps {
@@ -31,8 +50,8 @@ interface CbtModuleStepFormProps {
 }
 
 const CbtModuleStepForm: React.FC<CbtModuleStepFormProps> = ({ moduleId, step, onSuccess }) => {
-    const [formData, setFormData] = useState({
-        module_id: moduleId,
+    const createInitialState = (id: number): CbtModuleStepFormState => ({
+        module_id: id,
         step_order: 0,
         step_type: 'psychoeducation',
         content: '',
@@ -46,37 +65,66 @@ const CbtModuleStepForm: React.FC<CbtModuleStepFormProps> = ({ moduleId, step, o
         parent_id: null,
         extra_data: {},
     });
+
+    const [formData, setFormData] = useState<CbtModuleStepFormState>(() => createInitialState(moduleId));
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
         if (step) {
             setFormData({
-                ...step,
-                options: step.options || {},
-                extra_data: step.extra_data || {},
+                module_id: moduleId,
+                step_order: step.step_order,
+                step_type: step.step_type,
+                content: step.content,
+                user_input_type: step.user_input_type ?? 'none',
+                user_input_variable: step.user_input_variable ?? '',
+                feedback_prompt: step.feedback_prompt ?? '',
+                options: step.options ?? {},
+                tool_to_run: step.tool_to_run ?? '',
+                is_skippable: step.is_skippable,
+                delay_after_ms: step.delay_after_ms,
+                parent_id: step.parent_id,
+                extra_data: step.extra_data ?? {},
             });
+        } else {
+            setFormData(createInitialState(moduleId));
         }
-    }, [step]);
+    }, [step, moduleId]);
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-        const { name, value, type } = e.target;
-        const checked = (e.target as HTMLInputElement).checked;
+    const handleChange = (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+        const { name } = event.target;
+        const field = name as keyof CbtModuleStepFormState;
+
+        let nextValue: CbtModuleStepFormState[typeof field];
+
+        if (event.target instanceof HTMLInputElement && event.target.type === 'checkbox') {
+            nextValue = event.target.checked as CbtModuleStepFormState[typeof field];
+        } else if (field === 'step_order' || field === 'delay_after_ms') {
+            nextValue = Number(event.target.value) as CbtModuleStepFormState[typeof field];
+        } else if (field === 'parent_id') {
+            nextValue = (event.target.value === '' ? null : Number(event.target.value)) as CbtModuleStepFormState[typeof field];
+        } else {
+            nextValue = event.target.value as CbtModuleStepFormState[typeof field];
+        }
+
         setFormData(prev => ({
             ...prev,
-            [name]: type === 'checkbox' ? checked : value,
+            [field]: nextValue,
         }));
     };
 
     const handleJsonChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         try {
+            const field = name as 'options' | 'extra_data';
             setFormData(prev => ({
                 ...prev,
-                [name]: value ? JSON.parse(value) : {},
+                [field]: value ? JSON.parse(value) as JsonObject : {},
             }));
-        } catch (error) {
-            // Handle JSON parsing error if needed
+            setError(null);
+        } catch {
+            setError('Invalid JSON input. Please ensure the JSON is properly formatted.');
         }
     };
 
@@ -98,8 +146,9 @@ const CbtModuleStepForm: React.FC<CbtModuleStepFormProps> = ({ moduleId, step, o
                 });
             }
             onSuccess();
-        } catch (err: any) {
-            setError(err.message);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to save step';
+            setError(message);
         } finally {
             setIsSubmitting(false);
         }

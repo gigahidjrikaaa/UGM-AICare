@@ -82,15 +82,6 @@ interface ConversationsResponse {
   stats: ConversationStats;
 }
 // Grouped session view type
-interface SessionCardItem {
-  session_id: string;
-  user_id_hash: string;
-  message_count: number;
-  first_time: string;
-  last_time: string;
-  last_preview: string;
-}
-
 import { apiCall, authenticatedFetch } from '@/utils/adminApi';
 
 // API function (uses session automatically via adminApi)
@@ -139,6 +130,35 @@ const fetchSessions = async (params: { page: number; limit: number; session_sear
   if (params.date_to) query.append('date_to', params.date_to);
   return apiCall<SessionsListResponse>(`/api/v1/admin/conversation-sessions?${query.toString()}`);
 };
+
+const createDemoSessions = (): ConversationListItem[] => ([
+  {
+    id: 0,
+    user_id_hash: '8db3c65d',
+    session_id: 'e09ddd88',
+    conversation_id: 'e09ddd88',
+    message_preview: '',
+    response_preview:
+      'Hai! Gimana kabarmu hari ini? Ada sesuatu yang lagi kamu pikirin atau rasain yang pengen kamu bagiin? Aku di sini buat dengerin. 😊',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
+    message_length: 0,
+    response_length: 142,
+    session_message_count: 9
+  },
+  {
+    id: 1,
+    user_id_hash: '7c61e30b',
+    session_id: '69a96a0c',
+    conversation_id: '69a96a0c',
+    message_preview: '',
+    response_preview:
+      'Wah, makasih udah cerita. Rasanya wajar banget kok ngerasa capek belakangan ini. Mau coba kita atur langkah kecil bareng‑bareng?',
+    timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
+    message_length: 0,
+    response_length: 148,
+    session_message_count: 1
+  }
+]);
 
 // Components
 const ConversationCard: React.FC<{
@@ -246,8 +266,9 @@ const ConversationCard: React.FC<{
               document.body.appendChild(a);
               a.click();
               a.remove();
-            } catch (e: any) {
-              alert(e?.message || 'Failed to download transcript');
+            } catch (error) {
+              const message = error instanceof Error ? error.message : 'Failed to download transcript';
+              alert(message);
             }
           }}
           className="flex-1 min-w-[120px] flex items-center justify-center gap-1"
@@ -272,8 +293,9 @@ const ConversationCard: React.FC<{
               document.body.appendChild(a);
               a.click();
               a.remove();
-            } catch (e: any) {
-              alert(e?.message || 'Failed to download CSV');
+            } catch (error) {
+              const message = error instanceof Error ? error.message : 'Failed to download CSV';
+              alert(message);
             }
           }}
           className="flex-1 min-w-[120px] flex items-center justify-center gap-1"
@@ -398,35 +420,6 @@ function AIConversationsContent() {
   const ITEMS_PER_PAGE = 20;
 
   // Demo data used when API returns no sessions
-  const DEMO_SESSIONS: ConversationListItem[] = [
-    {
-      id: 0,
-      user_id_hash: '8db3c65d',
-      session_id: 'e09ddd88',
-      conversation_id: 'e09ddd88',
-      message_preview: '',
-      response_preview:
-        'Hai! Gimana kabarmu hari ini? Ada sesuatu yang lagi kamu pikirin atau rasain yang pengen kamu bagiin? Aku di sini buat dengerin. 😊',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 2).toISOString(),
-      message_length: 0,
-      response_length: 142,
-      session_message_count: 9
-    },
-    {
-      id: 1,
-      user_id_hash: '7c61e30b',
-      session_id: '69a96a0c',
-      conversation_id: '69a96a0c',
-      message_preview: '',
-      response_preview:
-        'Wah, makasih udah cerita. Rasanya wajar banget kok ngerasa capek belakangan ini. Mau coba kita atur langkah kecil bareng‑bareng?',
-      timestamp: new Date(Date.now() - 1000 * 60 * 60 * 24 * 5).toISOString(),
-      message_length: 0,
-      response_length: 148,
-      session_message_count: 1
-    }
-  ];
-
   // Flag modal state
   const [flagOpen, setFlagOpen] = useState(false);
   const [flagSessionId, setFlagSessionId] = useState<string | null>(null);
@@ -444,43 +437,57 @@ function AIConversationsContent() {
         sessions = sessions.filter(s => s.user_id_hash.toLowerCase().includes(needle));
       }
       if (!sessions.length) {
-        // Use demo data for a more illustrative UI when empty
         setUsingDemo(true);
-        setConversations(DEMO_SESSIONS);
-        setTotalCount(DEMO_SESSIONS.length);
+        const demoSessions = createDemoSessions();
+        setConversations(demoSessions);
+        setTotalCount(demoSessions.length);
+        setStats(null);
       } else {
         setUsingDemo(false);
-        setConversations(
-          sessions.map((s, idx) => {
-            const isAssistant = (s.last_role || 'assistant') === 'assistant';
-            const preview = s.last_preview || '';
-            const conv: ConversationListItem = {
-              id: idx,
-              user_id_hash: s.user_id_hash,
-              session_id: s.session_id,
-              conversation_id: s.session_id,
-              message_preview: isAssistant ? '' : preview,
-              response_preview: isAssistant ? preview : '',
-              timestamp: s.last_time,
-              message_length: isAssistant ? 0 : preview.length,
-              response_length: isAssistant ? preview.length : 0,
-              session_message_count: s.message_count,
-              last_text: s.last_text,
-              last_role: s.last_role,
-              open_flag_count: s.open_flag_count,
-            };
-            return conv;
-          })
-        );
+        const normalized = sessions.map((s, idx) => {
+          const isAssistant = (s.last_role || 'assistant') === 'assistant';
+          const preview = s.last_preview || '';
+          return {
+            id: idx,
+            user_id_hash: s.user_id_hash,
+            session_id: s.session_id,
+            conversation_id: s.session_id,
+            message_preview: isAssistant ? '' : preview,
+            response_preview: isAssistant ? preview : '',
+            timestamp: s.last_time,
+            message_length: isAssistant ? 0 : preview.length,
+            response_length: isAssistant ? preview.length : 0,
+            session_message_count: s.message_count,
+            last_text: s.last_text,
+            last_role: s.last_role,
+            open_flag_count: s.open_flag_count,
+          } satisfies ConversationListItem;
+        });
+        setConversations(normalized);
         setTotalCount(data.total_count);
+        try {
+          const statsResponse = await fetchConversations({
+            page: 1,
+            limit: 1,
+            search: searchTerm || undefined,
+            session_id: sessionFilter || undefined,
+            date_from: dateFrom || undefined,
+            date_to: dateTo || undefined,
+          });
+          setStats(statsResponse.stats);
+        } catch (statsError) {
+          console.warn('Failed to load conversation stats', statsError);
+          setStats(null);
+        }
       }
     } catch (err) {
       console.error('Failed to load conversations:', err);
       setError(err instanceof Error ? err.message : 'Failed to load conversations. Please try again later.');
+      setStats(null);
     } finally {
       setIsLoading(false);
     }
-  }, [currentPage, searchTerm, sessionFilter, dateFrom, dateTo]);
+  }, [currentPage, sessionFilter, dateFrom, dateTo, userHashFilter, searchTerm]);
 
   useEffect(() => {
     loadConversations();
@@ -495,10 +502,6 @@ function AIConversationsContent() {
   const handleSessionFilter = (value: string) => {
     setSessionFilter(value);
     setCurrentPage(1);
-  };
-
-  const handleViewDetail = (_conversationId: number) => {
-    // Deprecated in session grouping view; keep noop
   };
 
   const handleViewSession = (sessionId: string) => {
@@ -522,8 +525,9 @@ function AIConversationsContent() {
       });
       setFlagOpen(false);
       alert('Session flagged');
-    } catch (e: any) {
-      alert(e?.message || 'Failed to flag');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Failed to flag';
+      alert(message);
     }
   };
 
@@ -593,8 +597,8 @@ function AIConversationsContent() {
                 a.click();
                 a.parentNode?.removeChild(a);
                 URL.revokeObjectURL(url);
-              } catch (e) {
-                console.error('Export failed', e);
+              } catch (error) {
+                console.error('Export failed', error);
               }
             }}
           >

@@ -50,8 +50,9 @@ const CbtModuleForm: React.FC<CbtModuleFormProps> = ({ module, onSuccess }) => {
                 });
             }
             onSuccess();
-        } catch (err: any) {
-            setError(err.message);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to save module';
+            setError(message);
         } finally {
             setIsSubmitting(false);
         }

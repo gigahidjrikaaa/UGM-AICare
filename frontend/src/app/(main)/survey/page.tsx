@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { FiSend } from 'react-icons/fi';
-import { motion } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { apiCall } from '@/utils/api';
 import { useSession } from 'next-auth/react';
@@ -23,7 +22,7 @@ interface Survey {
 }
 
 export default function SurveyPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
   const [survey, setSurvey] = useState<Survey | null>(null);
   const [answers, setAnswers] = useState<Record<number, string>>({});
@@ -87,11 +86,14 @@ export default function SurveyPage() {
       <p className="text-gray-400 mb-8">{survey.description}</p>
 
       <div className="space-y-6">
-        {survey.questions.map((q) => (
-          <div key={q.id}>
-            <label className="block text-lg font-medium text-white mb-2">{q.question_text}</label>
+        {survey.questions.map((q) => {
+          const inputId = `survey-question-${q.id}`;
+          return (
+            <div key={q.id}>
+            <label htmlFor={inputId} className="block text-lg font-medium text-white mb-2">{q.question_text}</label>
             {q.question_type === 'text' && (
               <textarea
+                id={inputId}
                 value={answers[q.id] || ''}
                 onChange={(e) => handleAnswerChange(q.id, e.target.value)}
                 className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors"
@@ -131,8 +133,9 @@ export default function SurveyPage() {
                 ))}
               </div>
             )}
-          </div>
-        ))}
+            </div>
+          );
+        })}
       </div>
 
       <div className="mt-8">

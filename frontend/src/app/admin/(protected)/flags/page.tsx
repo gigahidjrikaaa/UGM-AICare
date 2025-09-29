@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { apiCall } from '@/utils/adminApi';
 import { Button } from '@/components/ui/Button';
 import Link from 'next/link';
@@ -24,7 +24,7 @@ export default function FlagsPage() {
   const [loading, setLoading] = useState(true);
   const [selected, setSelected] = useState<Record<number, boolean>>({});
 
-  const load = async () => {
+  const load = useCallback(async () => {
     try {
       setLoading(true);
       const q = statusFilter ? `?status_filter=${encodeURIComponent(statusFilter)}` : '';
@@ -35,9 +35,9 @@ export default function FlagsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [statusFilter]);
 
-  useEffect(() => { load(); }, [statusFilter]);
+  useEffect(() => { void load(); }, [load]);
 
   const updateFlag = async (id: number, payload: Partial<FlagItem>) => {
     await apiCall<FlagItem>(`/api/v1/admin/flags/${id}`, { method: 'PUT', body: JSON.stringify({ status: payload.status, reason: payload.reason, tags: payload.tags, notes: payload.notes }) });
@@ -82,7 +82,7 @@ export default function FlagsPage() {
             <option value="reviewing" className="bg-gray-800">Reviewing</option>
             <option value="resolved" className="bg-gray-800">Resolved</option>
           </select>
-          <Button variant="outline" className="text-white text-sm" onClick={() => load()}>Refresh</Button>
+          <Button variant="outline" className="text-white text-sm" onClick={() => { void load(); }}>Refresh</Button>
         </div>
       </div>
 

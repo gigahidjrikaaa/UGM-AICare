@@ -5,19 +5,10 @@ import { apiCall } from '@/utils/adminApi';
 import { Button } from '@/components/ui/Button';
 import GlobalSkeleton from '@/components/ui/GlobalSkeleton';
 import ErrorMessage from '@/components/ui/ErrorMessage';
-import CbtModuleStepForm from './CbtModuleStepForm';
+import CbtModuleStepForm, { CbtModuleStep } from './CbtModuleStepForm';
 import DeleteCbtModuleStepButton from './DeleteCbtModuleStepButton';
 import { FiPlus, FiEdit } from 'react-icons/fi';
 import Tooltip from '@/components/ui/Tooltip';
-
-interface CbtModuleStep {
-    id: number;
-    module_id: number;
-    step_order: number;
-    step_type: string;
-    content: string;
-    // ... other fields
-}
 
 interface CbtModuleStepsTableProps {
     moduleId: number;
@@ -36,8 +27,9 @@ const CbtModuleStepsTable: React.FC<CbtModuleStepsTableProps> = ({ moduleId }) =
         try {
             const data = await apiCall<CbtModuleStep[]>(`/api/v1/admin/cbt-modules/${moduleId}/steps`);
             setSteps(data);
-        } catch (err: any) {
-            setError(err.message);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to load steps';
+            setError(message);
         } finally {
             setIsLoading(false);
         }
@@ -122,7 +114,9 @@ const CbtModuleStepsTable: React.FC<CbtModuleStepsTableProps> = ({ moduleId }) =
                                             <td className="px-6 py-4 whitespace-normal text-sm text-gray-300">{step.content}</td>
                                             <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                                 <Tooltip title="Edit step">
-                                                    <button onClick={() => handleEdit(step)} className="text-blue-400 hover:text-blue-300 mr-4"><FiEdit /></button>
+                                                    <button onClick={() => handleEdit(step)} className="text-blue-400 hover:text-blue-300 mr-4" aria-label={`Edit step ${step.step_order}`}>
+                                                        <FiEdit />
+                                                    </button>
                                                 </Tooltip>
                                                 <Tooltip title="Delete step">
                                                     <span>

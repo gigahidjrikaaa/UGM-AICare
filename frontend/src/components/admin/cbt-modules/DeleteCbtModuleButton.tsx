@@ -20,8 +20,9 @@ const DeleteCbtModuleButton: React.FC<DeleteCbtModuleButtonProps> = ({ moduleId,
                     method: 'DELETE',
                 });
                 onSuccess();
-            } catch (err: any) {
-                alert('Failed to delete module: ' + err.message);
+            } catch (error) {
+                const message = error instanceof Error ? error.message : 'Failed to delete module';
+                alert(`Failed to delete module: ${message}`);
             } finally {
                 setIsDeleting(false);
             }

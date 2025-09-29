@@ -26,8 +26,6 @@ const CbtModulesTable = () => {
     const [modules, setModules] = useState<CbtModule[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
-    const [page, setPage] = useState(1);
-    const [totalPages, setTotalPages] = useState(1);
     const [isFormVisible, setIsFormVisible] = useState(false);
     const [selectedModule, setSelectedModule] = useState<CbtModule | undefined>(undefined);
 
@@ -35,15 +33,15 @@ const CbtModulesTable = () => {
         setIsLoading(true);
         setError(null);
         try {
-            const data = await apiCall<CbtModuleResponse>(`/api/v1/admin/cbt-modules?page=${page}&limit=10`);
+            const data = await apiCall<CbtModuleResponse>('/api/v1/admin/cbt-modules?page=1&limit=10');
             setModules(data.items);
-            setTotalPages(Math.ceil(data.total_count / 10));
-        } catch (err: any) {
-            setError(err.message);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'Failed to load modules';
+            setError(message);
         } finally {
             setIsLoading(false);
         }
-    }, [page]);
+    }, []);
 
     useEffect(() => {
         fetchModules();

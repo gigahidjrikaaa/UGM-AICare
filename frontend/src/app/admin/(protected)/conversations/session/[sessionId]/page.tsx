@@ -15,8 +15,6 @@ import {
 import { apiCall, authenticatedFetch } from "@/utils/adminApi";
 import { formatDistanceToNow } from "date-fns";
 
-type Role = "user" | "assistant";
-
 interface SessionUser {
   id: number;
   email?: string | null;
@@ -77,7 +75,7 @@ interface FlagResponse {
 const StatCard: React.FC<{
   label: string;
   value: string | number;
-  icon?: React.ComponentType<any>;
+  icon?: React.ComponentType<{ className?: string; style?: React.CSSProperties }>;
   accent?: string;
 }> = ({ label, value, icon: Icon, accent = "#FFCA40" }) => (
   <div className="bg-white/5 dark:bg-gray-800/60 backdrop-blur-md border border-white/10 dark:border-gray-700 rounded-xl p-3 sm:p-4">
@@ -120,8 +118,9 @@ export default function SessionDetailPage() {
     try {
       const res = await apiCall<SessionDetailResponse>(`/api/v1/admin/conversation-session/${sessionId}`);
       setData(res);
-    } catch (e: any) {
-      setError(e?.message || "Failed to load session");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to load session";
+      setError(message);
     } finally {
       setLoading(false);
     }
@@ -146,8 +145,8 @@ export default function SessionDetailPage() {
         setFlagStatus(filtered[0].status || "open");
         setFlagTags((filtered[0].tags || []).join(", "));
       }
-    } catch (e) {
-      // Non-blocking
+    } catch (error) {
+      console.warn("Failed to load flags", error);
     }
   }, [sessionId]);
 
@@ -177,8 +176,9 @@ export default function SessionDetailPage() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-    } catch (e: any) {
-      alert(e?.message || "Export failed");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Export failed";
+      alert(message);
     }
   };
 
@@ -217,8 +217,9 @@ export default function SessionDetailPage() {
       setFlagNotes("");
       await loadFlags();
       alert("Session flagged");
-    } catch (e: any) {
-      alert(e?.message || "Failed to flag session");
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Failed to flag session";
+      alert(message);
     }
   };
 
@@ -549,8 +550,9 @@ export default function SessionDetailPage() {
             </div>
             <div className="p-5 space-y-4">
               <div>
-                <label className="block text-sm font-medium mb-1">Status</label>
+                <label htmlFor="flag-status" className="block text-sm font-medium mb-1">Status</label>
                 <select
+                  id="flag-status"
                   value={flagStatus}
                   onChange={(e) => setFlagStatus(e.target.value)}
                   className="w-full px-3 py-2 border rounded-md bg-white dark:bg-gray-800"

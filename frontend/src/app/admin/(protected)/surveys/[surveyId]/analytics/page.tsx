@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { Button } from '@/components/ui/Button';
 import { apiCall, authenticatedFetch } from '@/utils/adminApi';
@@ -28,7 +28,7 @@ export default function SurveyAnalyticsPage() {
   const [data, setData] = useState<AnalyticsPayload | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     try {
       setLoading(true);
       const res = await apiCall<AnalyticsPayload>(`/api/v1/admin/surveys/${surveyId}/analytics`);
@@ -36,11 +36,13 @@ export default function SurveyAnalyticsPage() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [surveyId]);
 
   useEffect(() => {
-    if (!isNaN(surveyId)) fetchAnalytics();
-  }, [surveyId]);
+    if (!Number.isNaN(surveyId)) {
+      void fetchAnalytics();
+    }
+  }, [surveyId, fetchAnalytics]);
 
   const handleDownloadCsv = async () => {
     const isServer = typeof window === 'undefined';
