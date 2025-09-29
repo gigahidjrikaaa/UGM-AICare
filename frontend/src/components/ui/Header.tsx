@@ -174,7 +174,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
                   whileTap={{ scale: 0.98 }}
                   className="flex items-center bg-white/5 hover:bg-white/8 backdrop-blur-xl rounded-2xl p-2 pr-3 transition-all duration-200 border border-white/8 hover:border-white/15"
                   aria-haspopup="true"
-                  aria-expanded={isProfileOpen}
+                  aria-expanded={isProfileOpen ? 'true' : 'false'}
                 >
                   <motion.div 
                     className="relative h-7 w-7 rounded-xl overflow-hidden border border-white/15"

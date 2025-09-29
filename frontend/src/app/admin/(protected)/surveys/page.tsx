@@ -745,7 +745,7 @@ export default function SurveyManagementPage() {
                         type="button"
                         onClick={() => toggleExpanded(survey.id)}
                         className="mt-1 text-[11px] text-[#FFCA40] hover:underline focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/60 rounded px-1"
-                        aria-expanded={!!isExpanded}
+                        aria-expanded={isExpanded ? 'true' : 'false'}
                         aria-label={isExpanded ? 'Collapse full description' : 'Expand full description'}
                       >
                         {isExpanded ? 'Show less' : 'Show more'}

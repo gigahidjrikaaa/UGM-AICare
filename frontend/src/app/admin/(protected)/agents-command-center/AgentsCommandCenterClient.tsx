@@ -67,12 +67,11 @@ const AgentsCommandCenterClient: React.FC = () => {
   const [selectedRunId, setSelectedRunId] = useState<number | null>(null);
   const [selectedRunMessages, setSelectedRunMessages] = useState<RunMessage[]>([]);
   const [loadingMessages, setLoadingMessages] = useState<boolean>(false);
+  const [cancellingRunId, setCancellingRunId] = useState<number | null>(null);
   type AggregatedTokens = { [cid: string]: string };
   const [aggregatedTokens, setAggregatedTokens] = useState<AggregatedTokens>({});
   interface OrchestratorHistoryItem { runId?: number; correlationId?: string; question: string; answer?: string; resolvedAgent?: string; createdAt: string; metrics?: Record<string, unknown>; }
   const [orchestratorHistory, setOrchestratorHistory] = useState<OrchestratorHistoryItem[]>([]);
-  interface CorrelationRow { runId?: number; correlationId?: string; agent?: string; resolvedAgent?: string; status?: string; }
-  const [correlationRows, setCorrelationRows] = useState<CorrelationRow[]>([]);
   const wsClientRef = useRef<AgentsWSClient | null>(null);
   const dispatcherRef = useRef<AgentCommandDispatcher | null>(null);
   const listRef = useRef<HTMLDivElement | null>(null);
@@ -231,22 +230,6 @@ const AgentsCommandCenterClient: React.FC = () => {
     }
   }, [runs, selectedRunId, loadMessages]);
 
-  // Derive correlation rows
-  useEffect(() => {
-    const map: Record<string, CorrelationRow> = {};
-    orchestratorHistory.forEach(h => {
-      const key = h.correlationId || `run-${h.runId}`;
-      if(!map[key]) map[key] = { correlationId: h.correlationId, runId: h.runId, resolvedAgent: h.resolvedAgent, agent: 'orchestrator' };
-      map[key].resolvedAgent = h.resolvedAgent || map[key].resolvedAgent;
-    });
-    runs.filter(r => r.agent === 'orchestrator').forEach(r => {
-      const key = Object.keys(map).find(k => map[k].runId === Number(r.id)) || `run-${r.id}`;
-      if(!map[key]) map[key] = { runId: Number(r.id), agent: 'orchestrator' };
-      map[key].status = r.status;
-    });
-    setCorrelationRows(Object.values(map).slice(0,100));
-  }, [orchestratorHistory, runs]);
-
   useEffect(() => {
     if (selectedRunId) {
       localStorage.setItem('agents:lastRunId', String(selectedRunId));
@@ -256,6 +239,16 @@ const AgentsCommandCenterClient: React.FC = () => {
   const cancelRun = useCallback(async (runId: number) => {
     try { await fetch(`${API_BASE}/runs/${runId}/cancel`, { method: 'POST', credentials: 'include' }); } catch {/* ignore */}
   }, []);
+
+  const handleCancelRun = useCallback(async (runId: number) => {
+    setCancellingRunId(runId);
+    try {
+      await cancelRun(runId);
+      await refreshRuns();
+    } finally {
+      setCancellingRunId(prev => (prev === runId ? null : prev));
+    }
+  }, [cancelRun, refreshRuns]);
 
   const sendCommand = useCallback(async () => {
     const dispatcher = dispatcherRef.current;
@@ -471,6 +464,35 @@ const AgentsCommandCenterClient: React.FC = () => {
                   </div>
                 </div>
               </div>
+              {orchestratorHistory.length > 0 && (
+                <div className="bg-white/5 backdrop-blur-md border border-white/10 rounded-xl p-6">
+                  <h3 className="text-lg font-semibold text-white mb-4 flex items-center">🧠 Recent Orchestrations</h3>
+                  <div className="space-y-3 max-h-72 overflow-auto" aria-label="Recent orchestrator conversations">
+                    {orchestratorHistory.slice(0,8).map((item, idx) => {
+                      const key = item.correlationId || (item.runId ? `run-${item.runId}` : `idx-${idx}`);
+                      const createdLabel = new Date(item.createdAt).toLocaleString();
+                      return (
+                        <article key={key} className="p-4 rounded-lg bg-black/20 border border-white/10 space-y-3" aria-label="Orchestrator exchange">
+                          <header className="flex items-center justify-between gap-3 text-xs text-gray-400">
+                            <span className="font-mono" title={createdLabel}>{createdLabel}</span>
+                            {item.resolvedAgent && (
+                              <span className="px-2 py-1 rounded-full bg-white/10 text-[#FFCA40] font-semibold text-[11px] uppercase tracking-wide" aria-label={`Resolved agent ${item.resolvedAgent}`}>
+                                {item.resolvedAgent}
+                              </span>
+                            )}
+                          </header>
+                          {item.question && (
+                            <p className="text-sm text-gray-300" aria-label="Question">{item.question}</p>
+                          )}
+                          {item.answer && (
+                            <p className="text-sm text-white/90 bg-white/10 p-3 rounded-lg" aria-label="Answer">{item.answer}</p>
+                          )}
+                        </article>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </section>
           ) : (
             /* 3-column layout for manual mode */
@@ -671,9 +693,29 @@ const AgentsCommandCenterClient: React.FC = () => {
                           }`}
                         >
                           <span className="text-gray-300 font-mono text-sm truncate">{r.agent}.{r.action}</span>
-                          <span className={`px-2 py-1 rounded-full border text-xs font-semibold tracking-wide ${badgeColor}`}>
-                            {r.status}
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-1 rounded-full border text-xs font-semibold tracking-wide ${badgeColor}`}>
+                              {r.status}
+                            </span>
+                            {r.status === 'running' && (
+                              <button
+                                type="button"
+                                onClick={(event) => {
+                                  event.stopPropagation();
+                                  void handleCancelRun(Number(r.id));
+                                }}
+                                disabled={cancellingRunId === Number(r.id)}
+                                className={`px-2 py-1 rounded-md text-xs font-semibold border transition-colors duration-200 ${
+                                  cancellingRunId === Number(r.id)
+                                    ? 'bg-gray-500/20 text-gray-400 border-gray-500/40 cursor-not-allowed'
+                                    : 'bg-red-500/20 text-red-300 border-red-500/40 hover:bg-red-500/30 hover:text-red-200'
+                                }`}
+                                aria-label={`Cancel run ${r.id}`}
+                              >
+                                {cancellingRunId === Number(r.id) ? 'Cancelling…' : 'Cancel'}
+                              </button>
+                            )}
+                          </div>
                         </button>
                       );
                     })}

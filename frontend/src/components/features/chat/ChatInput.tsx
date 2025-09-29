@@ -194,7 +194,7 @@ export function ChatInput({
                 )}
                 title="Behavior Settings"
                 aria-label="Behavior Settings"
-                aria-expanded={behaviorOpen}
+                aria-expanded={behaviorOpen ? 'true' : 'false'}
                 aria-controls="behavior-popover"
               >
                 <SlidersHorizontal className="h-4 w-4" />

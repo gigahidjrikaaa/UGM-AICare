@@ -1,6 +1,7 @@
 """Password reset related schemas."""
 
 from pydantic import BaseModel, EmailStr, Field
+from typing import Optional
 
 class ForgotPasswordRequest(BaseModel):
     """Request to initiate password reset."""
@@ -39,4 +40,4 @@ class ValidateTokenResponse(BaseModel):
     """Response after token validation."""
     valid: bool = Field(..., description="Whether the token is valid")
     message: str = Field(..., description="Validation message")
-    email: str = Field(None, description="Associated email if token is valid")
+    email: Optional[EmailStr] = Field(None, description="Associated email if token is valid")
