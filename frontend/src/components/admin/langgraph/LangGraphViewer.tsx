@@ -12,6 +12,7 @@ import ReactFlow, {
   Position,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import './LangGraphViewer.css'; // added external stylesheet
 
 import { apiCall } from '@/utils/adminApi';
 
@@ -83,7 +84,6 @@ const agentOffset = 680; // Increased from 520
 const rowHeight = 200; // Increased from 170
 
 const AgentNode = ({ data }: NodeProps<AgentNodeData>) => {
-  const color = agentPalette[data.agentId] ?? '#FFCA40';
   const executionState = data.executionState;
   const isRunning = executionState?.status === 'running';
   const hasFailed = executionState?.status === 'failed';
@@ -110,13 +110,9 @@ const AgentNode = ({ data }: NodeProps<AgentNodeData>) => {
       </div>
       
       {/* Agent type badge */}
-      <div 
-        className="inline-block px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest mb-2"
-        style={{ 
-          backgroundColor: `${color}20`, 
-          color: color,
-          borderColor: color 
-        }}
+      <div
+        // agent-color is controlled via external CSS classes (agent-{agentId})
+        className={`inline-block px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest mb-2 agent-badge agent-${data.agentId}`}
       >
         {data.agent}
       </div>
@@ -373,7 +369,6 @@ const LangGraphViewer = () => {
       .map((agentId) => ({
         id: agentId,
         label: seen.get(agentId) ?? agentId,
-        color: agentPalette[agentId] ?? '#FFCA40',
       }));
   }, [sortedNodes, agentOrder]);
 
@@ -398,53 +393,26 @@ const LangGraphViewer = () => {
       .map((edge) => {
         const agentId =
           (edge.data?.agentId as string) ?? (apiNodeMap.get(edge.source)?.data?.agentId as string) ?? 'agent';
-        const color = agentPalette[agentId] ?? '#FFCA40';
         
-        // Enhanced edge styling for better visual hierarchy
         const isConditional = edge.edge_type === 'conditional' || edge.condition;
         const executionState = edge.execution_state;
         const wasTriggered = executionState?.triggered;
         
-        // Dynamic edge styling based on state
-        let edgeColor = color;
-        let strokeWidth = 2;
-        let opacity = 0.6;
-        
-        if (wasTriggered) {
-          opacity = 1.0;
-          strokeWidth = 3;
-          edgeColor = '#10B981'; // Green for triggered edges
-        } else if (isConditional) {
-          opacity = 0.4;
-          strokeWidth = 2;
-          edgeColor = '#F59E0B'; // Yellow for conditional edges
-        }
-        
+        // Use CSS classes for edge color / style. Classes are defined in LangGraphViewer.css.
         return {
           id: `${edge.source}->${edge.target}`,
           source: edge.source,
           target: edge.target,
           type: 'smoothstep',
           animated: wasTriggered,
-          style: { 
-            stroke: edgeColor,
-            strokeWidth,
-            strokeDasharray: isConditional ? '8,4' : undefined,
-            opacity
-          },
+          className: `lang-edge agent-${agentId} ${wasTriggered ? 'lang-edge-triggered' : isConditional ? 'lang-edge-conditional' : ''}`,
           label: (edge.data?.label as string) || (edge.condition ? `${edge.condition}` : undefined),
-          labelStyle: { 
-            fill: '#E2E8F0', 
-            fontSize: 11,
-            fontWeight: 500,
-            backgroundColor: 'rgba(15, 23, 42, 0.8)',
-            padding: '2px 6px',
-            borderRadius: '4px'
+          labelStyle: {
+            fontSize: '12px',
+            color: '#cbd5e1',
+            background: 'transparent',
+            pointerEvents: 'auto',
           },
-          labelBgStyle: {
-            fill: 'rgba(15, 23, 42, 0.9)',
-            fillOpacity: 0.9
-          }
         } satisfies FlowEdge;
       });
   }, [graphState, apiNodeMap, agentOrder]);
@@ -484,12 +452,9 @@ const LangGraphViewer = () => {
   return (
     <div className="relative w-full">
       <div className="mb-4 flex flex-wrap items-center gap-3">
-        {agentLegend.map(({ id, label, color }) => (
+  {agentLegend.map(({ id, label }) => (
           <div key={id} className="flex items-center gap-2">
-            <span 
-              className="h-3 w-3 rounded-full" 
-              style={{ backgroundColor: color }}
-            />
+            <span className={`h-3 w-3 rounded-full legend-dot agent-${id}`} />
             <span className="text-xs font-medium uppercase tracking-wide text-gray-300">
               {label}
             </span>
@@ -559,10 +524,7 @@ const LangGraphViewer = () => {
             }}
             nodeStrokeWidth={2}
             nodeBorderRadius={8}
-            style={{
-              backgroundColor: 'rgba(15, 23, 42, 0.8)',
-              border: '1px solid rgba(255,255,255,0.1)'
-            }}
+            className="langgraph-minimap"
           />
           <Controls />
 
