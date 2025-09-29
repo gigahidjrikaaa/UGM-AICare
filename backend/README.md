@@ -1,207 +1,209 @@
 # UGM-AICare Backend
 
-## Project Description
+FastAPI service that powers the Safety Agent Suite behind UGM-AICare. The backend orchestrates crisis-aware chat, consent-driven outreach, safety desk workflows, and privacy-first insights for university mental health support. Hosted Google Gemini models provide empathetic conversations, while an optional self-managed Gemma 3 runtime can be plugged into the same abstraction.
 
-UGM-AICare is a mental health AI assistant aimed at providing supportive conversations and resources for users experiencing mental health challenges. The backend supports the core functionality of the AI chatbot, user management, conversation history tracking, and sentiment analysis.
+---
 
-The system utilizes Google Gemini (hosted) and an optional self-managed Gemma 3 service to provide empathetic responses in conversational Indonesian, with a focus on mental health support.
+## Safety Agent Suite
 
-## Features
+| Agent | Scope | Highlights | Status (Sep 2025) |
+|-------|-------|------------|--------------------|
+| 🛡️ **Safety Triage Agent (STA)** | Real-time risk scoring inside the chat flow | Crisis banner orchestration, feature flags, human hand-off logging | API scaffolding in progress |
+| 📣 **Safety Campaign Agent (SCA)** | Consent-aware outreach and Action Cards | Evidence-backed content library, throttled dispatch, audit trails | Content pipeline design drafted |
+| 🗂️ **Safety Desk Agent (SDA)** | Operational cockpit for clinical staff | Case timelines, SLA tracking, interoperability hooks | Data model defined, routes pending |
+| 🔍 **Insights Agent (IA)** | Privacy-preserving analytics over anonymised events | Differential privacy budgets, consent dimensions, redaction policies | Migration drafted, query layer pending |
 
-- **AI Chatbot**: Interactive conversations with a mental health-focused AI assistant
-- **User Management**: User authentication and profile management
-- **Conversation Memory**: Storage of conversation history for context-aware responses
-- **Sentiment Analysis**: Tracking user sentiment for mental health monitoring
+Refer to `PROJECT_SINGLE_SOURCE_OF_TRUTH.md` for the canonical roadmap and alignment guidance.
 
-## Tech Stack
+---
 
-- **Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.9+)
-- **Database**: PostgreSQL (via SQLAlchemy ORM)
-- **Memory Storage**: Redis (with in-memory fallback)
-- **LLM Providers**: Google Gemini (cloud) and optional local Gemma 3 generation service
-- **Authentication**: JWT token-based authentication
-- **API Documentation**: Swagger UI (auto-generated)
-- **Background Tasks**: Celery (optional for async processing)
+## Core Capabilities
 
-## Project Structure
+- **Safety-first chat** with Gemini/Gemma responses, sentiment signals, and STA risk scoring
+- **User & consent management** via JWT-secured APIs and append-only consent ledgers
+- **Campaign orchestration** for Action Cards and n8n-triggered outreach (SCA)
+- **Case operations** with SDA scaffolding for clinical oversight and SLA enforcement
+- **Insights pipeline** prepared for differential privacy queries and audit-ready reporting
+- **Observability hooks** for structured logging, monitoring, and privacy budget events
+
+---
+
+## Architecture & Key Packages
 
 ```
 backend/
-│
 ├── app/
+│   ├── agents/
+│   │   ├── sta/            # Safety Triage Agent flows
+│   │   ├── sca/            # Safety Campaign Agent utilities
+│   │   ├── sda/            # Safety Desk Agent prototypes
+│   │   └── ia/             # Insights Agent scaffolding
 │   ├── core/
-│   │   ├── llm.py         # LLM integration for Gemini & Gemma 3
-│   │   └── memory.py      # Memory management for conversation history
-│   │
-│   ├── routes/
-│   │   ├── chat.py        # Chat endpoints
-│   │   └── users.py       # User management endpoints
-│   │
-│   ├── models.py          # SQLAlchemy database models
-│   └── main.py            # FastAPI application entry point
-│
-├── database.py            # Database connection and session management
-├── config.py              # Configuration settings
-├── migrations/            # Alembic migrations
-├── logs/                  # Application logs
-├── test/                  # Test scripts and fixtures
-│   └── test_chat_1.py     # Test for chat functionality
-│
-├── requirements.txt       # Python dependencies
-└── .env                   # Environment variables (should be created locally)
+│   │   ├── llm.py          # Gemini & Gemma provider abstraction via LangChain
+│   │   ├── memory.py       # Conversation memory orchestration
+│   │   └── policy.py       # Redaction + consent policy helpers (in progress)
+│   ├── database/           # Async SQLAlchemy session and migrations helpers
+│   ├── routes/             # FastAPI routers (chat, users, safety endpoints)
+│   ├── schemas/            # Pydantic models for requests/responses
+│   ├── services/           # Domain services (email, campaign, analytics)
+│   ├── middleware/         # CORS, logging, auth guards
+│   ├── utils/              # Env checks, feature flags, helper utilities
+│   └── main.py             # FastAPI application entry point
+├── alembic/                # Migration scripts and env configuration
+├── logs/                   # Application logs (excluded from VCS)
+├── scripts/                # Operational scripts (redaction, backfill, etc.)
+├── tests/                  # Pytest suites (async + unit tests)
+├── requirements.txt        # Python dependencies
+└── .env                    # Local-only environment file (not committed)
 ```
+
+---
+
+## Tech Stack & Integrations
+
+- **Runtime:** Python 3.11+ with FastAPI, asynchronous SQLAlchemy, and LangChain
+- **Data Layer:** PostgreSQL, Redis (session state + feature flags), deterministic hashing for privacy
+- **LLM Providers:** Google Gemini (hosted) and optional Gemma 3 runtime wired through `core/llm.py`
+- **Messaging & Tasks:** Celery / Redis queues, n8n webhooks, email/SMS connectors
+- **Observability:** Structured logging (JSON), Prometheus instrumentation, optional Sentry integration
+- **Security:** JWT auth, parameterised queries, configurable CORS, consent & redaction guardrails
+
+---
 
 ## Prerequisites
 
-- Python 3.9 or higher
-- PostgreSQL
-- Redis (optional, falls back to in-memory storage)
+- Python 3.11 or later
+- PostgreSQL 13+
+- Redis 6+ (recommended for production; local dev can fall back to in-memory cache)
+- (Optional) Local Gemma 3 text-generation service reachable over HTTP
 
-## Installation
+---
 
-1. Clone the repository:
+## Environment Setup
 
+1. **Clone the repository**
    ```bash
-   git clone https://github.com/YourUsername/UGM-AICare.git
+   git clone https://github.com/gigahidjrikaaa/UGM-AICare.git
    cd UGM-AICare/backend
    ```
 
-2. Create and activate a virtual environment:
-
+2. **Create an isolated environment** (recommended path: `.venv` in repo root)
    ```bash
-   python -m venv venv
-   # On Windows
-   venv\Scripts\activate
-   # On Linux/Mac
-   source venv/bin/activate
+   python -m venv .venv
+   # Windows (PowerShell)
+   .venv\Scripts\Activate.ps1
+   # macOS/Linux
+   source .venv/bin/activate
    ```
 
-3. Install dependencies:
-
+3. **Install dependencies**
    ```bash
+   pip install --upgrade pip
    pip install -r requirements.txt
    ```
 
-4. Create a `.env` file in the root directory with the following variables:
+4. **Provision environment variables**
+   - Copy `env.example` (root) or craft a dedicated `backend/.env`.
+   - Populate the following minimum set (see `app/utils/env_check.py` for the full list):
 
-   ```env
-   # Database configuration
-   DB_HOST=localhost
-   DB_PORT=5432
-   DB_NAME=aicare_db
-   DB_USER=your_db_username
-   DB_PASSWORD=your_db_password
-   DATABASE_URL=postgresql://your_db_username:your_db_password@localhost:5432/aicare_db
+     | Category | Key | Notes |
+     |----------|-----|-------|
+     | Database | `DATABASE_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Use async URL (`postgresql+asyncpg://...`) for runtime |
+     | Redis | `REDIS_HOST`, `REDIS_PORT` | Include `REDIS_USERNAME`/`REDIS_PASSWORD` if your instance requires auth |
+     | Auth | `JWT_SECRET_KEY`, `INTERNAL_API_KEY` | Keep secrets out of version control |
+     | App URLs | `ALLOWED_ORIGINS`, `FRONTEND_URL`, `BACKEND_URL` | Comma-separated origins for CORS |
+     | Email | `EMAIL_USERNAME`, `EMAIL_PASSWORD`, `EMAIL_SMTP_SERVER`, `EMAIL_SMTP_PORT` | Needed for outreach + crisis alerts |
+   | LLM | `GOOGLE_GENAI_API_KEY` | Required for Gemini access; update the Gemma service URL in `app/core/llm.py` if you host a local runtime |
+     | Blockchain (optional) | `EDU_TESTNET_RPC_URL`, `NFT_CONTRACT_ADDRESS`, `BACKEND_MINTER_PRIVATE_KEY` | Required only if on-chain rewards are enabled |
+     | Social (optional) | `TWITTER_*` keys | Needed for campaign connectors |
+     | Runtime | `APP_ENV`, `PORT` | `APP_ENV=development` for local work |
 
-   # API settings
-   API_SECRET_KEY=your_secret_key_here
-   API_DEBUG_MODE=True
-   # Hosted LLM configuration
-   GOOGLE_GENAI_API_KEY=your_google_gemini_key_here
+   - Never commit populated `.env` files; use `scripts/reset_db.py` and `app/utils/env_check.py` to validate configuration locally.
 
-   # Redis configuration (optional)
-   REDIS_HOST=localhost
-   REDIS_PORT=6379
-   ```
-
-5. Set up the database:
-
+5. **Prepare the database schema**
    ```bash
-   # Create the database
-   createdb aicare_db
-   
-   # Run migrations
    alembic upgrade head
    ```
 
-## Running the Application
-
-1. Start the FastAPI server:
-
+6. **(Optional) Seed sample data**
    ```bash
-   uvicorn app.main:app --reload
+   python reset_db.py --with-sample-data
    ```
 
-2. The API will be available at `http://127.0.0.1:8000`
-3. API documentation will be available at `http://127.0.0.1:8000/docs`
+---
 
-## Testing
-
-Run the test script to check if the chat functionality is working:
+## Running the Service
 
 ```bash
-python test/test_chat_1.py
+uvicorn app.main:app --reload
 ```
 
-## API Endpoints
+- API root: <http://127.0.0.1:8000/>
+- Interactive docs (Swagger): <http://127.0.0.1:8000/docs>
+- Redoc reference: <http://127.0.0.1:8000/redoc>
 
-### Chat
+During development, run `python -m app.utils.env_check` (or import `check_env()`) to confirm required variables before launching.
 
-- **POST** `/chat/` - Send a message to the AI assistant
-  - Request Body:
+---
 
-    ```json
-    {
-      "user_id": "string",
-      "message": "string"
-    }
-    ```
+## Quality Gates
 
-  - Response:
+- **Unit & async tests**
+  ```bash
+  pytest
+  ```
 
-    ```json
-    {
-      "response": "string"
-    }
-    ```
+- **Static analysis (optional but recommended)**
+  ```bash
+  black app tests
+  isort app tests
+  flake8 app tests
+  ```
 
-### Memory (if implemented)
+Ensure tests cover new Safety Agent flows (STA/SCA/SDA/IA) before enabling related feature flags.
 
-- **GET** `/memory/history/{user_id}` - Get conversation history
-- **POST** `/memory/conversation` - Save a conversation entry
+---
 
-## Configuration Options
+## Operational Notes
 
-- **LLM Providers**: Google Gemini (default) or local Gemma 3 service
-- **Memory Storage**: Uses Redis by default with in-memory fallback
-- **Debug Mode**: Set `API_DEBUG_MODE=True` for detailed logs
+- **Migrations:** Alembic revisions live inside `alembic/versions/`. Follow the schema rollout sequence defined in `PROJECT_SINGLE_SOURCE_OF_TRUTH.md` (Database → Agents → Frontend → Playbooks).
+- **Feature Flags:** STA feature rollout is guarded via configuration; keep defaults off until clinical review signs off.
+- **Gemma Runtime:** Update the `gemma_api_url` inside `app/core/llm.py` to point at your deployment (Docker service name by default). The LangChain loader automatically falls back to Gemini if Gemma is unavailable.
+- **Monitoring:** `prometheus-fastapi-instrumentator` exposes metrics under `/metrics`; integrate with your Prometheus/Grafana stack. Configure `SENTRY_DSN` to enable error tracing.
+- **n8n & Webhooks:** Secure `INTERNAL_API_KEY` and whitelist IPs when exposing webhook endpoints.
+
+---
 
 ## Troubleshooting
 
-### Redis Connection Issues
+| Symptom | Checks |
+|---------|--------|
+| Missing environment variables | Run `check_env()` from `app/utils/env_check.py`; ensure `.env` is loaded (use `python-dotenv` or export manually). |
+| Database connection errors | Verify PostgreSQL is running, confirm async URL uses `postgresql+asyncpg://`, rerun migrations. |
+| Redis unreachable | Ensure Redis server is accessible; for local dev you can set `REDIS_HOST=localhost` and start a local instance. The app falls back to in-memory cache but disables queue-backed features. |
+| Gemini API failures | Confirm `GOOGLE_GENAI_API_KEY`, project access, and region; inspect logged safety block reasons. |
+| Gemma service timeouts | Validate container/service health, endpoint URL, and that requests adhere to your rate limits. |
 
-If you encounter Redis connection errors:
-
-1. Ensure Redis server is running (`redis-server`)
-2. Check if Redis is accessible (`redis-cli ping`)
-3. The application will fall back to in-memory storage if Redis is unavailable
-
-### API Key Issues
-
-If Gemini requests fail:
-
-1. Verify your `GOOGLE_GENAI_API_KEY` in the `.env` file
-2. Confirm the Gemini project has access to the requested model
-3. Review rate limits and safety filters returned in the API response
-
-If the local Gemma 3 service is unreachable, ensure the Docker service `gemma_service` is running and accessible.
+---
 
 ## Contributing
 
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+1. Fork the repository and create a feature branch (`git checkout -b feature/safety-desk-mvp`).
+2. Ensure tests plus static analysis pass locally before committing.
+3. Update relevant docs (`PROJECT_SINGLE_SOURCE_OF_TRUTH.md`, `docs/single-source-of-truth.md`) with notable changes.
+4. Submit a pull request with a summary of Safety Agent impacts and validation steps.
+
+---
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
+Distributed under the MIT License. See `LICENSE` for more information.
 
-## Acknowledgments
+---
 
-- [FastAPI](https://fastapi.tiangolo.com/) for the web framework
+## Acknowledgements
+
+- [FastAPI](https://fastapi.tiangolo.com/) and the async Python ecosystem
 - [Google Gemini](https://ai.google.dev/) for hosted LLM access
-- [Gemma 3](https://ai.google.dev/gemma) for the optional self-hosted model
-
-Similar code found with 2 license types
+- [Gemma 3](https://ai.google.dev/gemma) for the self-managed model option
+- Clinical and research partners guiding Safety Agent guardrails
