@@ -1,6 +1,6 @@
 ﻿"use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { FiSettings, FiSave } from "react-icons/fi";
 import { InterventionSettings } from "@/types/admin/interventions";
 import clsx from "clsx";
@@ -12,6 +12,15 @@ interface SettingsCardProps {
 }
 
 const CHANNEL_OPTIONS = ["email", "sms", "whatsapp", "line", "push"];
+
+const FIELD_IDS = {
+  riskScore: "intervention-settings-risk-threshold",
+  dailyLimit: "intervention-settings-daily-limit",
+  escalationEmail: "intervention-settings-escalation-email",
+  officeStart: "intervention-settings-office-start",
+  officeEnd: "intervention-settings-office-end",
+  manualNotes: "intervention-settings-manual-notes",
+};
 
 export function SettingsCard({ settings, onSave, saving }: SettingsCardProps) {
   const [formState, setFormState] = useState({
@@ -109,8 +118,14 @@ export function SettingsCard({ settings, onSave, saving }: SettingsCardProps) {
 
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="block text-xs uppercase tracking-wide text-white/50">Risk score threshold</label>
+            <label
+              htmlFor={FIELD_IDS.riskScore}
+              className="block text-xs uppercase tracking-wide text-white/50"
+            >
+              Risk score threshold
+            </label>
             <input
+              id={FIELD_IDS.riskScore}
               type="range"
               min={0}
               max={1}
@@ -127,8 +142,14 @@ export function SettingsCard({ settings, onSave, saving }: SettingsCardProps) {
             </div>
           </div>
           <div>
-            <label className="block text-xs uppercase tracking-wide text-white/50">Daily outreach limit</label>
+            <label
+              htmlFor={FIELD_IDS.dailyLimit}
+              className="block text-xs uppercase tracking-wide text-white/50"
+            >
+              Daily outreach limit
+            </label>
             <input
+              id={FIELD_IDS.dailyLimit}
               type="number"
               min={1}
               max={500}
@@ -169,8 +190,14 @@ export function SettingsCard({ settings, onSave, saving }: SettingsCardProps) {
 
         <div className="grid gap-4 md:grid-cols-2">
           <div>
-            <label className="block text-xs uppercase tracking-wide text-white/50">Escalation email</label>
+            <label
+              htmlFor={FIELD_IDS.escalationEmail}
+              className="block text-xs uppercase tracking-wide text-white/50"
+            >
+              Escalation email
+            </label>
             <input
+              id={FIELD_IDS.escalationEmail}
               type="email"
               value={formState.escalation_email}
               onChange={(event) => {
@@ -183,8 +210,14 @@ export function SettingsCard({ settings, onSave, saving }: SettingsCardProps) {
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs uppercase tracking-wide text-white/50">Office hours start</label>
+              <label
+                htmlFor={FIELD_IDS.officeStart}
+                className="block text-xs uppercase tracking-wide text-white/50"
+              >
+                Office hours start
+              </label>
               <input
+                id={FIELD_IDS.officeStart}
                 type="time"
                 value={formState.office_hours_start}
                 onChange={(event) => {
@@ -195,8 +228,14 @@ export function SettingsCard({ settings, onSave, saving }: SettingsCardProps) {
               />
             </div>
             <div>
-              <label className="block text-xs uppercase tracking-wide text-white/50">Office hours end</label>
+              <label
+                htmlFor={FIELD_IDS.officeEnd}
+                className="block text-xs uppercase tracking-wide text-white/50"
+              >
+                Office hours end
+              </label>
               <input
+                id={FIELD_IDS.officeEnd}
                 type="time"
                 value={formState.office_hours_end}
                 onChange={(event) => {
@@ -210,8 +249,14 @@ export function SettingsCard({ settings, onSave, saving }: SettingsCardProps) {
         </div>
 
         <div>
-          <label className="block text-xs uppercase tracking-wide text-white/50">Playbook notes</label>
+          <label
+            htmlFor={FIELD_IDS.manualNotes}
+            className="block text-xs uppercase tracking-wide text-white/50"
+          >
+            Playbook notes
+          </label>
           <textarea
+            id={FIELD_IDS.manualNotes}
             value={formState.manual_notes}
             onChange={(event) => {
               setFormState((prev) => ({ ...prev, manual_notes: event.target.value }));

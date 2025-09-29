@@ -76,7 +76,8 @@ export default function FlagsPage() {
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
         <h1 className="text-2xl sm:text-3xl font-bold text-white">Flagged Sessions</h1>
         <div className="flex items-center gap-2 flex-wrap">
-          <select value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-sm">
+          <label htmlFor="flag-status-filter" className="sr-only">Filter flags by status</label>
+          <select id="flag-status-filter" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)} className="px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-sm">
             <option value="" className="bg-gray-800">All</option>
             <option value="open" className="bg-gray-800">Open</option>
             <option value="reviewing" className="bg-gray-800">Reviewing</option>
@@ -111,12 +112,19 @@ export default function FlagsPage() {
           <div key={f.id} className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-3 sm:p-4">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
               <div className="flex items-center gap-2 sm:gap-3 flex-wrap">
-                <input type="checkbox" checked={!!selected[f.id]} onChange={(e) => setSelected(prev => ({ ...prev, [f.id]: e.target.checked }))} />
+                <input
+                  id={`flag-select-${f.id}`}
+                  type="checkbox"
+                  checked={!!selected[f.id]}
+                  onChange={(e) => setSelected(prev => ({ ...prev, [f.id]: e.target.checked }))}
+                  aria-label={`Select flag ${f.id}`}
+                />
                 <div className="text-white font-mono text-xs sm:text-sm">Session …{f.session_id.slice(-8)}</div>
                 <div className="text-[10px] sm:text-xs text-gray-300">Flag #{f.id} • {new Date(f.created_at).toLocaleString()}</div>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
-                <select value={f.status} onChange={(e) => updateFlag(f.id, { status: e.target.value })} className="px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-xs sm:text-sm">
+                <label htmlFor={`flag-status-${f.id}`} className="sr-only">Update status for flag {f.id}</label>
+                <select id={`flag-status-${f.id}`} value={f.status} onChange={(e) => updateFlag(f.id, { status: e.target.value })} className="px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-xs sm:text-sm">
                   <option value="open" className="bg-gray-800">Open</option>
                   <option value="reviewing" className="bg-gray-800">Reviewing</option>
                   <option value="resolved" className="bg-gray-800">Resolved</option>
@@ -126,17 +134,17 @@ export default function FlagsPage() {
             </div>
             <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-2 sm:gap-3">
               <div>
-                <label className="block text-[10px] sm:text-xs text-gray-300 mb-1">Reason</label>
-                <textarea defaultValue={f.reason || ''} onBlur={(e) => updateFlag(f.id, { reason: e.target.value })} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-xs sm:text-sm" />
+                <label htmlFor={`flag-reason-${f.id}`} className="block text-[10px] sm:text-xs text-gray-300 mb-1">Reason</label>
+                <textarea id={`flag-reason-${f.id}`} defaultValue={f.reason || ''} onBlur={(e) => updateFlag(f.id, { reason: e.target.value })} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-xs sm:text-sm" />
               </div>
               <div>
-                <label className="block text-[10px] sm:text-xs text-gray-300 mb-1">Notes</label>
-                <textarea defaultValue={f.notes || ''} onBlur={(e) => updateFlag(f.id, { notes: e.target.value })} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-xs sm:text-sm" />
+                <label htmlFor={`flag-notes-${f.id}`} className="block text-[10px] sm:text-xs text-gray-300 mb-1">Notes</label>
+                <textarea id={`flag-notes-${f.id}`} defaultValue={f.notes || ''} onBlur={(e) => updateFlag(f.id, { notes: e.target.value })} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-xs sm:text-sm" />
               </div>
             </div>
             <div className="mt-3">
-              <label className="block text-[10px] sm:text-xs text-gray-300 mb-1">Tags</label>
-              <TagEditor initial={f.tags || []} onChange={(tags) => updateFlag(f.id, { tags })} />
+              <label className="block text-[10px] sm:text-xs text-gray-300 mb-1" htmlFor={`flag-tags-input-${f.id}`}>Tags</label>
+              <TagEditor inputId={`flag-tags-input-${f.id}`} initial={f.tags || []} onChange={(tags) => updateFlag(f.id, { tags })} />
             </div>
           </div>
         ))}
@@ -145,7 +153,7 @@ export default function FlagsPage() {
   );
 }
 
-function TagEditor({ initial, onChange }: { initial: string[]; onChange: (tags: string[]) => void; }) {
+function TagEditor({ initial, onChange, inputId }: { initial: string[]; onChange: (tags: string[]) => void; inputId?: string; }) {
   const [value, setValue] = useState('');
   const [tags, setTags] = useState<string[]>(initial);
   return (
@@ -156,7 +164,7 @@ function TagEditor({ initial, onChange }: { initial: string[]; onChange: (tags: 
           <button className="text-red-400" onClick={() => { const next = tags.filter(x => x !== t); setTags(next); onChange(next); }}>×</button>
         </span>
       ))}
-      <input value={value} onChange={(e) => setValue(e.target.value)} placeholder="Add tag" className="px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-[10px] sm:text-xs" />
+  <input id={inputId} value={value} onChange={(e) => setValue(e.target.value)} placeholder="Add tag" className="px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-[10px] sm:text-xs" />
       <Button variant="outline" className="text-white text-[10px] sm:text-xs" onClick={() => { const v = value.trim(); if (!v) return; if (!tags.includes(v)) { const next = [...tags, v]; setTags(next); onChange(next); } setValue(''); }}>Add</Button>
     </div>
   );

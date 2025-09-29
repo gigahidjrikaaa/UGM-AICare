@@ -16,7 +16,7 @@ RPC_URL = os.getenv("EDU_TESTNET_RPC_URL")
 CONTRACT_ADDRESS = os.getenv("NFT_CONTRACT_ADDRESS")
 MINTER_PRIVATE_KEY = os.getenv("BACKEND_MINTER_PRIVATE_KEY")
 
-import aiofiles
+import aiofiles # type: ignore
 
 # --- Load ABI (Option 1: Paste directly) ---
 # CONTRACT_ABI = [...] # Paste the ABI array here

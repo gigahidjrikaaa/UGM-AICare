@@ -1,3 +1,5 @@
+# pyright: reportMissingImports=false
+
 """Statistical Analysis Engine for Clinical Analytics.
 
 This module provides rigorous statistical analysis for clinical mental health data,
@@ -9,10 +11,14 @@ from dataclasses import dataclass
 from datetime import datetime, timedelta
 import logging
 
-# Statistical libraries
 import numpy as np
 import scipy.stats as stats
 from scipy.stats import ttest_1samp, ttest_ind, chi2_contingency
+
+try:  # pragma: no cover - optional dependency
+    from statsmodels.stats.diagnostic import durbin_watson
+except ImportError:  # pragma: no cover - sentinel for missing statsmodels
+    durbin_watson = None  # type: ignore[assignment]
 
 # Type hints
 from pydantic import BaseModel
@@ -357,8 +363,11 @@ class StatisticalAnalysisEngine:
             deterioration_rate = (np.sum(deteriorated) / n) * 100
         
         # Clinical significance rating
+        effect_size_value = statistical_result.effect_size if statistical_result.effect_size is not None else 0.0
+        abs_effect_size = abs(effect_size_value)
+
         if mcid_threshold_met and percentage_achieving_mcid >= 50 and statistical_result.statistically_significant:
-            if abs(statistical_result.effect_size) >= 0.8:
+            if abs_effect_size >= 0.8:
                 significance_rating = "high"
             else:
                 significance_rating = "moderate"
@@ -368,9 +377,9 @@ class StatisticalAnalysisEngine:
             significance_rating = "none"
         
         # Evidence quality assessment
-        if n >= 30 and statistical_result.statistically_significant and abs(statistical_result.effect_size) >= 0.5:
+        if n >= 30 and statistical_result.statistically_significant and abs_effect_size >= 0.5:
             evidence_quality = "strong"
-        elif n >= 15 and (statistical_result.statistically_significant or abs(statistical_result.effect_size) >= 0.3):
+        elif n >= 15 and (statistical_result.statistically_significant or abs_effect_size >= 0.3):
             evidence_quality = "moderate"
         else:
             evidence_quality = "weak"
@@ -394,7 +403,7 @@ class StatisticalAnalysisEngine:
             followup_scores=followup_scores,
             time_between_assessments_days=time_between_assessments or [],
             paired_t_test_result=statistical_result,
-            improvement_effect_size=statistical_result.effect_size,
+            improvement_effect_size=effect_size_value,
             minimal_clinically_important_difference=mcid_threshold,
             mcid_threshold_met=mcid_threshold_met,
             percentage_achieving_mcid=percentage_achieving_mcid,
@@ -483,10 +492,9 @@ class StatisticalAnalysisEngine:
         trend_significant = p_value < self.alpha_level
         
         # Autocorrelation check (Durbin-Watson test)
-        try:
-            from statsmodels.stats.diagnostic import durbin_watson
+        if durbin_watson is not None:
             dw_statistic = durbin_watson(residuals)
-        except ImportError:
+        else:
             # Fallback: simple autocorrelation check
             if len(residuals) > 1:
                 lag1_corr = np.corrcoef(residuals[:-1], residuals[1:])[0, 1]

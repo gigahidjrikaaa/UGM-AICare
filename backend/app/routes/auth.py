@@ -5,7 +5,7 @@ from typing import Optional
 from fastapi import Header, Cookie
 
 from fastapi import APIRouter, Depends, HTTPException, status, Request, Response
-from passlib.context import CryptContext
+from passlib.context import CryptContext # type: ignore
 from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession

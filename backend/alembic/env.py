@@ -1,31 +1,51 @@
-import sys
-from pathlib import Path
+from __future__ import annotations
 
-# Add the project root to the Python path
-sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from logging.config import fileConfig
 import os
+import sys
+from logging.config import fileConfig
+from pathlib import Path
+from typing import Final
+
 from dotenv import load_dotenv
-
-from sqlalchemy import engine_from_config
-from sqlalchemy import pool
 from sqlalchemy import create_engine
-
-from alembic import context
+from alembic import context # type: ignore
 
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
+BASE_DIR: Final[str] = str(Path(__file__).resolve().parents[1])
+
+# Ensure application package is importable for metadata discovery
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
+
+# Use the alembic context imported above
 config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
 fileConfig(config.config_file_name)
 
-# Get the database URL from the environment variable
+# Load environment configuration before resolving connection info
 load_dotenv()
-DATABASE_URL = os.getenv("DATABASE_URL")
-if DATABASE_URL:
-    config.set_main_option("sqlalchemy.url", DATABASE_URL)
+
+def _database_url() -> str:
+    url = os.getenv("DATABASE_URL")
+    if not url:
+        raise RuntimeError("DATABASE_URL environment variable is not set")
+    return url
+
+
+def _sync_database_url(url: str) -> str:
+    """Alembic uses sync drivers; coerce async URLs to sync equivalents."""
+    if url.startswith("postgresql+asyncpg"):
+        return url.replace("postgresql+asyncpg", "postgresql+psycopg")
+    if url.startswith("postgresql+psycopg_async"):
+        return url.replace("postgresql+psycopg_async", "postgresql+psycopg")
+    return url
+
+
+DATABASE_URL: Final[str] = _database_url()
+config.set_main_option("sqlalchemy.url", DATABASE_URL)
 
 # add your model's MetaData object here
 # for 'autogenerate' support
@@ -42,7 +62,7 @@ target_metadata = Base.metadata
 # ... etc.
 
 
-def run_migrations_offline():
+def run_migrations_offline() -> None:
     """Run migrations in 'offline' mode.
 
     This configures the context with just a URL
@@ -66,19 +86,14 @@ def run_migrations_offline():
         context.run_migrations()
 
 
-def run_migrations_online():
+def run_migrations_online() -> None:
     """Run migrations in 'online' mode.
 
     In this scenario we need to create an Engine
     and associate a connection with the context.
 
     """
-    db_url = os.getenv("DATABASE_URL")
-    if not db_url:
-        raise ValueError("DATABASE_URL environment variable is not set")
-
-    # Replace asyncpg with psycopg2 for synchronous operations
-    sync_db_url = db_url.replace("asyncpg", "psycopg2")
+    sync_db_url = _sync_database_url(DATABASE_URL)
 
     connectable = create_engine(sync_db_url)
 

@@ -8,7 +8,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.user import User
 from app.utils.email_utils import send_email
-from app.auth_utils import hash_password
 
 logger = logging.getLogger(__name__)
 
@@ -181,7 +180,14 @@ async def reset_password_with_token(
                 "success": False,
                 "message": "Reset token has expired. Please request a new one."
             }
-            
+
+        # Basic validation: avoid setting trivially short passwords
+        if not isinstance(new_password, str) or len(new_password) < 8:
+            return {"success": False, "message": "Password must be at least 8 characters long."}
+        
+        # Import hash_password locally to avoid potential circular imports
+        from app.utils.security_utils import hash_password
+
         # Hash the new password
         hashed_password = hash_password(new_password)
         

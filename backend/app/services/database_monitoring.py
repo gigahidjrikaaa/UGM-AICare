@@ -51,16 +51,49 @@ class DatabaseMonitoringService:
             'deadlock_threshold': 1,
         }
     
+    def _get_pool_metric(self, method_name: str, default: float = 0.0) -> float:
+        """Safely call a pool inspection method with graceful fallback."""
+        pool = self.pool
+        method = getattr(pool, method_name, None)
+
+        # Fallback to sync engine pool when available (AsyncEngine proxy)
+        if method is None and hasattr(self.engine, "sync_engine"):
+            sync_pool = getattr(self.engine.sync_engine, "pool", None)
+            if sync_pool is not None:
+                method = getattr(sync_pool, method_name, None)
+
+        if callable(method):
+            try:
+                result: Any = method()
+                if isinstance(result, (int, float)):
+                    return float(result)
+                if result is None:
+                    return default
+                if hasattr(result, "__float__"):
+                    try:
+                        return float(result)  # type: ignore[arg-type]
+                    except (TypeError, ValueError):
+                        logger.debug("Pool method %s returned non-convertible value %s", method_name, result)
+                else:
+                    logger.debug("Pool method %s returned non-numeric value %s", method_name, result)
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.debug("Error calling pool.%s: %s", method_name, exc)
+        else:
+            logger.debug("Pool %s has no method '%s'", type(self.pool).__name__, method_name)
+
+        return default
+    
     async def get_pool_stats(self) -> ConnectionPoolStats:
         """Get current connection pool statistics."""
         pool = self.pool
         
         # Get pool statistics
-        pool_size = pool.size()
-        checked_out = pool.checkedout()
-        overflow = pool.overflow()
-        invalid = pool.invalid()
-        checked_in = pool.checkedin()
+        pool_size = int(self._get_pool_metric('size'))
+        checked_out = int(self._get_pool_metric('checkedout'))
+        overflow = int(self._get_pool_metric('overflow'))
+        invalid = int(self._get_pool_metric('invalid'))
+        checked_in_default = max(pool_size - checked_out, 0)
+        checked_in = int(self._get_pool_metric('checkedin', float(checked_in_default)))
         total = pool_size + overflow
         
         utilization = (checked_out / total * 100) if total > 0 else 0
@@ -342,17 +375,18 @@ class DatabaseMonitoringService:
                 "average_utilization": f"{avg_utilization:.1f}%",
                 "peak_utilization": f"{max_utilization:.1f}%",
                 "average_overflow": f"{avg_overflow:.1f}",
-                "current_pool_size": self.pool.size()
+                "current_pool_size": int(self._get_pool_metric('size'))
             },
             "recommendations": []
         }
         
         # Pool size recommendations
         if max_utilization > 90:
-            new_size = int(self.pool.size() * 1.5)
+            current_size = max(int(self._get_pool_metric('size')), 1)
+            new_size = max(int(current_size * 1.5), current_size + 1)
             suggestions["recommendations"].append({
                 "setting": "pool_size",
-                "current": self.pool.size(),
+                "current": current_size,
                 "recommended": new_size,
                 "reason": f"Peak utilization {max_utilization:.1f}% is too high"
             })

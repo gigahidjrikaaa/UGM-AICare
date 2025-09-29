@@ -2,7 +2,6 @@
 
 import { FiAlertTriangle, FiPlus } from "react-icons/fi";
 import { QueueItem } from "@/types/admin/interventions";
-import clsx from "clsx";
 
 interface HighRiskListProps {
   items: QueueItem[];
@@ -34,7 +33,7 @@ export function HighRiskList({ items, onCreateIntervention }: HighRiskListProps)
                 {item.user_name || item.user_email || "Unassigned user"}
               </div>
               <div className="flex flex-wrap items-center gap-3 text-xs text-white/60">
-                {item.risk_score !== undefined && (
+                {item.risk_score != null && (
                   <span>Risk score: {(item.risk_score * 100).toFixed(0)}%</span>
                 )}
                 {item.severity_level && <span>Severity: {item.severity_level}</span>}

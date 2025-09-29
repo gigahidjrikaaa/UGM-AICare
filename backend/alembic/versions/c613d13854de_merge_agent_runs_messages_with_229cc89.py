@@ -5,7 +5,7 @@ a new migration script.
 
 """
 import sqlalchemy as sa
-from alembic import op
+from alembic import op # type: ignore
 import sqlalchemy as sa
 
 

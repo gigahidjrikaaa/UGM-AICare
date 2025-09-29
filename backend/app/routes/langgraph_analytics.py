@@ -313,6 +313,10 @@ async def get_alerts(
         
         alert_data = []
         for alert in alerts:
+            # Ensure we don't call isoformat on None or ambiguous SQLAlchemy attribute
+            resolved_at_val = alert.resolved_at
+            resolved_at_iso = resolved_at_val.isoformat() if isinstance(resolved_at_val, datetime) else None
+
             alert_data.append({
                 "id": alert.id,
                 "execution_id": alert.execution_id,
@@ -321,7 +325,7 @@ async def get_alerts(
                 "title": alert.title,
                 "message": alert.message,
                 "created_at": alert.created_at.isoformat(),
-                "resolved_at": alert.resolved_at.isoformat() if alert.resolved_at and isinstance(alert.resolved_at, datetime) else None,
+                "resolved_at": resolved_at_iso,
                 "status": alert.status,
                 "threshold_value": alert.threshold_value,
                 "actual_value": alert.actual_value,
@@ -366,12 +370,16 @@ async def resolve_alert(
         alert.status = "resolved"
         alert.resolved_at = datetime.now()
         await db.commit()
-        
+
+        # Use a local var and explicit type check before isoformat for safety with static analyzers
+        resolved_at_val = alert.resolved_at
+        resolved_at_iso = resolved_at_val.isoformat() if isinstance(resolved_at_val, datetime) else None
+
         return {
             "success": True,
             "message": "Alert resolved successfully",
             "alert_id": alert_id,
-            "resolved_at": alert.resolved_at.isoformat() if alert.resolved_at and isinstance(alert.resolved_at, datetime) else None
+            "resolved_at": resolved_at_iso
         }
         
     except HTTPException:

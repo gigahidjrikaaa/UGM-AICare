@@ -5,7 +5,7 @@ Revises: e574b9ff31e8_add_cbt_module_steps_table
 Create Date: 2025-09-22
 """
 from typing import Sequence, Union
-from alembic import op
+from alembic import op  # type: ignore[attr-defined]
 import sqlalchemy as sa
 from sqlalchemy.dialects import postgresql
 

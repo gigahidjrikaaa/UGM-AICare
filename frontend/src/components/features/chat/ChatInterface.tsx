@@ -234,7 +234,7 @@ export default function ChatInterface({ model, setModel, modelOptions }: ChatInt
                     className="text-[10px] rounded-full bg-ugm-gold text-ugm-blue px-2 py-0.5 shadow focus:outline-none focus:ring-2 focus:ring-ugm-gold/40"
                     aria-label={`Ada ${pendingMessages.length} pesan dalam antrean`}
                     aria-haspopup="dialog"
-                    aria-expanded={queueOpen ? 'true' : 'false'}
+                    aria-expanded={String(queueOpen)}
                     aria-controls="queue-popover"
                     title="Klik untuk melihat pesan antrean"
                     onClick={() => setQueueOpen(o => !o)}

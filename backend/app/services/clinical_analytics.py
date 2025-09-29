@@ -243,8 +243,16 @@ class ClinicalAnalyticsService:
         service_types = set(record.service_type for record in utilization_records)
         
         for service_type in service_types:
-            type_records = [r for r in utilization_records if r.service_type == service_type]
-            completed_count = sum(1 for r in type_records if r.session_completed)
+            type_records: List[ServiceUtilization] = []
+            for record in utilization_records:
+                if getattr(record, "service_type", None) == service_type:
+                    type_records.append(record)
+
+            completed_count = 0
+            for record in type_records:
+                if bool(getattr(record, "session_completed", False)):
+                    completed_count += 1
+
             total_count = len(type_records)
             
             if total_count >= self.privacy_engine.k_anonymity_threshold:
@@ -470,16 +478,19 @@ class ClinicalAnalyticsService:
         
         # Analyze utilization patterns
         if 'average_sessions_per_user' in utilization_metrics:
-            avg_sessions = utilization_metrics['average_sessions_per_user'].value
-            if avg_sessions < 3:
-                recommendations.append("Low session attendance detected. Consider engagement strategies.")
-            elif avg_sessions > 15:
-                recommendations.append("High session usage detected. Assess capacity planning needs.")
+            avg_sessions_result = utilization_metrics['average_sessions_per_user']
+            avg_sessions_value = avg_sessions_result.value
+            if isinstance(avg_sessions_value, (int, float)):
+                if avg_sessions_value < 3:
+                    recommendations.append("Low session attendance detected. Consider engagement strategies.")
+                elif avg_sessions_value > 15:
+                    recommendations.append("High session usage detected. Assess capacity planning needs.")
         
         # Analyze completion rates
         completion_rates = {k: v for k, v in utilization_metrics.items() if 'completion_rate' in k}
         for service_type, rate_result in completion_rates.items():
-            if rate_result.value < 0.6:  # Less than 60% completion
+            rate_value = rate_result.value
+            if isinstance(rate_value, (int, float)) and rate_value < 0.6:  # Less than 60% completion
                 service_name = service_type.replace('completion_rate_', '')
                 recommendations.append(f"Improve completion rates for {service_name} service")
         

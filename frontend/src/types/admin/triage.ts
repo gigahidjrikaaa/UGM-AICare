@@ -51,7 +51,9 @@ export interface TriageAssessmentListResponse {
   total: number;
 }
 
+export type RecommendedResource = Record<string, unknown>;
+
 export interface TriageTestResponse {
   classification: string;
-  recommended_resources: Array<Record<string, any>>;
+  recommended_resources: RecommendedResource[];
 }

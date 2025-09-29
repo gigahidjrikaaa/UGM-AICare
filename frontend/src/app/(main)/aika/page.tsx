@@ -7,7 +7,6 @@ import ParticleBackground from '@/components/ui/ParticleBackground'; // Assuming
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Info } from 'lucide-react';
-import { cn } from '@/lib/utils';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { AIKA_MEMORY_NOTE } from '@/constants/chat';
@@ -120,6 +119,9 @@ export default function AikaChatPage() {
 function HeaderBar() {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement | null>(null);
+  const assignButtonRef = (node: HTMLButtonElement | null) => {
+    btnRef.current = node;
+  };
   const popRef = useRef<HTMLDivElement | null>(null);
   const hoverTimerRef = useRef<number | null>(null);
   const closeTimerRef = useRef<number | null>(null);
@@ -180,17 +182,31 @@ function HeaderBar() {
           onMouseEnter={handleMouseEnter}
           onMouseLeave={handleMouseLeave}
         >
-          <button
-            ref={btnRef}
-            type="button"
-            aria-label="Informasi memori Aika"
-            aria-expanded={open}
-            aria-controls="aika-memory-popover"
-            onClick={() => setOpen(o => !o)}
-            className={cn('h-7 w-7 inline-flex items-center justify-center rounded-md border border-white/15 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-xs focus:outline-none focus:ring-2 focus:ring-ugm-gold/40 transition', open && 'ring-2 ring-ugm-gold/40')}
-          >
-            <Info className="h-4 w-4" />
-          </button>
+          {open ? (
+            <button
+              ref={assignButtonRef}
+              type="button"
+              aria-label="Informasi memori Aika"
+              aria-expanded="true"
+              aria-controls="aika-memory-popover"
+              onClick={() => setOpen(false)}
+              className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-white/15 bg-white/20 text-white hover:text-white text-xs focus:outline-none focus:ring-2 focus:ring-ugm-gold/40 transition ring-2 ring-ugm-gold/40"
+            >
+              <Info className="h-4 w-4" />
+            </button>
+          ) : (
+            <button
+              ref={assignButtonRef}
+              type="button"
+              aria-label="Informasi memori Aika"
+              aria-expanded="false"
+              aria-controls="aika-memory-popover"
+              onClick={() => setOpen(true)}
+              className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-white/15 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-xs focus:outline-none focus:ring-2 focus:ring-ugm-gold/40 transition"
+            >
+              <Info className="h-4 w-4" />
+            </button>
+          )}
           {open && (
             <div
               id="aika-memory-popover"
