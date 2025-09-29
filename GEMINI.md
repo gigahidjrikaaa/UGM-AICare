@@ -13,7 +13,7 @@ The project is a monorepo composed of three main parts:
 
 *   **Frontend:** Next.js 15+, TypeScript, React 19, Tailwind CSS 4, NextAuth.js, Ethers.js
 *   **Backend:** Python 3.9+, FastAPI, SQLAlchemy 2+, PostgreSQL, Redis
-*   **AI/LLM:** LangChain, Google Gemini, TogetherAI (Llama 3), LangGraph
+*   **AI/LLM:** LangChain, Google Gemini, Gemma 3 (self-hosted), LangGraph
 *   **Blockchain:** Solidity, Hardhat, OpenZeppelin Contracts
 *   **Deployment:** Vercel (Frontend), Render (Backend), Docker is also used.
 

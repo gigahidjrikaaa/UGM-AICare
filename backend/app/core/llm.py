@@ -47,7 +47,7 @@ def _convert_history_for_gemini(history: List[Dict[str, str]]) -> List[Dict[str,
             gemini_history.append({'role': 'user', 'parts': [content]})
         # Silently ignore system messages for now, or handle as needed
         # elif role == 'system':
-            # Gemini doesn't have a direct 'system' role in the chat history array like OpenAI/Together.
+            # Gemini doesn't have a direct 'system' role in the chat history array like OpenAI-style providers.
             # System prompts are often handled differently (e.g., in `GenerativeModel` constructor or passed separately).
             # For simplicity here, we'll omit them from the direct history conversion.
             # logger.warning("System messages are not directly passed in Gemini history.")

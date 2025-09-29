@@ -1,503 +1,202 @@
-# UGM-AICare: Project Single Source of Truth
+# UGM-AICare · Project Single Source of Truth (Safety Agent Alignment)
 
 ## About This Document
 
-This document serves as the primary reference point for the UGM-AICare project. For comprehensive technical documentation, implementation guides, and detailed specifications, please refer to the [docs folder](docs/README.md).
+This document is the canonical reference for architecture, roadmap, and operational standards across the Safety Agent refactor. It supersedes the legacy three-agent summary and keeps pace with the documentation clean-up tracked in `docs/DEPRECATED.md`.
 
-**Document Version:** 2.0  
-**Last Updated:** September 25, 2025  
+**Document Version:** 3.0  
+**Last Updated:** September 30, 2025  
 **Repository:** UGM-AICare  
-**Main Developer:** Giga Hidjrika Aura Adkhy  
-**Major Update:** Clinical Analytics System Implementation Complete
+**Maintainer:** Giga Hidjrika Aura Adkhy  
+**Major Update:** Safety Agent Suite alignment and documentation rationalisation
 
 ---
 
-## 1. Project Title and Core Problem Statement
+## 1. Mission and Problem Statement
 
 ### Title
 
-"Transforming University Mental Health Support: An Agentic AI Framework for Proactive Intervention and Resource Management"
+"Transforming University Mental Health Support: A Safety Agent Suite for Proactive Care, Human Oversight, and Privacy-First Analytics"
 
-### Problem Statement
+### The Challenge
 
-Mental health support in universities is often:
+University mental health services remain reactive, under-staffed, and data-poor. Scaling compassionate support requires:
 
-- **Reactive** rather than proactive
-- **Inefficient** in resource allocation
-- **Unable to scale** effectively with growing student populations
+- **Early warning** rather than crisis response
+- **Coordinated automation** across clinical, operational, and outreach teams
+- **Institution-grade privacy**, consent, and audit controls
 
-**Solution Goal:** Create a proactive, data-driven, and automated framework to support student well-being at an institutional level through intelligent AI agents.
+### Solution Goal
 
----
-
-## 2. Core Innovation: The 3-Agent Framework
-
-The solution implements a collaborative system of three specialized AI agents:
-
-### 🤖 Analytics Agent - Clinical Intelligence System
-
-- **Schedule:** Runs periodically (e.g., weekly)
-- **Function:** Privacy-preserving clinical intelligence analysis using validated mental health instruments
-- **Architecture:** Transformed from surveillance-based system to evidence-based clinical intelligence
-- **Output:** Professional-grade clinical insights with statistical validation and privacy protection
-- **Example:** Identifies treatment effectiveness patterns using validated PHQ-9 and GAD-7 assessments
-
-#### **Clinical Analytics Components**
-
-##### Real-Time Clinical Alerts System ⚡
-
-- Crisis risk detection with immediate professional escalation
-- Automated early warning system with confidence-based scoring
-- 30-second auto-refresh monitoring with escalation protocols
-- Professional contact integration (phone, email, messaging)
-
-##### Clinical Oversight Interface 👩‍⚕️
-
-- Professional validation of all AI-generated clinical insights
-- Statistical significance testing and effect size calculations
-- Evidence quality assessment (strong, moderate, weak categorization)
-- Clinical context documentation and approval workflows
-
-##### Consent Management System 🔐
-
-- Granular user control over data usage (treatment analytics, research participation)
-- Privacy preference levels (anonymous-only, basic, detailed sharing)
-- Automated consent renewal and withdrawal processing
-- Complete audit trail of consent changes
-
-##### Treatment Outcomes Analysis 📊
-
-- Evidence-based analysis using validated clinical instruments (PHQ-9, GAD-7)
-- Statistical rigor with confidence intervals and significance testing
-- MCID (Minimal Clinically Important Difference) analysis
-- Professional validation of all treatment recommendations
-
-##### Service Utilization Optimization 🎯
-
-- Resource allocation analysis and capacity planning
-- No-show prediction and appointment adherence tracking
-- Wait time optimization and service delivery efficiency
-- Privacy-protected utilization metrics with differential privacy
-
-##### Privacy Audit & Compliance 🛡️
-
-- Differential privacy tracking (ε-δ budget monitoring)
-- K-anonymity verification (k≥5 requirement)
-- Complete data access audit logs
-- Automated privacy risk assessment and recommendations
-
-#### **Privacy & Ethical Safeguards**
-
-- **No Private Content Analysis**: Zero access to private conversations or journals
-- **Validated Instruments Only**: Uses clinically validated mental health assessments
-- **Professional Oversight**: All AI insights require clinical validation
-- **Mathematical Privacy**: Differential privacy guarantees with configurable parameters
-- **User Autonomy**: Complete user control over data usage and sharing
-
-### 📢 Intervention Agent
-
-- **Trigger:** Activated by insights from the Analytics Agent
-- **Function:** Launches proactive outreach campaigns
-- **Output:** Automated, targeted interventions
-- **Example:** Sends helpful exam stress management resources to relevant student groups
-
-### 🏥 Triage Agent
-
-- **Operation:** Real-time analysis of ongoing conversations
-- **Function:** Classifies conversation severity and recommends appropriate support level
-- **Output:** Dynamic routing to resources (self-help articles, counseling booking, emergency contacts)
+Deliver a Safety Agent Suite that combines high-sensitivity crisis detection with curated outreach and institutional dashboards, all under explicit professional oversight and verifiable privacy guarantees.
 
 ---
 
-## 3. Technical Architecture
+## 2. Safety Agent Suite Overview
 
-### 🧠 Backend - "The Brain" (FastAPI + Python)
+Legacy analytics/intervention/triage agents are formally retired. The Safety Agent refactor introduces four coordinated services:
 
-- **Framework:** FastAPI with Python 3.9+
-- **Core Logic:** AI agent implementations using LangChain
-- **LLM Integration:**
-  - Google Generative AI SDK (Gemini)
-  - TogetherAI (Llama 3)
-- **Functions:**
-  - Prompt construction and LLM interaction
-  - Response parsing and analysis
-  - Agent orchestration logic
-- **Database ORM:** SQLAlchemy 2+
-- **Caching/State:** Redis for session management
-- **Authentication:** JWT with NextAuth integration
+### 🛡️ Safety Triage Agent (STA)
 
-### ⚡ Conversational Core - "The Central Nervous System" (LangGraph)
+- **Scope:** Real-time message classification, risk scoring, and escalation routing inside the user chat experience
+- **Key Features:** Crisis banner orchestration, consent-aware disclosures, feature flagged crisis protocols, human hand-off logging
+- **Status:** API scaffolding in progress (`backend/app/agents/sta/*`)
 
-- **Platform:** LangGraph
-- **Role:** Core, stateful conversational agent.
-- **Responsibilities:**
-  - Orchestrating the entire conversational flow.
-  - Managing the agent's state and memory (conversation history, user context).
-  - Implementing dynamic response strategies and tool usage (e.g., reasoning, acting, observing).
-  - Enforcing critical safety protocols and human-in-the-loop interventions.
-  - Running as an integrated part of our Python-based FastAPI backend.
+### 📣 Safety Campaign Agent (SCA)
 
-### ⚙️ Peripheral Automation - (N8N)
+- **Scope:** Curated Action Cards, event-triggered outreach, and campaign analytics
+- **Key Features:** Evidence-backed content library, consent-aware distribution, throttled delivery, audit trails
+- **Status:** Content pipeline design drafted; Action Card components queued for implementation
 
-- **Platform:** N8N
-- **Role:** Peripheral, stateless automation tasks.
-- **Responsibilities:**
-  - Executing stateless operational workflows triggered by the main application (via webhooks).
-  - Integrating with third-party APIs like Google Calendar for scheduling, email services for notifications, etc.
-  - Handling administrative tasks like generating nightly anonymized reports.
+### 🗂️ Safety Desk Agent (SDA)
 
-### 🖥️ Frontend - Admin Dashboard (Next.js)
+- **Scope:** Operational command centre for clinical staff (case management, SLA tracking, follow-up workflows)
+- **Key Features:** Case timelines, escalation ladders, SLA timers, interoperability hooks for campus systems
+- **Status:** Data model defined in `refactor_plan.md`; frontend routes to be moved under `admin/(protected)/safety-desk`
 
-- **Framework:** Next.js 15+ with App Router and Turbopack
-- **Language:** TypeScript with strict typing
-- **Styling:** Tailwind CSS 4
-- **Purpose:** Administrative interface for university staff
+### 🔍 Insights Agent (IA)
 
-#### **Clinical Analytics Implementation**
+- **Scope:** Privacy-respecting analytics over anonymised events/messages, replacing the legacy “Analytics Agent” surface
+- **Key Features:** Differential privacy budget tracking, consent-aware dimensions, redaction policies, clinical approval checkpoints
+- **Status:** Alembic revision `introduce_sda_ia_schema_and_events_overhaul` drafted; query layer pending implementation
 
-The frontend now includes a complete clinical intelligence dashboard system:
-
-- **Main Dashboard:** `frontend/src/components/admin/analytics/ClinicalAnalyticsDashboard.tsx`
-- **Real-Time Alerts:** `frontend/src/components/admin/analytics/RealTimeClinicalAlerts.tsx`
-- **Clinical Oversight:** `frontend/src/components/admin/analytics/ClinicalOversight.tsx`
-- **Consent Management:** `frontend/src/components/admin/analytics/ConsentManagement.tsx`
-- **Treatment Analysis:** `frontend/src/components/admin/analytics/TreatmentOutcomes.tsx`
-- **Service Utilization:** `frontend/src/components/admin/analytics/ServiceUtilization.tsx`
-- **Privacy Audit:** `frontend/src/components/admin/analytics/PrivacyAudit.tsx`
-
-**Integration Status:** ✅ Production Ready - All components fully integrated with accessibility compliance and professional medical interface design.
-
-- **Features:**
-  - Analytics Agent report viewing
-  - System operation oversight
-  - Campaign management
-  - User management and monitoring
-
-### 🗃️ Database (PostgreSQL)
-
-- **Primary Database:** PostgreSQL with Alembic migrations
-- **Data Storage:**
-  - Anonymized interaction logs
-  - Generated analytics reports
-  - Campaign details and metrics
-  - User profiles and session data
-- **Additional Storage:** Redis for real-time state management
+**Transitional Guidance:** Reference `docs/DEPRECATED.md` for the authoritative list of legacy documents and surfaces that are now historical. New development work must target STA/SCA/SDA/IA modules and alignment stories.
 
 ---
 
-## 4. Research Methodology and Scope
+## 3. Technical Architecture Snapshot
 
-### Research Framework
+### Backend Platform (FastAPI + LangChain)
 
-- **Methodology:** Design Science Research (DSR)
-- **Primary Objective:** Design, build, and functionally validate the agentic AI framework
-- **Final Deliverable:** Working prototype demonstration
+- **Target Structure:** `backend/app/agents/{sta,sca,sda,ia}/` packages with shared utilities in `backend/app/core/{db,rbac,policy,events,redaction}.py`
+- **Async-First:** All I/O (DB, LLM, external services) uses async functions with structured exception handling
+- **LLM Providers:** Google Gemini (hosted) and local Gemma 3 pipelines via LangChain abstractions; prompt flows revalidated during STA roll-out
+- **RBAC:** New permission matrix to be codified in `core/rbac.py` (supercedes ad-hoc admin checks)
+- **Observability:** Structured logging, trace IDs across redaction pipeline, and privacy budget events forwarded to monitoring stack
 
-### Evaluation Scope
+### Event-Centric Data Model
 
-- **Focus:** Technical functionality and feasibility assessment
-- **Validation:** System performance, agent collaboration effectiveness
-- **Limitations:**
-  - No live clinical trials with students
-  - No direct psychological outcome measurements
-  - Prototype-level implementation for proof of concept
+- **Primary Tables:** `events`, `messages`, `cases`, `resources`, `consents`, plus `users` refresh
+- **Design Principles:**
+  - Separation between raw user content (`messages`) and operational state (`cases`)
+  - Deterministic hashing for user identifiers with differential privacy wrappers
+  - Consent history recorded as append-only ledger
+- **Migration Plan:**
+  1. Introduce new schema (revision scaffolded)
+  2. Backfill via redaction-aware scripts in `backend/scripts/`
+  3. Toggle STA/SCA features once parity checks pass
 
----
+### Frontend Surfaces (Next.js 15 + Tailwind CSS 4)
 
-## 5. Current Implementation Status
+- **Admin:** Safety Desk (`/admin/(protected)/safety-desk`) and Insights (`/admin/(protected)/insights`) will replace legacy analytics/intervention dashboards
+- **User Chat:** Intent chips, Action Cards, Consent banners, and Crisis cues to be delivered through new components in `frontend/src/components/features/chat/`
+- **Accessibility:** All new UI components must meet WCAG 2.1 AA and support keyboard navigation, ARIA labelling, and localisation keys
 
-### Existing Components (Legacy Features)
+### Automation & Integrations
 
-- **AI Chatbot (Aika):** Empathetic mental health conversation companion
-- **User Authentication:** Google OAuth + NextAuth.js integration
-- **Basic Analytics:** User activity tracking and streak monitoring
-- **NFT Rewards:** Blockchain-based achievement system (Polygon Amoy testnet)
-- **Journal System:** User journaling with date tracking
-- **Profile Management:** User settings and wallet linking
-
-### Target Transformation
-
-The existing chatbot infrastructure serves as the foundation for implementing the 3-agent framework:
-
-- Analytics Agent will analyze existing conversation data
-- Intervention Agent will leverage existing user communication channels
-- Triage Agent will enhance existing chat capabilities with intelligent routing
+- **n8n:** Continues as orchestration layer but now triggers STA/SCA flows via the new agent routers
+- **Redis:** Session state, feature flags, and queue primitives for real-time triage alerts
+- **Email/SMS Providers:** Pluggable connectors to be wrapped with consent checks before dispatch
 
 ---
 
-## 6. Technical Implementation Guidelines
+## 4. Research & Clinical Governance
 
-### Agent Development Standards
-
-1. **LangChain Integration:** All agents must use LangChain for consistent LLM interaction
-2. **Async Operations:** Implement async/await patterns for all I/O operations
-3. **Error Handling:** Comprehensive error handling with graceful degradation
-4. **Logging:** Structured logging for agent actions and decisions
-5. **Security:** Input validation, sanitization, and secure API practices
-
-### Code Quality Requirements
-
-- **TypeScript:** Strict typing for all frontend components
-- **Python:** Type hints and Pydantic validation for backend
-- **Testing:** Unit tests for agent logic and integration tests for workflows
-- **Documentation:** Comprehensive code documentation and API specs
-
-### Deployment Architecture
-
-- **Frontend:** Vercel deployment with environment variable management
-- **Backend:** Render deployment with PostgreSQL and Redis services
-- **n8n:** Self-hosted or cloud deployment for workflow orchestration
-- **Monitoring:** Application monitoring and logging for agent performance
+- **Methodology:** Design Science Research (DSR) remains the evaluation framework; focus shifts to Safety Agent prototypes and human-in-the-loop validation
+- **Clinical Oversight:** Any automated recommendation requires explicit approval logging; Insights Agent dashboards must present uncertainty and evidence grading
+- **Ethics & Privacy:**
+  - Differential privacy (ε-δ budgets) enforced at the Insights layer
+  - Consent withdrawal honoured by redaction policies and agent routing
+  - No raw conversational content leaves secured storage; STA operates on redacted payloads
+- **Success Criteria:** Crisis detection precision/recall, campaign engagement with consent, SLA adherence for follow-ups, and zero privacy violations
 
 ---
 
-## 7. Agent Integration Specifications
+## 5. Implementation Status (September 2025)
 
-### Analytics Agent Interface
+| Track | Status | Highlights |
+|-------|--------|------------|
+| **Documentation** | ✅ Active | Legacy guides stubbed; `DEPRECATED.md` published; root Single Source updated (this document) |
+| **Data Model** | 🟡 In Progress | Alembic revision scaffolded; deterministic hashing + redaction utilities queued |
+| **Backend Agents** | 🟡 In Progress | Package skeletons defined; STA router prototyping resumed; RBAC rewrite pending |
+| **Frontend Refactor** | 🔴 Not Started | Legacy admin analytics still live; Safety Desk & Insights dashboards not yet scaffolded |
+| **Operational Playbooks** | 🟡 In Progress | Crisis escalation SOP drafted; monitoring wiring TBD |
 
-```python
-class AnalyticsAgent:
-    def analyze_trends(self, timeframe: str) -> AnalyticsReport
-    def identify_patterns(self, data: List[Interaction]) -> List[Pattern]
-    def generate_insights(self, patterns: List[Pattern]) -> List[Insight]
-```
-
-### Intervention Agent Interface
-
-```python
-class InterventionAgent:
-    def create_campaign(self, insights: List[Insight]) -> Campaign
-    def target_audience(self, campaign: Campaign) -> List[User]
-    def execute_outreach(self, campaign: Campaign, users: List[User]) -> CampaignResult
-```
-
-### Triage Agent Interface
-
-```python
-class TriageAgent:
-    def assess_conversation(self, messages: List[Message]) -> SeverityLevel
-    def recommend_action(self, severity: SeverityLevel) -> ActionRecommendation
-    def route_user(self, recommendation: ActionRecommendation) -> RoutingDecision
-```
+**Retired Components:** Clinical analytics dashboards under `frontend/src/components/admin/analytics/` remain in repo for reference but are formally deprecated. Remove usage after Safety Desk MVP lands.
 
 ---
 
-## 8. Data Flow and Agent Interaction
+## 6. Roadmap & Milestones
 
-### Workflow Sequence
+1. **Schema & Backfill (High Priority)**
+   - Finalise `events/messages/cases/consents` models and migrations
+   - Build redaction + consent enforcement utilities
+   - Backfill legacy data with audit reports
 
-1. **Data Collection:** User interactions stored in PostgreSQL
-2. **Analytics Processing:** Analytics Agent processes anonymized data
-3. **Pattern Recognition:** Identifies trends and generates insights
-4. **Intervention Planning:** Intervention Agent creates targeted campaigns
-5. **Campaign Execution:** Automated outreach via email/notifications
-6. **Real-time Triage:** Triage Agent monitors ongoing conversations
-7. **Dynamic Routing:** Users directed to appropriate support levels
+2. **Agent API Delivery**
+   - STA risk classification endpoints with feature flags
+   - SCA campaign orchestration service with Action Card registry
+   - SDA case management routes and SLA timers
+   - IA analytical queries with privacy budget ledger
 
-### Inter-Agent Communication
+3. **Frontend Alignment**
+   - Replace legacy admin routes with Safety Desk + Insights
+   - Integrate Action Cards and Consent flows into chat
+   - Update navigation, RBAC gating, and localisation bundles
 
-- **Message Queue:** Redis-based message passing between agents
-- **API Integration:** RESTful API endpoints for agent coordination
-- **Event-Driven:** Webhook triggers for agent activation
-- **State Management:** Shared state storage for collaborative decision-making
+4. **Assurance & Monitoring**
+   - Unit/integration test coverage for STA/SCA/SDA/IA
+   - Observability benchmarks (alert latencies, SLA metrics)
+   - Privacy compliance dashboards and runbooks
 
----
-
-## 9. Success Metrics and Validation
-
-### Technical Validation Criteria
-
-- **Agent Response Time:** Sub-second response for real-time triage
-- **Pattern Detection Accuracy:** Successful identification of known mental health trends
-- **Campaign Effectiveness:** Measurable engagement with intervention content
-- **System Reliability:** 99%+ uptime for critical agent functions
-- **Clinical Alert Response:** <30 seconds for critical alert notifications
-- **Privacy Compliance:** 100% differential privacy implementation with k≥5 anonymity
-
-### Functional Validation
-
-- **End-to-End Workflow:** Complete agent collaboration cycle
-- **Data Processing:** Accurate analysis of anonymized interaction data
-- **Automated Interventions:** Successful campaign creation and execution
-- **Real-time Classification:** Accurate conversation severity assessment
-
-### Clinical Analytics Validation
-
-- **Statistical Accuracy:** Confidence intervals and significance testing for all clinical insights
-- **Professional Oversight:** 100% validation of AI-generated clinical recommendations
-- **Privacy Protection:** Zero unauthorized access to private therapeutic content
-- **Clinical Compliance:** All analyses use validated mental health instruments (PHQ-9, GAD-7)
-- **User Consent Management:** Complete audit trail of consent changes and data usage
+Target rollout sequence: **Database → Backend Agents → Frontend Surfaces → Operational Playbooks**.
 
 ---
 
-## 10. Future Development Roadmap
+## 7. Active Documentation Set
 
-### Phase 1: Core Agent Implementation
+| Document | Purpose | Notes |
+|----------|---------|-------|
+| `docs/refactor_plan.md` | Implementation to-do list for Safety Agent suite | Source of truth for code migration steps |
+| `docs/DEPRECATED.md` | Index of retired documentation | Update when new specs go live |
+| `docs/single-source-of-truth.md` | Lightweight overview for onboarding | Should mirror high-level narrative here |
+| `docs/mental-health-ai-guidelines.md` | Ethics, crisis playbooks, cultural context | Remains valid and must be referenced in STA flows |
+| `docs/development-workflow.md` | Collaboration & workflow guidance | Update once Safety Desk surfaces land |
 
-- Develop Analytics Agent with basic pattern recognition
-- Implement Intervention Agent with email campaign capabilities
-- Create Triage Agent with conversation classification
-
-### Phase 2: Advanced Intelligence
-
-- Enhanced machine learning models for pattern detection
-- Sophisticated intervention personalization algorithms
-- Multi-modal triage assessment (text, sentiment, behavioral patterns)
-
-### Phase 3: Institutional Integration
-
-- University system integrations (LMS, student records)
-- Professional counselor dashboard and referral system
-- Comprehensive analytics and reporting platform
+**Removed/Stubs:** `ai-integration-guide.md`, `api-integration-reference.md`, `authentication-system-update.md`, `cbt-conversational-flows.md`, and other legacy guides now contain deprecation notices only. Do not resurrect them—extend the Safety Agent docs instead.
 
 ---
 
-## 11. Compliance and Ethical Considerations
+## 8. Engineering Guardrails
 
-### Data Privacy
-
-- **Anonymization:** All personal identifiers removed from analysis data
-- **GDPR Compliance:** User consent and data protection protocols
-- **Secure Storage:** Encrypted data storage and transmission
-
-### Ethical AI Guidelines
-
-- **Transparency:** Clear indication of AI-driven interventions
-- **Human Oversight:** Professional staff review of critical recommendations
-- **Bias Mitigation:** Regular auditing of agent decision-making patterns
-- **User Agency:** Always preserve user choice in accessing support
+- **Security:** Never hardcode secrets; rely on env vars and vault integrations. Enforce parameterised queries through SQLAlchemy.
+- **Error Handling:** Fail closed for crisis workflows (STA must default to human review when uncertain).
+- **Testing:** Add pytest + Playwright coverage around new STA/SCA flows before activation flags are set to true.
+- **Accessibility:** All Safety Desk and chat enhancements must meet a11y standards; include localisation keys for user-facing strings.
+- **Logging & Privacy:** Mask PII in logs; leverage the redaction utilities before writing payloads.
 
 ---
 
-## 12. Dependencies and Prerequisites
+## 9. Compliance Snapshot
 
-### External Services
-
-- **LLM Providers:** Google Gemini, TogetherAI (Llama 3)
-- **Database:** PostgreSQL (production), Redis (caching)
-- **Authentication:** Google OAuth APIs
-- **Email Service:** SMTP or service provider for interventions
-- **Blockchain:** Polygon Amoy testnet (for existing NFT features)
-
-### Development Tools
-
-- **Backend:** FastAPI, LangChain, SQLAlchemy, Alembic
-- **Frontend:** Next.js, TypeScript, Tailwind CSS, NextAuth.js
-- **Orchestration:** n8n workflow automation
-- **Testing:** Jest (frontend), pytest (backend)
-- **Deployment:** Vercel, Render, Docker containers
+- **Consent Ledger:** Every Action Card, notification, or analytics query must reference consent scope; withdrawal triggers purge workflows.
+- **Audit Trails:** Maintain immutable logs for triage escalations, campaign dispatches, and analytics queries (required for clinical governance).
+- **Human Oversight:** Automated decisions require professional acknowledgement; SDA UI will enforce sign-off before closing cases.
+- **Data Residency:** PostgreSQL + Redis deployments must honour institutional policies (documented in deployment runbooks).
 
 ---
 
-## 13. Comprehensive Documentation
+## 10. Key Contacts & Next Steps
 
-This project includes extensive documentation in the `docs/` folder to support development, research, and deployment:
+- **Product Direction:** Align roadmap changes through `refactor_plan.md`; raise issues for scope adjustments.
+- **Documentation Updates:** Mirror significant changes in both this file and `docs/single-source-of-truth.md`.
+- **Open Questions:**
+  1. Finalise naming/terminology for SDA SLAs and reporting lines
+  2. Choose primary delivery channel for SCA (email vs in-app vs SMS)
+  3. Confirm monitoring stack (Datadog vs OpenTelemetry native)
 
-### 📚 Complete Documentation Suite
-
-- **[📚 Documentation Index](docs/README.md)**: Navigation guide for all documentation
-- **[📋 Single Source of Truth](docs/single-source-of-truth.md)**: Detailed project overview and specifications
-- **[🏗️ Three-Agent Framework](docs/three-agent-framework.md)**: Technical architecture and agent implementation
-- **[⚙️ Technical Specifications](docs/technical-specifications.md)**: System requirements and detailed design
-- **[🚀 Implementation Guide](docs/implementation-guide.md)**: Step-by-step development instructions
-- **[🔬 Research Methodology](docs/research-methodology.md)**: Academic framework and validation procedures
-
-### 🎯 Quick Start by Role
-
-| Role | Start With | Then Reference |
-|------|------------|----------------|
-| **Developer** | [Implementation Guide](docs/implementation-guide.md) | [Technical Specifications](docs/technical-specifications.md) |
-| **Researcher** | [Research Methodology](docs/research-methodology.md) | [Single Source of Truth](docs/single-source-of-truth.md) |
-| **Admin** | [Single Source of Truth](docs/single-source-of-truth.md) | [Technical Specifications](docs/technical-specifications.md) |
-| **New Team Member** | [Documentation Index](docs/README.md) | [Implementation Guide](docs/implementation-guide.md) |
-
-### 🔗 Integration with Existing Docs
-
-The new documentation builds upon and references existing project documentation:
-
-- **AI Integration Guide**: LLM provider setup and configuration
-- **API Integration Reference**: Endpoint documentation and examples
-- **Mental Health AI Guidelines**: Ethical considerations and response protocols
-- **Development Workflow**: Team collaboration and development processes
+When completing any new feature, update this document and `docs/DEPRECATED.md` to reflect the canonical state. This file is the single reference all contributors and automation agents must consult before shipping changes.
 
 ---
 
-## 14. Current Implementation Status
-
-### ✅ **Phase 2 Complete: Clinical Analytics System**
-
-**Implementation Date:** September 25, 2025  
-**Status:** Production Ready
-
-#### **Completed Components**
-
-- **Real-Time Clinical Alerts**: Crisis detection with professional escalation protocols
-- **Clinical Oversight Interface**: Professional validation of all AI insights  
-- **Consent Management System**: Complete user control over data usage
-- **Treatment Outcomes Analysis**: Evidence-based analysis with validated instruments
-- **Service Utilization Optimization**: Resource allocation and efficiency analysis
-- **Privacy Audit & Compliance**: Differential privacy and k-anonymity protection
-- **Unified Clinical Dashboard**: Professional medical interface with all components integrated
-
-#### **Key Achievements**
-
-- **🔄 System Transformation**: From surveillance-based monitoring to privacy-preserving clinical intelligence
-- **🏥 Clinical Excellence**: Professional validation of all AI recommendations with statistical rigor
-- **🔒 Privacy Protection**: Mathematical privacy guarantees with user-controlled consent management
-- **⚡ Real-Time Safety**: Immediate crisis detection with automated professional escalation
-- **📊 Evidence-Based Practice**: All analyses use validated clinical instruments (PHQ-9, GAD-7)
-
-#### **Technical Excellence**
-
-- **Type Safety**: Complete TypeScript implementation with strict typing
-- **Accessibility**: WCAG 2.1 AA compliance with keyboard navigation
-- **Performance**: Optimized React components with professional animations
-- **Scalability**: Enterprise-grade architecture ready for production deployment
-- **Code Quality**: ESLint compliant with comprehensive error handling
-
-#### **Files Successfully Implemented**
-
-```bash
-frontend/src/components/admin/analytics/
-├── ClinicalAnalyticsDashboard.tsx     ✅ Main unified dashboard
-├── RealTimeClinicalAlerts.tsx         ✅ Crisis monitoring system
-├── ClinicalOversight.tsx              ✅ Professional validation
-├── ConsentManagement.tsx              ✅ Privacy control system
-├── TreatmentOutcomes.tsx              ✅ Evidence-based analysis
-├── ServiceUtilization.tsx             ✅ Resource optimization
-└── PrivacyAudit.tsx                   ✅ Compliance monitoring
-
-frontend/src/services/
-├── clinicalAnalytics.ts               ✅ Main analytics API
-└── clinicalAlerts.ts                  ✅ Alert management API
-
-frontend/src/app/admin/(protected)/analytics/
-└── page.tsx                           ✅ Analytics page integration
-```
-
-### 🚀 **Next Development Phases**
-
-#### **Phase 3: Backend Integration**
-
-- API endpoints for clinical analytics components
-- Database schema for clinical data and privacy tracking
-- Real-time alert processing and escalation workflows
-
-#### **Phase 4: Advanced Intelligence**
-
-- Enhanced machine learning models for pattern detection
-- Sophisticated intervention personalization algorithms
-- Multi-modal triage assessment capabilities
-
-#### **Phase 5: Institutional Integration**
-
-- University system integrations (LMS, student records)
-- Professional counselor dashboard and referral workflows
-- Comprehensive reporting and compliance systems
-
----
-
-*This document serves as the definitive reference for all UGM-AICare development activities and GitHub Copilot Agent interactions. All code generation, architectural decisions, and feature implementations should align with the specifications outlined above.*
-
-🏆 Current Status: Phase 2 Complete - Clinical Analytics System Production Ready
+*This Safety Agent-aligned Single Source of Truth replaces previous analytics-centric summaries. All engineering, documentation, and operational work must comply with the structure and guardrails described above.*

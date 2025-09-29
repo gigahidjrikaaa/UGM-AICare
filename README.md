@@ -11,7 +11,7 @@ This repository contains the monorepo for the UGM-AICare project, including the 
 ## Core Features
 
 * **AI Chatbot (Aika):**
-  * Provides empathetic, supportive conversations using Large Language Models (LLMs like Gemini or Llama 3 via TogetherAI).
+  * Provides empathetic, supportive conversations using Large Language Models (LLMs like Google Gemini or locally hosted Gemma 3).
   * Supports standard conversational flow.
   * Includes guided **Chat Modules** (e.g., Thought Record, Problem Breakdown) with state managed via Redis.
   * Features dynamic loading indicators and intelligent message chunking for readability.
@@ -52,7 +52,7 @@ This repository contains the monorepo for the UGM-AICare project, including the 
   * Database: PostgreSQL
   * Caching/State: Redis (via `redis-py` asyncio)
   * Authentication: JWT (`python-jose`), Passlib
-  * LLM Integration: Google Generative AI SDK, `httpx` (for TogetherAI)
+  * LLM Integration: Google Generative AI SDK (Gemini) and `httpx` for the optional Gemma 3 generation service
   * Task Scheduling: APScheduler (Celery also listed in `requirements.txt` but APScheduler seems used)
   * Web3 Interaction: Web3.py (listed but potentially unused in favor of Ethers.js scripts?)
   * Validation: Pydantic
@@ -130,7 +130,7 @@ This repository contains the monorepo for the UGM-AICare project, including the 
 * Redis Server (v6+ recommended)
 * Access keys for:
   * Google Cloud (for OAuth Credentials)
-  * LLM Providers (TogetherAI and/or Google Gemini)
+  * LLM Providers (Google Gemini API key; optional configuration for the local Gemma service)
   * Redis Cloud (or local connection details)
   * Blockchain Testnet (e.g., Alchemy/Infura API Key for Polygon Amoy) + Private Key for Deployer/Minter Wallet
   * Email Service (e.g., Gmail App Password or Resend API Key if used)

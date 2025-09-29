@@ -35,9 +35,8 @@ def check_env():
         "EMAIL_SMTP_SERVER",
         "EMAIL_SMTP_PORT",
 
-        # LLM/AI
-        "TOGETHER_API_KEY",
-        "GOOGLE_GENAI_API_KEY",
+    # LLM/AI
+    "GOOGLE_GENAI_API_KEY",
 
         # Blockchain
         "EDU_TESTNET_RPC_URL",

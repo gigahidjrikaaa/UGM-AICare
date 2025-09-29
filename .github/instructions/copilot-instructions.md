@@ -18,7 +18,7 @@ This enterprise-grade application builds upon existing therapeutic modules, mult
 - **Frontend**: Next.js 15+ with TypeScript, Tailwind CSS 4, Framer Motion, NextAuth.js
 - **Backend**: FastAPI with Python 3.9+, SQLAlchemy 2+, Alembic migrations, LangChain for agent orchestration
 - **Database**: PostgreSQL with Redis for caching, session state, and agent coordination
-- **AI Integration**: Google Generative AI SDK (Gemini), Together.ai (Llama 3), LangChain for agent workflows
+- **AI Integration**: Google Generative AI SDK (Gemini), optional self-hosted Gemma 3 service, and LangChain for agent workflows
 - **Orchestration**: n8n workflow automation engine for agent scheduling and coordination
 - **Blockchain**: Hardhat with Solidity contracts for NFT achievement system
 - **Deployment**: Docker Compose with multi-service architecture
@@ -197,7 +197,7 @@ if (session?.user?.role === "admin") { /* admin logic */ }
 - **Route Organization**: Feature-based routing in `app/routes/` (chat.py, auth.py, internal.py, agents.py)
 - **Agent Architecture**: New agent endpoints in `app/agents/` with LangChain integration
 - **Database Patterns**: SQLAlchemy models with Alembic migrations, enhanced for agent data storage
-- **LLM Integration**: Multi-provider abstraction in `core/llm.py` supporting Google Gemini and Together.ai
+- **LLM Integration**: Multi-provider abstraction in `core/llm.py` supporting Google Gemini and the optional Gemma 3 runtime
 - **Agent Orchestration**: LangChain workflows for agent coordination and prompt management
 - **Memory Management**: Conversation history and agent state management via Redis
 - **Background Tasks**: FastAPI BackgroundTasks for async agent operations and n8n integration

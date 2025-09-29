@@ -4,7 +4,7 @@
 
 UGM-AICare is a mental health AI assistant aimed at providing supportive conversations and resources for users experiencing mental health challenges. The backend supports the core functionality of the AI chatbot, user management, conversation history tracking, and sentiment analysis.
 
-The system utilizes a large language model (Llama 3.3 70B via Together.ai) to provide empathetic responses in conversational Indonesian, with a focus on mental health support.
+The system utilizes Google Gemini (hosted) and an optional self-managed Gemma 3 service to provide empathetic responses in conversational Indonesian, with a focus on mental health support.
 
 ## Features
 
@@ -18,7 +18,7 @@ The system utilizes a large language model (Llama 3.3 70B via Together.ai) to pr
 - **Framework**: [FastAPI](https://fastapi.tiangolo.com/) (Python 3.9+)
 - **Database**: PostgreSQL (via SQLAlchemy ORM)
 - **Memory Storage**: Redis (with in-memory fallback)
-- **LLM Provider**: Together.ai (Meta Llama 3.3 70B Instruct Turbo Free)
+- **LLM Providers**: Google Gemini (cloud) and optional local Gemma 3 generation service
 - **Authentication**: JWT token-based authentication
 - **API Documentation**: Swagger UI (auto-generated)
 - **Background Tasks**: Celery (optional for async processing)
@@ -30,7 +30,7 @@ backend/
 │
 ├── app/
 │   ├── core/
-│   │   ├── llm.py         # LLM integration with Together.ai
+│   │   ├── llm.py         # LLM integration for Gemini & Gemma 3
 │   │   └── memory.py      # Memory management for conversation history
 │   │
 │   ├── routes/
@@ -48,7 +48,7 @@ backend/
 │   └── test_chat_1.py     # Test for chat functionality
 │
 ├── requirements.txt       # Python dependencies
-└── .env                   # Environment variables (not versioned)
+└── .env                   # Environment variables (should be created locally)
 ```
 
 ## Prerequisites
@@ -96,7 +96,8 @@ backend/
    # API settings
    API_SECRET_KEY=your_secret_key_here
    API_DEBUG_MODE=True
-   TOGETHER_API_KEY=your_together_api_key_here
+   # Hosted LLM configuration
+   GOOGLE_GENAI_API_KEY=your_google_gemini_key_here
 
    # Redis configuration (optional)
    REDIS_HOST=localhost
@@ -161,7 +162,7 @@ python test/test_chat_1.py
 
 ## Configuration Options
 
-- **LLM Provider**: Currently using Together.ai's Llama 3.3 70B model
+- **LLM Providers**: Google Gemini (default) or local Gemma 3 service
 - **Memory Storage**: Uses Redis by default with in-memory fallback
 - **Debug Mode**: Set `API_DEBUG_MODE=True` for detailed logs
 
@@ -177,11 +178,13 @@ If you encounter Redis connection errors:
 
 ### API Key Issues
 
-If Together.ai API requests fail:
+If Gemini requests fail:
 
-1. Verify your API key in the `.env` file
-2. Ensure you have sufficient quota for API calls
-3. Check the format of the API key (should be a long string without quotes)
+1. Verify your `GOOGLE_GENAI_API_KEY` in the `.env` file
+2. Confirm the Gemini project has access to the requested model
+3. Review rate limits and safety filters returned in the API response
+
+If the local Gemma 3 service is unreachable, ensure the Docker service `gemma_service` is running and accessible.
 
 ## Contributing
 
@@ -198,7 +201,7 @@ This project is licensed under the MIT License - see the LICENSE file for detail
 ## Acknowledgments
 
 - [FastAPI](https://fastapi.tiangolo.com/) for the web framework
-- [Together.ai](https://www.together.ai) for LLM API access
-- [Meta's Llama 3.3 70B](https://ai.meta.com/llama/) for the underlying language model
+- [Google Gemini](https://ai.google.dev/) for hosted LLM access
+- [Gemma 3](https://ai.google.dev/gemma) for the optional self-hosted model
 
 Similar code found with 2 license types
