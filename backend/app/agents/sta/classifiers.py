@@ -1,16 +1,105 @@
 from __future__ import annotations
 
-from typing import Any, Mapping
+from typing import Any, Mapping, cast
 
-from app.agents.sta.schemas import STAClassifyRequest, STAClassifyResponse
+from app.agents.sta.schemas import RiskLevel, STAClassifyRequest, STAClassifyResponse
+
+
+_CRISIS_KEYWORDS: tuple[str, ...] = (
+    "bunuh diri",
+    "suicide",
+    "mengakhiri hidup",
+    "kill myself",
+    "gantung diri",
+    "overdose",
+    "tidak mau hidup",
+)
+
+_HIGH_DISTRESS_KEYWORDS: tuple[str, ...] = (
+    "panic",
+    "panik",
+    "serangan panik",
+    "self harm",
+    "melukai diri",
+    "tidur tidak",
+    "tidak bisa tidur",
+    "trauma",
+)
+
+_ACADEMIC_KEYWORDS: tuple[str, ...] = (
+    "skripsi",
+    "tesis",
+    "kuliah",
+    "ujian",
+    "nilai",
+    "tugas",
+)
+
+_RELATIONSHIP_KEYWORDS: tuple[str, ...] = (
+    "pacar",
+    "relationship",
+    "orang tua",
+    "family",
+    "pertemanan",
+)
+
+_FINANCIAL_KEYWORDS: tuple[str, ...] = (
+    "biaya",
+    "uang",
+    "keuangan",
+    "financial",
+    "bayar",
+)
 
 
 class SafetyTriageClassifier:
-    """Thin wrapper around risk/intent classifiers.
+    """Rule-based interim triage classifier until ML models are wired."""
 
-    TODO: Implement real ML classifiers and heuristics.
-    """
+    async def classify(
+        self,
+        payload: STAClassifyRequest,
+        *,
+        context: Mapping[str, Any] | None = None,
+    ) -> STAClassifyResponse:
+        text = payload.text.lower()
 
-    async def classify(self, payload: STAClassifyRequest, *, context: Mapping[str, Any] | None = None) -> STAClassifyResponse:
-        # Placeholder ensures callers have deterministic shape while implementation is pending.
-        raise NotImplementedError("SafetyTriageClassifier.classify is not implemented yet")
+        risk_score = 0
+        intent = "general_support"
+        next_step = "resource"
+        handoff = False
+        diagnostic_notes: list[str] = []
+
+        if any(keyword in text for keyword in _CRISIS_KEYWORDS):
+            risk_score = 3
+            intent = "crisis_support"
+            next_step = "human"
+            handoff = True
+            diagnostic_notes.append("Keyword match indicates crisis intent")
+        elif any(keyword in text for keyword in _HIGH_DISTRESS_KEYWORDS):
+            risk_score = 2
+            intent = "acute_distress"
+            next_step = "human"
+            handoff = True
+            diagnostic_notes.append("Elevated distress keywords detected")
+        else:
+            if any(keyword in text for keyword in _ACADEMIC_KEYWORDS):
+                intent = "academic_stress"
+                next_step = "sca"
+                risk_score = max(risk_score, 1)
+            if any(keyword in text for keyword in _RELATIONSHIP_KEYWORDS):
+                intent = "relationship_strain"
+                risk_score = max(risk_score, 1)
+            if any(keyword in text for keyword in _FINANCIAL_KEYWORDS):
+                intent = "financial_pressure"
+                risk_score = max(risk_score, 1)
+
+        notes = "; ".join(diagnostic_notes) if diagnostic_notes else None
+        risk_level = cast(RiskLevel, max(0, min(3, risk_score)))
+
+        return STAClassifyResponse(
+            risk_level=risk_level,
+            intent=intent,
+            next_step=next_step,
+            handoff=handoff,
+            diagnostic_notes=notes,
+        )

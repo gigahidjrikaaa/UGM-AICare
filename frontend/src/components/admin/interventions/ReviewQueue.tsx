@@ -36,8 +36,8 @@ export function ReviewQueue({ executions, loading, onUpdate, onManual }: ReviewQ
   return (
     <section className="mb-10 rounded-xl border border-white/10 bg-white/5 p-5 backdrop-blur">
       <div className="mb-4 flex items-center gap-2">
-        <FiExternalLink className="h-5 w-5 text-[#FFCA40]" />
-        <h2 className="text-lg font-semibold text-white">Human review queue</h2>
+  <FiExternalLink className="h-5 w-5 text-[#FFCA40]" />
+  <h2 className="text-lg font-semibold text-white">Safety coaching review queue</h2>
       </div>
 
       {executions.length === 0 ? (
@@ -80,7 +80,7 @@ export function ReviewQueue({ executions, loading, onUpdate, onManual }: ReviewQ
                     className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1.5 text-xs text-white/70 transition hover:border-[#4CF5AC]/50"
                     onClick={() => onManual(execution)}
                   >
-                    Escalate manually
+                    Launch safety coaching
                   </button>
                 )}
                 {ACTIONS.map(({ label, status, icon: Icon, tone }) => (

@@ -39,7 +39,7 @@ export default function TriagePanelPage() {
   const loadOverview = useCallback(async () => {
     try {
       setOverviewLoading(true);
-      const data = await apiCall<TriageOverview>('/api/v1/admin/triage/overview');
+  const data = await apiCall<TriageOverview>('/api/v1/admin/safety-triage/overview');
       setOverview(data);
     } catch (error) {
       console.error(error);
@@ -60,7 +60,7 @@ export default function TriagePanelPage() {
         if (severityFilter) {
           params.append('severity', severityFilter);
         }
-        const data = await apiCall<TriageAssessmentListResponse>(`/api/v1/admin/triage/assessments?${params.toString()}`);
+  const data = await apiCall<TriageAssessmentListResponse>(`/api/v1/admin/safety-triage/assessments?${params.toString()}`);
         setTotalAssessments(data.total);
         if (replace) {
           setAssessments(data.items);
@@ -116,7 +116,7 @@ export default function TriagePanelPage() {
     async (message: string) => {
       try {
         setTestLoading(true);
-        const response = await apiCall<TriageTestResponse>('/api/v1/admin/triage/classify', {
+  const response = await apiCall<TriageTestResponse>('/api/v1/admin/safety-triage/classify', {
           method: 'POST',
           body: JSON.stringify({ message }),
         });
@@ -186,7 +186,7 @@ export default function TriagePanelPage() {
       recommended_action?: string | null;
     }) => {
       const query = buildInterventionParams(payload);
-      router.push(`/admin/interventions${query ? `?${query}` : ''}`);
+  router.push(`/admin/safety-coaching${query ? `?${query}` : ''}`);
     },
     [buildInterventionParams, router],
   );
@@ -227,8 +227,8 @@ export default function TriagePanelPage() {
         overview={overview}
         onFocusHighSeverity={handleFocusHighSeverity}
         onScrollToAssessments={handleScrollToAssessments}
-        interventionsHref="/admin/interventions"
-        analyticsHref="/admin/analytics"
+  interventionsHref="/admin/safety-coaching"
+  analyticsHref="/admin/insights"
       />
 
       <TriageHighRiskList items={overview?.recent_high_risk ?? []} onEscalate={handleEscalatePreview} />

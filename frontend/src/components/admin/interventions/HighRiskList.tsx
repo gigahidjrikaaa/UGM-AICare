@@ -46,7 +46,7 @@ export function HighRiskList({ items, onCreateIntervention }: HighRiskListProps)
               className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-white/10 px-3 py-2 text-xs font-semibold text-white transition hover:border-white/40 hover:bg-white/20"
             >
               <FiPlus className="h-4 w-4" />
-              Create intervention
+              Create safety plan
             </button>
           </div>
         ))}

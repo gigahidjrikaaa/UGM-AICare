@@ -92,7 +92,7 @@ export default function JournalsAdminPage() {
       if (endDate) {
         params.append('end_date', endDate);
       }
-      const data = await apiCall<DashboardAnalyticsResponse>(`/api/v1/admin/analytics/dashboard?${params.toString()}`);
+  const data = await apiCall<DashboardAnalyticsResponse>(`/api/v1/admin/insights/dashboard?${params.toString()}`);
       if (data.journal_insights) {
         setInsights(data.journal_insights);
       } else {

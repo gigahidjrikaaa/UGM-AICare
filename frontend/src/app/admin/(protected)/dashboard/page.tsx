@@ -318,8 +318,8 @@ export default function AdminDashboardPage() {
             {[
               { title: 'New Appointment', desc: 'Schedule directly', icon: <FiPlus/>, href: '/admin/appointments', color: 'blue' },
               { title: 'Manage Counselors', desc: 'Add or edit profiles', icon: <FiUsers/>, href: '/admin/appointments', color: 'yellow' },
-              { title: 'View Analytics', desc: 'Platform usage reports', icon: <FiPieChart/>, href: '/admin/analytics', color: 'purple' },
-              { title: 'System Health', desc: 'Check system status', icon: <FiActivity/>, href: '/admin/analytics', color: 'green' },
+              { title: 'View Insights', desc: 'Platform usage reports', icon: <FiPieChart/>, href: '/admin/insights', color: 'purple' },
+              { title: 'System Health', desc: 'Check system status', icon: <FiActivity/>, href: '/admin/insights', color: 'green' },
             ].map(action => (
               <Link key={action.title} href={action.href}>
                 <div className={`bg-white/5 hover:bg-white/10 backdrop-blur-md rounded-xl p-4 sm:p-5 border border-white/10 cursor-pointer transition-all duration-150 shadow-lg hover:shadow-xl flex items-center space-x-4 h-full`}>

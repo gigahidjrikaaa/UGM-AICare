@@ -30,7 +30,7 @@ Refer to `PROJECT_SINGLE_SOURCE_OF_TRUTH.md` for the canonical roadmap and align
 
 ## Architecture & Key Packages
 
-```
+```bash
 backend/
 ├── app/
 │   ├── agents/
@@ -82,12 +82,14 @@ backend/
 ## Environment Setup
 
 1. **Clone the repository**
+
    ```bash
    git clone https://github.com/gigahidjrikaaa/UGM-AICare.git
    cd UGM-AICare/backend
    ```
 
 2. **Create an isolated environment** (recommended path: `.venv` in repo root)
+
    ```bash
    python -m venv .venv
    # Windows (PowerShell)
@@ -97,6 +99,7 @@ backend/
    ```
 
 3. **Install dependencies**
+
    ```bash
    pip install --upgrade pip
    pip install -r requirements.txt
@@ -113,6 +116,7 @@ backend/
      | Auth | `JWT_SECRET_KEY`, `INTERNAL_API_KEY` | Keep secrets out of version control |
      | App URLs | `ALLOWED_ORIGINS`, `FRONTEND_URL`, `BACKEND_URL` | Comma-separated origins for CORS |
      | Email | `EMAIL_USERNAME`, `EMAIL_PASSWORD`, `EMAIL_SMTP_SERVER`, `EMAIL_SMTP_PORT` | Needed for outreach + crisis alerts |
+
    | LLM | `GOOGLE_GENAI_API_KEY` | Required for Gemini access; update the Gemma service URL in `app/core/llm.py` if you host a local runtime |
      | Blockchain (optional) | `EDU_TESTNET_RPC_URL`, `NFT_CONTRACT_ADDRESS`, `BACKEND_MINTER_PRIVATE_KEY` | Required only if on-chain rewards are enabled |
      | Social (optional) | `TWITTER_*` keys | Needed for campaign connectors |
@@ -121,11 +125,13 @@ backend/
    - Never commit populated `.env` files; use `scripts/reset_db.py` and `app/utils/env_check.py` to validate configuration locally.
 
 5. **Prepare the database schema**
+
    ```bash
    alembic upgrade head
    ```
 
 6. **(Optional) Seed sample data**
+
    ```bash
    python reset_db.py --with-sample-data
    ```
@@ -149,11 +155,13 @@ During development, run `python -m app.utils.env_check` (or import `check_env()`
 ## Quality Gates
 
 - **Unit & async tests**
+
   ```bash
   pytest
   ```
 
 - **Static analysis (optional but recommended)**
+
   ```bash
   black app tests
   isort app tests

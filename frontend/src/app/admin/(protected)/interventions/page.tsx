@@ -62,7 +62,7 @@ export default function InterventionPanelPage() {
     router.replace(nextParams.toString() ? `${pathname}?${nextParams.toString()}` : pathname, { scroll: false });
   }, [pathname, router, searchParams]);
   const fetchOverview = useCallback(async () => {
-    const data = await apiCall<InterventionOverview>("/api/v1/admin/interventions/overview");
+    const data = await apiCall<InterventionOverview>("/api/v1/admin/safety-coaching/overview");
     setOverview(data);
   }, []);
 
@@ -70,7 +70,7 @@ export default function InterventionPanelPage() {
     setCampaignLoading(true);
     try {
       const data = await apiCall<{ items: InterventionCampaign[]; total: number }>(
-        `/api/v1/admin/interventions/campaigns?limit=${CAMPAIGN_LIMIT}`,
+        `/api/v1/admin/safety-coaching/campaigns?limit=${CAMPAIGN_LIMIT}`,
       );
       setCampaigns(data.items);
     } finally {
@@ -82,7 +82,7 @@ export default function InterventionPanelPage() {
     setQueueLoading(true);
     try {
       const data = await apiCall<{ items: InterventionExecution[]; total: number }>(
-        "/api/v1/admin/interventions/queue?limit=25",
+        "/api/v1/admin/safety-coaching/queue?limit=25",
       );
       setQueue(data.items);
     } finally {
@@ -91,7 +91,7 @@ export default function InterventionPanelPage() {
   }, []);
 
   const fetchSettings = useCallback(async () => {
-    const data = await apiCall<InterventionSettings>("/api/v1/admin/interventions/settings");
+  const data = await apiCall<InterventionSettings>("/api/v1/admin/safety-coaching/settings");
     setSettings(data);
   }, []);
 
@@ -114,7 +114,7 @@ export default function InterventionPanelPage() {
   const handleCampaignStatusChange = useCallback(
     async (campaignId: number, status: string) => {
       try {
-        await apiCall(`/api/v1/admin/interventions/campaigns/${campaignId}`, {
+  await apiCall(`/api/v1/admin/safety-coaching/campaigns/${campaignId}`, {
           method: "PATCH",
           body: JSON.stringify({ status }),
         });
@@ -131,7 +131,7 @@ export default function InterventionPanelPage() {
   const handleManualSubmit = useCallback(
     async (payload: ManualInterventionPayload) => {
       try {
-        await apiCall("/api/v1/admin/interventions/executions/manual", {
+  await apiCall("/api/v1/admin/safety-coaching/executions/manual", {
           method: "POST",
           body: JSON.stringify(payload),
         });
@@ -148,7 +148,7 @@ export default function InterventionPanelPage() {
   const handleExecutionUpdate = useCallback(
     async (executionId: number, status: string, notes?: string) => {
       try {
-        await apiCall(`/api/v1/admin/interventions/executions/${executionId}`, {
+  await apiCall(`/api/v1/admin/safety-coaching/executions/${executionId}`, {
           method: "PATCH",
           body: JSON.stringify({
             status,
@@ -170,7 +170,7 @@ export default function InterventionPanelPage() {
     async (payload: Partial<InterventionSettings>) => {
       try {
         setSettingsSaving(true);
-        await apiCall("/api/v1/admin/interventions/settings", {
+  await apiCall("/api/v1/admin/safety-coaching/settings", {
           method: "PUT",
           body: JSON.stringify(payload),
         });

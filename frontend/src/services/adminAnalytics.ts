@@ -19,7 +19,7 @@ export async function getTriageMetrics(params: {
     search.set('target_ms', String(params.targetMs));
   }
   const query = search.toString();
-  return apiCall<TriageMetricsInsight>(`/api/v1/admin/analytics/triage-metrics${query ? `?${query}` : ''}`);
+  return apiCall<TriageMetricsInsight>(`/api/v1/admin/insights/triage-metrics${query ? `?${query}` : ''}`);
 }
 
 export async function getCohortHotspots(params: {
@@ -42,7 +42,7 @@ export async function getCohortHotspots(params: {
     search.set('limit', String(params.limit));
   }
   const query = search.toString();
-  return apiCall<CohortHotspotsResponse>(`/api/v1/admin/analytics/cohort-hotspots${query ? `?${query}` : ''}`);
+  return apiCall<CohortHotspotsResponse>(`/api/v1/admin/insights/cohort-hotspots${query ? `?${query}` : ''}`);
 }
 
 export async function getPredictiveSignals(params: {
@@ -57,7 +57,7 @@ export async function getPredictiveSignals(params: {
     search.set('force_refresh', 'true');
   }
   const query = search.toString();
-  return apiCall<PredictiveSignalsResponse>(`/api/v1/admin/analytics/predictive-scores${query ? `?${query}` : ''}`);
+  return apiCall<PredictiveSignalsResponse>(`/api/v1/admin/insights/predictive-scores${query ? `?${query}` : ''}`);
 }
 
 export async function getInterventionSummary(params: {
@@ -80,5 +80,5 @@ export async function getInterventionSummary(params: {
     search.set('limit', String(params.limit));
   }
   const query = search.toString();
-  return apiCall<InterventionSummary>(`/api/v1/admin/analytics/intervention-summary${query ? `?${query}` : ''}`);
+  return apiCall<InterventionSummary>(`/api/v1/admin/insights/intervention-summary${query ? `?${query}` : ''}`);
 }

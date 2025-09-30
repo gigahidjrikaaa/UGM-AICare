@@ -1,4 +1,4 @@
-﻿"""Intervention management endpoints for the admin panel."""
+﻿"""Safety Coaching management endpoints for the admin panel."""
 from __future__ import annotations
 
 from datetime import datetime, timedelta
@@ -35,7 +35,7 @@ from app.schemas.admin import (
     QueueItem,
 )
 
-router = APIRouter(prefix="/interventions", tags=["Admin - Interventions"])
+router = APIRouter(prefix="/safety-coaching", tags=["Admin - Safety Coaching"])
 
 # --- Helpers -----------------------------------------------------------------
 

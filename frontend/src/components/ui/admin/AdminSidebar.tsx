@@ -15,7 +15,7 @@ const navGroups = [
     label: 'Overview',
     items: [
       { name: 'Dashboard', icon: <FiGrid size={18}/>, href: '/admin/dashboard' },
-      { name: 'Analytics', icon: <FiBarChart2 size={18}/>, href: '/admin/analytics' },
+  { name: 'Insights', icon: <FiBarChart2 size={18}/>, href: '/admin/insights' },
       { name: 'Flags & Reviews', icon: <FiShield size={18}/>, href: '/admin/flags' },
     ]
   },
@@ -35,8 +35,8 @@ const navGroups = [
     label: 'Agents & Intelligence',
     items: [
       { name: 'Agents Command Center', icon: <FiCpu size={18}/>, href: '/admin/agents-command-center' },
-      { name: 'Triage', icon: <FiActivity size={18}/>, href: '/admin/triage' },
-      { name: 'Interventions', icon: <FiLifeBuoy size={18}/>, href: '/admin/interventions' },
+  { name: 'Safety Triage', icon: <FiActivity size={18}/>, href: '/admin/safety-triage' },
+  { name: 'Safety Coaching', icon: <FiLifeBuoy size={18}/>, href: '/admin/safety-coaching' },
     ]
   }
 ];

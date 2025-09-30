@@ -73,14 +73,14 @@ export function TriageActionGuides({
         </ActionCard>
 
         <ActionCard
-          title="Coordinate outreach"
-          description="Move flagged students into an intervention sequence or manual follow-up."
+          title="Coordinate safety coaching"
+          description="Move flagged students into a safety coaching sequence or manual follow-up."
         >
           <Link
             href={interventionsHref}
             className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 font-semibold text-white transition hover:border-white/40 hover:bg-white/15"
           >
-            Open interventions
+            Open safety coaching
             <FiArrowRight className="h-3.5 w-3.5" />
           </Link>
           {recentHighRisk > 0 && (
@@ -89,14 +89,14 @@ export function TriageActionGuides({
         </ActionCard>
 
         <ActionCard
-          title="Deep-dive analytics"
-          description="Spot cohort spikes, trend lines, and SLA performance in the analytics workspace."
+          title="Deep-dive insights"
+          description="Spot cohort spikes, trend lines, and SLA performance in the insights workspace."
         >
           <Link
             href={analyticsHref}
             className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-3 py-1 font-semibold text-white transition hover:border-white/40 hover:bg-white/15"
           >
-            View analytics
+            View insights
             <FiPieChart className="h-3.5 w-3.5" />
           </Link>
         </ActionCard>

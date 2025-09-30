@@ -15,7 +15,7 @@ const ManualCandidateRow = ({ item, onSelect }: { item: QueueItem; onSelect: (it
   const name = item.user_name || item.user_email || 'Unassigned user';
   const severity = item.severity_level ?? 'n/a';
   const riskPercent = item.risk_score != null ? `${Math.round(item.risk_score * 100)}%` : '--';
-  const recommended = item.recommended_action ?? 'Review manually';
+  const recommended = item.recommended_action ?? 'Schedule safety coaching';
   const scheduledLabel = formatDistanceToNow(new Date(item.scheduled_at), { addSuffix: true });
 
   return (
@@ -46,7 +46,7 @@ const ManualCandidateRow = ({ item, onSelect }: { item: QueueItem; onSelect: (it
             className="inline-flex items-center gap-1 rounded-full border border-white/20 bg-white/10 px-2.5 py-1 font-semibold text-white transition hover:border-white/40 hover:bg-white/20"
           >
             <FiPlus className="h-3.5 w-3.5" />
-            Queue
+            Schedule coaching
           </button>
         </div>
       </td>
@@ -61,15 +61,15 @@ export function ManualInterventionCandidates({ items, loading = false, onSelect 
         <div className="flex items-center gap-2">
           <FiUsers className="h-5 w-5 text-amber-200" />
           <div>
-            <h2 className="text-lg font-semibold text-white">Manual intervention candidates</h2>
-            <p className="text-xs text-white/60">Students better served by human outreach than automated campaigns.</p>
+            <h2 className="text-lg font-semibold text-white">Safety coaching candidates</h2>
+            <p className="text-xs text-white/60">Students better served by guided human outreach than automated campaigns.</p>
           </div>
         </div>
         <Link
-          href="/admin/analytics"
+          href="/admin/insights"
           className="inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1 text-xs font-semibold text-white/70 transition hover:border-white/30 hover:text-white"
         >
-          View supporting data
+          View supporting insights
           <FiArrowRight className="h-3.5 w-3.5" />
         </Link>
       </div>
@@ -96,7 +96,7 @@ export function ManualInterventionCandidates({ items, loading = false, onSelect 
         </div>
       ) : (
         <div className="rounded-2xl border border-white/10 bg-white/5 p-6 text-sm text-white/60">
-          No manual interventions are recommended right now. Continue monitoring triage alerts for new escalations.
+          No manual safety coaching sessions are recommended right now. Continue monitoring triage alerts for new escalations.
         </div>
       )}
     </section>

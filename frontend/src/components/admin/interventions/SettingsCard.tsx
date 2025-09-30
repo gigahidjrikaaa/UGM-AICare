@@ -81,7 +81,7 @@ export function SettingsCard({ settings, onSave, saving }: SettingsCardProps) {
     <section className="mb-8 rounded-xl border border-white/10 bg-white/5 p-5 backdrop-blur">
       <div className="mb-4 flex items-center gap-2">
         <FiSettings className="h-5 w-5 text-[#4C8BF5]" />
-        <h2 className="text-lg font-semibold text-white">Agent Settings</h2>
+        <h2 className="text-lg font-semibold text-white">Safety Coaching Settings</h2>
       </div>
       <form className="space-y-5" onSubmit={handleSubmit}>
         <div className="grid gap-4 md:grid-cols-2">
@@ -93,9 +93,9 @@ export function SettingsCard({ settings, onSave, saving }: SettingsCardProps) {
               onChange={() => handleToggle("auto_mode_enabled")}
             />
             <span>
-              <span className="block font-medium text-white">Enable automated interventions</span>
+              <span className="block font-medium text-white">Enable automated safety coaching</span>
               <span className="text-white/60">
-                When enabled, the intervention agent can send pre-approved outreach automatically within configured guardrails.
+                When enabled, the safety coaching agent can send pre-approved outreach automatically within configured guardrails.
               </span>
             </span>
           </label>
@@ -110,7 +110,7 @@ export function SettingsCard({ settings, onSave, saving }: SettingsCardProps) {
             <span>
               <span className="block font-medium text-white">Require human review before send</span>
               <span className="text-white/60">
-                Keep the human-in-the-loop for sensitive interventions. Disable to allow auto-send for low-risk cohorts.
+                Keep the human-in-the-loop for sensitive safety coaching. Disable to allow auto-send for low-risk cohorts.
               </span>
             </span>
           </label>
@@ -264,7 +264,7 @@ export function SettingsCard({ settings, onSave, saving }: SettingsCardProps) {
             }}
             rows={3}
             className="mt-2 w-full rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white focus:border-[#4C8BF5] focus:outline-none"
-            placeholder="Internal guidance for admins reviewing interventions. Visible to human reviewers only."
+            placeholder="Internal guidance for admins reviewing safety coaching plans. Visible to human reviewers only."
           />
         </div>
 

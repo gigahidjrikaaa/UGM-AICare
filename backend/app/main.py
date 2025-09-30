@@ -21,9 +21,7 @@ from app.routes import (
     agents,
     surveys,
     cbt_modules,
-    triage,
-    langgraph,
-    langgraph_analytics,
+    safety_triage,
     clinical_analytics_routes,
 )
 from app.agents.sta.router import router as sta_router
@@ -153,14 +151,12 @@ app.include_router(summary.user_data_router)  # This will have prefix /api/v1/us
 app.include_router(profile.router)
 app.include_router(admin.router)  # Admin endpoints
 app.include_router(agents.router)
-app.include_router(triage.router)
+app.include_router(safety_triage.router)
 # TODO: wire new agent routers once services are implemented
 app.include_router(sta_router)
 app.include_router(sca_router)
 app.include_router(sda_router)
 app.include_router(ia_router)
-app.include_router(langgraph.router)
-app.include_router(langgraph_analytics.router)
 app.include_router(appointments.router)
 app.include_router(surveys.router)
 app.include_router(surveys.user_router)

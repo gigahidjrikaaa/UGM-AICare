@@ -45,9 +45,9 @@ export function OverviewCards({ overview, onRefresh, onCreateManual }: OverviewC
     <section className="mb-8">
       <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-3xl font-semibold text-white">Intervention Panel</h1>
+          <h1 className="text-3xl font-semibold text-white">Safety Coaching Panel</h1>
           <p className="mt-1 text-sm text-white/60">
-            Coordinate human-in-the-loop outreach and tune the intervention agent.
+            Coordinate human-in-the-loop outreach and tune the safety coaching agent.
           </p>
         </div>
         <div className="flex items-center gap-3">
@@ -57,7 +57,7 @@ export function OverviewCards({ overview, onRefresh, onCreateManual }: OverviewC
               onClick={onCreateManual}
               className="inline-flex items-center gap-2 rounded-lg border border-[#4CF5AC]/50 bg-[#4CF5AC]/20 px-4 py-2 text-sm font-semibold text-[#4CF5AC] transition hover:border-[#4CF5AC]/70"
             >
-              Create manual intervention
+              Create manual safety plan
             </button>
           )}
           <button

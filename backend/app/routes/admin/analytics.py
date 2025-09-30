@@ -1,4 +1,4 @@
-"""Analytics endpoints for admin panel."""
+"""Insights endpoints for the admin panel."""
 from __future__ import annotations
 
 import logging
@@ -14,7 +14,6 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.analytics_agent import AnalyticsAgent
 from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.models import AnalyticsReport, User
@@ -34,7 +33,7 @@ from app.services.triage_metrics import SLA_TARGET_MS
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/analytics", tags=["Admin - Analytics"])
+router = APIRouter(prefix="/insights", tags=["Admin - Insights"])
 
 
 def _serialize_report(model: AnalyticsReport) -> dict:
@@ -181,48 +180,42 @@ async def get_predictive_scores(
     db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user),
 ) -> PredictiveSignalsResponse:
-    """Return predictive risk signals, refreshing the analytics agent when required."""
+    """Return cached predictive risk signals or indicate unavailability."""
     logger.info(
         "Admin %s requesting predictive scores (force_refresh=%s)",
         admin_user.id,
         force_refresh,
     )
+
+    if force_refresh:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Predictive score regeneration is disabled until the Insights Agent pipeline ships.",
+        )
+
     cutoff = datetime.utcnow() - timedelta(hours=1)
     trace_id = uuid.uuid4().hex
     signals: List[PredictiveSignalPayload] = []
     generated_at_value = datetime.utcnow()
     source = "cache"
     warning: Optional[str] = None
-    if not force_refresh:
-        stmt = select(AnalyticsReport).order_by(desc(AnalyticsReport.generated_at)).limit(1)
-        existing = (await db.execute(stmt)).scalars().first()
-        if existing and existing.generated_at and existing.generated_at >= cutoff:
-            cached = _extract_predictive_signals(existing)
-            if cached:
-                signals = cached
-                generated_at_value = existing.generated_at
-            else:
-                warning = "No predictive signals stored for the cached analytics snapshot."
+
+    stmt = select(AnalyticsReport).order_by(desc(AnalyticsReport.generated_at)).limit(1)
+    existing = (await db.execute(stmt)).scalars().first()
+    if existing and existing.generated_at and existing.generated_at >= cutoff:
+        cached = _extract_predictive_signals(existing)
+        if cached:
+            signals = cached
+            generated_at_value = existing.generated_at
+        else:
+            warning = "No predictive signals stored for the cached analytics snapshot."
+
     if not signals:
-        try:
-            agent = AnalyticsAgent(db)
-            report = await agent.analyze_trends(timeframe_days=timeframe_days)
-            generated_at_value = report.period_end or datetime.utcnow()
-            signals = [
-                PredictiveSignalPayload.model_validate(signal.model_dump())
-                for signal in report.predictive_signals
-            ]
-            source = "fresh"
-            if not signals:
-                warning = "No predictive signals generated for the requested window."
-        except Exception as exc:  # pragma: no cover - external dependencies
-            logger.error("Failed to refresh predictive scores: %s", exc, exc_info=True)
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Failed to compute predictive scores",
-            ) from exc
-    else:
-        source = "cache"
+        warning = (
+            "Predictive signals are not yet available. The Insights Agent pipeline has not been activated."
+        )
+        source = "unavailable"
+
     generated_at_str = generated_at_value.isoformat()
     return PredictiveSignalsResponse(
         generated_at=generated_at_str,
@@ -234,50 +227,17 @@ async def get_predictive_scores(
     )
 
 
-@router.get("/intervention-summary", response_model=InterventionSummary)
-async def get_intervention_summary(
-    timeframe_days: int = Query(14, ge=7, le=90),
-    reference_date: Optional[date] = Query(None),
-    campaign_type: Optional[str] = Query(None),
-    limit: int = Query(5, ge=1, le=25),
-    db: AsyncSession = Depends(get_async_db),
-    admin_user: User = Depends(get_admin_user),
-) -> InterventionSummary:
-    """Return aggregated intervention execution outcomes for the window."""
-    logger.info(
-        "Admin %s requesting intervention summary (campaign_type=%s)",
-        admin_user.id,
-        campaign_type,
-    )
-    return await compute_intervention_summary(
-        db,
-        timeframe_days,
-        reference_date=reference_date,
-        campaign_type=campaign_type,
-        limit=limit,
-    )
-
-
 @router.post("/run")
 async def run_analytics_agent(
     db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user),
 ):
     """Trigger the analytics agent to generate a new report."""
-    logger.info("Admin %s triggered analytics agent", admin_user.id)
-    try:
-        agent = AnalyticsAgent(db)
-        report = await agent.analyze_trends(timeframe_days=7)
-        return {
-            "message": "Analytics report generated successfully",
-            "report": report.model_dump(),
-        }
-    except Exception as exc:  # pragma: no cover - runtime safety
-        logger.error("Error running analytics agent: %s", exc, exc_info=True)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to run analytics agent",
-        ) from exc
+    logger.info("Admin %s attempted to trigger retired analytics agent", admin_user.id)
+    raise HTTPException(
+        status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+        detail="The legacy analytics agent has been removed. Use the Insights Agent endpoints once available.",
+    )
 
 
 @router.get("")

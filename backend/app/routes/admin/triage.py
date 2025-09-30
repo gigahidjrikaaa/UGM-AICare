@@ -1,15 +1,15 @@
-"""Admin triage agent management endpoints."""
+"""Admin Safety Triage management endpoints."""
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from langchain_core.messages import HumanMessage
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.triage_agent import triage_agent
+from app.agents.sta.schemas import STAClassifyRequest
+from app.agents.sta.service import SafetyTriageService
 from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.models import Conversation, TriageAssessment, User
@@ -27,7 +27,7 @@ from app.services.triage_metrics import compute_triage_metrics
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(prefix="/triage", tags=["Admin - Triage"])
+router = APIRouter(prefix="/safety-triage", tags=["Admin - Safety Triage"])
 
 def _coerce_risk_factors(raw: object) -> list[str] | None:
     if raw is None:
@@ -224,26 +224,62 @@ async def classify_test_message(
     payload: TriageTestRequest,
     db: AsyncSession = Depends(get_async_db),  # Ensures session lifecycle parity
     admin_user: User = Depends(get_admin_user),
+    service: SafetyTriageService = Depends(SafetyTriageService),
 ) -> TriageTestResponse:
     """Run an ad-hoc triage classification for an admin-supplied message."""
 
     logger.info("Admin %s running manual triage classification", admin_user.id)
 
     try:
-        result = await triage_agent.ainvoke({"messages": [HumanMessage(content=payload.message)]})
+        _ = db  # ensure dependency is retained for session lifecycle parity
+        sta_request = STAClassifyRequest(
+            session_id=f"admin-test-{admin_user.id}",
+            text=payload.message,
+            meta={"source": "admin-test"},
+        )
+        result = await service.classify(sta_request)
+    except NotImplementedError as exc:
+        logger.error("Safety Triage classifier not ready: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Safety Triage service is not yet available",
+        ) from exc
     except Exception as exc:  # pragma: no cover - safety net for external calls
-        logger.error("Triage agent classify failure: %s", exc, exc_info=True)
+        logger.error("Safety Triage classify failure: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Failed to classify message",
         ) from exc
 
-    classification = str(result.get("classification", ""))
-    recommended_resources = result.get("recommended_resources") or []
-    if not isinstance(recommended_resources, list):
-        recommended_resources = [recommended_resources]
+    if result.risk_level >= 2:
+        recommendation = {
+            "title": "Escalate to human counselor",
+            "description": "Route the case to the Safety Desk team for manual follow-up.",
+            "next_step": result.next_step,
+            "handoff": result.handoff,
+            "risk_level": result.risk_level,
+        }
+    elif result.next_step == "sca":
+        recommendation = {
+            "title": "Create Safety Campaign follow-up",
+            "description": "Schedule supportive outreach with Action Cards aligned to the detected intent.",
+            "next_step": result.next_step,
+            "handoff": result.handoff,
+            "risk_level": result.risk_level,
+        }
+    else:
+        recommendation = {
+            "title": "Offer self-help resources",
+            "description": "Send the user curated coping strategies and campus resources.",
+            "next_step": result.next_step,
+            "handoff": result.handoff,
+            "risk_level": result.risk_level,
+        }
+
+    if result.diagnostic_notes:
+        recommendation["notes"] = result.diagnostic_notes
 
     return TriageTestResponse(
-        classification=classification,
-        recommended_resources=[dict(item) if isinstance(item, dict) else {"value": item} for item in recommended_resources],
+        classification=result.intent,
+        recommended_resources=[recommendation],
     )
