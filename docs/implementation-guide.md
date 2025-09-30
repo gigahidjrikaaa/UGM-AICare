@@ -144,6 +144,8 @@ class LLMRouter:
 
 ### Step 4: Agent Framework Implementation
 
+> **Migration Note:** The sample classes in this section reference the legacy three-agent framework (`analytics_agent.py`, `intervention_agent.py`, `triage_agent.py`). Those files have been removed. Use the Safety Agent suite packages (`app/agents/sta`, `sca`, `sda`, `ia`) and their services as the canonical implementation points.
+
 #### Analytics Agent
 
 ```python

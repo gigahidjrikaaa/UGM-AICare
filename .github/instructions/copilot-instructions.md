@@ -1,14 +1,17 @@
 # UGM-AICare AI Coding Agent Instructions
 
 ## Overview
-UGM-AICare is a transformative mental health AI platform implementing a sophisticated **three-agent framework** for proactive university mental health support. The project aims to transform reactive mental health services into proactive, data-driven, and automated frameworks through collaborative AI agents.
+UGM-AICare is a transformative mental health AI platform implementing the **Safety Agent suite**—a coordinated four-agent framework—for proactive university mental health support. The project aims to transform reactive mental health services into proactive, data-driven, and automated frameworks through collaborative AI agents.
 
-### Core Innovation: The 3-Agent Framework
-The solution implements a collaborative system of three specialized AI agents:
+### Core Innovation: Safety Agent Suite (4-Agent Framework)
+The solution implements a coordinated system of four specialized Safety Agents:
 
-1. **🤖 Analytics Agent**: Periodically analyzes anonymized student interaction data to identify emerging mental health trends and patterns
-2. **📢 Intervention Agent**: Launches proactive outreach campaigns triggered by insights from the Analytics Agent  
-3. **🏥 Triage Agent**: Real-time conversation analysis for severity classification and appropriate support level routing
+1. **🛡️ Safety Triage Agent (STA)**: Real-time conversation analysis for risk classification, routing, and redaction safeguards.
+2. **🧭 Safety Coaching Agent (SCA)**: Human-guided outreach plans, CBT resource delivery, and follow-up scheduling for escalated students.
+3. **📂 Safety Desk Agent (SDA)**: Case management desk that tracks manual escalations, assignments, and SLA compliance.
+4. **� Insights Agent (IA)**: Allow-listed analytics queries that surface privacy-preserving dashboards for administrators.
+
+> The legacy LangGraph modules (`analytics_agent.py`, `intervention_agent.py`, `triage_agent.py`) have been retired. All automation and visualization now run through the Safety Agent suite packages (`agents/sta`, `agents/sca`, `agents/sda`, `agents/ia`) and the shared graph specs in `agents/safety_graph_specs.py`.
 
 This enterprise-grade application builds upon existing therapeutic modules, multi-provider LLM integration, and comprehensive user management infrastructure.
 
@@ -43,85 +46,82 @@ This enterprise-grade application builds upon existing therapeutic modules, mult
                         └─────────────────┘
 ```
 
-### Three-Agent System Integration
-- **Analytics Agent**: Scheduled execution via n8n, analyzes interaction patterns in PostgreSQL
-- **Intervention Agent**: Triggered by Analytics insights, executes campaigns via email/notifications
-- **Triage Agent**: Real-time integration with existing Aika chatbot for conversation classification
+### Safety Agent Suite Integration
+- **Safety Triage Agent (STA)**: Classifies live chat sessions, emits `TriageAssessment` records, and triggers escalations.
+- **Safety Coaching Agent (SCA)**: Coordinates guided plans, CBT resources, and human-led outreach for flagged students.
+- **Safety Desk Agent (SDA)**: Manages manual escalation queues, assignments, and SLA alerts for counsellors.
+- **Insights Agent (IA)**: Serves privacy-preserving analytics dashboards via allow-listed SQL templates.
+
+These Safety Agents are exposed through `/api/v1/safety-triage`, `/api/v1/admin/safety-coaching`, `/api/v1/admin/safety-desk`, and `/api/v1/admin/insights`, ensuring the admin experience aligns with the four-agent vocabulary.
+
+### Active Refactor Plan (Safety Agent Suite Migration)
+- **Objective**: Finish the migration away from the legacy three-agent stack into the Safety Agent suite described in `docs/refactor_plan.md`.
+- **Backend actions**:
+    - Retire `backend/app/routes/triage.py` and `backend/app/routes/admin/interventions.py`; replace them with scoped agent routers under `backend/app/agents/sta`, `sca`, `sda`, and `ia`.
+    - Confirm legacy agent modules (`triage_agent.py`, `intervention_agent.py`, `analytics_agent.py`) remain deleted and route new work through the Safety Agent package structure (`agents/sta/*`, `agents/sca/*`, `agents/sda/*`, `agents/ia/*`).
+    - Introduce refreshed core utilities (`backend/app/core/{db.py,rbac.py,redaction.py,policy.py,events.py,settings.py}`) and the new SQLAlchemy models (`events`, `messages`, `consents`, `cases`, `resources`, `users`).
+    - Implement the alembic revision `introduce_sda_ia_schema_and_events_overhaul`, run the accompanying backfill script, and document any legacy schema that remains for historical purposes only.
+- **Frontend actions**:
+    - Sunset admin dashboards under `frontend/src/components/admin/{triage,interventions,analytics}` and rebuild the experience as `safety-desk` and `insights` views.
+    - Update chat surfaces to consume STA/SCA APIs instead of legacy `/triage`, `/analytics`, or `/interventions` endpoints.
+- **Testing expectations**: Add agent-focused suites in `backend/tests/agents/` and ensure new admin UI flows are covered with regression tests.
+- **Documentation**: Keep `DEPRECATED.md` current, add `docs/agent_contracts.md` and `docs/privacy_safeguards.md`, and annotate migration steps in `PROJECT_SINGLE_SOURCE_OF_TRUTH.md`.
 
 ## Critical Domain Knowledge
 
-### Three-Agent Framework & Research Context
+### Safety Agent Suite & Research Context
 - **Primary Purpose**: Agentic AI framework for proactive university mental health intervention
 - **Research Methodology**: Design Science Research (DSR) with prototype validation focus
 - **Target Users**: Indonesian university students (UGM) requiring proactive mental health support
-- **Innovation**: Transform reactive mental health services into proactive, data-driven interventions
+- **Innovation**: Transform reactive mental health services into proactive, data-driven interventions via the Safety Agent suite
 - **Privacy Requirements**: Anonymized data analysis with GDPR compliance and ethical AI guidelines
 
 ### Agent System Architecture (Core Innovation)
-The application's most sophisticated feature is the three-agent collaborative system:
+The application's most sophisticated feature is the Safety Agent suite:
 
-#### 🤖 Analytics Agent (`backend/app/agents/analytics_agent.py`)
-```python
-class AnalyticsAgent:
-    """Periodically analyzes anonymized student interaction data"""
-    
-    async def analyze_trends(self, timeframe: str) -> AnalyticsReport:
-        """Identifies emerging mental health patterns"""
-    
-    async def generate_insights(self, patterns: List[Pattern]) -> List[Insight]:
-        """Converts patterns into actionable insights"""
-        
-    # Scheduled via n8n workflows
-    # Analyzes conversation data from PostgreSQL
-    # Identifies trends like exam-period anxiety spikes
-```
+#### 🛡️ Safety Triage Agent (STA)
+- **Location:** `backend/app/agents/sta/`
+- **API:** `/api/agents/sta/classify`
+- **Role:** Classifies live messages, redacts sensitive snippets, and determines whether to route to SCA, SDA, or automated resources.
+- **Implementation Notes:** Uses `SafetyTriageService` and a rule-based classifier today; future ML models will drop in via dependency injection.
 
-#### 📢 Intervention Agent (`backend/app/agents/intervention_agent.py`)
-```python
-class InterventionAgent:
-    """Launches proactive outreach campaigns based on Analytics insights"""
-    
-    async def create_campaign(self, insights: List[Insight]) -> Campaign:
-        """Designs targeted intervention campaigns"""
-    
-    async def execute_outreach(self, campaign: Campaign) -> CampaignResult:
-        """Executes email/notification campaigns"""
-        
-    # Triggered by Analytics Agent findings
-    # Automated resource distribution (stress management guides)
-    # Targeted student group outreach
-```
+#### 🧭 Safety Coaching Agent (SCA)
+- **Location:** `backend/app/agents/sca/`
+- **API:** `/api/agents/sca/intervene` & `/api/agents/sca/followup`
+- **Role:** Generates human-guided outreach plans, CBT resource packs, and structured follow-up cadences for escalated students.
+- **Implementation Notes:** Service functions are scaffolded with TODOs; wire in CBT orchestration, personalization, and cooldown enforcement here.
 
-#### 🏥 Triage Agent (`backend/app/agents/triage_agent.py`) 
-```python
-class TriageAgent:
-    """Real-time conversation analysis and support level routing"""
-    
-    async def assess_conversation(self, messages: List[Message]) -> SeverityLevel:
-        """Classifies conversation severity in real-time"""
-    
-    async def route_user(self, severity: SeverityLevel) -> RoutingDecision:
-        """Routes to appropriate support level"""
-        
-    # Integrated with existing Aika chatbot
-    # Real-time crisis detection and routing
-    # Dynamic resource recommendation (self-help vs counseling)
-```
+#### 📂 Safety Desk Agent (SDA)
+- **Location:** `backend/app/agents/sda/`
+- **API:** `/api/agents/sda/cases`
+- **Role:** Provides human counsellors a queue of manual cases, tracks assignments, and enforces SLA timers.
+- **Implementation Notes:** `SafetyDeskService` is placeholder-only; integrate with case storage and `sla.py` helpers to activate the desk.
+
+#### 📊 Insights Agent (IA)
+- **Location:** `backend/app/agents/ia/`
+- **API:** `/api/agents/ia/query`
+- **Role:** Serves allow-listed analytics questions with k-anonymity protection for admin dashboards (Safety Insights).
+- **Implementation Notes:** Implement SQL templates in `queries.py` and enforce `InsightsAgentService.query` guardrails before enabling write paths.
+
+#### Foundational Safety Graph Specifications
+- **`safety_graph_specs.py`**: Describes the canonical node/edge layouts for STA, SCA, SDA, and IA used by the admin LangGraph viewer.
+- **`orchestrator_graph_spec.py`**: Documents how the orchestrator classifies requests and fans them out to the Safety Agent suite.
+- **`orchestrator.py`**: Transitional question router that still fronts STA/IA insights—update intent patterns as new admin queries surface.
+
+Use these specs when updating the LangGraph viewer or when introducing new orchestration steps. Do not recreate the removed `*_agent.py` pipelines; extend the Safety Agent services instead.
 
 #### Agent Coordination & Data Flow
 ```python
-# Workflow: Analytics → Intervention → Triage (continuous cycle)
-1. Analytics Agent: Weekly analysis of anonymized chat logs
-2. Pattern Detection: Identify trends (exam stress, seasonal depression)
-3. Insight Generation: Convert patterns to actionable insights
-4. Intervention Trigger: Insights trigger targeted campaigns
-5. Proactive Outreach: Automated resource distribution
-6. Real-time Triage: Ongoing conversation monitoring
-7. Dynamic Routing: Crisis detection and support escalation
+# Workflow: STA → (SCA | SDA) → IA feedback loop
+1. STA records real-time triage assessments and risk scores.
+2. SCA builds coaching plans or manual outreach using STA outputs and CBT history.
+3. SDA tracks human escalations, assignments, and SLA follow-up for critical cases.
+4. IA aggregates anonymized signals (triage, campaigns, journals) into dashboards.
+5. Insights from IA and campaign metrics feed back into STA/SCA tuning.
 ```
 
 ### Guided CBT Module System (Core User-Facing Feature)
-The Guided CBT module system remains the primary therapeutic interface for users, providing structured therapeutic interventions through the Aika chat. This system works in parallel with the three-agent framework:
+The Guided CBT module system remains the primary therapeutic interface for users, providing structured therapeutic interventions through the Aika chat. This system works in parallel with the Safety Agent suite:
 
 #### Module Architecture
 ```python
@@ -226,15 +226,13 @@ triage_alerts → Real-time severity alerts
 
 ## Key Workflows
 
-### Three-Agent Collaboration Workflow
-1. **Analytics Agent Execution**: Scheduled via n8n (weekly), analyzes anonymized chat data
-2. **Pattern Recognition**: Identifies mental health trends (exam stress, seasonal patterns)
-3. **Insight Generation**: Converts patterns into actionable insights for interventions
-4. **Intervention Trigger**: Insights automatically trigger Intervention Agent campaigns
-5. **Campaign Creation**: Automated design of targeted outreach (emails, resources)
-6. **Campaign Execution**: Proactive distribution to identified student segments
-7. **Real-time Triage**: Ongoing conversation monitoring by Triage Agent
-8. **Dynamic Routing**: Crisis detection and appropriate support level routing
+### Safety Agent Suite Collaboration Workflow
+1. **Safety Triage Agent (STA)** analyzes live sessions and writes `TriageAssessment` records.
+2. **Safety Coaching Agent (SCA)** consumes STA output, builds personalized coaching plans, and schedules human follow-ups.
+3. **Safety Desk Agent (SDA)** manages escalated cases, assigns counsellors, and tracks SLA thresholds.
+4. **Insights Agent (IA)** aggregates anonymized telemetry (triage, campaigns, journals) into dashboards with k-anonymity.
+5. **Campaign Automation**: IA signals feed SCA scheduling through the Safety Agent services and shared graph specs (no legacy LangGraph files remain).
+6. **Feedback Loop**: IA insights and campaign outcomes recalibrate STA thresholds and SCA playbooks.
 
 ### Enhanced Chat Flow with Guided Therapy & Agent Integration
 1. **Message Receipt**: `frontend/hooks/useChat.tsx` → `backend/routes/chat.py`
@@ -244,7 +242,7 @@ triage_alerts → Real-time severity alerts
 5. **Module Execution**: If CBT module selected, execute step-based therapeutic intervention
 6. **Response Generation**: Generate therapeutic response through CBT module or general LLM
 7. **State Persistence**: Update module state, conversation history, and agent coordination data
-8. **Analytics Feed**: Anonymized interaction data queued for Analytics Agent future analysis
+8. **Insights Feed**: Anonymized interaction data queued for the Insights Agent’s allow-listed analytics
 
 ### Module Completion & Therapeutic Progression
 ```python
@@ -254,7 +252,7 @@ if await module.should_complete(module_state):
     await complete_module(module_state)
     # Suggest next therapeutic module or return to general chat
     response = await suggest_next_therapeutic_steps(user_context)
-    # SECONDARY: Update Analytics Agent data for trend analysis
+    # SECONDARY: Update Insights Agent data for trend analysis
     await queue_completion_data_for_analytics(module_state, anonymized=True)
 ```
 
@@ -273,11 +271,11 @@ This project includes extensive documentation to support development, research, 
 
 #### Core Documents
 - **[📚 Documentation Index](../../docs/README.md)**: Navigation guide for all documentation
-- **[📋 Single Source of Truth](../../docs/single-source-of-truth.md)**: Detailed project overview and specifications
-- **[🏗️ Three-Agent Framework](../../docs/three-agent-framework.md)**: Technical architecture and agent implementation
-- **[⚙️ Technical Specifications](../../docs/technical-specifications.md)**: System requirements and detailed design
+- **[📋 Project Single Source of Truth](../../PROJECT_SINGLE_SOURCE_OF_TRUTH.md)**: Definitive project overview and specifications
+- **[🏗️ Technical Implementation Guide](../../docs/technical-implementation-guide.md)**: Detailed architecture and agent implementation notes
 - **[🚀 Implementation Guide](../../docs/implementation-guide.md)**: Step-by-step development instructions
-- **[🔬 Research Methodology](../../docs/research-methodology.md)**: Academic framework and validation procedures
+- **[🧭 Insight Foundations Plan](../../docs/insight-foundations-plan.md)**: Safety Agent suite roadmap and analytics alignment
+- **[�️ Development Workflow](../../docs/development-workflow.md)**: Team collaboration and delivery processes
 
 #### Specialized Documentation
 - **[AI Integration Guide](../../docs/ai-integration-guide.md)**: LLM provider setup and configuration
@@ -288,9 +286,9 @@ This project includes extensive documentation to support development, research, 
 #### Quick Reference by Role
 | Role | Start With | Then Reference |
 |------|------------|----------------|
-| **Developer** | [Implementation Guide](../../docs/implementation-guide.md) | [Technical Specifications](../../docs/technical-specifications.md) |
-| **Researcher** | [Research Methodology](../../docs/research-methodology.md) | [Single Source of Truth](../../docs/single-source-of-truth.md) |
-| **Admin** | [Single Source of Truth](../../docs/single-source-of-truth.md) | [Technical Specifications](../../docs/technical-specifications.md) |
+| **Developer** | [Implementation Guide](../../docs/implementation-guide.md) | [Technical Implementation Guide](../../docs/technical-implementation-guide.md) |
+| **Researcher** | [Insight Foundations Plan](../../docs/insight-foundations-plan.md) | [Mental Health AI Guidelines](../../docs/mental-health-ai-guidelines.md) |
+| **Admin** | [Project Single Source of Truth](../../PROJECT_SINGLE_SOURCE_OF_TRUTH.md) | [API Integration Reference](../../docs/api-integration-reference.md) |
 | **New Team Member** | [Documentation Index](../../docs/README.md) | [Implementation Guide](../../docs/implementation-guide.md) |
 
 ### 🎯 Single Source of Truth
@@ -423,28 +421,28 @@ docker-compose up -d
 This platform represents sophisticated therapeutic AI with **dual innovative systems**: 
 
 1. **Primary System**: Guided CBT modules providing direct therapeutic interventions through Aika chat
-2. **Secondary System**: Three-agent collaborative framework transforming institutional mental health support
+2. **Secondary System**: Safety Agent suite (STA, SCA, SDA, IA) transforming institutional mental health support
 
 The combination creates a comprehensive solution offering both individual therapeutic support and institutional-level mental health insights, all built on complex state management, multi-provider integrations, and comprehensive user journeys.
 
 **Always prioritize:**
 - **User Safety**: Mental health data privacy and ethical AI practices
-- **Agent Coordination**: Seamless collaboration between Analytics, Intervention, and Triage agents  
+- **Agent Coordination**: Seamless collaboration between STA, SCA, SDA, and IA  
 - **Data Privacy**: Anonymization and GDPR compliance in all agent operations
 - **Therapeutic Effectiveness**: Evidence-based interventions and professional oversight
 - **Research Integrity**: Design Science Research methodology and prototype validation
 
 **Key Development Focus Areas:**
 1. **Guided CBT Modules**: Primary user-facing therapeutic interventions through Aika chat
-2. **Three-Agent Framework**: Background analytics, proactive interventions, and real-time triage
+2. **Safety Agent Suite**: STA, SCA, SDA, and IA delivering analytics, coaching, case management, and insights
 3. **Therapeutic User Experience**: Step-based CBT progression with evidence-based interventions
 4. **LangChain Integration**: Consistent agent workflow and module orchestration patterns
-5. **Dual System Coordination**: CBT modules serving users while feeding anonymized data to agents
+5. **Dual System Coordination**: CBT modules serving users while feeding anonymized data to Safety Agents
 6. **Admin Dashboard**: Therapeutic progress monitoring alongside agent oversight tools
 
 **Development Priorities:**
 - **PRIMARY**: Guided CBT module implementation for direct user therapeutic benefit
-- **SECONDARY**: Three-agent framework for institutional-level mental health insights
+- **SECONDARY**: Safety Agent suite for institutional-level mental health insights
 - **INTEGRATION**: Seamless coordination between therapeutic modules and background agents
 - **PRIVACY**: Strict anonymization protocols for agent analytics while preserving therapeutic data
 

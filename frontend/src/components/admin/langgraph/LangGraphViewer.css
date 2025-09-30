@@ -15,26 +15,33 @@
   border-color: var(--agent-color);
   background-color: rgba(255,107,107,0.12);
 }
-.agent-triage.agent-badge,
-.legend-dot.agent-triage {
+.agent-sta.agent-badge,
+.legend-dot.agent-sta {
   --agent-color: #FFCA40;
   color: var(--agent-color);
   border-color: var(--agent-color);
   background-color: rgba(255,202,64,0.12);
 }
-.agent-analytics.agent-badge,
-.legend-dot.agent-analytics {
-  --agent-color: #38BDF8;
-  color: var(--agent-color);
-  border-color: var(--agent-color);
-  background-color: rgba(56,189,248,0.12);
-}
-.agent-intervention.agent-badge,
-.legend-dot.agent-intervention {
+.agent-sca.agent-badge,
+.legend-dot.agent-sca {
   --agent-color: #A855F7;
   color: var(--agent-color);
   border-color: var(--agent-color);
   background-color: rgba(168,85,247,0.12);
+}
+.agent-sda.agent-badge,
+.legend-dot.agent-sda {
+  --agent-color: #34D399;
+  color: var(--agent-color);
+  border-color: var(--agent-color);
+  background-color: rgba(52,211,153,0.12);
+}
+.agent-ia.agent-badge,
+.legend-dot.agent-ia {
+  --agent-color: #38BDF8;
+  color: var(--agent-color);
+  border-color: var(--agent-color);
+  background-color: rgba(56,189,248,0.12);
 }
 
 /* Fallback agent color */
@@ -81,9 +88,10 @@
 
 /* Agent-specific edge colors (applies --agent-color for that class) */
 .lang-edge.agent-orchestrator { --agent-color: #FF6B6B; }
-.lang-edge.agent-triage { --agent-color: #FFCA40; }
-.lang-edge.agent-analytics { --agent-color: #38BDF8; }
-.lang-edge.agent-intervention { --agent-color: #A855F7; }
+.lang-edge.agent-sta { --agent-color: #FFCA40; }
+.lang-edge.agent-sca { --agent-color: #A855F7; }
+.lang-edge.agent-sda { --agent-color: #34D399; }
+.lang-edge.agent-ia { --agent-color: #38BDF8; }
 .lang-edge.agent-agent { --agent-color: #FFCA40; }
 
 /* Edge label styling (labelClassName = 'edge-label') */
@@ -99,18 +107,22 @@
 }
 
 /* Some accessibility / contrast helpers */
-.agent-badge,
-.edge-label {
+.agent-sta,
+.legend-dot.agent-sta {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+.agent-sca,
+.legend-dot.agent-sca {
+  --agent-color: #A855F7;
 }
-
+.agent-sda,
+.legend-dot.agent-sda {
+  --agent-color: #34D399;
+}
+.agent-ia,
+.legend-dot.agent-ia {
 /* Ensure reactflow edge text uses our label background correctly */
 .edge-label .react-flow__text {
-  background: transparent;
-}
-
-/* Small responsive tweak if needed */
 @media (max-width: 640px) {
   .langgraph-minimap {
     display: none;

@@ -3,10 +3,13 @@ from typing import Iterable, List
 
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 
-from app.agents.analytics_agent import ANALYTICS_GRAPH_SPEC
-from app.agents.intervention_agent import INTERVENTION_GRAPH_SPEC
-from app.agents.triage_agent import TRIAGE_GRAPH_SPEC
-from app.agents.orchestrator import ORCHESTRATOR_GRAPH_SPEC
+from app.agents.orchestrator_graph_spec import ORCHESTRATOR_GRAPH_SPEC
+from app.agents.safety_graph_specs import (
+    IA_GRAPH_SPEC,
+    SCA_GRAPH_SPEC,
+    SDA_GRAPH_SPEC,
+    STA_GRAPH_SPEC,
+)
 from app.agents.execution_tracker import execution_tracker
 from app.dependencies import get_admin_user
 from app.models import User
@@ -23,10 +26,11 @@ router = APIRouter(prefix="/api/v1/admin/agents-config", tags=["Admin"])
 GRAPH_SPECS = {
     spec["id"]: spec
     for spec in (
-        ORCHESTRATOR_GRAPH_SPEC,
-        TRIAGE_GRAPH_SPEC,
-        ANALYTICS_GRAPH_SPEC,
-        INTERVENTION_GRAPH_SPEC,
+    ORCHESTRATOR_GRAPH_SPEC,
+    STA_GRAPH_SPEC,
+    SCA_GRAPH_SPEC,
+    SDA_GRAPH_SPEC,
+    IA_GRAPH_SPEC,
     )
 }
 

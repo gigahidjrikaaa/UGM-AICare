@@ -72,12 +72,13 @@ type AgentNodeData = {
 
 const agentPalette: Record<string, string> = {
   orchestrator: '#FF6B6B',
-  triage: '#FFCA40',
-  analytics: '#38BDF8',
-  intervention: '#A855F7',
+  sta: '#FFCA40',
+  sca: '#A855F7',
+  sda: '#34D399',
+  ia: '#38BDF8',
 };
 
-const agentDisplayOrder = ['orchestrator', 'triage', 'analytics', 'intervention'];
+const agentDisplayOrder = ['orchestrator', 'sta', 'sca', 'sda', 'ia'];
 // Improved spacing for better visual organization
 const columnWidth = 280; // Increased from 220
 const agentOffset = 680; // Increased from 520  

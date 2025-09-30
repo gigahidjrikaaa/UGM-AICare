@@ -2,6 +2,8 @@
 
 ## Analytics Agent Redesign - Code Changes
 
+> **Migration Note:** The concrete `analytics_agent.py` file referenced in this guide was part of the retired three-agent framework. Use the Insights Agent (`app/agents/ia`) and related services as the implementation target while applying the privacy controls described below.
+
 **Date**: September 25, 2025  
 **Type**: Technical Specification  
 **Priority**: Critical Implementation Guide  
