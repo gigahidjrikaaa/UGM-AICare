@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from __future__ import annotations
-
 from collections.abc import Awaitable, Callable
 from datetime import datetime
 import hashlib
@@ -42,8 +40,8 @@ class SafetyTriageService:
 
     def __init__(
         self,
-        classifier: SafetyTriageClassifier = Depends(SafetyTriageClassifier),
-        session: AsyncSession = Depends(get_async_db),
+        classifier: SafetyTriageClassifier,
+        session: AsyncSession,
         event_emitter: Callable[[AgentEvent], Awaitable[None]] = emit_agent_event,
     ) -> None:
         self._classifier = classifier
@@ -220,4 +218,13 @@ class SafetyTriageService:
         if level == "moderate":
             return CaseSeverityEnum.med
         return CaseSeverityEnum.low
+
+
+def get_safety_triage_service(
+    classifier: SafetyTriageClassifier = Depends(SafetyTriageClassifier),
+    session: AsyncSession = Depends(get_async_db),
+) -> "SafetyTriageService":
+    """FastAPI dependency factory for :class:`SafetyTriageService`."""
+
+    return SafetyTriageService(classifier=classifier, session=session)
 

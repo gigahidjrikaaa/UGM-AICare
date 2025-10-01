@@ -2,14 +2,70 @@
 
 import secrets
 import logging
+import importlib
+import asyncio
 from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.user import User
 from app.utils.email_utils import send_email
+from passlib.context import CryptContext
 
 logger = logging.getLogger(__name__)
+
+# Async helper to obtain a hashed password.
+# Tries to use app.utils.security_utils.hash_password if available (handles circular import safely),
+# otherwise falls back to passlib bcrypt. All sync work runs in a thread to avoid blocking the event loop.
+_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+async def _hash_password_async(password: str) -> str:
+    """
+    Return a hashed password string.
+    Preference order:
+      1. app.utils.security_utils.hash_password (if present).
+      2. Fallback to passlib bcrypt (run in thread).
+    This version validates and normalizes the return type to str to satisfy static type checks.
+    """
+    # Attempt to use project's hashing function if it exists.
+    try:
+        sec = importlib.import_module("app.utils.security_utils")
+        func = getattr(sec, "hash_password", None)
+        if callable(func):
+            try:
+                # Call the function; it might be sync or async.
+                result = func(password)
+
+                # If it's async, await it and validate
+                if asyncio.iscoroutine(result):
+                    hashed = await result
+                    if isinstance(hashed, str):
+                        return hashed
+                    if isinstance(hashed, (bytes, bytearray)):
+                        return hashed.decode()
+                    raise TypeError("Project hash_password returned unsupported type")
+
+                # If sync and already returned a str, accept it
+                if isinstance(result, str):
+                    return result
+
+                # Otherwise run the sync callable in a worker thread and validate
+                sync_result = await asyncio.to_thread(func, password)
+                if isinstance(sync_result, str):
+                    return sync_result
+                if isinstance(sync_result, (bytes, bytearray)):
+                    return sync_result.decode()
+                raise TypeError("Project hash_password returned unsupported type when called in thread")
+            except Exception:
+                # If calling the project's function fails, fall through to fallback.
+                logger.exception("Project hash_password failed; falling back to passlib bcrypt")
+    except Exception:
+        # Module not present or import failed -> fallback
+        logger.debug("app.utils.security_utils.hash_password not found; using fallback bcrypt")
+
+    # Fallback: use passlib's bcrypt in a thread to avoid blocking the event loop.
+    return await asyncio.to_thread(_pwd_context.hash, password)
 
 def generate_reset_token() -> str:
     """Generate a secure random token for password reset."""
@@ -185,11 +241,8 @@ async def reset_password_with_token(
         if not isinstance(new_password, str) or len(new_password) < 8:
             return {"success": False, "message": "Password must be at least 8 characters long."}
         
-        # Import hash_password locally to avoid potential circular imports
-        from app.utils.security_utils import hash_password
-
-        # Hash the new password
-        hashed_password = hash_password(new_password)
+        # Hash the new password (tries project implementation first, falls back to passlib)
+        hashed_password = await _hash_password_async(new_password)
         
         # Update user with new password and clear reset token
         user.password_hash = hashed_password

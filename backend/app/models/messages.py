@@ -5,9 +5,10 @@ import uuid
 from datetime import datetime
 
 from sqlalchemy import Column, DateTime, Enum, Index, String, Text
-from sqlalchemy.dialects.postgresql import JSONB, UUID
+from sqlalchemy.dialects.postgresql import UUID
 
 from app.database import Base
+from app.database.types import JSONBCompat
 
 
 class MessageRoleEnum(str, enum.Enum):
@@ -23,7 +24,7 @@ class Message(Base):
     session_id = Column(String, nullable=False, index=True)
     role = Column(Enum(MessageRoleEnum, name="message_role_enum"), nullable=False)
     content_redacted = Column(Text, nullable=False)
-    tools_used = Column(JSONB, nullable=True)
+    tools_used = Column(JSONBCompat, nullable=True)
     trace_id = Column(String, nullable=True)
     ts = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False, index=True)
 

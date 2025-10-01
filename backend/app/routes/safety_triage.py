@@ -2,7 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 
 from app.agents.sta.schemas import STAClassifyRequest, STAClassifyResponse
-from app.agents.sta.service import SafetyTriageService
+from app.agents.sta.service import SafetyTriageService, get_safety_triage_service
 
 router = APIRouter(prefix="/api/v1/safety-triage", tags=["Safety Triage"])
 
@@ -10,7 +10,7 @@ router = APIRouter(prefix="/api/v1/safety-triage", tags=["Safety Triage"])
 @router.post("/classify", response_model=STAClassifyResponse)
 async def classify_message(
     payload: STAClassifyRequest,
-    service: SafetyTriageService = Depends(SafetyTriageService),
+    service: SafetyTriageService = Depends(get_safety_triage_service),
 ) -> STAClassifyResponse:
     """Classify a single user message using the Safety Triage Agent service."""
     try:

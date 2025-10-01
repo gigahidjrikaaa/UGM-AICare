@@ -1,7 +1,7 @@
 import json
 import asyncio
 import pytest # type: ignore
-from httpx import AsyncClient
+from httpx import ASGITransport, AsyncClient
 from fastapi import WebSocket
 from starlette.websockets import WebSocketDisconnect
 
@@ -18,6 +18,12 @@ from app.dependencies import get_admin_user
 async def session() -> AsyncGenerator[AsyncSession, None]:  # <-- Fix return type
     async with AsyncSessionLocal() as s:  # type: ignore
         yield s
+
+
+@pytest.fixture
+def anyio_backend() -> str:
+    """Restrict anyio to asyncio backend to avoid optional trio dependency."""
+    return "asyncio"
 
 class DummyAdmin:
     id = 1
@@ -43,7 +49,8 @@ async def test_dispatch_command_creates_run_and_streams_tokens(monkeypatch):
         return P()
     monkeypatch.setattr(auth_utils, 'decrypt_and_validate_token', fake_decrypt)
 
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
         # Open websocket
         from fastapi.testclient import TestClient as SyncClient
         # Use sync client for websocket context manager
@@ -86,7 +93,8 @@ async def test_cancellation_flow(monkeypatch):
     from fastapi.testclient import TestClient as SyncClient
     sync_client = SyncClient(app=app, base_url="http://test")
 
-    async with AsyncClient(app=app, base_url="http://test") as client:
+    transport = ASGITransport(app=app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
         with sync_client.websocket_connect(f"/api/v1/agents/ws?token=faketoken") as ws:
             resp = await client.post("/api/v1/agents/command", json={"agent":"triage","action":"classify"})
             assert resp.status_code == 200

@@ -19,6 +19,7 @@ from app.routes import (
     appointments,
     admin,
     agents,
+    agents_command,
     surveys,
     cbt_modules,
     safety_triage,
@@ -151,6 +152,7 @@ app.include_router(summary.user_data_router)  # This will have prefix /api/v1/us
 app.include_router(profile.router)
 app.include_router(admin.router)  # Admin endpoints
 app.include_router(agents.router)
+app.include_router(agents_command.router)
 app.include_router(safety_triage.router)
 # TODO: wire new agent routers once services are implemented
 app.include_router(sta_router)

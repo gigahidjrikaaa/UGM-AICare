@@ -23,7 +23,7 @@ from app.models import (
 class InsightsAgentService:
     """Executes allow-listed analytics questions with k-anonymity enforcement."""
 
-    def __init__(self, session: AsyncSession = Depends(get_async_db)) -> None:
+    def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     async def query(self, payload: IAQueryRequest) -> IAQueryResponse:
@@ -265,3 +265,10 @@ class InsightsAgentService:
             "Identifies peak hours for user conversations across the requested range.",
         ]
         return IAQueryResponse(chart=chart, table=table, notes=notes)
+
+def get_insights_agent_service(
+    session: AsyncSession = Depends(get_async_db),
+) -> "InsightsAgentService":
+    """FastAPI dependency factory for :class:`InsightsAgentService`."""
+
+    return InsightsAgentService(session=session)

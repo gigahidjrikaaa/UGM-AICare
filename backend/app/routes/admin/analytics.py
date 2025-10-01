@@ -16,7 +16,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.ia.queries import ALLOWED_QUERIES
 from app.agents.ia.schemas import IAQueryParams, IAQueryRequest, IAQueryResponse, QuestionId
-from app.agents.ia.service import InsightsAgentService
+from app.agents.ia.service import InsightsAgentService, get_insights_agent_service
 from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.models import AnalyticsReport, User
@@ -141,7 +141,7 @@ async def run_insights_query(
     question_id: QuestionId,
     params: IAQueryParams,
     admin_user: User = Depends(get_admin_user),
-    service: InsightsAgentService = Depends(InsightsAgentService),
+    service: InsightsAgentService = Depends(get_insights_agent_service),
 ) -> IAQueryResponse:
     """Execute an allow-listed Insights Agent query."""
 

@@ -38,21 +38,19 @@ const UPDATED_AVAILABLE_MODULES: AvailableModule[] = [
 export function useChat({ model }: { model: string }) {
   const [inputValue, setInputValue] = useState('');
   const [currentMode, setCurrentMode] = useState<ChatMode>('standard');
-  const [pendingMessages, setPendingMessages] = useState<string[]>([]); // queued messages awaiting send
-  const mergeBufferRef = useRef<{ text: string; ts: number }[]>([]); // for time-bucket merging
-  const [mergeWindowMs, setMergeWindowMs] = useState<number>(() => {
-    try { const v = localStorage.getItem('aika_merge_window_ms'); if (v) return Math.min(Math.max(parseInt(v,10)||1200,200),8000); } catch {} return 1200; });
-  useEffect(() => { try { localStorage.setItem('aika_merge_window_ms', String(mergeWindowMs)); } catch {}; }, [mergeWindowMs]);
   const lastConversationIdRef = useRef<string | null>(null);
   const DRAFT_KEY = 'aika_chat_draft_v1';
-  const MAX_QUEUE = 5;
 
   const { messages, setMessages, chatContainerRef, addAssistantChunksSequentially } = useChatMessages();
   const { initialGreeting, isGreetingLoading } = useGreeting(messages);
   const { currentSessionId } = useChatSession();
-  const { isLoading, error, processApiCall, cancelCurrent } = useChatApi(currentSessionId, currentMode, addAssistantChunksSequentially, setMessages);
+  const { isLoading, error, processApiCall, cancelCurrent } = useChatApi(
+    currentSessionId,
+    currentMode,
+    addAssistantChunksSequentially,
+    setMessages,
+  );
 
-  // useEffect that sets the initial message for Aika
   useEffect(() => {
     if (messages.length === 0 && !isGreetingLoading && initialGreeting) {
       const newConversationId = uuidv4();
@@ -74,8 +72,10 @@ export function useChat({ model }: { model: string }) {
   const handleSendMessage = useCallback(async (message?: string) => {
     const userMessageContent = (typeof message === 'string' ? message : inputValue).trim();
     if (!userMessageContent) return;
+    if (isLoading) return;
 
-    const activeConversationId = messages.find(m => m.conversation_id)?.conversation_id || lastConversationIdRef.current || uuidv4();
+    const activeConversationId =
+      messages.find((m) => m.conversation_id)?.conversation_id || lastConversationIdRef.current || uuidv4();
     lastConversationIdRef.current = activeConversationId;
 
     const newUserMessage: Message = {
@@ -88,36 +88,17 @@ export function useChat({ model }: { model: string }) {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     };
-    setMessages(prev => [...prev, newUserMessage]);
-    setInputValue('');
-    try { localStorage.removeItem(DRAFT_KEY); } catch {}
 
-    if (isLoading) {
-      const now = Date.now();
-      mergeBufferRef.current.push({ text: userMessageContent, ts: now });
-      const earliest = mergeBufferRef.current[0]?.ts ?? now;
-      if (now - earliest >= mergeWindowMs) {
-        const mergedText = mergeBufferRef.current.map(m => m.text).join('\n');
-        mergeBufferRef.current = [];
-        setPendingMessages(prev => {
-          const combined = [...prev];
-          if (combined.length >= MAX_QUEUE) combined[combined.length - 1] = mergedText; else combined.push(mergedText);
-          return combined;
-        });
-      } else {
-        setPendingMessages(prev => {
-          const combined = [...prev];
-          if (combined.length >= MAX_QUEUE) combined[combined.length - 1] = userMessageContent; else combined.push(userMessageContent);
-          return combined;
-        });
-      }
-      return;
-    }
+    setMessages((prev) => [...prev, newUserMessage]);
+    setInputValue('');
+    try {
+      localStorage.removeItem(DRAFT_KEY);
+    } catch {}
 
     const historyForApi: ApiMessage[] = [...messages, newUserMessage]
-      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .filter((m) => m.role === 'user' || m.role === 'assistant')
       .slice(-10)
-      .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+      .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
     await processApiCall({
       messageContent: userMessageContent,
@@ -125,106 +106,56 @@ export function useChat({ model }: { model: string }) {
       conversation_id: activeConversationId,
       model,
     });
-  }, [inputValue, isLoading, messages, currentSessionId, processApiCall, model, setMessages, mergeWindowMs]);
+  }, [inputValue, isLoading, messages, currentSessionId, processApiCall, model, setMessages]);
 
-  // Drain queue & flush merge buffer when not loading
-  useEffect(() => {
-    if (!isLoading) {
-      if (mergeBufferRef.current.length) {
-        const merged = mergeBufferRef.current.map(m => m.text).join('\n');
-        mergeBufferRef.current = [];
-        if (merged.trim()) setPendingMessages(prev => [merged, ...prev]);
-      }
-      if (pendingMessages.length > 0) {
-        const [next, ...rest] = pendingMessages;
-        setPendingMessages(rest);
-        Promise.resolve().then(() => handleSendMessage(next));
-      }
-    }
-  }, [isLoading, pendingMessages, handleSendMessage]);
+  const handleStartModule = useCallback(
+    async (moduleId: string) => {
+      if (isLoading) return;
 
-  // Timer flush: ensure merge buffer empties even if stream is long-running
-  useEffect(() => {
-    if (!isLoading || mergeBufferRef.current.length === 0) return;
-    const timeout = setTimeout(() => {
-      if (mergeBufferRef.current.length) {
-        const merged = mergeBufferRef.current.map(m => m.text).join('\n');
-        mergeBufferRef.current = [];
-        setPendingMessages(prev => {
-          const combined = [...prev];
-            if (combined.length >= MAX_QUEUE) combined[combined.length - 1] = merged; else combined.push(merged);
-            return combined;
-        });
-      }
-    }, mergeWindowMs);
-    return () => clearTimeout(timeout);
-  }, [isLoading, pendingMessages, mergeWindowMs]);
+      const activeConversationId = messages.find((m) => m.conversation_id)?.conversation_id || uuidv4();
 
-  // Interrupt and replace current streaming response
-  const interruptWithMessage = useCallback((content: string) => {
-    if (!content.trim()) return;
-    cancelCurrent();
-    mergeBufferRef.current = [];
-    setPendingMessages([]);
-    setTimeout(() => handleSendMessage(content), 0);
-  }, [cancelCurrent, handleSendMessage]);
+      const systemMessageContent = `Memulai modul: ${
+        UPDATED_AVAILABLE_MODULES.find((m) => m.id === moduleId)?.name || moduleId
+      }...`;
+      const systemMessage: Message = {
+        id: uuidv4(),
+        role: 'system' as const,
+        content: systemMessageContent,
+        timestamp: new Date(),
+        session_id: currentSessionId,
+        conversation_id: activeConversationId,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
 
-  const removePendingAt = useCallback((index: number) => {
-    setPendingMessages(prev => prev.filter((_, i) => i !== index));
-  }, []);
+      const messagesWithSystem = [...messages, systemMessage];
+      setMessages(messagesWithSystem);
+      setCurrentMode(`module:${moduleId}`);
 
-  const movePending = useCallback((from: number, to: number) => {
-    setPendingMessages(prev => {
-      if (from < 0 || to < 0 || from >= prev.length || to >= prev.length || from === to) return prev;
-      const next = [...prev];
-      const [item] = next.splice(from, 1);
-      next.splice(to, 0, item);
-      return next;
-    });
-  }, []);
+      const historyForApi: ApiMessage[] = messagesWithSystem
+        .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
+        .slice(-10)
+        .map((msg) => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
 
-  const handleStartModule = useCallback(async (moduleId: string) => {
-    if (isLoading) return;
+      const eventPayload: ChatEventPayload = { type: 'start_module', module_id: moduleId };
 
-    const activeConversationId = messages.find(m => m.conversation_id)?.conversation_id || uuidv4();
-
-    const systemMessageContent = `Memulai modul: ${UPDATED_AVAILABLE_MODULES.find(m => m.id === moduleId)?.name || moduleId}...`;
-    const systemMessage: Message = {
-      id: uuidv4(),
-      role: 'system' as const,
-      content: systemMessageContent,
-      timestamp: new Date(),
-      session_id: currentSessionId,
-      conversation_id: activeConversationId,
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString(),
-    };
-
-    const messagesWithSystem = [...messages, systemMessage];
-    setMessages(messagesWithSystem);
-    setCurrentMode(`module:${moduleId}`);
-
-    const historyForApi: ApiMessage[] = messagesWithSystem
-      .filter(msg => msg.role === 'user' || msg.role === 'assistant')
-      .slice(-10)
-      .map((msg) => ({ role: msg.role as 'user' | 'assistant', content: msg.content }));
-
-    const eventPayload: ChatEventPayload = { type: 'start_module', module_id: moduleId };
-
-    await processApiCall({
-      event: eventPayload,
-      history: historyForApi.length > 0 ? historyForApi : undefined,
-      conversation_id: activeConversationId,
-      model: model,
-    });
-  }, [isLoading, messages, currentSessionId, processApiCall, setMessages, model]);
+      await processApiCall({
+        event: eventPayload,
+        history: historyForApi.length > 0 ? historyForApi : undefined,
+        conversation_id: activeConversationId,
+        model,
+      });
+    },
+    [isLoading, messages, currentSessionId, processApiCall, setMessages, model],
+  );
 
   const handleInputChange = useCallback((value: string) => {
     setInputValue(value);
-    try { localStorage.setItem(DRAFT_KEY, value); } catch {}
+    try {
+      localStorage.setItem(DRAFT_KEY, value);
+    } catch {}
   }, []);
 
-  // Load draft once
   useEffect(() => {
     try {
       const stored = localStorage.getItem(DRAFT_KEY);
@@ -248,13 +179,6 @@ export function useChat({ model }: { model: string }) {
     handleSendMessage,
     handleStartModule,
     setLiveTranscript,
-    pendingMessages,
     cancelCurrent,
-    interruptWithMessage,
-    removePendingAt,
-    movePending,
-    mergeWindowMs,
-    setMergeWindowMs,
   };
 }
-// ...existing code...

@@ -9,7 +9,7 @@ from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.sta.schemas import STAClassifyRequest
-from app.agents.sta.service import SafetyTriageService
+from app.agents.sta.service import SafetyTriageService, get_safety_triage_service
 from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.models import Conversation, TriageAssessment, User
@@ -224,7 +224,7 @@ async def classify_test_message(
     payload: TriageTestRequest,
     db: AsyncSession = Depends(get_async_db),  # Ensures session lifecycle parity
     admin_user: User = Depends(get_admin_user),
-    service: SafetyTriageService = Depends(SafetyTriageService),
+    service: SafetyTriageService = Depends(get_safety_triage_service),
 ) -> TriageTestResponse:
     """Run an ad-hoc triage classification for an admin-supplied message."""
 

@@ -25,7 +25,7 @@ from app.models import Case, CaseSeverityEnum, CaseStatusEnum
 class SafetyDeskService:
     """Queue management utilities for the Safety Desk Agent."""
 
-    def __init__(self, session: AsyncSession = Depends(get_async_db)) -> None:
+    def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
     async def list_cases(self, status_filter: str | None = None) -> SDAListCasesResponse:
@@ -99,3 +99,11 @@ class SafetyDeskService:
             summary_redacted=summary_redacted,
             sla_breach_at=sla_breach_at,
         )
+
+
+def get_safety_desk_service(
+    session: AsyncSession = Depends(get_async_db),
+) -> "SafetyDeskService":
+    """FastAPI dependency factory for :class:`SafetyDeskService`."""
+
+    return SafetyDeskService(session=session)
