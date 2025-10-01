@@ -1,13 +1,21 @@
 ﻿"""Safety Coaching management endpoints for the admin panel."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta
-from typing import Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import and_, desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.sca.schemas import (
+    SCAFollowUpRequest,
+    SCAFollowUpResponse,
+    SCAInterveneRequest,
+    SCAInterveneResponse,
+)
+from app.agents.sca.service import SupportCoachService, get_support_coach_service
 from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.models import (
@@ -34,6 +42,8 @@ from app.schemas.admin import (
     ManualInterventionCreate,
     QueueItem,
 )
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/safety-coaching", tags=["Admin - Safety Coaching"])
 
@@ -79,23 +89,36 @@ def _execution_to_response(
     execution: CampaignExecution,
     campaign: InterventionCampaign,
     user: Optional[User],
+    *,
+    plan_preview: SCAInterveneResponse | None = None,
 ) -> InterventionExecutionResponse:
-    return InterventionExecutionResponse(
-        id=execution.id,
-        campaign_id=execution.campaign_id,
-        user_id=execution.user_id,
-        status=execution.status,
-        scheduled_at=execution.scheduled_at,
-        executed_at=execution.executed_at,
-        delivery_method=execution.delivery_method,
-        notes=execution.notes,
-        engagement_score=execution.engagement_score,
-        is_manual=execution.is_manual,
-        user_name=getattr(user, "name", None),
-        user_email=getattr(user, "email", None),
-        campaign_title=campaign.title,
-        priority=campaign.priority,
-    )
+    preview_payload: Dict[str, Any] | None = None
+    if plan_preview is not None:
+        preview_payload = plan_preview.model_dump(mode="json")
+    elif isinstance(execution.trigger_data, dict):
+        cached = execution.trigger_data.get("sca_plan_preview")
+        if isinstance(cached, dict):
+            preview_payload = cached
+
+    payload = {
+        "id": execution.id,
+        "campaign_id": execution.campaign_id,
+        "user_id": execution.user_id,
+        "status": execution.status,
+        "scheduled_at": execution.scheduled_at,
+        "executed_at": execution.executed_at,
+        "delivery_method": execution.delivery_method,
+        "notes": execution.notes,
+        "engagement_score": execution.engagement_score,
+        "is_manual": execution.is_manual,
+        "user_name": getattr(user, "name", None),
+        "user_email": getattr(user, "email", None),
+        "campaign_title": campaign.title,
+        "priority": campaign.priority,
+        "plan_preview": preview_payload,
+    }
+
+    return InterventionExecutionResponse.model_validate(payload)
 
 
 def _queue_item_from_execution(
@@ -118,6 +141,18 @@ def _queue_item_from_execution(
         delivery_method=execution.delivery_method,
         notes=execution.notes,
     )
+
+
+def _merge_trigger_data(
+    metadata: Optional[Dict[str, Any]],
+    plan_preview: SCAInterveneResponse | None,
+) -> Optional[Dict[str, Any]]:
+    if plan_preview is None:
+        return metadata
+
+    merged = dict(metadata or {})
+    merged["sca_plan_preview"] = plan_preview.model_dump(mode="json")
+    return merged
 
 
 # --- Overview ----------------------------------------------------------------
@@ -397,10 +432,33 @@ async def create_manual_intervention(
     payload: ManualInterventionCreate,
     db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user),
+    support_service: SupportCoachService = Depends(get_support_coach_service),
 ) -> InterventionExecutionResponse:
     user = await db.get(User, payload.user_id)
     if user is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    plan_preview: SCAInterveneResponse | None = None
+    if payload.intent:
+        sca_request = SCAInterveneRequest(
+            session_id=f"admin-manual-{admin_user.id}-{payload.user_id}",
+            intent=payload.intent,
+            options=payload.options or {},
+            consent_followup=payload.consent_followup,
+        )
+        try:
+            plan_preview = await support_service.intervene(sca_request)
+        except NotImplementedError as exc:
+            logger.info("Support Coach service not ready for manual preview: %s", exc)
+        except ValueError as exc:
+            logger.warning("Invalid manual intervention preview for admin %s: %s", admin_user.id, exc)
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+        except Exception as exc:  # pragma: no cover - defensive guard
+            logger.error("Unexpected error running Support Coach preview: %s", exc, exc_info=True)
+            raise HTTPException(
+                status_code=status.HTTP_502_BAD_GATEWAY,
+                detail="Failed to contact Support Coach agent for preview",
+            ) from exc
 
     campaign: Optional[InterventionCampaign] = None
     if payload.campaign_id:
@@ -426,10 +484,10 @@ async def create_manual_intervention(
     execution = CampaignExecution(
         campaign_id=campaign.id,
         user_id=payload.user_id,
-        status="pending_review" if payload.metadata else "scheduled",
+        status="pending_review" if (payload.metadata or plan_preview) else "scheduled",
         scheduled_at=payload.scheduled_at or datetime.utcnow(),
         delivery_method=payload.delivery_method,
-        trigger_data=payload.metadata,
+        trigger_data=_merge_trigger_data(payload.metadata, plan_preview),
         notes=payload.notes,
         is_manual=True,
     )
@@ -438,7 +496,67 @@ async def create_manual_intervention(
     await db.refresh(execution)
     await db.refresh(campaign)
 
-    return _execution_to_response(execution, campaign, user)
+    return _execution_to_response(execution, campaign, user, plan_preview=plan_preview)
+
+
+@router.post("/plans/preview", response_model=SCAInterveneResponse)
+async def preview_support_plan(
+    payload: SCAInterveneRequest,
+    admin_user: User = Depends(get_admin_user),
+    support_service: SupportCoachService = Depends(get_support_coach_service),
+) -> SCAInterveneResponse:
+    logger.info(
+        "Admin %s requesting Safety Coaching plan preview (intent=%s)",
+        admin_user.id,
+        payload.intent,
+    )
+    try:
+        return await support_service.intervene(payload)
+    except NotImplementedError as exc:
+        logger.info("Support Coach service not yet implemented: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Support Coach agent is not available yet",
+        ) from exc
+    except ValueError as exc:
+        logger.warning("Invalid Support Coach request from admin %s: %s", admin_user.id, exc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive guard
+        logger.error("Failed to generate Support Coach plan preview: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate plan preview",
+        ) from exc
+
+
+@router.post("/follow-ups", response_model=SCAFollowUpResponse)
+async def record_follow_up(
+    payload: SCAFollowUpRequest,
+    admin_user: User = Depends(get_admin_user),
+    support_service: SupportCoachService = Depends(get_support_coach_service),
+) -> SCAFollowUpResponse:
+    logger.info(
+        "Admin %s submitting Support Coach follow-up (plan=%s)",
+        admin_user.id,
+        payload.last_plan_id,
+    )
+    try:
+        return await support_service.followup(payload)
+    except NotImplementedError as exc:
+        logger.info("Support Coach follow-up not yet available: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Support Coach agent is not available yet",
+        ) from exc
+    except ValueError as exc:
+        logger.warning("Invalid Support Coach follow-up request from admin %s: %s", admin_user.id, exc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive guard
+        logger.error("Failed to record Support Coach follow-up: %s", exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to record follow-up",
+        ) from exc
 
 
 @router.get("/executions", response_model=InterventionExecutionListResponse)

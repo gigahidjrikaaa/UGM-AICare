@@ -31,12 +31,14 @@ class ExecutionSummary(BaseModel):
 
 
 class QueueItem(BaseModel):
-    execution_id: int
+    execution_id: Optional[int]
     user_id: Optional[int]
     user_name: Optional[str] = None
     user_email: Optional[str] = None
     status: str
     scheduled_at: datetime
+    campaign_id: Optional[int] = None
+    priority: Optional[str] = None
     risk_score: Optional[float] = None
     severity_level: Optional[str] = None
     recommended_action: Optional[str] = None
@@ -87,7 +89,7 @@ class InterventionCampaignListResponse(BaseModel):
 
 
 class InterventionCampaignCreate(CampaignBase):
-    content: Dict[str, Any]
+    content: Dict[str, Any] = Field(default_factory=dict)
 
 
 class InterventionCampaignUpdate(BaseModel):
@@ -110,6 +112,9 @@ class ManualInterventionCreate(BaseModel):
     scheduled_at: Optional[datetime] = None
     notes: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
+    intent: Optional[str] = Field(default=None, description="Optional intent identifier for SCA preview")
+    options: Optional[Dict[str, Any]] = Field(default=None, description="Optional intervention tuning options")
+    consent_followup: Optional[bool] = Field(default=None, description="Whether the user consented to follow-up")
 
 
 class InterventionExecutionResponse(BaseModel):
@@ -127,6 +132,7 @@ class InterventionExecutionResponse(BaseModel):
     user_email: Optional[str] = None
     campaign_title: Optional[str] = None
     priority: Optional[str] = None
+    plan_preview: Optional[Dict[str, Any]] = None
 
     model_config = ConfigDict(from_attributes=True)
 

@@ -14,6 +14,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.ia.queries import ALLOWED_QUERIES
+from app.agents.ia.schemas import IAQueryParams, IAQueryRequest, IAQueryResponse, QuestionId
+from app.agents.ia.service import InsightsAgentService
 from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.models import AnalyticsReport, User
@@ -114,6 +117,59 @@ def _extract_predictive_signals(model: AnalyticsReport) -> List[PredictiveSignal
     trends = model.trends or {}
     raw_signals = trends.get("predictive_signals") or []
     return _coerce_predictive_payloads(raw_signals)
+
+
+@router.get("/questions")
+async def list_insights_questions(
+    admin_user: User = Depends(get_admin_user),
+) -> Dict[str, Any]:
+    """Expose allow-listed Insights Agent queries for the admin panel."""
+
+    logger.info("Admin %s listing insights agent questions", admin_user.id)
+    items = [
+        {
+            "id": question_id,
+            "definition": definition,
+        }
+        for question_id, definition in ALLOWED_QUERIES.items()
+    ]
+    return {"items": items, "total": len(items)}
+
+
+@router.post("/questions/{question_id}", response_model=IAQueryResponse)
+async def run_insights_query(
+    question_id: QuestionId,
+    params: IAQueryParams,
+    admin_user: User = Depends(get_admin_user),
+    service: InsightsAgentService = Depends(InsightsAgentService),
+) -> IAQueryResponse:
+    """Execute an allow-listed Insights Agent query."""
+
+    logger.info("Admin %s running insights query %s", admin_user.id, question_id)
+    request = IAQueryRequest(question_id=question_id, params=params)
+    try:
+        return await service.query(request)
+    except NotImplementedError as exc:
+        logger.info("Insights Agent service not yet available: %s", exc)
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Insights Agent service is not available yet",
+        ) from exc
+    except ValueError as exc:
+        logger.warning("Invalid insights query from admin %s: %s", admin_user.id, exc)
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.error(
+            "Failed to run insights query %s for admin %s: %s",
+            question_id,
+            admin_user.id,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to execute insights query",
+        ) from exc
 
 @router.get("/triage-metrics", response_model=TriageMetricsInsight)
 async def get_triage_metrics_insight(
