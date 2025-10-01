@@ -2,8 +2,11 @@
 
 import os
 import httpx
-import google.generativeai as genai # type: ignore
-from google.generativeai.types import HarmCategory, HarmBlockThreshold # type: ignore
+from typing import Any, cast
+
+import google.generativeai as genai
+import google.generativeai.types as genai_types
+from google.generativeai.types import HarmBlockThreshold, HarmCategory, content_types
 from dotenv import load_dotenv
 import logging
 from typing import List, Dict, Literal, Optional, Tuple
@@ -24,8 +27,12 @@ DEFAULT_GEMMA_LOCAL_MODEL = "gemma-3-12b-it-gguf"
 # Configure Gemini client (do this once at module load)
 if GOOGLE_API_KEY:
     try:
-        genai.configure(api_key=GOOGLE_API_KEY)
-        logger.info("Google Generative AI SDK configured successfully.")
+        configure_fn = getattr(genai, "configure", None)
+        if callable(configure_fn):
+            configure_fn(api_key=GOOGLE_API_KEY)
+            logger.info("Google Generative AI SDK configured successfully.")
+        else:
+            logger.error("google.generativeai.configure is unavailable; Gemini support disabled.")
     except Exception as e:
         logger.error(f"Failed to configure Google Generative AI SDK: {e}")
 else:
@@ -36,23 +43,33 @@ LLMProvider = Literal['gemini', 'gemma_local']
 
 # --- Helper: Convert Generic History to Gemini Format ---
 # Gemini expects alternating user/model roles, and uses 'model' instead of 'assistant'
-def _convert_history_for_gemini(history: List[Dict[str, str]]) -> List[Dict[str, str]]:
-    gemini_history = []
+def _make_text_part(text: str) -> content_types.PartDict:
+    return cast(content_types.PartDict, {"text": text})
+
+
+def _convert_history_for_gemini(history: List[Dict[str, str]]) -> List[content_types.ContentDict]:
+    gemini_history: List[content_types.ContentDict] = []
     for msg in history:
-        role = msg.get('role')
-        content = msg.get('content')
-        if role == 'assistant':
-            gemini_history.append({'role': 'model', 'parts': [content]})
-        elif role == 'user':
-            gemini_history.append({'role': 'user', 'parts': [content]})
-        # Silently ignore system messages for now, or handle as needed
-        # elif role == 'system':
-            # Gemini doesn't have a direct 'system' role in the chat history array like OpenAI-style providers.
-            # System prompts are often handled differently (e.g., in `GenerativeModel` constructor or passed separately).
-            # For simplicity here, we'll omit them from the direct history conversion.
-            # logger.warning("System messages are not directly passed in Gemini history.")
-    # Ensure history ends with a user message if the last message added was 'model'
-    # This might be handled by the calling function ensuring the *new* prompt is the last item.
+        role = msg.get("role")
+        content = msg.get("content")
+        if not content:
+            continue
+        if role == "assistant":
+            gemini_history.append(cast(
+                content_types.ContentDict,
+                {
+                "role": "model",
+                "parts": [_make_text_part(content)],
+                },
+            ))
+        elif role == "user":
+            gemini_history.append(cast(
+                content_types.ContentDict,
+                {
+                "role": "user",
+                "parts": [_make_text_part(content)],
+                },
+            ))
     return gemini_history
 
 
@@ -75,12 +92,21 @@ async def generate_gemini_response(
     try:
         logger.info(f"Sending request to Gemini API (Model: {model})")
 
-        # Handle system prompt - Gemini Pro API has specific 'system_instruction' parameter
-        gemini_model_args = {"model_name": model}
+        # Handle system prompt - convert to structured content if provided
+        gemini_model_args: Dict[str, Any] = {"model_name": model}
         if system_prompt:
-             gemini_model_args["system_instruction"] = system_prompt
-        
-        gemini_model = genai.GenerativeModel(**gemini_model_args)
+            gemini_model_args["system_instruction"] = cast(
+                content_types.ContentDict,
+                {
+                    "role": "system",
+                    "parts": [_make_text_part(system_prompt)],
+                },
+            )
+
+        generative_model_cls = getattr(genai, "GenerativeModel", None)
+        if generative_model_cls is None:
+            raise RuntimeError("google.generativeai.GenerativeModel is not available in the installed SDK")
+        gemini_model = generative_model_cls(**gemini_model_args)
 
         # Convert history and extract the latest user prompt
         if not history or history[-1]['role'] != 'user':
@@ -89,7 +115,7 @@ async def generate_gemini_response(
         last_user_prompt = history[-1]['content']
         gemini_history = _convert_history_for_gemini(history[:-1]) # Pass history *before* the last prompt
 
-        generation_config = genai.types.GenerationConfig(
+        generation_config = genai_types.GenerationConfig(
             max_output_tokens=max_tokens,
             temperature=temperature
         )
@@ -107,7 +133,10 @@ async def generate_gemini_response(
         if gemini_history:
              chat_session = gemini_model.start_chat(history=gemini_history)
              response = await chat_session.send_message_async( # Use async method
-                 last_user_prompt,
+                 cast(
+                     content_types.ContentDict,
+                     {"role": "user", "parts": [_make_text_part(last_user_prompt)]},
+                 ),
                  generation_config=generation_config,
                  safety_settings=safety_settings,
                  # stream=False # Set to True for streaming later
@@ -115,7 +144,12 @@ async def generate_gemini_response(
         else:
              # If no history, just generate content from the single prompt
              response = await gemini_model.generate_content_async( # Use async method
-                 last_user_prompt, # Send only the last user prompt
+                 [
+                     cast(
+                         content_types.ContentDict,
+                         {"role": "user", "parts": [_make_text_part(last_user_prompt)]},
+                     )
+                 ],
                  generation_config=generation_config,
                  safety_settings=safety_settings,
                  # stream=False
