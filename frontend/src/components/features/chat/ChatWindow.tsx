@@ -14,7 +14,7 @@ export function ChatWindow({ messages, chatContainerRef }: ChatWindowProps) {
     <div
       ref={chatContainerRef}
       // Make background transparent, adjust padding, remove border/rounding here
-      className="flex-1 overflow-y-auto p-4 space-y-4 bg-transparent"
+      className="flex-1 overflow-y-auto space-y-4 bg-transparent px-1 pb-4 pt-3 sm:px-3 md:px-5"
       // Remove max-height style here, let parent control height
     >
       {messages.map((msg) => (
@@ -23,3 +23,5 @@ export function ChatWindow({ messages, chatContainerRef }: ChatWindowProps) {
     </div>
   );
 }
+
+

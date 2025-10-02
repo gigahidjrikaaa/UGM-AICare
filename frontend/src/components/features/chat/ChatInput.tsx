@@ -1,18 +1,27 @@
-// src/components/features/chat/ChatInput.tsx
-import React, { useState, useRef, useEffect } from 'react';
-import { Button } from '@/components/ui/Button';
-import { Textarea } from '@/components/ui/TextArea';
-import { SendHorizonal, BrainCircuit, X, Mic, Settings, ChevronDown, SlidersHorizontal } from 'lucide-react';
-import { ChatMode, AvailableModule as ChatModule } from '@/types/chat';
-import { cn } from '@/lib/utils';
-import SettingsModal from './SettingsModal';
-import { toast } from 'react-hot-toast';
+﻿// src/components/features/chat/ChatInput.tsx
+import React, { useState, useRef, useEffect, useCallback } from "react";
+import { Button } from "@/components/ui/Button";
+import { Textarea } from "@/components/ui/TextArea";
+import {
+  SendHorizonal,
+  BrainCircuit,
+  Plus,
+  X as XIcon,
+  Mic,
+  Settings,
+  ChevronDown,
+  SlidersHorizontal,
+} from "lucide-react";
+import { ChatMode, AvailableModule as ChatModule } from "@/types/chat";
+import { cn } from "@/lib/utils";
+import SettingsModal from "./SettingsModal";
+import ChatSettingsModal from "./ChatSettingsModal";
+import { toast } from "react-hot-toast";
 
 interface ChatInputProps {
   inputValue: string;
   onInputChange: (value: string) => void;
   onSendMessage: () => void;
-  onInterruptSend?: () => void;
   onStartModule: (moduleId: string) => void;
   isLoading: boolean;
   currentMode: ChatMode;
@@ -22,15 +31,13 @@ interface ChatInputProps {
   model?: string;
   setModel?: (m: string) => void;
   modelOptions?: Array<{ value: string; label: string }>;
-  mergeWindowMs?: number;
-  setMergeWindowMs?: (ms: number) => void;
+  onCancel?: () => void;
 }
 
 export function ChatInput({
   inputValue,
   onInputChange,
   onSendMessage,
-  onInterruptSend,
   onStartModule,
   isLoading,
   currentMode,
@@ -40,339 +47,254 @@ export function ChatInput({
   model,
   setModel,
   modelOptions,
-  mergeWindowMs,
-  setMergeWindowMs,
+  onCancel,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  // memory popover moved to header
-  const behaviorBtnRef = useRef<HTMLButtonElement | null>(null);
-  const behaviorPopoverRef = useRef<HTMLDivElement | null>(null);
 
   const [showModules, setShowModules] = useState(false);
   const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const prevIsLoadingRef = useRef<boolean>(isLoading);
-  const [interruptOnEnter, setInterruptOnEnter] = useState<boolean>(true);
-  const [behaviorOpen, setBehaviorOpen] = useState(false);
-  const [mergeWindowLocal, setMergeWindowLocal] = useState<number>(() => {
-    if (typeof mergeWindowMs === 'number') return mergeWindowMs;
-    try { const v = localStorage.getItem('aika_merge_window_ms'); if (v) return parseInt(v,10)||1200; } catch {} return 1200; });
+  const [isChatSettingsOpen, setIsChatSettingsOpen] = useState(false);
+  const [interruptOnEnter, setInterruptOnEnter] = useState(true);
 
-  // Sync local when external prop changes
-  useEffect(() => {
-    if (typeof mergeWindowMs === 'number' && mergeWindowMs !== mergeWindowLocal) {
-      setMergeWindowLocal(mergeWindowMs);
-    }
-  }, [mergeWindowMs, mergeWindowLocal]);
-  const [pulse, setPulse] = useState(false);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem('aika_interrupt_on_enter');
-      if (stored) setInterruptOnEnter(stored === 'true');
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    try { localStorage.setItem('aika_interrupt_on_enter', String(interruptOnEnter)); } catch {}
-  }, [interruptOnEnter]);
-
-  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (event.key === 'Enter' && !event.shiftKey) {
-      if (!inputValue.trim()) return;
-      // Alt+Enter while streaming => queue (normal send) instead of interrupt
-      if (event.altKey && isLoading) {
-        event.preventDefault();
-        onSendMessage();
-        return;
-      }
-      event.preventDefault();
-      if (isLoading && onInterruptSend && interruptOnEnter) {
-        setPulse(true);
-        onInterruptSend();
-        setTimeout(() => setPulse(false), 400);
-      } else if (!isLoading) {
-        onSendMessage();
-      } else if (isLoading && !interruptOnEnter) {
-        // Queue instead of interrupt
-        onSendMessage();
-      }
-    }
-  };
+  const isStandardMode = currentMode === "standard";
+  const actionIsCancel = isLoading && Boolean(onCancel);
 
   useEffect(() => {
     if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
+      textareaRef.current.style.height = "auto";
       const scrollHeight = textareaRef.current.scrollHeight;
-      const maxHeight = 120;
+      const maxHeight = 140;
       textareaRef.current.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
     }
   }, [inputValue]);
 
   useEffect(() => {
-    if (prevIsLoadingRef.current && !isLoading && !inputValue && textareaRef.current) {
-      textareaRef.current.focus();
+    if (!isLoading && textareaRef.current) {
+      textareaRef.current.focus({ preventScroll: true });
     }
-    prevIsLoadingRef.current = isLoading;
-  }, [isLoading, inputValue]);
+  }, [isLoading]);
+
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem("aika_interrupt_on_enter");
+      if (stored !== null) {
+        setInterruptOnEnter(stored === "true");
+      }
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem("aika_interrupt_on_enter", String(interruptOnEnter));
+    } catch {}
+  }, [interruptOnEnter]);
 
   const handleModuleClick = (moduleId: string) => {
+    if (isLoading) {
+      toast.error("Tunggu sampai Aika selesai merespons sebelum memulai modul baru.");
+      return;
+    }
     onStartModule(moduleId);
     setShowModules(false);
   };
 
-
-  const isStandardMode = currentMode === 'standard';
-
-  // Close behavior popover on outside click
-  useEffect(() => {
-    if (!behaviorOpen) return;
-    const handler = (e: MouseEvent) => {
-      if (behaviorPopoverRef.current && !behaviorPopoverRef.current.contains(e.target as Node)) {
-        setBehaviorOpen(false);
-      }
-    };
-    window.addEventListener('mousedown', handler);
-    return () => window.removeEventListener('mousedown', handler);
-  }, [behaviorOpen]);
-
-  // ESC to close behavior popover
-  useEffect(() => {
-    if (!behaviorOpen) return;
-    const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') setBehaviorOpen(false); };
-    window.addEventListener('keydown', handler);
-    return () => window.removeEventListener('keydown', handler);
-  }, [behaviorOpen]);
-
-  // Restore focus to trigger after closing behavior popover
-  useEffect(() => {
-    if (!behaviorOpen && behaviorBtnRef.current) {
-      const active = document.activeElement as HTMLElement | null;
-      const withinPopover = active && (behaviorPopoverRef.current?.contains(active) || behaviorPopoverRef.current === active);
-      if (!withinPopover && document.hasFocus()) {
-        behaviorBtnRef.current.focus({ preventScroll: true });
-      }
+  const handleSend = useCallback(() => {
+    if (!inputValue.trim()) return;
+    if (isLoading) {
+      toast.error("Tunggu hingga Aika selesai merespons sebelum mengirim pesan baru.");
+      return;
     }
-  }, [behaviorOpen]);
+    onSendMessage();
+  }, [inputValue, isLoading, onSendMessage]);
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      if (isLoading) {
+        if (interruptOnEnter && onCancel) {
+          onCancel();
+        } else {
+          toast.error("Aika masih merespons. Batalkan atau tunggu sebentar sebelum mengirim pesan baru.");
+        }
+        return;
+      }
+      handleSend();
+    }
+  };
+
+  const handleActionClick = () => {
+    if (actionIsCancel) {
+      onCancel?.();
+      return;
+    }
+    handleSend();
+  };
+
+  const ActionIcon = actionIsCancel ? XIcon : SendHorizonal;
+  const actionLabel = actionIsCancel ? "Batalkan" : "Kirim";
+  const actionDisabled = actionIsCancel ? false : !inputValue.trim();
 
   return (
-    <div className="w-full border-t border-white/10 bg-gradient-to-b from-black/30 to-black/50 backdrop-blur-xl px-3 py-3 md:px-4 md:py-4 space-y-3">
-      {/* Meta Toolbar */}
-  {(modelOptions?.length || true) && (
-        <div className="flex flex-wrap items-center gap-2 md:gap-3">
+    <div className="w-full flex-shrink-0">
+      <div className="w-full rounded-3xl border border-white/12 bg-slate-900/70 p-4 shadow-[0_22px_50px_rgba(5,12,38,0.6)] backdrop-blur-xl sm:p-6">
+        <div className="flex flex-col gap-4">
           {modelOptions?.length ? (
-            <div className="flex items-center gap-2">
-              <label htmlFor="chat-model" className="sr-only">Model</label>
+            <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-white/70">
               <div className="relative">
+                <label htmlFor="chat-model" className="sr-only">
+                  Model
+                </label>
                 <select
                   id="chat-model"
                   value={model}
                   onChange={(e) => setModel?.(e.target.value)}
-                  className="appearance-none pr-8 text-xs md:text-sm rounded-md bg-white/10 border border-white/15 text-white px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-ugm-gold/40 focus:border-ugm-gold/40 hover:bg-white/15 transition"
+                  className="peer appearance-none rounded-xl border border-white/15 bg-white/10 px-3 py-2 pr-9 text-xs text-white/90 transition focus:outline-none focus:ring-2 focus:ring-ugm-gold/40 focus:border-ugm-gold/40 hover:bg-white/15"
                   aria-label="Pilih model AI"
                 >
-                  {modelOptions.map(opt => (
+                  {modelOptions.map((opt) => (
                     <option key={opt.value} value={opt.value} className="bg-slate-900 text-white">
                       {opt.label}
                     </option>
                   ))}
                 </select>
-                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-white/60" />
+                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/60 transition peer-focus:text-ugm-gold" />
               </div>
-            </div>
-          ) : null}
-
-          <div className="flex items-center gap-2 ml-auto relative">
-            <div className="relative" ref={behaviorPopoverRef}>
               <Button
-                ref={behaviorBtnRef}
                 variant="outline"
                 size="icon"
-                onClick={() => setBehaviorOpen(o => !o)}
-                className={cn(
-                  "h-8 w-8 border-white/15 bg-white/5 hover:bg-white/15 text-white",
-                  behaviorOpen && "ring-2 ring-ugm-gold/50"
-                )}
-                title="Behavior Settings"
-                aria-label="Behavior Settings"
-                aria-expanded={behaviorOpen ? 'true' : 'false'}
-                aria-controls="behavior-popover"
+                onClick={() => setIsChatSettingsOpen(true)}
+                className="h-9 w-9 border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+                title="Pengaturan Chat"
+                aria-label="Pengaturan Chat"
               >
                 <SlidersHorizontal className="h-4 w-4" />
               </Button>
-              {behaviorOpen && (
-                <div
-                  id="behavior-popover"
-                  role="dialog"
-                  aria-label="Pengaturan perilaku chat"
-                  className="absolute z-[65] left-1/2 top-full mt-2 -translate-x-1/2 w-80 max-w-[calc(100vw-2rem)] rounded-lg border border-white/15 bg-gradient-to-b from-slate-900/95 to-slate-900/90 backdrop-blur-xl p-4 pb-4 text-white shadow-2xl space-y-4 animate-in fade-in slide-in-from-top-2 focus:outline-none"
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setIsSettingsModalOpen(true)}
+                className="h-9 w-9 border-white/20 bg-white/10 text-white transition hover:bg-white/15"
+                title="Pengaturan Audio"
+                aria-label="Pengaturan Audio"
+              >
+                <Settings className="h-4 w-4" />
+              </Button>
+            </div>
+          ) : null}
+
+          <div className="rounded-[36px] border border-white/10 bg-[#111d3e]/80 p-2 pl-3 shadow-inner">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-end gap-3">
+                <button
+                  type="button"
+                  onClick={() => setShowModules((prev) => !prev)}
+                  disabled={isLoading || !isStandardMode}
+                  className={cn(
+                    "flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60",
+                    showModules && "bg-white/15"
+                  )}
+                  aria-label="Buka latihan terpandu"
                 >
-                  <span aria-hidden="true" className="pointer-events-none absolute left-1/2 top-0 -translate-y-1/2 -translate-x-1/2 h-4 w-4 rotate-45 rounded-sm border border-white/15 bg-slate-900/95" />
-                  <div className="flex items-center justify-between pb-1 border-b border-white/10">
-                    <h2 className="text-[11px] font-semibold tracking-wide text-ugm-gold">Pengaturan Perilaku</h2>
-                    <button
-                      onClick={() => setBehaviorOpen(false)}
-                      aria-label="Tutup"
-                      className="text-white/60 hover:text-white focus:outline-none focus:ring-2 focus:ring-ugm-gold/40 rounded"
-                    >
-                      ✕
-                    </button>
+                  {showModules ? <BrainCircuit className="h-4 w-4 text-ugm-gold" /> : <Plus className="h-5 w-5" />}
+                </button>
+
+                <div className="flex-1 rounded-[28px] border border-white/10 bg-slate-900/60 px-4 py-3">
+                  <Textarea
+                    ref={textareaRef}
+                    value={inputValue}
+                    onChange={(e) => onInputChange(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={isLoading ? "Aika sedang mengetik..." : isStandardMode ? "Bagikan apa yang kamu rasakan atau tanyakan sesuatu." : "Ketik jawabanmu..."}
+                    rows={1}
+                    className="w-full resize-none bg-transparent text-sm text-white placeholder:text-white/45 focus-visible:outline-none focus-visible:ring-0 sm:text-base"
+                  />
+                  <div className="mt-2 flex justify-between text-[11px] text-white/45">
+                    <span className="hidden sm:inline">Enter untuk {actionIsCancel ? "batalkan" : "kirim"}</span>
+                    <span>Shift + Enter baris baru</span>
                   </div>
-                  <div className="space-y-5 text-[11px] md:text-xs">
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2 font-medium">
-                        <input
-                          type="checkbox"
-                          className="h-4 w-4 accent-ugm-gold"
-                          checked={interruptOnEnter}
-                          onChange={(e) => setInterruptOnEnter(e.target.checked)}
-                          aria-label="Aktifkan interrupt saat tekan Enter"
-                        />
-                        Interrupt saat Enter (Alt+Enter untuk antre)
-                      </label>
-                      <p className="text-white/40 leading-snug">Jika aktif, menekan Enter ketika Aika merespons akan menghentikan streaming dan mengirim pesan segera.</p>
-                    </div>
-                    <div className="space-y-2">
-                      <label className="font-medium flex items-center justify-between">
-                        Window Penggabungan (ms)
-                        <input
-                          type="number"
-                          min={200}
-                          max={8000}
-                          step={100}
-                          value={mergeWindowLocal}
-                          onChange={e => setMergeWindowLocal(Math.min(8000, Math.max(200, parseInt(e.target.value||'0',10))))}
-                          className="w-24 bg-white/10 border border-white/15 rounded px-2 py-1 text-white text-[11px] focus:outline-none focus:ring-2 focus:ring-ugm-gold/40"
-                          aria-label="Durasi window penggabungan dalam milidetik"
-                        />
-                      </label>
-                      <input
-                        type="range"
-                        min={200}
-                        max={8000}
-                        step={100}
-                        value={mergeWindowLocal}
-                        onChange={e => setMergeWindowLocal(parseInt(e.target.value,10))}
-                        aria-label="Slider window penggabungan"
-                        className="w-full accent-ugm-gold"
-                      />
-                      <p className="text-white/40 leading-snug">Pesan cepat yang dikirim dalam jendela ini akan digabung dan dikirim berurutan setelah streaming selesai atau saat flush timer.</p>
-                    </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Button
+                    size="icon"
+                    onClick={toggleLiveTalk}
+                    className={cn(
+                      "h-12 w-12 rounded-full transition",
+                      isLiveTalkActive
+                        ? "bg-red-500 text-white hover:bg-red-600"
+                        : "bg-ugm-gold text-ugm-blue hover:bg-ugm-gold/90",
+                      "disabled:bg-ugm-gold/50"
+                    )}
+                    aria-label={isLiveTalkActive ? "Stop Live Talk" : "Start Live Talk"}
+                  >
+                    <Mic className="h-4 w-4" />
+                  </Button>
+
+                  <Button
+                    onClick={handleActionClick}
+                    disabled={actionDisabled}
+                    className={cn(
+                      "flex h-12 min-w-[52px] items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#FFC857] via-[#ffb341] to-[#f9a602] text-[#061231] font-semibold transition hover:from-[#ffd36f] hover:via-[#ffbf52] hover:to-[#fbb933] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f9a602] sm:px-6",
+                      actionIsCancel && "bg-red-500 text-white hover:bg-red-600 focus-visible:outline-red-400"
+                    )}
+                    aria-label={actionIsCancel ? "Batalkan respons" : "Kirim pesan"}
+                  >
+                    <ActionIcon className="h-4 w-4" />
+                    <span className="hidden sm:inline">{actionLabel}</span>
+                  </Button>
+                </div>
+              </div>
+
+              {showModules && (
+                <div className="rounded-2xl border border-white/12 bg-white/8 p-4 text-sm text-white/80 shadow-[inset_0_0_25px_rgba(12,22,60,0.35)]">
+                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/50">
+                    <BrainCircuit className="h-4 w-4 text-ugm-gold" />
+                    <span>Latihan yang tersedia</span>
                   </div>
-                  <div className="flex justify-end gap-2 pt-1">
-                    <Button variant="outline" size="sm" onClick={() => { setMergeWindowLocal(1200); }} className="border-white/20 text-white/70 hover:text-white">Reset</Button>
-                    <Button variant="outline" size="sm" onClick={() => { setBehaviorOpen(false); }} className="border-white/20 text-white/70 hover:text-white">Batal</Button>
-                    <Button size="sm" onClick={() => { try { localStorage.setItem('aika_merge_window_ms', String(mergeWindowLocal)); } catch {}; setMergeWindowMs?.(mergeWindowLocal); setBehaviorOpen(false); toast.success('Pengaturan disimpan'); }} className="bg-ugm-gold text-ugm-blue hover:bg-ugm-gold/90 focus:ring-2 focus:ring-ugm-gold/40">Simpan</Button>
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    {availableModules.map((mod) => (
+                      <button
+                        key={mod.id}
+                        onClick={() => handleModuleClick(mod.id)}
+                        disabled={isLoading}
+                        className="group flex w-full flex-col rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-left transition hover:border-ugm-gold/40 hover:bg-slate-900/80 disabled:opacity-50"
+                      >
+                        <span className="text-sm font-semibold text-white group-hover:text-ugm-gold">{mod.name}</span>
+                        <span className="text-[11px] text-white/60">{mod.description}</span>
+                      </button>
+                    ))}
                   </div>
                 </div>
               )}
             </div>
-            <div>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setIsSettingsModalOpen((prev) => !prev)}
-                className="h-8 w-8 border-white/15 bg-white/5 hover:bg-white/15 text-white"
-                title="Audio Settings"
-                aria-label="Audio Settings"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-              <SettingsModal isOpen={isSettingsModalOpen} onClose={() => setIsSettingsModalOpen(false)} />
-            </div>
           </div>
         </div>
-      )}
-
-      {showModules && (
-        <div className="p-3 border border-white/10 rounded-lg bg-black/30 backdrop-blur-sm shadow-inner max-h-44 overflow-y-auto">
-          <h4 className="text-xs font-semibold tracking-wide text-ugm-gold mb-2">Latihan</h4>
-          <ul className="space-y-1">
-            {availableModules.map((mod) => (
-              <li key={mod.id}>
-                <button
-                  onClick={() => handleModuleClick(mod.id)}
-                  disabled={isLoading}
-                  className="w-full text-left px-2 py-2 rounded-md hover:bg-white/10 disabled:opacity-50 text-xs md:text-sm text-white transition"
-                >
-                  <span className="font-medium">{mod.name}</span>
-                  <p className="text-[10px] md:text-xs text-gray-300 mt-0.5 line-clamp-2">{mod.description}</p>
-                </button>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
-      {/* Primary Input Row */}
-      <div className="flex items-end gap-2 md:gap-3">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={() => setShowModules(!showModules)}
-          disabled={isLoading || !isStandardMode}
-          className={cn(
-            "h-10 w-10 border-white/15 bg-white/5 hover:bg-white/15 text-ugm-gold flex-shrink-0",
-            !isStandardMode && "opacity-50 cursor-not-allowed"
-          )}
-          title={isStandardMode ? (showModules ? "Tutup Pilihan" : "Pilih Latihan") : "Mode Latihan Aktif"}
-          aria-label={isStandardMode ? (showModules ? "Tutup pilihan latihan" : "Pilih latihan") : "Mode latihan aktif"}
-        >
-          {showModules ? <X className="h-4 w-4" /> : <BrainCircuit className="h-4 w-4" />}
-        </Button>
-
-        {/* memory popover moved to header */}
-
-        <div className="flex-1 min-w-0 relative">
-          <Textarea
-            ref={textareaRef}
-            value={inputValue}
-            onChange={(e) => onInputChange(e.target.value)}
-            onKeyDown={handleKeyDown}
-            placeholder={isLoading ? "Aika sedang mengetik..." : isStandardMode ? "Ketik pesanmu di sini..." : "Ketik jawabanmu..."}
-            rows={1}
-            className={cn(
-              "flex-1 resize-none overflow-y-auto max-h-32 h-fit w-full",
-              "bg-white/10 text-white placeholder:text-white/40",
-              "rounded-md border border-white/15 focus:border-ugm-gold/50 focus:ring-ugm-gold/40 focus:ring-2 px-3 py-2 text-sm md:text-base",
-              "scrollbar-thin scrollbar-track-transparent scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20"
-            )}
-            disabled={false}
-            aria-label="Chat input"
-          />
-        </div>
-
-        <Button
-          onClick={toggleLiveTalk}
-          disabled={false}
-          size="icon"
-          className={cn(
-            "h-10 w-10 flex-shrink-0",
-            isLiveTalkActive ? "bg-red-500 text-white hover:bg-red-600" : "bg-ugm-gold text-ugm-blue hover:bg-ugm-gold/90",
-            "disabled:bg-ugm-gold/50"
-          )}
-          aria-label={isLiveTalkActive ? "Stop Live Talk" : "Start Live Talk"}
-        >
-          <Mic className="h-4 w-4" />
-        </Button>
-        <Button
-          onClick={() => {
-            if (isLoading && onInterruptSend && interruptOnEnter) {
-              setPulse(true);
-              onInterruptSend();
-              setTimeout(() => setPulse(false), 400);
-            } else {
-              onSendMessage();
-            }
-          }}
-          disabled={!inputValue.trim()}
-          size="icon"
-          className={`h-10 w-10 flex-shrink-0 bg-ugm-gold text-ugm-blue hover:bg-ugm-gold/90 disabled:bg-ugm-gold/50 relative ${pulse ? 'animate-pulse ring-2 ring-ugm-gold/60 ring-offset-2 ring-offset-slate-800' : ''}`}
-          aria-label={isLoading ? (interruptOnEnter ? "Interrupt dan kirim" : "Antrekan pesan") : "Kirim pesan"}
-        >
-          <SendHorizonal className="h-4 w-4" />
-        </Button>
       </div>
-      {/* Behavior popover outside overlay removed */}
+
+      <ChatSettingsModal
+        isOpen={isChatSettingsOpen}
+        onClose={() => setIsChatSettingsOpen(false)}
+        interruptOnEnter={interruptOnEnter}
+        onToggleInterrupt={setInterruptOnEnter}
+      />
+      <SettingsModal
+        isOpen={isSettingsModalOpen}
+        onClose={() => setIsSettingsModalOpen(false)}
+      />
     </div>
   );
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+

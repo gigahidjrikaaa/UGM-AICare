@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+﻿import { useCallback, useEffect, useRef, useState } from "react";
 import { useLiveTalkStore } from "../store/useLiveTalkStore";
 import { type Message as CoreMessage } from "@/types/chat";
 import { MicVAD } from "@ricky0123/vad-web";
@@ -55,6 +55,7 @@ const browserTextToSpeech = (
   utterance.onstart = onStart;
   utterance.onend = onEnd;
   utterance.onerror = onError;
+  window.speechSynthesis.cancel();
   window.speechSynthesis.speak(utterance);
 };
 
@@ -79,6 +80,11 @@ export const useLiveTalk = ({
     setVoices,
     selectedVoice,
     setSpectrogramData,
+    setLiveTranscript,
+    ttsEnabled,
+    upsertPartialTranscript,
+    finalizeTranscript,
+    resetTranscripts,
   } = useLiveTalkStore();
 
   const sttSocketRef = useRef<WebSocket | null>(null);
@@ -92,6 +98,9 @@ export const useLiveTalk = ({
   const dataArrayRef = useRef<Uint8Array | null>(null);
   const rafRef = useRef<number | null>(null);
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const sttReconnectTimerRef = useRef<number | null>(null);
+  const ttsReconnectTimerRef = useRef<number | null>(null);
+  const reconnectAttemptsRef = useRef<{ stt: number; tts: number }>({ stt: 0, tts: 0 });
 
   const [sttSocketStatus, setSttSocketStatus] = useState<SocketStatus>("disconnected");
   const [ttsSocketStatus, setTtsSocketStatus] = useState<SocketStatus>("disconnected");
@@ -148,9 +157,21 @@ export const useLiveTalk = ({
       browserRecognitionRef.current = null;
     }
 
+    if (sttReconnectTimerRef.current !== null) {
+      window.clearTimeout(sttReconnectTimerRef.current);
+      sttReconnectTimerRef.current = null;
+    }
+    if (ttsReconnectTimerRef.current !== null) {
+      window.clearTimeout(ttsReconnectTimerRef.current);
+      ttsReconnectTimerRef.current = null;
+    }
+    reconnectAttemptsRef.current = { stt: 0, tts: 0 };
+
     setUserSpeaking(false);
     setSpectrogramData(Array(SPECTROGRAM_BAR_COUNT).fill(0));
-  }, [setSpectrogramData, setUserSpeaking]);
+    setLiveTranscript('');
+    resetTranscripts();
+  }, [setSpectrogramData, setUserSpeaking, setLiveTranscript, resetTranscripts]);
 
   useEffect(() => {
     const getDevicesAndVoices = async () => {
@@ -176,7 +197,20 @@ export const useLiveTalk = ({
   }, [setMicrophones, setSpeakers, setVoices]);
 
   useEffect(() => {
+    const resetReconnectState = () => {
+      if (sttReconnectTimerRef.current !== null) {
+        window.clearTimeout(sttReconnectTimerRef.current);
+        sttReconnectTimerRef.current = null;
+      }
+      if (ttsReconnectTimerRef.current !== null) {
+        window.clearTimeout(ttsReconnectTimerRef.current);
+        ttsReconnectTimerRef.current = null;
+      }
+      reconnectAttemptsRef.current = { stt: 0, tts: 0 };
+    };
+
     if (!isLiveTalkActive) {
+      resetReconnectState();
       cleanupAudioPipeline();
 
       if (sttSocketRef.current) {
@@ -194,41 +228,262 @@ export const useLiveTalk = ({
       return;
     }
 
-    setSttSocketStatus("connecting");
-    setTtsSocketStatus("connecting");
+    let cancelled = false;
 
-    const sttWs = new WebSocket(STT_WEBSOCKET_URL);
-    sttSocketRef.current = sttWs;
-
-    sttWs.onopen = () => setSttSocketStatus("connected");
-    sttWs.onclose = () => setSttSocketStatus("disconnected");
-    sttWs.onerror = () => setSttSocketStatus("disconnected");
-    sttWs.onmessage = (event) => {
-      const transcript = event.data as string;
-      if (transcript) {
-        onTranscriptReceived(transcript);
+    function scheduleReconnect(type: "stt" | "tts") {
+      if (cancelled || !isLiveTalkActive) {
+        return;
       }
-    };
 
-    const ttsWs = new WebSocket(TTS_WEBSOCKET_URL);
-    ttsSocketRef.current = ttsWs;
+      const attempt = reconnectAttemptsRef.current[type] + 1;
+      reconnectAttemptsRef.current[type] = attempt;
 
-    ttsWs.onopen = () => setTtsSocketStatus("connected");
-    ttsWs.onclose = () => setTtsSocketStatus("disconnected");
-    ttsWs.onerror = () => setTtsSocketStatus("disconnected");
-    ttsWs.onmessage = () => {
-      // TODO: Handle audio frames from TTS service when available.
-    };
+      const delay = Math.min(500 * 2 ** (attempt - 1), 8000);
+
+      const timer = window.setTimeout(() => {
+        if (cancelled || !isLiveTalkActive) {
+          return;
+        }
+
+        if (type === "stt") {
+          connectStt();
+        } else {
+          connectTts();
+        }
+      }, delay);
+
+      if (type === "stt") {
+        if (sttReconnectTimerRef.current !== null) {
+          window.clearTimeout(sttReconnectTimerRef.current);
+        }
+        sttReconnectTimerRef.current = timer;
+      } else {
+        if (ttsReconnectTimerRef.current !== null) {
+          window.clearTimeout(ttsReconnectTimerRef.current);
+        }
+        ttsReconnectTimerRef.current = timer;
+      }
+    }
+
+    function connectStt() {
+      if (cancelled || !isLiveTalkActive) {
+        return;
+      }
+
+      if (
+        sttSocketRef.current &&
+        (sttSocketRef.current.readyState === WebSocket.OPEN ||
+          sttSocketRef.current.readyState === WebSocket.CONNECTING)
+      ) {
+        return;
+      }
+
+      setSttSocketStatus("connecting");
+
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(STT_WEBSOCKET_URL);
+      } catch (error) {
+        console.error("Failed to open STT socket:", error);
+        setSttSocketStatus("disconnected");
+        scheduleReconnect("stt");
+        return;
+      }
+
+      sttSocketRef.current = ws;
+
+      ws.onopen = () => {
+        if (cancelled) {
+          return;
+        }
+        setSttSocketStatus("connected");
+        reconnectAttemptsRef.current.stt = 0;
+        if (sttReconnectTimerRef.current !== null) {
+          window.clearTimeout(sttReconnectTimerRef.current);
+          sttReconnectTimerRef.current = null;
+        }
+      };
+
+      ws.onmessage = (event) => {
+        if (cancelled) {
+          return;
+        }
+
+        const raw = event.data;
+        let handled = false;
+
+        if (typeof raw === "string") {
+          try {
+            const parsed = JSON.parse(raw);
+            if (parsed && typeof parsed === "object") {
+              if (typeof parsed.partial === "string") {
+                const partial = parsed.partial.trim();
+                if (partial.length) {
+                  setLiveTranscript(partial);
+                  upsertPartialTranscript(partial);
+                  onPartialTranscript(partial);
+                  handled = true;
+                } else {
+                  upsertPartialTranscript("");
+                  setLiveTranscript("");
+                }
+              }
+
+              if (typeof parsed.final === "string") {
+                const finalText = parsed.final.trim();
+                if (finalText.length) {
+                  finalizeTranscript(finalText);
+                  upsertPartialTranscript("");
+                  setLiveTranscript("");
+                  onPartialTranscript(finalText);
+                  onTranscriptReceived(finalText);
+                  handled = true;
+                }
+              }
+            }
+          } catch (error) {
+            console.warn("Unable to parse STT payload:", error);
+          }
+
+          if (!handled) {
+            const transcript = raw.trim();
+            if (transcript) {
+              setLiveTranscript(transcript);
+              upsertPartialTranscript(transcript);
+              onPartialTranscript(transcript);
+              finalizeTranscript(transcript);
+              upsertPartialTranscript("");
+              setLiveTranscript("");
+              onTranscriptReceived(transcript);
+            } else {
+              upsertPartialTranscript("");
+              setLiveTranscript("");
+            }
+          }
+        }
+      };
+
+      ws.onerror = (event) => {
+        console.error("STT socket error", event);
+        try {
+          ws.close();
+        } catch (error) {
+          console.warn("Error closing STT socket after error", error);
+        }
+      };
+
+      ws.onclose = () => {
+        setSttSocketStatus("disconnected");
+        if (sttSocketRef.current === ws) {
+          sttSocketRef.current = null;
+        }
+        if (!cancelled && isLiveTalkActive) {
+          scheduleReconnect("stt");
+        }
+      };
+    }
+
+    function connectTts() {
+      if (cancelled || !isLiveTalkActive) {
+        return;
+      }
+
+      if (
+        ttsSocketRef.current &&
+        (ttsSocketRef.current.readyState === WebSocket.OPEN ||
+          ttsSocketRef.current.readyState === WebSocket.CONNECTING)
+      ) {
+        return;
+      }
+
+      setTtsSocketStatus("connecting");
+
+      let ws: WebSocket;
+      try {
+        ws = new WebSocket(TTS_WEBSOCKET_URL);
+      } catch (error) {
+        console.error("Failed to open TTS socket:", error);
+        setTtsSocketStatus("disconnected");
+        scheduleReconnect("tts");
+        return;
+      }
+
+      ttsSocketRef.current = ws;
+
+      ws.onopen = () => {
+        if (cancelled) {
+          return;
+        }
+        setTtsSocketStatus("connected");
+        reconnectAttemptsRef.current.tts = 0;
+        if (ttsReconnectTimerRef.current !== null) {
+          window.clearTimeout(ttsReconnectTimerRef.current);
+          ttsReconnectTimerRef.current = null;
+        }
+      };
+
+      ws.onmessage = () => {
+        // Audio streaming will be handled when backend support is ready.
+      };
+
+      ws.onerror = (event) => {
+        console.error("TTS socket error", event);
+        try {
+          ws.close();
+        } catch (error) {
+          console.warn("Error closing TTS socket after error", error);
+        }
+      };
+
+      ws.onclose = () => {
+        setTtsSocketStatus("disconnected");
+        if (ttsSocketRef.current === ws) {
+          ttsSocketRef.current = null;
+        }
+        if (!cancelled && isLiveTalkActive) {
+          scheduleReconnect("tts");
+        }
+      };
+    }
+
+    connectStt();
+    connectTts();
 
     return () => {
-      sttWs.close();
-      ttsWs.close();
-      sttSocketRef.current = null;
-      ttsSocketRef.current = null;
+      cancelled = true;
+      resetReconnectState();
+
+      if (sttSocketRef.current) {
+        try {
+          sttSocketRef.current.close();
+        } catch (error) {
+          console.warn("Error closing STT socket during cleanup", error);
+        }
+        sttSocketRef.current = null;
+      }
+
+      if (ttsSocketRef.current) {
+        try {
+          ttsSocketRef.current.close();
+        } catch (error) {
+          console.warn("Error closing TTS socket during cleanup", error);
+        }
+        ttsSocketRef.current = null;
+      }
+
       setSttSocketStatus("disconnected");
       setTtsSocketStatus("disconnected");
+      cleanupAudioPipeline();
     };
-  }, [cleanupAudioPipeline, isLiveTalkActive, onTranscriptReceived]);
+  }, [
+    cleanupAudioPipeline,
+    finalizeTranscript,
+    isLiveTalkActive,
+    onPartialTranscript,
+    onTranscriptReceived,
+    setLiveTranscript,
+    upsertPartialTranscript,
+  ]);
 
   useEffect(() => {
     if (!isLiveTalkActive) {
@@ -313,7 +568,17 @@ export const useLiveTalk = ({
           onSpeechStart: () => setUserSpeaking(true),
           onVADMisfire: () => setUserSpeaking(false),
           onSpeechEnd: (audio) => {
-            setUserSpeaking(false);
+            if (sttReconnectTimerRef.current !== null) {
+      window.clearTimeout(sttReconnectTimerRef.current);
+      sttReconnectTimerRef.current = null;
+    }
+    if (ttsReconnectTimerRef.current !== null) {
+      window.clearTimeout(ttsReconnectTimerRef.current);
+      ttsReconnectTimerRef.current = null;
+    }
+    reconnectAttemptsRef.current = { stt: 0, tts: 0 };
+
+    setUserSpeaking(false);
             if (
               sttSocketRef.current &&
               sttSocketRef.current.readyState === WebSocket.OPEN &&
@@ -375,8 +640,20 @@ export const useLiveTalk = ({
             }
           }
 
-          onPartialTranscript(finalTranscript + interimTranscript);
+          const combined = (finalTranscript + interimTranscript).trim();
+          if (combined) {
+            setLiveTranscript(combined);
+            upsertPartialTranscript(combined);
+            onPartialTranscript(combined);
+          } else {
+            setLiveTranscript('');
+            upsertPartialTranscript('');
+          }
           if (finalTranscript) {
+            finalizeTranscript(finalTranscript);
+            upsertPartialTranscript('');
+            setLiveTranscript('');
+            onPartialTranscript(finalTranscript);
             onTranscriptReceived(finalTranscript);
           }
         };
@@ -391,10 +668,18 @@ export const useLiveTalk = ({
 
       console.error("Browser Speech Recognition is not supported.");
     }
-  }, [isLiveTalkActive, sttSocketStatus, onPartialTranscript, onTranscriptReceived, setUserSpeaking]);
+  }, [isLiveTalkActive, sttSocketStatus, onPartialTranscript, onTranscriptReceived, setUserSpeaking, setLiveTranscript, upsertPartialTranscript, finalizeTranscript]);
 
   useEffect(() => {
     if (!isLiveTalkActive || messages.length === 0) {
+      return;
+    }
+
+    if (!ttsEnabled) {
+      if (typeof window !== "undefined" && window.speechSynthesis) {
+        window.speechSynthesis.cancel();
+      }
+      setAikaSpeaking(false);
       return;
     }
 
@@ -417,7 +702,7 @@ export const useLiveTalk = ({
         setAikaSpeaking(false);
       };
 
-      if (ttsSocketStatus === "connected" && ttsSocketRef.current) {
+      if (ttsSocketStatus === "connected" && ttsSocketRef.current && ttsEnabled) {
         try {
           ttsSocketRef.current.send(text);
           onStart();
@@ -430,7 +715,30 @@ export const useLiveTalk = ({
         browserTextToSpeech(text, selectedVoice, onStart, onEnd, onError);
       }
     }
-  }, [messages, isLiveTalkActive, setAikaSpeaking, ttsSocketStatus, selectedVoice]);
+  }, [messages, isLiveTalkActive, setAikaSpeaking, ttsSocketStatus, selectedVoice, ttsEnabled]);
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 

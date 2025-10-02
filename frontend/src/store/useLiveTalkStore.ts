@@ -1,18 +1,30 @@
-import { create } from 'zustand';
+﻿import { create } from 'zustand';
 
-// Define the type for media devices
 interface MediaDevice {
   deviceId: string;
   label: string;
   kind: string;
 }
 
-// Define the type for speech synthesis voices
 interface SpeechSynthesisVoice {
   name: string;
   lang: string;
   voiceURI: string;
 }
+
+interface TranscriptSegment {
+  id: string;
+  text: string;
+  final: boolean;
+  timestamp: number;
+}
+
+const generateTranscriptId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
 
 type LiveTalkState = {
   isLiveTalkActive: boolean;
@@ -26,6 +38,10 @@ type LiveTalkState = {
   selectedSpeaker: string | null;
   selectedVoice: string | null;
   spectrogramData: number[];
+  liveTranscript: string;
+  messageSoundsEnabled: boolean;
+  ttsEnabled: boolean;
+  transcriptSegments: TranscriptSegment[];
   toggleLiveTalk: () => void;
   setUserSpeaking: (status: boolean) => void;
   setAikaSpeaking: (status: boolean) => void;
@@ -37,6 +53,12 @@ type LiveTalkState = {
   setSelectedSpeaker: (deviceId: string) => void;
   setSelectedVoice: (voiceURI: string) => void;
   setSpectrogramData: (data: number[]) => void;
+  setLiveTranscript: (text: string) => void;
+  setMessageSoundsEnabled: (enabled: boolean) => void;
+  setTtsEnabled: (enabled: boolean) => void;
+  upsertPartialTranscript: (text: string) => void;
+  finalizeTranscript: (text: string) => void;
+  resetTranscripts: () => void;
 };
 
 export const useLiveTalkStore = create<LiveTalkState>((set) => ({
@@ -51,6 +73,10 @@ export const useLiveTalkStore = create<LiveTalkState>((set) => ({
   selectedSpeaker: null,
   selectedVoice: null,
   spectrogramData: Array(16).fill(0),
+  liveTranscript: '',
+  messageSoundsEnabled: true,
+  ttsEnabled: true,
+  transcriptSegments: [],
   toggleLiveTalk: () => set((state) => ({ isLiveTalkActive: !state.isLiveTalkActive })),
   setUserSpeaking: (status) => set({ isListening: status }),
   setAikaSpeaking: (status) => set({ isAikaSpeaking: status }),
@@ -62,4 +88,52 @@ export const useLiveTalkStore = create<LiveTalkState>((set) => ({
   setSelectedSpeaker: (deviceId) => set({ selectedSpeaker: deviceId }),
   setSelectedVoice: (voiceURI) => set({ selectedVoice: voiceURI }),
   setSpectrogramData: (data) => set({ spectrogramData: data }),
+  setLiveTranscript: (text) => set({ liveTranscript: text }),
+  setMessageSoundsEnabled: (enabled) => set({ messageSoundsEnabled: enabled }),
+  setTtsEnabled: (enabled) => set({ ttsEnabled: enabled }),
+  upsertPartialTranscript: (text) => set((state) => {
+    const trimmed = text.trim();
+    const segments = [...state.transcriptSegments];
+    if (!trimmed) {
+      if (segments.length && !segments[segments.length - 1].final) {
+        segments.pop();
+        return { transcriptSegments: segments };
+      }
+      return {};
+    }
+    const lastSegment = segments[segments.length - 1];
+    const nextSegment: TranscriptSegment = {
+      id: lastSegment && !lastSegment.final ? lastSegment.id : generateTranscriptId(),
+      text: trimmed,
+      final: false,
+      timestamp: Date.now(),
+    };
+    if (lastSegment && !lastSegment.final) {
+      segments[segments.length - 1] = nextSegment;
+    } else {
+      segments.push(nextSegment);
+    }
+    return { transcriptSegments: segments };
+  }),
+  finalizeTranscript: (text) => set((state) => {
+    const trimmed = text.trim();
+    if (!trimmed) {
+      return {};
+    }
+    const segments = [...state.transcriptSegments];
+    const lastSegment = segments[segments.length - 1];
+    const finalSegment: TranscriptSegment = {
+      id: lastSegment && !lastSegment.final ? lastSegment.id : generateTranscriptId(),
+      text: trimmed,
+      final: true,
+      timestamp: Date.now(),
+    };
+    if (lastSegment && !lastSegment.final) {
+      segments[segments.length - 1] = finalSegment;
+    } else {
+      segments.push(finalSegment);
+    }
+    return { transcriptSegments: segments };
+  }),
+  resetTranscripts: () => set({ transcriptSegments: [] }),
 }));

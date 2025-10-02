@@ -9,14 +9,17 @@ import Image from 'next/image';
 import { motion, Variants } from 'framer-motion';
 import { LoadingDots } from '@/components/ui/LoadingDots';
 import { useEffect } from 'react';
+import { useLiveTalkStore } from '@/store/useLiveTalkStore';
 
 interface MessageBubbleProps {
   message: Message;
 }
 
 export function MessageBubble({ message }: MessageBubbleProps) {
+  const messageSoundsEnabled = useLiveTalkStore((state) => state.messageSoundsEnabled);
+
   useEffect(() => {
-    if (!message.isLoading) {
+    if (!message.isLoading && messageSoundsEnabled) {
       const audio = new Audio(
         message.role === 'user'
           ? '/sounds/message_bubble_user.mp3'
@@ -30,7 +33,7 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         }
       });
     }
-  }, [message.isLoading, message.role]);
+  }, [message.isLoading, message.role, messageSoundsEnabled]);
 
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
