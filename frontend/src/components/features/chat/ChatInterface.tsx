@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useRef, useCallback, useMemo } from 'react';
+import React, { useEffect, useRef, useCallback, useMemo, useState } from 'react';
 import { ChatWindow } from './ChatWindow';
 import { ChatInput } from './ChatInput';
 import { useChat } from '@/hooks/useChat';
@@ -8,14 +8,17 @@ import { useLiveTalkStore } from '@/store/useLiveTalkStore';
 import { useLiveTalk } from '@/hooks/useLiveTalk';
 import SpectrogramBubble from '@/components/SpectrogramBubble';
 import { ToastProvider } from '@/components/ui/toast/ToastProvider';
+import { ChatControlCenter } from './ChatControlCenter';
 
 interface ChatInterfaceProps {
   model: string;
   setModel?: (m: string) => void;
   modelOptions?: Array<{ value: string; label: string }>;
+  isControlCenterOpen?: boolean;
+  onCloseControlCenter?: () => void;
 }
 
-export default function ChatInterface({ model, setModel, modelOptions }: ChatInterfaceProps) {
+export default function ChatInterface({ model, setModel, modelOptions, isControlCenterOpen = false, onCloseControlCenter }: ChatInterfaceProps) {
   const {
     messages,
     inputValue,
@@ -34,11 +37,29 @@ export default function ChatInterface({ model, setModel, modelOptions }: ChatInt
   const liveRegionRef = useRef<HTMLDivElement | null>(null);
   const prevLoadingRef = useRef<boolean>(false);
   const interruptedRef = useRef<boolean>(false);
+  const [interruptOnEnter, setInterruptOnEnter] = useState<boolean>(true);
 
   const handleCancel = useCallback(() => {
     interruptedRef.current = true;
     cancelCurrent();
   }, [cancelCurrent]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    const stored = window.localStorage.getItem('aika_interrupt_on_enter');
+    if (stored !== null) {
+      setInterruptOnEnter(stored === 'true');
+    }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+    window.localStorage.setItem('aika_interrupt_on_enter', String(interruptOnEnter));
+  }, [interruptOnEnter]);
 
   useEffect(() => {
     const region = liveRegionRef.current;
@@ -111,7 +132,10 @@ export default function ChatInterface({ model, setModel, modelOptions }: ChatInt
   return (
     <ToastProvider>
       <div className="flex h-full w-full flex-col gap-3 px-3 pb-3 pt-2 sm:px-4 md:px-6 lg:px-8">
-        <ChatWindow messages={messages} isLoading={isLoading} chatContainerRef={chatContainerRef} />
+        <ChatWindow
+          messages={messages}
+          chatContainerRef={chatContainerRef}
+        />
 
         <div ref={liveRegionRef} aria-live="polite" aria-atomic="true" className="sr-only" />
 
@@ -154,7 +178,7 @@ export default function ChatInterface({ model, setModel, modelOptions }: ChatInt
                 <SpectrogramBubble isActive={isListening || isAikaSpeaking} data={spectrogramData} />
                 <button
                   onClick={toggleLiveTalk}
-                  className="rounded-full bg-red-500 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-red-600 focus-visible:outline focus-visible:outline-2 focus-visible:outline-red-300"
+                    className="rounded-full bg-red-500 px-6 py-3 text-sm font-semibold text-white shadow-lg transition-colors hover:bg-red-600 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-red-300 focus-visible:ring-offset-2 focus-visible:ring-offset-slate-900"
                   aria-label="Hentikan Live Talk"
                 >
                   Hentikan Live Talk
@@ -172,15 +196,25 @@ export default function ChatInterface({ model, setModel, modelOptions }: ChatInt
               isLoading={isLoading}
               currentMode={currentMode}
               availableModules={availableModules}
-              model={model}
-              setModel={setModel}
-              modelOptions={modelOptions}
               onCancel={handleCancel}
+              interruptOnEnter={interruptOnEnter}
             />
           )}
         </div>
 
         {error && <div className="p-2 text-center text-red-500 text-xs">{error}</div>}
+
+        {isControlCenterOpen && onCloseControlCenter && (
+          <ChatControlCenter
+            isOpen={isControlCenterOpen}
+            onClose={onCloseControlCenter}
+            model={model}
+            setModel={setModel}
+            modelOptions={modelOptions}
+            interruptOnEnter={interruptOnEnter}
+            onToggleInterrupt={setInterruptOnEnter}
+          />
+        )}
       </div>
     </ToastProvider>
   );

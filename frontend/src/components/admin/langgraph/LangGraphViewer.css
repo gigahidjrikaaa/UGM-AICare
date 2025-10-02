@@ -111,18 +111,30 @@
 .legend-dot.agent-sta {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
 .agent-sca,
 .legend-dot.agent-sca {
   --agent-color: #A855F7;
 }
+
 .agent-sda,
 .legend-dot.agent-sda {
   --agent-color: #34D399;
 }
+
 .agent-ia,
 .legend-dot.agent-ia {
+  --agent-color: #34D399;
+}
+
 /* Ensure reactflow edge text uses our label background correctly */
 .edge-label .react-flow__text {
+  background: rgba(0, 0, 0, 0.8);
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
 @media (max-width: 640px) {
   .langgraph-minimap {
     display: none;

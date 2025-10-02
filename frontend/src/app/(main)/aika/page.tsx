@@ -6,7 +6,7 @@ import ChatInterface from '@/components/features/chat/ChatInterface';
 import ParticleBackground from '@/components/ui/ParticleBackground'; // Assuming this exists
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { Info } from 'lucide-react';
+import { Info, Settings } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { AIKA_MEMORY_NOTE } from '@/constants/chat';
@@ -37,6 +37,7 @@ export default function AikaChatPage() {
   const { status } = useSession();
   const router = useRouter();
   const [model, setModel] = useState('gemini_google');
+  const [isControlCenterOpen, setIsControlCenterOpen] = useState(false);
 
   // Persist model choice in localStorage
   useEffect(() => {
@@ -89,12 +90,14 @@ export default function AikaChatPage() {
         >
           {/* Unified Chat Container (header simplified, controls moved to footer bar) */}
           <div className="w-full max-w-5xl h-[85vh] flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
-            <HeaderBar />
+            <HeaderBar onOpenControlCenter={() => setIsControlCenterOpen(true)} />
             <div className="flex-1 overflow-hidden">
               <ChatInterface
                 model={model}
                 setModel={setModel}
                 modelOptions={modelOptions}
+                isControlCenterOpen={isControlCenterOpen}
+                onCloseControlCenter={() => setIsControlCenterOpen(false)}
               />
             </div>
           </div>
@@ -116,7 +119,7 @@ export default function AikaChatPage() {
   );
 }
 
-function HeaderBar() {
+function HeaderBar({ onOpenControlCenter }: { onOpenControlCenter: () => void }) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement | null>(null);
   const assignButtonRef = (node: HTMLButtonElement | null) => {
@@ -233,7 +236,17 @@ function HeaderBar() {
           )}
         </div>
       </h1>
-      <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-[#FFCA40]/15 text-[#FFCA40] border border-[#FFCA40]/30">Beta</span>
+      <div className="flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onOpenControlCenter}
+          className="h-7 w-7 inline-flex items-center justify-center rounded-md border border-white/15 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-xs focus:outline-none focus:ring-2 focus:ring-ugm-gold/40 transition"
+          aria-label="Buka pusat kontrol Aika"
+        >
+          <Settings className="h-4 w-4" />
+        </button>
+        <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-[#FFCA40]/15 text-[#FFCA40] border border-[#FFCA40]/30">Beta</span>
+      </div>
     </div>
   );
 }

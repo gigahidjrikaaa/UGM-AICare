@@ -1,22 +1,11 @@
 ﻿// src/components/features/chat/ChatInput.tsx
 import React, { useState, useRef, useEffect, useCallback } from "react";
-import { Button } from "@/components/ui/Button";
 import { Textarea } from "@/components/ui/TextArea";
-import {
-  SendHorizonal,
-  BrainCircuit,
-  Plus,
-  X as XIcon,
-  Mic,
-  Settings,
-  ChevronDown,
-  SlidersHorizontal,
-} from "lucide-react";
+import { SendHorizonal, BrainCircuit, Plus, X as XIcon, Mic } from "lucide-react";
 import { ChatMode, AvailableModule as ChatModule } from "@/types/chat";
 import { cn } from "@/lib/utils";
-import SettingsModal from "./SettingsModal";
-import ChatSettingsModal from "./ChatSettingsModal";
 import { toast } from "react-hot-toast";
+import { motion } from "framer-motion";
 
 interface ChatInputProps {
   inputValue: string;
@@ -28,10 +17,8 @@ interface ChatInputProps {
   availableModules: ChatModule[];
   isLiveTalkActive: boolean;
   toggleLiveTalk: () => void;
-  model?: string;
-  setModel?: (m: string) => void;
-  modelOptions?: Array<{ value: string; label: string }>;
   onCancel?: () => void;
+  interruptOnEnter: boolean;
 }
 
 export function ChatInput({
@@ -44,26 +31,32 @@ export function ChatInput({
   availableModules,
   isLiveTalkActive,
   toggleLiveTalk,
-  model,
-  setModel,
-  modelOptions,
   onCancel,
+  interruptOnEnter,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const [showModules, setShowModules] = useState(false);
-  const [isSettingsModalOpen, setIsSettingsModalOpen] = useState(false);
-  const [isChatSettingsOpen, setIsChatSettingsOpen] = useState(false);
-  const [interruptOnEnter, setInterruptOnEnter] = useState(true);
 
   const isStandardMode = currentMode === "standard";
   const actionIsCancel = isLoading && Boolean(onCancel);
+
+  // Handle escape key to close modal
+  useEffect(() => {
+    const handleEscape = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && showModules) {
+        setShowModules(false);
+      }
+    };
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [showModules]);
 
   useEffect(() => {
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       const scrollHeight = textareaRef.current.scrollHeight;
-      const maxHeight = 140;
+      const maxHeight = 200; // Increased max height for better long text handling
       textareaRef.current.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
     }
   }, [inputValue]);
@@ -73,21 +66,6 @@ export function ChatInput({
       textareaRef.current.focus({ preventScroll: true });
     }
   }, [isLoading]);
-
-  useEffect(() => {
-    try {
-      const stored = localStorage.getItem("aika_interrupt_on_enter");
-      if (stored !== null) {
-        setInterruptOnEnter(stored === "true");
-      }
-    } catch {}
-  }, []);
-
-  useEffect(() => {
-    try {
-      localStorage.setItem("aika_interrupt_on_enter", String(interruptOnEnter));
-    } catch {}
-  }, [interruptOnEnter]);
 
   const handleModuleClick = (moduleId: string) => {
     if (isLoading) {
@@ -130,157 +108,148 @@ export function ChatInput({
     handleSend();
   };
 
+  const handleTextareaFocus = () => {
+    // Focus the textarea to ensure it expands when clicked
+    if (textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  };
+
   const ActionIcon = actionIsCancel ? XIcon : SendHorizonal;
-  const actionLabel = actionIsCancel ? "Batalkan" : "Kirim";
   const actionDisabled = actionIsCancel ? false : !inputValue.trim();
 
   return (
     <div className="w-full flex-shrink-0">
-      <div className="w-full rounded-3xl border border-white/12 bg-slate-900/70 p-4 shadow-[0_22px_50px_rgba(5,12,38,0.6)] backdrop-blur-xl sm:p-6">
-        <div className="flex flex-col gap-4">
-          {modelOptions?.length ? (
-            <div className="flex flex-wrap items-center justify-end gap-2 text-xs text-white/70">
-              <div className="relative">
-                <label htmlFor="chat-model" className="sr-only">
-                  Model
-                </label>
-                <select
-                  id="chat-model"
-                  value={model}
-                  onChange={(e) => setModel?.(e.target.value)}
-                  className="peer appearance-none rounded-xl border border-white/15 bg-white/10 px-3 py-2 pr-9 text-xs text-white/90 transition focus:outline-none focus:ring-2 focus:ring-ugm-gold/40 focus:border-ugm-gold/40 hover:bg-white/15"
-                  aria-label="Pilih model AI"
-                >
-                  {modelOptions.map((opt) => (
-                    <option key={opt.value} value={opt.value} className="bg-slate-900 text-white">
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-                <ChevronDown className="pointer-events-none absolute right-2 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/60 transition peer-focus:text-ugm-gold" />
-              </div>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setIsChatSettingsOpen(true)}
-                className="h-9 w-9 border-white/20 bg-white/10 text-white transition hover:bg-white/15"
-                title="Pengaturan Chat"
-                aria-label="Pengaturan Chat"
-              >
-                <SlidersHorizontal className="h-4 w-4" />
-              </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setIsSettingsModalOpen(true)}
-                className="h-9 w-9 border-white/20 bg-white/10 text-white transition hover:bg-white/15"
-                title="Pengaturan Audio"
-                aria-label="Pengaturan Audio"
-              >
-                <Settings className="h-4 w-4" />
-              </Button>
-            </div>
-          ) : null}
+      <div className="flex flex-col gap-3">
+        {/* Responsive unified input container */}
+        <div className="flex items-end gap-2 sm:gap-3 rounded-full border border-white/20 bg-white/10 px-3 sm:px-4 py-2 sm:py-3 shadow-lg backdrop-blur-xl transition-all duration-300">
+          {/* Module picker button */}
+          <button
+            type="button"
+            onClick={() => setShowModules((prev) => !prev)}
+            disabled={isLoading || !isStandardMode}
+            className={cn(
+              "flex h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-full transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40",
+              showModules 
+                ? "bg-ugm-gold/20 text-ugm-gold" 
+                : "bg-transparent text-white/70 hover:bg-white/15 hover:text-white"
+            )}
+            aria-label="Buka latihan terpandu"
+          >
+            {showModules ? <BrainCircuit className="h-4 w-4 sm:h-5 sm:w-5" /> : <Plus className="h-4 w-4 sm:h-5 sm:w-5" />}
+          </button>
 
-          <div className="rounded-[36px] border border-white/10 bg-[#111d3e]/80 p-2 pl-3 shadow-inner">
-            <div className="flex flex-col gap-3">
-              <div className="flex items-end gap-3">
-                <button
-                  type="button"
-                  onClick={() => setShowModules((prev) => !prev)}
-                  disabled={isLoading || !isStandardMode}
-                  className={cn(
-                    "flex h-12 w-12 items-center justify-center rounded-full border border-white/15 bg-white/10 text-white transition hover:bg-white/15 disabled:cursor-not-allowed disabled:opacity-60",
-                    showModules && "bg-white/15"
-                  )}
-                  aria-label="Buka latihan terpandu"
-                >
-                  {showModules ? <BrainCircuit className="h-4 w-4 text-ugm-gold" /> : <Plus className="h-5 w-5" />}
-                </button>
-
-                <div className="flex-1 rounded-[28px] border border-white/10 bg-slate-900/60 px-4 py-3">
-                  <Textarea
-                    ref={textareaRef}
-                    value={inputValue}
-                    onChange={(e) => onInputChange(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={isLoading ? "Aika sedang mengetik..." : isStandardMode ? "Bagikan apa yang kamu rasakan atau tanyakan sesuatu." : "Ketik jawabanmu..."}
-                    rows={1}
-                    className="w-full resize-none bg-transparent text-sm text-white placeholder:text-white/45 focus-visible:outline-none focus-visible:ring-0 sm:text-base"
-                  />
-                  <div className="mt-2 flex justify-between text-[11px] text-white/45">
-                    <span className="hidden sm:inline">Enter untuk {actionIsCancel ? "batalkan" : "kirim"}</span>
-                    <span>Shift + Enter baris baru</span>
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Button
-                    size="icon"
-                    onClick={toggleLiveTalk}
-                    className={cn(
-                      "h-12 w-12 rounded-full transition",
-                      isLiveTalkActive
-                        ? "bg-red-500 text-white hover:bg-red-600"
-                        : "bg-ugm-gold text-ugm-blue hover:bg-ugm-gold/90",
-                      "disabled:bg-ugm-gold/50"
-                    )}
-                    aria-label={isLiveTalkActive ? "Stop Live Talk" : "Start Live Talk"}
-                  >
-                    <Mic className="h-4 w-4" />
-                  </Button>
-
-                  <Button
-                    onClick={handleActionClick}
-                    disabled={actionDisabled}
-                    className={cn(
-                      "flex h-12 min-w-[52px] items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#FFC857] via-[#ffb341] to-[#f9a602] text-[#061231] font-semibold transition hover:from-[#ffd36f] hover:via-[#ffbf52] hover:to-[#fbb933] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#f9a602] sm:px-6",
-                      actionIsCancel && "bg-red-500 text-white hover:bg-red-600 focus-visible:outline-red-400"
-                    )}
-                    aria-label={actionIsCancel ? "Batalkan respons" : "Kirim pesan"}
-                  >
-                    <ActionIcon className="h-4 w-4" />
-                    <span className="hidden sm:inline">{actionLabel}</span>
-                  </Button>
-                </div>
-              </div>
-
-              {showModules && (
-                <div className="rounded-2xl border border-white/12 bg-white/8 p-4 text-sm text-white/80 shadow-[inset_0_0_25px_rgba(12,22,60,0.35)]">
-                  <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.18em] text-white/50">
-                    <BrainCircuit className="h-4 w-4 text-ugm-gold" />
-                    <span>Latihan yang tersedia</span>
-                  </div>
-                  <div className="grid gap-2 sm:grid-cols-2">
-                    {availableModules.map((mod) => (
-                      <button
-                        key={mod.id}
-                        onClick={() => handleModuleClick(mod.id)}
-                        disabled={isLoading}
-                        className="group flex w-full flex-col rounded-xl border border-white/10 bg-slate-900/70 px-3 py-2 text-left transition hover:border-ugm-gold/40 hover:bg-slate-900/80 disabled:opacity-50"
-                      >
-                        <span className="text-sm font-semibold text-white group-hover:text-ugm-gold">{mod.name}</span>
-                        <span className="text-[11px] text-white/60">{mod.description}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+          {/* Dynamic textarea container */}
+          <div 
+            className={cn(
+              "transition-all duration-300 ease-in-out",
+              inputValue.trim() 
+                ? "flex-1" 
+                : "w-8 sm:w-10 hover:flex-1 focus-within:flex-1"
+            )}
+            onClick={handleTextareaFocus}
+          >
+            <Textarea
+              ref={textareaRef}
+              value={inputValue}
+              onChange={(e) => onInputChange(e.target.value)}
+              onKeyDown={handleKeyDown}
+              placeholder={isLoading ? "Aika sedang mengetik..." : isStandardMode ? "Ketik pesan..." : "Ketik jawabanmu..."}
+              rows={1}
+              className={cn(
+                "w-full resize-none border-0 bg-transparent px-0 text-sm sm:text-[15px] text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-0 transition-all duration-200",
+                !inputValue.trim() && "cursor-pointer"
               )}
-            </div>
+              style={{ 
+                minHeight: '32px',
+                lineHeight: '1.5'
+              }}
+            />
+          </div>
+
+          {/* Action buttons - responsive */}
+          <div className="flex flex-shrink-0 items-center gap-1 sm:gap-2">
+            <button
+              type="button"
+              onClick={toggleLiveTalk}
+              className={cn(
+                "flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full transition-all duration-200",
+                isLiveTalkActive
+                  ? "bg-red-500/20 text-red-400 hover:bg-red-500/30"
+                  : "bg-transparent text-white/70 hover:bg-white/15 hover:text-white"
+              )}
+              aria-label={isLiveTalkActive ? "Stop Live Talk" : "Start Live Talk"}
+            >
+              <Mic className="h-4 w-4 sm:h-5 sm:w-5" />
+            </button>
+
+            <button
+              type="button"
+              onClick={handleActionClick}
+              disabled={actionDisabled}
+              className={cn(
+                "flex h-8 w-8 sm:h-10 sm:w-10 items-center justify-center rounded-full transition-all duration-200 disabled:opacity-40",
+                actionIsCancel
+                  ? "bg-red-500 text-white hover:bg-red-600"
+                  : "bg-ugm-gold text-ugm-blue hover:bg-ugm-gold/90"
+              )}
+              aria-label={actionIsCancel ? "Batalkan respons" : "Kirim pesan"}
+            >
+              <ActionIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+            </button>
           </div>
         </div>
-      </div>
 
-      <ChatSettingsModal
-        isOpen={isChatSettingsOpen}
-        onClose={() => setIsChatSettingsOpen(false)}
-        interruptOnEnter={interruptOnEnter}
-        onToggleInterrupt={setInterruptOnEnter}
-      />
-      <SettingsModal
-        isOpen={isSettingsModalOpen}
-        onClose={() => setIsSettingsModalOpen(false)}
-      />
+        {/* Module picker popup modal - responsive */}
+        {showModules && (
+          <div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4"
+            onClick={() => setShowModules(false)}
+          >
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.2 }}
+              onClick={(e) => e.stopPropagation()}
+              className="w-full max-w-md sm:max-w-2xl rounded-2xl border border-white/20 bg-white/10 p-4 sm:p-6 shadow-2xl backdrop-blur-xl"
+            >
+              <div className="mb-4 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <BrainCircuit className="h-5 w-5 sm:h-6 sm:w-6 text-ugm-gold" />
+                  <h3 className="text-lg sm:text-xl font-semibold text-white">Latihan Terpandu CBT</h3>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowModules(false)}
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 text-white/70 transition hover:bg-white/20 hover:text-white"
+                  aria-label="Tutup"
+                >
+                  <XIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                </button>
+              </div>
+              
+              <p className="mb-4 text-xs sm:text-sm text-white/70">
+                Pilih latihan yang sesuai dengan kebutuhanmu saat ini. Setiap latihan dirancang untuk membantumu mengelola pikiran dan emosi dengan lebih baik.
+              </p>
+
+              <div className="grid gap-3 sm:grid-cols-2">
+                {availableModules.map((mod) => (
+                  <button
+                    key={mod.id}
+                    onClick={() => handleModuleClick(mod.id)}
+                    disabled={isLoading}
+                    className="group flex w-full flex-col rounded-xl border border-white/15 bg-white/5 px-3 sm:px-4 py-3 sm:py-3.5 text-left transition hover:border-ugm-gold/50 hover:bg-white/10 disabled:opacity-50"
+                  >
+                    <span className="text-sm sm:text-base font-semibold text-white group-hover:text-ugm-gold">{mod.name}</span>
+                    <span className="mt-1 text-xs sm:text-sm text-white/60">{mod.description}</span>
+                  </button>
+                ))}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
