@@ -18,6 +18,7 @@ from app.core.cbt_module_types import CBTModuleData
 from app.core.memory import clear_module_state, get_module_state, set_module_state
 from app.models import Conversation, User, UserSummary
 from app.schemas.chat import ChatRequest
+from app.services.personal_context import fetch_relevant_journal_entries
 
 
 @dataclass
@@ -32,6 +33,7 @@ class ChatTurnResult:
 # Callback signatures -------------------------------------------------------
 StreamCallback = Callable[[str], Awaitable[None]]
 SummaryScheduler = Callable[[int, str], None]
+SummarizeNow = Callable[[int, str], Awaitable[None]]
 LLMResponder = Callable[[List[Dict[str, str]], Optional[str], ChatRequest, Optional[StreamCallback]], Awaitable[str]]
 
 
@@ -86,6 +88,7 @@ async def process_chat_message(
     conversation_id: str,
     active_system_prompt: Optional[str],
     schedule_summary: Optional[SummaryScheduler],
+    summarize_now: Optional[SummarizeNow],
     llm_responder: LLMResponder,
     stream_callback: Optional[StreamCallback] = None,
 ) -> ChatTurnResult:
@@ -209,8 +212,11 @@ async def process_chat_message(
         conversation_id=conversation_id,
     )
 
-    if previous_session_id and schedule_summary:
-        schedule_summary(user_id, previous_session_id)
+    if previous_session_id:
+        if summarize_now:
+            await summarize_now(user_id, previous_session_id)
+        elif schedule_summary:
+            schedule_summary(user_id, previous_session_id)
 
     if is_new_context:
         past_summary = await _fetch_latest_summary(db, user_id)
@@ -231,6 +237,25 @@ async def process_chat_message(
             history_for_llm_call.insert(0, {"role": "system", "content": active_system_prompt})
     elif active_system_prompt and not any(h["role"] == "system" for h in history_for_llm_call):
         history_for_llm_call.insert(0, {"role": "system", "content": active_system_prompt})
+
+    journal_context_messages: List[Dict[str, str]] = []
+    if _mentions_journal(user_message_content):
+        journal_entries = await fetch_relevant_journal_entries(db, user_id, user_message_content)
+        if journal_entries:
+            formatted_entries = "\n".join(f"- {entry}" for entry in journal_entries)
+            journal_context_messages.append(
+                {
+                    "role": "system",
+                    "content": (
+                        "Referensi catatan jurnal yang mungkin relevan dengan pertanyaanmu:\n"
+                        f"{formatted_entries}\n"
+                        "Gunakan informasi ini dengan empati tanpa membocorkan sumbernya secara eksplisit."
+                    ),
+                }
+            )
+
+    if journal_context_messages:
+        history_for_llm_call.extend(journal_context_messages)
 
     history_for_llm_call.append({"role": "user", "content": user_message_content})
 
@@ -391,6 +416,21 @@ _memory_patterns: Iterable[re.Pattern[str]] = [
 def _is_memory_query(user_message: str) -> bool:
     text = user_message.lower().strip()
     for pattern in _memory_patterns:
+        if pattern.search(text):
+            return True
+    return False
+
+
+_journal_patterns: Iterable[re.Pattern[str]] = [
+    re.compile(r"\b(jurnal|journal|catatan|diary|curhat)\b", re.IGNORECASE),
+    re.compile(r"tulis[ai]?\s+di\s+jurnal", re.IGNORECASE),
+    re.compile(r"lihat\s+catatan", re.IGNORECASE),
+]
+
+
+def _mentions_journal(user_message: str) -> bool:
+    text = user_message.lower().strip()
+    for pattern in _journal_patterns:
         if pattern.search(text):
             return True
     return False

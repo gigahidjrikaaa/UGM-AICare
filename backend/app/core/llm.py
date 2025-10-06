@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # --- Configuration ---
 GOOGLE_API_KEY = os.environ.get("GOOGLE_GENAI_API_KEY")
 
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash" 
+DEFAULT_GEMINI_MODEL = "gemini-2.0-flash" 
 DEFAULT_GEMMA_LOCAL_MODEL = "gemma-3-12b-it-gguf"
 
 # Configure Gemini client (do this once at module load)
@@ -78,7 +78,7 @@ def _convert_history_for_gemini(history: List[Dict[str, str]]) -> List[content_t
 async def generate_gemini_response(
     history: List[Dict[str, str]],
     model: str = DEFAULT_GEMINI_MODEL,
-    max_tokens: int = 512,
+    max_tokens: int = 2048,
     temperature: float = 0.7,
     system_prompt: Optional[str] = None # Add system prompt handling
 ) -> str:
@@ -189,7 +189,7 @@ async def generate_gemini_response(
 async def stream_gemini_response(
     history: List[Dict[str, str]],
     model: str = DEFAULT_GEMINI_MODEL,
-    max_tokens: int = 512,
+    max_tokens: int = 2048,
     temperature: float = 0.7,
     system_prompt: Optional[str] = None,
 ) -> AsyncIterator[str]:
@@ -256,7 +256,7 @@ async def stream_gemini_response(
     try:
         if gemini_history:
             chat_session = gemini_model.start_chat(history=gemini_history)
-            stream = chat_session.send_message_async(
+            stream = await chat_session.send_message_async(
                 cast(
                     content_types.ContentDict,
                     {"role": "user", "parts": [_make_text_part(last_user_prompt)]},
@@ -266,7 +266,7 @@ async def stream_gemini_response(
                 stream=True,
             )
         else:
-            stream = gemini_model.generate_content_async(
+            stream = await gemini_model.generate_content_async(
                 [
                     cast(
                         content_types.ContentDict,
@@ -303,7 +303,7 @@ async def stream_gemini_response(
 async def generate_gemma_local_response(
     history: List[Dict[str, str]],
     model: str = DEFAULT_GEMMA_LOCAL_MODEL, # Model name is for logging
-    max_tokens: int = 512,
+    max_tokens: int = 2048,
     temperature: float = 0.7,
     system_prompt: Optional[str] = None
 ) -> str:
@@ -361,7 +361,7 @@ async def generate_gemma_local_response(
 async def generate_response(
     history: List[Dict[str, str]],
     model: Optional[str] = None,
-    max_tokens: int = 512,
+    max_tokens: int = 2048,
     temperature: float = 0.7,
     system_prompt: Optional[str] = None # Pass system prompt through
 ) -> str:

@@ -53,7 +53,7 @@ Keep the reflection concise (1-2 sentences).
                 history=history,
                 model="gemini_google",
                 system_prompt=system_prompt_for_reflection,
-                max_tokens=150, # Adjust as needed
+                max_tokens=512, # Adjust as needed
                 temperature=0.5 # Lower temperature for more focused, less "creative" reflections
             )
 

@@ -77,7 +77,7 @@ const DeviceSelector = () => {
         >
           {voices.length > 0 ? (
             voices.map((voice) => (
-              <option key={voice.voiceURI} value={voice.voiceURI} className="bg-gray-800">
+              <option key={`${voice.voiceURI}-${voice.name}`} value={voice.voiceURI} className="bg-gray-800">
                 {voice.name} ({voice.lang})
               </option>
             ))

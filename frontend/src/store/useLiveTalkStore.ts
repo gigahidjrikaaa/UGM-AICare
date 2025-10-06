@@ -1,4 +1,4 @@
-﻿import { create } from 'zustand';
+import { create } from 'zustand';
 
 interface MediaDevice {
   deviceId: string;
@@ -83,7 +83,34 @@ export const useLiveTalkStore = create<LiveTalkState>((set) => ({
   addMessage: (message) => set((state) => ({ conversation: [...state.conversation, message] })),
   setMicrophones: (devices) => set({ microphones: devices }),
   setSpeakers: (devices) => set({ speakers: devices }),
-  setVoices: (voices) => set({ voices }),
+  setVoices: (voices) => set((state) => {
+    const deduped: SpeechSynthesisVoice[] = [];
+    const seen = new Set<string>();
+    voices.forEach((voice) => {
+      const key = `${voice.voiceURI}|${voice.name}`;
+      if (!seen.has(key)) {
+        seen.add(key);
+        deduped.push(voice);
+      }
+    });
+
+    const toLower = (value: string | undefined) => (value ? value.toLowerCase() : "");
+    const isIndonesian = (voice: SpeechSynthesisVoice) => toLower(voice.lang).startsWith("id");
+    const isFemale = (voice: SpeechSynthesisVoice) => /female|wanita|perempuan|girl|cewe/i.test(voice.name);
+
+    const preferredVoice = deduped.find((voice) => isIndonesian(voice) && isFemale(voice))
+      || deduped.find((voice) => isIndonesian(voice));
+
+    const currentSelectionStillValid = state.selectedVoice
+      ? deduped.some((voice) => voice.voiceURI === state.selectedVoice)
+      : false;
+
+    const nextSelected = currentSelectionStillValid
+      ? state.selectedVoice
+      : preferredVoice?.voiceURI || deduped[0]?.voiceURI || null;
+
+    return { voices: deduped, selectedVoice: nextSelected };
+  }),
   setSelectedMicrophone: (deviceId) => set({ selectedMicrophone: deviceId }),
   setSelectedSpeaker: (deviceId) => set({ selectedSpeaker: deviceId }),
   setSelectedVoice: (voiceURI) => set({ selectedVoice: voiceURI }),
@@ -137,3 +164,4 @@ export const useLiveTalkStore = create<LiveTalkState>((set) => ({
   }),
   resetTranscripts: () => set({ transcriptSegments: [] }),
 }));
+

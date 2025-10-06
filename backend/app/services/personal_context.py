@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Tuple
 import asyncio
 
-from sqlalchemy import select, func
+from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Appointment, JournalEntry, User, UserSummary
@@ -174,3 +174,40 @@ async def _compute_personal_context(db: AsyncSession, user: User) -> str:
     if context:
         context += "\n\nGunakan konteks ini untuk menyesuaikan respons tanpa menyebutkan bahwa kamu menerima ringkasan ini."
     return context
+
+
+async def fetch_relevant_journal_entries(
+    db: AsyncSession,
+    user_id: int,
+    query_text: str,
+    limit: int = 3,
+) -> List[str]:
+    """Return journal snippets that appear relevant to the current user query."""
+
+    keywords = {
+        word.lower()
+        for word in query_text.split()
+        if len(word) >= 4 and word.isalpha()
+    }
+
+    stmt = select(JournalEntry.entry_date, JournalEntry.content).where(JournalEntry.user_id == user_id)
+
+    if keywords:
+        like_clauses = [JournalEntry.content.ilike(f"%{kw}%") for kw in keywords]
+        stmt = stmt.where(or_(*like_clauses))
+
+    stmt = stmt.order_by(JournalEntry.entry_date.desc()).limit(limit)
+
+    result = await db.execute(stmt)
+    rows = result.all()
+    snippets: List[str] = []
+    for entry_date, content in rows:
+        if not content:
+            continue
+        cleaned = content.replace("\n", " ").strip()
+        if len(cleaned) > 260:
+            cleaned = cleaned[:257].rstrip() + "..."
+        formatted_date = entry_date.strftime("%d %b %Y") if entry_date else "Tidak diketahui"
+        snippets.append(f"[{formatted_date}] {cleaned}")
+
+    return snippets

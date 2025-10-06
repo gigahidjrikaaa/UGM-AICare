@@ -83,7 +83,7 @@ async def interpret_question_to_spec(question: str) -> AnalyticsQuerySpec:
         {'role':'user','content':f"Question: {q}\nReturn JSON now."}
     ]
     try:
-        resp = await generate_gemini_response(history, temperature=0.1, max_tokens=256)
+        resp = await generate_gemini_response(history, temperature=0.1, max_tokens=1024)
         # Attempt to parse JSON strictly
         import json
         start = resp.find('{')
@@ -215,7 +215,7 @@ async def explain_analytics_result(result: AnalyticsRunResult) -> AnalyticsRunRe
         {'role':'user','content':user_prompt}
     ]
     try:
-        resp = await generate_gemini_response(history, temperature=0.2, max_tokens=220)
+        resp = await generate_gemini_response(history, temperature=0.2, max_tokens=1024)
         result.answer = resp
     except Exception as e:
         logger.warning(f"LLM explanation failed: {e}")

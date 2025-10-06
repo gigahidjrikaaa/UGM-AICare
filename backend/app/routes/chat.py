@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import asyncio
 import json
 import logging
 from datetime import datetime
@@ -10,7 +9,6 @@ from typing import Any, Callable, Dict, List, Optional, cast
 
 from fastapi import (
     APIRouter,
-    BackgroundTasks,
     Body,
     Depends,
     HTTPException,
@@ -83,7 +81,11 @@ async def _streaming_llm_responder(
         # Fallback to default behaviour if no callback is provided.
         return await _default_llm_responder(history, system_prompt, request, None)
 
-    model_name = request.model or "gemini_google"
+    requested_model = request.model or "gemini_google"
+    if requested_model == "gemini_google":
+        model_name = getattr(llm, "DEFAULT_GEMINI_MODEL", "gemini-2.0-flash")
+    else:
+        model_name = requested_model
     full_text = ""
     async for chunk in llm.stream_gemini_response(
         history=history,
@@ -105,7 +107,6 @@ async def _streaming_llm_responder(
 @router.post("/chat", response_model=ChatResponse)
 async def handle_chat_request(
     request: ChatRequest = Body(...),
-    background_tasks: BackgroundTasks = BackgroundTasks(),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_db),
 ) -> ChatResponse:
@@ -117,9 +118,6 @@ async def handle_chat_request(
     try:
         personal_context = await build_user_personal_context(db, current_user)
         active_system_prompt = _compose_system_prompt(request.system_prompt, personal_context)
-
-        def schedule_summary(user_id: int, previous_session_id: str) -> None:
-            background_tasks.add_task(summarize_and_save, user_id, previous_session_id)
 
         if request.event:
             result = await process_chat_event(
@@ -138,7 +136,8 @@ async def handle_chat_request(
                 session_id=session_id,
                 conversation_id=conversation_id,
                 active_system_prompt=active_system_prompt,
-                schedule_summary=schedule_summary,
+                schedule_summary=None,
+                summarize_now=summarize_and_save,
                 llm_responder=_default_llm_responder,
             )
         else:
@@ -231,9 +230,6 @@ async def chat_ws(
             personal_context = await build_user_personal_context(db, user)
             active_system_prompt = _compose_system_prompt(chat_request.system_prompt, personal_context)
 
-            def schedule_summary(user_id: int, previous_session_id: str) -> None:
-                asyncio.create_task(summarize_and_save(user_id, previous_session_id))
-
             if chat_request.event:
                 result = await process_chat_event(
                     request=chat_request,
@@ -272,7 +268,8 @@ async def chat_ws(
                     session_id=session_id,
                     conversation_id=conversation_id,
                     active_system_prompt=active_system_prompt,
-                    schedule_summary=schedule_summary,
+                    schedule_summary=None,
+                    summarize_now=summarize_and_save,
                     llm_responder=_streaming_llm_responder,
                     stream_callback=stream_callback,
                 )
@@ -369,7 +366,7 @@ Ringkasan singkat dan kasual:"""
             summary_text = await llm.generate_response(
                 history=summary_llm_history,
                 model="gemini_google",
-                max_tokens=1024,
+                max_tokens=2048,
                 temperature=0.5,
             )
 
