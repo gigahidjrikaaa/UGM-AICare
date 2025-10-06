@@ -9,6 +9,11 @@ Memory Strategy:
 - Chat processing adds minimal hints and system prompts
 - Tools fetch detailed summaries, journals, and conversation history when needed
 - This prevents redundant data loading and reduces token usage
+
+Agent Integration:
+- STA (Safety Triage Agent) analyzes messages for risk in the background
+- SCA (Support Coach Agent) generates intervention plans when appropriate
+- Agents work alongside Aika without blocking or replacing conversational flow
 """
 from __future__ import annotations
 
@@ -29,7 +34,7 @@ from app.core.cbt_module_logic import (
 from app.core.cbt_module_types import CBTModuleData
 from app.core.memory import clear_module_state, get_module_state, set_module_state
 from app.models import Conversation, User, UserSummary
-from app.schemas.chat import ChatRequest
+from app.schemas.chat import ChatRequest, InterventionPlan
 from app.services.personal_context import fetch_relevant_journal_entries
 
 logger = logging.getLogger(__name__)
@@ -42,6 +47,7 @@ class ChatTurnResult:
     provider_used: str
     model_used: str
     module_completed_id: Optional[str] = None
+    intervention_plan: Optional[InterventionPlan] = None
 
 
 # Callback signatures -------------------------------------------------------
@@ -265,6 +271,60 @@ async def process_chat_message(
         response=aika_response_text,
     )
 
+    # Agent Integration: Analyze message and potentially generate intervention plan
+    intervention_plan: Optional[InterventionPlan] = None
+    try:
+        from app.services.agent_integration import AgentIntegrationService
+        
+        agent_service = AgentIntegrationService(db)
+        agent_result = await agent_service.analyze_and_intervene(
+            user_id=user_id,
+            session_id=session_id,
+            user_message=user_message_content,
+            consent_followup=True,  # Default to True; can be made configurable
+            enable_sta=True,  # Enable safety triage analysis
+            enable_sca=True,  # Enable support coach interventions
+        )
+        
+        if agent_result.should_intervene and agent_result.intervention_plan:
+            logger.info(
+                "Agent intervention triggered - User: %s, Reason: %s",
+                user_id,
+                agent_result.intervention_reason,
+            )
+            # Convert SCA response to InterventionPlan schema
+            plan_steps_dict = [
+                {
+                    "id": step.id,
+                    "label": step.label,
+                    "duration_min": step.duration_min,
+                }
+                for step in agent_result.intervention_plan.plan_steps
+            ]
+            resource_cards_dict = [
+                {
+                    "resource_id": card.resource_id,
+                    "title": card.title,
+                    "summary": card.summary,
+                    "url": card.url,
+                }
+                for card in agent_result.intervention_plan.resource_cards
+            ]
+            intervention_plan = InterventionPlan(
+                plan_steps=plan_steps_dict,
+                resource_cards=resource_cards_dict,
+                next_check_in=agent_result.intervention_plan.next_check_in.isoformat() if agent_result.intervention_plan.next_check_in else None,
+                intervention_reason=agent_result.intervention_reason,
+            )
+    except Exception as agent_error:
+        # Don't block chat flow if agent integration fails
+        logger.error(
+            "Agent integration failed for user %s: %s",
+            user_id,
+            agent_error,
+            exc_info=True,
+        )
+
     final_history = _build_final_history(
         request_history=request.history,
         user_message=user_message_content,
@@ -278,6 +338,7 @@ async def process_chat_message(
         final_history=final_history,
         provider_used=str(provider_used),
         model_used=str(model_used),
+        intervention_plan=intervention_plan,
     )
 
 

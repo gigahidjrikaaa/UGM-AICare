@@ -10,6 +10,7 @@ import { motion, Variants } from 'framer-motion';
 import { LoadingDots } from '@/components/ui/LoadingDots';
 import { useEffect } from 'react';
 import { useLiveTalkStore } from '@/store/useLiveTalkStore';
+import { InterventionPlan } from './InterventionPlan';
 
 interface MessageBubbleProps {
   message: Message;
@@ -123,6 +124,14 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         )}>
           {renderBubbleContent()}
         </div>
+        
+        {/* Intervention Plan Display */}
+        {!isUser && message.interventionPlan && !message.isLoading && (
+          <div className="max-w-xs md:max-w-md lg:max-w-lg mt-2">
+            <InterventionPlan plan={message.interventionPlan} />
+          </div>
+        )}
+        
         {!message.isLoading && (
           <div className={cn(
             'mt-1 text-[10px]',

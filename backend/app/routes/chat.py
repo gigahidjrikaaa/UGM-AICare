@@ -272,6 +272,7 @@ async def handle_chat_request(
             model_used=result.model_used,
             history=result.final_history,
             module_completed_id=result.module_completed_id,
+            intervention_plan=result.intervention_plan,
         )
 
     except ValueError as exc:
@@ -423,6 +424,7 @@ async def chat_ws(
                     "provider": result.provider_used,
                     "model": result.model_used,
                     "moduleCompletedId": result.module_completed_id,
+                    "interventionPlan": result.intervention_plan.model_dump() if result.intervention_plan else None,
                     "sessionId": session_id,
                     "conversationId": conversation_id,
                 }

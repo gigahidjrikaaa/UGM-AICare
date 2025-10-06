@@ -6,7 +6,7 @@ import { useChatSession } from './useChatSession';
 import { useChatMessages } from './useChatMessages';
 import { useChatApi, DEFAULT_SYSTEM_PROMPT } from './useChatApi';
 import { useChatStream } from './useChatStream';
-import type { Message, ChatMode, AvailableModule, ApiMessage, ChatEventPayload, ChatRequestPayload } from '@/types/chat';
+import type { Message, ChatMode, AvailableModule, ApiMessage, ChatEventPayload, ChatRequestPayload, InterventionPlan } from '@/types/chat';
 import { v4 as uuidv4 } from 'uuid';
 
 const UPDATED_AVAILABLE_MODULES: AvailableModule[] = [
@@ -183,7 +183,24 @@ export function useChat({ model }: { model: string }) {
           cleanedResponse = cleanedResponse.replace(toolIndicatorMatch[0], '').trim();
         }
         
+        // Handle intervention plan if present
+        const interventionPlan = event.interventionPlan as InterventionPlan | undefined;
+        
         finalizeStreamingAssistantMessage(streamMessageId, cleanedResponse);
+        
+        // Update message with intervention plan if provided
+        if (interventionPlan) {
+          setMessages((prev) =>
+            prev.map((msg) =>
+              msg.id === streamMessageId
+                ? {
+                    ...msg,
+                    interventionPlan,
+                  }
+                : msg,
+            ),
+          );
+        }
       },
       onError: (messageText) => {
         // Log the streaming error for diagnostics (do not expose stack traces or sensitive details to users)

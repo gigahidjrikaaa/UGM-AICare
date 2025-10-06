@@ -24,6 +24,7 @@ from app.routes import (
     cbt_modules,
     safety_triage,
     clinical_analytics_routes,
+    system,
 )
 from app.agents.sta.router import router as sta_router
 from app.agents.sca.router import router as sca_router
@@ -154,6 +155,7 @@ app.include_router(admin.router)  # Admin endpoints
 app.include_router(agents.router)
 app.include_router(agents_command.router)
 app.include_router(safety_triage.router)
+app.include_router(system.router)  # System diagnostics endpoints
 # TODO: wire new agent routers once services are implemented
 app.include_router(sta_router)
 app.include_router(sca_router)

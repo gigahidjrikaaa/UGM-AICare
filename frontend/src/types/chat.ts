@@ -1,4 +1,24 @@
 // src/types/chat.ts
+export interface PlanStep {
+  id: string;
+  label: string;
+  duration_min?: number;
+}
+
+export interface ResourceCard {
+  resource_id: string;
+  title: string;
+  summary: string;
+  url?: string;
+}
+
+export interface InterventionPlan {
+  plan_steps: PlanStep[];
+  resource_cards: ResourceCard[];
+  next_check_in?: string; // ISO datetime string
+  intervention_reason?: string;
+}
+
 export interface Message {
   id: string;
   conversation_id: string;
@@ -14,7 +34,8 @@ export interface Message {
   annotations?: unknown[]; // Or a more specific type if annotations have a defined structure
   run_id?: string;
   metadata?: Record<string, unknown>; // To store things like module_id for event messages
-  timestamp: Date
+  timestamp: Date;
+  interventionPlan?: InterventionPlan; // SCA-generated support plan
 }
 
 export type ChatMode = 'standard' | 'summarize' | 'rag' | `module:${string}`; // Example
