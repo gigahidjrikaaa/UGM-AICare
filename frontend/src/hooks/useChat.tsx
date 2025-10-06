@@ -145,6 +145,9 @@ export function useChat({ model }: { model: string }) {
         finalizeStreamingAssistantMessage(streamMessageId, finalResponse);
       },
       onError: (messageText) => {
+        // Log the streaming error for diagnostics (do not expose stack traces or sensitive details to users)
+        // This uses the parameter so the linter won't report it as unused.
+        console.error('Chat streaming error:', messageText);
         void fallbackToRest();
       },
     });
