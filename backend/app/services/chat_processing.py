@@ -1,6 +1,18 @@
-"""Shared chat processing helpers for REST and streaming endpoints."""
+"""
+Shared chat processing helpers for REST and streaming endpoints.
+
+This module provides lightweight memory context and delegates detailed data
+retrieval to the tool calling system (get_conversation_summaries, get_journal_entries, etc.).
+
+Memory Strategy:
+- Personal context provides lightweight baseline info (see personal_context.py)
+- Chat processing adds minimal hints and system prompts
+- Tools fetch detailed summaries, journals, and conversation history when needed
+- This prevents redundant data loading and reduces token usage
+"""
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 import re
@@ -19,6 +31,8 @@ from app.core.memory import clear_module_state, get_module_state, set_module_sta
 from app.models import Conversation, User, UserSummary
 from app.schemas.chat import ChatRequest
 from app.services.personal_context import fetch_relevant_journal_entries
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -165,43 +179,10 @@ async def process_chat_message(
             module_completed_id=module_completed_id,
         )
 
+    # Memory queries are now handled by get_conversation_summaries tool
+    # Let the LLM + tools handle these naturally instead of hardcoded responses
     if _is_memory_query(user_message_content):
-        latest_summary = await _fetch_latest_summary(db, user_id)
-        if latest_summary:
-            summary_snippet = _clean_summary_prefix(latest_summary.summary_text)
-            aika_response_text = (
-                "Tentu, aku ingat percakapan kita sebelumnya. "
-                f"Secara garis besar, kita sempat membahas tentang {summary_snippet}. "
-                "Ada yang ingin kamu diskusikan lebih lanjut dari situ, atau ada hal baru yang ingin kamu ceritakan hari ini?"
-            )
-        else:
-            aika_response_text = (
-                "Sepertinya ini percakapan pertama kita, atau aku belum punya ringkasan dari obrolan kita sebelumnya untuk diingat. "
-                "Ada yang ingin kamu ceritakan untuk memulai?"
-            )
-
-        await _persist_conversation(
-            db,
-            user_id=user_id,
-            session_id=session_id,
-            conversation_id=conversation_id,
-            message=user_message_content,
-            response=aika_response_text,
-        )
-
-        final_history = _build_final_history(
-            request_history=request.history,
-            user_message=user_message_content,
-            assistant_message=aika_response_text,
-        )
-        provider_used = "system_direct_response"
-        model_used = "memory_retrieval"
-        return ChatTurnResult(
-            response_text=aika_response_text,
-            final_history=final_history,
-            provider_used=provider_used,
-            model_used=model_used,
-        )
+        logger.info("Memory query detected for user %s - will be handled by tools", user_id)
 
     history_for_llm_call = list(history_from_request_api_messages)
 
@@ -211,6 +192,12 @@ async def process_chat_message(
         session_id=session_id,
         conversation_id=conversation_id,
     )
+    
+    # Debug logging for memory system
+    logger.info(
+        "Memory Debug - User: %s, Session: %s, IsNewContext: %s, PreviousSession: %s",
+        user_id, session_id, is_new_context, previous_session_id
+    )
 
     if previous_session_id:
         if summarize_now:
@@ -218,41 +205,34 @@ async def process_chat_message(
         elif schedule_summary:
             schedule_summary(user_id, previous_session_id)
 
+    # With tool calling enabled, we rely on tools to fetch summaries when needed
+    # Only add a lightweight hint for new sessions
     if is_new_context:
-        past_summary = await _fetch_latest_summary(db, user_id)
-        if past_summary and getattr(past_summary, "summary_text", None):
-            summary_injection_text = (
-                "Untuk membantumu mengingat, ini ringkasan singkat dari percakapan kita sebelumnya:\n"
-                f"{past_summary.summary_text}\n"
-                "--- Akhir dari ringkasan ---\n\nSekarang, mari kita lanjutkan. Ada apa?"
-            )
-            summary_message = {"role": "system", "content": summary_injection_text}
-            temp_history: List[Dict[str, str]] = []
-            if active_system_prompt:
-                temp_history.append({"role": "system", "content": active_system_prompt})
-            temp_history.append(summary_message)
-            temp_history.extend(history_for_llm_call)
-            history_for_llm_call = temp_history
-        elif active_system_prompt:
+        logger.info("Memory Debug - New session context for user %s", user_id)
+        # Add system prompt if not already present
+        if active_system_prompt and not any(h["role"] == "system" for h in history_for_llm_call):
             history_for_llm_call.insert(0, {"role": "system", "content": active_system_prompt})
     elif active_system_prompt and not any(h["role"] == "system" for h in history_for_llm_call):
         history_for_llm_call.insert(0, {"role": "system", "content": active_system_prompt})
 
+    # With tool calling, journal entries are fetched via get_journal_entries tool
+    # We only provide lightweight context for immediate relevance
     journal_context_messages: List[Dict[str, str]] = []
-    if _mentions_journal(user_message_content):
-        journal_entries = await fetch_relevant_journal_entries(db, user_id, user_message_content)
-        if journal_entries:
-            formatted_entries = "\n".join(f"- {entry}" for entry in journal_entries)
-            journal_context_messages.append(
-                {
-                    "role": "system",
-                    "content": (
-                        "Referensi catatan jurnal yang mungkin relevan dengan pertanyaanmu:\n"
-                        f"{formatted_entries}\n"
-                        "Gunakan informasi ini dengan empati tanpa membocorkan sumbernya secara eksplisit."
-                    ),
-                }
-            )
+    
+    # Check if user explicitly mentions journals
+    journal_keywords = ["jurnal", "catatan", "menulis", "wrote", "journal"]
+    mentions_journal = any(keyword in user_message_content.lower() for keyword in journal_keywords)
+    
+    if mentions_journal:
+        # Provide a hint that journal data is available via tools
+        journal_context_messages.append({
+            "role": "system",
+            "content": (
+                "User menyebutkan jurnal. Gunakan get_journal_entries tool untuk mengakses "
+                "catatan jurnal mereka dengan pencarian kata kunci jika diperlukan."
+            ),
+        })
+        logger.info("Memory Debug - Journal mention detected, tool hint added for user %s", user_id)
 
     if journal_context_messages:
         history_for_llm_call.extend(journal_context_messages)
@@ -369,6 +349,10 @@ async def _detect_session_change(
 
 
 async def _fetch_latest_summary(db: AsyncSession, user_id: int) -> Optional[UserSummary]:
+    """
+    DEPRECATED: Use get_conversation_summaries tool instead.
+    Kept for backwards compatibility only.
+    """
     stmt = (
         select(UserSummary)
         .where(UserSummary.user_id == user_id)
@@ -379,6 +363,10 @@ async def _fetch_latest_summary(db: AsyncSession, user_id: int) -> Optional[User
 
 
 def _clean_summary_prefix(summary: str) -> str:
+    """
+    DEPRECATED: No longer needed with tool calling system.
+    Kept for backwards compatibility only.
+    """
     prefixes = [
         "poin-poin utama:",
         "poin utama:",
@@ -394,6 +382,7 @@ def _clean_summary_prefix(summary: str) -> str:
 
 
 _memory_patterns: Iterable[re.Pattern[str]] = [
+    # Indonesian patterns
     re.compile(
         r"(ingat|inget|remember)\s*(?:lagi|kah|kan|dong|ga|gak|nggak)?\s*(?:tentang|soal|mengenai|apa)?\s*(?:percakapan|obrolan|diskusi|pembicaraan|sesi|chat|history|summary|ringkasan|resume|resume kita|resume obrolan|resume percakapan)\s*(?:kita|sebelumnya|kemarin|terakhir|our|last|previous)?",
         re.IGNORECASE,
@@ -406,10 +395,25 @@ _memory_patterns: Iterable[re.Pattern[str]] = [
         r"apa\s*(?:lagi)?\s*(?:sih|ya)?\s*(?:yang|yg)\s*(?:pernah|sempat|udah|sudah)?\s*(?:kita|we)\s*(?:bahas|bicarakan|diskusikan|obrolin|omongin|talked\s+about|discussed)",
         re.IGNORECASE,
     ),
+    # Simple patterns
     re.compile(r"ingat\s+obrolan\s+kita", re.IGNORECASE),
     re.compile(r"ingat\s+percakapan\s+kita", re.IGNORECASE),
     re.compile(r"kamu\s+inget\s+gak", re.IGNORECASE),
     re.compile(r"do\s+you\s+remember", re.IGNORECASE),
+    
+    # Additional common patterns
+    re.compile(r"\b(?:ada\s+)?(?:riwayat|history|rekam|catatan)\s*(?:chat|obrolan|percakapan)", re.IGNORECASE),
+    re.compile(r"(?:bagaimana|gimana)\s*(?:dengan)?\s*(?:obrolan|percakapan)\s*(?:sebelumnya|kemarin|terakhir)", re.IGNORECASE),
+    re.compile(r"(?:lanjut|sambung|continue)\s*(?:dari)?\s*(?:obrolan|percakapan|diskusi)\s*(?:sebelumnya|kemarin|terakhir)", re.IGNORECASE),
+    re.compile(r"apa\s*(?:yang)?\s*(?:pernah|sudah|udah)\s*(?:kita|aku|saya)\s*(?:bahas|cerita|diskusi)", re.IGNORECASE),
+    
+    # Context reference patterns
+    re.compile(r"seperti\s*(?:yang)?\s*(?:pernah|sudah|udah)\s*(?:kita|aku|saya)\s*(?:bahas|cerita)", re.IGNORECASE),
+    re.compile(r"kayak\s*(?:yang)?\s*(?:kemarin|sebelumnya|dulu)", re.IGNORECASE),
+    
+    # Memory-related keywords
+    re.compile(r"\b(?:masih\s+)?(?:ingat|inget)\b", re.IGNORECASE),
+    re.compile(r"\b(?:ada\s+)?(?:konteks|context)\b", re.IGNORECASE),
 ]
 
 

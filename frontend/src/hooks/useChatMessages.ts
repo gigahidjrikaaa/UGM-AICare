@@ -138,6 +138,20 @@ export function useChatMessages(initialMessages: Message[] = []) {
     setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
   }, []);
 
+  const updateMessageToolIndicator = useCallback((messageId: string, toolIndicator: string) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId
+          ? {
+              ...msg,
+              toolIndicator,
+              updated_at: new Date().toISOString(),
+            }
+          : msg,
+      ),
+    );
+  }, []);
+
   return {
     messages,
     setMessages,
@@ -148,5 +162,6 @@ export function useChatMessages(initialMessages: Message[] = []) {
     finalizeStreamingAssistantMessage,
     failStreamingAssistantMessage,
     removeMessageById,
+    updateMessageToolIndicator,
   };
 }

@@ -74,8 +74,15 @@ export function MessageBubble({ message }: MessageBubbleProps) {
   const renderBubbleContent = () => {
     if (message.isLoading) {
       return (
-        <div className="flex items-center justify-start h-full px-3.5 py-2.5 text-ugm-blue-dark">
-          <LoadingDots text="Aika sedang mengetik..." />
+        <div className="flex flex-col gap-2">
+          {message.toolIndicator && (
+            <div className="text-[10px] text-ugm-blue/70 italic px-1 py-0.5 bg-ugm-gold/10 rounded border border-ugm-gold/20 w-fit">
+              {message.toolIndicator}
+            </div>
+          )}
+          <div className="flex items-center justify-start h-full px-3.5 py-2.5 text-ugm-blue-dark">
+            <LoadingDots text="Aika sedang mengetik..." />
+          </div>
         </div>
       );
     }

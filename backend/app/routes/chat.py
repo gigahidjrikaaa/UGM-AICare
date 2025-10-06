@@ -22,6 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import auth_utils
 from app.core import llm
+from app.core.tools import get_aika_tools
 from app.database import get_async_db
 from app.dependencies import get_current_active_user
 from app.models import Conversation, User, UserSummary
@@ -34,12 +35,13 @@ from app.services.personal_context import (
     build_user_personal_context,
     invalidate_user_personal_context,
 )
+from app.services.tool_calling import generate_with_tools
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["Chat"])
 
-MIN_TURNS_FOR_SUMMARY = 2
+MIN_TURNS_FOR_SUMMARY = 1  # Reduced from 2 to 1 for better memory capture
 MAX_HISTORY_CHARS_FOR_SUMMARY = 15000
 
 
@@ -61,6 +63,7 @@ async def _default_llm_responder(
     request: ChatRequest,
     _stream_callback: Optional[Callable[[str], Any]] = None,
 ) -> str:
+    """Default LLM responder without tool calling."""
     model_name = request.model or "gemini_google"
     return await llm.generate_response(
         history=history,
@@ -71,12 +74,57 @@ async def _default_llm_responder(
     )
 
 
+async def _tool_aware_llm_responder(
+    history: List[Dict[str, str]],
+    system_prompt: Optional[str],
+    request: ChatRequest,
+    db: AsyncSession,
+    user_id: int,
+    stream_callback: Optional[Callable[[str], Any]] = None,
+) -> str:
+    """LLM responder with tool calling capabilities.
+    
+    This responder enables Aika to actively query the database for:
+    - Conversation summaries from previous sessions
+    - Journal entries with optional keyword search
+    - Detailed conversation context from specific sessions
+    
+    Args:
+        history: Conversation history
+        system_prompt: System instruction
+        request: Chat request configuration
+        db: Database session for tool execution
+        user_id: User ID for scoping tool queries
+        stream_callback: Optional callback for streaming
+        
+    Returns:
+        Generated response text
+    """
+    # Use the proper tool calling service
+    from app.services.tool_calling import generate_with_tools
+    
+    response_text, tool_calls = await generate_with_tools(
+        history=history,
+        system_prompt=system_prompt,
+        request=request,
+        db=db,
+        user_id=user_id,
+        stream_callback=stream_callback,
+    )
+    
+    if tool_calls:
+        logger.info(f"Tool calling completed with {len(tool_calls)} tool call(s)")
+    
+    return response_text
+
+
 async def _streaming_llm_responder(
     history: List[Dict[str, str]],
     system_prompt: Optional[str],
     request: ChatRequest,
     stream_callback: Optional[Callable[[str], Any]] = None,
 ) -> str:
+    """Streaming LLM responder without tool calling."""
     if stream_callback is None:
         # Fallback to default behaviour if no callback is provided.
         return await _default_llm_responder(history, system_prompt, request, None)
@@ -104,13 +152,70 @@ async def _streaming_llm_responder(
     return full_text
 
 
+async def _streaming_tool_aware_llm_responder(
+    history: List[Dict[str, str]],
+    system_prompt: Optional[str],
+    request: ChatRequest,
+    db: AsyncSession,
+    user_id: int,
+    stream_callback: Optional[Callable[[str], Any]] = None,
+) -> str:
+    """Streaming LLM responder with tool calling capabilities.
+    
+    Note: Tool calling in streaming mode is complex. This implementation
+    enables tools but may need enhancements for full tool calling loop support.
+    
+    Args:
+        history: Conversation history
+        system_prompt: System instruction
+        request: Chat request configuration
+        db: Database session for tool execution
+        user_id: User ID for scoping tool queries
+        stream_callback: Callback for streaming chunks
+        
+    Returns:
+        Complete response text
+    """
+    if stream_callback is None:
+        # Fallback to non-streaming tool-aware responder
+        return await _tool_aware_llm_responder(history, system_prompt, request, db, user_id, None)
+
+    # Use the proper tool calling service with streaming
+    from app.services.tool_calling import generate_with_tools
+    
+    response_text, tool_calls = await generate_with_tools(
+        history=history,
+        system_prompt=system_prompt,
+        request=request,
+        db=db,
+        user_id=user_id,
+        stream_callback=stream_callback,
+    )
+    
+    if tool_calls:
+        logger.info(f"Streaming with tools completed, {len(tool_calls)} tool call(s)")
+    
+    return response_text
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def handle_chat_request(
     request: ChatRequest = Body(...),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_db),
+    enable_tools: bool = Query(default=True, description="Enable tool calling for memory access"),
 ) -> ChatResponse:
-    """Handle traditional REST chat requests."""
+    """Handle traditional REST chat requests.
+    
+    Args:
+        request: Chat request with message, history, and configuration
+        current_user: Authenticated user
+        db: Database session
+        enable_tools: Whether to enable tool calling (default: True)
+        
+    Returns:
+        ChatResponse with assistant's reply and updated history
+    """
 
     session_id = request.session_id
     conversation_id = request.conversation_id
@@ -118,6 +223,24 @@ async def handle_chat_request(
     try:
         personal_context = await build_user_personal_context(db, current_user)
         active_system_prompt = _compose_system_prompt(request.system_prompt, personal_context)
+
+        # Choose LLM responder based on tool enablement
+        if enable_tools:
+            # Create a closure that includes db and user_id for tool execution
+            async def tool_responder(hist, sysprompt, req, callback):
+                return await _tool_aware_llm_responder(
+                    history=hist,
+                    system_prompt=sysprompt,
+                    request=req,
+                    db=db,
+                    user_id=current_user.id,
+                    stream_callback=callback,
+                )
+            llm_responder = tool_responder
+            logger.info(f"Tool calling enabled for user {current_user.id}, session {session_id}")
+        else:
+            llm_responder = _default_llm_responder
+            logger.debug(f"Tool calling disabled for user {current_user.id}, session {session_id}")
 
         if request.event:
             result = await process_chat_event(
@@ -138,7 +261,7 @@ async def handle_chat_request(
                 active_system_prompt=active_system_prompt,
                 schedule_summary=None,
                 summarize_now=summarize_and_save,
-                llm_responder=_default_llm_responder,
+                llm_responder=llm_responder,
             )
         else:
             raise HTTPException(status_code=400, detail="Invalid request: Missing message or event payload")
@@ -260,6 +383,17 @@ async def chat_ws(
             async def stream_callback(chunk: str) -> None:
                 await emit_token(chunk, session_id=session_id, conversation_id=conversation_id)
 
+            # Use tool-aware streaming responder by default
+            async def tool_aware_streaming_responder(hist, sysprompt, req, callback):
+                return await _streaming_tool_aware_llm_responder(
+                    history=hist,
+                    system_prompt=sysprompt,
+                    request=req,
+                    db=db,
+                    user_id=user.id,
+                    stream_callback=callback,
+                )
+
             try:
                 result = await process_chat_message(
                     request=chat_request,
@@ -270,7 +404,7 @@ async def chat_ws(
                     active_system_prompt=active_system_prompt,
                     schedule_summary=None,
                     summarize_now=summarize_and_save,
-                    llm_responder=_streaming_llm_responder,
+                    llm_responder=tool_aware_streaming_responder,
                     stream_callback=stream_callback,
                 )
             except HTTPException as exc:

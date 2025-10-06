@@ -9,6 +9,7 @@ export interface Message {
   created_at: string;
   updated_at: string;
   isLoading?: boolean; // For UI state, not part of backend model
+  toolIndicator?: string; // For showing tool usage info
   feedback_id?: string;
   annotations?: unknown[]; // Or a more specific type if annotations have a defined structure
   run_id?: string;

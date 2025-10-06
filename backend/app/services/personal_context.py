@@ -119,6 +119,14 @@ async def invalidate_user_personal_context(user_id: int) -> None:
 
 
 async def _compute_personal_context(db: AsyncSession, user: User) -> str:
+    """Compute personal context for the user.
+    
+    Note: With tool calling enabled, this context serves as a base profile.
+    The LLM can actively query for more detailed information using tools:
+    - get_conversation_summaries: For past conversation details
+    - get_journal_entries: For journal content with search
+    - get_conversation_context: For specific session details
+    """
     profile_lines: List[str] = []
 
     name = _safe_decrypt(user.name) or _safe_decrypt(user.first_name)
@@ -146,33 +154,55 @@ async def _compute_personal_context(db: AsyncSession, user: User) -> str:
             "Pengguna mengizinkan check-in email" if user.allow_email_checkins else "Pengguna memilih tidak menerima check-in email"
         )
 
+    # Get a lightweight summary instead of detailed content
+    # (Tools can fetch detailed summaries when needed)
     latest_summary = await _get_latest_summary(db, user.id)
-    journal_highlights = await _get_recent_journal_highlights(db, user.id)
     upcoming_appointment = await _get_upcoming_appointment(db, user.id)
 
-    # Count total journal entries for quick reference
+    # Count total entries for quick reference
     total_journals_stmt = select(func.count(JournalEntry.id)).where(JournalEntry.user_id == user.id)
     total_journals = (await db.execute(total_journals_stmt)).scalar() or 0
+    
+    # Count total summaries for quick reference
+    total_summaries_stmt = select(func.count(UserSummary.id)).where(UserSummary.user_id == user.id)
+    total_summaries = (await db.execute(total_summaries_stmt)).scalar() or 0
 
     sections: List[str] = []
     if profile_lines:
         sections.append("Profil Pengguna:\n- " + "\n- ".join(profile_lines))
 
-    sections.append(f"Total catatan jurnal tersimpan: {total_journals}")
+    # Add quick stats
+    quick_stats = []
+    if total_journals > 0:
+        quick_stats.append(f"Total catatan jurnal: {total_journals}")
+    if total_summaries > 0:
+        quick_stats.append(f"Total ringkasan percakapan: {total_summaries}")
+    if quick_stats:
+        sections.append("Statistik:\n- " + "\n- ".join(quick_stats))
 
+    # Add lightweight summary (just the latest one)
     if latest_summary:
-        sections.append("Ringkasan percakapan terakhir:\n" + latest_summary)
-
-    if journal_highlights:
-        formatted_highlights = "\n".join(f"- {snippet}" for snippet in journal_highlights)
-        sections.append("Sorotan jurnal terbaru:\n" + formatted_highlights)
+        # Truncate if too long - tools can fetch full summaries
+        summary_preview = latest_summary[:200] + "..." if len(latest_summary) > 200 else latest_summary
+        sections.append(f"Ringkasan percakapan terakhir (preview):\n{summary_preview}")
 
     if upcoming_appointment:
         sections.append("Agenda bantuan profesional:\n" + upcoming_appointment)
 
     context = "\n\n".join(section.strip() for section in sections if section.strip())
+    
     if context:
-        context += "\n\nGunakan konteks ini untuk menyesuaikan respons tanpa menyebutkan bahwa kamu menerima ringkasan ini."
+        # Add tool usage guidance
+        context += (
+            "\n\n**Menggunakan Konteks:**"
+            "\n- Gunakan informasi ini sebagai dasar untuk personalisasi"
+            "\n- Jika perlu detail lebih, gunakan tools yang tersedia:"
+            "\n  * get_conversation_summaries: Untuk mengakses ringkasan percakapan sebelumnya"
+            "\n  * get_journal_entries: Untuk membaca catatan jurnal dengan pencarian kata kunci"
+            "\n  * get_conversation_context: Untuk melihat detail percakapan spesifik"
+            "\n- Integrasikan informasi dari tools secara natural tanpa menyebutkan sumbernya"
+        )
+    
     return context
 
 

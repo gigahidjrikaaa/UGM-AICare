@@ -80,9 +80,24 @@ async def generate_gemini_response(
     model: str = DEFAULT_GEMINI_MODEL,
     max_tokens: int = 2048,
     temperature: float = 0.7,
-    system_prompt: Optional[str] = None # Add system prompt handling
-) -> str:
-    """Generates a response using the Google Gemini API (async)."""
+    system_prompt: Optional[str] = None,  # Add system prompt handling
+    tools: Optional[List[Any]] = None,  # Add tools support
+    return_full_response: bool = False,  # Return full response object for tool calling
+) -> str | Any:
+    """Generates a response using the Google Gemini API (async).
+    
+    Args:
+        history: Conversation history with role and content
+        model: Gemini model to use
+        max_tokens: Maximum tokens in response
+        temperature: Sampling temperature
+        system_prompt: Optional system instruction
+        tools: Optional list of Tool objects for function calling
+        return_full_response: If True, returns full response object for tool calling
+        
+    Returns:
+        Generated response text, or full response object if return_full_response=True
+    """
     if not GOOGLE_API_KEY:
         # The warning during initial module load already indicated if the key was missing.
         # This check prevents proceeding if the key was definitely not provided.
@@ -90,7 +105,7 @@ async def generate_gemini_response(
         raise ValueError("Google API key not configured.")
 
     try:
-        logger.info(f"Sending request to Gemini API (Model: {model})")
+        logger.info(f"Sending request to Gemini API (Model: {model}, Tools: {bool(tools)})")
 
         # Handle system prompt - convert to structured content if provided
         gemini_model_args: Dict[str, Any] = {"model_name": model}
@@ -102,6 +117,11 @@ async def generate_gemini_response(
                     "parts": [_make_text_part(system_prompt)],
                 },
             )
+        
+        # Add tools if provided
+        if tools:
+            gemini_model_args["tools"] = tools
+            logger.debug(f"Enabled {len(tools)} tool(s) for this request")
 
         generative_model_cls = getattr(genai, "GenerativeModel", None)
         if generative_model_cls is None:
@@ -158,7 +178,11 @@ async def generate_gemini_response(
 
         # Handle potential blocks or errors (check response structure)
         try:
-            # Accessing response.text might raise ValueError if blocked
+            # If tools are enabled and caller wants full response, return it
+            if return_full_response:
+                return response
+            
+            # Accessing response.text might raise ValueError if blocked or if it's a function call
             response_text = response.text
             # logger.info("Received response from Gemini API.")
             # logger.info("System Prompt: " + system_prompt)
@@ -166,7 +190,20 @@ async def generate_gemini_response(
             # logger.info("Response: " + response_text.strip())
             return response_text.strip()
         except ValueError as e:
-            # This often indicates blocked content or unusual finish reason
+            # Check if this is a function call (not an error)
+            if response.candidates and len(response.candidates) > 0:
+                candidate = response.candidates[0]
+                if candidate.content and candidate.content.parts:
+                    for part in candidate.content.parts:
+                        if hasattr(part, 'function_call') and part.function_call:
+                            # This is a function call, not an error
+                            if return_full_response:
+                                return response
+                            # If not returning full response, this is unexpected
+                            logger.error("Function call received but return_full_response=False")
+                            return "Error: Function calling is not properly configured."
+            
+            # This is actually an error or blocked content
             logger.warning(f"Gemini response might be blocked or empty: {e}. Checking feedback/candidates.")
             if response.prompt_feedback and response.prompt_feedback.block_reason:
                  reason = response.prompt_feedback.block_reason.name
@@ -192,8 +229,21 @@ async def stream_gemini_response(
     max_tokens: int = 2048,
     temperature: float = 0.7,
     system_prompt: Optional[str] = None,
+    tools: Optional[List[Any]] = None,  # Add tools support
 ) -> AsyncIterator[str]:
-    """Yield response chunks from the Gemini API."""
+    """Yield response chunks from the Gemini API.
+    
+    Args:
+        history: Conversation history with role and content
+        model: Gemini model to use
+        max_tokens: Maximum tokens in response
+        temperature: Sampling temperature
+        system_prompt: Optional system instruction
+        tools: Optional list of Tool objects for function calling
+        
+    Yields:
+        Response text chunks
+    """
     if not GOOGLE_API_KEY:
         raise ValueError("Google API key not configured.")
 
@@ -210,6 +260,11 @@ async def stream_gemini_response(
                 "parts": [_make_text_part(system_prompt)],
             },
         )
+    
+    # Add tools if provided
+    if tools:
+        gemini_model_args["tools"] = tools
+        logger.debug(f"Enabled {len(tools)} tool(s) for streaming request")
 
     gemini_model = generative_model_cls(**gemini_model_args)
 
@@ -291,6 +346,7 @@ async def stream_gemini_response(
                 max_tokens=max_tokens,
                 temperature=temperature,
                 system_prompt=system_prompt,
+                tools=tools,  # Pass tools to fallback
             )
             if fallback:
                 yield fallback

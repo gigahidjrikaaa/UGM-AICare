@@ -52,6 +52,7 @@ export function useChat({ model }: { model: string }) {
     appendToStreamingAssistantMessage,
     finalizeStreamingAssistantMessage,
     removeMessageById,
+    updateMessageToolIndicator,
   } = useChatMessages();
   const { initialGreeting, isGreetingLoading } = useGreeting(messages);
   const { currentSessionId } = useChatSession();
@@ -125,6 +126,8 @@ export function useChat({ model }: { model: string }) {
     };
 
     const streamMessageId = startStreamingAssistantMessage(currentSessionId, activeConversationId);
+    let toolIndicatorDetected = false;
+    let accumulatedContent = '';
 
     const fallbackToRest = async () => {
       removeMessageById(streamMessageId);
@@ -138,11 +141,49 @@ export function useChat({ model }: { model: string }) {
 
     const streamingStarted = await startStreaming(streamingPayload, {
       onToken: (chunk) => {
-        appendToStreamingAssistantMessage(streamMessageId, String(chunk));
+        const chunkStr = String(chunk);
+        accumulatedContent += chunkStr;
+        
+        // Check if tool indicator is present (starts with 🔧)
+        if (!toolIndicatorDetected && accumulatedContent.includes('🔧')) {
+          const toolIndicatorMatch = accumulatedContent.match(/🔧\s*_([^_]+)_/);
+          if (toolIndicatorMatch) {
+            toolIndicatorDetected = true;
+            const toolIndicatorText = toolIndicatorMatch[0];
+            updateMessageToolIndicator(streamMessageId, toolIndicatorText);
+            
+            // Remove tool indicator from content
+            accumulatedContent = accumulatedContent.replace(toolIndicatorMatch[0], '').trim();
+            
+            // Update message content without the indicator
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === streamMessageId
+                  ? {
+                      ...msg,
+                      content: accumulatedContent,
+                      updated_at: new Date().toISOString(),
+                    }
+                  : msg,
+              ),
+            );
+            return;
+          }
+        }
+        
+        appendToStreamingAssistantMessage(streamMessageId, chunkStr);
       },
       onCompleted: (event) => {
         const finalResponse = typeof event.response === 'string' ? event.response : '';
-        finalizeStreamingAssistantMessage(streamMessageId, finalResponse);
+        
+        // Remove tool indicator from final response if present
+        let cleanedResponse = finalResponse;
+        const toolIndicatorMatch = cleanedResponse.match(/🔧\s*_([^_]+)_\n*/);
+        if (toolIndicatorMatch) {
+          cleanedResponse = cleanedResponse.replace(toolIndicatorMatch[0], '').trim();
+        }
+        
+        finalizeStreamingAssistantMessage(streamMessageId, cleanedResponse);
       },
       onError: (messageText) => {
         // Log the streaming error for diagnostics (do not expose stack traces or sensitive details to users)
@@ -169,6 +210,7 @@ export function useChat({ model }: { model: string }) {
     finalizeStreamingAssistantMessage,
     removeMessageById,
     startStreaming,
+    updateMessageToolIndicator,
   ]);
 
   const handleStartModule = useCallback(
