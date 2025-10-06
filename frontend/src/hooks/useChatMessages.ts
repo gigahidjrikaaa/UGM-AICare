@@ -67,5 +67,86 @@ export function useChatMessages(initialMessages: Message[] = []) {
     }
   }, []);
 
-  return { messages, setMessages, chatContainerRef, addAssistantChunksSequentially };
+  const startStreamingAssistantMessage = useCallback((
+    messageSessionId: string,
+    messageConversationId: string,
+  ) => {
+    const streamMessageId = uuidv4();
+    const timestamp = new Date();
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: streamMessageId,
+        role: 'assistant',
+        content: '',
+        timestamp,
+        isLoading: true,
+        session_id: messageSessionId,
+        conversation_id: messageConversationId,
+        created_at: timestamp.toISOString(),
+        updated_at: timestamp.toISOString(),
+      },
+    ]);
+    return streamMessageId;
+  }, []);
+
+  const appendToStreamingAssistantMessage = useCallback((messageId: string, chunk: string) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId
+          ? {
+              ...msg,
+              content: (msg.content || '') + chunk,
+              updated_at: new Date().toISOString(),
+            }
+          : msg,
+      ),
+    );
+  }, []);
+
+  const finalizeStreamingAssistantMessage = useCallback((messageId: string, finalContent?: string) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId
+          ? {
+              ...msg,
+              content: typeof finalContent === 'string' ? finalContent : msg.content,
+              isLoading: false,
+              updated_at: new Date().toISOString(),
+            }
+          : msg,
+      ),
+    );
+  }, []);
+
+  const failStreamingAssistantMessage = useCallback((messageId: string, errorContent: string) => {
+    setMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === messageId
+          ? {
+              ...msg,
+              content: errorContent,
+              isLoading: false,
+              updated_at: new Date().toISOString(),
+            }
+          : msg,
+      ),
+    );
+  }, []);
+
+  const removeMessageById = useCallback((messageId: string) => {
+    setMessages((prev) => prev.filter((msg) => msg.id !== messageId));
+  }, []);
+
+  return {
+    messages,
+    setMessages,
+    chatContainerRef,
+    addAssistantChunksSequentially,
+    startStreamingAssistantMessage,
+    appendToStreamingAssistantMessage,
+    finalizeStreamingAssistantMessage,
+    failStreamingAssistantMessage,
+    removeMessageById,
+  };
 }

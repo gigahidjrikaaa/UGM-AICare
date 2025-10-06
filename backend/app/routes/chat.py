@@ -1,43 +1,53 @@
-# backend/app/routes/chat.py
-import json
-import re
-from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import desc, select
-from fastapi import APIRouter, HTTPException, Body, Depends, status, BackgroundTasks, Query # type: ignore
-from typing import Any, List, Dict, Optional, Literal, cast
-from datetime import datetime, timedelta # Import datetime
-import logging
+"""Chat endpoints covering REST requests and streaming WebSocket support."""
 
-# Adjust import based on your project structure
-from app.database import get_async_db
-from app.models import User, Conversation, UserSummary
-from app.core import llm
-from app.core.memory import get_module_state, set_module_state, clear_module_state
-from app.dependencies import get_current_active_user
-from app.schemas.chat import ChatRequest, ChatResponse, ConversationHistoryItem
-from app.schemas.summary import SummarizeRequest
-from app.core.cbt_module_logic import (
-    get_module_step_prompt,
-    process_user_response_for_step,
-    # get_module_definition # if needed for descriptions, etc.
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+from datetime import datetime
+from typing import Any, Callable, Dict, List, Optional, cast
+
+from fastapi import (
+    APIRouter,
+    BackgroundTasks,
+    Body,
+    Depends,
+    HTTPException,
+    Query,
+    WebSocket,
+    WebSocketDisconnect,
+    status,
 )
-from app.core.cbt_module_types import CBTModuleData # For type hinting
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app import auth_utils
+from app.core import llm
+from app.database import get_async_db
+from app.dependencies import get_current_active_user
+from app.models import Conversation, User, UserSummary
+from app.schemas.chat import ChatRequest, ChatResponse, ConversationHistoryItem
+from app.services.chat_processing import (
+    process_chat_event,
+    process_chat_message,
+)
 from app.services.personal_context import (
     build_user_personal_context,
     invalidate_user_personal_context,
 )
 
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__) # Create a logger for this module
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["Chat"])
 
-# --- Helpers ---
+MIN_TURNS_FOR_SUMMARY = 2
+MAX_HISTORY_CHARS_FOR_SUMMARY = 15000
+
 
 def _compose_system_prompt(base_prompt: Optional[str], personal_context: str) -> Optional[str]:
     base = (base_prompt or "").strip()
     context = (personal_context or "").strip()
-
     if base and context:
         return f"{base}\n\n{context}"
     if context:
@@ -46,517 +56,404 @@ def _compose_system_prompt(base_prompt: Optional[str], personal_context: str) ->
         return base
     return None
 
-# --- Constants for Summarization ---
-MIN_TURNS_FOR_SUMMARY = 2  # Minimum number of full conversation turns (user msg + AI response) to trigger a summary.
-MAX_HISTORY_CHARS_FOR_SUMMARY = 15000  # Approx 3k-4k tokens, adjust based on your summarization LLM's limits and desired performance.
 
-# --- Helper Functions for Async Database Operations ---
-# No longer need sync database background tasks - all operations are async
+async def _default_llm_responder(
+    history: List[Dict[str, str]],
+    system_prompt: Optional[str],
+    request: ChatRequest,
+    _stream_callback: Optional[Callable[[str], Any]] = None,
+) -> str:
+    model_name = request.model or "gemini_google"
+    return await llm.generate_response(
+        history=history,
+        model=model_name,
+        max_tokens=request.max_tokens,
+        temperature=request.temperature,
+        system_prompt=system_prompt,
+    )
 
-# --- API Endpoint (Async) ---
-# Add dependencies=[Depends(get_current_user)] if you have authentication
+
+async def _streaming_llm_responder(
+    history: List[Dict[str, str]],
+    system_prompt: Optional[str],
+    request: ChatRequest,
+    stream_callback: Optional[Callable[[str], Any]] = None,
+) -> str:
+    if stream_callback is None:
+        # Fallback to default behaviour if no callback is provided.
+        return await _default_llm_responder(history, system_prompt, request, None)
+
+    model_name = request.model or "gemini_google"
+    full_text = ""
+    async for chunk in llm.stream_gemini_response(
+        history=history,
+        model=model_name,
+        max_tokens=request.max_tokens,
+        temperature=request.temperature,
+        system_prompt=system_prompt,
+    ):
+        if not chunk:
+            continue
+        full_text += chunk
+        try:
+            await stream_callback(chunk)
+        except Exception as callback_err:  # pragma: no cover - defensive logging
+            logger.warning("Streaming callback failed: %s", callback_err)
+    return full_text
+
+
 @router.post("/chat", response_model=ChatResponse)
 async def handle_chat_request(
     request: ChatRequest = Body(...),
-    background_tasks: BackgroundTasks = BackgroundTasks(), # For background tasks
-    current_user: User = Depends(get_current_active_user), # Get authenticated user
-    db: AsyncSession = Depends(get_async_db) # Use async database session
-    ):
-    """
-    Handles chat, detects session changes to trigger summarization of the *previous* session,
-    and injects the *latest available* summary into the context for the *current* session.
-    """
-    module_just_completed_id: Optional[str] = None # Variable to hold completed module ID
-    module_state_full: Optional[Dict[str, Any]] = None # Initialize here
-    session_id = request.session_id # Define session_id early for use in error logging if needed
-    conversation_id = request.conversation_id # Define conversation_id early
+    background_tasks: BackgroundTasks = BackgroundTasks(),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_async_db),
+) -> ChatResponse:
+    """Handle traditional REST chat requests."""
+
+    session_id = request.session_id
+    conversation_id = request.conversation_id
+
     try:
-        user_id = current_user.id
         personal_context = await build_user_personal_context(db, current_user)
         active_system_prompt = _compose_system_prompt(request.system_prompt, personal_context)
-        aika_response_text: str = "" 
 
-        #! --- Crucial Note on Frontend session_id Management ---
-        #! The backend's summarization trigger relies on the `session_id` changing
-        #! when a user starts a new distinct conversation.
-        #! Ensure the frontend maintains a consistent `session_id` for an ongoing
-        #! interaction (e.g., until tab closure, explicit logout, or significant inactivity)
-        #! and generates a new one when a new logical session begins.
-        #! Avoid new `session_id` on simple page refreshes if it's the same conversation.
-        
-        # --- Determine Flow: Event or Message ---
+        def schedule_summary(user_id: int, previous_session_id: str) -> None:
+            background_tasks.add_task(summarize_and_save, user_id, previous_session_id)
+
         if request.event:
-            # --- === Handle Event (e.g., Button Click) === ---
-            if request.event.type == 'start_module':
-                module_id = request.event.module_id
-                logger.info(f"EVENT: User {user_id} starting module '{module_id}' in session {session_id}")
-
-                initial_step = 1
-                initial_module_data: CBTModuleData = {}
-                try:
-                    # Get the first prompt using the new CBT logic
-                    prompt_result = get_module_step_prompt(module_id, initial_step, initial_module_data)
-                    if prompt_result is None:
-                        logger.error(f"Could not find module or step 1 for module_id: {module_id}")
-                        raise HTTPException(status_code=404, detail=f"Module {module_id} or its first step not found.")
-                    aika_response_text = prompt_result
-
-                    # Set initial module state in Redis, now including module_data
-                    await set_module_state(session_id, module_id, initial_step, initial_module_data)
-                    logger.info(f"Redis: Set state for session {session_id} - module={module_id}, step={initial_step}, data={initial_module_data}")
-
-                except HTTPException as http_exc: # Catch specific known exception
-                    raise http_exc
-                except Exception as e:
-                    logger.error(f"Error initializing or getting start prompt for module {module_id}: {e}", exc_info=True)
-                    # Attempt to clear Redis state if start fails partially
-                    try:
-                        await clear_module_state(session_id)
-                    except Exception as redis_clear_err:
-                        logger.error(f"Redis Error clearing state after failed start for session {session_id}: {redis_clear_err}", exc_info=True)
-                    raise HTTPException(status_code=500, detail=f"Failed to initialize or generate start message for module {module_id}")
-
-                # For events, history for response is just the new AI message appended to what frontend might have sent
-                # Frontend's types/api.ts shows ChatRequestPayload.history can be List[ApiMessage]
-                # And ApiMessage is {role, content, timestamp?}
-                # ChatResponse.history needs to be List[Dict[str,str]]
-                # Ensure history from request (if any) is correctly formatted.
-                # The frontend's useChat.tsx `handleStartModule` sends history, so it should be used.
-                final_history_to_return: List[Dict[str, str]] = []
-                if request.history:
-                    final_history_to_return.extend(request.history)
-                final_history_to_return.append({"role": "assistant", "content": aika_response_text}) # Add AI response
-
-            else: # Other event types
-                logger.warning(f"Unsupported event type received: {request.event.type} for session {session_id}")
-                raise HTTPException(status_code=400, detail=f"Unsupported event type: {request.event.type}")
-
+            result = await process_chat_event(
+                request=request,
+                current_user=current_user,
+                db=db,
+                session_id=session_id,
+                conversation_id=conversation_id,
+                active_system_prompt=active_system_prompt,
+            )
         elif request.message:
-            # --- === Handle Standard Text Message === ---
-            user_message_content = request.message
-
-            history_from_request_api_messages: List[Dict[str, str]] = []
-            if request.history:
-                 history_from_request_api_messages = [{"role": item["role"], "content": item["content"]} for item in request.history]
-
-            logger.info(f"MESSAGE: User {user_id} sent message in session {session_id}, conversation {conversation_id}")
-
-            module_state_full = await get_module_state(session_id)
-
-            if module_state_full:
-                module_id = module_state_full['module_id'] # Key changed in memory.py
-                current_step_id = module_state_full['step_id'] # Key changed in memory.py
-                current_module_data: CBTModuleData = module_state_full['data']
-                logger.info(f"MODULE_STEP: Session {session_id} continuing module '{module_id}' at step {current_step_id}")
-
-                try:
-                    updated_module_data, next_step_id, action = process_user_response_for_step(
-                        module_id, current_step_id, user_message_content, current_module_data
-                    )
-
-                    if action == "complete_module":
-                        completion_prompt = get_module_step_prompt(module_id, current_step_id, updated_module_data) # Get prompt of the completing step
-                        if completion_prompt is None: # Fallback if completing step has no prompt
-                            aika_response_text = "Modul telah selesai. Terima kasih!"
-                        else:
-                            aika_response_text = completion_prompt
-                        await clear_module_state(session_id)
-                        logger.info(f"MODULE_COMPLETE: Module {module_id} completed for session {session_id}. State cleared.")
-                        module_just_completed_id = module_id
-                    else:
-                        await set_module_state(session_id, module_id, next_step_id, updated_module_data)
-                        prompt_result = get_module_step_prompt(module_id, next_step_id, updated_module_data)
-                        if prompt_result is None:
-                            logger.error(f"Could not find next step prompt for module {module_id}, step {next_step_id}")
-                            # This case might mean module ended without explicit "complete_module"
-                            # Or an issue in module definition.
-                            await clear_module_state(session_id) # Clear state to prevent loop
-                            aika_response_text = "Sepertinya ada sedikit kendala dengan langkah selanjutnya di modul ini. Mari kita coba lagi nanti atau kembali ke percakapan biasa."
-                            module_just_completed_id = module_id
-                        else:
-                            aika_response_text = prompt_result
-
-
-                except Exception as e:
-                    logger.error(f"Error processing module step for {module_id}, step {current_step_id}: {e}", exc_info=True)
-                    # Consider clearing module state on error to prevent user from being stuck
-                    await clear_module_state(session_id)
-                    module_just_completed_id = module_id # Consider this an end to the module attempt
-                    aika_response_text = "Maaf, terjadi kesalahan internal saat memproses modul ini. Kita kembali ke percakapan biasa ya."
-                    # raise HTTPException(status_code=500, detail="Terjadi kesalahan saat memproses langkah modul.")
-
-                # Save conversation turn for module step
-                try:
-                    conv_entry = Conversation(user_id=user_id, session_id=session_id, conversation_id=conversation_id, message=user_message_content, response=aika_response_text, timestamp=datetime.now())
-                    db.add(conv_entry)
-                    await db.commit()
-                except Exception as e:
-                    await db.rollback()
-                    logger.error(f"DB Error saving module conversation turn for session {session_id}: {e}", exc_info=True)
-                    raise HTTPException(status_code=500, detail="Could not save module conversation turn.")
-            
-            else: # No active module, check for memory query
-                user_message_lower = user_message_content.lower().strip()
-
-                # Pola Regex untuk mendeteksi pertanyaan tentang ingatan percakapan
-                # Pola ini mencoba menangkap variasi umum dalam bahasa Indonesia dan Inggris
-                patterns = [
-                    # Pola umum: (ingat/inget/remember) ... (percakapan/obrolan/...)
-                    r"(ingat|inget|remember)\s*(?:lagi|kah|kan|dong|ga|gak|nggak)?\s*(?:tentang|soal|mengenai|apa)?\s*(?:percakapan|obrolan|diskusi|pembicaraan|sesi|chat|history|summary|ringkasan|resume|resume kita|resume obrolan|resume percakapan)\s*(?:kita|sebelumnya|kemarin|terakhir|our|last|previous)?",
-                    # Pola pertanyaan: (apa/apakah) ... (kamu/you) ... (ingat/inget/remember) ... (percakapan/obrolan/...)
-                    r"(?:apa|apakah|do|did)\s*(?:kah)?\s*(?:kamu|you)\s*(?:sih|ya)?\s*(?:masih\s+)?(ingat|inget|remember)\s*(?:lagi|kah|kan|dong|ga|gak|nggak)?\s*(?:tentang|soal|mengenai|apa)?\s*(?:percakapan|obrolan|diskusi|pembicaraan|sesi|chat|history|summary|ringkasan|resume)\s*(?:kita|sebelumnya|kemarin|terakhir|our|last|previous)?",
-                    # Pola "apa yang kita bahas/bicarakan"
-                    r"apa\s*(?:lagi)?\s*(?:sih|ya)?\s*(?:yang|yg)\s*(?:pernah|sempat|udah|sudah)?\s*(?:kita|we)\s*(?:bahas|bicarakan|diskusikan|obrolin|omongin|talked\s+about|discussed)",
-                    # Frasa langsung yang sangat umum (sebagai tambahan jika regex kompleks terlewat)
-                    r"ingat\s+obrolan\s+kita",
-                    r"ingat\s+percakapan\s+kita",
-                    r"kamu\s+inget\s+gak", # Ini lebih umum, mungkin perlu dipertimbangkan konteksnya jika terlalu banyak false positive
-                    r"do\s+you\s+remember" # Umum dalam bahasa Inggris
-                ]
-
-                asked_about_memory = False
-                for pattern in patterns:
-                    if re.search(pattern, user_message_lower):
-                        asked_about_memory = True
-                        break
-
-                if asked_about_memory:
-                    logger.info(f"MEMORY_QUERY: User {user_id} asked about previous conversation memory in session {session_id}.")
-                    stmt = select(UserSummary).where(UserSummary.user_id == user_id).order_by(UserSummary.timestamp.desc())
-                    result = await db.execute(stmt)
-                    latest_summary = result.first()
-
-                    if latest_summary and latest_summary.summary_text is not None and latest_summary.summary_text.strip():
-                        summary_snippet = latest_summary.summary_text
-
-                        # Light cleaning for any lingering formal prefixes, just in case
-                        prefixes_to_remove = ["poin-poin utama:", "poin utama:", "ringkasan:", "summary:", "secara garis besar,"]
-                        for prefix in prefixes_to_remove:
-                            if summary_snippet.lower().startswith(prefix.lower()):
-                                summary_snippet = summary_snippet[len(prefix):].strip()
-                        
-                        aika_response_text = (
-                            f"Tentu, aku ingat percakapan kita sebelumnya. "
-                            f"Secara garis besar, kita sempat membahas tentang {summary_snippet}. "
-                            f"Ada yang ingin kamu diskusikan lebih lanjut dari situ, atau ada hal baru yang ingin kamu ceritakan hari ini?"
-                        )
-                        logger.info(f"MEMORY_QUERY: Responded with summary for user {user_id}.")
-                    else:
-                        aika_response_text = (
-                            "Sepertinya ini percakapan pertama kita, atau aku belum punya ringkasan dari obrolan kita sebelumnya untuk diingat. "
-                            "Ada yang ingin kamu ceritakan untuk memulai?"
-                        )
-                        logger.info(f"MEMORY_QUERY: No summary found, responded accordingly for user {user_id}.")
-
-                    # --- Save this specific interaction ---
-                    try:
-                        conv_entry = Conversation(
-                            user_id=user_id, session_id=session_id, conversation_id=conversation_id,
-                            message=user_message_content, response=aika_response_text, timestamp=datetime.now()
-                        )
-                        db.add(conv_entry)
-                        await db.commit()
-                    except Exception as e:
-                        await db.rollback()
-                        logger.error(f"DB Error saving memory query conversation turn for session {session_id}: {e}", exc_info=True)
-                    
-                    # --- Prepare and return the constructed response directly ---
-                    final_history_to_return: List[Dict[str, str]] = []
-                    if request.history: # request.history is List[ApiMessage] which is List[Dict[str,str]]
-                        final_history_to_return.extend(request.history)
-                    final_history_to_return.append({"role": "user", "content": user_message_content})
-                    final_history_to_return.append({"role": "assistant", "content": aika_response_text})
-                    
-                    return ChatResponse(
-                        response=aika_response_text,
-                        provider_used="system_direct_response", # Custom provider string
-                        model_used="memory_retrieval",      # Custom model string
-                        history=final_history_to_return,
-                        module_completed_id=None # No module involved here
-                    )
-                else: # Standard Conversation Flow (No Active Module AND not a memory query)
-                    logger.info(f"STANDARD_CHAT: Processing standard message for session {session_id}, conversation {conversation_id}")
-                    
-                    # --- Session Change Detection & Summary Handling ---
-                    previous_session_id_to_summarize = None
-                    stmt = select(Conversation).where(Conversation.user_id == user_id).order_by(Conversation.timestamp.desc())
-                    result = await db.execute(stmt)
-                    row = result.first()
-                    if row:
-                        latest_db_message_for_user = row[0]
-                    else:
-                        latest_db_message_for_user = None
-
-                    is_new_session = False
-                    if latest_db_message_for_user:
-                        if str(latest_db_message_for_user.session_id) != str(session_id):
-                            previous_session_id_to_summarize = latest_db_message_for_user.session_id
-                            is_new_session = True
-                            logger.info(f"STANDARD_CHAT: New session detected ({session_id}). Previous DB session: {previous_session_id_to_summarize}. Triggering summary for previous session.")
-                            background_tasks.add_task(summarize_and_save, cast(int, current_user.id), cast(str, previous_session_id_to_summarize))
-                        else: # Check for new conversation within the same session
-                            if str(latest_db_message_for_user.conversation_id) != str(conversation_id):
-                                is_new_session = True # Treat as new context for summary injection
-                                logger.info(f"STANDARD_CHAT: New conversation detected ({conversation_id}) in existing session {session_id}. Will inject summary if available.")
-
-                    else:
-                        is_new_session = True
-                        logger.info(f"STANDARD_CHAT: First message ever for user {user_id} in session {session_id}. No previous session to summarize.")
-
-                    # --- Prepare History for LLM - Inject Summary on New Session/Conversation Start ---
-                    history_for_llm_call = list(history_from_request_api_messages) # Make a copy to modify
-
-
-                    if is_new_session:
-                        stmt = select(UserSummary).where(UserSummary.user_id == user_id).order_by(UserSummary.timestamp.desc())
-                        result = await db.execute(stmt)
-                        past_summary = result.scalars().first()  # Get model instance directly
-
-                        if past_summary and getattr(past_summary, 'summary_text', None):
-                            summary_injection_text = (
-                                "Untuk membantumu mengingat, ini ringkasan singkat dari percakapan kita sebelumnya:\n"
-                                f"{past_summary.summary_text}\n"
-                                "--- Akhir dari ringkasan ---\n\nSekarang, mari kita lanjutkan. Ada apa?"
-                            )
-                            summary_injection_message = {"role": "system", "content": summary_injection_text}
-                            temp_history_for_llm: List[Dict[str, str]] = []
-                            if active_system_prompt:
-                                temp_history_for_llm.append({"role": "system", "content": active_system_prompt})
-                            temp_history_for_llm.append(summary_injection_message)
-                            temp_history_for_llm.extend(history_for_llm_call)
-                            history_for_llm_call = temp_history_for_llm
-                            logger.info(f"STANDARD_CHAT: Injected previous summary for user {user_id} into LLM context for new session.")
-                        else:
-                            logger.info(
-                                f"STANDARD_CHAT: No previous summary found to inject for user {user_id} (is_new_session={is_new_session})."
-                            )
-
-                    history_for_llm_call.append({"role": "user", "content": user_message_content})
-
-                    # --- Call the Standard LLM ---
-                    try:
-                        # llm.generate_response expects history as List[Dict[str, str]]
-                        # request.history is already List[Dict[str,str]] if it comes from ChatRequest
-                        # history_for_llm_api_message is the one to use here.
-                        aika_response_text = await llm.generate_response(
-                            history=history_for_llm_call, # Use the potentially augmented history
-                            model="gemini_google", # Explicitly specify Gemini model
-                            max_tokens=request.max_tokens,
-                            temperature=request.temperature,
-                            system_prompt=active_system_prompt if not any(h['role'] == 'system' for h in history_for_llm_call) else None
-                        )
-                    except Exception as llm_err:
-                        logger.error(f"LLM generation failed for standard chat session {session_id}: {llm_err}", exc_info=True)
-                        raise HTTPException(status_code=503, detail=f"LLM service unavailable or failed: {str(llm_err)}")
-
-
-                    if aika_response_text.startswith("Error:"): # Check for errors returned by LLM service itself
-                        logger.error(f"LLM generation returned error for session {session_id}: {aika_response_text}")
-                        status_code_llm = 400 if "API key" in aika_response_text or "Invalid history" in aika_response_text else 503
-                        raise HTTPException(status_code=status_code_llm, detail=aika_response_text)
-
-                    # --- Save the standard conversation turn ---
-                    try:
-                        conversation_entry = Conversation(
-                            user_id=user_id,
-                            session_id=session_id,
-                            conversation_id=conversation_id, # Save conversation_id
-                            message=user_message_content,
-                            response=aika_response_text,
-                            timestamp=datetime.now()
-                        )
-                        db.add(conversation_entry)
-                        await db.commit()
-                    except Exception as e:
-                        await db.rollback()
-                        logger.error(f"DB error saving standard conversation turn for session {session_id}: {e}", exc_info=True)
-                        raise HTTPException(status_code=500, detail="Could not save conversation turn.")
-
-        else: # Neither message nor event
-            logger.error(f"Invalid request structure for session {session_id}: Neither message nor event found.")
-            raise HTTPException(status_code=400, detail="Invalid request: Missing message/history or event.")
-
-        # --- Prepare and return the final response ---
-        # The history returned to frontend should be the original history + new AI response
-        # request.history is List[Dict[str, str]]
-        final_history_to_return: List[Dict[str, str]] = []
-        if request.history:
-            final_history_to_return.extend(request.history)
-        if request.message : # Add user message to history if it was a message request
-             final_history_to_return.append({"role": "user", "content": request.message})
-        final_history_to_return.append({"role": "assistant", "content": aika_response_text})
-
-
-        # Determine model_used based on provider and request, fallback to default if not specified
-        actual_provider_used = request.provider or "gemini" # Default if not specified
-        actual_model_used = request.model # Use model from request if provided
-        if not actual_model_used and llm.DEFAULT_PROVIDERS: # Check if DEFAULT_PROVIDERS is defined in llm
-             actual_model_used = llm.DEFAULT_PROVIDERS.get(actual_provider_used, "unknown_model")
-        elif not actual_model_used:
-             actual_model_used = "unknown_model"
-
+            result = await process_chat_message(
+                request=request,
+                current_user=current_user,
+                db=db,
+                session_id=session_id,
+                conversation_id=conversation_id,
+                active_system_prompt=active_system_prompt,
+                schedule_summary=schedule_summary,
+                llm_responder=_default_llm_responder,
+            )
+        else:
+            raise HTTPException(status_code=400, detail="Invalid request: Missing message or event payload")
 
         return ChatResponse(
-            response=aika_response_text,
-            provider_used=str(actual_provider_used), # Ensure it's string
-            model_used=str(actual_model_used), # Ensure it's string
-            history=final_history_to_return,
-            module_completed_id=module_just_completed_id
+            response=result.response_text,
+            provider_used=result.provider_used,
+            model_used=result.model_used,
+            history=result.final_history,
+            module_completed_id=result.module_completed_id,
         )
 
-    except ValueError as e: # Catch Pydantic validation errors
-        logger.warning(f"Value error in /chat endpoint processing request: {e}", exc_info=True)
-        raise HTTPException(status_code=400, detail=str(e))
-    except HTTPException as http_exc:
-         raise http_exc
-    except Exception as e:
+    except ValueError as exc:
+        logger.warning("Value error in /chat endpoint: %s", exc, exc_info=True)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:  # pragma: no cover - defensive logging
         user_id_for_log = current_user.id if current_user else "unknown_user"
-        logger.error(f"Unhandled exception in /chat endpoint for user {user_id_for_log}, session {session_id}: {e}", exc_info=True)
-        # Try to clear module state if an unexpected error occurs during module processing
-        if module_state_full: # If we were in a module
+        logger.error(
+            "Unhandled exception in /chat endpoint for user %s, session %s: %s",
+            user_id_for_log,
+            session_id,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="An internal server error occurred.") from exc
+
+
+@router.websocket("/chat/ws")
+async def chat_ws(
+    websocket: WebSocket,
+    token: str,
+    db: AsyncSession = Depends(get_async_db),
+) -> None:
+    """Stream chat responses to the frontend via WebSocket."""
+    try:
+        payload = auth_utils.decrypt_and_validate_token(token)
+    except HTTPException:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    user_id_str = payload.sub
+    if user_id_str is None:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    try:
+        user_id = int(user_id_str)
+    except ValueError:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    user = await db.get(User, user_id)
+    if not user:
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
+        return
+
+    await websocket.accept()
+
+    async def emit_token(chunk: str, *, session_id: str, conversation_id: str) -> None:
+        await websocket.send_json(
+            {
+                "type": "token",
+                "token": chunk,
+                "sessionId": session_id,
+                "conversationId": conversation_id,
+            }
+        )
+
+    try:
+        while True:
+            message = await websocket.receive_text()
             try:
-                await clear_module_state(session_id)
-                logger.info(f"MODULE_CLEARED_ON_ERROR: Cleared module state for session {session_id} due to unhandled exception.")
-            except Exception as redis_err:
-                logger.error(f"Failed to clear module state for session {session_id} during unhandled exception: {redis_err}")
-        raise HTTPException(status_code=500, detail="An internal server error occurred.")
+                raw_payload = json.loads(message)
+            except json.JSONDecodeError as exc:
+                await websocket.send_json({"type": "error", "detail": f"Invalid JSON: {exc}"})
+                continue
+
+            try:
+                chat_request = ChatRequest.model_validate(raw_payload)
+            except Exception as exc:  # pragma: no cover - defensive logging
+                await websocket.send_json({"type": "error", "detail": f"Invalid payload: {exc}"})
+                continue
+
+            session_id = chat_request.session_id
+            conversation_id = chat_request.conversation_id
+
+            personal_context = await build_user_personal_context(db, user)
+            active_system_prompt = _compose_system_prompt(chat_request.system_prompt, personal_context)
+
+            def schedule_summary(user_id: int, previous_session_id: str) -> None:
+                asyncio.create_task(summarize_and_save(user_id, previous_session_id))
+
+            if chat_request.event:
+                result = await process_chat_event(
+                    request=chat_request,
+                    current_user=user,
+                    db=db,
+                    session_id=session_id,
+                    conversation_id=conversation_id,
+                    active_system_prompt=active_system_prompt,
+                )
+                await websocket.send_json(
+                    {
+                        "type": "completed",
+                        "response": result.response_text,
+                        "history": result.final_history,
+                        "provider": result.provider_used,
+                        "model": result.model_used,
+                        "moduleCompletedId": result.module_completed_id,
+                        "sessionId": session_id,
+                        "conversationId": conversation_id,
+                    }
+                )
+                continue
+
+            if not chat_request.message:
+                await websocket.send_json({"type": "error", "detail": "Missing message payload."})
+                continue
+
+            async def stream_callback(chunk: str) -> None:
+                await emit_token(chunk, session_id=session_id, conversation_id=conversation_id)
+
+            try:
+                result = await process_chat_message(
+                    request=chat_request,
+                    current_user=user,
+                    db=db,
+                    session_id=session_id,
+                    conversation_id=conversation_id,
+                    active_system_prompt=active_system_prompt,
+                    schedule_summary=schedule_summary,
+                    llm_responder=_streaming_llm_responder,
+                    stream_callback=stream_callback,
+                )
+            except HTTPException as exc:
+                await websocket.send_json({"type": "error", "detail": exc.detail})
+                continue
+            except Exception as exc:  # pragma: no cover - defensive logging
+                logger.error("Streaming chat failed: %s", exc, exc_info=True)
+                await websocket.send_json({"type": "error", "detail": "Internal server error."})
+                continue
+
+            await websocket.send_json(
+                {
+                    "type": "completed",
+                    "response": result.response_text,
+                    "history": result.final_history,
+                    "provider": result.provider_used,
+                    "model": result.model_used,
+                    "moduleCompletedId": result.module_completed_id,
+                    "sessionId": session_id,
+                    "conversationId": conversation_id,
+                }
+            )
+
+    except WebSocketDisconnect:
+        logger.debug("Chat WebSocket disconnected for user_id=%s", user_id)
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.error("Chat WebSocket error for user_id=%s: %s", user_id, exc, exc_info=True)
+        await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
 
 
-# --- Define the Summarization Function ---
-async def summarize_and_save(user_id: int, session_id_to_summarize: str):
-    """Fetches history, calls LLM to summarize, and saves to UserSummary table."""
-    logger.info(f"Background Task: Starting summarization for user {user_id}, session {session_id_to_summarize}")
-    # --- Use a dedicated async DB session for the background task ---
+async def summarize_and_save(user_id: int, session_id_to_summarize: str) -> None:
+    """Fetch history, create a summary, and persist it for future context injection."""
+    logger.info(
+        "Background Task: Starting summarization for user %s, session %s",
+        user_id,
+        session_id_to_summarize,
+    )
     from app.database import AsyncSessionLocal
+
     async with AsyncSessionLocal() as db:
         try:
-            # 1. Retrieve conversation history
-            stmt = select(Conversation).where(
-                Conversation.session_id == session_id_to_summarize,
-                Conversation.user_id == user_id
-            ).order_by(Conversation.timestamp.asc())
+            stmt = (
+                select(Conversation)
+                .where(
+                    Conversation.session_id == session_id_to_summarize,
+                    Conversation.user_id == user_id,
+                )
+                .order_by(Conversation.timestamp.asc())
+            )
             result = await db.execute(stmt)
             conversation_history = result.scalars().all()
 
             if not conversation_history or len(conversation_history) < MIN_TURNS_FOR_SUMMARY:
-                 logger.info(f"Background Task: Skipping summarization for session {session_id_to_summarize} (less than {MIN_TURNS_FOR_SUMMARY} turns).")
-                 return
+                logger.info(
+                    "Background Task: Skipping summarization for session %s (too short).",
+                    session_id_to_summarize,
+                )
+                return
 
-            # 2. Format history for LLM
             history_lines = []
             for turn in conversation_history:
                 history_lines.append(f"user: {turn.message}")
                 history_lines.append(f"assistant: {turn.response}")
             formatted_history = "\n".join(history_lines)
 
-            # --- Optional: Truncate history if too long ---
-            # This is a simple truncation; you might want to use a more sophisticated method
             if len(formatted_history) > MAX_HISTORY_CHARS_FOR_SUMMARY:
                 original_len = len(formatted_history)
-                formatted_history = formatted_history[-MAX_HISTORY_CHARS_FOR_SUMMARY:] # Take the most recent part
-                logger.warning(f"Background Task: Truncated conversation history for session {session_id_to_summarize} from {original_len} to {len(formatted_history)} chars for summarization.")
-                # Optionally, add a note to the prompt that history was truncated
-                # formatted_history = "[History truncated due to length]\n...\n" + formatted_history
+                formatted_history = formatted_history[-MAX_HISTORY_CHARS_FOR_SUMMARY :]
+                logger.warning(
+                    "Background Task: Truncated conversation history for session %s from %s to %s chars.",
+                    session_id_to_summarize,
+                    original_len,
+                    len(formatted_history),
+                )
 
-
-            # 3. Create the summarization prompt
-            # --- Using your improved prompt ---
-            summarization_prompt = f"""Kamu adalah Aika, AI pendamping dari UGM-AICare. Tugasmu adalah membuat ringkasan singkat dari percakapan sebelumnya dengan pengguna. Ringkasan ini akan kamu gunakan untuk mengingatkan pengguna tentang apa yang telah dibahas jika mereka bertanya "apakah kamu ingat percakapan kita?".
+            summarization_prompt = f"""Kamu adalah Aika, AI pendamping dari UGM-AICare. Tugasmu adalah membuat ringkasan singkat dari percakapan sebelumnya dengan pengguna. Ringkasan ini akan kamu gunakan untuk mengingatkan pengguna tentang apa yang telah dibahas jika mereka bertanya \"apakah kamu ingat percakapan kita?\".
 
 Buatlah ringkasan dalam 1-2 kalimat saja, dalam Bahasa Indonesia yang alami dan kasual, seolah-olah kamu sedang berbicara santai dengan teman. Fokus pada inti atau perasaan utama yang diungkapkan pengguna.
-Hindari penggunaan daftar, poin-poin, judul seperti "Poin Utama", atau format markdown. Cukup tuliskan sebagai paragraf singkat yang mengalir.
+Hindari penggunaan daftar, poin-poin, judul seperti \"Poin Utama\", atau format markdown. Cukup tuliskan sebagai paragraf singkat yang mengalir.
 
 Contoh output yang baik:
-"kita sempat ngobrolin soal kamu yang lagi ngerasa nggak nyaman karena pernah gagal memimpin organisasi."
-"kamu cerita tentang perasaanmu yang campur aduk setelah kejadian di kampus."
-"kita kemarin membahas tentang kesulitanmu mencari teman dan bagaimana itu membuatmu merasa kesepian."
+\"kita sempat ngobrolin soal kamu yang lagi ngerasa nggak nyaman karena pernah gagal memimpin organisasi.\"
+\"kamu cerita tentang perasaanmu yang campur aduk setelah kejadian di kampus.\"
+\"kita kemarin membahas tentang kesulitanmu mencari teman dan bagaimana itu membuatmu merasa kesepian.\"
 
 Percakapan yang perlu diringkas:
 {formatted_history}
 
 Ringkasan singkat dan kasual:"""
 
-            # 4. Call the LLM
             summary_llm_history = [{"role": "user", "content": summarization_prompt}]
-            # Ensure DEFAULT_PROVIDERS and actual model name resolution logic is robust in llm.py
-            summary_provider = "gemma_local" # Or configurable
-            summary_model = llm.DEFAULT_PROVIDERS.get(summary_provider, "gemma_local") if hasattr(llm, 'DEFAULT_PROVIDERS') else "gemma_local"
 
             summary_text = await llm.generate_response(
-                 history=summary_llm_history,
-                 model="gemini_google", # Explicitly specify Gemini model for summary
-                 max_tokens=1024,
-                 temperature=0.5
+                history=summary_llm_history,
+                model="gemini_google",
+                max_tokens=1024,
+                temperature=0.5,
             )
 
             if summary_text.startswith("Error:"):
-                 # Log the full error from LLM for better debugging
-                 logger.error(f"Background Task: LLM Error during summarization for session {session_id_to_summarize}: {summary_text}")
-                 raise Exception(f"LLM Error during summarization") # Generic error to frontend/caller
+                logger.error(
+                    "Background Task: LLM error during summarization for session %s: %s",
+                    session_id_to_summarize,
+                    summary_text,
+                )
+                raise RuntimeError("LLM error during summarization")
 
-            # 5. Save the summary
             new_summary = UserSummary(
-                 user_id=user_id,
-                 summarized_session_id=session_id_to_summarize,
-                 summary_text=summary_text.strip(),
-                 timestamp=datetime.now() # Ensure timestamp is set here
+                user_id=user_id,
+                summarized_session_id=session_id_to_summarize,
+                summary_text=summary_text.strip(),
+                timestamp=datetime.now(),
             )
             db.add(new_summary)
-            await db.commit() # Commit within this background task's session
-            logger.info(f"Background Task: Saved summary for user {user_id} from session {session_id_to_summarize}")
+            await db.commit()
+            logger.info(
+                "Background Task: Saved summary for user %s from session %s",
+                user_id,
+                session_id_to_summarize,
+            )
             await invalidate_user_personal_context(user_id)
 
-        except Exception as e:
-            await db.rollback() # Rollback this background task's session on error
-            logger.error(f"Background Task: Failed to summarize session {session_id_to_summarize} for user {user_id}: {e}", exc_info=True)
+        except Exception as exc:  # pragma: no cover - defensive logging
+            await db.rollback()
+            logger.error(
+                "Background Task: Failed to summarize session %s for user %s: %s",
+                session_id_to_summarize,
+                user_id,
+                exc,
+                exc_info=True,
+            )
 
-# --- New Endpoint for Chat History ---
+
 @router.get("/history", response_model=List[ConversationHistoryItem])
 async def get_chat_history(
-    limit: int = Query(100, ge=1, le=500), # Limit for pagination
-    skip: int = Query(0, ge=0), # Optional pagination
+    limit: int = Query(100, ge=1, le=500),
+    skip: int = Query(0, ge=0),
     db: AsyncSession = Depends(get_async_db),
-    current_user: User = Depends(get_current_active_user) # Get authenticated user
-):
-    """Fetches conversation history for the authenticated user."""
+    current_user: User = Depends(get_current_active_user),
+) -> List[ConversationHistoryItem]:
+    """Return conversation history for the authenticated user."""
     try:
-        logger.info(f"Fetching conversation turns for user {current_user.id}") # Use the module's logger
-
-        # 1. Fetch conversation turns from DB in chronological order
-        stmt = select(Conversation).where(Conversation.user_id == current_user.id).order_by(Conversation.timestamp.asc()).offset(skip).limit(limit)
+        stmt = (
+            select(Conversation)
+            .where(Conversation.user_id == current_user.id)
+            .order_by(Conversation.timestamp.asc())
+            .offset(skip)
+            .limit(limit)
+        )
         result = await db.execute(stmt)
         conversation_turns = result.scalars().all()
-        logger.info(f"Retrieved {len(conversation_turns)} conversation turns for user {current_user.id}")
 
-        # 2. Transform the data into individual history items
         history_items: List[Dict[str, Any]] = []
         for turn in conversation_turns:
-            # Add user message
-            history_items.append({
-                "role": "user",
-                "content": turn.message, # Map DB 'message' to 'content'
-                "timestamp": turn.timestamp,
-                "session_id": turn.session_id
-            })
-            # Add assistant response
-            history_items.append({
-                "role": "assistant",
-                "content": turn.response, # Map DB 'response' to 'content'
-                "timestamp": turn.timestamp, # Using same timestamp for simplicity
-                "session_id": turn.session_id
-            })
+            history_items.append(
+                {
+                    "role": "user",
+                    "content": turn.message,
+                    "timestamp": turn.timestamp,
+                    "session_id": turn.session_id,
+                }
+            )
+            history_items.append(
+                {
+                    "role": "assistant",
+                    "content": turn.response,
+                    "timestamp": turn.timestamp,
+                    "session_id": turn.session_id,
+                }
+            )
 
-        # 3. Sort the combined list of messages (user + assistant) by timestamp descending
-        history_items.sort(key=lambda x: x["timestamp"], reverse=False)
-
-        # 4. Apply pagination (limit/skip) to the final transformed list
+        history_items.sort(key=lambda item: item["timestamp"], reverse=False)
         paginated_history = history_items[skip : skip + limit]
-        logger.info(f"Returning {len(paginated_history)} transformed history items for user {current_user.id} (skip={skip}, limit={limit})")
+        return [ConversationHistoryItem(**item) for item in paginated_history]
 
-        # 5. Return the transformed list (FastAPI will validate against response_model)
-        return [ConversationHistoryItem(**item) for item in paginated_history] # Ensure all fields match
-
-    except Exception as e:
-        logger.error(f"Error fetching/transforming chat history for user {current_user.id}: {e}", exc_info=True)
-        # Ensure a generic error is raised to avoid leaking details
-        raise HTTPException(status_code=500, detail="Failed to retrieve chat history")
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.error(
+            "Error fetching chat history for user %s: %s",
+            current_user.id,
+            exc,
+            exc_info=True,
+        )
+        raise HTTPException(status_code=500, detail="Failed to retrieve chat history") from exc

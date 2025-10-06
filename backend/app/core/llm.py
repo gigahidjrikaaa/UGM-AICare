@@ -2,7 +2,7 @@
 
 import os
 import httpx
-from typing import Any, cast
+from typing import Any, AsyncIterator, cast
 
 import google.generativeai as genai
 import google.generativeai.types as genai_types
@@ -21,7 +21,7 @@ logger = logging.getLogger(__name__)
 # --- Configuration ---
 GOOGLE_API_KEY = os.environ.get("GOOGLE_GENAI_API_KEY")
 
-DEFAULT_GEMINI_MODEL = "gemini-2.0-flash" 
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash" 
 DEFAULT_GEMMA_LOCAL_MODEL = "gemma-3-12b-it-gguf"
 
 # Configure Gemini client (do this once at module load)
@@ -184,6 +184,120 @@ async def generate_gemini_response(
         logger.error(f"Error calling Gemini API: {e}", exc_info=True)
         # More specific error handling can be added based on google.api_core.exceptions
         return f"Error: An unexpected error occurred with Gemini API. {e}"
+
+
+async def stream_gemini_response(
+    history: List[Dict[str, str]],
+    model: str = DEFAULT_GEMINI_MODEL,
+    max_tokens: int = 512,
+    temperature: float = 0.7,
+    system_prompt: Optional[str] = None,
+) -> AsyncIterator[str]:
+    """Yield response chunks from the Gemini API."""
+    if not GOOGLE_API_KEY:
+        raise ValueError("Google API key not configured.")
+
+    generative_model_cls = getattr(genai, "GenerativeModel", None)
+    if generative_model_cls is None:
+        raise RuntimeError("google.generativeai.GenerativeModel is not available in the installed SDK")
+
+    gemini_model_args: Dict[str, Any] = {"model_name": model}
+    if system_prompt:
+        gemini_model_args["system_instruction"] = cast(
+            content_types.ContentDict,
+            {
+                "role": "system",
+                "parts": [_make_text_part(system_prompt)],
+            },
+        )
+
+    gemini_model = generative_model_cls(**gemini_model_args)
+
+    if not history or history[-1]["role"] != "user":
+        yield "Error: Conversation history must end with a user message."
+        return
+
+    last_user_prompt = history[-1]["content"]
+    gemini_history = _convert_history_for_gemini(history[:-1])
+
+    generation_config = genai_types.GenerationConfig(
+        max_output_tokens=max_tokens,
+        temperature=temperature,
+    )
+
+    safety_settings = {
+        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
+    }
+
+    async def _iter_stream(stream: Any) -> AsyncIterator[str]:
+        async for chunk in stream:
+            try:
+                if hasattr(chunk, "text") and chunk.text:
+                    yield chunk.text
+                    continue
+                candidates = getattr(chunk, "candidates", None)
+                if not candidates:
+                    continue
+                for candidate in candidates:
+                    content = getattr(candidate, "content", None)
+                    parts = getattr(content, "parts", None) if content else None
+                    if not parts:
+                        continue
+                    for part in parts:
+                        text = getattr(part, "text", None) or part.get("text") if isinstance(part, dict) else None
+                        if text:
+                            yield text
+            except Exception as err:  # pragma: no cover - defensive logging
+                logger.debug("Gemini stream chunk parse failed: %s", err)
+
+    try:
+        if gemini_history:
+            chat_session = gemini_model.start_chat(history=gemini_history)
+            stream = chat_session.send_message_async(
+                cast(
+                    content_types.ContentDict,
+                    {"role": "user", "parts": [_make_text_part(last_user_prompt)]},
+                ),
+                generation_config=generation_config,
+                safety_settings=safety_settings,
+                stream=True,
+            )
+        else:
+            stream = gemini_model.generate_content_async(
+                [
+                    cast(
+                        content_types.ContentDict,
+                        {"role": "user", "parts": [_make_text_part(last_user_prompt)]},
+                    )
+                ],
+                generation_config=generation_config,
+                safety_settings=safety_settings,
+                stream=True,
+            )
+
+        yielded = False
+        async for chunk_text in _iter_stream(stream):
+            if chunk_text:
+                yielded = True
+                yield chunk_text
+
+        if not yielded:
+            fallback = await generate_gemini_response(
+                history=history,
+                model=model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                system_prompt=system_prompt,
+            )
+            if fallback:
+                yield fallback
+
+    except Exception as exc:
+        logger.error("Error streaming from Gemini API: %s", exc, exc_info=True)
+        yield f"Error: An unexpected error occurred with Gemini API. {exc}"
 
 # --- Local Gemma 3 API Function (Async) ---
 async def generate_gemma_local_response(

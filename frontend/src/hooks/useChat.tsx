@@ -1,10 +1,12 @@
 // src/hooks/useChat.ts
 import { useState, useCallback, useEffect, useRef } from 'react';
+import { useSession } from 'next-auth/react';
 import { useGreeting } from './useGreeting';
 import { useChatSession } from './useChatSession';
 import { useChatMessages } from './useChatMessages';
-import { useChatApi } from './useChatApi';
-import type { Message, ChatMode, AvailableModule, ApiMessage, ChatEventPayload } from '@/types/chat';
+import { useChatApi, DEFAULT_SYSTEM_PROMPT } from './useChatApi';
+import { useChatStream } from './useChatStream';
+import type { Message, ChatMode, AvailableModule, ApiMessage, ChatEventPayload, ChatRequestPayload } from '@/types/chat';
 import { v4 as uuidv4 } from 'uuid';
 
 const UPDATED_AVAILABLE_MODULES: AvailableModule[] = [
@@ -41,15 +43,27 @@ export function useChat({ model }: { model: string }) {
   const lastConversationIdRef = useRef<string | null>(null);
   const DRAFT_KEY = 'aika_chat_draft_v1';
 
-  const { messages, setMessages, chatContainerRef, addAssistantChunksSequentially } = useChatMessages();
+  const {
+    messages,
+    setMessages,
+    chatContainerRef,
+    addAssistantChunksSequentially,
+    startStreamingAssistantMessage,
+    appendToStreamingAssistantMessage,
+    finalizeStreamingAssistantMessage,
+    removeMessageById,
+  } = useChatMessages();
   const { initialGreeting, isGreetingLoading } = useGreeting(messages);
   const { currentSessionId } = useChatSession();
+  const { data: session } = useSession();
   const { isLoading, error, processApiCall, cancelCurrent } = useChatApi(
     currentSessionId,
     currentMode,
     addAssistantChunksSequentially,
     setMessages,
   );
+  const { status: streamStatus, isStreaming, startStreaming, cancelStreaming } = useChatStream();
+  const isBusy = isLoading || isStreaming;
 
   useEffect(() => {
     if (messages.length === 0 && !isGreetingLoading && initialGreeting) {
@@ -72,7 +86,7 @@ export function useChat({ model }: { model: string }) {
   const handleSendMessage = useCallback(async (message?: string) => {
     const userMessageContent = (typeof message === 'string' ? message : inputValue).trim();
     if (!userMessageContent) return;
-    if (isLoading) return;
+    if (isBusy) return;
 
     const activeConversationId =
       messages.find((m) => m.conversation_id)?.conversation_id || lastConversationIdRef.current || uuidv4();
@@ -100,17 +114,63 @@ export function useChat({ model }: { model: string }) {
       .slice(-10)
       .map((m) => ({ role: m.role as 'user' | 'assistant', content: m.content }));
 
-    await processApiCall({
-      messageContent: userMessageContent,
+    const streamingPayload: ChatRequestPayload = {
+      message: userMessageContent,
       history: historyForApi,
+      google_sub: session?.user?.id ?? '',
+      session_id: currentSessionId,
       conversation_id: activeConversationId,
+      system_prompt: DEFAULT_SYSTEM_PROMPT,
       model,
+    };
+
+    const streamMessageId = startStreamingAssistantMessage(currentSessionId, activeConversationId);
+
+    const fallbackToRest = async () => {
+      removeMessageById(streamMessageId);
+      await processApiCall({
+        messageContent: userMessageContent,
+        history: historyForApi,
+        conversation_id: activeConversationId,
+        model,
+      });
+    };
+
+    const streamingStarted = await startStreaming(streamingPayload, {
+      onToken: (chunk) => {
+        appendToStreamingAssistantMessage(streamMessageId, String(chunk));
+      },
+      onCompleted: (event) => {
+        const finalResponse = typeof event.response === 'string' ? event.response : '';
+        finalizeStreamingAssistantMessage(streamMessageId, finalResponse);
+      },
+      onError: (messageText) => {
+        void fallbackToRest();
+      },
     });
-  }, [inputValue, isLoading, messages, currentSessionId, processApiCall, model, setMessages]);
+
+    if (!streamingStarted) {
+      await fallbackToRest();
+    }
+  }, [
+    inputValue,
+    isBusy,
+    messages,
+    currentSessionId,
+    processApiCall,
+    model,
+    setMessages,
+    session?.user?.id,
+    startStreamingAssistantMessage,
+    appendToStreamingAssistantMessage,
+    finalizeStreamingAssistantMessage,
+    removeMessageById,
+    startStreaming,
+  ]);
 
   const handleStartModule = useCallback(
     async (moduleId: string) => {
-      if (isLoading) return;
+      if (isBusy) return;
 
       const activeConversationId = messages.find((m) => m.conversation_id)?.conversation_id || uuidv4();
 
@@ -146,7 +206,7 @@ export function useChat({ model }: { model: string }) {
         model,
       });
     },
-    [isLoading, messages, currentSessionId, processApiCall, setMessages, model],
+    [isBusy, messages, currentSessionId, processApiCall, setMessages, model],
   );
 
   const handleInputChange = useCallback((value: string) => {
@@ -167,10 +227,18 @@ export function useChat({ model }: { model: string }) {
     setInputValue(transcript);
   }, []);
 
+  const handleCancel = useCallback(() => {
+    if (isStreaming) {
+      cancelStreaming();
+    } else {
+      cancelCurrent();
+    }
+  }, [isStreaming, cancelStreaming, cancelCurrent]);
+
   return {
     messages,
     inputValue,
-    isLoading,
+    isLoading: isBusy,
     error,
     currentMode,
     availableModules: UPDATED_AVAILABLE_MODULES,
@@ -179,6 +247,7 @@ export function useChat({ model }: { model: string }) {
     handleSendMessage,
     handleStartModule,
     setLiveTranscript,
-    cancelCurrent,
+    cancelCurrent: handleCancel,
+    streamStatus,
   };
 }
