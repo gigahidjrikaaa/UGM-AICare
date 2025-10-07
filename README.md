@@ -4,7 +4,7 @@
 
 ## Overview
 
-**Transforming University Mental Health Support with AI Safety Agents**
+Transforming University Mental Health Support with AI Safety Agents
 
 UGM-AICare is a comprehensive mental health platform designed specifically for university communities at Universitas Gadjah Mada. Built with a **Safety Agent Suite architecture**, it delivers proactive crisis detection, personalized coaching, operational case management, and privacy-first analytics—all under explicit professional oversight and verifiable privacy guarantees.
 
@@ -17,6 +17,7 @@ The platform centers around **Aika**, an AI companion powered by a multi-agent s
 **Four coordinated AI agents powered by LangGraph orchestration:**
 
 #### 🚨 Safety Triage Agent (STA)
+
 - **Real-time Crisis Detection**: Automated risk classification and escalation routing within chat conversations
 - **Consent-Aware Disclosures**: Feature-flagged crisis protocols with human oversight
 - **Crisis Banner Orchestration**: Dynamic in-chat safety alerts and resource recommendations
@@ -24,6 +25,7 @@ The platform centers around **Aika**, an AI companion powered by a multi-agent s
 - **Fail-Closed Design**: Defaults to human review when AI confidence is uncertain
 
 #### 💬 Support Coach Agent (SCA)
+
 - **Personalized Intervention Plans**: Evidence-based action plans with step-by-step guidance
 - **Automated Plan Generation**: AI-generated interventions stored and tracked in database
 - **Progress Tracking**: Visual progress bars and completion status for each intervention step
@@ -31,12 +33,14 @@ The platform centers around **Aika**, an AI companion powered by a multi-agent s
 - **Throttled Delivery**: Prevents notification fatigue with intelligent pacing
 
 #### 🗂️ Service Desk Agent (SDA)
+
 - **Case Management Dashboard**: Operational command center for clinical staff
 - **SLA Tracking**: Automated timers and escalation ladders for follow-ups
 - **Case Timelines**: Complete history of interventions and escalations
 - **Interoperability Hooks**: Integration points for campus systems
 
 #### 🔍 Intelligence Analytics (IA)
+
 - **Privacy-Respecting Analytics**: Differential privacy with ε-δ budget tracking
 - **Consent-Aware Dimensions**: Only analyzes data with explicit consent
 - **Redaction Policies**: Clinical approval checkpoints for sensitive insights
@@ -44,19 +48,20 @@ The platform centers around **Aika**, an AI companion powered by a multi-agent s
 
 ### 🤖 Intelligent Chat Support (Aika)
 
-* **AI-Powered Conversations:**
-  * Empathetic, context-aware responses using Large Language Models (Google Gemini or locally hosted Gemma 3)
-  * Multi-agent orchestration via LangGraph for intent-based routing
-  * Real-time safety monitoring and crisis escalation
+- **AI-Powered Conversations:**
+  - Empathetic, context-aware responses using Large Language Models (Google Gemini or locally hosted Gemma 3)
+  - Multi-agent orchestration via LangGraph for intent-based routing
+  - Real-time safety monitoring and crisis escalation
 
-* **Guided Chat Modules:**
-  * Structured conversational flows (e.g., Thought Record, Problem Breakdown)
-  * State management via Redis for session persistence
-  * Dynamic loading indicators and intelligent message chunking
+- **Guided Chat Modules:**
+  - Structured conversational flows (e.g., Thought Record, Problem Breakdown)
+  - State management via Redis for session persistence
+  - Dynamic loading indicators and intelligent message chunking
 
-* **Multi-Language Support:** Available in English and Bahasa Indonesia
+- **Multi-Language Support:** Available in English and Bahasa Indonesia
 
-* **24/7 Availability:** Always-on support with automated safety monitoring
+- **24/7 Availability:** Always-on support with automated safety monitoring
+
 ### 🛡️ Safety & Privacy First
 
 - **Secure Authentication:**
@@ -268,18 +273,18 @@ Organized with npm/yarn workspaces for streamlined dependency management across 
 
 ### Prerequisites
 
-* Node.js (v18+ recommended)
-* npm or yarn or pnpm
-* Python (3.9+ recommended)
-* pip and virtualenv (`python -m venv venv`)
-* PostgreSQL Server
-* Redis Server (v6+ recommended)
-* Access keys for:
-  * Google Cloud (for OAuth Credentials)
-  * LLM Providers (Google Gemini API key; optional configuration for the local Gemma service)
-  * Redis Cloud (or local connection details)
-  * Blockchain Testnet (e.g., Alchemy/Infura API Key for Polygon Amoy) + Private Key for Deployer/Minter Wallet
-  * Email Service (e.g., Gmail App Password or Resend API Key if used)
+- Node.js (v18+ recommended)
+- npm or yarn or pnpm
+- Python (3.9+ recommended)
+- pip and virtualenv (`python -m venv venv`)
+- PostgreSQL Server
+- Redis Server (v6+ recommended)
+- Access keys for:
+  - Google Cloud (for OAuth Credentials)
+  - LLM Providers (Google Gemini API key; optional configuration for the local Gemma service)
+  - Redis Cloud (or local connection details)
+  - Blockchain Testnet (e.g., Alchemy/Infura API Key for Polygon Amoy) + Private Key for Deployer/Minter Wallet
+  - Email Service (e.g., Gmail App Password or Resend API Key if used)
 
 ### Setup Steps
 
@@ -360,9 +365,9 @@ Organized with npm/yarn workspaces for streamlined dependency management across 
     cd ..
     ```
 
-* Frontend usually runs on `http://localhost:4000`
-* Backend usually runs on `http://localhost:8000` (API docs at `http://localhost:8000/docs`)
-* Hardhat node usually runs on `http://127.0.0.1:8545/`
+- Frontend usually runs on `http://localhost:4000`
+- Backend usually runs on `http://localhost:8000` (API docs at `http://localhost:8000/docs`)
+- Hardhat node usually runs on `http://127.0.0.1:8545/`
 
 ## Environment Variables
 
@@ -509,7 +514,7 @@ npx hardhat test
 
 ### Safety Agent Workflow
 
-```
+```bash
 User Message → LangGraph Orchestrator
               ↓
     ┌─────────┴─────────┬──────────┬──────────┐
@@ -571,4 +576,4 @@ This project is licensed under the MIT License. See the [LICENSE](LICENSE) file 
 
 ---
 
-**Built with ❤️ for university mental health by the UGM AICare Team**
+Built with ❤️ for university mental health by the UGM AICare Team
