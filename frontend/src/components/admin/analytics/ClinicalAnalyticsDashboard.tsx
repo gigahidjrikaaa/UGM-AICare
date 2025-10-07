@@ -22,7 +22,9 @@ import {
   FiInfo,
   FiBell,
   FiUser,
-  FiLock
+  FiLock,
+  FiZap,
+  FiTarget
 } from 'react-icons/fi';
 
 import { ClinicalAnalyticsOverview } from './ClinicalAnalyticsOverview';
@@ -32,6 +34,8 @@ import { PrivacyAudit } from './PrivacyAudit';
 import { ClinicalOversight } from './ClinicalOversight';
 import { ConsentManagement } from './ConsentManagement';
 import { RealTimeClinicalAlerts } from './RealTimeClinicalAlerts';
+import { SafetyAgentPerformance } from './SafetyAgentPerformance';
+import { InterventionPlanAnalytics } from './InterventionPlanAnalytics';
 
 interface Tab {
   id: string;
@@ -52,6 +56,18 @@ const tabs: Tab[] = [
     label: 'Clinical Alerts',
     icon: FiBell,
     description: 'Real-time monitoring for high-risk situations requiring immediate attention'
+  },
+  {
+    id: 'agents',
+    label: 'Safety Agents',
+    icon: FiZap,
+    description: 'Performance metrics for STA, SCA, SDA, IA, and LangGraph orchestrator'
+  },
+  {
+    id: 'interventions',
+    label: 'Intervention Plans',
+    icon: FiTarget,
+    description: 'Intervention plan analytics, completion rates, and effectiveness tracking'
   },
   {
     id: 'treatment',
@@ -94,6 +110,10 @@ export function ClinicalAnalyticsDashboard() {
         return <ClinicalAnalyticsOverview />;
       case 'alerts':
         return <RealTimeClinicalAlerts />;
+      case 'agents':
+        return <SafetyAgentPerformance />;
+      case 'interventions':
+        return <InterventionPlanAnalytics />;
       case 'treatment':
         return <TreatmentOutcomes />;
       case 'utilization':
