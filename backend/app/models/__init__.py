@@ -35,7 +35,13 @@ from .social import Tweet, UserBadge
 
 # Analytics and reporting models
 from .analytics import AnalyticsReport
-from .interventions import InterventionCampaign, CampaignExecution, InterventionAgentSettings
+from .interventions import (
+    InterventionCampaign, 
+    CampaignExecution, 
+    InterventionAgentSettings,
+    InterventionPlanRecord,
+    InterventionPlanStepCompletion
+)
 from .agents import AgentRun, AgentMessage
 from .assessments import TriageAssessment
 from .scheduling import TherapistSchedule, FlaggedSession

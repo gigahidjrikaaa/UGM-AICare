@@ -108,7 +108,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
             {[
               { href: "/", label: "Home" },
               { href: "/about", label: "About" },
-              { href: "/resources", label: "Resources" },
+              { href: "/journaling", label: "Journaling" },
               { href: "/aika", label: "Talk to Aika" }
             ].map((link, i) => (
               <motion.div key={i} className="relative">

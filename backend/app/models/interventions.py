@@ -9,6 +9,7 @@ from datetime import datetime
 
 if TYPE_CHECKING:
     from .user import User
+    from .conversations import Conversation
 
 class InterventionCampaign(Base):
     """Automated intervention campaigns."""
@@ -76,3 +77,69 @@ class InterventionAgentSettings(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
     updated_by_user: Mapped[Optional["User"]] = relationship("User")
+
+
+class InterventionPlanRecord(Base):
+    """Stores SCA-generated intervention plans for users."""
+    __tablename__ = "intervention_plan_records"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    session_id: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
+    conversation_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("conversations.id"), nullable=True, index=True)
+    
+    # Plan metadata
+    plan_title: Mapped[str] = mapped_column(String(500), nullable=False)
+    risk_level: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # From STA (0-3)
+    
+    # Full plan data from SCA (JSON structure)
+    plan_data: Mapped[dict] = mapped_column(JSON, nullable=False)
+    # Structure: {
+    #   "plan_steps": [{"title": str, "description": str, "completed": bool}],
+    #   "resource_cards": [{"title": str, "url": str, "description": str}],
+    #   "next_check_in": {"timeframe": str, "method": str}
+    # }
+    
+    # Progress tracking
+    completion_tracking: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
+    # Structure: {
+    #   "completed_steps": [0, 2],  # indices of completed steps
+    #   "completion_percentage": 0.0,
+    #   "last_updated": "2025-10-07T12:00:00Z"
+    # }
+    
+    total_steps: Mapped[int] = mapped_column(Integer, nullable=False)
+    completed_steps: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    
+    # Status tracking
+    status: Mapped[str] = mapped_column(String(50), default="active", index=True)
+    # Values: active, completed, archived, expired
+    
+    is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    archived_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+    last_viewed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    
+    # Relationships
+    user: Mapped["User"] = relationship("User")
+    conversation: Mapped[Optional["Conversation"]] = relationship("Conversation")
+
+
+class InterventionPlanStepCompletion(Base):
+    """Tracks individual step completions within intervention plans."""
+    __tablename__ = "intervention_plan_step_completions"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    plan_id: Mapped[int] = mapped_column(Integer, ForeignKey("intervention_plan_records.id"), nullable=False, index=True)
+    step_index: Mapped[int] = mapped_column(Integer, nullable=False)
+    step_title: Mapped[str] = mapped_column(String(500), nullable=False)
+    
+    completed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    completed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)

@@ -1,0 +1,4 @@
+.progressBar {
+  width: var(--progress-width);
+  transition: width 300ms ease-in-out;
+}

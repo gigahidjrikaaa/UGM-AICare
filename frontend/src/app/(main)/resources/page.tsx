@@ -1,188 +1,520 @@
-// frontend/src/app/resources/page.tsx
 "use client";
 
-import ParticleBackground from '@/components/ui/ParticleBackground';
-import React from 'react';
-import { FiPhone, FiAlertTriangle, FiUsers, FiHeart, FiShield } from 'react-icons/fi';
-import ResourceCard, { ResourceCardProps } from '@/components/ui/ResourceCard'; // Import the new ResourceCard
+import React from "react";
+import {
+  FiAlertTriangle,
+  FiHeart,
+  FiPhone,
+  FiSearch,
+  FiArrowRight,
+  FiBookOpen,
+  FiCheckCircle,
+  FiStar,
+  FiMonitor,
+  FiMessageCircle,
+} from "react-icons/fi";
+import { BsChatDots } from "react-icons/bs";
+import Link from "next/link";
+import ParticleBackground from "@/components/ui/ParticleBackground";
+import ResourceCard, { ResourceCardProps } from "@/components/ui/ResourceCard";
+import { PlanCard } from "@/components/resources/PlanCard";
+import { useInterventionPlans } from "@/hooks/useInterventionPlans";
 
-// --- Data for Resources ---
+interface PracticeCardProps {
+  title: string;
+  duration: string;
+  goal: string;
+  steps: string[];
+  cta?: { label: string; href: string };
+}
+
+const PracticeCard: React.FC<PracticeCardProps> = ({ title, duration, goal, steps, cta }) => (
+  <div className="p-5 bg-gradient-to-br from-white/5 via-white/8 to-white/5 border border-white/10 rounded-xl shadow-lg space-y-4">
+    <div className="flex items-center gap-3">
+      <div className="p-2 rounded-lg bg-[#FFCA40]/10 text-[#FFCA40]">
+        <FiStar size={18} />
+      </div>
+      <div>
+        <h3 className="text-lg font-semibold text-white">{title}</h3>
+        <p className="text-xs text-gray-300 uppercase tracking-widest">
+          {duration} • {goal}
+        </p>
+      </div>
+    </div>
+    <ul className="space-y-2 text-sm text-gray-100">
+      {steps.map((step) => (
+        <li key={step} className="flex gap-2">
+          <FiCheckCircle className="mt-1 flex-shrink-0 text-[#FFCA40]" size={14} />
+          <span className="leading-relaxed">{step}</span>
+        </li>
+      ))}
+    </ul>
+    {cta && (
+      <a href={cta.href} className="inline-flex items-center px-3 py-2 bg-white/10 hover:bg-white/20 transition-colors rounded-lg text-sm text-white">
+        {cta.label}
+        <FiArrowRight className="ml-2" />
+      </a>
+    )}
+  </div>
+);
+
+const selfGuidedPractices: PracticeCardProps[] = [
+  {
+    title: "Mindful Breathing Reset",
+    duration: "5 minutes",
+    goal: "Reduce stress spikes",
+    steps: [
+      "Sit upright, feet grounded. Place a hand on your chest to notice movement.",
+      "Breathe in for 4 seconds, hold for 4, exhale for 6. Repeat for 5 cycles.",
+      "Notice one thing you can see, hear, and feel to anchor yourself.",
+      "Write a quick reflection in your journal about what shifted.",
+    ],
+    cta: { label: "Start breathing timer", href: "https://www.calm.com/breathe" },
+  },
+  {
+    title: "Two-Line Journal Check-In",
+    duration: "3 minutes",
+    goal: "Spot emotional patterns",
+    steps: [
+      "Write one sentence about something that felt heavy today.",
+      "Follow with one sentence about something that gave you energy or relief.",
+      "Optional: jot a next-step intention for tomorrow.",
+      "Revisit in a week to notice recurring themes and improvements.",
+    ],
+    cta: { label: "Open journal", href: "/(main)/journaling" },
+  },
+  {
+    title: "Night-Time Wind Down",
+    duration: "10 minutes",
+    goal: "Ease busy thoughts before bed",
+    steps: [
+      "Dim screens and lights. Play soft audio or white noise.",
+      "List three things you handled today—even the small wins.",
+      "Write down worries for tomorrow, then schedule when you'll handle them.",
+      "Try progressive muscle relaxation: tense and release each muscle group from toes to head.",
+    ],
+    cta: { label: "Download sleep checklist", href: "https://drive.google.com" },
+  },
+];
+
 const ugmResources: ResourceCardProps[] = [
-    {
-        name: "Gadjah Mada Medical Center (GMC)",
-        description: "Provides various medical services, including psychological counseling (\"Konseling Psikologi\"). Offers support for both physical and mental well-being.",
-        targetAudience: "UGM Students, Staff, and General Public (some services)",
-        servicesOffered: ["Medical Consultation", "Psychological Counseling", "Health Checks"],
-        address: "SEKIP Blok L3, Sendowo, Sinduadi, Mlati, Sleman, DIY 55281",
-        phone: "+62 (0274) 551412",
-        whatsapp: "6281328786991", // Admin WhatsApp
-        website: "gmc.ugm.ac.id",
-        operatingHours: "Mon-Fri: 07.30 - 20.00, Sat: 07.30 - 14.00 (Confirm for specific services)",
-        notes: "Psychological counseling may require an appointment. Check website for details.",
-        category: "UGM",
-    },
-    {
-        name: "Health Promoting University (HPU UGM)",
-        description: "Focuses on holistic health services including mental health support, workshops, and community health programs to foster a healthy campus environment.",
-        targetAudience: "UGM Community",
-        servicesOffered: ["Mental Health Support", "Health Workshops", "Community Programs", "Wellness Info"],
-        address: "Jl. Mahoni, Sekip Utara, Yogyakarta",
-        phone: "+62 (0274) 552406",
-        website: "hpu.ugm.ac.id",
-        operatingHours: "Office hours, specific program times vary.",
-        category: "UGM",
-    },
-    {
-        name: "Faculty of Psychology Counseling Services (PPM)",
-        description: "Professional counseling available through the Center for Public Service (Pusat Pelayanan Masyarakat) with licensed psychologists.",
-        targetAudience: "UGM Students, Staff, and General Public",
-        servicesOffered: ["Individual Counseling", "Group Counseling", "Psychological Assessment"],
-        address: "Faculty of Psychology UGM, Jl. Sosio Humaniora Bulaksumur, Yogyakarta",
-        phone: "+62 (0274) 550435",
-        email: "ppm.psikologi@ugm.ac.id",
-        website: "psikologi.ugm.ac.id/ppm",
-        operatingHours: "Appointment-based, check website or contact for availability.",
-        category: "UGM",
-    },
-    {
-        name: "UGM Student Affairs Crisis Line (Ditmawa)",
-        description: "Available for emergency student support 24/7. Managed by the Directorate of Student Affairs for urgent mental health concerns and crisis situations.",
-        targetAudience: "UGM Students",
-        servicesOffered: ["24/7 Crisis Support", "Emergency Mental Health Aid"],
-        phone: "+62 812-2877-3800", // Also WhatsApp
-        whatsapp: "6281228773800",
-        website: "ditmawa.ugm.ac.id",
-        operatingHours: "24/7",
-        notes: "For urgent situations and crisis intervention.",
-        category: "UGM",
-    }
+  {
+    name: "Gadjah Mada Medical Center (GMC)",
+    description:
+      "Medical and psychological services for the UGM community. Book ahead for counseling sessions.",
+    targetAudience: "UGM students & staff",
+    servicesOffered: ["Psychological Counseling", "Medical Consultation", "Health Checks"],
+    address: "SEKIP Blok L3, Sinduadi, Sleman, DIY",
+    phone: "+62 (0274) 551412",
+    whatsapp: "6281328786991",
+    website: "https://gmc.ugm.ac.id",
+    operatingHours: "Mon-Fri 07.30–20.00 • Sat 07.30–14.00",
+  },
+  {
+    name: "HPU UGM (Health Promoting University)",
+    description:
+      "Workshops, peer programmes, and health consultations to support a thriving campus community.",
+    targetAudience: "UGM community",
+    servicesOffered: ["Mental Health Programs", "Workshops", "Peer Support"],
+    address: "Jl. Mahoni, Sekip Utara, Yogyakarta",
+    phone: "+62 (0274) 552406",
+    website: "https://hpu.ugm.ac.id",
+    operatingHours: "Office hours (check events for schedule)",
+  },
+  {
+    name: "Faculty of Psychology Counseling (PPM)",
+    description:
+      "Licensed psychologists offer individual and group sessions by appointment.",
+    targetAudience: "Students, staff, public",
+    servicesOffered: ["Individual Counseling", "Group Counseling", "Psychological Assessment"],
+    address: "Fakultas Psikologi UGM, Bulaksumur",
+    phone: "+62 (0274) 550435",
+    email: "ppm.psikologi@ugm.ac.id",
+    website: "https://psikologi.ugm.ac.id/ppm",
+  },
+  {
+    name: "UGM Student Affairs Crisis Line",
+    description:
+      "24/7 WhatsApp and phone line for urgent student support through Ditmawa.",
+    targetAudience: "UGM students",
+    servicesOffered: ["Crisis Support", "Emergency Response"],
+    phone: "+62 812-2877-3800",
+    whatsapp: "6281228773800",
+    website: "https://ditmawa.ugm.ac.id",
+    operatingHours: "24/7",
+  },
 ];
 
-const nationalHotlines: ResourceCardProps[] = [
-    {
-        name: "Kemenkes SEJIWA (Counseling)",
-        description: "Ministry of Health's national mental health counseling service.",
-        targetAudience: "General Public (Indonesia)",
-        servicesOffered: ["Mental Health Counseling", "Crisis Support"],
-        phone: "119 ext. 8",
-        website: "www.healing119.id", // Assuming this is the correct website
-        operatingHours: "24/7 (typically, confirm via call)",
-        category: "National",
-    },
-    {
-        name: "LISA Suicide Prevention Helpline (Bahasa Indonesia)",
-        description: "Dedicated suicide prevention helpline offering support in Bahasa Indonesia.",
-        targetAudience: "Individuals in crisis, those with suicidal thoughts (Bahasa)",
-        servicesOffered: ["Suicide Prevention", "Crisis Intervention"],
-        phone: "+62 811 3855 472",
-        category: "National",
-    },
-    {
-        name: "LISA Suicide Prevention Helpline (English)",
-        description: "Dedicated suicide prevention helpline offering support in English.",
-        targetAudience: "Individuals in crisis, those with suicidal thoughts (English)",
-        servicesOffered: ["Suicide Prevention", "Crisis Intervention"],
-        phone: "+62 811 3815 472",
-        category: "National",
-    },
-    {
-        name: "Yayasan Inti Mata Jiwa",
-        description: "Foundation providing mental health support and counseling services.",
-        targetAudience: "General Public",
-        servicesOffered: ["Counseling", "Mental Health Awareness"],
-        phone: "+62 821 3860 8128",
-        category: "National",
-    },
-    {
-        name: "SAPA 129 (KemenPPPA)",
-        description: "Ministry of Women Empowerment and Child Protection's hotline for reporting violence against women and children.",
-        targetAudience: "Women and Children experiencing violence, reporters",
-        servicesOffered: ["Reporting Violence", "Protection Services Info"],
-        phone: "129",
-        website: "sapa129.kemenpppa.go.id", // Example, verify actual website
-        category: "National",
-    },
-    {
-        name: "IndoPsyCare (Admin Chat for Info)",
-        description: "Provides information and admin support for psychological care services.",
-        targetAudience: "General Public seeking info",
-        servicesOffered: ["Information on Psychologists", "Appointment Assistance (potentially)"],
-        phone: "+62 812-1511-3685", // Likely WhatsApp for admin chat
-        whatsapp: "6281215113685",
-        category: "National",
-    }
+const nationalResources: ResourceCardProps[] = [
+  {
+    name: "SEJIWA 119 ext. 8",
+    description: "National mental-health hotline with counselors on standby.",
+    targetAudience: "Anyone in Indonesia",
+    servicesOffered: ["Counseling", "Crisis Support"],
+    phone: "119 ext. 8",
+    website: "https://healing119.id",
+    operatingHours: "24/7",
+  },
+  {
+    name: "LISA Suicide Prevention (Bahasa)",
+    description: "Confidential suicide-prevention helpline in Bahasa Indonesia.",
+    targetAudience: "Individuals in crisis",
+    phone: "+62 811 3855 472",
+  },
+  {
+    name: "LISA Suicide Prevention (English)",
+    description: "English-language suicide-prevention helpline.",
+    targetAudience: "International students & English speakers",
+    phone: "+62 811 3815 472",
+  },
+  {
+    name: "SAPA 129 – Ministry of Women & Child Protection",
+    description: "Report violence or seek guidance for women and children.",
+    targetAudience: "Women & children",
+    servicesOffered: ["Violence Reporting", "Counseling"],
+    phone: "129",
+    whatsapp: "628119129129",
+    website: "https://sap129.id",
+  },
 ];
 
+const digitalTools = [
+  {
+    title: "Grounding Audio Pack",
+    description: "Short audio guides for panic, overthinking, and sleep support.",
+    href: "https://drive.google.com",
+  },
+  {
+    title: "Weekly Planner Template",
+    description: "Printable planner to balance study, rest, and wellbeing goals.",
+    href: "https://notion.so",
+  },
+  {
+    title: "Mood Tracker (Google Sheet)",
+    description: "Track emotions and triggers; share with a counselor if needed.",
+    href: "https://docs.google.com",
+  },
+];
 
-export default function ResourcesPage() {
-    return (
-        <div className="min-h-screen bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white pt-4 md:pt-10 relative pb-16"> {/* Increased top padding, added bottom padding */}
-            <div className="absolute inset-0 z-0 opacity-30">
-                <ParticleBackground count={80} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={1} maxSize={5} speed={0.8} />
-            </div>
+const upcomingEvents = [
+  {
+    title: "Stress Reset: Mini Workshop",
+    date: "Wed, 16 Oct • 16:00 WIB",
+    location: "HPU Studio, Sekip Utara",
+    href: "https://hpu.ugm.ac.id/events",
+  },
+  {
+    title: "Peer Circle: Homesickness Edition",
+    date: "Fri, 18 Oct • 18:30 WIB",
+    location: "Zoom (link shared after RSVP)",
+    href: "https://bit.ly/peer-circle-ugm",
+  },
+];
 
-            <main className="max-w-5xl mx-auto p-4 md:p-6 lg:p-8 relative z-10">
-                <header className="text-center mb-10 md:mb-12">
-                    <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-[#FFCA40] mb-3">
-                        Mental Health & Well-being Resources
-                    </h1>
-                    <p className="text-base sm:text-lg text-gray-300 max-w-2xl mx-auto">
-                        Your well-being matters. Explore these resources for support, guidance, and information.
-                    </p>
-                </header>
+export default function SupportHubPage() {
+  const { data, isLoading, error, refetch } = useInterventionPlans(true);
 
-                {/* Disclaimer - Enhanced Styling */}
-                <div className="mb-10 md:mb-12 p-4 sm:p-5 bg-red-700/80 border-2 border-red-500/70 rounded-xl shadow-2xl flex items-start text-white">
-                    <FiAlertTriangle className="text-red-200 mr-3 sm:mr-4 mt-1 flex-shrink-0" size={28} />
-                    <div>
-                        <h2 className="text-lg sm:text-xl font-semibold mb-1.5 text-red-100">Immediate Crisis Support</h2>
-                        <p className="text-sm sm:text-base mb-3">
-                            If you or someone you know is in immediate danger or crisis, please reach out to emergency services or a dedicated crisis hotline immediately. <strong>Aika is not a substitute for emergency services.</strong>
-                        </p>
-                        <div className="flex flex-wrap gap-3">
-                            <a href="tel:112" className="px-4 py-2 bg-red-500 hover:bg-red-400 rounded-lg font-semibold text-white transition-colors text-sm inline-flex items-center shadow-md">
-                                <FiPhone className="mr-2" /> Call Emergency: 112
-                            </a>
-                            <a href="tel:119;ext=8" className="px-4 py-2 bg-red-500 hover:bg-red-400 rounded-lg font-semibold text-white transition-colors text-sm inline-flex items-center shadow-md">
-                                <FiHeart className="mr-2" /> Kemenkes Hotline: 119 (ext. 8)
-                            </a>
-                        </div>
-                    </div>
+  const plans = data?.plans || [];
+  const hasPlan = plans.length > 0;
+
+  return (
+    <div className="relative min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
+      <ParticleBackground />
+      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 space-y-16">
+        <header className="space-y-6 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-xs sm:text-sm text-[#FFCA40] uppercase tracking-[0.3em]">
+            <FiBookOpen /> Community Support Hub
+          </div>
+          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-bold text-white">UGM Mental Health Resources</h1>
+          <p className="text-base sm:text-lg text-gray-300 max-w-2xl mx-auto">
+            Find trusted campus contacts, national hotlines, self-care practices, and upcoming events to support your wellbeing journey.
+          </p>
+          <div className="max-w-xl mx-auto">
+            <label className="relative block">
+              <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+              <input
+                type="search"
+                placeholder="Search resources (e.g., counseling, workshops, crisis line)"
+                className="w-full pl-10 pr-4 py-3 rounded-xl bg-white/10 border border-white/15 text-sm text-white placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-[#FFCA40] focus:border-transparent"
+              />
+            </label>
+            <p className="text-xs text-gray-400 text-left mt-2">
+              Quick links:
+              <span className="text-[#FFCA40]"> #counseling</span>
+              <span className="text-[#FFCA40]"> #workshops</span>
+              <span className="text-[#FFCA40]"> #hotlines</span>
+            </p>
+          </div>
+        </header>
+
+        {/* SCA Integration Banner */}
+        <section className="bg-gradient-to-r from-[#001D58] to-[#003580] border-2 border-[#FFCA40]/30 rounded-2xl p-6 sm:p-8 shadow-2xl shadow-[#FFCA40]/10">
+          <div className="flex flex-col md:flex-row gap-6 items-center">
+            <div className="flex-shrink-0">
+              <div className="relative">
+                <div className="absolute inset-0 bg-[#FFCA40] blur-xl opacity-30 rounded-full"></div>
+                <div className="relative p-4 bg-[#FFCA40] rounded-2xl">
+                  <BsChatDots size={32} className="text-[#001D58]" />
                 </div>
+              </div>
+            </div>
+            <div className="flex-1 text-center md:text-left">
+              <h2 className="text-2xl font-bold text-white mb-2 flex items-center justify-center md:justify-start gap-2">
+                <FiMessageCircle className="text-[#FFCA40]" />
+                Need Help Right Now?
+              </h2>
+              <p className="text-gray-200 text-sm sm:text-base leading-relaxed mb-4">
+                Talk to <span className="font-semibold text-[#FFCA40]">Aika</span> for personalized support and contextual intervention plans. 
+                Our AI companion can assess your situation and provide immediate guidance tailored to your needs.
+              </p>
+              <p className="text-xs text-gray-300 italic">
+                ✨ Aika uses our Support Coach Agent (SCA) to generate personalized intervention plans with step-by-step actions and relevant resources.
+              </p>
+            </div>
+            <div className="flex-shrink-0">
+              <Link
+                href="/aika"
+                className="group relative inline-flex items-center gap-3 px-6 py-4 bg-[#FFCA40] hover:bg-[#FFD770] text-[#001D58] font-bold rounded-xl shadow-lg shadow-[#FFCA40]/30 hover:shadow-[#FFCA40]/50 transition-all duration-300 transform hover:scale-105"
+              >
+                <BsChatDots size={20} />
+                <span>Talk to Aika</span>
+                <FiArrowRight className="group-hover:translate-x-1 transition-transform" />
+              </Link>
+            </div>
+          </div>
+        </section>
 
-                {/* UGM On-Campus Resources */}
-                <section className="mb-10 md:mb-12">
-                    <h2 className="text-2xl sm:text-3xl font-semibold border-b-2 border-[#FFCA40]/60 pb-3 mb-6 flex items-center text-white">
-                        <FiUsers className="mr-3 text-[#FFCA40]" size={28} /> UGM On-Campus Resources
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-5 sm:gap-6">
-                        {ugmResources.map((resource) => (
-                            <ResourceCard key={resource.name} {...resource} />
-                        ))}
-                    </div>
-                </section>
+        {/* Emergency Crisis Support */}
+        <section className="bg-red-700/80 border border-red-500/60 rounded-2xl p-6 sm:p-7 shadow-xl text-white flex flex-col sm:flex-row gap-5" id="immediate-help">
+          <div className="sm:w-1/4 flex items-start gap-3">
+            <div className="p-3 bg-red-600/80 rounded-xl shadow-inner">
+              <FiAlertTriangle size={28} className="text-white" />
+            </div>
+            <div>
+              <h2 className="text-xl font-semibold">Emergency Crisis Support</h2>
+              <p className="text-sm text-red-100/90">
+                If you are in immediate danger or crisis, contact emergency services right away. These lines are available 24/7.
+              </p>
+            </div>
+          </div>
+          <div className="sm:w-3/4 grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <a href="tel:112" className="flex items-center justify-between px-4 py-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-white/10">
+                  <FiPhone />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">Emergency Services</p>
+                  <p className="text-xs text-red-100/80">Call: 112</p>
+                </div>
+              </div>
+              <FiArrowRight />
+            </a>
+            <a href="https://wa.me/6281228773800" className="flex items-center justify-between px-4 py-3 bg-white/10 hover:bg-white/20 rounded-xl transition-colors">
+              <div className="flex items-center gap-3">
+                <div className="p-2 rounded-lg bg-white/10">
+                  <FiHeart />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold">UGM Crisis Line</p>
+                  <p className="text-xs text-red-100/80">WhatsApp: +62 812-2877-3800</p>
+                </div>
+              </div>
+              <FiArrowRight />
+            </a>
+          </div>
+        </section>
 
-                {/* National Hotlines & Support */}
-                <section className="mb-10 md:mb-12">
-                    <h2 className="text-2xl sm:text-3xl font-semibold border-b-2 border-[#FFCA40]/60 pb-3 mb-6 flex items-center text-white">
-                        <FiShield className="mr-3 text-[#FFCA40]" size={28} /> National Hotlines & Support (Indonesia)
-                    </h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-                        {nationalHotlines.map((resource) => (
-                            <ResourceCard key={resource.name} {...resource} />
-                        ))}
-                    </div>
-                </section>
+        {/* My Intervention Plans Section */}
+        <section className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-[#FFCA40]/10 text-[#FFCA40]">
+              <FiCheckCircle />
+            </div>
+            <div>
+              <h2 className="text-2xl font-semibold text-white">My Intervention Plans</h2>
+              <p className="text-sm text-gray-300">Review personalized plans generated by Aika during your support sessions.</p>
+            </div>
+          </div>
 
-                {/* Future: How to Choose Section / Filters / Search */}
-                {/* 
-                <section className="mb-10 md:mb-12 p-6 bg-white/5 rounded-xl border border-white/10">
-                    <h2 className="text-xl font-semibold mb-4 text-ugm-gold-light">Finding the Right Support</h2>
-                    <p className="text-gray-300">Not sure where to start? [Placeholder for guidance]</p>
-                </section>
-                */}
+          {/* Loading State */}
+          {isLoading && (
+            <div className="bg-white/5 border border-white/10 rounded-xl p-8 text-center">
+              <div className="max-w-md mx-auto space-y-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/10 text-gray-400 animate-pulse">
+                  <FiMessageCircle size={32} />
+                </div>
+                <p className="text-sm text-gray-400">Loading your intervention plans...</p>
+              </div>
+            </div>
+          )}
 
-            </main>
-        </div>
-    );
+          {/* Error State */}
+          {error && !isLoading && (
+            <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-8 text-center">
+              <div className="max-w-md mx-auto space-y-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-red-500/20 text-red-400">
+                  <FiAlertTriangle size={32} />
+                </div>
+                <h3 className="text-xl font-semibold text-red-300">Failed to load plans</h3>
+                <p className="text-sm text-red-400">
+                  {error.message || 'Something went wrong while fetching your intervention plans.'}
+                </p>
+                <button
+                  onClick={() => refetch()}
+                  className="inline-flex items-center gap-2 px-5 py-3 bg-red-500/20 hover:bg-red-500/30 text-red-300 font-semibold rounded-lg transition-colors"
+                >
+                  Try again
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Plans List */}
+          {!isLoading && !error && hasPlan && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {plans.map((plan) => (
+                <PlanCard key={plan.id} plan={plan} onUpdate={refetch} />
+              ))}
+            </div>
+          )}
+
+          {/* Empty State */}
+          {!isLoading && !error && !hasPlan && (
+            <div className="bg-white/5 border border-white/10 rounded-xl p-8 text-center">
+              <div className="max-w-md mx-auto space-y-4">
+                <div className="inline-flex items-center justify-center w-16 h-16 rounded-full bg-white/10 text-gray-400">
+                  <FiMessageCircle size={32} />
+                </div>
+                <h3 className="text-xl font-semibold text-white">No intervention plans yet</h3>
+                <p className="text-sm text-gray-400 leading-relaxed">
+                  When you chat with Aika and our Support Coach Agent (SCA) identifies you need help, personalized intervention plans will appear here. 
+                  These plans include step-by-step actions, resources, and follow-up guidance.
+                </p>
+                <Link
+                  href="/aika"
+                  className="inline-flex items-center gap-2 px-5 py-3 bg-[#FFCA40] hover:bg-[#FFD770] text-[#001D58] font-semibold rounded-lg transition-colors"
+                >
+                  <BsChatDots />
+                  Start a conversation with Aika
+                  <FiArrowRight />
+                </Link>
+              </div>
+            </div>
+          )}
+        </section>
+
+        {/* Self-Guided Practices */}
+        <section className="space-y-6" id="self-guided">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-[#FFCA40]/10 text-[#FFCA40]">
+              <FiMonitor />
+            </div>
+            <div>
+              <h2 className="text-2xl font-semibold text-white">Self-guided practices</h2>
+              <p className="text-sm text-gray-300">Try short exercises to calm your body, reflect, or prepare for tomorrow.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            {selfGuidedPractices.map((practice) => (
+              <PracticeCard key={practice.title} {...practice} />
+            ))}
+          </div>
+        </section>
+
+        {/* Professional Support Contacts */}
+        <section className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-[#FFCA40]/10 text-[#FFCA40]">
+              <FiBookOpen />
+            </div>
+            <div>
+              <h2 className="text-2xl font-semibold text-white">Professional support contacts</h2>
+              <p className="text-sm text-gray-300">Reach out for one-on-one counseling, workshops, or crisis support when you need more help.</p>
+            </div>
+          </div>
+          <div className="space-y-10">
+            <div>
+              <h3 className="text-lg font-semibold text-gray-200 mb-4">On-campus support (UGM)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+                {ugmResources.map((resource) => (
+                  <ResourceCard key={resource.name} {...resource} />
+                ))}
+              </div>
+            </div>
+            <div>
+              <h3 className="text-lg font-semibold text-gray-200 mb-4">National helplines (Indonesia)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                {nationalResources.map((resource) => (
+                  <ResourceCard key={resource.name} {...resource} />
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Digital Tools */}
+        <section className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-[#FFCA40]/10 text-[#FFCA40]">
+              <FiMonitor />
+            </div>
+            <div>
+              <h2 className="text-2xl font-semibold text-white">Digital tools & worksheets</h2>
+              <p className="text-sm text-gray-300">Download templates and audio guides to support your wellbeing practice.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {digitalTools.map((tool) => (
+              <a
+                key={tool.title}
+                href={tool.href}
+                className="p-5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors space-y-2"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <h3 className="text-lg font-semibold text-white">{tool.title}</h3>
+                <p className="text-sm text-gray-300 leading-relaxed">{tool.description}</p>
+                <span className="inline-flex items-center text-xs text-[#FFCA40] uppercase tracking-widest font-semibold">
+                  Open resource <FiArrowRight className="ml-1" />
+                </span>
+              </a>
+            ))}
+          </div>
+        </section>
+
+        {/* Upcoming Workshops */}
+        <section className="space-y-6">
+          <div className="flex items-center gap-3">
+            <div className="p-2 rounded-lg bg-[#FFCA40]/10 text-[#FFCA40]">
+              <FiBookOpen />
+            </div>
+            <div>
+              <h2 className="text-2xl font-semibold text-white">Upcoming workshops & circles</h2>
+              <p className="text-sm text-gray-300">Join a live session to learn coping strategies and connect with others.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            {upcomingEvents.map((event) => (
+              <a
+                key={event.title}
+                href={event.href}
+                className="p-5 bg-white/5 border border-white/10 rounded-xl hover:bg-white/10 transition-colors flex flex-col gap-2"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <span className="text-xs uppercase tracking-[0.3em] text-[#FFCA40]">Upcoming</span>
+                <h3 className="text-lg font-semibold text-white">{event.title}</h3>
+                <p className="text-sm text-gray-300">{event.date}</p>
+                <p className="text-sm text-gray-400">{event.location}</p>
+                <span className="text-xs text-[#FFCA40] inline-flex items-center mt-2">
+                  RSVP <FiArrowRight className="ml-1" />
+                </span>
+              </a>
+            ))}
+          </div>
+        </section>
+      </main>
+    </div>
+  );
 }

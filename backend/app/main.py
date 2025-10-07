@@ -25,6 +25,7 @@ from app.routes import (
     safety_triage,
     clinical_analytics_routes,
     system,
+    intervention_plans,
 )
 from app.agents.sta.router import router as sta_router
 from app.agents.sca.router import router as sca_router
@@ -161,6 +162,7 @@ app.include_router(sta_router)
 app.include_router(sca_router)
 app.include_router(sda_router)
 app.include_router(ia_router)
+app.include_router(intervention_plans.router)  # Intervention plan records
 app.include_router(appointments.router)
 app.include_router(surveys.router)
 app.include_router(surveys.user_router)

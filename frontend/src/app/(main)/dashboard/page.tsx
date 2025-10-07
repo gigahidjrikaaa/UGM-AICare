@@ -1,4 +1,3 @@
-
 "use client";
 
 import Link from "next/link";
@@ -10,7 +9,6 @@ import {
   FiActivity,
   FiArrowRight,
   FiAward,
-  FiBookOpen,
   FiCalendar,
   FiClock,
   FiRefreshCw,
@@ -57,12 +55,6 @@ const quickActions: QuickAction[] = [
     label: "Book support",
     description: "Schedule time with the counselling team.",
     icon: <FiCalendar className="h-5 w-5" />,
-  },
-  {
-    href: "/resources",
-    label: "Explore resources",
-    description: "Find guides, coping strategies, and modules.",
-    icon: <FiBookOpen className="h-5 w-5" />,
   },
 ];
 
@@ -163,7 +155,9 @@ export default function DashboardPage() {
 
   const firstName = useMemo(() => {
     if (!profile) return "Friend";
-    const preferred = profile.header.preferred_name ?? profile.header.full_name ?? profile.header.name;
+    // Use only fields that exist on ProfileHeaderSummary.
+    // Removed reference to `profile.header.name` which does not exist.
+    const preferred = profile.header.preferred_name ?? profile.header.full_name ?? "";
     if (!preferred) return "Friend";
     return preferred.split(" ")[0];
   }, [profile]);

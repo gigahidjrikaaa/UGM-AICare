@@ -31,6 +31,14 @@ from app.agents.sta.schemas import (
     STAClassifyResponse,
 )
 from app.agents.sta.service import SafetyTriageService
+from app.schemas.intervention_plans import (
+    InterventionPlanRecordCreate,
+    InterventionPlanData,
+    PlanStep,
+    ResourceCard,
+    NextCheckIn
+)
+from app.services.intervention_plan_service import InterventionPlanService
 
 logger = logging.getLogger(__name__)
 
@@ -189,6 +197,15 @@ class AgentIntegrationService:
             result.intervention_plan = sca_response
             result.intervention_reason = f"risk_level_{risk_level}_{intent}"
             
+            # Store the intervention plan in database
+            await self._store_intervention_plan(
+                user_id=user_id,
+                session_id=session_id,
+                sca_response=sca_response,
+                risk_level=risk_level,
+                conversation_id=None  # TODO: Pass conversation_id from chat service if available
+            )
+            
             logger.info(
                 "SCA Intervention Generated - User: %s, Intent: %s, Steps: %s, Resources: %s",
                 user_id,
@@ -260,3 +277,111 @@ class AgentIntegrationService:
         if session_id:
             return hashlib.sha256(f"session:{session_id}".encode("utf-8")).hexdigest()[:16]
         return None
+    
+    async def _store_intervention_plan(
+        self,
+        user_id: int,
+        session_id: str,
+        sca_response: SCAInterveneResponse,
+        risk_level: int,
+        conversation_id: Optional[int] = None
+    ) -> None:
+        """Store SCA-generated intervention plan in database.
+        
+        Args:
+            user_id: User's database ID
+            session_id: Current session ID
+            sca_response: The SCA intervention response
+            risk_level: Risk level from STA (0-3)
+            conversation_id: Optional conversation ID from chat
+        """
+        try:
+            # Convert SCA response objects to intervention plan schema format
+            from app.schemas.intervention_plans import PlanStep as InterventionPlanStep
+            from app.schemas.intervention_plans import ResourceCard as InterventionResourceCard
+            from app.schemas.intervention_plans import NextCheckIn as InterventionNextCheckIn
+            
+            # Convert plan steps (SCA uses id/label, we use title/description)
+            plan_steps = [
+                InterventionPlanStep(
+                    title=step.label,  # SCA uses 'label'
+                    description=f"{step.label} ({step.duration_min} min)" if step.duration_min else step.label,
+                    completed=False
+                )
+                for step in sca_response.plan_steps
+            ]
+            
+            # Convert resource cards (SCA uses resource_id/summary, we use title/url/description)
+            resource_cards = [
+                InterventionResourceCard(
+                    title=card.title,
+                    url=card.url or "",
+                    description=card.summary
+                )
+                for card in sca_response.resource_cards
+            ]
+            
+            # Convert next_check_in (SCA uses datetime, we use timeframe/method)
+            if sca_response.next_check_in:
+                # Calculate timeframe from datetime
+                from datetime import datetime
+                time_diff = sca_response.next_check_in - datetime.now()
+                hours = int(time_diff.total_seconds() / 3600)
+                if hours < 24:
+                    timeframe = f"{hours} hours"
+                else:
+                    days = hours // 24
+                    timeframe = f"{days} days"
+                
+                next_check_in = InterventionNextCheckIn(
+                    timeframe=timeframe,
+                    method="chat"
+                )
+            else:
+                next_check_in = InterventionNextCheckIn(
+                    timeframe="24 hours",
+                    method="chat"
+                )
+            
+            plan_data = InterventionPlanData(
+                plan_steps=plan_steps,
+                resource_cards=resource_cards,
+                next_check_in=next_check_in
+            )
+            
+            # Generate plan title from first step or intent
+            plan_title = plan_steps[0].title if plan_steps else "Support Plan"
+            if len(plan_title) > 100:
+                plan_title = plan_title[:97] + "..."
+            
+            plan_create = InterventionPlanRecordCreate(
+                user_id=user_id,
+                session_id=session_id,
+                conversation_id=conversation_id,
+                plan_title=plan_title,
+                risk_level=risk_level,
+                plan_data=plan_data,
+                total_steps=len(plan_steps)
+            )
+            
+            # Store in database using async session
+            stored_plan = await InterventionPlanService.create_plan(
+                db=self.db,
+                plan_data=plan_create
+            )
+            
+            logger.info(
+                "Intervention plan stored - ID: %s, User: %s, Steps: %s",
+                stored_plan.id,
+                user_id,
+                len(plan_steps)
+            )
+            
+        except Exception as error:
+            logger.error(
+                "Failed to store intervention plan for user %s: %s",
+                user_id,
+                error,
+                exc_info=True
+            )
+            # Don't raise - plan storage failure shouldn't block user flow

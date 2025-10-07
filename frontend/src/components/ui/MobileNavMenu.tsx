@@ -24,7 +24,6 @@ interface MobileNavMenuProps {
 const mobileNavItems = [
     { href: "/", label: "Home", icon: <FiBookOpen size={18} /> },
     { href: "/about", label: "About", icon: <FiInfo size={18} /> },
-    { href: "/resources", label: "Resources", icon: <FiBookOpen size={18} /> },
     { href: "/aika", label: "Talk to Aika", icon: <BsChatDots size={18} /> },
     { href: "/journaling", label: "Journaling", icon: <FiActivity size={18} /> },
     { href: "/appointments", label: "Appointments", icon: <BsCalendar size={18} /> },

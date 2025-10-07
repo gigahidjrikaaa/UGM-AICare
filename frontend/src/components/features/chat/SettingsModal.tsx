@@ -167,7 +167,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
                 </div>
                 <button
                   onClick={onClose}
-                  className="self-start rounded-full p-1 text-gray-300 transition-colors hover:text-white focus-visible:outline focus-visible:outline-2 focus-visible:outline-ugm-gold/60"
+                  className="self-start rounded-full p-1 text-gray-300 transition-colors hover:text-white focus-visible:outline-2 focus-visible:outline-ugm-gold/60"
                   aria-label="Tutup pengaturan"
                 >
                   <FiX size={20} />
