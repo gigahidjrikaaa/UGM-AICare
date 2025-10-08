@@ -2,6 +2,14 @@
 
 The Safety Agent refactor (September 2025) supersedes several earlier documents that described the legacy analytics, intervention, and triage stacks. Those files have been retained only as historical stubs for commit history and should not be used for current development work.
 
+## Deprecated Routes
+
+| Route | Status | Replacement |
+|-------|--------|-------------|
+| `/admin/insights` | Deprecated (October 2025) | Use `/admin/analytics` - Consolidated Clinical Analytics Dashboard with Safety Agent Performance and Intervention Plan Analytics |
+
+## Deprecated Documentation Files
+
 | Legacy File | Status | Replacement |
 |-------------|--------|-------------|
 | `ai-integration-guide.md` | Deprecated | See `single-source-of-truth.md` (Safety Agent Architecture) and `refactor_plan.md` |

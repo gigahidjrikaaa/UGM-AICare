@@ -4,28 +4,28 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { signOut } from 'next-auth/react'; // Import signOut
 import {
-  FiGrid, FiUsers, FiMessageSquare, FiCalendar, FiBookOpen,
-  FiBarChart2, FiSettings, FiShield, FiLogOut, FiHelpCircle, FiFileText, FiHeart, FiLifeBuoy, FiActivity, FiUser, FiCpu
+  FiUsers,
+  FiMessageSquare,
+  FiCalendar,
+  FiSettings,
+  FiShield,
+  FiLogOut,
+  FiHelpCircle,
+  FiFileText,
+  FiHeart,
+  FiUser,
+  FiCpu,
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink'; // Assuming SidebarLink component exists
 
 // Grouped navigation structure for improved UX
 const navGroups = [
   {
-    label: 'Overview',
-    items: [
-      { name: 'Dashboard', icon: <FiGrid size={18}/>, href: '/admin/dashboard' },
-  { name: 'Insights', icon: <FiBarChart2 size={18}/>, href: '/admin/insights' },
-      { name: 'Flags & Reviews', icon: <FiShield size={18}/>, href: '/admin/flags' },
-    ]
-  },
-  {
     label: 'People & Content',
     items: [
       { name: 'Users', icon: <FiUsers size={18}/>, href: '/admin/users' },
       { name: 'Appointments', icon: <FiCalendar size={18}/>, href: '/admin/appointments' },
       { name: 'Conversations', icon: <FiMessageSquare size={18}/>, href: '/admin/conversations' },
-      { name: 'Journals', icon: <FiBookOpen size={18}/>, href: '/admin/journals' },
       { name: 'Content Resources', icon: <FiFileText size={18}/>, href: '/admin/content-resources' },
       { name: 'Surveys', icon: <FiFileText size={18}/>, href: '/admin/surveys' },
       { name: 'CBT Modules', icon: <FiHeart size={18}/>, href: '/admin/cbt-modules' },
@@ -35,8 +35,6 @@ const navGroups = [
     label: 'Agents & Intelligence',
     items: [
       { name: 'Agents Command Center', icon: <FiCpu size={18}/>, href: '/admin/agents-command-center' },
-  { name: 'Safety Triage', icon: <FiActivity size={18}/>, href: '/admin/safety-triage' },
-  { name: 'Safety Coaching', icon: <FiLifeBuoy size={18}/>, href: '/admin/safety-coaching' },
     ]
   }
 ];
