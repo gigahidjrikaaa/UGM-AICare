@@ -1,4 +1,4 @@
-import React from 'react';
+﻿import React from 'react';
 import { Metadata } from 'next';
 import { FiList } from 'react-icons/fi';
 import CbtModuleStepsTable from '@/components/admin/cbt-modules/CbtModuleStepsTable';
@@ -7,8 +7,11 @@ export const metadata: Metadata = {
     title: 'Admin: CBT Module Steps',
 };
 
-const CbtModuleStepsPage = ({ params }: { params: { moduleId: string } }) => {
-    const moduleId = parseInt(params.moduleId, 10);
+type ParamsPromise = Promise<{ moduleId: string }>;
+
+const CbtModuleStepsPage = async ({ params }: { params?: ParamsPromise }) => {
+    const resolvedParams = params ? await params : { moduleId: '0' };
+    const moduleIdNumber = parseInt(resolvedParams.moduleId, 10);
 
     return (
         <div>
@@ -18,10 +21,10 @@ const CbtModuleStepsPage = ({ params }: { params: { moduleId: string } }) => {
                         <FiList className="mr-3 text-[#FFCA40]" />
                         CBT Module Steps
                     </h1>
-                    <p className="text-gray-400 mt-1">Manage steps for module {moduleId}</p>
+                    <p className="text-gray-400 mt-1">Manage steps for module {moduleIdNumber}</p>
                 </div>
             </div>
-            <CbtModuleStepsTable moduleId={moduleId} />
+            <CbtModuleStepsTable moduleId={moduleIdNumber} />
         </div>
     );
 };

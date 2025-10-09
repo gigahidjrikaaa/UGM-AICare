@@ -59,26 +59,6 @@ class CampaignExecution(Base):
     campaign: Mapped["InterventionCampaign"] = relationship("InterventionCampaign", back_populates="executions")
     user: Mapped["User"] = relationship("User")
 
-class InterventionAgentSettings(Base):
-    """Settings for automated intervention agent."""
-    __tablename__ = "intervention_agent_settings"
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    auto_mode_enabled: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    human_review_required: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    risk_score_threshold: Mapped[float] = mapped_column(Float, default=0.7, nullable=False)
-    daily_send_limit: Mapped[int] = mapped_column(Integer, default=25, nullable=False)
-    channels_enabled: Mapped[Optional[list[str]]] = mapped_column(JSON, nullable=True)
-    escalation_email: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
-    office_hours_start: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
-    office_hours_end: Mapped[Optional[str]] = mapped_column(String(16), nullable=True)
-    manual_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    updated_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
-
-    updated_by_user: Mapped[Optional["User"]] = relationship("User")
-
-
 class InterventionPlanRecord(Base):
     """Stores SCA-generated intervention plans for users."""
     __tablename__ = "intervention_plan_records"

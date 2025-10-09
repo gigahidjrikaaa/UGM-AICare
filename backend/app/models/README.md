@@ -17,12 +17,10 @@ backend/app/models/
 ├── content.py                 # Educational content and CBT modules
 ├── email.py                   # Email templates and distribution
 ├── social.py                  # Social media and gamification
-├── analytics.py               # System analytics and reporting
 ├── interventions.py           # Automated intervention campaigns
 ├── agents.py                  # Agent execution tracking
 ├── assessments.py             # Risk assessment and triage
 ├── scheduling.py              # Therapist scheduling and sessions
-├── clinical_analytics.py      # Phase 2: Privacy-preserving analytics
 └── langgraph_tracking.py      # Phase 2: LangGraph execution tracking
 ```
 
@@ -77,10 +75,10 @@ backend/app/models/
   - `Tweet`: Social media sentiment analysis
   - `UserBadge`: Achievement badges and rewards
 
-### Analytics Models
+### Intervention Models
 
-- **analytics.py**: System performance and insights
-  - `AnalyticsReport`: System analytics and performance reports
+> Legacy analytics reporting tables (`analytics.py`, `clinical_analytics.py`) were removed in favor of the Safety Agent telemetry schema.
+
 
 - **interventions.py**: Automated mental health interventions
   - `InterventionCampaign`: Automated intervention campaigns
@@ -99,23 +97,6 @@ backend/app/models/
 - **scheduling.py**: Professional services management
   - `TherapistSchedule`: Therapist availability
   - `FlaggedSession`: Sessions requiring review
-
-### Phase 2 Analytics Models
-
-- **clinical_analytics.py**: Privacy-preserving clinical intelligence
-  - `ValidatedAssessment`: Validated clinical assessments
-  - `ClinicalOutcome`: Treatment outcome tracking
-  - `ServiceUtilization`: Healthcare service usage
-  - `InterventionOutcome`: Intervention effectiveness
-  - `SystemPerformanceMetric`: System performance metrics
-  - `ClinicalInsight`: Clinical insights and recommendations
-
-- **langgraph_tracking.py**: Advanced AI execution monitoring
-  - `LangGraphExecution`: Complete graph execution sessions
-  - `LangGraphNodeExecution`: Individual node executions
-  - `LangGraphEdgeExecution`: Edge/transition tracking
-  - `LangGraphPerformanceMetric`: Custom performance metrics
-  - `LangGraphAlert`: Performance alerts and notifications
 
 ## Import Strategy
 
@@ -189,9 +170,6 @@ conversation = Conversation(
 ```python
 # For appointment scheduling system
 from app.models import Psychologist, Appointment, AppointmentType
-
-# For clinical analytics dashboard
-from app.models import ValidatedAssessment, ClinicalOutcome
 
 # For intervention system
 from app.models import InterventionCampaign, CampaignExecution

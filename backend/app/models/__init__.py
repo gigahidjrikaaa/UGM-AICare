@@ -9,12 +9,10 @@ This package contains database models organized by domain:
 - content: Educational content and CBT modules
 - email: Email system and template models
 - social: Social media and gamification models
-- analytics: System analytics and reporting
-- interventions: Automated intervention campaigns
+- interventions: Automated intervention campaigns and plans
 - agents: Agent execution tracking
 - assessments: Risk assessment and triage
 - scheduling: Therapist scheduling and session management
-- clinical_analytics: Privacy-preserving clinical analytics models
 - langgraph_tracking: LangGraph execution tracking models
 - events/messages/cases/resources/consents/users: Safety agent telemetry and RBAC
 """
@@ -33,28 +31,16 @@ from .content import ContentResource, CbtModule, CbtModuleStep
 from .email import EmailTemplate, EmailGroup, EmailRecipient, EmailLog
 from .social import Tweet, UserBadge
 
-# Analytics and reporting models
-from .analytics import AnalyticsReport
+# Intervention models
 from .interventions import (
-    InterventionCampaign, 
-    CampaignExecution, 
-    InterventionAgentSettings,
+    InterventionCampaign,
+    CampaignExecution,
     InterventionPlanRecord,
-    InterventionPlanStepCompletion
+    InterventionPlanStepCompletion,
 )
 from .agents import AgentRun, AgentMessage
 from .assessments import TriageAssessment
 from .scheduling import TherapistSchedule, FlaggedSession
-
-# Clinical analytics models (Phase 2)
-from .clinical_analytics import (
-    ValidatedAssessment,
-    ClinicalOutcome,
-    ServiceUtilization,
-    InterventionOutcome,
-    SystemPerformanceMetric,
-    ClinicalInsight,
-)
 
 # LangGraph tracking models (Phase 2)
 from .langgraph_tracking import (
@@ -113,13 +99,11 @@ __all__ = [
     "Tweet",
     "UserBadge",
 
-    # Analytics Models
-    "AnalyticsReport",
-
     # Intervention Models
     "InterventionCampaign",
     "CampaignExecution",
-    "InterventionAgentSettings",
+    "InterventionPlanRecord",
+    "InterventionPlanStepCompletion",
 
     # Agent Models
     "AgentRun",
@@ -132,15 +116,7 @@ __all__ = [
     "TherapistSchedule",
     "FlaggedSession",
 
-    # Clinical Analytics Models (Phase 2)
-    "ValidatedAssessment",
-    "ClinicalOutcome",
-    "ServiceUtilization",
-    "InterventionOutcome",
-    "SystemPerformanceMetric",
-    "ClinicalInsight",
-
-    # LangGraph Tracking Models (Phase 2)
+    # LangGraph tracking models (Phase 2)
     "LangGraphExecution",
     "LangGraphNodeExecution",
     "LangGraphEdgeExecution",

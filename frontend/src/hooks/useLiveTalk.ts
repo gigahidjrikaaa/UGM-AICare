@@ -8,12 +8,46 @@ const TTS_WEBSOCKET_URL = "ws://localhost:8002/ws/tts";
 const SPECTROGRAM_BAR_COUNT = 16;
 const SPECTROGRAM_FRAME_INTERVAL_MS = 50;
 
-type SpeechRecognitionConstructor = new () => SpeechRecognition;
+type BrowserSpeechRecognitionAlternative = {
+  transcript: string
+  confidence: number
+}
+
+type BrowserSpeechRecognitionResult = {
+  readonly isFinal: boolean
+  readonly length: number
+  [index: number]: BrowserSpeechRecognitionAlternative
+}
+
+type BrowserSpeechRecognitionEvent = {
+  resultIndex: number
+  results: {
+    readonly length: number
+    [index: number]: BrowserSpeechRecognitionResult
+  }
+}
+
+type BrowserSpeechRecognition = {
+  lang: string
+  continuous: boolean
+  interimResults: boolean
+  start: () => void
+  stop: () => void
+  abort: () => void
+  onaudiostart?: (() => void) | null
+  onaudioend?: (() => void) | null
+  onresult?: ((event: BrowserSpeechRecognitionEvent) => void) | null
+  onstart?: (() => void) | null
+  onend?: (() => void) | null
+  onerror?: ((event: unknown) => void) | null
+}
+
+type BrowserSpeechRecognitionConstructor = new () => BrowserSpeechRecognition
 
 type ExtendedWindow = Window &
   typeof globalThis & {
-    webkitSpeechRecognition?: SpeechRecognitionConstructor;
-    SpeechRecognition?: SpeechRecognitionConstructor;
+    webkitSpeechRecognition?: BrowserSpeechRecognitionConstructor;
+    SpeechRecognition?: BrowserSpeechRecognitionConstructor;
   };
 
 type SocketStatus = "connecting" | "connected" | "disconnected";
@@ -92,10 +126,10 @@ export const useLiveTalk = ({
   const micVadRef = useRef<MicVAD | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  const browserRecognitionRef = useRef<SpeechRecognition | null>(null);
+  const browserRecognitionRef = useRef<BrowserSpeechRecognition | null>(null);
   const lastSpokenMessageIdRef = useRef<string | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
-  const dataArrayRef = useRef<Uint8Array | null>(null);
+  const dataArrayRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
   const rafRef = useRef<number | null>(null);
   const sourceNodeRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const sttReconnectTimerRef = useRef<number | null>(null);
@@ -526,7 +560,7 @@ export const useLiveTalk = ({
         sourceNodeRef.current = sourceNode;
         sourceNode.connect(analyser);
 
-        const dataArray = new Uint8Array(analyser.frequencyBinCount);
+        const dataArray: Uint8Array<ArrayBuffer> = new Uint8Array(analyser.frequencyBinCount);
         dataArrayRef.current = dataArray;
 
         let lastFrameTimestamp = 0;
@@ -569,16 +603,16 @@ export const useLiveTalk = ({
           onVADMisfire: () => setUserSpeaking(false),
           onSpeechEnd: (audio) => {
             if (sttReconnectTimerRef.current !== null) {
-      window.clearTimeout(sttReconnectTimerRef.current);
-      sttReconnectTimerRef.current = null;
-    }
-    if (ttsReconnectTimerRef.current !== null) {
-      window.clearTimeout(ttsReconnectTimerRef.current);
-      ttsReconnectTimerRef.current = null;
-    }
-    reconnectAttemptsRef.current = { stt: 0, tts: 0 };
+              window.clearTimeout(sttReconnectTimerRef.current);
+              sttReconnectTimerRef.current = null;
+            }
+            if (ttsReconnectTimerRef.current !== null) {
+              window.clearTimeout(ttsReconnectTimerRef.current);
+              ttsReconnectTimerRef.current = null;
+            }
+            reconnectAttemptsRef.current = { stt: 0, tts: 0 };
 
-    setUserSpeaking(false);
+            setUserSpeaking(false);
             if (
               sttSocketRef.current &&
               sttSocketRef.current.readyState === WebSocket.OPEN &&
@@ -717,6 +751,12 @@ export const useLiveTalk = ({
     }
   }, [messages, isLiveTalkActive, setAikaSpeaking, ttsSocketStatus, selectedVoice, ttsEnabled]);
 };
+
+
+
+
+
+
 
 
 

@@ -1,4 +1,4 @@
-"""User authentication and profile models."""
+﻿"""User authentication and profile models."""
 
 from typing import Optional, List, TYPE_CHECKING
 from sqlalchemy import Column, Integer, String, DateTime, Boolean, Date, Float, Text
@@ -12,7 +12,6 @@ if TYPE_CHECKING:
     from .conversations import Conversation
     from .journal import JournalEntry
     from .social import UserBadge
-    from .clinical_analytics import ValidatedAssessment
 
 class User(Base):
     """User model for authentication and profile management."""
@@ -89,7 +88,6 @@ class User(Base):
     journal_entries: Mapped[List["JournalEntry"]] = relationship("JournalEntry", back_populates="user")
     awarded_badges: Mapped[List["UserBadge"]] = relationship("UserBadge", back_populates="user")
     appointments: Mapped[List["Appointment"]] = relationship("Appointment", back_populates="user")
-    validated_assessments: Mapped[List["ValidatedAssessment"]] = relationship("ValidatedAssessment", foreign_keys="ValidatedAssessment.user_id", back_populates="user")
 
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', role='{self.role}')>"

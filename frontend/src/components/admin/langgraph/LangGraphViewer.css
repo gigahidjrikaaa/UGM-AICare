@@ -1,5 +1,4 @@
-   Styles previously inlined in the TSX file have been moved here.
-*/
+﻿/* Styles previously inlined in the TSX file have been moved here. */
 
 /* Agent badge base */
 .agent-badge {
@@ -140,3 +139,5 @@
     display: none;
   }
 }
+
+

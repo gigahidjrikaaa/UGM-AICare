@@ -1,4 +1,4 @@
-"use client"
+﻿"use client"
 import { useState } from "react"
 import { ethers } from "ethers"
 
@@ -6,7 +6,7 @@ import type { Eip1193Provider } from "ethers";
 
 declare global {
   interface Window {
-    ethereum?: Eip1193Provider;
+    ethereum?: Eip1193Provider & { isMetaMask?: boolean };
   }
 }
 
@@ -49,3 +49,5 @@ export const useDIDLogin = () => {
 
   return { loginWithDID, loading, token }
 }
+
+

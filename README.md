@@ -185,7 +185,6 @@ Organized with npm/yarn workspaces for streamlined dependency management across 
 │   │   │   ├── sca/        # Support Coach Agent
 │   │   │   ├── sda/        # Service Desk Agent
 │   │   │   ├── ia/         # Intelligence Analytics
-│   │   │   ├── orchestrator.py  # LangGraph orchestration
 │   │   │   └── tools/      # Shared agent utilities
 │   │   ├── core/         # Core utilities (auth, DB, RBAC, events)
 │   │   ├── database/     # SQLAlchemy setup, base models
@@ -377,7 +376,7 @@ Create the necessary `.env` (for backend/blockchain) and `.env.local` (for front
 
 ### Multi-Agent Orchestration
 
-- **LangGraph Orchestrator:** `backend/app/agents/orchestrator.py` manages intent classification and routes questions to the appropriate Safety Agent (STA, SCA, SDA, or IA)
+- **LangGraph Orchestrator (legacy):** superseded by `backend/app/agents/orchestrator_graph_spec.py` and the dedicated STA/SCA/SDA/IA routers
 - **Agent Graph Specification:** `backend/app/agents/orchestrator_graph_spec.py` defines the orchestration flow with conditional edges for agent selection
 - **Execution Tracking:** `backend/app/agents/execution_tracker.py` monitors agent execution with graph IDs, node tracking, and performance metrics
 
