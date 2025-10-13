@@ -92,3 +92,4 @@ isort==5.12.0
 flake8==6.1.0
 
 gunicorn>=20.1.0  # For production server
+spacy==3.7.5

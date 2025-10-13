@@ -36,6 +36,8 @@ from app.core.memory import clear_module_state, get_module_state, set_module_sta
 from app.models import Conversation, User, UserSummary
 from app.schemas.chat import ChatRequest, InterventionPlan
 from app.services.personal_context import fetch_relevant_journal_entries
+from app.core.settings import settings
+from app.core.redaction import sanitize_text
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +120,10 @@ async def process_chat_message(
         raise HTTPException(status_code=400, detail="Invalid request: Missing message content")
 
     user_message_content = request.message.strip()
+    # Apply PII redaction on user input if enabled
+    if settings.pii_redaction_enabled:
+        sanitized, _meta = sanitize_text(user_message_content)
+        user_message_content = sanitized
     if not user_message_content:
         raise HTTPException(status_code=400, detail="Message content is empty")
 
@@ -161,24 +167,29 @@ async def process_chat_message(
                 module_completed_id = None
                 aika_response_text = prompt_result
 
+        # Optionally sanitize assistant output before persisting
+        aika_to_store = aika_response_text
+        if settings.pii_redaction_enabled:
+            aika_to_store, _ = sanitize_text(aika_response_text)
+
         await _persist_conversation(
             db,
             user_id=user_id,
             session_id=session_id,
             conversation_id=conversation_id,
             message=user_message_content,
-            response=aika_response_text,
+            response=aika_to_store,
         )
 
         final_history = _build_final_history(
             request_history=request.history,
             user_message=user_message_content,
-            assistant_message=aika_response_text,
+            assistant_message=aika_to_store if settings.pii_redaction_enabled else aika_response_text,
         )
         provider_used = request.provider or "gemini"
         model_used = request.model or "cbt_module"
         return ChatTurnResult(
-            response_text=aika_response_text,
+            response_text=aika_to_store if settings.pii_redaction_enabled else aika_response_text,
             final_history=final_history,
             provider_used=str(provider_used),
             model_used=str(model_used),
@@ -262,13 +273,18 @@ async def process_chat_message(
         status_code_llm = 400 if "API key" in aika_response_text or "Invalid history" in aika_response_text else 503
         raise HTTPException(status_code=status_code_llm, detail=aika_response_text)
 
+    # Optionally sanitize assistant output before persisting
+    aika_to_store = aika_response_text
+    if settings.pii_redaction_enabled:
+        aika_to_store, _ = sanitize_text(aika_response_text)
+
     await _persist_conversation(
         db,
         user_id=user_id,
         session_id=session_id,
         conversation_id=conversation_id,
         message=user_message_content,
-        response=aika_response_text,
+        response=aika_to_store,
     )
 
     # Agent Integration: Analyze message and potentially generate intervention plan
@@ -328,13 +344,13 @@ async def process_chat_message(
     final_history = _build_final_history(
         request_history=request.history,
         user_message=user_message_content,
-        assistant_message=aika_response_text,
+        assistant_message=aika_to_store if settings.pii_redaction_enabled else aika_response_text,
     )
 
     provider_used = request.provider or "gemini"
     model_used = request.model or "gemini_google"
     return ChatTurnResult(
-        response_text=aika_response_text,
+        response_text=aika_to_store if settings.pii_redaction_enabled else aika_response_text,
         final_history=final_history,
         provider_used=str(provider_used),
         model_used=str(model_used),

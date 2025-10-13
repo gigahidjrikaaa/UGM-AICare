@@ -42,7 +42,9 @@ RUN apt-get update &&     apt-get install -y --no-install-recommends libpq5 dos2
 COPY --from=builder /app/wheels /wheels
 
 # Install Python dependencies from wheels
-RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels
+RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels \
+    && python -m spacy download xx_ent_wiki_sm || true \
+    && python -m spacy download en_core_web_sm || true
 
 # Copy the entire application code from the build context (./backend)
 COPY --chown=appuser:appgroup . .
