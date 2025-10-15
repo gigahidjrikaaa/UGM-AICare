@@ -7,6 +7,7 @@ from app.database import AsyncSessionLocal # Factory to create async sessions fo
 from app.models import User
 from app.utils.security_utils import decrypt_data
 from app.utils.email_utils import send_email
+from app.services.insights_service import InsightsService
 from datetime import datetime, time as dt_time, timedelta, date
 import random
 import os
@@ -90,13 +91,38 @@ async def async_send_proactive_checkins():
         except Exception as e:
             logger.error(f"Scheduler: Error during check-in job execution: {e}", exc_info=True)
 
+def generate_weekly_ia_report():
+    """Scheduled job to generate weekly IA insights report."""
+    asyncio.run(async_generate_weekly_ia_report())
+
+async def async_generate_weekly_ia_report():
+    """Async implementation of the weekly IA report job."""
+    logger.info("Scheduler: Running weekly IA report generation...")
+    async with AsyncSessionLocal() as db:
+        try:
+            insights_service = InsightsService(db)
+            
+            # Generate report for the past week
+            report = await insights_service.generate_weekly_report()
+            
+            logger.info(
+                f"Scheduler: Successfully generated weekly IA report {report.id}. "
+                f"Assessments: {report.assessment_count}, High risk: {report.high_risk_count}"
+            )
+            
+            # TODO: Send email notification to admins (Phase 5)
+            # For now, report is stored and event is emitted
+            
+        except Exception as e:
+            logger.error(f"Scheduler: Error during IA report generation: {e}", exc_info=True)
+
 def start_scheduler():
     """Adds the check-in job and starts the scheduler."""
     if scheduler.running:
         logger.info("APScheduler already running.")
         return
 
-    # Schedule to run once daily (e.g., at 10:00 AM WIB)
+    # Schedule proactive check-in (once daily at 10:00 AM WIB)
     scheduler.add_job(
         send_proactive_checkins,
         trigger='cron',
@@ -107,6 +133,19 @@ def start_scheduler():
         misfire_grace_time=3600 # Allow job to run up to 1 hour late if scheduler was down
     )
     logger.info(f"Scheduled job '{CHECKIN_JOB_ID}' with trigger: cron[hour=10, minute=0]")
+    
+    # Schedule weekly IA report (every Sunday at 2:00 AM WIB)
+    scheduler.add_job(
+        generate_weekly_ia_report,
+        trigger='cron',
+        day_of_week='sun',
+        hour=2,
+        minute=0,
+        id='weekly_ia_report_job',
+        replace_existing=True,
+        misfire_grace_time=3600
+    )
+    logger.info("Scheduled job 'weekly_ia_report_job' with trigger: cron[day_of_week=sun, hour=2, minute=0]")
 
     try:
         scheduler.start()

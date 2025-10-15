@@ -17,6 +17,7 @@ from app.core.events import AgentEvent, AgentNameEnum, emit_agent_event
 from app.core.redaction import extract_pii, prelog_redact
 from app.database import get_async_db
 from app.models import Case, CaseSeverityEnum, CaseStatusEnum, TriageAssessment
+from app.services.agent_orchestrator import AgentOrchestrator
 
 Severity = str
 Recommendation = str
@@ -42,10 +43,12 @@ class SafetyTriageService:
         self,
         classifier: SafetyTriageClassifier,
         session: AsyncSession,
+        orchestrator: AgentOrchestrator | None = None,
         event_emitter: Callable[[AgentEvent], Awaitable[None]] = emit_agent_event,
     ) -> None:
         self._classifier = classifier
         self._session = session
+        self._orchestrator = orchestrator
         self._emit_event = event_emitter
 
     async def classify(self, payload: STAClassifyRequest) -> STAClassifyResponse:
@@ -82,13 +85,24 @@ class SafetyTriageService:
 
         try:
             self._session.add(assessment)
-            await self._maybe_create_case(
-                user_hash=user_hash,
-                session_id=payload.session_id,
-                text=payload.text,
-                severity=severity,
-                should_handoff=result.handoff,
-            )
+            # Use orchestrator for case creation if high/critical severity
+            if self._orchestrator and severity in ('high', 'critical'):
+                await self._session.flush()  # Ensure assessment has an ID
+                await self._orchestrator.handle_sta_classification(
+                    triage_assessment=assessment,
+                    user_hash=user_hash,
+                    session_id=payload.session_id,
+                    conversation_id=conversation_id
+                )
+            else:
+                # Fallback to old behavior for backward compatibility
+                await self._maybe_create_case(
+                    user_hash=user_hash,
+                    session_id=payload.session_id,
+                    text=payload.text,
+                    severity=severity,
+                    should_handoff=result.handoff,
+                )
             await self._session.commit()
             await self._session.refresh(assessment)
         except Exception:
@@ -225,6 +239,11 @@ def get_safety_triage_service(
     session: AsyncSession = Depends(get_async_db),
 ) -> "SafetyTriageService":
     """FastAPI dependency factory for :class:`SafetyTriageService`."""
-
-    return SafetyTriageService(classifier=classifier, session=session)
+    # Initialize orchestrator for this request
+    orchestrator = AgentOrchestrator(session)
+    return SafetyTriageService(
+        classifier=classifier,
+        session=session,
+        orchestrator=orchestrator
+    )
 

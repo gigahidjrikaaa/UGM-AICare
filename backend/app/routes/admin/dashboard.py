@@ -1,6 +1,7 @@
 """Unified Admin Dashboard endpoints."""
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timedelta, date
 from typing import List
 
@@ -27,6 +28,7 @@ from app.schemas.admin.dashboard import (
 
 
 router = APIRouter(prefix="/dashboard", tags=["Admin - Dashboard"])
+logger = logging.getLogger(__name__)
 
 
 @router.get("/overview", response_model=DashboardOverview)
@@ -99,21 +101,37 @@ async def get_overview(
         dialect_name = None
 
     if dialect_name == "postgresql":
+        # Try to extract trending topics from risk_factors JSON array
         sql = text(
             """
             SELECT lower(trim(elem)) AS topic, COUNT(*) AS cnt
             FROM (
-              SELECT jsonb_array_elements_text(COALESCE(triage_assessments.risk_factors::jsonb, '[]'::jsonb)) AS elem
+              SELECT jsonb_array_elements_text(
+                CASE 
+                  WHEN jsonb_typeof(triage_assessments.risk_factors::jsonb) = 'array' 
+                  THEN triage_assessments.risk_factors::jsonb
+                  ELSE '[]'::jsonb
+                END
+              ) AS elem
               FROM triage_assessments
-              WHERE triage_assessments.created_at >= :start AND triage_assessments.created_at <= :end
+              WHERE triage_assessments.created_at >= :start 
+                AND triage_assessments.created_at <= :end
+                AND triage_assessments.risk_factors IS NOT NULL
             ) t
+            WHERE elem IS NOT NULL AND trim(elem) != ''
             GROUP BY lower(trim(elem))
             ORDER BY cnt DESC
             LIMIT 5
             """
         )
-        rows = (await db.execute(sql, {"start": start, "end": now})).all()
-        trending = [TrendingTopic(topic=str(t).strip('"'), count=int(c or 0)) for t, c in rows]
+        try:
+            rows = (await db.execute(sql, {"start": start, "end": now})).all()
+            trending = [TrendingTopic(topic=str(t).strip('"'), count=int(c or 0)) for t, c in rows]
+        except Exception as e:
+            # Fallback if JSON parsing fails - rollback and use empty list
+            logger.warning(f"Failed to extract trending topics from risk_factors: {e}")
+            await db.rollback()
+            trending = []
     else:
         hc_stmt = (
             select(TriageAssessment.severity_level, func.count())

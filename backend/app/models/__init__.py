@@ -15,6 +15,9 @@ This package contains database models organized by domain:
 - scheduling: Therapist scheduling and session management
 - langgraph_tracking: LangGraph execution tracking models
 - events/messages/cases/resources/consents/users: Safety agent telemetry and RBAC
+- insights: IA-generated insights reports for admin dashboard
+- campaign: Proactive outreach campaigns for SCA control
+- system: System settings and agent health monitoring
 """
 
 # Core models
@@ -58,6 +61,11 @@ from .consents import Consent, ConsentScopeEnum
 from .cases import Case, CaseNote, CaseStatusEnum, CaseSeverityEnum
 from .resources import Resource
 from .users import AgentUser, AgentRoleEnum
+
+# Admin infrastructure models (Phase 1)
+from .insights import InsightsReport
+from .campaign import Campaign, CampaignTrigger, CampaignMetrics
+from .system import SystemSettings, AgentHealthLog, CaseAssignment
 
 __all__ = [
     # Core Models
@@ -137,4 +145,13 @@ __all__ = [
     "CaseStatusEnum",
     "CaseSeverityEnum",
     "AgentRoleEnum",
+
+    # Admin Infrastructure Models (Phase 1)
+    "InsightsReport",
+    "Campaign",
+    "CampaignTrigger",
+    "CampaignMetrics",
+    "SystemSettings",
+    "AgentHealthLog",
+    "CaseAssignment",
 ]

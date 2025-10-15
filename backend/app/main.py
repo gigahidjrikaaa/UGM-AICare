@@ -27,6 +27,7 @@ from app.routes import (
     system,
     intervention_plans,
 )
+from app.routes.admin import insights as admin_insights
 from app.agents.sta.router import router as sta_router
 from app.agents.sca.router import router as sca_router
 from app.agents.sda.router import router as sda_router
@@ -152,6 +153,7 @@ app.include_router(summary.activity_router) # This will have prefix /api/v1/acti
 app.include_router(summary.user_data_router)  # This will have prefix /api/v1/user
 app.include_router(profile.router)
 app.include_router(admin.router)  # Admin endpoints
+app.include_router(admin_insights.router)  # Admin insights endpoints
 app.include_router(agents.router)
 app.include_router(agents_command.router)
 app.include_router(safety_triage.router)
