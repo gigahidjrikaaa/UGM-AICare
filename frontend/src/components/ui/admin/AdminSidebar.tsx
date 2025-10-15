@@ -34,6 +34,9 @@ const navGroups = [
   {
     label: 'Agents & Intelligence',
     items: [
+      { name: 'Dashboard', icon: <FiShield size={18}/>, href: '/admin/dashboard' },
+      { name: 'Cases', icon: <FiShield size={18}/>, href: '/admin/cases' },
+      { name: 'Outreach', icon: <FiCpu size={18}/>, href: '/admin/outreach' },
       { name: 'Agents Command Center', icon: <FiCpu size={18}/>, href: '/admin/agents-command-center' },
     ]
   }

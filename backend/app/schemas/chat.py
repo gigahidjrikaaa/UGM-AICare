@@ -1,5 +1,5 @@
 # backend/app/schemas/chat.py
-from pydantic import BaseModel, Field, validator, model_validator
+from pydantic import BaseModel, Field, validator, model_validator, ConfigDict
 from typing import Any, List, Dict, Optional, Literal
 from datetime import datetime
 
@@ -131,10 +131,9 @@ class ChatResponse(BaseModel):
     }
 
 class ConversationHistoryItem(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     role: str
     content: str
     timestamp: datetime
     session_id: str # Include session ID for grouping
-
-    class Config:
-         from_attributes = True # Or from_attributes = True

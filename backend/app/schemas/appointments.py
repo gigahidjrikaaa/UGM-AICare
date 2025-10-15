@@ -1,5 +1,5 @@
 # backend/app/schemas/appointments.py
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Optional
 from datetime import datetime
 
@@ -18,8 +18,7 @@ class PsychologistCreate(PsychologistBase):
 class Psychologist(PsychologistBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes = True)
 
 # --- AppointmentType Schemas ---
 class AppointmentTypeBase(BaseModel):
@@ -33,8 +32,7 @@ class AppointmentTypeCreate(AppointmentTypeBase):
 class AppointmentType(AppointmentTypeBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes = True)
 
 # --- Appointment Schemas ---
 class AppointmentBase(BaseModel):

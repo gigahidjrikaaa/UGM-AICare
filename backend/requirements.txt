@@ -1,7 +1,7 @@
 # Web Framework
-fastapi
+fastapi>=0.115.5
 uvicorn
-pydantic==2.8.0
+pydantic>=2.9.0
 python-multipart==0.0.6
 
 # HTTP Client

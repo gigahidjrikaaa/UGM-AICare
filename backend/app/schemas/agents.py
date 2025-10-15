@@ -1,5 +1,6 @@
-from pydantic import BaseModel
-from typing import List, Dict, Any
+from pydantic import BaseModel, ConfigDict, Field
+from typing import List, Dict, Any, Optional
+from datetime import datetime
 
 # --- Triage Agent Schemas ---
 
@@ -82,8 +83,7 @@ class AgentRun(BaseModel):
     completed_at: Optional[datetime] = None
     error_message: Optional[str] = None
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes = True)
 
 
 class AgentMessage(BaseModel):
@@ -93,12 +93,10 @@ class AgentMessage(BaseModel):
     role: str
     message_type: str
     content: str
-    metadata: Optional[Dict[str, Any]] = None  # Will map from ORM attribute 'meta'
+    metadata: Optional[Dict[str, Any]] = Field(None, alias="meta")  # Map from ORM attribute 'meta'
     created_at: datetime
 
-    class Config:
-        from_attributes = True
-        fields = {"metadata": {"alias": "meta"}}
+    model_config = ConfigDict(from_attributes=True, populate_by_name=True)
 
 
 class AgentStreamEvent(BaseModel):

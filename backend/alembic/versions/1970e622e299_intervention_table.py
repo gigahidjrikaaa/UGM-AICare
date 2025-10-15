@@ -10,7 +10,7 @@ from sqlalchemy.dialects import postgresql
 
 # revision identifiers, used by Alembic.
 revision = '1970e622e299'
-down_revision = '9d8d0d55a48a'
+down_revision = '196e622e2990'
 branch_labels = None
 depends_on = None
 
@@ -34,93 +34,119 @@ def upgrade():
     sa.PrimaryKeyConstraint('id')
     )
     op.create_index(op.f('ix_intervention_agent_settings_id'), 'intervention_agent_settings', ['id'], unique=False)
-    op.alter_column('appointments', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.alter_column('appointments', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.add_column('campaign_executions', sa.Column('notes', sa.Text(), nullable=True))
-    op.add_column('campaign_executions', sa.Column('is_manual', sa.Boolean(), nullable=False))
-    op.alter_column('campaign_executions', 'status',
-               existing_type=sa.VARCHAR(length=50),
-               nullable=False)
-    op.alter_column('campaign_executions', 'scheduled_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.alter_column('campaign_executions', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.alter_column('campaign_executions', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.alter_column('email_groups', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.alter_column('email_groups', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.alter_column('email_logs', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.alter_column('email_templates', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.alter_column('email_templates', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.alter_column('flagged_sessions', 'status',
-               existing_type=sa.VARCHAR(),
-               nullable=False)
-    op.alter_column('intervention_campaigns', 'target_audience_size',
-               existing_type=sa.INTEGER(),
-               nullable=False)
-    op.alter_column('intervention_campaigns', 'priority',
-               existing_type=sa.VARCHAR(length=50),
-               nullable=False)
-    op.alter_column('intervention_campaigns', 'status',
-               existing_type=sa.VARCHAR(length=50),
-               nullable=False)
-    op.alter_column('intervention_campaigns', 'start_date',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.alter_column('intervention_campaigns', 'executions_delivered',
-               existing_type=sa.INTEGER(),
-               nullable=False)
-    op.alter_column('intervention_campaigns', 'executions_failed',
-               existing_type=sa.INTEGER(),
-               nullable=False)
-    op.alter_column('intervention_campaigns', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.alter_column('intervention_campaigns', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.alter_column('journal_prompts', 'is_active',
-               existing_type=sa.BOOLEAN(),
-               nullable=False)
-    op.alter_column('triage_assessments', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.alter_column('triage_assessments', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.alter_column('tweets', 'tweet_id',
-               existing_type=sa.VARCHAR(length=255),
-               nullable=False)
-    op.alter_column('tweets', 'sentiment_score',
-               existing_type=sa.DOUBLE_PRECISION(precision=53),
-               nullable=False)
-    op.alter_column('tweets', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.alter_column('tweets', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=False)
-    op.alter_column('users', 'sentiment_score',
-               existing_type=sa.DOUBLE_PRECISION(precision=53),
-               nullable=False,
-               existing_server_default=sa.text("'0'::double precision"))
+    
+    # Only alter appointments table if it exists
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    if 'appointments' in inspector.get_table_names():
+        op.alter_column('appointments', 'created_at',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+        op.alter_column('appointments', 'updated_at',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+    
+    # Only alter campaign_executions if it exists
+    if 'campaign_executions' in inspector.get_table_names():
+        op.add_column('campaign_executions', sa.Column('notes', sa.Text(), nullable=True))
+        op.add_column('campaign_executions', sa.Column('is_manual', sa.Boolean(), nullable=False))
+        op.alter_column('campaign_executions', 'status',
+                   existing_type=sa.VARCHAR(length=50),
+                   nullable=False)
+        op.alter_column('campaign_executions', 'scheduled_at',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+        op.alter_column('campaign_executions', 'created_at',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+        op.alter_column('campaign_executions', 'updated_at',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+    
+    if 'email_groups' in inspector.get_table_names():
+        op.alter_column('email_groups', 'created_at',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+        op.alter_column('email_groups', 'updated_at',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+    
+    if 'email_logs' in inspector.get_table_names():
+        op.alter_column('email_logs', 'created_at',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+    
+    if 'email_templates' in inspector.get_table_names():
+        op.alter_column('email_templates', 'created_at',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+        op.alter_column('email_templates', 'updated_at',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+    
+    if 'flagged_sessions' in inspector.get_table_names():
+        op.alter_column('flagged_sessions', 'status',
+                   existing_type=sa.VARCHAR(),
+                   nullable=False)
+    
+    if 'intervention_campaigns' in inspector.get_table_names():
+        op.alter_column('intervention_campaigns', 'target_audience_size',
+                   existing_type=sa.INTEGER(),
+                   nullable=False)
+        op.alter_column('intervention_campaigns', 'priority',
+                   existing_type=sa.VARCHAR(length=50),
+                   nullable=False)
+        op.alter_column('intervention_campaigns', 'status',
+                   existing_type=sa.VARCHAR(length=50),
+                   nullable=False)
+        op.alter_column('intervention_campaigns', 'start_date',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+        op.alter_column('intervention_campaigns', 'executions_delivered',
+                   existing_type=sa.INTEGER(),
+                   nullable=False)
+        op.alter_column('intervention_campaigns', 'executions_failed',
+                   existing_type=sa.INTEGER(),
+                   nullable=False)
+        op.alter_column('intervention_campaigns', 'created_at',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+        op.alter_column('intervention_campaigns', 'updated_at',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+    
+    if 'journal_prompts' in inspector.get_table_names():
+        op.alter_column('journal_prompts', 'is_active',
+                   existing_type=sa.BOOLEAN(),
+                   nullable=False)
+    
+    if 'triage_assessments' in inspector.get_table_names():
+        op.alter_column('triage_assessments', 'created_at',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+        op.alter_column('triage_assessments', 'updated_at',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+    
+    if 'tweets' in inspector.get_table_names():
+        op.alter_column('tweets', 'tweet_id',
+                   existing_type=sa.VARCHAR(length=255),
+                   nullable=False)
+        op.alter_column('tweets', 'sentiment_score',
+                   existing_type=sa.DOUBLE_PRECISION(precision=53),
+                   nullable=False)
+        op.alter_column('tweets', 'created_at',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+        op.alter_column('tweets', 'updated_at',
+                   existing_type=postgresql.TIMESTAMP(),
+                   nullable=False)
+    
+    if 'users' in inspector.get_table_names():
+        op.alter_column('users', 'sentiment_score',
+                   existing_type=sa.DOUBLE_PRECISION(precision=53),
+                   nullable=False,
+                   existing_server_default=sa.text("'0'::double precision"))
     # ### end Alembic commands ###
 
 

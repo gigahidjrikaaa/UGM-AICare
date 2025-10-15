@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from typing import Dict, List, Optional
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from app.schemas.admin.conversations import ConversationStats
 from app.schemas.admin.triage import RiskTrendPoint, SlaMetrics

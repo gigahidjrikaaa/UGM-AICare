@@ -2,7 +2,7 @@
 
 from datetime import datetime
 from typing import Optional, List, Sequence, Dict, Any
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class PlanStep(BaseModel):
@@ -80,8 +80,7 @@ class InterventionPlanRecordResponse(InterventionPlanRecordBase):
     last_viewed_at: Optional[datetime]
     archived_at: Optional[datetime]
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes = True)
 
 
 class InterventionPlanListResponse(BaseModel):

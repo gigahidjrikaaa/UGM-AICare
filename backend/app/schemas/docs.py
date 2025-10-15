@@ -1,5 +1,5 @@
 # backend/app/schemas/docs.py
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import Dict, List, Optional, Any
 
 #? --- Docs Schemas ---

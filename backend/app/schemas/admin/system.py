@@ -1,7 +1,7 @@
 ﻿from typing import Any, List, Optional
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 
 
 class SystemSettingItem(BaseModel):

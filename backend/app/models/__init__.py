@@ -55,7 +55,7 @@ from .langgraph_tracking import (
 from .events import Event, AgentNameEnum
 from .messages import Message, MessageRoleEnum
 from .consents import Consent, ConsentScopeEnum
-from .cases import Case, CaseStatusEnum, CaseSeverityEnum
+from .cases import Case, CaseNote, CaseStatusEnum, CaseSeverityEnum
 from .resources import Resource
 from .users import AgentUser, AgentRoleEnum
 
@@ -128,6 +128,7 @@ __all__ = [
     "Message",
     "Consent",
     "Case",
+    "CaseNote",
     "Resource",
     "AgentUser",
     "AgentNameEnum",

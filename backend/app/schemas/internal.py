@@ -1,18 +1,17 @@
 # backend/app/schemas/internal.py
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 from typing import Optional
 
 #? --- Internal API Schemas ---
 class UserInternalResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     google_sub: str
     email: Optional[str] = None # Encrypted email, can be decrypted if needed
     wallet_address: str | None = None
     role: Optional[str] = None
     allow_email_checkins: bool = True # Whether user wants email check-ins
-
-    class Config:
-        from_attributes = True # Or orm_mode = True for Pydantic v2
         
 #? --- Schemas for POST /internal/sync-user ---
 class UserSyncPayload(BaseModel):

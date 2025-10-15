@@ -36,38 +36,58 @@ async def load_abi():
         logger.error(f"Error loading ABI file: {e}")
         return None
 
-CONTRACT_ABI = asyncio.run(load_abi())
+# Lazy-load the ABI to avoid running asyncio.run() at import time
+CONTRACT_ABI = None
+
+async def get_contract_abi():
+    """Get the contract ABI, loading it if not already loaded."""
+    global CONTRACT_ABI
+    if CONTRACT_ABI is None:
+        CONTRACT_ABI = await load_abi()
+    return CONTRACT_ABI
 
 
 # --- Web3 Setup ---
 w3 = None
 minter_account = None
 contract = None
+_initialized = False
 
-if RPC_URL and MINTER_PRIVATE_KEY and CONTRACT_ADDRESS and CONTRACT_ABI:
-    try:
-        w3 = Web3(Web3.HTTPProvider(RPC_URL))
-        # Inject PoA middleware if needed for the testnet (common for non-Mainnet PoA chains)
-        # w3.middleware_onion.inject(extra_data_to_poa_middleware, layer=0)
+async def init_blockchain():
+    """Initialize blockchain connection lazily."""
+    global w3, minter_account, contract, _initialized, CONTRACT_ABI
+    
+    if _initialized:
+        return
+    
+    CONTRACT_ABI = await get_contract_abi()
+    
+    if RPC_URL and MINTER_PRIVATE_KEY and CONTRACT_ADDRESS and CONTRACT_ABI:
+        try:
+            w3 = Web3(Web3.HTTPProvider(RPC_URL))
+            # Inject PoA middleware if needed for the testnet (common for non-Mainnet PoA chains)
+            # w3.middleware_onion.inject(extra_data_to_poa_middleware, layer=0)
 
-        if w3.is_connected():
-            logger.info(f"Connected to Web3 RPC: {RPC_URL}")
-            minter_account = w3.eth.account.from_key(MINTER_PRIVATE_KEY)
-            logger.info(f"Backend Minter Address: {minter_account.address}")
+            if w3.is_connected():
+                logger.info(f"Connected to Web3 RPC: {RPC_URL}")
+                minter_account = w3.eth.account.from_key(MINTER_PRIVATE_KEY)
+                logger.info(f"Backend Minter Address: {minter_account.address}")
 
-            # Load Contract
-            contract = w3.eth.contract(address=Web3.to_checksum_address(CONTRACT_ADDRESS), abi=CONTRACT_ABI)
-            logger.info(f"NFT Contract loaded at address: {CONTRACT_ADDRESS}")
-        else:
-            logger.error("Failed to connect to Web3 RPC.")
-            w3 = None # Ensure w3 is None if connection failed
-    except Exception as e:
-        logger.error(f"Error initializing Web3 or Contract: {e}", exc_info=True)
-        w3 = None
-        minter_account = None
-        contract = None
-else:
-    logger.warning("Blockchain environment variables (RPC_URL, NFT_CONTRACT_ADDRESS, MINTER_PRIVATE_KEY) or ABI not fully configured. Minting disabled.")
+                # Load Contract
+                contract = w3.eth.contract(address=Web3.to_checksum_address(CONTRACT_ADDRESS), abi=CONTRACT_ABI)
+                logger.info(f"NFT Contract loaded at address: {CONTRACT_ADDRESS}")
+            else:
+                logger.error("Failed to connect to Web3 RPC.")
+                w3 = None  # Ensure w3 is None if connection failed
+        except Exception as e:
+            logger.error(f"Error initializing Web3 or Contract: {e}", exc_info=True)
+            w3 = None
+            minter_account = None
+            contract = None
+    else:
+        logger.warning("Blockchain environment variables (RPC_URL, NFT_CONTRACT_ADDRESS, MINTER_PRIVATE_KEY) or ABI not fully configured. Minting disabled.")
+    
+    _initialized = True
 
 # --- Minting Function ---
 # NOTE: This function is synchronous. For a fully async implementation, consider using the async version of the web3.py library.

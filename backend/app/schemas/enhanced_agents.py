@@ -1,6 +1,6 @@
 """Enhanced schemas for LangGraph execution state tracking."""
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 from enum import Enum

@@ -53,16 +53,12 @@ log_dir = "logs" if os.getenv("APP_ENV") != "production" else "/tmp/logs"
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, "chat.log")
 
-import aiofiles # type: ignore
-
 # Simplified log file existence check for clarity
 if os.getenv("APP_ENV") != "production" and not os.path.exists(log_file):
     try:
-        async def create_log_file():
-            async with aiofiles.open(log_file, "w") as f:
-                await f.write(f"Log file created at {datetime.now()}\n")
-        import asyncio
-        asyncio.run(create_log_file())
+        # Use synchronous file creation at module level
+        with open(log_file, "w") as f:
+            f.write(f"Log file created at {datetime.now()}\n")
     except IOError as e:
         print(f"Warning: Could not create log file {log_file}: {e}") # Use print/stderr for early errors
 
@@ -88,6 +84,9 @@ async def lifespan(app: FastAPI):
     logger.info("Starting application lifespan...")
     # Initialize the database
     await init_db()
+    # Initialize blockchain connection
+    from app.core.blockchain_utils import init_blockchain
+    await init_blockchain()
     # Start the background scheduler
     start_scheduler()
     yield
@@ -173,6 +172,22 @@ logger.info(f"Allowed origins: {origins}")
 
 # Check environment variables
 check_env()
+
+# Add custom OpenAPI generation with error handling
+@app.get("/openapi.json", include_in_schema=False)
+async def custom_openapi():
+    """Custom OpenAPI endpoint with detailed error reporting"""
+    try:
+        if app.openapi_schema:
+            return app.openapi_schema
+        openapi_schema = app.openapi()
+        app.openapi_schema = openapi_schema
+        return openapi_schema
+    except Exception as e:
+        import traceback
+        logger.error(f"OpenAPI generation failed: {str(e)}")
+        logger.error(f"Traceback: {traceback.format_exc()}")
+        return {"error": str(e), "traceback": traceback.format_exc()}
 
 
 @app.get("/")

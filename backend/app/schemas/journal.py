@@ -1,5 +1,5 @@
 # backend/app/schemas/journal.py
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List, Optional
 from datetime import datetime, date
 
@@ -20,8 +20,7 @@ class JournalPromptUpdate(BaseModel):
 class JournalPromptResponse(JournalPromptBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes = True)
 
 #? --- Journal Schemas ---
 class JournalEntryBase(BaseModel):
@@ -51,8 +50,7 @@ class JournalReflectionPointResponse(JournalReflectionPointBase):
     user_id: int
     created_at: datetime
 
-    class Config:
-        from_attributes = True
+    model_config = ConfigDict(from_attributes = True)
 
 class JournalEntryResponse(JournalEntryBase): # Modify existing schema
     id: int

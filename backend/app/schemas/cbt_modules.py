@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from datetime import datetime
 from typing import List, Optional
 
@@ -25,8 +25,7 @@ class CbtModuleStep(CbtModuleStepBase):
     created_at: datetime
     updated_at: datetime
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes = True)
 
 class CbtModuleBase(BaseModel):
     title: str
@@ -41,8 +40,7 @@ class CbtModule(CbtModuleBase):
     updated_at: datetime
     steps: List[CbtModuleStep] = []
 
-    class Config:
-        orm_mode = True
+    model_config = ConfigDict(from_attributes = True)
 
 class CbtModuleResponse(BaseModel):
     items: List[CbtModule]

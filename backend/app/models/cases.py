@@ -4,7 +4,8 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Enum, String, Text
+from sqlalchemy import Column, DateTime, Enum, String, Text, ForeignKey
+from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
 
 from app.database import Base
@@ -38,3 +39,18 @@ class Case(Base):
     summary_redacted = Column(Text, nullable=True)
     sla_breach_at = Column(DateTime(timezone=True), nullable=True)
     closure_reason = Column(Text, nullable=True)
+
+    # Relationships
+    notes: Mapped[list["CaseNote"]] = relationship("CaseNote", back_populates="case", cascade="all, delete-orphan")
+
+
+class CaseNote(Base):
+    __tablename__ = "case_notes"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    case_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey("cases.id", ondelete="CASCADE"), index=True, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=datetime.utcnow, nullable=False)
+    author_id: Mapped[int | None] = mapped_column(nullable=True, index=True)
+    note: Mapped[str] = mapped_column(Text, nullable=False)
+
+    case: Mapped["Case"] = relationship("Case", back_populates="notes")

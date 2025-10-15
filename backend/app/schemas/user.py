@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from typing import Any, List, Optional
 
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel, EmailStr, ConfigDict
 
 
 class LinkDIDRequest(BaseModel):
@@ -11,15 +11,14 @@ class LinkDIDRequest(BaseModel):
 
 
 class EarnedBadgeInfo(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     badge_id: int
     awarded_at: datetime
     transaction_hash: str
     contract_address: str
     name: Optional[str] = None
     image_url: Optional[str] = None
-
-    class Config:
-        from_attributes = True
 
 
 class EmergencyContact(BaseModel):
@@ -141,12 +140,13 @@ class UserProfileOverviewUpdate(BaseModel):
     university: Optional[str] = None
     major: Optional[str] = None
     year_of_study: Optional[str] = None
-
-    class Config:
-        extra = 'ignore'
+    
+    model_config = ConfigDict(extra='ignore')
 
 
 class UserProfileResponse(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    
     id: int
     google_sub: str
     email: Optional[str] = None
@@ -154,9 +154,6 @@ class UserProfileResponse(BaseModel):
     current_streak: int = 0
     longest_streak: int = 0
     allow_email_checkins: bool = True
-
-    class Config:
-        from_attributes = True
 
 
 class CheckinSettingsUpdate(BaseModel):
