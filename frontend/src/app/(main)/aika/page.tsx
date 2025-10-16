@@ -6,10 +6,12 @@ import ChatInterface from '@/components/features/chat/ChatInterface';
 import ParticleBackground from '@/components/ui/ParticleBackground'; // Assuming this exists
 import Image from 'next/image';
 import { motion } from 'framer-motion';
-import { Info, Settings } from 'lucide-react';
+import { Info, Settings, ClipboardList } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import { AIKA_MEMORY_NOTE } from '@/constants/chat';
+import { InterventionPlansSidebar } from '@/components/features/chat/InterventionPlansSidebar';
+import { useInterventionPlans } from '@/hooks/useInterventionPlans';
 // Model selector now integrated inside ChatInterface footer
 
 // Loading Component (Keep as before)
@@ -38,6 +40,10 @@ export default function AikaChatPage() {
   const router = useRouter();
   const [model, setModel] = useState('gemini_google');
   const [isControlCenterOpen, setIsControlCenterOpen] = useState(false);
+  const [isPlansOpen, setIsPlansOpen] = useState(false);
+  
+  // Fetch intervention plans to show count badge
+  const { data: plansData } = useInterventionPlans(true);
 
   // Persist model choice in localStorage
   useEffect(() => {
@@ -90,7 +96,11 @@ export default function AikaChatPage() {
         >
           {/* Unified Chat Container (header simplified, controls moved to footer bar) */}
           <div className="w-full max-w-5xl h-[85vh] flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
-            <HeaderBar onOpenControlCenter={() => setIsControlCenterOpen(true)} />
+            <HeaderBar 
+              onOpenControlCenter={() => setIsControlCenterOpen(true)} 
+              onOpenPlans={() => setIsPlansOpen(true)}
+              activePlansCount={plansData?.total || 0}
+            />
             <div className="flex-1 overflow-hidden">
               <ChatInterface
                 model={model}
@@ -101,6 +111,12 @@ export default function AikaChatPage() {
               />
             </div>
           </div>
+          
+          {/* Intervention Plans Sidebar */}
+          <InterventionPlansSidebar 
+            isOpen={isPlansOpen}
+            onClose={() => setIsPlansOpen(false)}
+          />
 
           {/* Footer credit - Moved outside main container for centering */}
           <motion.div
@@ -119,7 +135,15 @@ export default function AikaChatPage() {
   );
 }
 
-function HeaderBar({ onOpenControlCenter }: { onOpenControlCenter: () => void }) {
+function HeaderBar({ 
+  onOpenControlCenter, 
+  onOpenPlans,
+  activePlansCount 
+}: { 
+  onOpenControlCenter: () => void;
+  onOpenPlans: () => void;
+  activePlansCount: number;
+}) {
   const [open, setOpen] = useState(false);
   const btnRef = useRef<HTMLButtonElement | null>(null);
   const assignButtonRef = (node: HTMLButtonElement | null) => {
@@ -237,6 +261,22 @@ function HeaderBar({ onOpenControlCenter }: { onOpenControlCenter: () => void })
         </div>
       </h1>
       <div className="flex items-center gap-2">
+        {/* Intervention Plans Button */}
+        <button
+          type="button"
+          onClick={onOpenPlans}
+          className="relative h-7 w-7 inline-flex items-center justify-center rounded-md border border-white/15 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-xs focus:outline-none focus:ring-2 focus:ring-ugm-gold/40 transition"
+          aria-label="Lihat rencana intervensi"
+        >
+          <ClipboardList className="h-4 w-4" />
+          {activePlansCount > 0 && (
+            <span className="absolute -top-1 -right-1 h-4 w-4 rounded-full bg-teal-500 text-white text-[9px] font-semibold flex items-center justify-center border border-white/30 shadow-sm">
+              {activePlansCount > 9 ? '9+' : activePlansCount}
+            </span>
+          )}
+        </button>
+        
+        {/* Control Center Button */}
         <button
           type="button"
           onClick={onOpenControlCenter}
@@ -245,6 +285,7 @@ function HeaderBar({ onOpenControlCenter }: { onOpenControlCenter: () => void })
         >
           <Settings className="h-4 w-4" />
         </button>
+        
         <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-[#FFCA40]/15 text-[#FFCA40] border border-[#FFCA40]/30">Beta</span>
       </div>
     </div>

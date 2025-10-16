@@ -106,9 +106,10 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
           {/* Desktop Navigation Links - Professional Style */}
           <nav className="hidden md:flex items-center gap-6">
             {[
-              { href: "/", label: "Home" },
+              { href: "/dashboard", label: "Home" },
               { href: "/about", label: "About" },
               { href: "/journaling", label: "Journaling" },
+              { href: "/appointments", label: "Appointments" },
               { href: "/aika", label: "Talk to Aika" }
             ].map((link, i) => (
               <motion.div key={i} className="relative">

@@ -37,8 +37,10 @@ from app.schemas.user import (
     TimelineEntry,
     UserProfileOverviewResponse,
     UserProfileOverviewUpdate,
+    UserStatsResponse,
 )
 from app.utils.security_utils import decrypt_data, encrypt_data
+from app.services.user_stats_service import UserStatsService
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -314,6 +316,28 @@ async def get_profile_overview(
         localization=localization,
         aicare_team_notes=_safe_decrypt(current_user.aicare_team_notes),
     )
+
+
+@router.post("/refresh-stats", response_model=UserStatsResponse)
+async def refresh_user_stats(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_active_user),
+) -> UserStatsResponse:
+    """
+    Refresh and update user statistics (streaks, sentiment score).
+    Call this endpoint from dashboard/profile to ensure stats are always current.
+    """
+    logger.info(f"Refreshing stats for user {current_user.id}")
+    try:
+        stats_service = UserStatsService(db)
+        stats = await stats_service.refresh_user_stats(current_user)
+        return stats
+    except Exception as e:
+        logger.error(f"Failed to refresh stats for user {current_user.id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to refresh user statistics"
+        )
 
 
 @router.put("/overview", response_model=UserProfileOverviewResponse)

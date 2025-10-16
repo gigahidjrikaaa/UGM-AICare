@@ -1,184 +1,322 @@
 "use client";
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
-import { format, addDays, startOfWeek, addWeeks } from 'date-fns';
+import { motion, AnimatePresence } from 'framer-motion';
+import { format } from 'date-fns';
 import { id } from 'date-fns/locale';
-import { FiCalendar, FiClock, FiUser, FiMapPin, FiChevronLeft, FiChevronRight, FiInfo, FiCheck } from 'react-icons/fi';
+import { 
+  FiCalendar, 
+  FiClock, 
+  FiUser, 
+  FiMapPin, 
+  FiPlus,
+  FiSearch,
+  FiFilter,
+  FiDownload,
+  FiCheckCircle,
+  FiXCircle,
+  FiAlertCircle,
+  FiFileText,
+  FiMap
+} from 'react-icons/fi';
+import dynamic from 'next/dynamic';
 
-// Define type for counselor
-type Counselor = {
+// Dynamically import the map component to avoid SSR issues
+const AppointmentMap = dynamic(() => import('@/components/appointments/AppointmentMap'), {
+  ssr: false,
+  loading: () => <div className="h-[400px] bg-white/5 animate-pulse rounded-lg"></div>
+});
+
+// Types
+interface Appointment {
+  id: number;
+  user: {
+    id: number;
+    email?: string;
+    avatar_url?: string;
+  };
+  psychologist: {
+    id: number;
+    name: string;
+    specialization?: string;
+    image_url?: string;
+  };
+  appointment_type: string;
+  appointment_datetime: string;
+  notes?: string;
+  status: 'scheduled' | 'completed' | 'cancelled' | 'moved';
+  created_at: string;
+}
+
+interface Psychologist {
   id: number;
   name: string;
-  specialization: string;
-  image: string;
-  available: boolean;
+  specialization?: string;
+  image_url?: string;
+  is_available: boolean;
+}
+
+// Mock location for map (Gadjah Mada Medical Center)
+const DEFAULT_LOCATION = {
+  lat: -7.769689,
+  lng: 110.378349,
+  name: "Gadjah Mada Medical Center",
+  address: "Jl. Farmako, Sekip Utara, Yogyakarta 55281"
 };
-
-// Mock data for counselors
-const counselors: Counselor[] = [
-  {
-    id: 1, 
-    name: "Dr. Putri Handayani", 
-    specialization: "Clinical Psychologist",
-    image: "/counselors/putri.jpg",
-    available: true
-  },
-  {
-    id: 2, 
-    name: "Dr. Budi Santoso", 
-    specialization: "Psychiatrist",
-    image: "/counselors/budi.jpg",
-    available: true
-  },
-  {
-    id: 3, 
-    name: "Anita Wijaya, M.Psi", 
-    specialization: "Counseling Psychologist",
-    image: "/counselors/anita.jpg",
-    available: true
-  },
-  {
-    id: 4, 
-    name: "Dr. Joko Prasetyo", 
-    specialization: "Mental Health Specialist",
-    image: "/counselors/joko.jpg",
-    available: false
-  }
-];
-
-// Mock data for appointment types
-const appointmentTypes = [
-  { id: 1, name: "Initial Consultation", duration: 60, description: "First-time assessment and evaluation" },
-  { id: 2, name: "Follow-up Session", duration: 45, description: "Continue ongoing treatment" },
-  { id: 3, name: "Crisis Intervention", duration: 60, description: "Urgent mental health support" },
-  { id: 4, name: "Group Therapy", duration: 90, description: "Session with 3-5 participants" }
-];
-
-// Mock data for available time slots
-const generateTimeSlots = (date: string | number | Date) => {
-  // Generate different availability based on the day
-  const day = new Date(date).getDay();
-  
-  // Weekend has fewer slots
-  if (day === 0 || day === 6) {
-    return [
-      { time: "09:00", available: true },
-      { time: "10:30", available: false },
-      { time: "13:00", available: true }
-    ];
-  }
-  
-  // Weekdays have more slots
-  return [
-    { time: "08:00", available: true },
-    { time: "09:30", available: true },
-    { time: "11:00", available: false },
-    { time: "13:00", available: true },
-    { time: "14:30", available: true },
-    { time: "16:00", available: day !== 5 } // Friday afternoon off
-  ];
-};
-  
 
 export default function AppointmentsPage() {
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
-  const [step, setStep] = useState(1);
-  const [selectedDate, setSelectedDate] = useState<string | null>(null);
-  const [selectedTime, setSelectedTime] = useState<{time: string, available: boolean} | null>(null);
-  const [selectedCounselor, setSelectedCounselor] = useState<Counselor | null>(null);
-  const [selectedType, setSelectedType] = useState<{id: number, name: string, duration: number, description: string} | null>(null);
-  const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
-  const [notes, setNotes] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [success, setSuccess] = useState(false);
-  const [timeSlots, setTimeSlots] = useState<{ time: string; available: boolean }[]>([]);
   
+  // State management
+  const [activeTab, setActiveTab] = useState<'upcoming' | 'history' | 'counselors'>('upcoming');
+  const [appointments, setAppointments] = useState<Appointment[]>([]);
+  const [psychologists, setPsychologists] = useState<Psychologist[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<string>('all');
+  const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
+  const [showNotesModal, setShowNotesModal] = useState(false);
+  const [showMapModal, setShowMapModal] = useState(false);
+  const [preAppointmentNotes, setPreAppointmentNotes] = useState('');
+
   // Redirect if not authenticated
   useEffect(() => {
     if (status === "unauthenticated") {
       router.push('/signin?callbackUrl=/appointments');
     }
   }, [status, router]);
-  
-  // Update time slots when date is selected
+
+  // Fetch appointments
   useEffect(() => {
-    if (selectedDate) {
-      setTimeSlots(generateTimeSlots(selectedDate));
+    const fetchAppointments = async () => {
+      if (status !== "authenticated") return;
+      
+      setLoading(true);
+      try {
+        // TODO: Replace with actual API call
+        // const response = await fetch('/api/v1/appointments/my-appointments', {
+        //   headers: {
+        //     'Authorization': `Bearer ${session?.accessToken}`
+        //   }
+        // });
+        // const data = await response.json();
+        // setAppointments(data);
+
+        // Mock data for now
+        const mockAppointments: Appointment[] = [
+          {
+            id: 1,
+            user: { id: 1, email: 'user@example.com' },
+            psychologist: {
+              id: 1,
+              name: "Dr. Putri Handayani",
+              specialization: "Clinical Psychologist",
+              image_url: "/counselors/putri.jpg"
+            },
+            appointment_type: "Initial Consultation",
+            appointment_datetime: new Date(Date.now() + 86400000 * 2).toISOString(),
+            notes: "First-time consultation for anxiety management",
+            status: "scheduled",
+            created_at: new Date().toISOString()
+          },
+          {
+            id: 2,
+            user: { id: 1, email: 'user@example.com' },
+            psychologist: {
+              id: 2,
+              name: "Dr. Budi Santoso",
+              specialization: "Psychiatrist",
+              image_url: "/counselors/budi.jpg"
+            },
+            appointment_type: "Follow-up Session",
+            appointment_datetime: new Date(Date.now() - 86400000 * 7).toISOString(),
+            status: "completed",
+            created_at: new Date(Date.now() - 86400000 * 14).toISOString()
+          },
+          {
+            id: 3,
+            user: { id: 1, email: 'user@example.com' },
+            psychologist: {
+              id: 3,
+              name: "Anita Wijaya, M.Psi",
+              specialization: "Counseling Psychologist",
+              image_url: "/counselors/anita.jpg"
+            },
+            appointment_type: "Crisis Intervention",
+            appointment_datetime: new Date(Date.now() - 86400000 * 3).toISOString(),
+            status: "cancelled",
+            created_at: new Date(Date.now() - 86400000 * 10).toISOString()
+          }
+        ];
+        setAppointments(mockAppointments);
+      } catch (error) {
+        console.error("Error fetching appointments:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchAppointments();
+  }, [status, session]);
+
+  // Fetch psychologists
+  useEffect(() => {
+    const fetchPsychologists = async () => {
+      try {
+        const response = await fetch('/api/v1/appointments/psychologists');
+        const data = await response.json();
+        setPsychologists(data);
+      } catch (error) {
+        console.error("Error fetching psychologists:", error);
+        // Mock data fallback
+        setPsychologists([
+          {
+            id: 1,
+            name: "Dr. Putri Handayani",
+            specialization: "Clinical Psychologist",
+            image_url: "/counselors/putri.jpg",
+            is_available: true
+          },
+          {
+            id: 2,
+            name: "Dr. Budi Santoso",
+            specialization: "Psychiatrist",
+            image_url: "/counselors/budi.jpg",
+            is_available: true
+          },
+          {
+            id: 3,
+            name: "Anita Wijaya, M.Psi",
+            specialization: "Counseling Psychologist",
+            image_url: "/counselors/anita.jpg",
+            is_available: true
+          },
+          {
+            id: 4,
+            name: "Dr. Joko Prasetyo",
+            specialization: "Mental Health Specialist",
+            image_url: "/counselors/joko.jpg",
+            is_available: false
+          }
+        ]);
+      }
+    };
+
+    fetchPsychologists();
+  }, []);
+
+  // Filter appointments
+  const filteredAppointments = useMemo(() => {
+    let filtered = appointments;
+
+    // Filter by tab
+    const now = new Date();
+    if (activeTab === 'upcoming') {
+      filtered = filtered.filter(apt => 
+        new Date(apt.appointment_datetime) >= now && apt.status === 'scheduled'
+      );
+    } else if (activeTab === 'history') {
+      filtered = filtered.filter(apt => 
+        new Date(apt.appointment_datetime) < now || ['completed', 'cancelled', 'moved'].includes(apt.status)
+      );
     }
-  }, [selectedDate]);
-  
-  // Generate array of dates for the week view
-  const weekDates = Array.from({ length: 7 }, (_, i) => 
-    addDays(currentWeekStart, i)
-  );
-  
-  const nextWeek = () => {
-    setCurrentWeekStart(addWeeks(currentWeekStart, 1));
-  };
-  
-  const prevWeek = () => {
-    // Don't allow selecting dates in the past
-    if (currentWeekStart > new Date()) {
-      setCurrentWeekStart(addWeeks(currentWeekStart, -1));
+
+    // Filter by status
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter(apt => apt.status === statusFilter);
     }
-  };
-  
-  const isDateSelectable = (date: number | Date) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    return date >= today;
+
+    // Filter by search query
+    if (searchQuery) {
+      filtered = filtered.filter(apt =>
+        apt.psychologist.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        apt.appointment_type.toLowerCase().includes(searchQuery.toLowerCase())
+      );
+    }
+
+    return filtered;
+  }, [appointments, activeTab, statusFilter, searchQuery]);
+
+  // Filter counselors by search
+  const filteredCounselors = useMemo(() => {
+    if (!searchQuery) return psychologists;
+    return psychologists.filter(psy =>
+      psy.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      psy.specialization?.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  }, [psychologists, searchQuery]);
+
+  // Get status badge
+  const getStatusBadge = (status: string) => {
+    const badges = {
+      scheduled: { icon: FiClock, color: 'bg-blue-500/20 text-blue-400', label: 'Scheduled' },
+      completed: { icon: FiCheckCircle, color: 'bg-green-500/20 text-green-400', label: 'Completed' },
+      cancelled: { icon: FiXCircle, color: 'bg-red-500/20 text-red-400', label: 'Cancelled' },
+      moved: { icon: FiAlertCircle, color: 'bg-yellow-500/20 text-yellow-400', label: 'Rescheduled' }
+    };
+    const badge = badges[status as keyof typeof badges] || badges.scheduled;
+    const Icon = badge.icon;
+    return (
+      <span className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${badge.color}`}>
+        <Icon className="w-3 h-3" />
+        {badge.label}
+      </span>
+    );
   };
 
-  const handleBookAnotherAppointment = () => {
-    setStep(1);
-    setSelectedDate(null);
-    setSelectedTime(null);
-    setSelectedCounselor(null);
-    setSelectedType(null);
-    setNotes("");
-    setSuccess(false);
-  }
-  
-  const handleSubmit = async () => {
-    if (!selectedDate || !selectedTime || !selectedCounselor || !selectedType) {
-      alert("Please complete all required fields");
-      return;
-    }
-    
-    setLoading(true);
+  // Handle add pre-appointment notes
+  const handleAddNotes = (appointment: Appointment) => {
+    setSelectedAppointment(appointment);
+    setPreAppointmentNotes(appointment.notes || '');
+    setShowNotesModal(true);
+  };
+
+  // Save pre-appointment notes
+  const savePreAppointmentNotes = async () => {
+    if (!selectedAppointment) return;
     
     try {
-      // Here you would integrate with your actual API
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulating API call
-      
-      // Simulate successful appointment booking
-      setSuccess(true);
-      setLoading(false);
-      
-      // Reset form after success
-    //   setTimeout(() => {
-    //     setStep(1);
-    //     setSelectedDate(null);
-    //     setSelectedTime(null);
-    //     setSelectedCounselor(null);
-    //     setSelectedType(null);
-    //     setNotes("");
-    //     setSuccess(false);
-    //   }, 5000);
-      
+      // TODO: Replace with actual API call
+      // await fetch(`/api/v1/appointments/${selectedAppointment.id}/notes`, {
+      //   method: 'PUT',
+      //   headers: {
+      //     'Content-Type': 'application/json',
+      //     'Authorization': `Bearer ${session?.accessToken}`
+      //   },
+      //   body: JSON.stringify({ notes: preAppointmentNotes })
+      // });
+
+      // Update local state
+      setAppointments(prev => prev.map(apt =>
+        apt.id === selectedAppointment.id
+          ? { ...apt, notes: preAppointmentNotes }
+          : apt
+      ));
+
+      setShowNotesModal(false);
+      setSelectedAppointment(null);
+      alert('Pre-appointment notes saved successfully!');
     } catch (error) {
-      console.error("Error booking appointment:", error);
-      setLoading(false);
-      alert("Something went wrong. Please try again.");
+      console.error("Error saving notes:", error);
+      alert('Failed to save notes. Please try again.');
     }
   };
 
-  if (status === "loading" || status === "unauthenticated") {
+  // Export to Google Calendar
+  const exportToGoogleCalendar = (appointment: Appointment) => {
+    const startTime = new Date(appointment.appointment_datetime);
+    const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 hour duration
+
+    const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(appointment.appointment_type + ' - ' + appointment.psychologist.name)}&dates=${startTime.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}/${endTime.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}&details=${encodeURIComponent(appointment.notes || '')}&location=${encodeURIComponent(DEFAULT_LOCATION.address)}&sf=true&output=xml`;
+
+    window.open(googleCalendarUrl, '_blank');
+  };
+
+  if (status === "loading" || loading) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] p-6 flex items-center justify-center">
         <div className="animate-pulse flex flex-col items-center">
@@ -190,431 +328,420 @@ export default function AppointmentsPage() {
     );
   }
 
-  if (success) {
-    return (
-      <div className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] p-6 flex items-center justify-center">
-        <motion.div 
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-8 max-w-lg w-full text-center"
-        >
-          <div className="bg-green-500/20 rounded-full p-4 w-20 h-20 mx-auto mb-6 flex items-center justify-center">
-            <FiCheck className="text-green-400 text-4xl" />
-          </div>
-          <h2 className="text-2xl font-bold text-white mb-4">Appointment Scheduled!</h2>
-          <p className="text-gray-200 mb-6">
-            Your appointment has been successfully booked with {selectedCounselor?.name} on {format(new Date(selectedDate!), 'EEEE, d MMMM yyyy', { locale: id })} at {selectedTime?.time}.
-          </p>
-          <div className="bg-white/5 border border-white/10 rounded-lg p-4 mb-6 text-left">
-            <p className="text-sm text-gray-300 mb-1"><strong>Appointment Type:</strong> {selectedType?.name}</p>
-            <p className="text-sm text-gray-300 mb-1"><strong>Duration:</strong> {selectedType?.duration} minutes</p>
-            <p className="text-sm text-gray-300"><strong>Location:</strong> Gadjah Mada Medical Center, Psychology Dept., 2nd Floor</p>
-          </div>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/aika">
-              <button className="px-6 py-3 bg-[#FFCA40] text-[#001D58] rounded-lg font-medium">
-                Talk to Aika
-              </button>
-            </Link>
-            <Link href="/appointments">
-              <button className="px-6 py-3 bg-white/20 text-white rounded-lg font-medium" onClick={handleBookAnotherAppointment}>
-                Book Another Appointment
-              </button>
-            </Link>
-          </div>
-          <p className="text-xs text-gray-400 mt-6">
-            You will receive a confirmation email shortly. Please arrive 15 minutes early.
-          </p>
-        </motion.div>
-      </div>
-    );
-  }
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] py-10 px-4 sm:px-6">
-      <div className="max-w-6xl mx-auto">
-        {/* Page Header */}
-        <div className="text-center mb-10">
-          <h1 className="text-3xl font-bold text-white">Schedule an Appointment</h1>
-          <p className="text-gray-300 mt-2 max-w-xl mx-auto">
-            Book a session with Gadjah Mada Medical Center&apos;s psychological services team
-          </p>
-        </div>
-        
-        {/* Appointment Progress Steps */}
+      <div className="max-w-7xl mx-auto">
+        {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between max-w-md mx-auto">
-            {[1, 2, 3].map((s) => (
-              <div key={s} className="flex flex-col items-center">
-                <div className={`w-8 h-8 rounded-full flex items-center justify-center font-medium ${
-                  step === s 
-                    ? 'bg-[#FFCA40] text-[#001D58]' 
-                    : step > s 
-                      ? 'bg-green-500 text-white'
-                      : 'bg-white/20 text-white/60'
-                }`}>
-                  {step > s ? <FiCheck /> : s}
-                </div>
-                <span className={`text-xs mt-2 ${step >= s ? 'text-white' : 'text-white/60'}`}>
-                  {s === 1 ? 'Select Date & Time' : s === 2 ? 'Choose Provider' : 'Confirm'}
-                </span>
-              </div>
-            ))}
-            
-            {/* Progress bar connecting circles */}
-            <div className="absolute left-0 right-0 flex justify-center">
-              <div className="h-0.5 bg-white/20 w-32 sm:w-52 -z-10 mt-4">
-                <div 
-                  className={`h-full bg-[#FFCA40] ${
-                    step === 1 ? 'w-0' : step === 2 ? 'w-1/2' : 'w-full'
-                  }`}
-                ></div>
-              </div>
-            </div>
+          <h1 className="text-3xl font-bold text-white mb-2">My Appointments</h1>
+          <p className="text-gray-300">Manage your appointments and connect with counselors</p>
+        </div>
+
+        {/* Action Bar */}
+        <div className="mb-6 flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+          {/* Search */}
+          <div className="relative flex-1 max-w-md">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+            <input
+              type="text"
+              placeholder="Search appointments or counselors..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-10 pr-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-[#FFCA40]"
+            />
+          </div>
+
+          {/* Actions */}
+          <div className="flex gap-3">
+            <button
+              onClick={() => setShowMapModal(true)}
+              className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition"
+            >
+              <FiMap className="w-4 h-4" />
+              <span className="hidden sm:inline">View Map</span>
+            </button>
+            <Link href="/appointments/book">
+              <button className="flex items-center gap-2 px-4 py-2 bg-[#FFCA40] hover:bg-[#ffb700] text-[#001D58] rounded-lg font-medium transition">
+                <FiPlus className="w-4 h-4" />
+                Book Appointment
+              </button>
+            </Link>
           </div>
         </div>
-        
-        {/* Main content area */}
-        <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-6 sm:p-8">
-          {/* Step 1: Date and Time Selection */}
-          {step === 1 && (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
+
+        {/* Tabs */}
+        <div className="flex gap-2 mb-6 border-b border-white/10 overflow-x-auto">
+          <button
+            onClick={() => setActiveTab('upcoming')}
+            className={`px-4 py-3 font-medium transition whitespace-nowrap ${
+              activeTab === 'upcoming'
+                ? 'text-[#FFCA40] border-b-2 border-[#FFCA40]'
+                : 'text-gray-300 hover:text-white'
+            }`}
+          >
+            Upcoming
+          </button>
+          <button
+            onClick={() => setActiveTab('history')}
+            className={`px-4 py-3 font-medium transition whitespace-nowrap ${
+              activeTab === 'history'
+                ? 'text-[#FFCA40] border-b-2 border-[#FFCA40]'
+                : 'text-gray-300 hover:text-white'
+            }`}
+          >
+            History
+          </button>
+          <button
+            onClick={() => setActiveTab('counselors')}
+            className={`px-4 py-3 font-medium transition whitespace-nowrap ${
+              activeTab === 'counselors'
+                ? 'text-[#FFCA40] border-b-2 border-[#FFCA40]'
+                : 'text-gray-300 hover:text-white'
+            }`}
+          >
+            Counselors Directory
+          </button>
+        </div>
+
+        {/* Filters (only show for appointments tabs) */}
+        {activeTab !== 'counselors' && (
+          <div className="mb-6 flex gap-2 overflow-x-auto">
+            <button
+              onClick={() => setStatusFilter('all')}
+              className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition ${
+                statusFilter === 'all'
+                  ? 'bg-[#FFCA40] text-[#001D58]'
+                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
+              }`}
             >
-              <h2 className="text-xl font-bold text-white mb-6">Select Date & Time</h2>
-              
-              {/* Calendar Week View */}
-              <div className="mb-8">
-                <div className="flex items-center justify-between mb-4">
-                  <button 
-                    onClick={prevWeek}
-                    className="p-2 rounded-full hover:bg-white/10 transition"
-                    aria-label="Previous week"
-                  >
-                    <FiChevronLeft className="text-white" />
-                  </button>
-                  <h3 className="text-white font-medium">
-                    {format(currentWeekStart, 'd MMM')} - {format(addDays(currentWeekStart, 6), 'd MMM yyyy')}
-                  </h3>
-                  <button 
-                    onClick={nextWeek}
-                    className="p-2 rounded-full hover:bg-white/10 transition"
-                    aria-label="Next week"
-                  >
-                    <FiChevronRight className="text-white" />
-                  </button>
-                </div>
-                
-                <div className="grid grid-cols-7 gap-2">
-                  {/* Day headings */}
-                  {weekDates.map((date, i) => (
-                    <div key={`heading-${i}`} className="text-center">
-                      <p className="text-xs text-gray-400 mb-1">
-                        {format(date, 'EEE', { locale: id })}
-                      </p>
-                    </div>
-                  ))}
-                  
-                  {/* Date buttons */}
-                  {weekDates.map((date, i) => {
-                    const dateStr = format(date, 'yyyy-MM-dd');
-                    const isSelected = selectedDate === dateStr;
-                    const isSelectable = isDateSelectable(date);
-                    
-                    return (
-                      <button
-                        key={`date-${i}`}
-                        onClick={() => isSelectable && setSelectedDate(dateStr)}
-                        disabled={!isSelectable}
-                        className={`py-2 rounded-lg text-center transition-all ${
-                          isSelected
-                            ? 'bg-[#FFCA40] text-[#001D58]'
-                            : isSelectable
-                              ? 'hover:bg-white/20 bg-white/5'
-                              : 'bg-white/5 text-white/30 cursor-not-allowed'
-                        }`}
-                      >
-                        <span className="text-sm block">{format(date, 'd')}</span>
-                      </button>
-                    );
-                  })}
-                </div>
-              </div>
-              
-              {/* Time Selection */}
-              {selectedDate && (
-                <div className="mb-8">
-                  <h3 className="text-white font-medium mb-3">Available Times</h3>
-                  <p className="text-sm text-gray-300 mb-4">
-                    <FiCalendar className="inline mr-2" />
-                    {format(new Date(selectedDate), 'EEEE, d MMMM yyyy', { locale: id })}
+              All
+            </button>
+            <button
+              onClick={() => setStatusFilter('scheduled')}
+              className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition ${
+                statusFilter === 'scheduled'
+                  ? 'bg-[#FFCA40] text-[#001D58]'
+                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
+              }`}
+            >
+              Scheduled
+            </button>
+            <button
+              onClick={() => setStatusFilter('completed')}
+              className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition ${
+                statusFilter === 'completed'
+                  ? 'bg-[#FFCA40] text-[#001D58]'
+                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
+              }`}
+            >
+              Completed
+            </button>
+            <button
+              onClick={() => setStatusFilter('cancelled')}
+              className={`px-3 py-1.5 rounded-full text-sm whitespace-nowrap transition ${
+                statusFilter === 'cancelled'
+                  ? 'bg-[#FFCA40] text-[#001D58]'
+                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
+              }`}
+            >
+              Cancelled
+            </button>
+          </div>
+        )}
+
+        {/* Content */}
+        <AnimatePresence mode="wait">
+          {activeTab !== 'counselors' ? (
+            // Appointments List
+            <motion.div
+              key="appointments"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="grid gap-4"
+            >
+              {filteredAppointments.length === 0 ? (
+                <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-12 text-center">
+                  <FiCalendar className="w-16 h-16 text-gray-400 mx-auto mb-4" />
+                  <h3 className="text-xl font-medium text-white mb-2">No appointments found</h3>
+                  <p className="text-gray-300 mb-6">
+                    {activeTab === 'upcoming' 
+                      ? "You don't have any upcoming appointments." 
+                      : "No appointment history available."}
                   </p>
-                  
-                  <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-6 gap-3">
-                    {timeSlots.map((slot, i) => (
-                      <button
-                        key={`time-${i}`}
-                        onClick={() => slot.available && setSelectedTime(slot)}
-                        disabled={!slot.available}
-                        className={`py-3 rounded-lg text-center transition ${
-                          selectedTime?.time === slot.time
-                            ? 'bg-[#FFCA40] text-[#001D58]'
-                            : slot.available
-                              ? 'hover:bg-white/20 bg-white/5'
-                              : 'bg-white/5 text-white/30 cursor-not-allowed'
-                        }`}
-                      >
-                        {slot.time}
-                      </button>
-                    ))}
-                  </div>
-                  
-                  {timeSlots.length === 0 && (
-                    <p className="text-gray-300 text-center py-4">
-                      No available times for this date
-                    </p>
-                  )}
+                  <Link href="/appointments/book">
+                    <button className="px-6 py-3 bg-[#FFCA40] hover:bg-[#ffb700] text-[#001D58] rounded-lg font-medium transition">
+                      Book Your First Appointment
+                    </button>
+                  </Link>
                 </div>
-              )}
-              
-              <div className="flex justify-between mt-8">
-                <Link href="/">
-                  <button className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg">
-                    Cancel
-                  </button>
-                </Link>
-                <button
-                  onClick={() => selectedDate && selectedTime && setStep(2)}
-                  disabled={!selectedDate || !selectedTime}
-                  className={`px-6 py-2 rounded-lg ${
-                    selectedDate && selectedTime
-                      ? 'bg-[#FFCA40] text-[#001D58] hover:bg-[#ffb700]'
-                      : 'bg-white/10 text-white/50 cursor-not-allowed'
-                  }`}
-                >
-                  Continue
-                </button>
-              </div>
-            </motion.div>
-          )}
-          
-          {/* Step 2: Counselor and Appointment Type Selection */}
-          {step === 2 && (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <h2 className="text-xl font-bold text-white mb-6">Choose Provider & Session Type</h2>
-              
-              {/* Counselor Selection */}
-              <div className="mb-8">
-                <h3 className="text-white font-medium mb-3">Select a Mental Health Professional</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {counselors.map((counselor) => (
-                    <button
-                      key={counselor.id}
-                      onClick={() => counselor.available && setSelectedCounselor(counselor)}
-                      disabled={!counselor.available}
-                      className={`p-4 rounded-lg flex items-center transition ${
-                        selectedCounselor?.id === counselor.id
-                          ? 'bg-[#FFCA40]/20 border-2 border-[#FFCA40]'
-                          : counselor.available
-                            ? 'bg-white/5 border border-white/10 hover:bg-white/10'
-                            : 'bg-white/5 border border-white/10 opacity-50 cursor-not-allowed'
-                      }`}
-                    >
-                      <div className="w-16 h-16 rounded-full overflow-hidden bg-white/20 flex-shrink-0 mr-4">
-                        <div className="w-full h-full bg-gradient-to-br from-[#173a7a] to-[#0a2a6e] flex items-center justify-center">
-                          <FiUser className="text-2xl text-white/70" />
+              ) : (
+                filteredAppointments.map((appointment) => (
+                  <motion.div
+                    key={appointment.id}
+                    layout
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 0.95 }}
+                    className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-6 hover:bg-white/15 transition"
+                  >
+                    <div className="flex flex-col md:flex-row gap-6">
+                      {/* Counselor Info */}
+                      <div className="flex items-start gap-4 flex-1">
+                        <div className="w-16 h-16 rounded-full overflow-hidden bg-white/20 flex-shrink-0">
+                          <div className="w-full h-full bg-gradient-to-br from-[#173a7a] to-[#0a2a6e] flex items-center justify-center">
+                            <FiUser className="text-2xl text-white/70" />
+                          </div>
+                        </div>
+                        <div className="flex-1">
+                          <h3 className="text-lg font-semibold text-white mb-1">
+                            {appointment.psychologist.name}
+                          </h3>
+                          <p className="text-sm text-gray-300 mb-2">
+                            {appointment.psychologist.specialization}
+                          </p>
+                          <div className="flex flex-wrap gap-2 mb-3">
+                            {getStatusBadge(appointment.status)}
+                            <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400">
+                              {appointment.appointment_type}
+                            </span>
+                          </div>
+                          <div className="flex flex-col gap-2 text-sm text-gray-300">
+                            <div className="flex items-center gap-2">
+                              <FiCalendar className="w-4 h-4 text-[#FFCA40]" />
+                              {format(new Date(appointment.appointment_datetime), 'EEEE, d MMMM yyyy', { locale: id })}
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <FiClock className="w-4 h-4 text-[#FFCA40]" />
+                              {format(new Date(appointment.appointment_datetime), 'HH:mm')} WIB
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <FiMapPin className="w-4 h-4 text-[#FFCA40]" />
+                              {DEFAULT_LOCATION.name}
+                            </div>
+                          </div>
                         </div>
                       </div>
-                      <div className="text-left">
-                        <h4 className="font-medium text-white">{counselor.name}</h4>
-                        <p className="text-sm text-gray-300">{counselor.specialization}</p>
-                        {!counselor.available && (
-                          <span className="text-xs text-red-300 mt-1 block">
-                            Currently unavailable
-                          </span>
+
+                      {/* Actions */}
+                      <div className="flex flex-col gap-2 min-w-[180px]">
+                        <button
+                          onClick={() => handleAddNotes(appointment)}
+                          className="flex items-center justify-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition text-sm"
+                        >
+                          <FiFileText className="w-4 h-4" />
+                          {appointment.notes ? 'Edit Notes' : 'Add Notes'}
+                        </button>
+                        <button
+                          onClick={() => exportToGoogleCalendar(appointment)}
+                          className="flex items-center justify-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition text-sm"
+                        >
+                          <FiDownload className="w-4 h-4" />
+                          Add to Calendar
+                        </button>
+                        {appointment.status === 'scheduled' && (
+                          <Link href={`/appointments/book?reschedule=${appointment.id}`}>
+                            <button className="w-full px-4 py-2 bg-[#FFCA40] hover:bg-[#ffb700] text-[#001D58] rounded-lg font-medium transition text-sm">
+                              Reschedule
+                            </button>
+                          </Link>
                         )}
                       </div>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              {/* Appointment Type Selection */}
-              <div className="mb-8">
-                <h3 className="text-white font-medium mb-3">Select Appointment Type</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {appointmentTypes.map((type) => (
-                    <button
-                      key={type.id}
-                      onClick={() => setSelectedType(type)}
-                      className={`p-4 rounded-lg text-left transition ${
-                        selectedType?.id === type.id
-                          ? 'bg-[#FFCA40]/20 border-2 border-[#FFCA40]'
-                          : 'bg-white/5 border border-white/10 hover:bg-white/10'
-                      }`}
-                    >
-                      <div className="flex justify-between">
-                        <h4 className="font-medium text-white">{type.name}</h4>
-                        <span className="text-sm text-gray-300">{type.duration} min</span>
+                    </div>
+
+                    {/* Notes Preview */}
+                    {appointment.notes && (
+                      <div className="mt-4 pt-4 border-t border-white/10">
+                        <p className="text-xs text-gray-400 mb-1">Pre-appointment notes:</p>
+                        <p className="text-sm text-gray-200">{appointment.notes}</p>
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">{type.description}</p>
-                    </button>
-                  ))}
-                </div>
-              </div>
-              
-              <div className="flex justify-between mt-8">
-                <button 
-                  onClick={() => setStep(1)}
-                  className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg"
-                >
-                  Back
-                </button>
-                <button
-                  onClick={() => selectedCounselor && selectedType && setStep(3)}
-                  disabled={!selectedCounselor || !selectedType}
-                  className={`px-6 py-2 rounded-lg ${
-                    selectedCounselor && selectedType
-                      ? 'bg-[#FFCA40] text-[#001D58] hover:bg-[#ffb700]'
-                      : 'bg-white/10 text-white/50 cursor-not-allowed'
-                  }`}
-                >
-                  Continue
-                </button>
-              </div>
+                    )}
+                  </motion.div>
+                ))
+              )}
             </motion.div>
-          )}
-          
-          {/* Step 3: Confirmation and Additional Info */}
-          {step === 3 && (
-            <motion.div 
-              initial={{ opacity: 0, y: 10 }}
+          ) : (
+            // Counselors Directory
+            <motion.div
+              key="counselors"
+              initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
             >
-              <h2 className="text-xl font-bold text-white mb-6">Confirm Your Appointment</h2>
-              
-              {/* Appointment Summary */}
-              <div className="bg-white/5 border border-white/10 rounded-lg p-6 mb-6">
-                <h3 className="font-medium text-white mb-4">Appointment Details</h3>
-                
-                <div className="space-y-4">
-                  <div className="flex">
-                    <FiCalendar className="text-[#FFCA40] mr-3 mt-1 flex-shrink-0" />
-                    <div>
-                      <p className="text-white">
-                        {selectedDate && format(new Date(selectedDate), 'EEEE, d MMMM yyyy', { locale: id })}
-                      </p>
-                      <p className="text-sm text-gray-300">
-                        {selectedTime?.time} WIB
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex">
-                    <FiUser className="text-[#FFCA40] mr-3 mt-1 flex-shrink-0" />
-                    <div>
-                      <p className="text-white">
-                        {selectedCounselor?.name}
-                      </p>
-                      <p className="text-sm text-gray-300">
-                        {selectedCounselor?.specialization}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex">
-                    <FiClock className="text-[#FFCA40] mr-3 mt-1 flex-shrink-0" />
-                    <div>
-                      <p className="text-white">
-                        {selectedType?.name}
-                      </p>
-                      <p className="text-sm text-gray-300">
-                        {selectedType?.duration} minutes
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex">
-                    <FiMapPin className="text-[#FFCA40] mr-3 mt-1 flex-shrink-0" />
-                    <div>
-                      <p className="text-white">
-                        Gadjah Mada Medical Center
-                      </p>
-                      <p className="text-sm text-gray-300">
-                        Psychology Department, 2nd Floor
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Additional Notes */}
-              <div className="mb-6">
-                <label htmlFor="notes" className="block text-white font-medium mb-2">Additional Notes</label>
-                <textarea
-                  id="notes"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Share any information that might be helpful for your provider"
-                  className="w-full bg-white/5 border border-white/20 rounded-lg p-3 text-white placeholder-gray-400"
-                  rows={4}
-                ></textarea>
-              </div>
-              
-              {/* Appointment Policies */}
-              <div className="bg-[#173a7a]/50 border border-white/10 rounded-lg p-4 mb-8">
-                <div className="flex">
-                  <FiInfo className="text-[#FFCA40] mr-3 mt-1 flex-shrink-0" />
-                  <div>
-                    <h4 className="text-white font-medium">Important Information</h4>
-                    <ul className="list-disc list-inside text-sm text-gray-300 space-y-1 mt-2">
-                      <li>Please arrive 15 minutes before your scheduled time</li>
-                      <li>Bring your UGM student/staff ID card</li>
-                      <li>Cancellation requires 24-hour notice</li>
-                      <li>For emergencies, please call the UGM Crisis Line at (0274) 123-4567</li>
-                    </ul>
-                  </div>
-                </div>
-              </div>
-              
-              <div className="flex justify-between mt-8">
-                <button 
-                  onClick={() => setStep(2)}
-                  className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg"
+              {filteredCounselors.map((counselor) => (
+                <motion.div
+                  key={counselor.id}
+                  layout
+                  initial={{ opacity: 0, scale: 0.95 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.95 }}
+                  className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-6 hover:bg-white/15 transition"
                 >
-                  Back
-                </button>
-                <button
-                  onClick={handleSubmit}
-                  disabled={loading}
-                  className={`px-6 py-2 bg-[#FFCA40] text-[#001D58] rounded-lg flex items-center ${
-                    loading ? 'opacity-70' : 'hover:bg-[#ffb700]'
-                  }`}
-                >
-                  {loading && (
-                    <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-[#001D58]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                  )}
-                  {loading ? 'Processing...' : 'Confirm Appointment'}
-                </button>
-              </div>
+                  <div className="flex flex-col items-center text-center">
+                    <div className="w-24 h-24 rounded-full overflow-hidden bg-white/20 mb-4">
+                      <div className="w-full h-full bg-gradient-to-br from-[#173a7a] to-[#0a2a6e] flex items-center justify-center">
+                        <FiUser className="text-3xl text-white/70" />
+                      </div>
+                    </div>
+                    <h3 className="text-lg font-semibold text-white mb-1">
+                      {counselor.name}
+                    </h3>
+                    <p className="text-sm text-gray-300 mb-4">
+                      {counselor.specialization}
+                    </p>
+                    <div className="mb-4">
+                      {counselor.is_available ? (
+                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-green-500/20 text-green-400">
+                          <div className="w-2 h-2 rounded-full bg-green-400 animate-pulse"></div>
+                          Available
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium bg-gray-500/20 text-gray-400">
+                          Currently Unavailable
+                        </span>
+                      )}
+                    </div>
+                    <Link href={`/appointments/book?counselor=${counselor.id}`} className="w-full">
+                      <button
+                        disabled={!counselor.is_available}
+                        className={`w-full px-4 py-2 rounded-lg font-medium transition ${
+                          counselor.is_available
+                            ? 'bg-[#FFCA40] hover:bg-[#ffb700] text-[#001D58]'
+                            : 'bg-white/10 text-gray-400 cursor-not-allowed'
+                        }`}
+                      >
+                        {counselor.is_available ? 'Book Appointment' : 'Unavailable'}
+                      </button>
+                    </Link>
+                  </div>
+                </motion.div>
+              ))}
             </motion.div>
           )}
-        </div>
-        
-        {/* Help information */}
-        <div className="mt-8 text-center text-gray-400 text-sm">
-          <p>Need assistance? Contact the UGM Medical Center at <a href="tel:+62274123456" className="text-[#FFCA40] hover:underline">+62 274 123456</a></p>
-        </div>
+        </AnimatePresence>
+
+        {/* Pre-appointment Notes Modal */}
+        <AnimatePresence>
+          {showNotesModal && selectedAppointment && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              onClick={() => setShowNotesModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-[#001D58] rounded-xl border border-white/20 p-6 max-w-2xl w-full max-h-[80vh] overflow-y-auto"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-white mb-1">Pre-Appointment Notes</h2>
+                    <p className="text-sm text-gray-300">
+                      Share information that {selectedAppointment.psychologist.name} should know before your session
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => setShowNotesModal(false)}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    <FiXCircle className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="mb-6">
+                  <label htmlFor="pre-notes" className="block text-white font-medium mb-2">
+                    Your Notes
+                  </label>
+                  <textarea
+                    id="pre-notes"
+                    value={preAppointmentNotes}
+                    onChange={(e) => setPreAppointmentNotes(e.target.value)}
+                    placeholder="Share any concerns, symptoms, or topics you'd like to discuss..."
+                    className="w-full bg-white/5 border border-white/20 rounded-lg p-3 text-white placeholder-gray-400 min-h-[200px] focus:outline-none focus:ring-2 focus:ring-[#FFCA40]"
+                  />
+                </div>
+
+                <div className="flex gap-3 justify-end">
+                  <button
+                    onClick={() => setShowNotesModal(false)}
+                    className="px-6 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={savePreAppointmentNotes}
+                    className="px-6 py-2 bg-[#FFCA40] hover:bg-[#ffb700] text-[#001D58] rounded-lg font-medium transition"
+                  >
+                    Save Notes
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Map Modal */}
+        <AnimatePresence>
+          {showMapModal && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+              onClick={() => setShowMapModal(false)}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                className="bg-[#001D58] rounded-xl border border-white/20 p-6 max-w-4xl w-full"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-start justify-between mb-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-white mb-1">Appointment Location</h2>
+                    <p className="text-sm text-gray-300">{DEFAULT_LOCATION.address}</p>
+                  </div>
+                  <button
+                    onClick={() => setShowMapModal(false)}
+                    className="text-gray-400 hover:text-white"
+                  >
+                    <FiXCircle className="w-6 h-6" />
+                  </button>
+                </div>
+
+                <div className="rounded-lg overflow-hidden">
+                  <AppointmentMap
+                    center={[DEFAULT_LOCATION.lat, DEFAULT_LOCATION.lng]}
+                    markers={[
+                      {
+                        position: [DEFAULT_LOCATION.lat, DEFAULT_LOCATION.lng],
+                        title: DEFAULT_LOCATION.name,
+                        description: DEFAULT_LOCATION.address
+                      }
+                    ]}
+                  />
+                </div>
+
+                <div className="mt-4 flex gap-3">
+                  <a
+                    href={`https://www.google.com/maps/dir/?api=1&destination=${DEFAULT_LOCATION.lat},${DEFAULT_LOCATION.lng}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex-1 px-4 py-2 bg-[#FFCA40] hover:bg-[#ffb700] text-[#001D58] rounded-lg font-medium text-center transition"
+                  >
+                    Get Directions
+                  </a>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
       </div>
     </div>
   );

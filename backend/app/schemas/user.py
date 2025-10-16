@@ -174,3 +174,11 @@ class TestEmailPayload(BaseModel):
 class SyncAchievementsResponse(BaseModel):
     message: str
     newly_awarded_badges: List[EarnedBadgeInfo] = []
+
+
+class UserStatsResponse(BaseModel):
+    """Response model for user statistics (streaks, sentiment)."""
+    current_streak: int
+    longest_streak: int
+    sentiment_score: float
+    last_activity_date: Optional[date] = None

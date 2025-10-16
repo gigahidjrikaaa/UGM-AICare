@@ -14,6 +14,7 @@ import {
   FiRefreshCw,
   FiTrendingUp,
 } from "@/icons";
+import WalletLinkButton from "@/components/ui/WalletLinkButton";
 import apiClient, { fetchUserProfileOverview } from "@/services/api";
 import type { TimelineEntry, UserProfileOverviewResponse } from "@/types/profile";
 
@@ -116,6 +117,14 @@ export default function DashboardPage() {
       setProfileLoading(true);
       setProfileError(null);
       try {
+        // First, refresh user stats to ensure they're current
+        try {
+          await apiClient.post("/profile/refresh-stats");
+        } catch (error) {
+          console.warn("Failed to refresh user stats (non-critical)", error);
+          // Continue even if stats refresh fails
+        }
+        
         const result = await fetchUserProfileOverview();
         setProfile(result);
       } catch (error) {
@@ -270,6 +279,13 @@ export default function DashboardPage() {
                     <FiActivity className="h-4 w-4" />
                   </span>
                 </Link>
+              </div>
+              <div className="mt-4 flex items-center gap-4">
+                <div className="flex-1">
+                  <p className="text-xs uppercase tracking-wide text-white/50">Digital Identity</p>
+                  <p className="mt-1 text-xs text-white/60">Secure your decentralized identity with Web3</p>
+                </div>
+                <WalletLinkButton />
               </div>
             </div>
             <div className="grid gap-4 sm:grid-cols-2">

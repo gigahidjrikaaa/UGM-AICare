@@ -51,7 +51,7 @@ export default function ProfileDropdown({ isOpen, user, onClose, onSignOut }: Pr
             aria-hidden="true"
           />
 
-          {/* Dropdown Menu Container - Enhanced iOS Glassmorphism */}
+          {/* Dropdown Menu Container - Enhanced Readable Glassmorphism */}
           <motion.div
             key="profile-menu"
             initial={{ opacity: 0, y: -15, scale: 0.9 }}
@@ -62,15 +62,15 @@ export default function ProfileDropdown({ isOpen, user, onClose, onSignOut }: Pr
               ease: [0.25, 0.46, 0.45, 0.94], // iOS-like easing
               scale: { duration: 0.2 }
             }}
-            className="absolute right-0 mt-3 w-72 bg-white/10 backdrop-blur-2xl rounded-3xl shadow-2xl border border-white/20 overflow-hidden z-40"
+            className="absolute right-0 mt-3 w-72 bg-white/95 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/50 overflow-hidden z-40"
             role="menu"
             aria-orientation="vertical"
             aria-labelledby="user-menu-button"
           >
             {/* User Info Section - Enhanced */}
-            <div className="p-6 border-b border-white/10 bg-white/5">
+            <div className="p-6 border-b border-gray-200/50 bg-gradient-to-br from-teal-50/80 to-blue-50/80">
                <div className="flex items-center">
-                  <div className="relative h-12 w-12 rounded-2xl overflow-hidden border-2 border-[#FFCA40]/30 flex-shrink-0 shadow-lg">
+                  <div className="relative h-12 w-12 rounded-2xl overflow-hidden border-2 border-teal-500/40 flex-shrink-0 shadow-lg">
                     <Image
                       src={user.image || "/default-avatar.png"}
                       alt={user.name || "User"}
@@ -80,11 +80,11 @@ export default function ProfileDropdown({ isOpen, user, onClose, onSignOut }: Pr
                     />
                   </div>
                   <div className="ml-4 overflow-hidden">
-                    <p className="text-white font-semibold text-base truncate">{user.name}</p>
-                    <p className="text-white/60 text-sm truncate">{user.email}</p>
+                    <p className="text-gray-900 font-semibold text-base truncate">{user.name}</p>
+                    <p className="text-gray-600 text-sm truncate">{user.email}</p>
                     <div className="flex items-center mt-1">
-                      <div className="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
-                      <span className="text-green-300 text-xs font-medium">Online</span>
+                      <div className="w-2 h-2 bg-green-500 rounded-full mr-2 shadow-lg shadow-green-500/50"></div>
+                      <span className="text-green-600 text-xs font-medium">Online</span>
                     </div>
                   </div>
               </div>
@@ -97,11 +97,11 @@ export default function ProfileDropdown({ isOpen, user, onClose, onSignOut }: Pr
                    <Link
                       href={item.href}
                       onClick={onClose}
-                      className="flex items-center px-6 py-3 text-sm text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200 group"
+                      className="flex items-center px-6 py-3 text-sm text-gray-700 hover:text-gray-900 hover:bg-teal-50/50 transition-all duration-200 group"
                       role="menuitem"
                    >
                      <motion.div 
-                       className="text-white/60 group-hover:text-[#FFCA40] transition-colors duration-200"
+                       className="text-gray-500 group-hover:text-teal-600 transition-colors duration-200"
                        whileHover={{ scale: 1.1 }}
                      >
                        {item.icon}
@@ -112,7 +112,7 @@ export default function ProfileDropdown({ isOpen, user, onClose, onSignOut }: Pr
                        initial={{ x: -10 }}
                        whileHover={{ x: 0 }}
                      >
-                       <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                       <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                        </svg>
                      </motion.div>
@@ -121,18 +121,18 @@ export default function ProfileDropdown({ isOpen, user, onClose, onSignOut }: Pr
               ))}
               
               {/* Divider */}
-              <div className="mx-6 my-2 h-px bg-white/10"></div>
+              <div className="mx-6 my-2 h-px bg-gray-200"></div>
               
               {/* Sign Out Button - Enhanced */}
                <motion.button
                     onClick={onSignOut}
-                    whileHover={{ backgroundColor: "rgba(239, 68, 68, 0.15)" }}
+                    whileHover={{ backgroundColor: "rgba(239, 68, 68, 0.1)" }}
                     whileTap={{ scale: 0.98 }}
-                    className="flex items-center w-full text-left px-6 py-3 text-sm text-white/80 hover:text-red-300 transition-all duration-200 group"
+                    className="flex items-center w-full text-left px-6 py-3 text-sm text-gray-700 hover:text-red-600 transition-all duration-200 group"
                     role="menuitem"
                 >
                  <motion.div 
-                   className="text-white/60 group-hover:text-red-400 transition-colors duration-200 mr-3"
+                   className="text-gray-500 group-hover:text-red-500 transition-colors duration-200 mr-3"
                    whileHover={{ scale: 1.1 }}
                  >
                    <FiLogOut />

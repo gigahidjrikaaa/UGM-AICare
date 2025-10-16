@@ -34,6 +34,7 @@ import { format } from "date-fns";
 import GlobalSkeleton from "@/components/ui/GlobalSkeleton";
 import ParticleBackground from "@/components/ui/ParticleBackground";
 import EarnedBadgesDisplay from "@/components/ui/EarnedBadgesDisplay";
+import WalletLinkButton from "@/components/ui/WalletLinkButton";
 import apiClient, { fetchUserProfileOverview, updateUserProfileOverview } from "@/services/api";
 import type { TimelineEntry, UserProfileOverviewResponse, UserProfileOverviewUpdate } from "@/types/profile";
 
@@ -292,6 +293,14 @@ export default function ProfilePage() {
     setProfileLoading(true);
     setProfileError(null);
     try {
+      // First, refresh user stats to ensure they're current
+      try {
+        await apiClient.post("/profile/refresh-stats");
+      } catch (error) {
+        console.warn("Failed to refresh user stats (non-critical)", error);
+        // Continue even if stats refresh fails
+      }
+      
       const data = await fetchUserProfileOverview();
       setProfile(data);
       setAllowCheckins(data.consent.allow_email_checkins);
@@ -706,6 +715,13 @@ export default function ProfilePage() {
                 </div>
               )}
             </div>
+          </div>
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+            <div className="text-white">
+              <p className="text-xs uppercase tracking-wide text-white/50">Digital Identity</p>
+              <p className="mt-1 text-sm text-white/70">Connect your wallet to secure your decentralized identity</p>
+            </div>
+            <WalletLinkButton />
           </div>
           <div className="mt-6 grid gap-3 sm:grid-cols-3">
             {headerMetrics.map((metric) => (
