@@ -23,7 +23,16 @@ config = context.config
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
-fileConfig(config.config_file_name)
+config_file = config.config_file_name
+# config.config_file_name may be None (e.g., when Alembic is invoked programmatically).
+# Only call fileConfig when a config file path/name is present to satisfy type-checkers
+# and avoid passing None to fileConfig.
+if config_file:
+    fileConfig(config_file)
+else:
+    # No config file provided; skip configuring logging from file.
+    # Logging can still be configured programmatically elsewhere if needed.
+    pass
 
 # Load environment configuration before resolving connection info
 load_dotenv()
@@ -38,9 +47,9 @@ def _database_url() -> str:
 def _sync_database_url(url: str) -> str:
     """Alembic uses sync drivers; coerce async URLs to sync equivalents."""
     if url.startswith("postgresql+asyncpg"):
-        return url.replace("postgresql+asyncpg", "postgresql+psycopg")
+        return url.replace("postgresql+asyncpg", "postgresql+psycopg2")
     if url.startswith("postgresql+psycopg_async"):
-        return url.replace("postgresql+psycopg_async", "postgresql+psycopg")
+        return url.replace("postgresql+psycopg_async", "postgresql+psycopg2")
     return url
 
 

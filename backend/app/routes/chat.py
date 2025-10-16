@@ -223,6 +223,11 @@ async def handle_chat_request(
     try:
         personal_context = await build_user_personal_context(db, current_user)
         active_system_prompt = _compose_system_prompt(request.system_prompt, personal_context)
+        
+        # DEBUG: Log system prompt to verify it's being received
+        logger.info(f"🎭 System prompt received from frontend: {request.system_prompt[:100] if request.system_prompt else 'None'}...")
+        logger.info(f"👤 Personal context: {personal_context[:100] if personal_context else 'None'}...")
+        logger.info(f"✅ Active system prompt (composed): {active_system_prompt[:100] if active_system_prompt else 'None'}...")
 
         # Choose LLM responder based on tool enablement
         if enable_tools:
@@ -351,8 +356,14 @@ async def chat_ws(
             session_id = chat_request.session_id
             conversation_id = chat_request.conversation_id
 
+            # DEBUG: Log system prompt flow
+            logger.info(f"🎭 [WebSocket] System prompt from frontend: {chat_request.system_prompt[:100] if chat_request.system_prompt else 'None'}...")
+            
             personal_context = await build_user_personal_context(db, user)
+            logger.info(f"👤 [WebSocket] Personal context: {personal_context[:100] if personal_context else 'None'}...")
+            
             active_system_prompt = _compose_system_prompt(chat_request.system_prompt, personal_context)
+            logger.info(f"✅ [WebSocket] Active system prompt (composed): {active_system_prompt[:100] if active_system_prompt else 'None'}...")
 
             if chat_request.event:
                 result = await process_chat_event(

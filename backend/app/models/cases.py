@@ -4,7 +4,7 @@ import enum
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Column, DateTime, Enum, String, Text, ForeignKey
+from sqlalchemy import Column, DateTime, Enum, Integer, String, Text, ForeignKey
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from sqlalchemy.dialects.postgresql import UUID
 
@@ -33,9 +33,10 @@ class Case(Base):
     updated_at = Column(DateTime(timezone=True), default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     status = Column(Enum(CaseStatusEnum, name="case_status_enum"), nullable=False)
     severity = Column(Enum(CaseSeverityEnum, name="case_severity_enum"), nullable=False)
-    assigned_to = Column(String, nullable=True)
+    assigned_to = Column(Integer, ForeignKey("users.id"), nullable=True)
     user_hash = Column(String, nullable=False)
     session_id = Column(String, nullable=True)
+    conversation_id = Column(Integer, ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True)
     summary_redacted = Column(Text, nullable=True)
     sla_breach_at = Column(DateTime(timezone=True), nullable=True)
     closure_reason = Column(Text, nullable=True)

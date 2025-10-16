@@ -56,7 +56,7 @@ export function ChatInput({
     if (textareaRef.current) {
       textareaRef.current.style.height = "auto";
       const scrollHeight = textareaRef.current.scrollHeight;
-      const maxHeight = 200; // Increased max height for better long text handling
+      const maxHeight = 120; // Reduced max height for better initial size
       textareaRef.current.style.height = `${Math.min(scrollHeight, maxHeight)}px`;
     }
   }, [inputValue]);
@@ -139,14 +139,9 @@ export function ChatInput({
             {showModules ? <BrainCircuit className="h-4 w-4 sm:h-5 sm:w-5" /> : <Plus className="h-4 w-4 sm:h-5 sm:w-5" />}
           </button>
 
-          {/* Dynamic textarea container */}
+          {/* Dynamic textarea container - always full width */}
           <div 
-            className={cn(
-              "transition-all duration-300 ease-in-out",
-              inputValue.trim() 
-                ? "flex-1" 
-                : "w-8 sm:w-10 hover:flex-1 focus-within:flex-1"
-            )}
+            className="flex-1 transition-all duration-300 ease-in-out"
             onClick={handleTextareaFocus}
           >
             <Textarea
@@ -157,11 +152,11 @@ export function ChatInput({
               placeholder={isLoading ? "Aika sedang mengetik..." : isStandardMode ? "Ketik pesan..." : "Ketik jawabanmu..."}
               rows={1}
               className={cn(
-                "w-full resize-none border-0 bg-transparent px-0 text-sm sm:text-[15px] text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-0 transition-all duration-200",
-                !inputValue.trim() && "cursor-pointer"
+                "w-full resize-none border-0 bg-transparent px-0 text-sm sm:text-[15px] text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 transition-all duration-200"
               )}
               style={{ 
                 minHeight: '32px',
+                maxHeight: '120px',
                 lineHeight: '1.5'
               }}
             />

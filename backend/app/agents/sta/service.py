@@ -109,14 +109,21 @@ class SafetyTriageService:
             await self._session.rollback()
             raise
 
-        await self._maybe_emit_event(
-            payload=payload,
-            result=result,
-            user_hash=user_hash,
-            recommendation=recommendation,
-            assessment_id=assessment.id,
-            processing_ms=processing_ms,
-        )
+        # TODO: Event emission disabled due to schema mismatch between Event model and database
+        # The events table in DB has: id, agent, event_type, user_id, conversation_id, metadata, created_at, updated_at
+        # The Event model expects: id, created_at, user_hash, session_id, agent, intent, risk_flag, step, etc.
+        # This needs to be resolved by either:
+        # 1. Updating the Event model to match the database schema, OR
+        # 2. Creating a migration to alter the events table to match the model
+        # For now, event emission is disabled to allow STA classification to work
+        # await self._maybe_emit_event(
+        #     payload=payload,
+        #     result=result,
+        #     user_hash=user_hash,
+        #     recommendation=recommendation,
+        #     assessment_id=assessment.id,
+        #     processing_ms=processing_ms,
+        # )
 
         return result
 

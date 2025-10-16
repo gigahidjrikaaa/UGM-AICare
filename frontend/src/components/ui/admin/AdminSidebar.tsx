@@ -39,6 +39,12 @@ const navGroups = [
       { name: 'Outreach', icon: <FiCpu size={18}/>, href: '/admin/outreach' },
       { name: 'Agents Command Center', icon: <FiCpu size={18}/>, href: '/admin/agents-command-center' },
     ]
+  },
+  {
+    label: 'Development Tools',
+    items: [
+      { name: 'Testing Scenarios', icon: <FiHelpCircle size={18}/>, href: '/admin/testing' },
+    ]
   }
 ];
 

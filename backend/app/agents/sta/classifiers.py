@@ -13,6 +13,15 @@ _CRISIS_KEYWORDS: tuple[str, ...] = (
     "gantung diri",
     "overdose",
     "tidak mau hidup",
+    "better off without me",
+    "ending it all",
+    "end my life",
+    "tidak ingin hidup",
+    "ingin mati",
+    "lebih baik mati",
+    "goodbye note",
+    "goodbye letter",
+    "surat perpisahan",
 )
 
 _HIGH_DISTRESS_KEYWORDS: tuple[str, ...] = (
@@ -24,6 +33,26 @@ _HIGH_DISTRESS_KEYWORDS: tuple[str, ...] = (
     "tidur tidak",
     "tidak bisa tidur",
     "trauma",
+    "depress",
+    "hopeless",
+    "putus asa",
+    "kosong",
+    "empty inside",
+    "tidak ada artinya",
+    "meaningless",
+    "tidak berguna",
+    "useless",
+    "ga berguna",
+    "tidak ada gunanya",
+    "staying in bed",
+    "tidur terus",
+    "skipping class",
+    "bolos kuliah",
+    "nothing matters",
+    "burnout",
+    "drop out",
+    "berhenti kuliah",
+    "tidak bisa lagi",
 )
 
 _ACADEMIC_KEYWORDS: tuple[str, ...] = (

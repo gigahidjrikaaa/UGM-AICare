@@ -186,21 +186,32 @@ export function useChat({ model }: { model: string }) {
         // Handle intervention plan if present
         const interventionPlan = event.interventionPlan as InterventionPlan | undefined;
         
-        finalizeStreamingAssistantMessage(streamMessageId, cleanedResponse);
+        // Instead of finalizing the streaming message as-is,
+        // split it into multiple bubbles for better readability
+        removeMessageById(streamMessageId);
         
-        // Update message with intervention plan if provided
-        if (interventionPlan) {
-          setMessages((prev) =>
-            prev.map((msg) =>
-              msg.id === streamMessageId
-                ? {
-                    ...msg,
-                    interventionPlan,
-                  }
-                : msg,
-            ),
-          );
-        }
+        // Use addAssistantChunksSequentially to split the message
+        void addAssistantChunksSequentially(
+          cleanedResponse,
+          streamMessageId, // Use streamMessageId as loader (already removed above)
+          currentSessionId,
+          activeConversationId
+        ).then(() => {
+          // After chunks are added, update the last chunk with intervention plan if present
+          if (interventionPlan) {
+            setMessages((prev) => {
+              const lastAssistantIndex = prev.length - 1;
+              if (lastAssistantIndex >= 0 && prev[lastAssistantIndex].role === 'assistant') {
+                return prev.map((msg, idx) =>
+                  idx === lastAssistantIndex
+                    ? { ...msg, interventionPlan }
+                    : msg
+                );
+              }
+              return prev;
+            });
+          }
+        });
       },
       onError: (messageText) => {
         // Log the streaming error for diagnostics (do not expose stack traces or sensitive details to users)

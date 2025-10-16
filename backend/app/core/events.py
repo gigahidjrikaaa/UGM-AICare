@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,9 +48,11 @@ class SafetyCaseRecord:
 
 
 async def emit_agent_event(event: AgentEvent) -> None:
-    async with AsyncSessionLocal() as session:  # type: AsyncSession
+    async with AsyncSessionLocal() as session:
+        # cast to give type-checkers the correct type without using an inline type comment
+        session = cast(AsyncSession, session)
         record = Event(
-            ts=event.ts,
+            created_at=event.ts,
             user_hash=_require_user_hash(event.payload),
             session_id=event.payload.get("session_id"),
             agent=event.agent,
@@ -70,7 +72,8 @@ async def emit_agent_event(event: AgentEvent) -> None:
 
 
 async def log_agent_message(record: AgentMessageRecord) -> None:
-    async with AsyncSessionLocal() as session:  # type: AsyncSession
+    async with AsyncSessionLocal() as session:
+        session = cast(AsyncSession, session)
         message = Message(
             session_id=record.session_id,
             role=record.role,
@@ -84,7 +87,8 @@ async def log_agent_message(record: AgentMessageRecord) -> None:
 
 
 async def create_safety_case(case: SafetyCaseRecord) -> Case:
-    async with AsyncSessionLocal() as session:  # type: AsyncSession
+    async with AsyncSessionLocal() as session:
+        session = cast(AsyncSession, session)
         db_case = Case(
             status=CaseStatusEnum.new,
             severity=case.severity,

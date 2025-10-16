@@ -222,15 +222,23 @@ async def process_chat_message(
         elif schedule_summary:
             schedule_summary(user_id, previous_session_id)
 
-    # With tool calling enabled, we rely on tools to fetch summaries when needed
-    # Only add a lightweight hint for new sessions
+    # System prompt handling:
+    # IMPORTANT: Do NOT insert system prompt as a message in history!
+    # System prompts should be passed as a parameter to the LLM, not as a message.
+    # The old code was inserting it as {"role": "system", ...} which caused it to be
+    # removed later (see line 259-260) resulting in None being passed to Gemini.
+    
     if is_new_context:
         logger.info("Memory Debug - New session context for user %s", user_id)
-        # Add system prompt if not already present
-        if active_system_prompt and not any(h["role"] == "system" for h in history_for_llm_call):
-            history_for_llm_call.insert(0, {"role": "system", "content": active_system_prompt})
-    elif active_system_prompt and not any(h["role"] == "system" for h in history_for_llm_call):
-        history_for_llm_call.insert(0, {"role": "system", "content": active_system_prompt})
+        if active_system_prompt:
+            logger.info(f"📝 System prompt will be passed as parameter (new context): {active_system_prompt[:100]}...")
+        else:
+            logger.info(f"⚠️ No system prompt available (new context)")
+    else:
+        if active_system_prompt:
+            logger.info(f"📝 System prompt will be passed as parameter (existing context): {active_system_prompt[:100]}...")
+        else:
+            logger.info(f"⚠️ No system prompt available (existing context)")
 
     # With tool calling, journal entries are fetched via get_journal_entries tool
     # We only provide lightweight context for immediate relevance
@@ -256,8 +264,12 @@ async def process_chat_message(
 
     history_for_llm_call.append({"role": "user", "content": user_message_content})
 
-    has_system_message = any(msg["role"] == "system" for msg in history_for_llm_call)
-    system_prompt_for_model = None if has_system_message else active_system_prompt
+    # Always pass the system prompt as a parameter to the LLM
+    # Do NOT check for system messages in history - that was the bug!
+    # System prompts should be passed via system_instruction parameter, not as messages
+    system_prompt_for_model = active_system_prompt
+    
+    logger.info(f"🚀 Calling LLM responder with system_prompt={'SET' if system_prompt_for_model else 'None'}")
 
     try:
         aika_response_text = await llm_responder(

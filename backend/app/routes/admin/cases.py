@@ -188,26 +188,39 @@ async def list_cases(
             assignments_count = (await db.execute(assignments_count_stmt)).scalar() or 0
             
             # Get latest triage assessment
+            # Note: Case has user_hash (string) and session_id, but TriageAssessment has user_id (integer)
+            # We look up user_id via the Conversation table which links session_id to user_id
             latest_triage = None
-            if case.user_hash:
-                triage_stmt = (
-                    select(TriageAssessment)
-                    .where(TriageAssessment.user_id == case.user_hash)  # Note: May need adjustment based on schema
-                    .order_by(TriageAssessment.created_at.desc())
+            
+            if case.session_id:
+                # Get user_id from conversations table
+                user_stmt = (
+                    select(Conversation.user_id)
+                    .where(Conversation.session_id == case.session_id)
                     .limit(1)
                 )
-                triage_result = await db.execute(triage_stmt)
-                triage = triage_result.scalar_one_or_none()
+                user_result = await db.execute(user_stmt)
+                user_id = user_result.scalar_one_or_none()
                 
-                if triage:
-                    latest_triage = TriageAssessmentSummary(
-                        id=triage.id,
-                        risk_score=triage.risk_score,
-                        severity_level=triage.severity_level,
-                        confidence_score=triage.confidence_score,
-                        risk_factors=triage.risk_factors,
-                        created_at=triage.created_at
+                if user_id:
+                    triage_stmt = (
+                        select(TriageAssessment)
+                        .where(TriageAssessment.user_id == user_id)
+                        .order_by(TriageAssessment.created_at.desc())
+                        .limit(1)
                     )
+                    triage_result = await db.execute(triage_stmt)
+                    triage = triage_result.scalar_one_or_none()
+                    
+                    if triage:
+                        latest_triage = TriageAssessmentSummary(
+                            id=triage.id,
+                            risk_score=triage.risk_score,
+                            severity_level=triage.severity_level,
+                            confidence_score=triage.confidence_score,
+                            risk_factors=triage.risk_factors,
+                            created_at=triage.created_at
+                        )
             
             case_items.append(CaseListItem(
                 id=str(case.id),
@@ -330,23 +343,29 @@ async def get_case_detail(
         
         # Get all triage assessments for this user
         triage_assessments = []
-        if case.user_hash:
-            triage_result = await db.execute(
-                select(TriageAssessment)
-                .where(TriageAssessment.user_id == case.user_hash)  # May need schema adjustment
-                .order_by(TriageAssessment.created_at.desc())
-            )
-            triage_assessments = [
-                TriageAssessmentSummary(
-                    id=t.id,
-                    risk_score=t.risk_score,
-                    severity_level=t.severity_level,
-                    confidence_score=t.confidence_score,
-                    risk_factors=t.risk_factors,
-                    created_at=t.created_at
+        if case.session_id:
+            # Query via Conversation table to get user_id (integer) from session_id (string)
+            user_id_stmt = select(Conversation.user_id).where(Conversation.session_id == case.session_id).limit(1)
+            user_id_result = await db.execute(user_id_stmt)
+            user_id = user_id_result.scalar_one_or_none()
+            
+            if user_id:
+                triage_result = await db.execute(
+                    select(TriageAssessment)
+                    .where(TriageAssessment.user_id == user_id)
+                    .order_by(TriageAssessment.created_at.desc())
                 )
-                for t in triage_result.scalars().all()
-            ]
+                triage_assessments = [
+                    TriageAssessmentSummary(
+                        id=t.id,
+                        risk_score=t.risk_score,
+                        severity_level=t.severity_level,
+                        confidence_score=t.confidence_score,
+                        risk_factors=t.risk_factors,
+                        created_at=t.created_at
+                    )
+                    for t in triage_result.scalars().all()
+                ]
         
         # Get conversation preview if conversation_id exists
         conversation_preview = None

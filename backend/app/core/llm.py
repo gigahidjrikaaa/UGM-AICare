@@ -106,10 +106,12 @@ async def generate_gemini_response(
 
     try:
         logger.info(f"Sending request to Gemini API (Model: {model}, Tools: {bool(tools)})")
+        logger.info(f"🔍 [DEBUG] system_prompt parameter received: {repr(system_prompt)[:200]}")
 
         # Handle system prompt - convert to structured content if provided
         gemini_model_args: Dict[str, Any] = {"model_name": model}
         if system_prompt:
+            logger.info(f"🤖 Gemini system_instruction being set: {system_prompt[:100]}...")
             gemini_model_args["system_instruction"] = cast(
                 content_types.ContentDict,
                 {
@@ -117,6 +119,8 @@ async def generate_gemini_response(
                     "parts": [_make_text_part(system_prompt)],
                 },
             )
+        else:
+            logger.warning("⚠️ No system_prompt provided to Gemini API!")
         
         # Add tools if provided
         if tools:
