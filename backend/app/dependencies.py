@@ -19,21 +19,40 @@ def get_token_from_request(
 ) -> str:
     """Obtain bearer token from Authorization header or known cookies.
 
-    Order of precedence: Authorization header > access_token > token > auth
+    Order of precedence: Authorization header > access_token > token > auth > nextauth_session
     """
     candidate: str | None = None
+    source = "none"
+    
     if authorization and authorization.lower().startswith("bearer "):
         parts = authorization.split(" ", 1)
         if len(parts) == 2 and parts[1].strip():
             candidate = parts[1].strip()
+            source = "Authorization header"
+    
     if not candidate:
-        candidate = access_token or token_cookie or auth_cookie or nextauth_session
+        if access_token:
+            candidate = access_token
+            source = "access_token cookie"
+        elif token_cookie:
+            candidate = token_cookie
+            source = "token cookie"
+        elif auth_cookie:
+            candidate = auth_cookie
+            source = "auth cookie"
+        elif nextauth_session:
+            candidate = nextauth_session
+            source = "next-auth.session-token cookie"
+    
     if not candidate:
+        logger.warning("No authentication token found in request (checked: Authorization header, cookies: access_token, token, auth, next-auth.session-token)")
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
             detail="Missing authentication token",
             headers={"WWW-Authenticate": 'Bearer error="invalid_token"'},
         )
+    
+    logger.debug(f"Token found in: {source}")
     return candidate
 
 

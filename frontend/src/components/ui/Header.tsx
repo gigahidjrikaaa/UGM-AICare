@@ -47,7 +47,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
 
   return (
     <>
-      <header className={`fixed top-0 left-0 right-0 z-50 transition-all duration-700 ease-out ${
+      <header className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-700 ease-out ${
         scrolled 
           ? "bg-white/8 backdrop-blur-2xl border-white/15 shadow-xl shadow-black/5" 
           : "bg-white/3 backdrop-blur-xl border-white/8"

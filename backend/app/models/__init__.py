@@ -67,6 +67,9 @@ from .insights import InsightsReport
 from .campaign import Campaign, CampaignTrigger, CampaignMetrics
 from .system import SystemSettings, AgentHealthLog, CaseAssignment
 
+# Real-time alert models (Phase 4)
+from .alerts import Alert, AlertType, AlertSeverity
+
 __all__ = [
     # Core Models
     "User",
@@ -154,4 +157,9 @@ __all__ = [
     "SystemSettings",
     "AgentHealthLog",
     "CaseAssignment",
+
+    # Real-time Alert Models (Phase 4)
+    "Alert",
+    "AlertType",
+    "AlertSeverity",
 ]

@@ -66,7 +66,7 @@ export default function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40" // z-40 is below sidebar (z-50)
+            className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[80]" // z-80 is below sidebar (z-90)
             aria-hidden="true"
           />
 
@@ -78,7 +78,7 @@ export default function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
             exit={{ x: '-100%' }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
             // --- CHANGE HERE: Use 'fixed' positioning, remove lg:sticky ---
-            className="fixed top-0 left-0 bottom-0 z-50 w-[85%] max-w-[280px] bg-gradient-to-b from-[#001a4f]/95 to-[#00112e]/95 backdrop-blur-xl border-r border-white/10 shadow-xl flex flex-col"
+            className="fixed top-0 left-0 bottom-0 z-[90] w-[85%] max-w-[280px] bg-gradient-to-b from-[#001a4f]/95 to-[#00112e]/95 backdrop-blur-xl border-r border-white/10 shadow-xl flex flex-col"
             // --- No more lg:sticky, lg:translate-x-0, etc. ---
             role="navigation"
             aria-label="Main navigation"

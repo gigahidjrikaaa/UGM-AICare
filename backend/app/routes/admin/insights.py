@@ -74,7 +74,7 @@ class GenerateReportRequest(BaseModel):
 # Helper function to check admin permissions
 async def require_admin(current_user: User = Depends(get_current_user)) -> User:
     """Ensure user has admin role."""
-    if not current_user.is_admin:
+    if current_user.role != "admin":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required"

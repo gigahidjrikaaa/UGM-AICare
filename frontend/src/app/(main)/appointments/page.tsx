@@ -14,7 +14,6 @@ import {
   FiMapPin, 
   FiPlus,
   FiSearch,
-  FiFilter,
   FiDownload,
   FiCheckCircle,
   FiXCircle,
@@ -23,41 +22,15 @@ import {
   FiMap
 } from 'react-icons/fi';
 import dynamic from 'next/dynamic';
+import { useMyAppointments, usePsychologists, useUpdateAppointmentNotes } from '@/hooks/useAppointments';
+import { toast } from 'react-hot-toast';
+import type { Appointment, Psychologist } from '@/lib/appointments-api';
 
 // Dynamically import the map component to avoid SSR issues
 const AppointmentMap = dynamic(() => import('@/components/appointments/AppointmentMap'), {
   ssr: false,
   loading: () => <div className="h-[400px] bg-white/5 animate-pulse rounded-lg"></div>
 });
-
-// Types
-interface Appointment {
-  id: number;
-  user: {
-    id: number;
-    email?: string;
-    avatar_url?: string;
-  };
-  psychologist: {
-    id: number;
-    name: string;
-    specialization?: string;
-    image_url?: string;
-  };
-  appointment_type: string;
-  appointment_datetime: string;
-  notes?: string;
-  status: 'scheduled' | 'completed' | 'cancelled' | 'moved';
-  created_at: string;
-}
-
-interface Psychologist {
-  id: number;
-  name: string;
-  specialization?: string;
-  image_url?: string;
-  is_available: boolean;
-}
 
 // Mock location for map (Gadjah Mada Medical Center)
 const DEFAULT_LOCATION = {
@@ -68,20 +41,34 @@ const DEFAULT_LOCATION = {
 };
 
 export default function AppointmentsPage() {
-  const { data: session, status } = useSession();
+  const { status } = useSession();
   const router = useRouter();
   
   // State management
   const [activeTab, setActiveTab] = useState<'upcoming' | 'history' | 'counselors'>('upcoming');
-  const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [psychologists, setPsychologists] = useState<Psychologist[]>([]);
-  const [loading, setLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [selectedAppointment, setSelectedAppointment] = useState<Appointment | null>(null);
   const [showNotesModal, setShowNotesModal] = useState(false);
   const [showMapModal, setShowMapModal] = useState(false);
   const [preAppointmentNotes, setPreAppointmentNotes] = useState('');
+
+  // React Query hooks for appointments
+  const { 
+    data: appointments = [], 
+    isLoading: loading, 
+    error: appointmentsError 
+  } = useMyAppointments({
+    upcoming_only: activeTab === 'upcoming' ? true : undefined,
+    past_only: activeTab === 'history' ? true : undefined,
+    status_filter: statusFilter === 'all' ? undefined : statusFilter
+  });
+
+  const { 
+    data: psychologists = []
+  } = usePsychologists(true);
+
+  const updateNotesMutation = useUpdateAppointmentNotes();
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -90,124 +77,12 @@ export default function AppointmentsPage() {
     }
   }, [status, router]);
 
-  // Fetch appointments
+  // Show error toast if API fails
   useEffect(() => {
-    const fetchAppointments = async () => {
-      if (status !== "authenticated") return;
-      
-      setLoading(true);
-      try {
-        // TODO: Replace with actual API call
-        // const response = await fetch('/api/v1/appointments/my-appointments', {
-        //   headers: {
-        //     'Authorization': `Bearer ${session?.accessToken}`
-        //   }
-        // });
-        // const data = await response.json();
-        // setAppointments(data);
-
-        // Mock data for now
-        const mockAppointments: Appointment[] = [
-          {
-            id: 1,
-            user: { id: 1, email: 'user@example.com' },
-            psychologist: {
-              id: 1,
-              name: "Dr. Putri Handayani",
-              specialization: "Clinical Psychologist",
-              image_url: "/counselors/putri.jpg"
-            },
-            appointment_type: "Initial Consultation",
-            appointment_datetime: new Date(Date.now() + 86400000 * 2).toISOString(),
-            notes: "First-time consultation for anxiety management",
-            status: "scheduled",
-            created_at: new Date().toISOString()
-          },
-          {
-            id: 2,
-            user: { id: 1, email: 'user@example.com' },
-            psychologist: {
-              id: 2,
-              name: "Dr. Budi Santoso",
-              specialization: "Psychiatrist",
-              image_url: "/counselors/budi.jpg"
-            },
-            appointment_type: "Follow-up Session",
-            appointment_datetime: new Date(Date.now() - 86400000 * 7).toISOString(),
-            status: "completed",
-            created_at: new Date(Date.now() - 86400000 * 14).toISOString()
-          },
-          {
-            id: 3,
-            user: { id: 1, email: 'user@example.com' },
-            psychologist: {
-              id: 3,
-              name: "Anita Wijaya, M.Psi",
-              specialization: "Counseling Psychologist",
-              image_url: "/counselors/anita.jpg"
-            },
-            appointment_type: "Crisis Intervention",
-            appointment_datetime: new Date(Date.now() - 86400000 * 3).toISOString(),
-            status: "cancelled",
-            created_at: new Date(Date.now() - 86400000 * 10).toISOString()
-          }
-        ];
-        setAppointments(mockAppointments);
-      } catch (error) {
-        console.error("Error fetching appointments:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchAppointments();
-  }, [status, session]);
-
-  // Fetch psychologists
-  useEffect(() => {
-    const fetchPsychologists = async () => {
-      try {
-        const response = await fetch('/api/v1/appointments/psychologists');
-        const data = await response.json();
-        setPsychologists(data);
-      } catch (error) {
-        console.error("Error fetching psychologists:", error);
-        // Mock data fallback
-        setPsychologists([
-          {
-            id: 1,
-            name: "Dr. Putri Handayani",
-            specialization: "Clinical Psychologist",
-            image_url: "/counselors/putri.jpg",
-            is_available: true
-          },
-          {
-            id: 2,
-            name: "Dr. Budi Santoso",
-            specialization: "Psychiatrist",
-            image_url: "/counselors/budi.jpg",
-            is_available: true
-          },
-          {
-            id: 3,
-            name: "Anita Wijaya, M.Psi",
-            specialization: "Counseling Psychologist",
-            image_url: "/counselors/anita.jpg",
-            is_available: true
-          },
-          {
-            id: 4,
-            name: "Dr. Joko Prasetyo",
-            specialization: "Mental Health Specialist",
-            image_url: "/counselors/joko.jpg",
-            is_available: false
-          }
-        ]);
-      }
-    };
-
-    fetchPsychologists();
-  }, []);
+    if (appointmentsError) {
+      toast.error(appointmentsError.message || 'Failed to load appointments');
+    }
+  }, [appointmentsError]);
 
   // Filter appointments
   const filteredAppointments = useMemo(() => {
@@ -216,25 +91,25 @@ export default function AppointmentsPage() {
     // Filter by tab
     const now = new Date();
     if (activeTab === 'upcoming') {
-      filtered = filtered.filter(apt => 
+      filtered = filtered.filter((apt: Appointment) => 
         new Date(apt.appointment_datetime) >= now && apt.status === 'scheduled'
       );
     } else if (activeTab === 'history') {
-      filtered = filtered.filter(apt => 
+      filtered = filtered.filter((apt: Appointment) => 
         new Date(apt.appointment_datetime) < now || ['completed', 'cancelled', 'moved'].includes(apt.status)
       );
     }
 
     // Filter by status
     if (statusFilter !== 'all') {
-      filtered = filtered.filter(apt => apt.status === statusFilter);
+      filtered = filtered.filter((apt: Appointment) => apt.status === statusFilter);
     }
 
     // Filter by search query
     if (searchQuery) {
-      filtered = filtered.filter(apt =>
+      filtered = filtered.filter((apt: Appointment) =>
         apt.psychologist.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        apt.appointment_type.toLowerCase().includes(searchQuery.toLowerCase())
+        apt.appointment_type.name.toLowerCase().includes(searchQuery.toLowerCase())
       );
     }
 
@@ -244,7 +119,7 @@ export default function AppointmentsPage() {
   // Filter counselors by search
   const filteredCounselors = useMemo(() => {
     if (!searchQuery) return psychologists;
-    return psychologists.filter(psy =>
+    return psychologists.filter((psy: Psychologist) =>
       psy.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       psy.specialization?.toLowerCase().includes(searchQuery.toLowerCase())
     );
@@ -280,29 +155,18 @@ export default function AppointmentsPage() {
     if (!selectedAppointment) return;
     
     try {
-      // TODO: Replace with actual API call
-      // await fetch(`/api/v1/appointments/${selectedAppointment.id}/notes`, {
-      //   method: 'PUT',
-      //   headers: {
-      //     'Content-Type': 'application/json',
-      //     'Authorization': `Bearer ${session?.accessToken}`
-      //   },
-      //   body: JSON.stringify({ notes: preAppointmentNotes })
-      // });
-
-      // Update local state
-      setAppointments(prev => prev.map(apt =>
-        apt.id === selectedAppointment.id
-          ? { ...apt, notes: preAppointmentNotes }
-          : apt
-      ));
+      // Call the API to update notes
+      await updateNotesMutation.mutateAsync({
+        id: selectedAppointment.id,
+        notes: preAppointmentNotes
+      });
 
       setShowNotesModal(false);
       setSelectedAppointment(null);
-      alert('Pre-appointment notes saved successfully!');
+      toast.success('Pre-appointment notes saved successfully!');
     } catch (error) {
       console.error("Error saving notes:", error);
-      alert('Failed to save notes. Please try again.');
+      toast.error('Failed to save notes. Please try again.');
     }
   };
 
@@ -311,7 +175,7 @@ export default function AppointmentsPage() {
     const startTime = new Date(appointment.appointment_datetime);
     const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 hour duration
 
-    const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(appointment.appointment_type + ' - ' + appointment.psychologist.name)}&dates=${startTime.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}/${endTime.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}&details=${encodeURIComponent(appointment.notes || '')}&location=${encodeURIComponent(DEFAULT_LOCATION.address)}&sf=true&output=xml`;
+    const googleCalendarUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(appointment.appointment_type.name + ' - ' + appointment.psychologist.name)}&dates=${startTime.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}/${endTime.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}&details=${encodeURIComponent(appointment.notes || '')}&location=${encodeURIComponent(DEFAULT_LOCATION.address)}&sf=true&output=xml`;
 
     window.open(googleCalendarUrl, '_blank');
   };
@@ -356,6 +220,7 @@ export default function AppointmentsPage() {
             <button
               onClick={() => setShowMapModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition"
+              aria-label="View appointment location map"
             >
               <FiMap className="w-4 h-4" />
               <span className="hidden sm:inline">View Map</span>
@@ -476,7 +341,7 @@ export default function AppointmentsPage() {
                   </Link>
                 </div>
               ) : (
-                filteredAppointments.map((appointment) => (
+                filteredAppointments.map((appointment: Appointment) => (
                   <motion.div
                     key={appointment.id}
                     layout
@@ -503,7 +368,7 @@ export default function AppointmentsPage() {
                           <div className="flex flex-wrap gap-2 mb-3">
                             {getStatusBadge(appointment.status)}
                             <span className="inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium bg-purple-500/20 text-purple-400">
-                              {appointment.appointment_type}
+                              {appointment.appointment_type.name}
                             </span>
                           </div>
                           <div className="flex flex-col gap-2 text-sm text-gray-300">
@@ -569,7 +434,7 @@ export default function AppointmentsPage() {
               exit={{ opacity: 0, y: -20 }}
               className="grid gap-4 md:grid-cols-2 lg:grid-cols-3"
             >
-              {filteredCounselors.map((counselor) => (
+              {filteredCounselors.map((counselor: Psychologist) => (
                 <motion.div
                   key={counselor.id}
                   layout
@@ -648,6 +513,7 @@ export default function AppointmentsPage() {
                   <button
                     onClick={() => setShowNotesModal(false)}
                     className="text-gray-400 hover:text-white"
+                    aria-label="Close notes modal"
                   >
                     <FiXCircle className="w-6 h-6" />
                   </button>
@@ -710,6 +576,7 @@ export default function AppointmentsPage() {
                   <button
                     onClick={() => setShowMapModal(false)}
                     className="text-gray-400 hover:text-white"
+                    aria-label="Close map modal"
                   >
                     <FiXCircle className="w-6 h-6" />
                   </button>

@@ -12,6 +12,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.sta.classifiers import SafetyTriageClassifier
+from app.agents.sta.ml_classifier import HybridClassifier, SemanticCrisisClassifier
 from app.agents.sta.schemas import STAClassifyRequest, STAClassifyResponse
 from app.core.events import AgentEvent, AgentNameEnum, emit_agent_event
 from app.core.redaction import extract_pii, prelog_redact
@@ -157,6 +158,27 @@ class SafetyTriageService:
             summary_redacted=prelog_redact(text),
         )
         self._session.add(case)
+        await self._session.flush()  # Flush to get the case ID
+        
+        # Emit event for case creation
+        from app.services.event_bus import EventType, publish_event
+        try:
+            await publish_event(
+                event_type=EventType.CASE_CREATED,
+                source_agent="sta",
+                data={
+                    "case_id": str(case.id),
+                    "severity": severity,
+                    "title": f"New {severity.capitalize()} Case Created",
+                    "user_hash": user_hash,
+                    "session_id": session_id,
+                }
+            )
+        except Exception as e:
+            # Log but don't fail the case creation
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to emit CASE_CREATED event: {e}", exc_info=True)
 
     async def _maybe_emit_event(
         self,
@@ -242,14 +264,37 @@ class SafetyTriageService:
 
 
 def get_safety_triage_service(
-    classifier: SafetyTriageClassifier = Depends(SafetyTriageClassifier),
     session: AsyncSession = Depends(get_async_db),
 ) -> "SafetyTriageService":
-    """FastAPI dependency factory for :class:`SafetyTriageService`."""
+    """FastAPI dependency factory for :class:`SafetyTriageService`.
+    
+    Uses HybridClassifier that combines:
+    - Rule-based keyword/pattern matching (fast, always available)
+    - ML semantic similarity (accurate, graceful fallback if unavailable)
+    
+    Returns SafetyTriageService with best available classifier.
+    """
+    # Initialize base rule-based classifier
+    rule_classifier = SafetyTriageClassifier()
+    
+    # Try to create hybrid classifier with ML support
+    try:
+        semantic_classifier = SemanticCrisisClassifier()
+        classifier = HybridClassifier(
+            rule_classifier=rule_classifier,
+            semantic_classifier=semantic_classifier
+        )
+    except Exception as e:
+        # Fallback to rule-based only if ML initialization fails
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.warning(f"ML classifier initialization failed, using rule-based only: {e}")
+        classifier = rule_classifier  # type: ignore
+    
     # Initialize orchestrator for this request
     orchestrator = AgentOrchestrator(session)
     return SafetyTriageService(
-        classifier=classifier,
+        classifier=classifier,  # type: ignore
         session=session,
         orchestrator=orchestrator
     )

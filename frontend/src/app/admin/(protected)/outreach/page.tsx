@@ -83,13 +83,13 @@ export default function OutreachPage() {
       {openNew && (
         <div className="bg-white/5 border border-white/10 rounded-lg p-4 space-y-3">
           <div className="flex gap-3">
-            <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Title" className="bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-white/90" />
-            <select value={newType} onChange={(e) => setNewType(e.target.value)} className="bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-white/90">
+            <input value={newTitle} onChange={(e) => setNewTitle(e.target.value)} placeholder="Title" className="bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-white/90" aria-label="Campaign title" />
+            <select value={newType} onChange={(e) => setNewType(e.target.value)} className="bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-white/90" aria-label="Campaign type">
               <option value="message">Message</option>
               <option value="email">Email</option>
               <option value="notification">Notification</option>
             </select>
-            <select value={newPriority} onChange={(e) => setNewPriority(e.target.value)} className="bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-white/90">
+            <select value={newPriority} onChange={(e) => setNewPriority(e.target.value)} className="bg-white/5 border border-white/10 rounded px-2 py-1 text-sm text-white/90" aria-label="Campaign priority">
               <option value="low">Low</option>
               <option value="medium">Medium</option>
               <option value="high">High</option>

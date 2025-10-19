@@ -89,8 +89,7 @@ class InsightsService:
             sentiment_data=sentiment_data,
             high_risk_count=high_risk_count,
             assessment_count=len(assessments),
-            generated_at=datetime.utcnow(),
-            created_at=datetime.utcnow()
+            generated_at=datetime.utcnow()
         )
         
         self.db.add(report)
@@ -99,12 +98,15 @@ class InsightsService:
         
         logger.info(f"Generated IA report {report.id}")
         
-        # Emit event for orchestrator
+        # Emit event for orchestrator and SSE broadcasting
         await publish_event(
             event_type=EventType.IA_REPORT_GENERATED,
             source_agent='ia',
             data={
                 'report_id': str(report.id),
+                'report_type': report.report_type,
+                'period_start': period_start.isoformat() if period_start else None,
+                'period_end': period_end.isoformat() if period_end else None,
                 'trending_topics': trending_topics[:5] if trending_topics else [],
                 'high_risk_count': high_risk_count,
                 'assessment_count': len(assessments)

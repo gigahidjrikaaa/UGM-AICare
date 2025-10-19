@@ -6,6 +6,7 @@ import CredentialsProvider from "next-auth/providers/credentials";
 declare module "next-auth" {
   interface Session {
     accessToken?: string;
+    error?: "BackendTokenExpired";
     user: {
       id?: string | null;
       role?: string | null;
@@ -26,6 +27,8 @@ declare module "next-auth/jwt" {
     role?: string;
     accessToken?: string;
     google_sub?: string;
+    accessTokenExpires?: number;
+    error?: "BackendTokenExpired";
   }
 }
 
@@ -175,15 +178,41 @@ export const authOptions: NextAuthOptions = {
         token.id = exchange?.user?.id ?? token.id;
         token.google_sub = exchange?.user?.google_sub ?? account.providerAccountId;
         token.email = exchange?.user?.email ?? token.email;
+        
+        // Store token expiry time (backend tokens typically expire in 24 hours)
+        token.accessTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
       } else if (account?.provider === "credentials" && user) {
         token.id = typedUser.id ?? token.id;
         token.role = typedUser.role ?? token.role;
         token.accessToken = typedUser.accessToken ?? token.accessToken;
+        
+        // Store token expiry time (backend tokens typically expire in 24 hours)
+        token.accessTokenExpires = Date.now() + 24 * 60 * 60 * 1000;
+      }
+
+      // Check if the backend access token has expired
+      if (token.accessTokenExpires && Date.now() > (token.accessTokenExpires as number)) {
+        // Token has expired - invalidate the session
+        console.warn('[NextAuth] Backend access token has expired');
+        return {
+          ...token,
+          error: "BackendTokenExpired" as const,
+        };
       }
 
       return token;
     },
     async session({ session, token }) {
+      // Check for token expiration error
+      if ('error' in token && token.error === "BackendTokenExpired") {
+        // Mark session as expired but still return it
+        // The client will check this and sign out
+        return {
+          ...session,
+          error: "BackendTokenExpired",
+        };
+      }
+
       if (session.user) {
         if (token.id) {
           session.user.id = token.id;

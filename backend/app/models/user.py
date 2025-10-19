@@ -8,7 +8,7 @@ from app.database import Base
 from datetime import datetime
 
 if TYPE_CHECKING:
-    from .appointments import Appointment
+    from .appointments import Appointment, Psychologist
     from .conversations import Conversation
     from .journal import JournalEntry
     from .social import UserBadge
@@ -88,6 +88,12 @@ class User(Base):
     journal_entries: Mapped[List["JournalEntry"]] = relationship("JournalEntry", back_populates="user")
     awarded_badges: Mapped[List["UserBadge"]] = relationship("UserBadge", back_populates="user")
     appointments: Mapped[List["Appointment"]] = relationship("Appointment", back_populates="user")
+    psychologist_profile: Mapped[Optional["Psychologist"]] = relationship(
+        "Psychologist", 
+        back_populates="user", 
+        uselist=False,
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', role='{self.role}')>"

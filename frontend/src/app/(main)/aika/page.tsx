@@ -3,7 +3,6 @@
 
 import { useState, useEffect, useRef } from 'react';
 import ChatInterface from '@/components/features/chat/ChatInterface';
-import ParticleBackground from '@/components/ui/ParticleBackground'; // Assuming this exists
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { Info, Settings, ClipboardList } from 'lucide-react';
@@ -42,8 +41,8 @@ export default function AikaChatPage() {
   const [isControlCenterOpen, setIsControlCenterOpen] = useState(false);
   const [isPlansOpen, setIsPlansOpen] = useState(false);
   
-  // Fetch intervention plans to show count badge
-  const { data: plansData } = useInterventionPlans(true);
+  // Fetch intervention plans to show count badge and provide refetch
+  const { data: plansData, refetch: refetchPlans } = useInterventionPlans(true);
 
   // Persist model choice in localStorage
   useEffect(() => {
@@ -84,53 +83,44 @@ export default function AikaChatPage() {
   // --- Main Render (Authenticated) ---
   return (
     <>
-      <main className="h-screen w-screen overflow-hidden bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white"> {/* Solid gradient */}
-        {/* Particle Background */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
-          <ParticleBackground count={70} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={1} />
-        </div>
-
-        {/* Content area - Centered */}
-        <motion.div
-          className="relative z-10 h-screen flex flex-col items-center justify-center p-2 md:p-4 lg:p-6" // Center content vertically/horizontally
-        >
-          {/* Unified Chat Container (header simplified, controls moved to footer bar) */}
-          <div className="w-full max-w-5xl h-[85vh] flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
-            <HeaderBar 
-              onOpenControlCenter={() => setIsControlCenterOpen(true)} 
-              onOpenPlans={() => setIsPlansOpen(true)}
-              activePlansCount={plansData?.total || 0}
-            />
-            <div className="flex-1 overflow-hidden">
-              <ChatInterface
-                model={model}
-                setModel={setModel}
-                modelOptions={modelOptions}
-                isControlCenterOpen={isControlCenterOpen}
-                onCloseControlCenter={() => setIsControlCenterOpen(false)}
-              />
-            </div>
-          </div>
-          
-          {/* Intervention Plans Sidebar */}
-          <InterventionPlansSidebar 
-            isOpen={isPlansOpen}
-            onClose={() => setIsPlansOpen(false)}
+      {/* Content area - background, particles, and padding all from AppLayout! */}
+      <div className="min-h-screen w-full text-white flex flex-col items-center justify-center p-2 md:p-4 lg:p-6">
+        {/* Unified Chat Container (header simplified, controls moved to footer bar) */}
+        <div className="w-full max-w-5xl h-[calc(100vh-10rem)] flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
+          <HeaderBar 
+            onOpenControlCenter={() => setIsControlCenterOpen(true)} 
+            onOpenPlans={() => setIsPlansOpen(true)}
+            activePlansCount={plansData?.total || 0}
           />
+          <div className="flex-1 overflow-hidden">
+            <ChatInterface
+              model={model}
+              setModel={setModel}
+              modelOptions={modelOptions}
+              isControlCenterOpen={isControlCenterOpen}
+              onCloseControlCenter={() => setIsControlCenterOpen(false)}
+              onInterventionPlanCreated={refetchPlans}
+            />
+          </div>
+        </div>
+        
+        {/* Intervention Plans Sidebar */}
+        <InterventionPlansSidebar 
+          isOpen={isPlansOpen}
+          onClose={() => setIsPlansOpen(false)}
+        />
 
-          {/* Footer credit - Moved outside main container for centering */}
-          <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5 }}
-              className="pt-3 text-center text-xs text-gray-300/70"
-            >
-              <p>Disclaimer: Aika adalah AI dan bukan pengganti profesional medis.</p>
-              <p className="mt-1">Built with ❤️ by UGM AICare Team</p>
-          </motion.div>
-
-        </motion.div> {/* End centered content area */}
-      </main>
+        {/* Footer credit - Moved outside main container for centering */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.5 }}
+          className="pt-3 text-center text-xs text-gray-300/70"
+        >
+          <p>Disclaimer: Aika adalah AI dan bukan pengganti profesional medis.</p>
+          <p className="mt-1">Built with ❤️ by UGM AICare Team</p>
+        </motion.div>
+      </div>
     </>
   );
 }

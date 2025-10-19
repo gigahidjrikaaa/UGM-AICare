@@ -50,7 +50,6 @@ export function useChat({ model }: { model: string }) {
     addAssistantChunksSequentially,
     startStreamingAssistantMessage,
     appendToStreamingAssistantMessage,
-    finalizeStreamingAssistantMessage,
     removeMessageById,
     updateMessageToolIndicator,
   } = useChatMessages();
@@ -183,6 +182,10 @@ export function useChat({ model }: { model: string }) {
           cleanedResponse = cleanedResponse.replace(toolIndicatorMatch[0], '').trim();
         }
         
+        // DEBUG: Log the entire event to see what's being received
+        console.log('🔍 [DEBUG] WebSocket completed event:', event);
+        console.log('🔍 [DEBUG] interventionPlan in event:', event.interventionPlan);
+        
         // Handle intervention plan if present
         const interventionPlan = event.interventionPlan as InterventionPlan | undefined;
         
@@ -235,10 +238,10 @@ export function useChat({ model }: { model: string }) {
     session?.user?.id,
     startStreamingAssistantMessage,
     appendToStreamingAssistantMessage,
-    finalizeStreamingAssistantMessage,
     removeMessageById,
     startStreaming,
     updateMessageToolIndicator,
+    addAssistantChunksSequentially,
   ]);
 
   const handleStartModule = useCallback(

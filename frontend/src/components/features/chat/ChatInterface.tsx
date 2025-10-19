@@ -16,9 +16,17 @@ interface ChatInterfaceProps {
   modelOptions?: Array<{ value: string; label: string }>;
   isControlCenterOpen?: boolean;
   onCloseControlCenter?: () => void;
+  onInterventionPlanCreated?: () => void;
 }
 
-export default function ChatInterface({ model, setModel, modelOptions, isControlCenterOpen = false, onCloseControlCenter }: ChatInterfaceProps) {
+export default function ChatInterface({ 
+  model, 
+  setModel, 
+  modelOptions, 
+  isControlCenterOpen = false, 
+  onCloseControlCenter,
+  onInterventionPlanCreated 
+}: ChatInterfaceProps) {
   const {
     messages,
     inputValue,
@@ -80,6 +88,17 @@ export default function ChatInterface({ model, setModel, modelOptions, isControl
 
     prevLoadingRef.current = isLoading;
   }, [isLoading]);
+
+  // Auto-refetch intervention plans when a new plan is detected in messages
+  useEffect(() => {
+    if (onInterventionPlanCreated && messages.length > 0) {
+      const lastMessage = messages[messages.length - 1];
+      if (lastMessage.role === 'assistant' && lastMessage.interventionPlan && !lastMessage.isLoading) {
+        // New intervention plan detected, refetch the sidebar list
+        onInterventionPlanCreated();
+      }
+    }
+  }, [messages, onInterventionPlanCreated]);
 
   const {
     isLiveTalkActive,

@@ -1,11 +1,12 @@
 /**
  * Component to display an individual intervention plan
+ * Enhanced with UGM design system colors and improved UX
  */
 
 'use client';
 
 import React, { useState } from 'react';
-import { CheckCircle2, Circle, Archive, ChevronDown, ChevronUp, Calendar } from 'lucide-react';
+import { CheckCircle2, Circle, Archive, ChevronDown, ChevronUp, Calendar, Sparkles, BookOpen, Clock } from 'lucide-react';
 import { useCompleteStep, useArchivePlan } from '@/hooks/useInterventionPlans';
 import type { InterventionPlanRecord } from '@/services/interventionPlanApi';
 import styles from './PlanCard.module.css';
@@ -31,7 +32,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate }) => {
   };
 
   const handleArchive = async () => {
-    if (!confirm('Are you sure you want to archive this plan?')) return;
+    if (!confirm('Apakah kamu yakin ingin mengarsipkan rencana ini?')) return;
     
     try {
       await archivePlan(plan.id, () => {
@@ -47,7 +48,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate }) => {
   const completionPercentage = plan.completion_tracking?.completion_percentage || 0;
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return new Date(dateString).toLocaleDateString('id-ID', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',
@@ -55,61 +56,71 @@ export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate }) => {
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 hover:shadow-md transition-shadow">
+    <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border-2 border-ugm-blue/20 p-6 hover:shadow-xl hover:border-ugm-blue/40 transition-all">
       {/* Header */}
-      <div className="flex items-start justify-between mb-4">
-        <div className="flex-1">
-          <h3 className="text-lg font-semibold text-gray-900 mb-1">
-            {plan.plan_title || 'Intervention Plan'}
-          </h3>
-          <div className="flex items-center gap-4 text-sm text-gray-500">
-            <span className="flex items-center gap-1">
-              <Calendar size={14} />
-              {formatDate(plan.created_at)}
-            </span>
-            <span className="px-2 py-0.5 bg-teal-50 text-teal-700 rounded-full text-xs font-medium">
-              {plan.status}
-            </span>
+      <div className="flex items-start justify-between mb-5">
+        <div className="flex-1 flex items-start gap-3">
+          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-ugm-blue to-ugm-blue-light flex items-center justify-center shadow-md flex-shrink-0">
+            <Sparkles className="w-6 h-6 text-white" />
+          </div>
+          <div className="flex-1">
+            <h3 className="text-base font-bold text-ugm-blue-dark mb-2">
+              {plan.plan_title || 'Rencana Intervensi'}
+            </h3>
+            <div className="flex items-center gap-3 text-sm text-gray-600">
+              <span className="flex items-center gap-1.5">
+                <Calendar className="w-4 h-4" />
+                {formatDate(plan.created_at)}
+              </span>
+              <span className="px-2.5 py-1 bg-gradient-to-r from-ugm-gold/20 to-ugm-gold-light/20 text-ugm-blue-dark rounded-full text-xs font-bold border border-ugm-gold/30">
+                {plan.status}
+              </span>
+            </div>
           </div>
         </div>
         <button
           onClick={handleArchive}
           disabled={isArchiving}
-          className="text-gray-400 hover:text-gray-600 transition-colors p-2 rounded-lg hover:bg-gray-50 disabled:opacity-50"
-          title="Archive plan"
+          className="text-gray-400 hover:text-red-500 transition-colors p-2.5 rounded-xl hover:bg-red-50 disabled:opacity-50 group"
+          title="Arsipkan rencana"
         >
-          <Archive size={20} />
+          <Archive className="w-5 h-5 group-hover:scale-110 transition-transform" />
         </button>
       </div>
 
-      {/* Progress Bar */}
-      <div className="mb-4">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-sm font-medium text-gray-700">
-            Progress: {completedSteps}/{totalSteps} steps
+      {/* Enhanced Progress Bar */}
+      <div className="mb-5">
+        <div className="flex items-center justify-between mb-3">
+          <span className="text-sm font-bold text-ugm-blue-dark">
+            Progress: {completedSteps}/{totalSteps} langkah
           </span>
-          <span className="text-sm font-semibold text-teal-600">
+          <span className="text-base font-bold text-ugm-gold">
             {completionPercentage}%
           </span>
         </div>
-        <div className="w-full bg-gray-100 rounded-full h-2.5">
+        <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden border border-gray-200">
           <div
-            className={`bg-teal-500 h-2.5 rounded-full ${styles.progressBar}`}
+            className={`bg-gradient-to-r from-ugm-gold via-ugm-gold-light to-ugm-gold h-3 rounded-full ${styles.progressBar} relative overflow-hidden`}
             style={{ '--progress-width': `${completionPercentage}%` } as React.CSSProperties}
-          />
+          >
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse" />
+          </div>
         </div>
       </div>
 
       {/* Expandable Steps */}
-      <div className="border-t pt-4">
+      <div className="border-t-2 border-ugm-blue/10 pt-5">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center justify-between w-full text-left mb-3 hover:text-teal-600 transition-colors"
+          className="flex items-center justify-between w-full text-left mb-4 hover:bg-ugm-blue/5 -mx-2 px-2 py-2 rounded-xl transition-colors group"
         >
-          <span className="text-sm font-medium text-gray-700">
-            {isExpanded ? 'Hide' : 'Show'} Steps
+          <span className="text-sm font-bold text-ugm-blue flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-ugm-blue/10 flex items-center justify-center group-hover:bg-ugm-blue/20 transition-colors">
+              <Sparkles className="w-4 h-4 text-ugm-blue" />
+            </div>
+            {isExpanded ? 'Sembunyikan' : 'Tampilkan'} Langkah-Langkah
           </span>
-          {isExpanded ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+          {isExpanded ? <ChevronUp className="w-5 h-5 text-ugm-blue" /> : <ChevronDown className="w-5 h-5 text-ugm-blue" />}
         </button>
 
         {isExpanded && (
@@ -120,25 +131,27 @@ export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate }) => {
               return (
                 <div
                   key={index}
-                  className={`flex items-start gap-3 p-3 rounded-lg transition-colors ${
-                    isCompleted ? 'bg-teal-50' : 'bg-gray-50'
+                  className={`flex items-start gap-4 p-4 rounded-xl transition-all group ${
+                    isCompleted 
+                      ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300/60 shadow-sm' 
+                      : 'bg-white border-2 border-gray-200 hover:border-ugm-blue/50 hover:shadow-md'
                   }`}
                 >
                   <button
                     onClick={() => handleStepToggle(index, isCompleted)}
                     disabled={isCompletingStep}
-                    className="flex-shrink-0 mt-0.5 disabled:opacity-50 transition-transform hover:scale-110"
+                    className="flex-shrink-0 mt-0.5 disabled:opacity-50 transition-transform group-hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ugm-gold rounded-full"
                   >
                     {isCompleted ? (
-                      <CheckCircle2 size={20} className="text-teal-600" />
+                      <CheckCircle2 className="w-7 h-7 text-green-600 drop-shadow-sm" />
                     ) : (
-                      <Circle size={20} className="text-gray-400" />
+                      <Circle className="w-7 h-7 text-gray-400 group-hover:text-ugm-blue transition-colors" />
                     )}
                   </button>
                   <div className="flex-1 min-w-0">
                     <p
-                      className={`text-sm ${
-                        isCompleted ? 'text-gray-600 line-through' : 'text-gray-800'
+                      className={`text-sm font-semibold leading-relaxed ${
+                        isCompleted ? 'text-gray-500 line-through' : 'text-ugm-blue-dark'
                       }`}
                     >
                       {step.description}
@@ -150,14 +163,15 @@ export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate }) => {
 
             {/* Next Check-in */}
             {plan.plan_data?.next_check_in && (
-              <div className="mt-4 p-4 bg-blue-50 rounded-lg border border-blue-100">
-                <h4 className="text-sm font-semibold text-blue-900 mb-2">
-                  📅 Next Check-in
+              <div className="mt-5 p-4 bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl border-2 border-blue-200/60 shadow-sm">
+                <h4 className="text-sm font-bold text-ugm-blue-dark mb-2 flex items-center gap-2">
+                  <Clock className="w-4 h-4" />
+                  Check-in Berikutnya
                 </h4>
-                <p className="text-sm text-blue-800 mb-1">
+                <p className="text-sm text-ugm-blue mb-1 font-semibold">
                   {plan.plan_data.next_check_in.timeframe}
                 </p>
-                <p className="text-xs text-blue-700">
+                <p className="text-xs text-gray-700">
                   {plan.plan_data.next_check_in.method}
                 </p>
               </div>
@@ -165,17 +179,20 @@ export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate }) => {
 
             {/* Resources */}
             {plan.plan_data?.resource_cards && plan.plan_data.resource_cards.length > 0 && (
-              <div className="mt-4">
-                <h4 className="text-sm font-semibold text-gray-900 mb-2">
-                  📚 Recommended Resources
+              <div className="mt-5">
+                <h4 className="text-sm font-bold text-ugm-blue-dark mb-3 flex items-center gap-2">
+                  <div className="w-7 h-7 rounded-lg bg-ugm-blue/10 flex items-center justify-center">
+                    <BookOpen className="w-4 h-4 text-ugm-gold" />
+                  </div>
+                  Sumber yang Direkomendasikan
                 </h4>
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {plan.plan_data.resource_cards.map((resource, idx) => (
-                    <div key={idx} className="p-3 bg-purple-50 rounded-lg border border-purple-100">
-                      <p className="text-sm font-medium text-purple-900 mb-1">
+                    <div key={idx} className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border-2 border-purple-200/60 shadow-sm hover:shadow-md transition-shadow">
+                      <p className="text-sm font-bold text-purple-900 mb-2">
                         {resource.title}
                       </p>
-                      <p className="text-xs text-purple-700">
+                      <p className="text-xs text-purple-700 leading-relaxed">
                         {resource.description}
                       </p>
                     </div>

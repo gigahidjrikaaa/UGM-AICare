@@ -8,55 +8,9 @@ import { motion } from 'framer-motion';
 import { format, addDays, startOfWeek, addWeeks } from 'date-fns';
 import { id } from 'date-fns/locale';
 import { FiCalendar, FiClock, FiUser, FiMapPin, FiChevronLeft, FiChevronRight, FiInfo, FiCheck } from 'react-icons/fi';
-
-// Define type for counselor
-type Counselor = {
-  id: number;
-  name: string;
-  specialization: string;
-  image: string;
-  available: boolean;
-};
-
-// Mock data for counselors
-const counselors: Counselor[] = [
-  {
-    id: 1, 
-    name: "Dr. Putri Handayani", 
-    specialization: "Clinical Psychologist",
-    image: "/counselors/putri.jpg",
-    available: true
-  },
-  {
-    id: 2, 
-    name: "Dr. Budi Santoso", 
-    specialization: "Psychiatrist",
-    image: "/counselors/budi.jpg",
-    available: true
-  },
-  {
-    id: 3, 
-    name: "Anita Wijaya, M.Psi", 
-    specialization: "Counseling Psychologist",
-    image: "/counselors/anita.jpg",
-    available: true
-  },
-  {
-    id: 4, 
-    name: "Dr. Joko Prasetyo", 
-    specialization: "Mental Health Specialist",
-    image: "/counselors/joko.jpg",
-    available: false
-  }
-];
-
-// Mock data for appointment types
-const appointmentTypes = [
-  { id: 1, name: "Initial Consultation", duration: 60, description: "First-time assessment and evaluation" },
-  { id: 2, name: "Follow-up Session", duration: 45, description: "Continue ongoing treatment" },
-  { id: 3, name: "Crisis Intervention", duration: 60, description: "Urgent mental health support" },
-  { id: 4, name: "Group Therapy", duration: 90, description: "Session with 3-5 participants" }
-];
+import { useCreateAppointment, usePsychologists, useAppointmentTypes } from '@/hooks/useAppointments';
+import { toast } from 'react-hot-toast';
+import type { Psychologist, AppointmentType } from '@/lib/appointments-api';
 
 // Mock data for available time slots
 const generateTimeSlots = (date: string | number | Date) => {
@@ -90,13 +44,18 @@ export default function AppointmentsPage() {
   const [step, setStep] = useState(1);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [selectedTime, setSelectedTime] = useState<{time: string, available: boolean} | null>(null);
-  const [selectedCounselor, setSelectedCounselor] = useState<Counselor | null>(null);
-  const [selectedType, setSelectedType] = useState<{id: number, name: string, duration: number, description: string} | null>(null);
+  const [selectedCounselor, setSelectedCounselor] = useState<Psychologist | null>(null);
+  const [selectedType, setSelectedType] = useState<AppointmentType | null>(null);
   const [currentWeekStart, setCurrentWeekStart] = useState(startOfWeek(new Date(), { weekStartsOn: 1 }));
   const [notes, setNotes] = useState("");
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [timeSlots, setTimeSlots] = useState<{ time: string; available: boolean }[]>([]);
+  
+  // React Query hooks to fetch data
+  const createAppointmentMutation = useCreateAppointment();
+  const { data: psychologists = [], isLoading: isLoadingPsychologists } = usePsychologists(true);
+  const { data: appointmentTypes = [], isLoading: isLoadingTypes } = useAppointmentTypes();
   
   // Redirect if not authenticated
   useEffect(() => {
@@ -146,35 +105,45 @@ export default function AppointmentsPage() {
   
   const handleSubmit = async () => {
     if (!selectedDate || !selectedTime || !selectedCounselor || !selectedType) {
-      alert("Please complete all required fields");
+      toast.error("Please complete all required fields");
       return;
     }
     
     setLoading(true);
     
     try {
-      // Here you would integrate with your actual API
-      await new Promise(resolve => setTimeout(resolve, 1500)); // Simulating API call
+      // Create ISO 8601 datetime string
+      const appointmentDateTime = new Date(`${selectedDate}T${selectedTime.time}:00`).toISOString();
       
-      // Simulate successful appointment booking
+      // Call the API to create appointment
+      await createAppointmentMutation.mutateAsync({
+        psychologist_id: selectedCounselor.id,
+        appointment_type_id: selectedType.id,
+        appointment_datetime: appointmentDateTime,
+        notes: notes || undefined,
+        status: 'scheduled'
+      });
+      
       setSuccess(true);
       setLoading(false);
-      
-      // Reset form after success
-    //   setTimeout(() => {
-    //     setStep(1);
-    //     setSelectedDate(null);
-    //     setSelectedTime(null);
-    //     setSelectedCounselor(null);
-    //     setSelectedType(null);
-    //     setNotes("");
-    //     setSuccess(false);
-    //   }, 5000);
+      toast.success('Appointment booked successfully!');
       
     } catch (error) {
       console.error("Error booking appointment:", error);
       setLoading(false);
-      alert("Something went wrong. Please try again.");
+      
+      if (error instanceof Error) {
+        if (error.message.includes('Unauthorized')) {
+          toast.error('Please log in again to book an appointment');
+          router.push('/login');
+        } else if (error.message.includes('conflict') || error.message.includes('already have')) {
+          toast.error('You already have an appointment at this time. Please choose a different time slot.');
+        } else {
+          toast.error(error.message || 'Something went wrong. Please try again.');
+        }
+      } else {
+        toast.error('Something went wrong. Please try again.');
+      }
     }
   };
 
@@ -207,7 +176,7 @@ export default function AppointmentsPage() {
           </p>
           <div className="bg-white/5 border border-white/10 rounded-lg p-4 mb-6 text-left">
             <p className="text-sm text-gray-300 mb-1"><strong>Appointment Type:</strong> {selectedType?.name}</p>
-            <p className="text-sm text-gray-300 mb-1"><strong>Duration:</strong> {selectedType?.duration} minutes</p>
+            <p className="text-sm text-gray-300 mb-1"><strong>Duration:</strong> {selectedType?.duration_minutes} minutes</p>
             <p className="text-sm text-gray-300"><strong>Location:</strong> Gadjah Mada Medical Center, Psychology Dept., 2nd Floor</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -412,61 +381,73 @@ export default function AppointmentsPage() {
               {/* Counselor Selection */}
               <div className="mb-8">
                 <h3 className="text-white font-medium mb-3">Select a Mental Health Professional</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {counselors.map((counselor) => (
-                    <button
-                      key={counselor.id}
-                      onClick={() => counselor.available && setSelectedCounselor(counselor)}
-                      disabled={!counselor.available}
-                      className={`p-4 rounded-lg flex items-center transition ${
-                        selectedCounselor?.id === counselor.id
-                          ? 'bg-[#FFCA40]/20 border-2 border-[#FFCA40]'
-                          : counselor.available
-                            ? 'bg-white/5 border border-white/10 hover:bg-white/10'
-                            : 'bg-white/5 border border-white/10 opacity-50 cursor-not-allowed'
-                      }`}
-                    >
-                      <div className="w-16 h-16 rounded-full overflow-hidden bg-white/20 flex-shrink-0 mr-4">
-                        <div className="w-full h-full bg-gradient-to-br from-[#173a7a] to-[#0a2a6e] flex items-center justify-center">
-                          <FiUser className="text-2xl text-white/70" />
+                {isLoadingPsychologists ? (
+                  <div className="text-center py-8 text-gray-300">Loading psychologists...</div>
+                ) : psychologists.length === 0 ? (
+                  <div className="text-center py-8 text-gray-300">No psychologists available at the moment.</div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {psychologists.map((counselor: Psychologist) => (
+                      <button
+                        key={counselor.id}
+                        onClick={() => counselor.is_available && setSelectedCounselor(counselor)}
+                        disabled={!counselor.is_available}
+                        className={`p-4 rounded-lg flex items-center transition ${
+                          selectedCounselor?.id === counselor.id
+                            ? 'bg-[#FFCA40]/20 border-2 border-[#FFCA40]'
+                            : counselor.is_available
+                              ? 'bg-white/5 border border-white/10 hover:bg-white/10'
+                              : 'bg-white/5 border border-white/10 opacity-50 cursor-not-allowed'
+                        }`}
+                      >
+                        <div className="w-16 h-16 rounded-full overflow-hidden bg-white/20 flex-shrink-0 mr-4">
+                          <div className="w-full h-full bg-gradient-to-br from-[#173a7a] to-[#0a2a6e] flex items-center justify-center">
+                            <FiUser className="text-2xl text-white/70" />
+                          </div>
                         </div>
-                      </div>
-                      <div className="text-left">
-                        <h4 className="font-medium text-white">{counselor.name}</h4>
-                        <p className="text-sm text-gray-300">{counselor.specialization}</p>
-                        {!counselor.available && (
-                          <span className="text-xs text-red-300 mt-1 block">
-                            Currently unavailable
-                          </span>
-                        )}
-                      </div>
-                    </button>
-                  ))}
-                </div>
+                        <div className="text-left">
+                          <h4 className="font-medium text-white">{counselor.name}</h4>
+                          <p className="text-sm text-gray-300">{counselor.specialization || 'Psychologist'}</p>
+                          {!counselor.is_available && (
+                            <span className="text-xs text-red-300 mt-1 block">
+                              Currently unavailable
+                            </span>
+                          )}
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
               
               {/* Appointment Type Selection */}
               <div className="mb-8">
                 <h3 className="text-white font-medium mb-3">Select Appointment Type</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {appointmentTypes.map((type) => (
-                    <button
-                      key={type.id}
-                      onClick={() => setSelectedType(type)}
-                      className={`p-4 rounded-lg text-left transition ${
-                        selectedType?.id === type.id
-                          ? 'bg-[#FFCA40]/20 border-2 border-[#FFCA40]'
-                          : 'bg-white/5 border border-white/10 hover:bg-white/10'
-                      }`}
-                    >
+                {isLoadingTypes ? (
+                  <div className="text-center py-8 text-gray-300">Loading appointment types...</div>
+                ) : appointmentTypes.length === 0 ? (
+                  <div className="text-center py-8 text-gray-300">No appointment types available.</div>
+                ) : (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {appointmentTypes.map((type: AppointmentType) => (
+                      <button
+                        key={type.id}
+                        onClick={() => setSelectedType(type)}
+                        className={`p-4 rounded-lg text-left transition ${
+                          selectedType?.id === type.id
+                            ? 'bg-[#FFCA40]/20 border-2 border-[#FFCA40]'
+                            : 'bg-white/5 border border-white/10 hover:bg-white/10'
+                        }`}
+                      >
                       <div className="flex justify-between">
                         <h4 className="font-medium text-white">{type.name}</h4>
-                        <span className="text-sm text-gray-300">{type.duration} min</span>
+                        <span className="text-sm text-gray-300">{type.duration_minutes} min</span>
                       </div>
-                      <p className="text-xs text-gray-400 mt-1">{type.description}</p>
+                      <p className="text-xs text-gray-400 mt-1">{type.description || 'Standard consultation session'}</p>
                     </button>
                   ))}
                 </div>
+                )}
               </div>
               
               <div className="flex justify-between mt-8">
@@ -536,7 +517,7 @@ export default function AppointmentsPage() {
                         {selectedType?.name}
                       </p>
                       <p className="text-sm text-gray-300">
-                        {selectedType?.duration} minutes
+                        {selectedType?.duration_minutes} minutes
                       </p>
                     </div>
                   </div>

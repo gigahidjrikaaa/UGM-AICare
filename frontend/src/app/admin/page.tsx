@@ -22,6 +22,7 @@ export default function AdminLoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const [showCredentials, setShowCredentials] = useState(false);
+  const [sessionExpiredMessage, setSessionExpiredMessage] = useState("");
   const router = useRouter();
   const { data: session, status } = useSession();
 
@@ -32,9 +33,24 @@ export default function AdminLoginPage() {
   };
 
   useEffect(() => {
+    // Check for session expired query parameter
+    if (typeof window !== 'undefined') {
+      const urlParams = new URLSearchParams(window.location.search);
+      if (urlParams.get('sessionExpired') === 'true') {
+        setSessionExpiredMessage('Your session has expired. Please log in again.');
+        // Clear the query parameter
+        window.history.replaceState({}, '', '/admin');
+      }
+      // Clear the session cleared flag
+      localStorage.removeItem('admin-session-cleared');
+    }
+
     if (status === "authenticated") {
       if (session?.user?.role === "admin") {
-        router.push("/admin/conversations"); // Or your main admin dashboard route
+        // Check for return URL
+        const urlParams = new URLSearchParams(window.location.search);
+        const returnUrl = urlParams.get('returnUrl');
+        router.push(returnUrl || "/admin/conversations");
       } else {
         // If a non-admin user lands here and is logged in, send them away.
         router.push("/signin"); 
@@ -141,6 +157,19 @@ export default function AdminLoginPage() {
             </div>
           )}
 
+          {/* Session Expired Warning */}
+          {sessionExpiredMessage && (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className="bg-yellow-500/20 border border-yellow-500/50 text-yellow-300 p-3 rounded-lg mb-6 flex items-center"
+            >
+              <FiAlertCircle className="mr-2 flex-shrink-0" />
+              <span className="text-sm">{sessionExpiredMessage}</span>
+            </motion.div>
+          )}
+
+          {/* Error Message */}
           {error && (
             <motion.div
               initial={{ opacity: 0, y: -10 }}

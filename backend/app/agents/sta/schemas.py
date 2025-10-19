@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 RiskLevel = Literal[0, 1, 2, 3]
 NextStep = Literal['sca', 'human', 'resource']
+SupportPlanType = Literal['calm_down', 'break_down_problem', 'general_coping', 'none']
 
 
 class STAClassifyRequest(BaseModel):
@@ -21,6 +22,14 @@ class STAClassifyResponse(BaseModel):
     next_step: NextStep
     handoff: bool = False
     diagnostic_notes: Optional[str] = Field(default=None, exclude=True)
+    needs_support_coach_plan: bool = Field(
+        default=False,
+        description="Flag indicating if user could benefit from SCA Support Coach Plan"
+    )
+    support_plan_type: SupportPlanType = Field(
+        default='none',
+        description="Type of support plan recommended: calm_down, break_down_problem, general_coping, or none"
+    )
 
     class Config:
         json_schema_extra = {
@@ -29,5 +38,7 @@ class STAClassifyResponse(BaseModel):
                 "intent": "academic_stress",
                 "next_step": "sca",
                 "handoff": False,
+                "needs_support_coach_plan": True,
+                "support_plan_type": "break_down_problem"
             }
         }

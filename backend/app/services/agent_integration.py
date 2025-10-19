@@ -185,17 +185,39 @@ class AgentIntegrationService:
             # Generate user_hash for event tracking (same logic as STA)
             user_hash = self._generate_user_hash(user_id, session_id)
             
+            # Check if STA recommends using Support Coach Plan
+            use_gemini_plan = sta_response.needs_support_coach_plan
+            plan_type = sta_response.support_plan_type if use_gemini_plan else None
+            
+            if use_gemini_plan:
+                logger.info(
+                    f"STA flagged need for Support Coach Plan: type={plan_type}, user={user_id}"
+                )
+            
             sca_request = SCAInterveneRequest(
                 session_id=session_id,
                 intent=intent,
-                options={"user_hash": user_hash} if user_hash else {},
+                options={
+                    "user_hash": user_hash,
+                    "risk_level": risk_level,
+                } if user_hash else {"risk_level": risk_level},
                 consent_followup=consent_followup,
             )
-            sca_response = await self.sca_service.intervene(payload=sca_request)
+            
+            # Generate intervention - use Gemini if flagged by STA
+            sca_response = await self.sca_service.intervene(
+                payload=sca_request,
+                use_gemini_plan=use_gemini_plan,
+                plan_type=plan_type,
+                user_message=user_message if use_gemini_plan else None,
+                sta_context={"risk_level": risk_level} if use_gemini_plan else None
+            )
             
             result.should_intervene = True
             result.intervention_plan = sca_response
             result.intervention_reason = f"risk_level_{risk_level}_{intent}"
+            if use_gemini_plan:
+                result.intervention_reason += f"_gemini_{plan_type}"
             
             # Store the intervention plan in database
             await self._store_intervention_plan(
@@ -207,11 +229,12 @@ class AgentIntegrationService:
             )
             
             logger.info(
-                "SCA Intervention Generated - User: %s, Intent: %s, Steps: %s, Resources: %s",
+                "SCA Intervention Generated - User: %s, Intent: %s, Steps: %s, Resources: %s, Gemini: %s",
                 user_id,
                 intent,
                 len(sca_response.plan_steps),
                 len(sca_response.resource_cards),
+                use_gemini_plan,
             )
         except Exception as sca_error:
             logger.error("SCA intervention failed for user %s: %s", user_id, sca_error, exc_info=True)

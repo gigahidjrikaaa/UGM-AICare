@@ -10,6 +10,8 @@ import {
   ChevronDown,
   ChevronUp,
   Sparkles,
+  Heart,
+  BookOpen,
 } from 'lucide-react';
 
 interface InterventionPlanProps {
@@ -41,55 +43,70 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4, ease: 'easeOut' }}
-      className="mt-4 bg-gradient-to-br from-ugm-blue/5 to-ugm-gold/5 border border-ugm-blue/20 rounded-xl overflow-hidden shadow-sm"
+      className="mt-4 bg-white/95 backdrop-blur-xl border-2 border-ugm-blue/20 rounded-2xl overflow-hidden shadow-2xl hover:shadow-ugm-blue/20"
     >
-      {/* Header */}
-      <div
-        className="p-4 bg-white/50 backdrop-blur-sm border-b border-ugm-blue/10 cursor-pointer hover:bg-white/70 transition-colors"
-        onClick={() => setIsExpanded(!isExpanded)}
-      >
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex items-start gap-3 flex-1">
-            <div className="p-2 bg-gradient-to-br from-ugm-blue to-ugm-blue-dark rounded-lg shadow-sm">
-              <Sparkles className="w-5 h-5 text-white" />
+      {/* Enhanced Header with Gradient */}
+      <div className="bg-gradient-to-br from-ugm-blue via-ugm-blue to-ugm-blue-light p-5 relative overflow-hidden">
+        {/* Decorative elements */}
+        <div className="absolute top-0 right-0 w-32 h-32 bg-ugm-gold/10 rounded-full blur-3xl" />
+        <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-white/5 rounded-full blur-2xl" />
+        
+        <div className="relative z-10">
+          <div className="flex items-start justify-between gap-3">
+            <div className="flex items-start gap-3 flex-1">
+              <div className="p-3 bg-gradient-to-br from-ugm-gold to-ugm-gold-light rounded-2xl shadow-xl flex-shrink-0">
+                <Sparkles className="w-6 h-6 text-ugm-blue" />
+              </div>
+              <div className="flex-1">
+                <h4 className="text-base font-bold text-white flex items-center gap-2 flex-wrap">
+                  Rencana Dukungan untuk Kamu
+                  <span className="text-xs font-semibold text-ugm-gold bg-ugm-gold/20 px-3 py-1 rounded-full border border-ugm-gold/40">
+                    {completedCount}/{totalSteps} selesai
+                  </span>
+                </h4>
+                <p className="text-sm text-white/90 mt-1 leading-relaxed">
+                  Aku telah menyiapkan beberapa langkah yang bisa membantu. Yuk coba satu per satu!
+                </p>
+              </div>
             </div>
-            <div className="flex-1">
-              <h4 className="text-sm font-semibold text-ugm-blue-dark flex items-center gap-2">
-                Rencana Dukungan untuk Kamu
-                <span className="text-[10px] font-normal text-ugm-blue/60 bg-ugm-gold/10 px-2 py-0.5 rounded-full">
-                  {completedCount}/{totalSteps} selesai
-                </span>
-              </h4>
-              <p className="text-xs text-gray-600 mt-0.5">
-                Aku telah menyiapkan beberapa langkah yang bisa membantu. Yuk coba satu per satu!
-              </p>
-            </div>
+            <button
+              onClick={() => setIsExpanded(!isExpanded)}
+              className="p-2 hover:bg-white/10 rounded-xl transition-all hover:scale-105 flex-shrink-0"
+              aria-label={isExpanded ? 'Tutup rencana' : 'Buka rencana'}
+            >
+              {isExpanded ? (
+                <ChevronUp className="w-5 h-5 text-white" />
+              ) : (
+                <ChevronDown className="w-5 h-5 text-white" />
+              )}
+            </button>
           </div>
-          <button
-            className="p-1 hover:bg-ugm-blue/10 rounded-full transition-colors"
-            aria-label={isExpanded ? 'Tutup rencana' : 'Buka rencana'}
-          >
-            {isExpanded ? (
-              <ChevronUp className="w-5 h-5 text-ugm-blue" />
-            ) : (
-              <ChevronDown className="w-5 h-5 text-ugm-blue" />
-            )}
-          </button>
-        </div>
 
-        {/* Progress Bar */}
-        {totalSteps > 0 && (
-          <div className="mt-3">
-            <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-ugm-blue to-ugm-gold"
-                initial={{ width: 0 }}
-                animate={{ width: `${progressPercent}%` }}
-                transition={{ duration: 0.5, ease: 'easeOut' }}
-              />
+          {/* Enhanced Progress Bar */}
+          {totalSteps > 0 && (
+            <div className="mt-5 space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-white/80 font-semibold">Progres Kamu</span>
+                <span className="text-ugm-gold font-bold">{Math.round(progressPercent)}%</span>
+              </div>
+              <div className="h-3 bg-white/15 rounded-full overflow-hidden backdrop-blur-sm border border-white/20">
+                <motion.div
+                  className="h-full bg-gradient-to-r from-ugm-gold via-ugm-gold-light to-ugm-gold rounded-full shadow-lg relative overflow-hidden"
+                  initial={{ width: 0 }}
+                  animate={{ width: `${progressPercent}%` }}
+                  transition={{ duration: 0.6, ease: 'easeOut' }}
+                >
+                  <motion.div
+                    animate={{ x: ['0%', '100%'] }}
+                    transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                    style={{ width: '50%' }}
+                  />
+                </motion.div>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Content */}
@@ -100,10 +117,17 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3 }}
+            className="bg-gradient-to-b from-gray-50/50 to-white"
           >
             {/* Plan Steps */}
             {plan.plan_steps.length > 0 && (
-              <div className="p-4 space-y-3">
+              <div className="p-5 space-y-3">
+                <h5 className="text-sm font-bold text-ugm-blue flex items-center gap-2 mb-1">
+                  <div className="w-7 h-7 rounded-lg bg-ugm-blue/10 flex items-center justify-center">
+                    <Heart className="w-4 h-4 text-pink-500" />
+                  </div>
+                  Langkah-Langkah Aksi
+                </h5>
                 {plan.plan_steps.map((step, index) => {
                   const isCompleted = completedSteps.has(step.id);
                   return (
@@ -113,18 +137,18 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
                       animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: index * 0.1 }}
                       className={cn(
-                        'flex items-start gap-3 p-3 rounded-lg border-2 transition-all cursor-pointer',
+                        'flex items-start gap-4 p-4 rounded-xl border-2 transition-all cursor-pointer group',
                         isCompleted
-                          ? 'bg-ugm-gold/10 border-ugm-gold/30'
-                          : 'bg-white border-gray-200 hover:border-ugm-blue/30 hover:shadow-sm'
+                          ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-300/60 shadow-sm'
+                          : 'bg-white border-gray-200 hover:border-ugm-blue/50 hover:shadow-md'
                       )}
                       onClick={() => toggleStep(step.id)}
                     >
-                      <div className="flex-shrink-0 mt-0.5">
+                      <div className="flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110">
                         {isCompleted ? (
-                          <CheckCircle2 className="w-6 h-6 text-ugm-gold" />
+                          <CheckCircle2 className="w-6 h-6 text-green-600 drop-shadow-sm" />
                         ) : (
-                          <div className="w-6 h-6 rounded-full border-2 border-gray-300 flex items-center justify-center text-xs font-semibold text-gray-400">
+                          <div className="w-6 h-6 rounded-full border-2 border-ugm-blue/40 flex items-center justify-center text-xs font-bold text-ugm-blue bg-white shadow-sm group-hover:border-ugm-blue group-hover:bg-ugm-blue/5">
                             {index + 1}
                           </div>
                         )}
@@ -132,7 +156,7 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
                       <div className="flex-1 min-w-0">
                         <p
                           className={cn(
-                            'text-sm font-medium',
+                            'text-sm font-semibold leading-relaxed',
                             isCompleted
                               ? 'text-gray-500 line-through'
                               : 'text-ugm-blue-dark'
@@ -141,9 +165,9 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
                           {step.label}
                         </p>
                         {step.duration_min && (
-                          <div className="flex items-center gap-1 mt-1 text-xs text-gray-500">
-                            <Clock className="w-3 h-3" />
-                            <span>{step.duration_min} menit</span>
+                          <div className="flex items-center gap-1.5 mt-2 text-xs text-gray-600 bg-gray-100 w-fit px-2.5 py-1 rounded-lg">
+                            <Clock className="w-3.5 h-3.5" />
+                            <span className="font-medium">{step.duration_min} menit</span>
                           </div>
                         )}
                       </div>
@@ -155,9 +179,11 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
 
             {/* Resource Cards */}
             {plan.resource_cards.length > 0 && (
-              <div className="p-4 pt-0 space-y-2">
-                <h5 className="text-xs font-semibold text-ugm-blue-dark mb-2 flex items-center gap-1">
-                  <ExternalLink className="w-3 h-3" />
+              <div className="px-5 pb-5 space-y-3">
+                <h5 className="text-sm font-bold text-ugm-blue flex items-center gap-2 mb-1">
+                  <div className="w-7 h-7 rounded-lg bg-ugm-blue/10 flex items-center justify-center">
+                    <BookOpen className="w-4 h-4 text-ugm-gold" />
+                  </div>
                   Sumber Bantuan Tambahan
                 </h5>
                 {plan.resource_cards.map((card, index) => (
@@ -170,23 +196,23 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
                     target={card.url ? '_blank' : undefined}
                     rel={card.url ? 'noopener noreferrer' : undefined}
                     className={cn(
-                      'block p-3 rounded-lg border border-gray-200 transition-all',
+                      'block p-4 rounded-xl border-2 transition-all',
                       card.url
-                        ? 'hover:border-ugm-blue/50 hover:bg-white hover:shadow-sm cursor-pointer'
-                        : 'cursor-default'
+                        ? 'bg-white border-purple-200/80 hover:border-ugm-gold/60 hover:shadow-lg cursor-pointer group'
+                        : 'bg-gray-50 border-gray-200 cursor-default'
                     )}
                   >
-                    <div className="flex items-start gap-2">
+                    <div className="flex items-start gap-3">
                       <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium text-ugm-blue-dark">
+                        <p className="text-sm font-semibold text-ugm-blue-dark group-hover:text-ugm-blue transition-colors">
                           {card.title}
                         </p>
-                        <p className="text-xs text-gray-600 mt-0.5">
+                        <p className="text-xs text-gray-600 mt-1 leading-relaxed">
                           {card.summary}
                         </p>
                       </div>
                       {card.url && (
-                        <ExternalLink className="w-4 h-4 text-ugm-blue flex-shrink-0 mt-0.5" />
+                        <ExternalLink className="w-4 h-4 text-ugm-blue flex-shrink-0 mt-0.5 group-hover:text-ugm-gold transition-colors" />
                       )}
                     </div>
                   </motion.a>
@@ -196,16 +222,16 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
 
             {/* Next Check-in */}
             {plan.next_check_in && (
-              <div className="px-4 pb-4">
-                <div className="p-3 bg-ugm-blue/5 border border-ugm-blue/10 rounded-lg">
-                  <p className="text-xs text-ugm-blue-dark">
-                    <span className="font-semibold">Check-in berikutnya:</span>{' '}
+              <div className="px-5 pb-5">
+                <div className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200/60 rounded-xl shadow-sm">
+                  <p className="text-sm text-ugm-blue-dark leading-relaxed">
+                    <span className="font-bold">Check-in berikutnya:</span>{' '}
                     {new Date(plan.next_check_in).toLocaleString('id-ID', {
                       dateStyle: 'medium',
                       timeStyle: 'short',
                     })}
                   </p>
-                  <p className="text-xs text-gray-600 mt-1">
+                  <p className="text-xs text-gray-700 mt-2 leading-relaxed">
                     Aku akan tanya kabar kamu lagi di waktu itu ya! 💙
                   </p>
                 </div>

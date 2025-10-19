@@ -38,10 +38,10 @@ interface User {
   total_badges: number;
   total_appointments: number;
   last_login: string | null;
-  name?: string; // Added for therapist/admin
-  phone?: string; // Added for therapist/admin
-  date_of_birth?: string; // Added for therapist/admin
-  specialization?: string; // Added for therapist
+  name?: string; // Added for counselor/admin
+  phone?: string; // Added for counselor/admin
+  date_of_birth?: string; // Added for counselor/admin
+  specialization?: string; // Added for counselor
   avatar_url?: string | null;
 }
 
@@ -715,14 +715,17 @@ export default function UserManagementPage() {
                       </button>
                       
                       {/* Role Badge */}
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                        user.role === 'admin' 
-                          ? 'bg-red-500/20 text-red-400' 
-                          : user.role === 'therapist'
-                          ? 'bg-blue-500/20 text-blue-400'
-                          : 'bg-gray-500/20 text-gray-400'
-                      }`}>
-                        {user.role || 'user'}
+                      <span 
+                        onClick={(e) => e.stopPropagation()}
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          user.role === 'admin' 
+                            ? 'bg-red-500/20 text-red-400' 
+                            : user.role === 'counselor'
+                            ? 'bg-blue-500/20 text-blue-400'
+                            : 'bg-gray-500/20 text-gray-400'
+                        }`}
+                      >
+                        {user.role === 'counselor' ? 'Counselor' : user.role || 'user'}
                       </span>
                       
                       {/* Status Toggle */}
@@ -742,10 +745,9 @@ export default function UserManagementPage() {
                       </button>
                       
                       {/* Actions Dropdown */}
-                      <div className="relative">
+                      <div className="relative" onClick={(e) => e.stopPropagation()}>
                         <select
                           onChange={(e) => {
-                            e.stopPropagation();
                             const action = e.target.value;
                             e.target.value = ''; // Reset selection
                             
@@ -753,8 +755,8 @@ export default function UserManagementPage() {
                               case 'make-admin':
                                 updateUserRole(user.id, 'admin');
                                 break;
-                              case 'make-therapist':
-                                updateUserRole(user.id, 'therapist');
+                              case 'make-counselor':
+                                updateUserRole(user.id, 'counselor');
                                 break;
                               case 'make-user':
                                 updateUserRole(user.id, 'user');
@@ -770,17 +772,17 @@ export default function UserManagementPage() {
                                 break;
                             }
                           }}
-                          className="bg-white/10 text-white text-xs border border-white/20 rounded px-2 py-1 hover:bg-white/20 focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/50"
+                          className="bg-gradient-to-r from-white/10 to-white/5 text-white text-xs border border-white/30 rounded-lg px-3 py-1.5 hover:from-white/20 hover:to-white/10 focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40] cursor-pointer transition-all shadow-sm backdrop-blur-sm"
                           title="User Actions Menu"
                           aria-label="User Actions Menu"
                         >
-                          <option value="">Actions</option>
-                          <option value="make-admin">Make Admin</option>
-                          <option value="make-therapist">Make Therapist</option>
-                          <option value="make-user">Make User</option>
-                          <option value="reset-password">Reset Password</option>
-                          <option value="delete">Deactivate</option>
-                          <option value="delete-permanent">Delete Permanently</option>
+                          <option value="" className="bg-[#001D58] text-white">⚡ Actions</option>
+                          <option value="make-admin" className="bg-[#001D58] text-white">👑 Make Admin</option>
+                          <option value="make-counselor" className="bg-[#001D58] text-white">🩺 Make Counselor</option>
+                          <option value="make-user" className="bg-[#001D58] text-white">👤 Make User</option>
+                          <option value="reset-password" className="bg-[#001D58] text-white">🔑 Reset Password</option>
+                          <option value="delete" className="bg-[#001D58] text-white">⏸️ Deactivate</option>
+                          <option value="delete-permanent" className="bg-[#001D58] text-white">🗑️ Delete Permanently</option>
                         </select>
                       </div>
                     </div>
@@ -958,12 +960,12 @@ export default function UserManagementPage() {
                             className={`inline-flex items-center px-2 py-1 rounded-full border ${
                               selectedUser.role === 'admin'
                                 ? 'border-red-400 text-red-300'
-                                : selectedUser.role === 'therapist'
+                                : selectedUser.role === 'counselor'
                                 ? 'border-blue-400 text-blue-300'
                                 : 'border-white/20 text-white/70'
                             }`}
                           >
-                            {selectedUser.role || 'user'}
+                            {selectedUser.role === 'counselor' ? 'Counselor' : selectedUser.role || 'user'}
                           </span>
                           <span>Status: {selectedUser.is_active ? 'Active' : 'Inactive'}</span>
                         </div>
@@ -1073,11 +1075,11 @@ export default function UserManagementPage() {
                                 className="w-full px-2 py-1 bg-white/10 border border-white/20 rounded-md text-white text-sm focus:ring-1 focus:ring-[#FFCA40] focus:border-[#FFCA40]"
                               >
                                 <option value="user" className="bg-gray-800">User</option>
-                                <option value="therapist" className="bg-gray-800">Therapist</option>
+                                <option value="counselor" className="bg-gray-800">Counselor</option>
                                 <option value="admin" className="bg-gray-800">Admin</option>
                               </select>
                             ) : (
-                              selectedUser.role || 'user'
+                              selectedUser.role === 'counselor' ? 'Counselor' : selectedUser.role || 'user'
                             )}
                           </dd>
 
@@ -1131,9 +1133,9 @@ export default function UserManagementPage() {
                             )}
                           </dd>
                         </dl>
-                        {selectedUser.role === 'therapist' && (
+                        {selectedUser.role === 'counselor' && (
                           <div className="mt-6">
-                            <h4 className="text-sm font-medium text-gray-300 mb-3">Therapist Information</h4>
+                            <h4 className="text-sm font-medium text-gray-300 mb-3">Counselor Information</h4>
                             <dl className="grid grid-cols-2 gap-x-4 gap-y-2">
                               <dt className="text-sm text-gray-400">Specialization:</dt>
                               <dd className="text-sm text-white text-right">

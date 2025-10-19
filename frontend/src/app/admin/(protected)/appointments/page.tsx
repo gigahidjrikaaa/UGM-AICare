@@ -1,56 +1,26 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo, Fragment } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import Image from 'next/image';
 import {
-  FiEye,
-  FiEdit,
-  FiTrash2,
-  FiMail,
-  FiPhone,
-  FiCopy,
-  FiMessageCircle,
-  FiMessageSquare,
+  FiCalendar,
+  FiClock,
+  FiUser,
+  FiSearch,
+  FiFilter,
   FiDownload,
-  FiChevronDown,
-  FiChevronUp,
-  FiSend,
+  FiX,
+  FiCheck,
+  FiAlertCircle,
 } from 'react-icons/fi';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { apiCall } from '@/utils/adminApi';
 import { Button } from '@/components/ui/Button';
-import Tooltip from '@/components/ui/Tooltip';
 
 interface User {
   id: number;
   email: string | null;
-  avatar_url?: string | null;
-}
-
-interface TherapistSchedule {
-  id: number;
-  day_of_week: string;
-  start_time: string;
-  end_time: string;
-  is_available: boolean;
-  reason: string | null;
-}
-
-interface TherapistApiResponse {
-  id: number;
-  email: string | null;
-  name: string | null;
-  first_name: string | null;
-  last_name: string | null;
-  phone: string | null;
-  specialization: string | null;
-  is_available: boolean;
-  allow_email_checkins: boolean;
-  total_appointments: number;
-  upcoming_schedules: TherapistSchedule[];
-  image_url?: string | null;
   avatar_url?: string | null;
 }
 
@@ -60,12 +30,6 @@ interface AppointmentTherapist {
   specialization: string | null;
   is_available: boolean;
   image_url?: string | null;
-}
-
-interface Therapist extends TherapistApiResponse {
-  displayName: string;
-  upcoming_schedules: TherapistSchedule[];
-  schedules: TherapistSchedule[];
 }
 
 interface Appointment {
@@ -79,75 +43,29 @@ interface Appointment {
   created_at: string;
 }
 
-const DAY_ORDER = [
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-  'Sunday',
-];
-
-const getDayPosition = (day: string) => {
-  const index = DAY_ORDER.indexOf(day);
-  return index === -1 ? DAY_ORDER.length : index;
-};
-
-const groupScheduleByDay = (schedule: TherapistSchedule[]) => {
-  const buckets = new Map<string, TherapistSchedule[]>();
-  schedule.forEach((slot) => {
-    const key = slot.day_of_week || 'Unspecified';
-    const existing = buckets.get(key) ?? [];
-    existing.push(slot);
-    buckets.set(key, existing);
-  });
-
-  return Array.from(buckets.entries())
-    .sort((a, b) => getDayPosition(a[0]) - getDayPosition(b[0]))
-    .map(([day, slots]) => ({
-      day,
-      slots: [...slots].sort((slotA, slotB) => slotA.start_time.localeCompare(slotB.start_time)),
-    }));
-};
-
-const getNextAvailableSlot = (schedule: TherapistSchedule[]) =>
-  schedule.find((slot) => slot.is_available) ?? schedule[0];
+type ViewMode = 'cards' | 'list';
 
 export default function AppointmentManagementPage() {
-  const router = useRouter();
-  const searchParams = useSearchParams();
   const [appointments, setAppointments] = useState<Appointment[]>([]);
-  const [psychologists, setPsychologists] = useState<Therapist[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('appointments');
-  // Filters & selection
+  const [viewMode, setViewMode] = useState<ViewMode>('cards');
+  
+  // Filters
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('');
+  const [typeFilter, setTypeFilter] = useState<string>('');
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
-  const [quick, setQuick] = useState<'all' | 'today' | 'upcoming'>('all');
-  const [selected, setSelected] = useState<Record<number, boolean>>({});
-  const [viewAppt, setViewAppt] = useState<Appointment | null>(null);
-  const [selectedTherapist, setSelectedTherapist] = useState<Therapist | null>(null);
-  const [isScheduleModalOpen, setIsScheduleModalOpen] = useState(false);
-  const [newSchedule, setNewSchedule] = useState({
-    day_of_week: 'Monday',
-    start_time: '09:00',
-    end_time: '17:00',
-    is_available: true,
-    reason: '',
-  });
-  const [therapistSchedules, setTherapistSchedules] = useState<Record<number, TherapistSchedule[]>>({});
-  const [expandedTherapists, setExpandedTherapists] = useState<Record<number, boolean>>({});
-  const [scheduleLoadingMap, setScheduleLoadingMap] = useState<Record<number, boolean>>({});
+  const [quickFilter, setQuickFilter] = useState<'all' | 'today' | 'upcoming' | 'past'>('all');
+  
+  // Detail view
+  const [selectedAppt, setSelectedAppt] = useState<Appointment | null>(null);
 
   const fetchAppointments = useCallback(async () => {
     try {
       setLoading(true);
       const data = await apiCall<Appointment[]>('/api/v1/admin/appointments');
       setAppointments(data);
-      setSelected({});
     } catch (error) {
       console.error('Error fetching appointments:', error);
       toast.error(error instanceof Error ? error.message : 'Failed to load appointments');
@@ -156,488 +74,508 @@ export default function AppointmentManagementPage() {
     }
   }, []);
 
-  const fetchPsychologists = useCallback(async () => {
-    try {
-      setLoading(true);
-      const data = await apiCall<TherapistApiResponse[]>('/api/v1/admin/psychologists');
-      const mapped: Therapist[] = data.map((item) => {
-        const nameFromParts = [item.first_name, item.last_name]
-          .filter((part) => part && part.trim().length)
-          .join(' ')
-          .trim();
-        const displayName =
-          (item.name && item.name.trim()) ||
-          nameFromParts ||
-          item.email ||
-          'Therapist';
-        const imageUrl = item.image_url ?? item.avatar_url ?? null;
-        const avatarUrl = item.avatar_url ?? imageUrl ?? null;
-
-        return {
-          ...item,
-          image_url: imageUrl,
-          avatar_url: avatarUrl,
-          displayName,
-          upcoming_schedules: item.upcoming_schedules ?? [],
-          schedules: item.upcoming_schedules ?? [],
-        };
-      });
-      setPsychologists(mapped);
-    } catch (error) {
-      console.error('Error fetching psychologists:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to load therapists');
-    } finally {
-      setLoading(false);
-    }
-  }, []);
-
   useEffect(() => {
-    // Initialize tab from query param (?tab=therapists)
-    const tab = searchParams?.get('tab');
-    if (tab === 'therapists') setActiveTab('therapists');
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const setTabAndUrl = (tab: 'appointments' | 'therapists') => {
-    setActiveTab(tab);
-    try {
-      const current = new URLSearchParams(searchParams?.toString());
-      current.set('tab', tab);
-      router.replace(`/admin/appointments?${current.toString()}`);
-    } catch {
-      // no-op
-    }
-  };
-
-  useEffect(() => {
-    if (activeTab === 'appointments') {
-      fetchAppointments();
-    } else {
-      fetchPsychologists();
-    }
-  }, [activeTab, fetchAppointments, fetchPsychologists]);
+    fetchAppointments();
+  }, [fetchAppointments]);
 
   const filteredAppointments = useMemo(() => {
     let list = [...appointments];
     const q = searchTerm.trim().toLowerCase();
+    
     if (q) {
       list = list.filter(a =>
         (a.user.email || '').toLowerCase().includes(q) ||
         (a.psychologist.name || '').toLowerCase().includes(q) ||
-        (a.appointment_type || '').toLowerCase().includes(q)
+        (a.appointment_type || '').toLowerCase().includes(q) ||
+        (a.notes || '').toLowerCase().includes(q)
       );
     }
+    
     if (statusFilter) {
       list = list.filter(a => a.status === statusFilter);
     }
+    
+    if (typeFilter) {
+      list = list.filter(a => a.appointment_type === typeFilter);
+    }
+    
     if (dateFrom) {
       const from = new Date(dateFrom);
       list = list.filter(a => new Date(a.appointment_datetime) >= from);
     }
+    
     if (dateTo) {
       const to = new Date(dateTo);
-      list = list.filter(a => new Date(a.appointment_datetime) <= new Date(to.getTime() + 86400000 - 1));
+      to.setHours(23, 59, 59, 999);
+      list = list.filter(a => new Date(a.appointment_datetime) <= to);
     }
-    if (quick === 'today') {
-      const today = new Date();
+    
+    const now = new Date();
+    if (quickFilter === 'today') {
       list = list.filter(a => {
         const d = new Date(a.appointment_datetime);
-        return d.getFullYear() === today.getFullYear() && d.getMonth() === today.getMonth() && d.getDate() === today.getDate();
+        return d.toDateString() === now.toDateString();
       });
-    } else if (quick === 'upcoming') {
-      const now = new Date();
+    } else if (quickFilter === 'upcoming') {
       list = list.filter(a => new Date(a.appointment_datetime) >= now);
+    } else if (quickFilter === 'past') {
+      list = list.filter(a => new Date(a.appointment_datetime) < now);
     }
-    // Sort by date desc
-    list.sort((a,b) => +new Date(b.appointment_datetime) - +new Date(a.appointment_datetime));
+    
+    // Sort by date descending (most recent first)
+    list.sort((a, b) => +new Date(b.appointment_datetime) - +new Date(a.appointment_datetime));
     return list;
-  }, [appointments, searchTerm, statusFilter, dateFrom, dateTo, quick]);
+  }, [appointments, searchTerm, statusFilter, typeFilter, dateFrom, dateTo, quickFilter]);
 
-  const allSelected = filteredAppointments.length > 0 && filteredAppointments.every(a => selected[a.id]);
-  const toggleSelectAll = (value: boolean) => {
-    const next: Record<number, boolean> = { ...selected };
-    filteredAppointments.forEach(a => { next[a.id] = value; });
-    setSelected(next);
-  };
-  const selectedIds = useMemo(() => Object.entries(selected).filter(([,v])=>v).map(([k]) => Number(k)), [selected]);
+  const appointmentTypes = useMemo(() => {
+    const types = new Set(appointments.map(a => a.appointment_type));
+    return Array.from(types);
+  }, [appointments]);
 
-  const getErrorMessage = (err: unknown, fallback: string) => {
-    if (err instanceof Error) return err.message;
-    if (typeof err === 'object' && err && 'message' in err) {
-      const m = (err as { message?: unknown }).message;
-      if (typeof m === 'string') return m;
-    }
-    return fallback;
-  };
+  const stats = useMemo(() => {
+    const total = appointments.length;
+    const scheduled = appointments.filter(a => a.status === 'scheduled').length;
+    const completed = appointments.filter(a => a.status === 'completed').length;
+    const cancelled = appointments.filter(a => a.status === 'cancelled').length;
+    const now = new Date();
+    const upcoming = appointments.filter(a => 
+      new Date(a.appointment_datetime) >= now && a.status === 'scheduled'
+    ).length;
+    
+    return { total, scheduled, completed, cancelled, upcoming };
+  }, [appointments]);
 
   const updateStatus = async (id: number, status: string) => {
     try {
-      await apiCall(`/api/v1/admin/appointments/${id}`, { method: 'PUT', body: JSON.stringify({ status }) });
-      toast.success('Status updated');
+      await apiCall(`/api/v1/admin/appointments/${id}`, { 
+        method: 'PUT', 
+        body: JSON.stringify({ status }) 
+      });
+      toast.success('Status updated successfully');
       fetchAppointments();
+      if (selectedAppt?.id === id) {
+        setSelectedAppt(prev => prev ? { ...prev, status } : null);
+      }
     } catch (err: unknown) {
-      toast.error(getErrorMessage(err, 'Failed to update status'));
+      const message = err instanceof Error ? err.message : 'Failed to update status';
+      toast.error(message);
     }
   };
 
-  const bulkUpdate = async (status: string) => {
-    if (!selectedIds.length) return;
+  const deleteAppointment = async (id: number) => {
+    if (!confirm('Delete this appointment? This action cannot be undone.')) return;
+    
     try {
-      await Promise.all(selectedIds.map(id => apiCall(`/api/v1/admin/appointments/${id}`, { method: 'PUT', body: JSON.stringify({ status }) })));
-      toast.success(`Updated ${selectedIds.length} appointments`);
+      await apiCall(`/api/v1/admin/appointments/${id}`, { method: 'DELETE' });
+      toast.success('Appointment deleted');
       fetchAppointments();
+      if (selectedAppt?.id === id) {
+        setSelectedAppt(null);
+      }
     } catch (err: unknown) {
-      toast.error(getErrorMessage(err, 'Bulk update failed'));
+      const message = err instanceof Error ? err.message : 'Failed to delete appointment';
+      toast.error(message);
     }
   };
 
-  const bulkDelete = async () => {
-    if (!selectedIds.length) return;
-    if (!confirm(`Delete ${selectedIds.length} appointments? This cannot be undone.`)) return;
-    try {
-      await Promise.all(selectedIds.map(id => apiCall(`/api/v1/admin/appointments/${id}`, { method: 'DELETE' })));
-      toast.success('Deleted selected');
-      fetchAppointments();
-    } catch (err: unknown) {
-      toast.error(getErrorMessage(err, 'Bulk delete failed'));
-    }
-  };
-
-  const exportCSV = (rows: Appointment[]) => {
-    const header = ['ID','Patient Email','Therapist','Type','DateTime','Status','Created At','Notes'];
-    const lines = rows.map(a => [a.id, a.user.email || 'N/A', a.psychologist.name, a.appointment_type, new Date(a.appointment_datetime).toISOString(), a.status, a.created_at, (a.notes || '').replace(/\n/g,' ')].join(','));
+  const exportCSV = () => {
+    const rows = filteredAppointments;
+    const header = ['ID', 'Patient Email', 'Psychologist', 'Type', 'Date & Time', 'Status', 'Notes', 'Created At'];
+    const lines = rows.map(a => [
+      a.id,
+      a.user.email || 'N/A',
+      a.psychologist.name,
+      a.appointment_type,
+      new Date(a.appointment_datetime).toLocaleString(),
+      a.status,
+      (a.notes || '').replace(/\n/g, ' '),
+      new Date(a.created_at).toLocaleString()
+    ].join(','));
+    
     const csv = [header.join(','), ...lines].join('\n');
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `appointments_${Date.now()}.csv`;
+    a.download = `appointments_${new Date().toISOString().split('T')[0]}.csv`;
     document.body.appendChild(a);
     a.click();
     a.remove();
     URL.revokeObjectURL(url);
+    toast.success('CSV exported successfully');
   };
 
-  const handleCopyToClipboard = async (value: string, successMessage: string) => {
-    try {
-      if (navigator?.clipboard?.writeText) {
-        await navigator.clipboard.writeText(value);
-      } else {
-        const textarea = document.createElement('textarea');
-        textarea.value = value;
-        textarea.style.position = 'fixed';
-        textarea.style.opacity = '0';
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand('copy');
-        document.body.removeChild(textarea);
-      }
-      toast.success(successMessage);
-    } catch (err) {
-      console.error('Copy failed', err);
-      toast.error('Unable to copy value');
-    }
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
-  const sanitizePhoneNumber = (value: string) => value.replace(/[^+\d]/g, '');
-
-  const handleEmailTherapist = (email: string) => {
-    if (!email) {
-      toast.error('No email available for this therapist');
-      return;
-    }
-    window.open(`mailto:${email}`, '_blank', 'noopener');
+  const formatTime = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleTimeString('en-US', {
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
-  const handleCallTherapist = (phone: string) => {
-    if (!phone) {
-      toast.error('No phone number available for this therapist');
-      return;
-    }
-    window.open(`tel:${sanitizePhoneNumber(phone)}`);
-  };
-
-  const handleWhatsAppTherapist = (phone: string) => {
-    const digits = sanitizePhoneNumber(phone);
-    if (!digits) {
-      toast.error('No valid phone number available for WhatsApp');
-      return;
-    }
-    window.open(`https://wa.me/${digits}`, '_blank', 'noopener');
-  };
-
-  const handleSmsTherapist = (phone: string) => {
-    const digits = sanitizePhoneNumber(phone);
-    if (!digits) {
-      toast.error('No valid phone number available for SMS');
-      return;
-    }
-    window.open(`sms:${digits}`);
-  };
-
-  const handleDownloadContactCard = (therapist: Therapist) => {
-    const lines = [
-      'BEGIN:VCARD',
-      'VERSION:3.0',
-      `FN:${therapist.displayName}`,
-    ];
-    if (therapist.last_name || therapist.first_name) {
-      lines.push(
-        `N:${therapist.last_name || ''};${therapist.first_name || ''};;;`
-      );
-    }
-    if (therapist.specialization) {
-      lines.push(`TITLE:${therapist.specialization}`);
-    }
-    if (therapist.email) {
-      lines.push(`EMAIL;TYPE=WORK:${therapist.email}`);
-    }
-    if (therapist.phone) {
-      lines.push(`TEL;TYPE=CELL:${sanitizePhoneNumber(therapist.phone)}`);
-    }
-    lines.push('END:VCARD');
-
-    const blob = new Blob([lines.join('\n')], { type: 'text/vcard;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const anchor = document.createElement('a');
-    anchor.href = url;
-    anchor.download = `${therapist.displayName.replace(/\s+/g, '_').toLowerCase()}_contact.vcf`;
-    document.body.appendChild(anchor);
-    anchor.click();
-    anchor.remove();
-    URL.revokeObjectURL(url);
-    toast.success('Downloaded contact card');
-  };
-
-  const handleCheckInEmail = (therapist: Therapist) => {
-    if (!therapist.email) {
-      toast.error('No email available for this therapist');
-      return;
-    }
-
-    const schedule = therapistSchedules[therapist.id] ?? therapist.upcoming_schedules ?? [];
-    const nextSlot = getNextAvailableSlot(schedule) ?? null;
-    const greeting = therapist.first_name || therapist.displayName || 'there';
-    const subject = encodeURIComponent('Quick availability check-in');
-    const slotDetails = nextSlot
-      ? `I noticed your next availability is listed as ${nextSlot.day_of_week} from ${nextSlot.start_time} to ${nextSlot.end_time}.`
-      : 'I wanted to make sure we have the latest view of your availability.';
-    const body = encodeURIComponent(
-      `Hi ${greeting},\n\n${slotDetails}\n\nLet me know if there are any updates or times that work best for you.\n\nThanks!\nAdmin Team`
-    );
-
-    window.open(`mailto:${therapist.email}?subject=${subject}&body=${body}`, '_blank', 'noopener');
-  };
-
-  const handleToggleSchedule = async (therapist: Therapist) => {
-    if (expandedTherapists[therapist.id]) {
-      setExpandedTherapists((prev) => ({ ...prev, [therapist.id]: false }));
-      return;
-    }
-
-    if (!therapistSchedules[therapist.id]) {
-      setScheduleLoadingMap((prev) => ({ ...prev, [therapist.id]: true }));
-      let loaded = false;
-      try {
-        const data = await apiCall<TherapistSchedule[]>(`/api/v1/admin/therapists/${therapist.id}/schedule`);
-        setTherapistSchedules((prev) => ({ ...prev, [therapist.id]: data }));
-        loaded = true;
-      } catch (error) {
-        console.error('Error fetching therapist schedule:', error);
-        toast.error(error instanceof Error ? error.message : 'Failed to load schedule');
-      } finally {
-        setScheduleLoadingMap((prev) => ({ ...prev, [therapist.id]: false }));
-      }
-
-      if (!loaded) {
-        return;
-      }
-    }
-
-    setExpandedTherapists((prev) => ({ ...prev, [therapist.id]: true }));
-  };
-
-  const handleScheduleModalOpen = async (therapistId: number) => {
-    try {
-      const data = await apiCall<TherapistSchedule[]>(`/api/v1/admin/therapists/${therapistId}/schedule`);
-      setTherapistSchedules((prev) => ({ ...prev, [therapistId]: data }));
-      const therapist = psychologists.find(p => p.id === therapistId);
-      if (therapist) {
-        setSelectedTherapist({ ...therapist, schedules: data, upcoming_schedules: data });
-        setIsScheduleModalOpen(true);
-      }
-    } catch (error) {
-      console.error('Error fetching therapist schedule:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to load schedule');
-    }
-  };
-  const handleScheduleModalClose = () => {
-    setSelectedTherapist(null);
-    setIsScheduleModalOpen(false);
-  };
-
-  const handleNewScheduleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-    const { name, value, type } = e.target;
-    const checked = (e.target as HTMLInputElement).checked;
-    setNewSchedule((prev) => ({
-      ...prev,
-      [name]: type === 'checkbox' ? checked : value,
-    }));
-  };
-
-  const handleCreateSchedule = async () => {
-    if (!selectedTherapist) return;
-    try {
-      await apiCall(`/api/v1/admin/therapists/${selectedTherapist.id}/schedule`, {
-        method: 'POST',
-        body: JSON.stringify(newSchedule),
-      });
-      toast.success('Schedule created successfully');
-      await fetchPsychologists();
-      handleScheduleModalOpen(selectedTherapist.id); // Refresh the schedule
-    } catch (error) {
-      console.error('Error creating schedule:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to create schedule');
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'scheduled':
+        return 'bg-blue-500/20 text-blue-300 border-blue-500/30';
+      case 'completed':
+        return 'bg-green-500/20 text-green-300 border-green-500/30';
+      case 'cancelled':
+        return 'bg-red-500/20 text-red-300 border-red-500/30';
+      default:
+        return 'bg-gray-500/20 text-gray-300 border-gray-500/30';
     }
   };
 
-  const handleDeleteSchedule = async (scheduleId: number) => {
-    if (!selectedTherapist) return;
-    if (!confirm('Are you sure you want to delete this schedule?')) return;
-    try {
-      await apiCall(`/api/v1/admin/therapists/schedule/${scheduleId}`, {
-        method: 'DELETE',
-      });
-      toast.success('Schedule deleted successfully');
-      await fetchPsychologists();
-      handleScheduleModalOpen(selectedTherapist.id); // Refresh the schedule
-    } catch (error) {
-      console.error('Error deleting schedule:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to delete schedule');
-    }
+  const clearFilters = () => {
+    setSearchTerm('');
+    setStatusFilter('');
+    setTypeFilter('');
+    setDateFrom('');
+    setDateTo('');
+    setQuickFilter('all');
   };
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center">
-        <h1 className="text-3xl font-bold text-white">Appointment Management</h1>
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-3xl font-bold text-white">Appointments</h1>
+          <p className="text-sm text-white/60 mt-1">Manage and track all patient appointments</p>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportCSV}
+            disabled={filteredAppointments.length === 0}
+            className="gap-2"
+          >
+            <FiDownload className="h-4 w-4" />
+            Export CSV
+          </Button>
+          <Button onClick={fetchAppointments} size="sm" className="gap-2">
+            <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            Refresh
+          </Button>
+        </div>
       </div>
 
-      <div className="flex border-b border-white/20">
-        <button
-          onClick={() => setTabAndUrl('appointments')}
-          className={`px-4 py-2 text-sm font-medium ${
-            activeTab === 'appointments'
-              ? 'text-[#FFCA40] border-b-2 border-[#FFCA40]'
-              : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          Appointments
-        </button>
-        <button
-          onClick={() => setTabAndUrl('therapists')}
-          className={`px-4 py-2 text-sm font-medium ${
-            activeTab === 'therapists'
-              ? 'text-[#FFCA40] border-b-2 border-[#FFCA40]'
-              : 'text-gray-400 hover:text-white'
-          }`}
-        >
-          Therapists
-        </button>
+      {/* Stats Cards */}
+      <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+          <div className="text-xs uppercase tracking-wide text-white/60 mb-1">Total</div>
+          <div className="text-2xl font-bold text-white">{stats.total}</div>
+        </div>
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+          <div className="text-xs uppercase tracking-wide text-white/60 mb-1">Upcoming</div>
+          <div className="text-2xl font-bold text-[#FFCA40]">{stats.upcoming}</div>
+        </div>
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+          <div className="text-xs uppercase tracking-wide text-white/60 mb-1">Scheduled</div>
+          <div className="text-2xl font-bold text-blue-300">{stats.scheduled}</div>
+        </div>
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+          <div className="text-xs uppercase tracking-wide text-white/60 mb-1">Completed</div>
+          <div className="text-2xl font-bold text-green-300">{stats.completed}</div>
+        </div>
+        <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+          <div className="text-xs uppercase tracking-wide text-white/60 mb-1">Cancelled</div>
+          <div className="text-2xl font-bold text-red-300">{stats.cancelled}</div>
+        </div>
       </div>
 
-      {/* Filters Toolbar */}
-      {activeTab === 'appointments' && (
-        <div className="bg-white/5 border border-white/10 rounded-xl p-4 flex flex-col md:flex-row gap-3 md:items-end md:justify-between">
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 w-full">
-            <div>
-              <label className="block text-xs text-gray-300 mb-1">Search</label>
-              <input value={searchTerm} onChange={e=>setSearchTerm(e.target.value)} placeholder="Email, therapist, type" className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-sm" />
-            </div>
-            <div>
-              <label htmlFor="filter-status" className="block text-xs text-gray-300 mb-1">Status</label>
-              <select id="filter-status" value={statusFilter} onChange={e=>setStatusFilter(e.target.value)} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-sm">
-                <option value="">All</option>
-                <option value="scheduled">Scheduled</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </div>
-            <div>
-              <label htmlFor="filter-from" className="block text-xs text-gray-300 mb-1">From</label>
-              <input id="filter-from" aria-label="From date" type="date" value={dateFrom} onChange={e=>setDateFrom(e.target.value)} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-sm" />
-            </div>
-            <div>
-              <label htmlFor="filter-to" className="block text-xs text-gray-300 mb-1">To</label>
-              <input id="filter-to" aria-label="To date" type="date" value={dateTo} onChange={e=>setDateTo(e.target.value)} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-md text-white text-sm" />
-            </div>
+      {/* Filters */}
+      <div className="bg-white/5 border border-white/10 rounded-xl p-5">
+        <div className="flex items-center justify-between mb-4">
+          <div className="flex items-center gap-2 text-white">
+            <FiFilter className="h-5 w-5" />
+            <h2 className="font-semibold">Filters</h2>
           </div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={()=>{setQuick('today')}} className={quick==='today' ? 'border-[#FFCA40]' : ''}>Today</Button>
-            <Button variant="outline" onClick={()=>{setQuick('upcoming')}} className={quick==='upcoming' ? 'border-[#FFCA40]' : ''}>Upcoming</Button>
-            <Button variant="outline" onClick={()=>{setQuick('all')}} className={quick==='all' ? 'border-[#FFCA40]' : ''}>All</Button>
-            <Button variant="outline" onClick={()=>exportCSV(filteredAppointments)}>Export</Button>
-            <Button onClick={fetchAppointments}>Refresh</Button>
-          </div>
+          {(searchTerm || statusFilter || typeFilter || dateFrom || dateTo || quickFilter !== 'all') && (
+            <button
+              onClick={clearFilters}
+              className="text-sm text-white/60 hover:text-white transition-colors flex items-center gap-1"
+            >
+              <FiX className="h-4 w-4" />
+              Clear all
+            </button>
+          )}
         </div>
-      )}
 
-      {/* Bulk actions bar */}
-      {activeTab === 'appointments' && selectedIds.length > 0 && (
-        <div className="bg-yellow-500/10 border border-yellow-400/30 rounded-xl p-3 flex items-center justify-between">
-          <div className="text-sm text-yellow-100">{selectedIds.length} selected</div>
-          <div className="flex items-center gap-2">
-            <Button variant="outline" onClick={()=>bulkUpdate('completed')}>Mark Completed</Button>
-            <Button variant="outline" onClick={()=>bulkUpdate('cancelled')}>Cancel</Button>
-            <Button variant="outline" onClick={()=>exportCSV(appointments.filter(a=>selected[a.id]))}>Export</Button>
-            <Button variant="outline" onClick={bulkDelete}>Delete</Button>
-          </div>
+        {/* Quick Filters */}
+        <div className="flex flex-wrap gap-2 mb-4">
+          <button
+            onClick={() => setQuickFilter('all')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              quickFilter === 'all'
+                ? 'bg-[#FFCA40] text-black'
+                : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            All
+          </button>
+          <button
+            onClick={() => setQuickFilter('today')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              quickFilter === 'today'
+                ? 'bg-[#FFCA40] text-black'
+                : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            Today
+          </button>
+          <button
+            onClick={() => setQuickFilter('upcoming')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              quickFilter === 'upcoming'
+                ? 'bg-[#FFCA40] text-black'
+                : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            Upcoming
+          </button>
+          <button
+            onClick={() => setQuickFilter('past')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              quickFilter === 'past'
+                ? 'bg-[#FFCA40] text-black'
+                : 'bg-white/10 text-white hover:bg-white/20'
+            }`}
+          >
+            Past
+          </button>
         </div>
-      )}
 
+        {/* Advanced Filters */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
+          <div className="relative">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/40" />
+            <input
+              type="text"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+              placeholder="Search..."
+              className="w-full pl-10 pr-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#FFCA40] transition-colors text-sm"
+            />
+          </div>
+          
+          <select
+            value={statusFilter}
+            onChange={e => setStatusFilter(e.target.value)}
+            aria-label="Filter by status"
+            className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#FFCA40] transition-colors text-sm"
+          >
+            <option value="">All Statuses</option>
+            <option value="scheduled">Scheduled</option>
+            <option value="completed">Completed</option>
+            <option value="cancelled">Cancelled</option>
+          </select>
+
+          <select
+            value={typeFilter}
+            onChange={e => setTypeFilter(e.target.value)}
+            aria-label="Filter by type"
+            className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#FFCA40] transition-colors text-sm"
+          >
+            <option value="">All Types</option>
+            {appointmentTypes.map(type => (
+              <option key={type} value={type}>{type}</option>
+            ))}
+          </select>
+
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            placeholder="From date"
+            className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#FFCA40] transition-colors text-sm"
+          />
+
+          <input
+            type="date"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            placeholder="To date"
+            className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#FFCA40] transition-colors text-sm"
+          />
+        </div>
+
+        {/* Results count */}
+        <div className="mt-4 text-sm text-white/60">
+          Showing <span className="text-white font-medium">{filteredAppointments.length}</span> of{' '}
+          <span className="text-white font-medium">{appointments.length}</span> appointments
+        </div>
+      </div>
+
+      {/* View Mode Toggle */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setViewMode('cards')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              viewMode === 'cards'
+                ? 'bg-white/10 text-white border border-white/20'
+                : 'text-white/60 hover:text-white'
+            }`}
+          >
+            Cards
+          </button>
+          <button
+            onClick={() => setViewMode('list')}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              viewMode === 'list'
+                ? 'bg-white/10 text-white border border-white/20'
+                : 'text-white/60 hover:text-white'
+            }`}
+          >
+            List
+          </button>
+        </div>
+      </div>
+
+      {/* Content */}
       {loading ? (
-        <div className="flex justify-center items-center p-8">
-          <div className="animate-spin rounded-full h-32 w-32 border-t-2 border-b-2 border-white/20"></div>
+        <div className="flex justify-center items-center p-12">
+          <div className="w-12 h-12 border-4 border-white/20 border-t-[#FFCA40] rounded-full animate-spin" />
+        </div>
+      ) : filteredAppointments.length === 0 ? (
+        <div className="bg-white/5 border border-white/10 rounded-xl p-12 text-center">
+          <FiAlertCircle className="h-12 w-12 text-white/40 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-white mb-2">No appointments found</h3>
+          <p className="text-white/60">
+            {searchTerm || statusFilter || typeFilter || dateFrom || dateTo || quickFilter !== 'all'
+              ? 'Try adjusting your filters to see more results.'
+              : 'No appointments have been scheduled yet.'}
+          </p>
         </div>
       ) : (
         <>
-          {activeTab === 'appointments' && (
-            <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 overflow-hidden">
+          {viewMode === 'cards' ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {filteredAppointments.map(appointment => {
+                const patientAvatar = appointment.user.avatar_url;
+                const patientInitial = (appointment.user.email || 'U').charAt(0).toUpperCase();
+                const isPast = new Date(appointment.appointment_datetime) < new Date();
+
+                return (
+                  <motion.div
+                    key={appointment.id}
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="bg-white/5 border border-white/10 rounded-xl p-5 hover:bg-white/10 transition-all cursor-pointer group"
+                    onClick={() => setSelectedAppt(appointment)}
+                  >
+                    {/* Header */}
+                    <div className="flex items-start justify-between mb-4">
+                      <div className="flex items-center gap-3">
+                        <div className="relative h-12 w-12 rounded-full overflow-hidden border border-white/15 bg-white/5 flex-shrink-0">
+                          {patientAvatar ? (
+                            <Image
+                              src={patientAvatar}
+                              alt={`Avatar for ${appointment.user.email || 'user'}`}
+                              fill
+                              sizes="48px"
+                              className="object-cover"
+                            />
+                          ) : (
+                            <div className="flex h-full w-full items-center justify-center bg-[#FFCA40]/10 text-base font-semibold text-[#FFCA40]">
+                              {patientInitial}
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-white truncate">
+                            {appointment.user.email || 'Unknown'}
+                          </div>
+                          <div className="text-xs text-white/60">Patient</div>
+                        </div>
+                      </div>
+                      <span className={`px-2.5 py-1 rounded-full text-xs font-medium border ${getStatusColor(appointment.status)}`}>
+                        {appointment.status}
+                      </span>
+                    </div>
+
+                    {/* Details */}
+                    <div className="space-y-3">
+                      <div className="flex items-center gap-2 text-sm text-white/80">
+                        <FiCalendar className="h-4 w-4 text-white/40" />
+                        <span>{formatDate(appointment.appointment_datetime)}</span>
+                        {isPast && (
+                          <span className="text-xs text-red-300">(Past)</span>
+                        )}
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-white/80">
+                        <FiClock className="h-4 w-4 text-white/40" />
+                        <span>{formatTime(appointment.appointment_datetime)}</span>
+                      </div>
+                      <div className="flex items-center gap-2 text-sm text-white/80">
+                        <FiUser className="h-4 w-4 text-white/40" />
+                        <span className="truncate">{appointment.psychologist.name}</span>
+                      </div>
+                    </div>
+
+                    {/* Type Badge */}
+                    <div className="mt-4 pt-4 border-t border-white/10">
+                      <span className="text-xs text-white/60">Type: </span>
+                      <span className="text-xs text-[#FFCA40] font-medium">{appointment.appointment_type}</span>
+                    </div>
+
+                    {/* Notes Preview */}
+                    {appointment.notes && (
+                      <div className="mt-3 text-xs text-white/50 line-clamp-2">
+                        {appointment.notes}
+                      </div>
+                    )}
+                  </motion.div>
+                );
+              })}
+            </div>
+          ) : (
+            <div className="bg-white/5 border border-white/10 rounded-xl overflow-hidden">
               <div className="overflow-x-auto">
-                <table className="min-w-full divide-y divide-white/20">
+                <table className="min-w-full divide-y divide-white/10">
                   <thead className="bg-white/5">
                     <tr>
-                      <th className="px-3 py-3">
-                        <input aria-label="Select all appointments" type="checkbox" checked={allSelected} onChange={e=>toggleSelectAll(e.target.checked)} />
+                      <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                        Patient
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Patient</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Therapist</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Date & Time</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Status</th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">Notes</th>
-                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">Actions</th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                        Psychologist
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                        Date & Time
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                        Type
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
+                        Status
+                      </th>
+                      <th className="px-6 py-3 text-right text-xs font-medium text-white/60 uppercase tracking-wider">
+                        Actions
+                      </th>
                     </tr>
                   </thead>
-                  <tbody className="bg-transparent divide-y divide-white/20">
-                    {filteredAppointments.map((appointment) => {
-                      const patientAvatar = appointment.user.avatar_url || null;
+                  <tbody className="divide-y divide-white/10">
+                    {filteredAppointments.map(appointment => {
+                      const patientAvatar = appointment.user.avatar_url;
                       const patientInitial = (appointment.user.email || 'U').charAt(0).toUpperCase();
-                      const therapistAvatar = appointment.psychologist.image_url || null;
-                      const therapistInitial = (appointment.psychologist.name || 'T').charAt(0).toUpperCase();
 
                       return (
-                        <tr key={appointment.id}>
-                          <td className="px-3 py-4 whitespace-nowrap text-sm">
-                            <input
-                              aria-label={`Select appointment ${appointment.id}`}
-                              type="checkbox"
-                              checked={!!selected[appointment.id]}
-                              onChange={(e) =>
-                                setSelected((prev) => ({ ...prev, [appointment.id]: e.target.checked }))
-                              }
-                            />
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
+                        <tr key={appointment.id} className="hover:bg-white/5 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-3">
                               <div className="relative h-10 w-10 rounded-full overflow-hidden border border-white/15 bg-white/5">
                                 {patientAvatar ? (
@@ -655,94 +593,60 @@ export default function AppointmentManagementPage() {
                                 )}
                               </div>
                               <div>
-                                <div className="text-sm font-medium text-white">
-                                  {appointment.user.email || 'Unknown user'}
-                                </div>
+                                <div className="text-sm font-medium text-white">{appointment.user.email || 'Unknown'}</div>
                                 <div className="text-xs text-white/60">User #{appointment.user.id}</div>
                               </div>
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <div className="flex items-center gap-3 text-gray-400">
-                              <div className="relative h-10 w-10 rounded-full overflow-hidden border border-white/15 bg-white/5">
-                                {therapistAvatar ? (
-                                  <Image
-                                    src={therapistAvatar}
-                                    alt={`Avatar for ${appointment.psychologist.name}`}
-                                    fill
-                                    sizes="40px"
-                                    className="object-cover"
-                                  />
-                                ) : (
-                                  <div className="flex h-full w-full items-center justify-center bg-white/10 text-sm font-semibold text-white/70">
-                                    {therapistInitial}
-                                  </div>
-                                )}
-                              </div>
-                              <div>
-                                <div className="text-sm font-medium text-white">
-                                  {appointment.psychologist.name}
-                                </div>
-                                <div className="text-xs text-white/60">
-                                  {appointment.psychologist.specialization || 'General practice'}
-                                </div>
-                              </div>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-white">{appointment.psychologist.name}</div>
+                            <div className="text-xs text-white/60">
+                              {appointment.psychologist.specialization || 'General practice'}
                             </div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400">
-                            {new Date(appointment.appointment_datetime).toLocaleString()}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-white">{formatDate(appointment.appointment_datetime)}</div>
+                            <div className="text-xs text-white/60">{formatTime(appointment.appointment_datetime)}</div>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm">
-                            <label htmlFor={`appt-status-${appointment.id}`} className="sr-only">Update status</label>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-sm text-white/80">{appointment.appointment_type}</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
                             <select
-                              id={`appt-status-${appointment.id}`}
-                              aria-label="Appointment status"
                               value={appointment.status}
-                              onChange={(e) => updateStatus(appointment.id, e.target.value)}
-                              className="bg-white/10 border border-white/20 rounded px-2 py-1 text-sm"
+                              onChange={e => updateStatus(appointment.id, e.target.value)}
+                              onClick={e => e.stopPropagation()}
+                              aria-label={`Update status for appointment ${appointment.id}`}
+                              className="px-3 py-1.5 bg-white/10 border border-white/20 rounded-lg text-sm text-white focus:outline-none focus:border-[#FFCA40] transition-colors"
                             >
                               <option value="scheduled">Scheduled</option>
                               <option value="completed">Completed</option>
                               <option value="cancelled">Cancelled</option>
                             </select>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-400 max-w-[240px]">
-                            {appointment.notes ? (
-                              <Tooltip title={appointment.notes}>
-                                <span className="line-clamp-1 inline-block align-middle">{appointment.notes}</span>
-                              </Tooltip>
-                            ) : (
-                              <span className="text-gray-500">—</span>
-                            )}
-                          </td>
-                          <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            <button
-                              title="View Details"
-                              onClick={() => setViewAppt(appointment)}
-                              className="text-white hover:text-gray-300 transition-colors mr-4"
-                            >
-                              <FiEye className="h-4 w-4" />
-                            </button>
-                            <button title="Edit Appointment" className="text-blue-400 hover:text-blue-300 transition-colors mr-4">
-                              <FiEdit className="h-4 w-4" />
-                            </button>
-                            <button
-                              title="Delete Appointment"
-                              onClick={async () => {
-                                if (confirm('Delete this appointment?')) {
-                                  try {
-                                    await apiCall(`/api/v1/admin/appointments/${appointment.id}`, { method: 'DELETE' });
-                                    toast.success('Deleted');
-                                    fetchAppointments();
-                                  } catch (err: unknown) {
-                                    toast.error(getErrorMessage(err, 'Delete failed'));
-                                  }
-                                }
-                              }}
-                              className="text-red-400 hover:text-red-300 transition-colors"
-                            >
-                              <FiTrash2 className="h-4 w-4" />
-                            </button>
+                          <td className="px-6 py-4 whitespace-nowrap text-right">
+                            <div className="flex items-center justify-end gap-2">
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  setSelectedAppt(appointment);
+                                }}
+                                className="p-2 text-white/60 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                title="View details"
+                              >
+                                <FiCalendar className="h-4 w-4" />
+                              </button>
+                              <button
+                                onClick={e => {
+                                  e.stopPropagation();
+                                  deleteAppointment(appointment.id);
+                                }}
+                                className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/10 rounded-lg transition-colors"
+                                title="Delete"
+                              >
+                                <FiX className="h-4 w-4" />
+                              </button>
+                            </div>
                           </td>
                         </tr>
                       );
@@ -753,526 +657,204 @@ export default function AppointmentManagementPage() {
             </div>
           )}
 
-          {activeTab === 'therapists' && (
-            <div className="space-y-4">
-              {psychologists.length === 0 ? (
-                <div className="rounded-xl border border-white/15 bg-white/5 p-6 text-center text-sm text-white/60">
-                  No therapists found. Invite your therapists to create accounts with the therapist role to manage schedules here.
-                </div>
-              ) : (
-                psychologists.map((therapist) => {
-                  const cachedSchedule = therapistSchedules[therapist.id];
-                  const scheduleSource = cachedSchedule ?? therapist.upcoming_schedules ?? [];
-                  const previewSchedule = scheduleSource.slice(0, 5);
-                  const isExpanded = !!expandedTherapists[therapist.id];
-                  const isLoadingSchedule = !!scheduleLoadingMap[therapist.id];
-                  const groupedSchedule: ReturnType<typeof groupScheduleByDay> = isExpanded
-                    ? groupScheduleByDay(scheduleSource)
-                    : [];
-                  const nextSlot = getNextAvailableSlot(scheduleSource) ?? null;
-                  const sanitizedPhone = therapist.phone ? sanitizePhoneNumber(therapist.phone) : '';
-                  const therapistPhoto = therapist.image_url || therapist.avatar_url || null;
-                  const therapistInitial = therapist.displayName.charAt(0).toUpperCase();
-
-                  const quickActions: Array<{
-                    key: string;
-                    label: string;
-                    icon: React.JSX.Element;
-                    onClick: () => void;
-                    tone?: 'accent' | 'success';
-                  }> = [];
-
-                  if (therapist.email) {
-                    quickActions.push(
-                      {
-                        key: 'email',
-                        label: 'Email',
-                        icon: <FiMail className="h-4 w-4" />,
-                        onClick: () => handleEmailTherapist(therapist.email!),
-                        tone: 'accent',
-                      },
-                      {
-                        key: 'checkin-email',
-                        label: 'Check-in email',
-                        icon: <FiSend className="h-4 w-4" />,
-                        onClick: () => handleCheckInEmail(therapist),
-                        tone: 'accent',
-                      },
-                    );
-                  }
-
-                  if (therapist.phone) {
-                    quickActions.push(
-                      {
-                        key: 'call',
-                        label: 'Call',
-                        icon: <FiPhone className="h-4 w-4" />,
-                        onClick: () => handleCallTherapist(therapist.phone!),
-                      },
-                      {
-                        key: 'sms',
-                        label: 'SMS',
-                        icon: <FiMessageSquare className="h-4 w-4" />,
-                        onClick: () => handleSmsTherapist(therapist.phone!),
-                      },
-                      {
-                        key: 'whatsapp',
-                        label: 'WhatsApp',
-                        icon: <FiMessageCircle className="h-4 w-4" />,
-                        onClick: () => handleWhatsAppTherapist(therapist.phone!),
-                        tone: 'success',
-                      },
-                    );
-                  }
-
-                  if (therapist.phone || therapist.email) {
-                    quickActions.push({
-                      key: 'save-contact',
-                      label: 'Save contact',
-                      icon: <FiDownload className="h-4 w-4" />,
-                      onClick: () => handleDownloadContactCard(therapist),
-                    });
-                  }
-
-                  const actionClassName = (tone?: 'accent' | 'success') => {
-                    const base = 'inline-flex w-full items-center justify-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors border text-center';
-                    if (tone === 'accent') {
-                      return `${base} border-[#FFCA40]/40 bg-[#FFCA40]/10 text-[#FFCA40] hover:bg-[#FFCA40]/20`;
-                    }
-                    if (tone === 'success') {
-                      return `${base} border-[#25D366]/50 text-[#25D366] hover:border-[#25D366]/70 hover:text-[#25D366]`;
-                    }
-                    return `${base} border-white/15 text-white/80 hover:border-white/40 hover:text-white`;
-                  };
-
-                  const contactRows = [
-                    {
-                      label: 'Email',
-                      value: therapist.email ?? 'No email on record',
-                      href: therapist.email ? `mailto:${therapist.email}` : undefined,
-                      canCopy: !!therapist.email,
-                      copyValue: therapist.email ?? '',
-                      copyMessage: 'Email copied to clipboard',
-                    },
-                    {
-                      label: 'Phone',
-                      value: therapist.phone ?? 'No phone on record',
-                      href: therapist.phone ? `tel:${sanitizedPhone}` : undefined,
-                      canCopy: !!therapist.phone,
-                      copyValue: therapist.phone ?? '',
-                      copyMessage: 'Phone number copied to clipboard',
-                    },
-                  ];
-
-                  return (
-                    <div
-                      key={therapist.id}
-                      className="rounded-xl border border-white/15 bg-white/5 p-6 text-white/90 shadow-sm backdrop-blur space-y-6"
-                    >
-                      <div className="flex flex-col gap-6 md:flex-row md:items-start">
-                        <div className="flex flex-1 items-start gap-4">
-                          <div className="relative h-20 w-20 overflow-hidden rounded-xl border border-white/15 bg-white/10 flex-shrink-0">
-                            {therapistPhoto ? (
-                              <Image
-                                src={therapistPhoto}
-                                alt={`Photo of ${therapist.displayName}`}
-                                fill
-                                sizes="80px"
-                                className="object-cover"
-                              />
-                            ) : (
-                              <div className="flex h-full w-full items-center justify-center bg-[#FFCA40]/10 text-2xl font-semibold text-[#FFCA40]">
-                                {therapistInitial}
-                              </div>
-                            )}
-                          </div>
-                          <div className="min-w-0 space-y-3">
-                            <div className="flex flex-wrap items-center gap-3">
-                              <h3 className="text-xl font-semibold leading-snug break-words text-white">
-                                {therapist.displayName}
-                              </h3>
-                              <span
-                                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium ${
-                                  therapist.is_available
-                                    ? 'bg-green-500/20 text-green-300'
-                                    : 'bg-gray-500/20 text-gray-300'
-                                }`}
-                              >
-                                {therapist.is_available ? 'Available' : 'Unavailable'}
-                              </span>
-                            </div>
-                            <p className="break-words text-sm text-white/60">
-                              {therapist.specialization || 'No specialization provided'}
-                            </p>
-                            <div className="mt-3 flex flex-wrap items-center gap-2 text-xs text-white/60">
-                              <span className="inline-flex items-center rounded-full border border-white/15 px-2.5 py-1">
-                                <span className="font-semibold text-white/80">{therapist.total_appointments}</span>
-                                <span className="ml-2">appointments handled</span>
-                              </span>
-                              {therapist.allow_email_checkins ? (
-                                <span className="inline-flex items-center rounded-full border border-[#FFCA40]/30 px-2.5 py-1 text-[#FFCA40]">
-                                  Email check-ins enabled
-                                </span>
-                              ) : (
-                                <span className="inline-flex items-center rounded-full border border-white/10 px-2.5 py-1 text-white/50">
-                                  Email check-ins disabled
-                                </span>
-                              )}
-                            </div>
-                            {nextSlot && (
-                              <div className="mt-2 text-xs text-white/60">
-                                Next slot:
-                                <span className="ml-1 break-words text-white/90">
-                                  {nextSlot.day_of_week} {nextSlot.start_time} - {nextSlot.end_time}
-                                </span>
-                                {!nextSlot.is_available && (
-                                  <span className="ml-1 text-red-300">
-                                    ({nextSlot.reason ? `Unavailable - ${nextSlot.reason}` : 'Unavailable'})
-                                  </span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                        {quickActions.length > 0 && (
-                          <div className="w-full max-w-xl md:w-auto">
-                            <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Reach out</div>
-                            <div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">
-                              {quickActions.map((action) => (
-                                <button
-                                  key={action.key}
-                                  type="button"
-                                  onClick={action.onClick}
-                                  className={actionClassName(action.tone)}
-                                >
-                                  {action.icon}
-                                  <span>{action.label}</span>
-                                </button>
-                              ))}
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                      <div className="grid gap-4 md:grid-cols-3">
-                        <section className="space-y-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
-                          <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Contact details</div>
-                          <dl className="space-y-3">
-                            {contactRows.map((row) => (
-                              <Fragment key={row.label}>
-                                <dt className="text-xs uppercase tracking-wide text-white/40">{row.label}</dt>
-                                <dd className="mt-1 text-sm flex items-start justify-between gap-3">
-                                  <div className="min-w-0">
-                                    {row.href ? (
-                                      <a href={row.href} className="break-words text-white hover:text-[#FFCA40]">
-                                        {row.value}
-                                      </a>
-                                    ) : (
-                                      <span className={`${row.canCopy ? 'text-white' : 'text-white/50'} break-words`}>{row.value}</span>
-                                    )}
-                                  </div>
-                                  {row.canCopy && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleCopyToClipboard(row.copyValue, row.copyMessage)}
-                                      className="flex-shrink-0 text-white/60 transition hover:text-white"
-                                      aria-label={`Copy ${row.label.toLowerCase()}`}
-                                    >
-                                      <FiCopy className="h-4 w-4" />
-                                    </button>
-                                  )}
-                                </dd>
-                              </Fragment>
-                            ))}
-                          </dl>
-                        </section>
-                        <section className="space-y-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
-                          <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Notes</div>
-                          <p className="text-white/70">
-                            Use the quick actions to reach out and confirm availability changes before manually adjusting
-                            schedules.
-                          </p>
-                          {therapist.allow_email_checkins ? (
-                            <p className="rounded-md border border-[#FFCA40]/30 bg-[#FFCA40]/5 p-3 text-xs text-[#FFCA40]">
-                              This therapist has opted in to receive proactive check-in emails.
-                            </p>
-                          ) : (
-                            <p className="rounded-md border border-white/15 bg-black/30 p-3 text-xs text-white/60">
-                              Email check-ins are disabled for this therapist.
-                            </p>
-                          )}
-                        </section>
-                        <section className="space-y-3 rounded-lg border border-white/10 bg-white/5 px-4 py-3 text-sm">
-                          <div className="flex items-center justify-between">
-                            <div className="text-xs font-semibold uppercase tracking-wide text-white/60">Availability</div>
-                            <button
-                              type="button"
-                              onClick={() => handleToggleSchedule(therapist)}
-                              className="inline-flex items-center gap-1 text-xs font-medium text-[#FFCA40] hover:text-[#ffda63]"
-                            >
-                              {isExpanded ? (
-                                <>
-                                  <FiChevronUp className="h-3 w-3" /> Hide full schedule
-                                </>
-                              ) : (
-                                <>
-                                  <FiChevronDown className="h-3 w-3" /> View full schedule
-                                </>
-                              )}
-                            </button>
-                          </div>
-                          <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2">
-                            {previewSchedule.length ? (
-                              <ul className="space-y-1 text-white/80">
-                                {previewSchedule.map((slot) => (
-                                  <li key={slot.id} className="flex flex-wrap items-center gap-2 text-sm">
-                                    <span className="font-medium text-white">{slot.day_of_week}</span>
-                                    <span className="text-white/60">&bull;</span>
-                                    <span>
-                                      {slot.start_time} - {slot.end_time}
-                                    </span>
-                                    {!slot.is_available && (
-                                      <span className="inline-flex items-center rounded-full bg-red-500/20 px-2 py-0.5 text-xs text-red-300">
-                                        Unavailable
-                                      </span>
-                                    )}
-                                  </li>
-                                ))}
-                              </ul>
-                            ) : (
-                              <div className="text-white/60">No schedule published yet.</div>
-                            )}
-                          </div>
-                          {isExpanded && (
-                            <div className="rounded-lg border border-white/10 bg-black/30 px-3 py-3">
-                              {isLoadingSchedule ? (
-                                <div className="text-sm text-white/60">Loading full schedule...</div>
-                              ) : groupedSchedule.length ? (
-                                <div className="space-y-3">
-                                  {groupedSchedule.map(({ day, slots }) => (
-                                    <div key={`${therapist.id}-${day}`}>
-                                      <div className="text-xs font-semibold uppercase tracking-wide text-white/60">{day}</div>
-                                      <ul className="mt-1 space-y-1 text-white/75">
-                                        {slots.map((slot) => (
-                                          <li key={slot.id} className="flex flex-wrap items-center gap-2 text-sm">
-                                            <span className="font-medium text-white">
-                                              {slot.start_time} - {slot.end_time}
-                                            </span>
-                                            <span
-                                              className={`inline-flex items-center rounded-full px-2 py-0.5 text-xs ${
-                                                slot.is_available
-                                                  ? 'bg-green-500/20 text-green-300'
-                                                  : 'bg-red-500/20 text-red-300'
-                                              }`}
-                                            >
-                                              {slot.is_available ? 'Available' : 'Unavailable'}
-                                            </span>
-                                            {!slot.is_available && slot.reason && (
-                                              <span className="text-xs text-white/60">({slot.reason})</span>
-                                            )}
-                                          </li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  ))}
-                                </div>
-                              ) : (
-                                <div className="text-sm text-white/60">No schedule published yet.</div>
-                              )}
-                            </div>
-                          )}
-                        </section>
-                      </div>
-                      <footer className="flex flex-col gap-2 border-t border-white/10 pt-4 text-sm text-white/70 md:flex-row md:items-center md:justify-between">
-                        <div>
-                          Keep this record up to date by confirming changes with the therapist before editing
-                          availability.
-                        </div>
-                        <div className="flex flex-wrap items-center gap-2">
-                          <Button variant="outline" size="sm" onClick={fetchPsychologists}>
-                            Refresh list
-                          </Button>
-                          <Button size="sm" onClick={() => handleScheduleModalOpen(therapist.id)}>
-                            Manage schedule
-                          </Button>
-                        </div>
-                      </footer>
-                    </div>
-                  );
-                })
-              )}
-            </div>
-          )}
         </>
       )}
 
+      {/* Appointment Detail Modal */}
       <AnimatePresence>
-        {isScheduleModalOpen && selectedTherapist && (
+        {selectedAppt && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
-            onClick={handleScheduleModalClose}
+            onClick={() => setSelectedAppt(null)}
           >
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto"
-              onClick={(e) => e.stopPropagation()}
+              initial={{ scale: 0.95, y: 20 }}
+              animate={{ scale: 1, y: 0 }}
+              exit={{ scale: 0.95, y: 20 }}
+              className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+              onClick={e => e.stopPropagation()}
             >
-              <div className="px-6 py-4 border-b border-white/20">
-                <h3 className="text-lg font-medium text-white">Schedule for {selectedTherapist.displayName}</h3>
+              {/* Header */}
+              <div className="px-6 py-4 border-b border-white/20 flex items-center justify-between sticky top-0 bg-white/10 backdrop-blur-md z-10">
+                <div className="flex items-center gap-3">
+                  <FiCalendar className="h-5 w-5 text-[#FFCA40]" />
+                  <h3 className="text-lg font-semibold text-white">Appointment Details</h3>
+                </div>
+                <button
+                  onClick={() => setSelectedAppt(null)}
+                  className="p-2 hover:bg-white/10 rounded-lg transition-colors text-white/60 hover:text-white"
+                  aria-label="Close modal"
+                >
+                  <FiX className="h-5 w-5" />
+                </button>
               </div>
-              <div className="p-6">
-                <div className="space-y-4">
-                  {selectedTherapist.schedules.map((schedule) => (
-                    <div key={schedule.id} className="p-4 border border-white/20 rounded-lg flex justify-between items-center">
-                      <div>
-                        <p className="text-sm font-medium text-white">{schedule.day_of_week}</p>
-                        <p className="text-xs text-gray-400">{schedule.start_time} - {schedule.end_time}</p>
-                        <p className={`text-xs ${schedule.is_available ? 'text-green-400' : 'text-red-400'}`}>
-                          {schedule.is_available ? 'Available' : 'Unavailable'} {schedule.reason && `(${schedule.reason})`}
-                        </p>
+
+              {/* Content */}
+              <div className="p-6 space-y-6">
+                {/* Patient Info */}
+                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                  <div className="text-xs uppercase tracking-wide text-white/60 mb-3">Patient Information</div>
+                  <div className="flex items-center gap-4">
+                    <div className="relative h-16 w-16 rounded-full overflow-hidden border border-white/15 bg-white/5 flex-shrink-0">
+                      {selectedAppt.user.avatar_url ? (
+                        <Image
+                          src={selectedAppt.user.avatar_url}
+                          alt={`Avatar for ${selectedAppt.user.email || 'user'}`}
+                          fill
+                          sizes="64px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-[#FFCA40]/10 text-xl font-semibold text-[#FFCA40]">
+                          {(selectedAppt.user.email || 'U').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-base font-semibold text-white">{selectedAppt.user.email || 'Unknown'}</div>
+                      <div className="text-sm text-white/60">User ID: {selectedAppt.user.id}</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Psychologist Info */}
+                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                  <div className="text-xs uppercase tracking-wide text-white/60 mb-3">Psychologist</div>
+                  <div className="flex items-center gap-4">
+                    <div className="relative h-16 w-16 rounded-full overflow-hidden border border-white/15 bg-white/5 flex-shrink-0">
+                      {selectedAppt.psychologist.image_url ? (
+                        <Image
+                          src={selectedAppt.psychologist.image_url}
+                          alt={`Avatar for ${selectedAppt.psychologist.name}`}
+                          fill
+                          sizes="64px"
+                          className="object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-white/10 text-xl font-semibold text-white/70">
+                          {(selectedAppt.psychologist.name || 'P').charAt(0).toUpperCase()}
+                        </div>
+                      )}
+                    </div>
+                    <div>
+                      <div className="text-base font-semibold text-white">{selectedAppt.psychologist.name}</div>
+                      <div className="text-sm text-white/60">
+                        {selectedAppt.psychologist.specialization || 'General practice'}
                       </div>
-                      <button title="Delete Schedule" onClick={() => handleDeleteSchedule(schedule.id)} className="text-red-400 hover:text-red-300">
-                        <FiTrash2 />
-                      </button>
                     </div>
-                  ))}
+                  </div>
                 </div>
-                <div className="mt-6">
-                  <h4 className="text-md font-medium text-white mb-2">Add New Schedule</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <select aria-label="Day of the week" name="day_of_week" value={newSchedule.day_of_week} onChange={handleNewScheduleChange} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors">
-                      <option>Monday</option>
-                      <option>Tuesday</option>
-                      <option>Wednesday</option>
-                      <option>Thursday</option>
-                      <option>Friday</option>
-                      <option>Saturday</option>
-                      <option>Sunday</option>
-                    </select>
-                    <input aria-label="Start Time" type="time" name="start_time" value={newSchedule.start_time} onChange={handleNewScheduleChange} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors" />
-                    <input aria-label="End Time" type="time" name="end_time" value={newSchedule.end_time} onChange={handleNewScheduleChange} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors" />
-                  </div>
-                  <div className="mt-4">
-                    <label className="flex items-center">
-                      <input aria-label="Available" type="checkbox" name="is_available" checked={newSchedule.is_available} onChange={handleNewScheduleChange} className="h-4 w-4 text-[#FFCA40] focus:ring-[#FFCA40] bg-white/10 border-white/20 rounded" />
-                      <span className="ml-2 text-sm text-gray-300">Available</span>
-                    </label>
-                  </div>
-                  {!newSchedule.is_available && (
-                    <div className="mt-4">
-                      <label className="block text-sm font-medium text-gray-300 mb-2">Reason for Unavailability</label>
-                      <input type="text" title='Delete Schedule' name="reason" value={newSchedule.reason} onChange={handleNewScheduleChange} className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors" />
+
+                {/* Appointment Details */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                    <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Date</div>
+                    <div className="flex items-center gap-2 text-white">
+                      <FiCalendar className="h-4 w-4 text-white/60" />
+                      <span className="font-medium">{formatDate(selectedAppt.appointment_datetime)}</span>
                     </div>
-                  )}
-                  <div className="mt-4">
-                    <button onClick={handleCreateSchedule} className="inline-flex items-center px-4 py-2 bg-[#FFCA40] hover:bg-[#ffda63] text-black rounded-lg text-sm font-medium transition-colors">
-                      Add Schedule
-                    </button>
                   </div>
+
+                  <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                    <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Time</div>
+                    <div className="flex items-center gap-2 text-white">
+                      <FiClock className="h-4 w-4 text-white/60" />
+                      <span className="font-medium">{formatTime(selectedAppt.appointment_datetime)}</span>
+                    </div>
+                  </div>
+
+                  <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                    <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Type</div>
+                    <div className="text-[#FFCA40] font-medium">{selectedAppt.appointment_type}</div>
+                  </div>
+
+                  <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                    <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Status</div>
+                    <span className={`inline-block px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(selectedAppt.status)}`}>
+                      {selectedAppt.status}
+                    </span>
+                  </div>
+                </div>
+
+                {/* Notes */}
+                {selectedAppt.notes && (
+                  <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                    <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Notes</div>
+                    <p className="text-white/80 whitespace-pre-wrap">{selectedAppt.notes}</p>
+                  </div>
+                )}
+
+                {/* Metadata */}
+                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                  <div className="text-xs uppercase tracking-wide text-white/60 mb-2">Metadata</div>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-white/60">Appointment ID</span>
+                      <span className="text-white font-mono">#{selectedAppt.id}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-white/60">Created At</span>
+                      <span className="text-white">{new Date(selectedAppt.created_at).toLocaleString()}</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Status Update */}
+                <div className="bg-white/5 border border-white/10 rounded-lg p-4">
+                  <div className="text-xs uppercase tracking-wide text-white/60 mb-3">Update Status</div>
+                  <select
+                    value={selectedAppt.status}
+                    onChange={e => updateStatus(selectedAppt.id, e.target.value)}
+                    aria-label="Update appointment status"
+                    className="w-full px-4 py-2.5 bg-white/10 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#FFCA40] transition-colors"
+                  >
+                    <option value="scheduled">Scheduled</option>
+                    <option value="completed">Completed</option>
+                    <option value="cancelled">Cancelled</option>
+                  </select>
                 </div>
               </div>
-              <div className="px-6 py-4 border-t border-white/20 flex justify-end">
-                <button onClick={handleScheduleModalClose} className="px-4 py-2 bg-gray-500/20 text-gray-300 rounded-lg hover:bg-gray-500/30">Close</button>
+
+              {/* Footer */}
+              <div className="px-6 py-4 border-t border-white/20 flex items-center justify-between bg-white/5">
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    deleteAppointment(selectedAppt.id);
+                  }}
+                  className="text-red-400 border-red-400/30 hover:bg-red-500/10"
+                >
+                  Delete Appointment
+                </Button>
+                <div className="flex items-center gap-3">
+                  <Button variant="outline" onClick={() => setSelectedAppt(null)}>
+                    Close
+                  </Button>
+                  <Button onClick={() => {
+                    const status = selectedAppt.status === 'completed' ? 'scheduled' : 'completed';
+                    updateStatus(selectedAppt.id, status);
+                  }}>
+                    {selectedAppt.status === 'completed' ? (
+                      <>
+                        <FiX className="h-4 w-4 mr-2" />
+                        Mark Incomplete
+                      </>
+                    ) : (
+                      <>
+                        <FiCheck className="h-4 w-4 mr-2" />
+                        Mark Complete
+                      </>
+                    )}
+                  </Button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
-
-      {/* View details slide-over */}
-      {viewAppt && (
-        <div className="fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/50" onClick={()=>setViewAppt(null)} />
-          <div className="absolute right-0 top-0 h-full w-full sm:w-[520px] bg-white dark:bg-gray-900 border-l border-gray-200 dark:border-gray-700 shadow-xl overflow-y-auto">
-            <div className="p-5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
-              <h3 className="text-lg font-semibold">Appointment #{viewAppt.id}</h3>
-              <Button variant="outline" size="sm" onClick={()=>setViewAppt(null)}>Close</Button>
-            </div>
-            <div className="p-5 space-y-4 text-sm">
-              <div className="flex items-center gap-3">
-                <div className="text-gray-500 min-w-[70px]">Patient</div>
-                <div className="flex items-center gap-3">
-                  <div className="relative h-12 w-12 rounded-full overflow-hidden border border-white/15 bg-white/5">
-                    {viewAppt.user.avatar_url ? (
-                      <Image
-                        src={viewAppt.user.avatar_url}
-                        alt={`Avatar for ${viewAppt.user.email || 'user'}`}
-                        fill
-                        sizes="48px"
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-[#FFCA40]/10 text-base font-semibold text-[#FFCA40]">
-                        {(viewAppt.user.email || 'U').charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-medium text-white">{viewAppt.user.email || 'Unknown'}</div>
-                    <div className="text-xs text-gray-500">User #{viewAppt.user.id}</div>
-                  </div>
-                </div>
-              </div>
-              <div className="flex items-center gap-3">
-                <div className="text-gray-500 min-w-[70px]">Therapist</div>
-                <div className="flex items-center gap-3">
-                  <div className="relative h-12 w-12 rounded-full overflow-hidden border border-white/15 bg-white/5">
-                    {viewAppt.psychologist.image_url ? (
-                      <Image
-                        src={viewAppt.psychologist.image_url}
-                        alt={`Avatar for ${viewAppt.psychologist.name}`}
-                        fill
-                        sizes="48px"
-                        className="object-cover"
-                      />
-                    ) : (
-                      <div className="flex h-full w-full items-center justify-center bg-white/10 text-base font-semibold text-white/70">
-                        {(viewAppt.psychologist.name || 'T').charAt(0).toUpperCase()}
-                      </div>
-                    )}
-                  </div>
-                  <div>
-                    <div className="font-medium text-white">{viewAppt.psychologist.name}</div>
-                    <div className="text-xs text-gray-500">
-                      {viewAppt.psychologist.specialization || 'General practice'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <div className="text-gray-500">Date & Time</div>
-                  <div className="font-medium">{new Date(viewAppt.appointment_datetime).toLocaleString()}</div>
-                </div>
-                <div>
-                  <div className="text-gray-500">Status</div>
-                  <div className="font-medium capitalize">{viewAppt.status}</div>
-                </div>
-              </div>
-              <div>
-                <div className="text-gray-500">Type</div>
-                <div className="font-medium">{viewAppt.appointment_type}</div>
-              </div>
-              <div>
-                <div className="text-gray-500">Created</div>
-                <div className="font-medium">{new Date(viewAppt.created_at).toLocaleString()}</div>
-              </div>
-              <div>
-                <div className="text-gray-500">Notes</div>
-                <div className="font-medium whitespace-pre-wrap break-words">{viewAppt.notes || '—'}</div>
-              </div>
-            </div>
-            <div className="p-5 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={()=>exportCSV([viewAppt])}>Export CSV</Button>
-              <Button onClick={()=>{ updateStatus(viewAppt.id, viewAppt.status === 'cancelled' ? 'scheduled' : 'cancelled'); }}>Toggle Cancel</Button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

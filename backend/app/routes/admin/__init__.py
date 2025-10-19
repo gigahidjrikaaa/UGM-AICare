@@ -13,6 +13,10 @@ from .cases import router as cases_router
 from .system import router as system_router
 from .users import router as users_router
 from .testing import router as testing_router
+from .insights import router as insights_router
+from .alerts import router as alerts_router
+from .sse import router as sse_router
+from .campaigns import router as campaigns_router
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
 router.include_router(appointments_router)
@@ -26,6 +30,10 @@ router.include_router(dashboard_router)
 router.include_router(interventions_router)
 router.include_router(cases_router)
 router.include_router(testing_router)
+router.include_router(insights_router)
+router.include_router(alerts_router)
+router.include_router(sse_router)
+router.include_router(campaigns_router)
 
 __all__ = [
     "router",

@@ -46,6 +46,9 @@ langchain-core
 langchain-google-genai
 langgraph
 
+# Semantic Similarity for Crisis Detection
+sentence-transformers>=2.2.0  # For ML-based crisis classification
+
 # Statistical Analysis and Privacy
 numpy>=1.24.0
 scipy>=1.10.0

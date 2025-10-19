@@ -15,6 +15,8 @@ import {
   FiHeart,
   FiUser,
   FiCpu,
+  FiUserCheck,
+  FiSend,
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink'; // Assuming SidebarLink component exists
 
@@ -24,6 +26,7 @@ const navGroups = [
     label: 'People & Content',
     items: [
       { name: 'Users', icon: <FiUsers size={18}/>, href: '/admin/users' },
+      { name: 'Psychologists', icon: <FiUserCheck size={18}/>, href: '/admin/psychologists' },
       { name: 'Appointments', icon: <FiCalendar size={18}/>, href: '/admin/appointments' },
       { name: 'Conversations', icon: <FiMessageSquare size={18}/>, href: '/admin/conversations' },
       { name: 'Content Resources', icon: <FiFileText size={18}/>, href: '/admin/content-resources' },
@@ -36,6 +39,7 @@ const navGroups = [
     items: [
       { name: 'Dashboard', icon: <FiShield size={18}/>, href: '/admin/dashboard' },
       { name: 'Cases', icon: <FiShield size={18}/>, href: '/admin/cases' },
+      { name: 'Campaigns', icon: <FiSend size={18}/>, href: '/admin/campaigns' },
       { name: 'Outreach', icon: <FiCpu size={18}/>, href: '/admin/outreach' },
       { name: 'Agents Command Center', icon: <FiCpu size={18}/>, href: '/admin/agents-command-center' },
     ]

@@ -2,7 +2,8 @@ from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Optional, Dict
+import logging
 
 from app.agents.sca.resources import get_default_resources
 from app.agents.sca.schemas import (
@@ -14,6 +15,8 @@ from app.agents.sca.schemas import (
     SCAInterveneResponse,
 )
 from app.core.events import AgentEvent, AgentNameEnum, emit_agent_event
+
+logger = logging.getLogger(__name__)
 
 
 PlanMatrix = dict[str, list[PlanStep]]
@@ -57,10 +60,88 @@ class SupportCoachService:
     ) -> None:
         self._emit_event = event_emitter
 
-    async def intervene(self, payload: SCAInterveneRequest) -> SCAInterveneResponse:
+    async def intervene(
+        self, 
+        payload: SCAInterveneRequest,
+        use_gemini_plan: bool = False,
+        plan_type: Optional[str] = None,
+        user_message: Optional[str] = None,
+        sta_context: Optional[Dict[str, Any]] = None
+    ) -> SCAInterveneResponse:
+        """Generate intervention plan - uses Gemini AI if requested, otherwise static plans.
+        
+        Args:
+            payload: Standard SCA intervention request
+            use_gemini_plan: If True, generate personalized plan with Gemini AI
+            plan_type: Type of plan ("calm_down", "break_down_problem", "general_coping")
+            user_message: Original user message for context (required if use_gemini_plan=True)
+            sta_context: Additional context from STA (risk_level, etc.)
+        
+        Returns:
+            SCAInterveneResponse with plan steps and resources
+        """
         intent_key = payload.intent.strip().lower()
-        plan_steps = list(_DEFAULT_PLAN_STEPS.get(intent_key, _FALLBACK_PLAN))
-        resources = list(self._coerce_resources(intent_key))
+        
+        # Use Gemini-powered plan generation if requested
+        if use_gemini_plan and plan_type and user_message:
+            try:
+                logger.info(f"Generating Gemini-powered {plan_type} plan for intent: {intent_key}")
+                
+                from app.agents.sca.gemini_plan_generator import generate_personalized_plan
+                
+                # Build context for Gemini
+                gemini_context = {}
+                if sta_context:
+                    gemini_context.update(sta_context)
+                
+                # Add any additional context from payload options
+                if isinstance(payload.options, dict):
+                    if "risk_level" in payload.options:
+                        gemini_context["risk_level"] = payload.options["risk_level"]
+                    if "demographics" in payload.options:
+                        gemini_context["demographics"] = payload.options["demographics"]
+                    if "previous_sessions" in payload.options:
+                        gemini_context["previous_sessions"] = payload.options["previous_sessions"]
+                
+                # Generate personalized plan
+                plan_data = await generate_personalized_plan(
+                    user_message=user_message,
+                    intent=intent_key,
+                    plan_type=plan_type,
+                    context=gemini_context if gemini_context else None
+                )
+                
+                # Convert to PlanStep and ResourceCard objects
+                plan_steps = [
+                    PlanStep(
+                        id=step.get("id", f"step_{i}"),
+                        label=step.get("label", ""),
+                        duration_min=step.get("duration_min")
+                    )
+                    for i, step in enumerate(plan_data.get("plan_steps", []))
+                ]
+                
+                resources = [
+                    ResourceCard(
+                        resource_id=card.get("resource_id", f"resource_{i}"),
+                        title=card.get("title", ""),
+                        summary=card.get("summary", ""),
+                        url=card.get("url")
+                    )
+                    for i, card in enumerate(plan_data.get("resource_cards", []))
+                ]
+                
+                logger.info(f"Gemini plan generated: {len(plan_steps)} steps, {len(resources)} resources")
+                
+            except Exception as e:
+                logger.error(f"Gemini plan generation failed, falling back to static: {e}", exc_info=True)
+                # Fallback to static plans
+                plan_steps = list(_DEFAULT_PLAN_STEPS.get(intent_key, _FALLBACK_PLAN))
+                resources = list(self._coerce_resources(intent_key))
+        else:
+            # Use static plans (original behavior)
+            plan_steps = list(_DEFAULT_PLAN_STEPS.get(intent_key, _FALLBACK_PLAN))
+            resources = list(self._coerce_resources(intent_key))
 
         check_in_hours = self._resolve_followup_window(payload, default_hours=24)
         next_check_in = (
@@ -87,6 +168,8 @@ class SupportCoachService:
                     else None,
                     "resource_count": len(resources),
                     "plan_length": len(plan_steps),
+                    "used_gemini": use_gemini_plan,
+                    "plan_type": plan_type if use_gemini_plan else "static",
                 },
                 ts=datetime.utcnow(),
             )

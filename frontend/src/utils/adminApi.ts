@@ -1,7 +1,7 @@
 import type { AdminPasswordChangePayload, AdminPasswordChangeResponse, AdminProfileResponse, AdminProfileUpdatePayload } from '@/types/admin/profile';
 
 // Helper utility for making authenticated API requests to the admin endpoints
-import { getSession } from 'next-auth/react';
+import { getSession, signOut } from 'next-auth/react';
 
 interface RequestOptions extends RequestInit {
   headers?: Record<string, string>;
@@ -9,12 +9,20 @@ interface RequestOptions extends RequestInit {
 
 /**
  * Makes an authenticated API request using the current NextAuth session
- * This replaces the localStorage-based auth that was being used before
+ * Automatically handles session expiry and redirects to login
  */
 export async function authenticatedFetch(url: string, options: RequestOptions = {}): Promise<Response> {
   const session = await getSession();
   
   if (!session?.accessToken) {
+    console.warn('[authenticatedFetch] No access token in session, signing out...');
+    // Session is invalid - sign out properly through NextAuth
+    if (typeof window !== 'undefined') {
+      await signOut({ 
+        callbackUrl: '/admin?sessionExpired=true',
+        redirect: true,
+      });
+    }
     throw new Error('No valid session found. Please log in again.');
   }
 
@@ -29,10 +37,27 @@ export async function authenticatedFetch(url: string, options: RequestOptions = 
     headers['Content-Type'] = headers['Content-Type'] ?? 'application/json';
   }
 
-  return fetch(url, {
+  const response = await fetch(url, {
     ...options,
     headers,
   });
+
+  // Handle 401 Unauthorized - backend token expired
+  if (response.status === 401) {
+    console.warn('[authenticatedFetch] Received 401 Unauthorized - backend token expired');
+    
+    if (typeof window !== 'undefined') {
+      // Sign out properly through NextAuth to clear all cookies/tokens
+      await signOut({ 
+        callbackUrl: '/admin?sessionExpired=true',
+        redirect: true,
+      });
+    }
+    
+    throw new Error('Session expired. Please log in again.');
+  }
+
+  return response;
 }
 
 /**
