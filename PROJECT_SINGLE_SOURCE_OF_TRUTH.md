@@ -39,13 +39,15 @@ Deliver a Safety Agent Suite that combines high-sensitivity crisis detection wit
 The Safety Agent Suite is now implemented as a **LangGraph-orchestrated multi-agent system** with deterministic state machines, typed state management, and conditional routing. All four agents operate through compiled StateGraph workflows with real-time execution tracking.
 
 **Orchestration Architecture:**
-```
+
+```bash
 User Message → STA (Triage) → [Low/Moderate] → SCA (Coach) → END
                              → [High/Critical] → SDA (Escalate) → END
 Analytics Queries → IA (Privacy-Preserving Aggregation) → END
 ```
 
 **Core LangGraph Components:**
+
 - **StateGraph**: Workflow orchestration with typed state (`SafetyAgentState`, `IAState` TypedDict)
 - **Nodes**: Agent operations (e.g., `triage_node`, `generate_plan_node`, `create_case_node`)
 - **Edges**: Conditional routing based on risk level, intent classification, and consent validation
@@ -83,6 +85,7 @@ Analytics Queries → IA (Privacy-Preserving Aggregation) → END
 **Master Orchestrator:** `backend/app/agents/orchestrator_graph.py` coordinates STA→SCA/SDA routing with conditional edges and subgraph invocation.
 
 **API Endpoints:**
+
 - `POST /api/v1/agents/graph/sta/execute` - Execute STA workflow only
 - `POST /api/v1/agents/graph/orchestrator/execute` - Full orchestration (STA→SCA/SDA)
 - `POST /api/v1/agents/graph/ia/execute` - Execute IA analytics workflow
@@ -161,6 +164,7 @@ Analytics Queries → IA (Privacy-Preserving Aggregation) → END
 **Retired Components:** Legacy n8n agent orchestration fully deprecated. All agent coordination now via LangGraph StateGraph. Clinical analytics dashboards under `frontend/src/components/admin/analytics/` remain in repo for reference but are formally deprecated.
 
 **Test Coverage:**
+
 - ✅ STA smoke tests passing (`test_langgraph_smoke.py`)
 - ✅ IA smoke tests passing (`test_langgraph_ia_smoke.py`)
 - 🟡 Comprehensive unit tests with mocking deferred (smoke tests provide sufficient validation)

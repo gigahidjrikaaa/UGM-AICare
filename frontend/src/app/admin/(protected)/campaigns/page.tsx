@@ -9,6 +9,7 @@ import {
   RocketLaunchIcon,
   TrashIcon,
   ChartBarIcon,
+  ClockIcon,
   PlayIcon,
 } from '@heroicons/react/24/outline';
 import { getCampaigns, deleteCampaign } from '@/services/adminCampaignApi';
@@ -28,6 +29,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   CampaignFormModal,
   CampaignMetricsModal,
+  CampaignHistoryModal,
   ExecuteCampaignModal,
   AICampaignModal,
 } from '@/components/admin/campaigns';
@@ -43,6 +45,7 @@ export default function CampaignsPage() {
   const [showFormModal, setShowFormModal] = useState(false);
   const [showAIModal, setShowAIModal] = useState(false);
   const [showMetricsModal, setShowMetricsModal] = useState(false);
+  const [showHistoryModal, setShowHistoryModal] = useState(false);
   const [showExecuteModal, setShowExecuteModal] = useState(false);
   const [selectedCampaign, setSelectedCampaign] = useState<Campaign | null>(null);
 
@@ -79,6 +82,11 @@ export default function CampaignsPage() {
   const handleViewMetrics = (campaign: Campaign) => {
     setSelectedCampaign(campaign);
     setShowMetricsModal(true);
+  };
+
+  const handleViewHistory = (campaign: Campaign) => {
+    setSelectedCampaign(campaign);
+    setShowHistoryModal(true);
   };
 
   const handleExecuteCampaign = (campaign: Campaign) => {
@@ -129,9 +137,9 @@ export default function CampaignsPage() {
         className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
       >
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Campaign Management</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">SCA Outreach Management</h1>
           <p className="text-white/60 text-sm">
-            Create and manage proactive outreach campaigns
+            Manage proactive Support Coach Agent (SCA) campaigns and interventions
           </p>
         </div>
 
@@ -324,6 +332,13 @@ export default function CampaignsPage() {
                           </button>
                         )}
                         <button
+                          onClick={() => handleViewHistory(campaign)}
+                          className="p-2 hover:bg-purple-500/20 text-purple-400 rounded-lg transition-colors"
+                          title="View History"
+                        >
+                          <ClockIcon className="w-5 h-5" />
+                        </button>
+                        <button
                           onClick={() => handleViewMetrics(campaign)}
                           className="p-2 hover:bg-blue-500/20 text-blue-400 rounded-lg transition-colors"
                           title="View Metrics"
@@ -412,6 +427,17 @@ export default function CampaignsPage() {
             setShowExecuteModal(false);
             setSelectedCampaign(null);
             queryClient.invalidateQueries({ queryKey: ['campaigns'] });
+          }}
+        />
+      )}
+
+      {showHistoryModal && selectedCampaign && (
+        <CampaignHistoryModal
+          campaign={selectedCampaign}
+          isOpen={showHistoryModal}
+          onClose={() => {
+            setShowHistoryModal(false);
+            setSelectedCampaign(null);
           }}
         />
       )}

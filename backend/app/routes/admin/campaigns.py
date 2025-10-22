@@ -12,6 +12,8 @@ from app.dependencies import get_admin_user
 from app.models.user import User
 from app.schemas.admin.campaigns import (
     CampaignCreate,
+    CampaignExecutionHistoryListResponse,
+    CampaignExecutionHistoryResponse,
     CampaignExecutionRequest,
     CampaignExecutionResponse,
     CampaignListResponse,
@@ -314,6 +316,56 @@ async def get_campaign_metrics(
         total_users_targeted=total_targeted,
         total_users_engaged=total_engaged,
         average_success_rate=avg_success,
+    )
+
+
+# ============================================================================
+# Campaign Execution History Endpoints
+# ============================================================================
+
+@router.get("/{campaign_id}/history", response_model=CampaignExecutionHistoryListResponse)
+async def get_campaign_execution_history(
+    campaign_id: UUID,
+    skip: int = Query(0, ge=0, description="Number of records to skip"),
+    limit: int = Query(50, ge=1, le=100, description="Maximum records to return"),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user),
+) -> CampaignExecutionHistoryListResponse:
+    """Get execution history for a campaign.
+    
+    Returns a paginated list of all campaign executions with details:
+    - When the campaign was executed
+    - Who executed it
+    - How many users were targeted
+    - Success/failure metrics
+    - The actual message content sent
+    - List of targeted user IDs
+    """
+    from sqlalchemy import desc, select
+    from app.models.campaign import SCACampaignExecution
+    
+    # Get total count
+    count_query = select(SCACampaignExecution).where(SCACampaignExecution.campaign_id == campaign_id)
+    result = await db.execute(count_query)
+    total = len(result.scalars().all())
+    
+    # Get paginated results
+    query = (
+        select(SCACampaignExecution)
+        .where(SCACampaignExecution.campaign_id == campaign_id)
+        .order_by(desc(SCACampaignExecution.executed_at))
+        .offset(skip)
+        .limit(limit)
+    )
+    
+    result = await db.execute(query)
+    executions = result.scalars().all()
+    
+    return CampaignExecutionHistoryListResponse(
+        items=[CampaignExecutionHistoryResponse.model_validate(e) for e in executions],
+        total=total,
+        skip=skip,
+        limit=limit,
     )
 
 

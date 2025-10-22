@@ -19,7 +19,7 @@ from app.agents.graph_state import SCAState
 from app.agents.sca.service import SupportCoachService
 from app.agents.sca.schemas import SCAInterveneRequest
 from app.agents.execution_tracker import execution_tracker
-from app.models import InterventionPlan, InterventionTypeEnum
+from app.models import InterventionPlanRecord
 
 logger = logging.getLogger(__name__)
 
@@ -289,25 +289,24 @@ async def persist_plan_node(state: SCAState, db: AsyncSession) -> SCAState:
                 execution_tracker.complete_node(execution_id, "sca::persist_plan")
             return state
         
-        # Map intervention_type to enum
-        type_map = {
-            "calm_down": InterventionTypeEnum.calm_down,
-            "break_down_problem": InterventionTypeEnum.break_down_problem,
-            "general_coping": InterventionTypeEnum.general_coping
-        }
-        intervention_type_enum = type_map.get(
-            state.get("intervention_type", "general_coping"),
-            InterventionTypeEnum.general_coping
-        )
+        # Get intervention_type string and plan data
+        intervention_type = state.get("intervention_type", "general_coping")
+        plan_data = state.get("intervention_plan", {})
         
-        # Create InterventionPlan record
-        plan = InterventionPlan(
+        # Ensure intervention_type is stored in plan_data
+        if "intervention_type" not in plan_data:
+            plan_data["intervention_type"] = intervention_type
+        
+        # Create InterventionPlanRecord
+        plan = InterventionPlanRecord(
             user_id=state.get("user_id"),
-            triage_assessment_id=state.get("triage_assessment_id"),
-            intervention_type=intervention_type_enum,
-            plan_data=state.get("intervention_plan"),
-            status="active",
-            created_at=datetime.now()
+            session_id=state.get("session_id"),
+            conversation_id=state.get("conversation_id"),
+            plan_title=f"{intervention_type.replace('_', ' ').title()} Intervention Plan",
+            risk_level=state.get("risk_level", 0),
+            plan_data=plan_data,
+            completion_tracking={},
+            status="active"
         )
         
         db.add(plan)

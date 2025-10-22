@@ -39,8 +39,9 @@ const navGroups = [
     items: [
       { name: 'Dashboard', icon: <FiShield size={18}/>, href: '/admin/dashboard' },
       { name: 'Cases', icon: <FiShield size={18}/>, href: '/admin/cases' },
-      { name: 'Campaigns', icon: <FiSend size={18}/>, href: '/admin/campaigns' },
-      { name: 'Outreach', icon: <FiCpu size={18}/>, href: '/admin/outreach' },
+      { name: 'Service Desk', icon: <FiShield size={18}/>, href: '/admin/service-desk' },
+      { name: 'SCA Outreach', icon: <FiSend size={18}/>, href: '/admin/campaigns' },
+      { name: 'LangGraph Monitoring', icon: <FiCpu size={18}/>, href: '/admin/langgraph' },
       { name: 'Agents Command Center', icon: <FiCpu size={18}/>, href: '/admin/agents-command-center' },
     ]
   },

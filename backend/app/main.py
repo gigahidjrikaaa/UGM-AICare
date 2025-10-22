@@ -29,6 +29,7 @@ from app.routes import (
     clinical_analytics_routes,
     system,
     intervention_plans,
+    langgraph_analytics,
 )
 from app.routes.admin import insights as admin_insights
 from app.agents.sta.router import router as sta_router
@@ -165,6 +166,7 @@ app.include_router(admin_insights.router)  # Admin insights endpoints
 app.include_router(agents.router)
 app.include_router(agents_command.router)
 app.include_router(agents_graph.router)  # LangGraph agent execution endpoints
+app.include_router(langgraph_analytics.router)  # LangGraph monitoring and analytics endpoints
 app.include_router(safety_triage.router)
 app.include_router(system.router)  # System diagnostics endpoints
 # TODO: wire new agent routers once services are implemented

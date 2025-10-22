@@ -6,7 +6,7 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { listCases } from '@/services/adminCaseApi';
 import type { CaseListResponse, CaseFilters } from '@/types/admin/cases';
 import CaseListTable from '@/components/admin/cases/CaseListTable';
@@ -18,6 +18,8 @@ import {
   FiAlertCircle, FiClock, FiUsers, FiCheckCircle, 
   FiAlertTriangle, FiActivity, FiInfo 
 } from 'react-icons/fi';
+import { useSSE } from '@/hooks/useSSE';
+import type { SSEEvent } from '@/hooks/useSSE';
 
 export default function CasesPage() {
   const [response, setResponse] = useState<CaseListResponse>({
@@ -41,6 +43,53 @@ export default function CasesPage() {
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
+
+  // Handle SSE events for real-time case updates
+  const handleSSEEvent = useCallback((event: SSEEvent) => {
+    console.log('[Cases] SSE Event:', event);
+
+    switch (event.type) {
+      case 'case_created':
+      case 'case_updated': {
+        // Show notification badge for updates
+        if (event.type === 'case_created') {
+          toast.success('📬 New case created', { duration: 3000 });
+        } else {
+          toast('🔄 Case updated', { duration: 2000 });
+        }
+
+        // Reload cases to show updates
+        setFilters(prev => ({ ...prev }));
+        break;
+      }
+
+      case 'sla_breach': {
+        toast.error('⚠️ SLA breach detected', { duration: 5000 });
+        setFilters(prev => ({ ...prev }));
+        break;
+      }
+
+      case 'connected':
+        console.log('[Cases] SSE connected');
+        break;
+
+      case 'ping':
+        // Heartbeat - no action needed
+        break;
+
+      default:
+        console.log('[Cases] Unhandled event type:', event.type);
+    }
+  }, []);
+
+  // Initialize SSE connection for real-time updates
+  useSSE({
+    url: '/api/v1/admin/sse/events',
+    onEvent: handleSSEEvent,
+    eventTypes: ['connected', 'case_created', 'case_updated', 'sla_breach', 'ping'],
+    autoReconnect: true,
+    debug: process.env.NODE_ENV === 'development',
+  });
 
   useEffect(() => {
     const fetchCases = async () => {

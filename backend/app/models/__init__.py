@@ -37,7 +37,7 @@ from .social import Tweet, UserBadge
 # Intervention models
 from .interventions import (
     InterventionCampaign,
-    CampaignExecution,
+    CampaignExecution as InterventionCampaignExecution,
     InterventionPlanRecord,
     InterventionPlanStepCompletion,
 )
@@ -64,7 +64,7 @@ from .users import AgentUser, AgentRoleEnum
 
 # Admin infrastructure models (Phase 1)
 from .insights import InsightsReport
-from .campaign import Campaign, CampaignTrigger, CampaignMetrics
+from .campaign import Campaign, CampaignTrigger, CampaignMetrics, SCACampaignExecution
 from .system import SystemSettings, AgentHealthLog, CaseAssignment
 
 # Real-time alert models (Phase 4)
@@ -112,7 +112,7 @@ __all__ = [
 
     # Intervention Models
     "InterventionCampaign",
-    "CampaignExecution",
+    "InterventionCampaignExecution",
     "InterventionPlanRecord",
     "InterventionPlanStepCompletion",
 
@@ -154,6 +154,7 @@ __all__ = [
     "Campaign",
     "CampaignTrigger",
     "CampaignMetrics",
+    "SCACampaignExecution",
     "SystemSettings",
     "AgentHealthLog",
     "CaseAssignment",

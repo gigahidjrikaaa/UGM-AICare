@@ -15,6 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
 from app.agents.sta.sta_graph_service import STAGraphService
+from app.agents.sca.sca_graph_service import SCAGraphService
+from app.agents.sda.sda_graph_service import SDAGraphService
 from app.agents.orchestrator_graph_service import OrchestratorGraphService
 from app.agents.ia.ia_graph_service import IAGraphService
 
@@ -166,6 +168,301 @@ async def sta_graph_health() -> Dict[str, Any]:
         "version": "1.0.0",
         "langgraph_enabled": True
     }
+
+
+# ============================================================================
+# SCA (Support Coach Agent) Graph Endpoints
+# ============================================================================
+
+class SCAGraphRequest(BaseModel):
+    """Request payload for SCA graph execution."""
+    
+    user_id: int = Field(..., description="User database ID")
+    session_id: str = Field(..., description="Session identifier")
+    user_hash: str = Field(..., description="Anonymized user identifier")
+    message: str = Field(..., description="User message for coaching")
+    conversation_id: int | None = Field(None, description="Optional conversation ID")
+    severity: str = Field(..., description="Risk severity from STA (low/moderate/high/critical)")
+    intent: str = Field(..., description="Detected intent from STA")
+    triage_assessment_id: int | None = Field(None, description="Database ID of triage assessment")
+
+
+class SCAGraphResponse(BaseModel):
+    """Response from SCA graph execution."""
+    
+    success: bool = Field(..., description="Whether execution succeeded without errors")
+    execution_id: str = Field(..., description="Unique execution tracking ID")
+    execution_path: List[str] = Field(..., description="List of nodes executed")
+    
+    intervention_type: str | None = Field(None, description="Type of intervention plan")
+    intervention_plan_id: int | None = Field(None, description="Database ID of intervention plan")
+    plan_persisted: bool = Field(False, description="Whether plan was saved to database")
+    
+    errors: List[str] = Field(default_factory=list, description="Errors encountered during execution")
+    execution_time_ms: float | None = Field(None, description="Total execution time in milliseconds")
+
+
+@router.post("/sca/execute", response_model=SCAGraphResponse, status_code=status.HTTP_200_OK)
+async def execute_sca_graph(
+    request: SCAGraphRequest,
+    db: AsyncSession = Depends(get_async_db)
+) -> SCAGraphResponse:
+    """Execute Support Coach Agent (SCA) workflow via LangGraph.
+    
+    This endpoint runs the full SCA state machine:
+        ingest_triage_signal → determine_intervention_type → generate_plan → 
+        safety_review → persist_plan
+    
+    The graph uses the existing SupportCoachService for CBT-informed coaching
+    and integrates with ExecutionStateTracker for real-time monitoring.
+    
+    **Intervention Types:**
+    - `calm_down`: For anxiety/panic situations
+    - `break_down_problem`: For overwhelmed/stuck situations
+    - `general_coping`: For general stress
+    
+    **Input Requirements:**
+    SCA requires STA outputs (severity, intent) to determine appropriate coaching.
+    
+    Args:
+        request: SCA graph execution request
+        db: Database session
+        
+    Returns:
+        Execution result with intervention plan details
+        
+    Raises:
+        HTTPException: If graph execution fails
+        
+    Example:
+        ```bash
+        curl -X POST http://localhost:8000/api/v1/agents/graph/sca/execute \\
+          -H "Content-Type: application/json" \\
+          -d '{
+            "user_id": 1,
+            "session_id": "test-123",
+            "user_hash": "hash-123",
+            "message": "I feel so overwhelmed with everything",
+            "conversation_id": 1,
+            "severity": "moderate",
+            "intent": "overwhelmed",
+            "triage_assessment_id": 456
+          }'
+        ```
+    """
+    try:
+        # Create service and execute graph
+        service = SCAGraphService(db)
+        result = await service.execute(
+            user_id=request.user_id,
+            session_id=request.session_id,
+            user_hash=request.user_hash,
+            message=request.message,
+            conversation_id=request.conversation_id,
+            severity=request.severity,
+            intent=request.intent,
+            triage_assessment_id=request.triage_assessment_id
+        )
+        
+        # Calculate execution time
+        execution_time_ms = None
+        started_at = result.get("started_at")
+        completed_at = result.get("completed_at")
+        if started_at and completed_at:
+            delta = completed_at - started_at
+            execution_time_ms = delta.total_seconds() * 1000
+        
+        # Build response
+        return SCAGraphResponse(
+            success=len(result.get("errors", [])) == 0,
+            execution_id=result.get("execution_id", "unknown"),
+            execution_path=result.get("execution_path", []),
+            intervention_type=result.get("intervention_type"),
+            intervention_plan_id=result.get("intervention_plan_id"),
+            plan_persisted=result.get("intervention_plan_id") is not None,
+            errors=result.get("errors", []),
+            execution_time_ms=execution_time_ms
+        )
+        
+    except Exception as e:
+        logger.error(f"SCA graph execution failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"SCA graph execution failed: {str(e)}"
+        )
+
+
+@router.get("/sca/health", status_code=status.HTTP_200_OK)
+async def sca_graph_health() -> Dict[str, Any]:
+    """Health check for SCA graph endpoint.
+    
+    Returns:
+        Basic health status
+    """
+    return {
+        "status": "healthy",
+        "graph": "sca",
+        "name": "Support Coach Agent",
+        "version": "1.0.0",
+        "langgraph_enabled": True,
+        "intervention_types": ["calm_down", "break_down_problem", "general_coping"]
+    }
+
+
+# ============================================================================
+# SDA (Service Desk Agent) Graph Endpoints
+# ============================================================================
+
+class SDAGraphRequest(BaseModel):
+    """Request payload for SDA graph execution."""
+    
+    user_id: int = Field(..., description="User database ID")
+    session_id: str = Field(..., description="Session identifier")
+    user_hash: str = Field(..., description="Anonymized user identifier")
+    message: str = Field(..., description="User message triggering escalation")
+    conversation_id: int | None = Field(None, description="Optional conversation ID")
+    severity: str = Field(..., description="Risk severity from STA (must be 'high' or 'critical')")
+    intent: str = Field(..., description="Detected intent from STA")
+    risk_score: float = Field(..., description="Numerical risk score from STA (0.0-1.0)")
+    triage_assessment_id: int | None = Field(None, description="Database ID of triage assessment")
+
+
+class SDAGraphResponse(BaseModel):
+    """Response from SDA graph execution."""
+    
+    success: bool = Field(..., description="Whether execution succeeded without errors")
+    execution_id: str = Field(..., description="Unique execution tracking ID")
+    execution_path: List[str] = Field(..., description="List of nodes executed")
+    
+    case_created: bool = Field(False, description="Whether case was created")
+    case_id: int | None = Field(None, description="Database ID of created case")
+    case_severity: str | None = Field(None, description="Case severity level")
+    sla_breach_at: str | None = Field(None, description="ISO timestamp when SLA will breach")
+    assigned_to: str | None = Field(None, description="Counsellor assignment info")
+    
+    errors: List[str] = Field(default_factory=list, description="Errors encountered during execution")
+    execution_time_ms: float | None = Field(None, description="Total execution time in milliseconds")
+
+
+@router.post("/sda/execute", response_model=SDAGraphResponse, status_code=status.HTTP_200_OK)
+async def execute_sda_graph(
+    request: SDAGraphRequest,
+    db: AsyncSession = Depends(get_async_db)
+) -> SDAGraphResponse:
+    """Execute Service Desk Agent (SDA) workflow via LangGraph.
+    
+    This endpoint runs the full SDA state machine:
+        ingest_escalation → create_case → calculate_sla → auto_assign → notify_counsellor
+    
+    The graph handles high/critical severity cases requiring manual intervention
+    by licensed counsellors.
+    
+    **SLA Policy:**
+    - Critical: 1 hour response time
+    - High: 4 hours response time
+    
+    **Requirements:**
+    SDA only handles high/critical severity cases. Will return error for low/moderate.
+    
+    Args:
+        request: SDA graph execution request
+        db: Database session
+        
+    Returns:
+        Execution result with case details and SLA information
+        
+    Raises:
+        HTTPException: If graph execution fails or severity is invalid
+        
+    Example:
+        ```bash
+        curl -X POST http://localhost:8000/api/v1/agents/graph/sda/execute \\
+          -H "Content-Type: application/json" \\
+          -d '{
+            "user_id": 1,
+            "session_id": "test-123",
+            "user_hash": "hash-123",
+            "message": "I want to end everything",
+            "conversation_id": 1,
+            "severity": "critical",
+            "intent": "crisis",
+            "risk_score": 0.95,
+            "triage_assessment_id": 456
+          }'
+        ```
+    """
+    try:
+        # Create service and execute graph
+        service = SDAGraphService(db)
+        result = await service.execute(
+            user_id=request.user_id,
+            session_id=request.session_id,
+            user_hash=request.user_hash,
+            message=request.message,
+            conversation_id=request.conversation_id,
+            severity=request.severity,
+            intent=request.intent,
+            risk_score=request.risk_score,
+            triage_assessment_id=request.triage_assessment_id
+        )
+        
+        # Calculate execution time
+        execution_time_ms = None
+        started_at = result.get("started_at")
+        completed_at = result.get("completed_at")
+        if started_at and completed_at:
+            delta = completed_at - started_at
+            execution_time_ms = delta.total_seconds() * 1000
+        
+        # Build response
+        return SDAGraphResponse(
+            success=len(result.get("errors", [])) == 0,
+            execution_id=result.get("execution_id", "unknown"),
+            execution_path=result.get("execution_path", []),
+            case_created=result.get("case_created", False),
+            case_id=result.get("case_id"),
+            case_severity=result.get("case_severity"),
+            sla_breach_at=result.get("sla_breach_at"),
+            assigned_to=result.get("assigned_to"),
+            errors=result.get("errors", []),
+            execution_time_ms=execution_time_ms
+        )
+        
+    except ValueError as e:
+        # Handle severity validation error
+        logger.warning(f"Invalid SDA request: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail=str(e)
+        )
+    except Exception as e:
+        logger.error(f"SDA graph execution failed: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"SDA graph execution failed: {str(e)}"
+        )
+
+
+@router.get("/sda/health", status_code=status.HTTP_200_OK)
+async def sda_graph_health() -> Dict[str, Any]:
+    """Health check for SDA graph endpoint.
+    
+    Returns:
+        Basic health status
+    """
+    return {
+        "status": "healthy",
+        "graph": "sda",
+        "name": "Service Desk Agent",
+        "version": "1.0.0",
+        "langgraph_enabled": True,
+        "supported_severities": ["high", "critical"],
+        "sla_policies": {
+            "critical": "1 hour",
+            "high": "4 hours"
+        }
+    }
+
 
 
 # ============================================================================

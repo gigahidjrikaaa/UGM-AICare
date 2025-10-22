@@ -215,7 +215,11 @@ export function ExecuteCampaignModal({ campaign, onClose, onSuccess }: ExecuteCa
                   </div>
                   <div className="p-3 bg-blue-500/20 rounded-lg">
                     <p className="text-blue-400 text-xs">Duration</p>
-                    <p className="text-white text-xl font-bold">{result.execution_time_seconds.toFixed(2)}s</p>
+                    <p className="text-white text-xl font-bold">
+                      {result.execution_time_seconds !== undefined 
+                        ? `${result.execution_time_seconds.toFixed(2)}s` 
+                        : 'N/A'}
+                    </p>
                   </div>
                 </div>
               </motion.div>

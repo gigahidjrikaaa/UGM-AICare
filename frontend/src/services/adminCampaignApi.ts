@@ -7,6 +7,7 @@ import apiClient from './api';
 import type {
   Campaign,
   CampaignListResponse,
+  CampaignExecutionHistoryListResponse,
   CreateCampaignRequest,
   UpdateCampaignRequest,
   ExecuteCampaignRequest,
@@ -123,7 +124,10 @@ export async function executeCampaign(
   campaignId: string,
   params?: ExecuteCampaignRequest
 ): Promise<ExecuteCampaignResponse> {
-  const response = await apiClient.post(`${CAMPAIGNS_BASE}/${campaignId}/execute`, params || {});
+  const response = await apiClient.post(`${CAMPAIGNS_BASE}/execute`, {
+    campaign_id: campaignId,
+    dry_run: params?.dry_run || false,
+  });
   return response.data;
 }
 
@@ -142,8 +146,23 @@ export async function previewCampaignTargets(campaignId: string): Promise<{
   total_targeted: number;
   sample_users: Array<{ user_id: number; user_hash: string }>;
 }> {
-  const response = await apiClient.post(`${CAMPAIGNS_BASE}/${campaignId}/execute`, {
+  const response = await apiClient.post(`${CAMPAIGNS_BASE}/execute`, {
+    campaign_id: campaignId,
     dry_run: true,
   });
+  return response.data;
+}
+
+/**
+ * Get campaign execution history
+ */
+export async function getCampaignHistory(
+  campaignId: string,
+  skip: number = 0,
+  limit: number = 50
+): Promise<CampaignExecutionHistoryListResponse> {
+  const response = await apiClient.get(
+    `${CAMPAIGNS_BASE}/${campaignId}/history?skip=${skip}&limit=${limit}`
+  );
   return response.data;
 }

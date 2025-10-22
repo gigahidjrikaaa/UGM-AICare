@@ -17,13 +17,15 @@ The platform centers around **Aika**, an AI companion powered by a multi-agent s
 **Four coordinated AI agents powered by LangGraph StateGraph orchestration (Implemented: October 2025):**
 
 **Architecture:**
-```
+
+```bash
 User Message → STA (Triage) → [Low/Moderate] → SCA (Coach) → END
                              → [High/Critical] → SDA (Escalate) → END
 Analytics Queries → IA (Privacy-Preserving Aggregation) → END
 ```
 
 **LangGraph Orchestration:**
+
 - **StateGraph Workflows**: Deterministic state machines with typed state (`SafetyAgentState`, `IAState`)
 - **Conditional Routing**: Risk-based agent selection with automatic escalation paths
 - **Execution Tracking**: Real-time monitoring with database persistence (`LangGraphExecution` tables)

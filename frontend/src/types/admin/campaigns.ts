@@ -201,3 +201,30 @@ export const OPERATOR_LABELS: Record<ConditionOperator, string> = {
   less_than: 'Less Than',
   less_than_or_equal: 'Less Than or Equal',
 };
+
+/**
+ * Campaign Execution History
+ * Audit trail of campaign executions
+ */
+export interface CampaignExecutionHistory {
+  id: string;
+  campaign_id: string;
+  campaign_name: string;
+  executed_at: string;
+  executed_by: number | null;
+  total_targeted: number;
+  messages_sent: number;
+  messages_failed: number;
+  execution_time_seconds: number;
+  dry_run: boolean;
+  targeted_user_ids: number[] | null;
+  message_content: string;
+  error_message: string | null;
+}
+
+export interface CampaignExecutionHistoryListResponse {
+  items: CampaignExecutionHistory[];
+  total: number;
+  skip: number;
+  limit: number;
+}

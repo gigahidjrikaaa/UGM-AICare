@@ -27,7 +27,7 @@ from app.models import (  # noqa: E402
 	Case,
 	CaseSeverityEnum,
 	CaseStatusEnum,
-	CampaignExecution,
+	InterventionCampaignExecution,
 	Conversation,
 	InterventionCampaign,
 	TriageAssessment,
@@ -59,7 +59,7 @@ TABLES = [
 	TriageAssessment.__table__,
 	Conversation.__table__,
 	InterventionCampaign.__table__,
-	CampaignExecution.__table__,
+	InterventionCampaignExecution.__table__,
 ]
 
 
@@ -267,22 +267,22 @@ async def test_insights_agent_service_runs_core_queries() -> None:
 				description="",
 				content={"steps": []},
 			)
-			session.add(campaign)
-			await session.flush()
+		session.add(campaign)
+		await session.flush()
 
-			executions = [
-				CampaignExecution(
-					campaign_id=campaign.id,
-					user_id=user_primary.id,
-					status="completed",
-					engagement_score=0.85,
-					created_at=now - timedelta(hours=3),
-				),
-				CampaignExecution(
-					campaign_id=campaign.id,
-					user_id=user_secondary.id,
-					status="sent",
-					engagement_score=0.5,
+		executions = [
+			InterventionCampaignExecution(
+				campaign_id=campaign.id,
+				user_id=user_primary.id,
+				status="completed",
+				engagement_score=0.85,
+				created_at=now - timedelta(hours=3),
+			),
+			InterventionCampaignExecution(
+				campaign_id=campaign.id,
+				user_id=user_secondary.id,
+				status="sent",
+				engagement_score=0.5,
 					created_at=now - timedelta(hours=5),
 				),
 			]

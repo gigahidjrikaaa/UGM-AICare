@@ -14,7 +14,7 @@ from app.agents.ia.queries import ALLOWED_QUERIES
 from app.agents.ia.schemas import IAQueryRequest, IAQueryResponse
 from app.database import get_async_db
 from app.models import (
-    CampaignExecution,
+    InterventionCampaignExecution,
     Conversation,
     TriageAssessment,
 )
@@ -131,14 +131,14 @@ class InsightsAgentService:
     async def _resource_reuse(self, start: datetime, end: datetime) -> IAQueryResponse:
         stmt = (
             select(
-                CampaignExecution.campaign_id,
-                func.count(CampaignExecution.id),
-                func.count(func.distinct(CampaignExecution.user_id)),
+                InterventionCampaignExecution.campaign_id,
+                func.count(InterventionCampaignExecution.id),
+                func.count(func.distinct(InterventionCampaignExecution.user_id)),
             )
-            .where(CampaignExecution.created_at >= start)
-            .where(CampaignExecution.created_at <= end)
-            .group_by(CampaignExecution.campaign_id)
-            .order_by(func.count(CampaignExecution.id).desc())
+            .where(InterventionCampaignExecution.created_at >= start)
+            .where(InterventionCampaignExecution.created_at <= end)
+            .group_by(InterventionCampaignExecution.campaign_id)
+            .order_by(func.count(InterventionCampaignExecution.id).desc())
             .limit(10)
         )
         result = await self._session.execute(stmt)
@@ -210,11 +210,11 @@ class InsightsAgentService:
             select(
                 func.count().label("total"),
                 func.sum(
-                    case((CampaignExecution.engagement_score >= 0.7, 1), else_=0)
+                    case((InterventionCampaignExecution.engagement_score >= 0.7, 1), else_=0)
                 ).label("helpful"),
             )
-            .where(CampaignExecution.created_at >= start)
-            .where(CampaignExecution.created_at <= end)
+            .where(InterventionCampaignExecution.created_at >= start)
+            .where(InterventionCampaignExecution.created_at <= end)
         )
         total, helpful = (await self._session.execute(stmt)).one()
         total = int(total or 0)

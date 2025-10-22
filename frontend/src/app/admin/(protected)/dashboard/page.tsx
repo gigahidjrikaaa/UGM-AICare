@@ -20,6 +20,7 @@ import { GenerateReportModal } from '@/components/admin/dashboard/GenerateReport
 import { Toast } from '@/components/admin/dashboard/Toast';
 import { ConnectionStatus } from '@/components/admin/dashboard/ConnectionStatus';
 import { InsightsCampaignModal } from '@/components/admin/campaigns';
+import LangGraphHealthWidget from '@/components/admin/dashboard/LangGraphHealthWidget';
 import type { GenerateReportParams } from '@/components/admin/dashboard/GenerateReportModal';
 import { getDashboardOverview, getDashboardTrends, generateInsightsReport } from '@/services/adminDashboardApi';
 import type { DashboardOverview, TrendsResponse, TimeRange } from '@/types/admin/dashboard';
@@ -261,8 +262,8 @@ export default function AdminDashboardPage() {
         
         <KPICard
           title="Overall Sentiment"
-          value={kpis.overall_sentiment !== null ? `${kpis.overall_sentiment.toFixed(1)}%` : '—'}
-          trend={kpis.sentiment_delta !== null ? {
+          value={kpis.overall_sentiment !== null && kpis.overall_sentiment !== undefined ? `${kpis.overall_sentiment.toFixed(1)}%` : '—'}
+          trend={kpis.sentiment_delta !== null && kpis.sentiment_delta !== undefined ? {
             direction: kpis.sentiment_delta >= 0 ? 'up' : 'down',
             value: Math.abs(kpis.sentiment_delta),
           } : undefined}
@@ -307,7 +308,7 @@ export default function AdminDashboardPage() {
         
         <KPICard
           title="Avg Resolution Time"
-          value={kpis.avg_case_resolution_time !== null 
+          value={kpis.avg_case_resolution_time !== null && kpis.avg_case_resolution_time !== undefined
             ? `${kpis.avg_case_resolution_time.toFixed(1)}h` 
             : '—'
           }
@@ -323,6 +324,11 @@ export default function AdminDashboardPage() {
           icon={<MegaphoneIcon className="w-6 h-6 text-orange-400" />}
           severity="info"
         />
+      </div>
+
+      {/* LangGraph Health Status Widget */}
+      <div className="w-full">
+        <LangGraphHealthWidget />
       </div>
 
       {/* Toggle for Trends Section */}

@@ -11,6 +11,7 @@ from sqlalchemy import and_, desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.campaign import Campaign
+from app.models.campaign import SCACampaignExecution
 from app.models.cases import Case
 from app.models.user import User
 from app.services.campaign_service import CampaignService
@@ -37,6 +38,9 @@ class CampaignExecutionService:
         Returns:
             Execution results dictionary
         """
+        from time import time
+        start_time = time()
+        
         campaign = await CampaignService.get_campaign(db, campaign_id)
         if not campaign:
             logger.error(f"Campaign not found: {campaign_id}")
@@ -45,6 +49,7 @@ class CampaignExecutionService:
                 "error": "Campaign not found",
                 "targets_count": 0,
                 "messages_sent": 0,
+                "execution_time_seconds": 0.0,
             }
         
         if campaign.status != "active":
@@ -54,6 +59,7 @@ class CampaignExecutionService:
                 "error": f"Campaign is not active (status: {campaign.status})",
                 "targets_count": 0,
                 "messages_sent": 0,
+                "execution_time_seconds": time() - start_time,
             }
         
         # Step 1: Get target audience
@@ -65,12 +71,14 @@ class CampaignExecutionService:
         logger.info(f"Campaign {campaign_id}: {targets_count} users targeted")
         
         if dry_run:
+            execution_time = time() - start_time
             return {
                 "success": True,
                 "dry_run": True,
                 "targets_count": targets_count,
                 "target_user_ids": [user.id for user in target_users],
                 "messages_sent": 0,
+                "execution_time_seconds": execution_time,
             }
         
         # Step 2: Send messages via SCA
@@ -106,6 +114,26 @@ class CampaignExecutionService:
                 users_engaged=0,  # Updated later when users reply
             )
         
+        execution_time = time() - start_time
+        
+        # Step 4: Log execution history for audit trail
+        execution_record = SCACampaignExecution(
+            campaign_id=campaign_id,
+            executed_at=datetime.utcnow(),
+            executed_by=None,  # TODO: Pass current user from auth context
+            campaign_name=campaign.name,
+            message_content=campaign.message_template,
+            total_targeted=targets_count,
+            messages_sent=messages_sent,
+            messages_failed=messages_failed,
+            execution_time_seconds=execution_time,
+            dry_run=False,
+            targeted_user_ids=[user.id for user in target_users],
+            error_message=None if messages_failed == 0 else f"{messages_failed} messages failed",
+        )
+        db.add(execution_record)
+        await db.commit()
+        
         logger.info(
             f"Campaign {campaign_id} executed: "
             f"{messages_sent} sent, {messages_failed} failed"
@@ -118,6 +146,7 @@ class CampaignExecutionService:
             "messages_sent": messages_sent,
             "messages_failed": messages_failed,
             "users_targeted": len(users_targeted),
+            "execution_time_seconds": execution_time,
         }
 
     @staticmethod
@@ -235,46 +264,37 @@ class CampaignExecutionService:
         """
         try:
             from app.utils.email_utils import send_email
+            from app.utils.security_utils import decrypt_data
             from app.core.settings import get_settings
             
             settings = get_settings()
             frontend_url = settings.frontend_url
             
-            # Get user's name for personalization
-            user_name = user.full_name or user.first_name or user.email.split("@")[0]
+            # Decrypt user email (emails are encrypted in database)
+            user_email = decrypt_data(user.email)
+            if not user_email:
+                logger.error(f"Failed to decrypt email for user {user.id}")
+                return False
             
-            # Get user's active case info (if any)
+            # Get user's name for personalization
+            # User model has first_name, last_name, name, and preferred_name fields
+            user_name = (
+                user.preferred_name or 
+                user.name or 
+                (f"{user.first_name} {user.last_name}".strip() if user.first_name or user.last_name else None) or
+                user_email.split("@")[0]
+            )
+            
+            # Get user's profile data for personalization
+            # Note: Cases use user_hash for privacy, can't directly link to user.id
             case_count = 0
-            risk_score = "N/A"
+            risk_score = user.risk_level or "N/A"
             days_inactive = 0
             
-            try:
-                result = await db.execute(
-                    select(Case)
-                    .where(
-                        and_(
-                            Case.user_id == user.id,
-                            Case.status.in_(["open", "in_progress"])
-                        )
-                    )
-                )
-                active_cases = result.scalars().all()
-                case_count = len(active_cases)
-                
-                if active_cases:
-                    # Get highest severity case
-                    severity_order = {"critical": 4, "high": 3, "medium": 2, "low": 1}
-                    highest_case = max(
-                        active_cases,
-                        key=lambda c: severity_order.get(c.severity, 0)
-                    )
-                    risk_score = highest_case.severity.upper()
-                
-                # Calculate days since last activity
-                if user.last_activity_date:
-                    days_inactive = (date.today() - user.last_activity_date).days
-            except Exception as e:
-                logger.warning(f"Could not fetch case data for user {user.id}: {e}")
+            # Calculate days since last activity
+            if user.last_activity_date:
+                from datetime import date
+                days_inactive = (date.today() - user.last_activity_date).days
             
             # Personalize message template with all available variables
             message_text = campaign.message_template
@@ -368,15 +388,15 @@ class CampaignExecutionService:
             # Send email
             subject = f"UGM AI-Care: {campaign.name}"
             success = send_email(
-                recipient_email=user.email,
+                recipient_email=user_email,  # Use decrypted email
                 subject=subject,
                 html_content=html_content
             )
             
             if success:
-                logger.info(f"✅ Campaign email sent to {user.email} (User ID: {user.id})")
+                logger.info(f"✅ Campaign email sent to {user_email} (User ID: {user.id})")
             else:
-                logger.error(f"❌ Failed to send campaign email to {user.email}")
+                logger.error(f"❌ Failed to send campaign email to {user_email}")
             
             return success
             
@@ -402,6 +422,8 @@ class CampaignExecutionService:
         """
         users = await CampaignExecutionService._get_target_audience(db, target_criteria)
         
+        from app.utils.security_utils import decrypt_data
+        
         total_count = len(users)
         preview_users = users[:limit]
         
@@ -411,8 +433,13 @@ class CampaignExecutionService:
             "preview": [
                 {
                     "id": user.id,
-                    "name": user.full_name,
-                    "email": user.email,
+                    "name": (
+                        user.preferred_name or 
+                        user.name or 
+                        (f"{user.first_name} {user.last_name}".strip() if user.first_name or user.last_name else None) or
+                        (decrypt_data(user.email) or user.email).split("@")[0]
+                    ),
+                    "email": decrypt_data(user.email) or user.email,  # Decrypt for display
                 }
                 for user in preview_users
             ],

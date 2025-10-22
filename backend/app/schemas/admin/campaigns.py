@@ -153,6 +153,7 @@ class CampaignExecutionResponse(BaseModel):
     messages_failed: int = 0
     users_targeted: int = 0
     target_user_ids: List[int] = Field(default_factory=list)
+    execution_time_seconds: float = Field(0.0, description="Execution duration in seconds")
     error: Optional[str] = None
 
 
@@ -177,3 +178,36 @@ class UserEngagementRecord(BaseModel):
     campaign_id: UUID
     user_id: int
     engaged: bool = True
+
+
+# ============================================================================
+# Campaign History/Execution Log Schemas
+# ============================================================================
+
+class CampaignExecutionHistoryResponse(BaseModel):
+    """Schema for campaign execution history record."""
+    
+    id: UUID
+    campaign_id: UUID
+    campaign_name: str
+    executed_at: datetime
+    executed_by: Optional[int]
+    total_targeted: int
+    messages_sent: int
+    messages_failed: int
+    execution_time_seconds: float
+    dry_run: bool
+    targeted_user_ids: Optional[List[int]] = None
+    message_content: str
+    error_message: Optional[str] = None
+    
+    model_config = ConfigDict(from_attributes=True)
+
+
+class CampaignExecutionHistoryListResponse(BaseModel):
+    """Schema for paginated campaign execution history."""
+    
+    items: List[CampaignExecutionHistoryResponse]
+    total: int
+    skip: int
+    limit: int

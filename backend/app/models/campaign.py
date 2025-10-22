@@ -6,7 +6,7 @@ import uuid
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Column, Date, DateTime, Float, ForeignKey, Integer, String, Text
+from sqlalchemy import Column, Date, DateTime, Float, ForeignKey, Integer, String, Text, Boolean
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -53,6 +53,7 @@ class Campaign(Base):
     creator: Mapped[Optional["User"]] = relationship("User", foreign_keys=[created_by])
     triggers: Mapped[list["CampaignTrigger"]] = relationship("CampaignTrigger", back_populates="campaign", cascade="all, delete-orphan")
     metrics: Mapped[list["CampaignMetrics"]] = relationship("CampaignMetrics", back_populates="campaign", cascade="all, delete-orphan")
+    executions: Mapped[list["SCACampaignExecution"]] = relationship("SCACampaignExecution", back_populates="campaign", cascade="all, delete-orphan")
 
     def __repr__(self) -> str:
         return f"<Campaign(id={self.id}, name={self.name}, status={self.status})>"
@@ -118,3 +119,43 @@ class CampaignMetrics(Base):
 
     def __repr__(self) -> str:
         return f"<CampaignMetrics(id={self.id}, campaign_id={self.campaign_id}, date={self.execution_date})>"
+
+
+class SCACampaignExecution(Base):
+    """Detailed execution history for SCA campaign sends.
+    
+    Tracks each SCA campaign execution with target users and message content
+    for audit trail and history review.
+    """
+    __tablename__ = "sca_campaign_executions"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    campaign_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('campaigns.id', ondelete='CASCADE'), nullable=False, index=True)
+    
+    # Execution details
+    executed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default='now()', index=True)
+    executed_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
+    
+    # Campaign snapshot (capture current state at execution time)
+    campaign_name: Mapped[str] = mapped_column(String(255), nullable=False)
+    message_content: Mapped[str] = mapped_column(Text, nullable=False)  # Actual message template used
+    
+    # Execution results
+    total_targeted: Mapped[int] = mapped_column(Integer, default=0)
+    messages_sent: Mapped[int] = mapped_column(Integer, default=0)
+    messages_failed: Mapped[int] = mapped_column(Integer, default=0)
+    execution_time_seconds: Mapped[float] = mapped_column(Float, default=0.0)
+    dry_run: Mapped[bool] = mapped_column(Boolean, default=False)  # Was this a test run?
+    
+    # Target users (store user IDs for audit trail)
+    targeted_user_ids: Mapped[Optional[list]] = mapped_column(JSONB, nullable=True)  # List of user IDs
+    
+    # Error tracking
+    error_message: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
+    
+    # Relationships
+    campaign: Mapped["Campaign"] = relationship("Campaign", back_populates="executions")
+    executor: Mapped[Optional["User"]] = relationship("User", foreign_keys=[executed_by])
+
+    def __repr__(self) -> str:
+        return f"<SCACampaignExecution(id={self.id}, campaign_id={self.campaign_id}, executed_at={self.executed_at})>"

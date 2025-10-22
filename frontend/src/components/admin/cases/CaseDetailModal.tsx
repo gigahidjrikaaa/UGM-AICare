@@ -9,6 +9,8 @@ import { useEffect, useState } from 'react';
 import { getCaseDetail, getCaseConversation } from '@/services/adminCaseApi';
 import type { CaseDetailResponse, ConversationMessageSummary } from '@/types/admin/cases';
 import { formatDistanceToNow, format } from 'date-fns';
+import InterventionPlanModal from './InterventionPlanModal';
+import type { SCAGraphResponse } from '@/services/langGraphApi';
 
 interface CaseDetailModalProps {
   caseId: string;
@@ -31,6 +33,8 @@ export default function CaseDetailModal({
   const [error, setError] = useState<string | null>(null);
   const [showFullConversation, setShowFullConversation] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'assignments' | 'triage' | 'conversation'>('overview');
+  const [interventionPlanResult, setInterventionPlanResult] = useState<SCAGraphResponse | null>(null);
+  const [showInterventionPlan, setShowInterventionPlan] = useState(false);
 
   useEffect(() => {
     if (!isOpen || !caseId) return;
@@ -183,18 +187,72 @@ export default function CaseDetailModal({
               </div>
 
               {/* Action Buttons */}
-              <div className="flex gap-2">
+              <div className="flex gap-2 flex-wrap">
                 <button
                   onClick={() => onStatusUpdate?.(caseId)}
-                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                  className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                 >
                   Update Status
                 </button>
                 <button
                   onClick={() => onAssign?.(caseId)}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700"
+                  className="px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 transition-colors"
                 >
                   Assign/Reassign
+                </button>
+                <button
+                  onClick={async () => {
+                    if (!caseDetail) return;
+                    
+                    try {
+                      // Dynamic import to avoid circular dependencies
+                      const { langGraphApi } = await import('@/services/langGraphApi');
+                      const toast = (await import('react-hot-toast')).default;
+                      
+                      // Prepare SCA request from case data
+                      // Note: user_id not available in CaseDetailResponse, using placeholder
+                      const scaRequest = {
+                        user_id: parseInt(caseDetail.user_hash.substring(0, 8), 16) % 10000, // Derive numeric ID from hash
+                        session_id: caseDetail.session_id || caseDetail.conversation_id || `case_${caseDetail.id}`,
+                        user_hash: caseDetail.user_hash,
+                        severity: caseDetail.severity === 'med' ? 'moderate' : caseDetail.severity as 'critical' | 'high' | 'moderate' | 'low',
+                        message: caseDetail.summary_redacted || 'Generate intervention plan for this case',
+                        intent: 'intervention_plan_generation',
+                        risk_level: caseDetail.severity === 'critical' ? 3 : caseDetail.severity === 'high' ? 2 : caseDetail.severity === 'med' ? 1 : 0,
+                      };
+                      
+                      toast.loading('Generating intervention plan with SCA...', { id: 'sca-gen' });
+                      const result = await langGraphApi.executeSCA(scaRequest);
+                      
+                      if (result.success && result.intervention_plan) {
+                        toast.success(
+                          `✅ Intervention Plan Generated!`,
+                          { id: 'sca-gen', duration: 2000 }
+                        );
+                        
+                        // Store result and show modal
+                        setInterventionPlanResult(result);
+                        setShowInterventionPlan(true);
+                      } else {
+                        toast.error(
+                          result.errors?.join(', ') || 'Failed to generate intervention plan',
+                          { id: 'sca-gen' }
+                        );
+                      }
+                    } catch (err) {
+                      const toast = (await import('react-hot-toast')).default;
+                      toast.error(
+                        `Error: ${err instanceof Error ? err.message : 'Unknown error'}`,
+                        { id: 'sca-gen' }
+                      );
+                    }
+                  }}
+                  className="px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors flex items-center gap-2"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Generate Intervention Plan (SCA)
                 </button>
               </div>
 
@@ -374,6 +432,25 @@ export default function CaseDetailModal({
           </button>
         </div>
       </div>
+
+      {/* Intervention Plan Modal */}
+      <InterventionPlanModal
+        isOpen={showInterventionPlan}
+        onClose={() => setShowInterventionPlan(false)}
+        plan={interventionPlanResult ? {
+          intervention_type: interventionPlanResult.intervention_type,
+          steps: interventionPlanResult.intervention_plan.plan_steps.map((step, idx) => ({
+            step: step.title,
+            description: step.description,
+            order: idx + 1,
+          })),
+          resources: interventionPlanResult.intervention_plan.resource_cards.map(card => card.title),
+          estimated_duration: interventionPlanResult.intervention_plan.next_check_in?.timeframe,
+          follow_up_recommended: true,
+        } : null}
+        planId={interventionPlanResult?.intervention_plan_id?.toString()}
+        executionTime={interventionPlanResult?.execution_time_ms}
+      />
     </div>
   );
 }

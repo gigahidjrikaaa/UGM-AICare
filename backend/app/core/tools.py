@@ -18,7 +18,7 @@ import logging
 from datetime import date as Date, datetime, timedelta
 from typing import Any, Dict, List, Optional
 
-from google.generativeai.types import FunctionDeclaration, Tool
+import google.generativeai as genai
 from sqlalchemy import desc, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -33,22 +33,22 @@ MAX_CONVERSATION_MESSAGES = 20
 MAX_JOURNAL_CONTENT_LENGTH = 300
 
 
-def get_aika_tools() -> List[Tool]:
+def get_aika_tools() -> List[Dict[str, Any]]:
     """Return list of tools available to Aika.
     
     Returns:
-        List[Tool]: Tools configured for Gemini function calling
+        List[Dict]: Tools configured for Gemini function calling
     """
     
-    get_conversation_summaries = FunctionDeclaration(
-        name="get_conversation_summaries",
-        description=(
+    get_conversation_summaries = {
+        "name": "get_conversation_summaries",
+        "description": (
             "Retrieve conversation summaries from previous chat sessions. "
             "Use this when the user asks about past conversations, wants to recall "
             "previous discussions, or references something they talked about before. "
             "Returns a list of conversation summaries ordered by recency."
         ),
-        parameters={
+        "parameters": {
             "type": "object",
             "properties": {
                 "limit": {
@@ -58,17 +58,17 @@ def get_aika_tools() -> List[Tool]:
             },
             "required": [],
         },
-    )
+    }
     
-    get_journal_entries = FunctionDeclaration(
-        name="get_journal_entries",
-        description=(
+    get_journal_entries = {
+        "name": "get_journal_entries",
+        "description": (
             "Search and retrieve user's journal entries. Use this when the user "
             "asks about their journals, wants to see what they wrote, or references "
             "feelings/events they might have journaled about. Can search by keywords "
             "or retrieve recent entries."
         ),
-        parameters={
+        "parameters": {
             "type": "object",
             "properties": {
                 "keywords": {
@@ -87,16 +87,16 @@ def get_aika_tools() -> List[Tool]:
             },
             "required": [],
         },
-    )
+    }
     
-    get_conversation_context = FunctionDeclaration(
-        name="get_conversation_context",
-        description=(
+    get_conversation_context = {
+        "name": "get_conversation_context",
+        "description": (
             "Get detailed context about a specific conversation session. "
             "Use this when you need to recall specific details from a previous "
             "conversation or understand the full context of past interactions."
         ),
-        parameters={
+        "parameters": {
             "type": "object",
             "properties": {
                 "session_id": {
@@ -110,18 +110,14 @@ def get_aika_tools() -> List[Tool]:
             },
             "required": [],
         },
-    )
+    }
     
-    # Create tool with all function declarations
-    memory_tool = Tool(
-        function_declarations=[
-            get_conversation_summaries,
-            get_journal_entries,
-            get_conversation_context,
-        ]
-    )
-    
-    return [memory_tool]
+    # Return list of function declarations
+    return [
+        get_conversation_summaries,
+        get_journal_entries,
+        get_conversation_context,
+    ]
 
 
 async def execute_get_conversation_summaries(
