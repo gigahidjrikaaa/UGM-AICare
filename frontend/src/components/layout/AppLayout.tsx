@@ -65,7 +65,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
       {/* Render Sidebar only if authenticated */}
       {status === 'authenticated' && (
         <NoSsr>
-          <AppSidebar isOpen={isSidebarOpen} onClose={() => setSidebarOpen(false)} />
+          <AppSidebar 
+            isOpen={isSidebarOpen} 
+            onClose={() => setSidebarOpen(false)}
+            onOpenFeedback={() => setFeedbackOpen(true)}
+          />
         </NoSsr>
       )}
 
@@ -88,54 +92,40 @@ export default function AppLayout({ children }: AppLayoutProps) {
           // Add top padding for sticky header on standard pages, skip for full-screen pages
           !isFullScreenPage && "pt-16"
         )}>
-            {children}
+            <div className="min-h-screen">
+              {children}
+            </div>
+            
+            {/* Footer - placed inside main so it appears after scrolling to bottom */}
+            {!isFullScreenPage && (
+              <NoSsr>
+                <Footer />
+              </NoSsr>
+            )}
         </main>
-
-        {/* Footer - Only show on non-full-screen pages */}
-        {!isFullScreenPage && (
-          <NoSsr>
-            <Footer />
-          </NoSsr>
-        )}
       </div>
 
-      {/* Floating Feedback Button & Modal - Render only if authenticated */}
+      {/* Feedback Form Modal - Render only if authenticated */}
       {status === 'authenticated' && (
         <NoSsr>
-          <>
-            {/* Floating Button to open Feedback Form */}
-            {!isFeedbackOpen && (
-              <button
-                type="button"
-                aria-label="Open feedback form"
-                className="fixed bottom-5 right-5 z-50 bg-blue-600 hover:bg-blue-700 text-white rounded-full shadow-lg p-4 focus:outline-none focus:ring-2 focus:ring-blue-400"
-                onClick={() => setFeedbackOpen(true)}
+          <AnimatePresence>
+            {isFeedbackOpen && (
+              <motion.div
+                className="fixed bottom-5 right-5 z-50"
+                initial={{ opacity: 0, y: 50 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 50 }}
               >
-                {/* You can use an icon here */}
-                <span className="sr-only">Open feedback form</span>
-                📝
-              </button>
+                <FeedbackForm
+                  onClose={() => setFeedbackOpen(false)}
+                  onSubmitSuccess={() => {
+                    toast.success("Thank you for your feedback!");
+                    setFeedbackOpen(false);
+                  }}
+                />
+              </motion.div>
             )}
-            {/* Feedback Form Modal */}
-            <AnimatePresence>
-              {isFeedbackOpen && (
-                <motion.div
-                  className="fixed bottom-5 right-5 z-50"
-                  initial={{ opacity: 0, y: 50 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: 50 }}
-                >
-                  <FeedbackForm
-                    onClose={() => setFeedbackOpen(false)}
-                    onSubmitSuccess={() => {
-                      toast.success("Thank you for your feedback!");
-                      setFeedbackOpen(false);
-                    }}
-                  />
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </>
+          </AnimatePresence>
         </NoSsr>
       )}
     </div>

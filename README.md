@@ -96,7 +96,7 @@ The platform centers around **Aika**, an AI companion powered by a multi-agent s
 ### 🎮 Gamification & Engagement
 
 - **NFT Achievement Badges:**
-  - Unique NFT badges on Polygon Amoy testnet for achieving milestones
+  - Unique NFT badges on EDU Chain testnet for achieving milestones
   - Custom ERC1155 smart contract (`UGMJournalBadges.sol`)
   - Blockchain-backed achievement tracking
 
@@ -165,7 +165,7 @@ Organized with npm/yarn workspaces for streamlined dependency management across 
 - **Language:** Solidity (0.8.28)
 - **Libraries:** OpenZeppelin Contracts for secure NFT standards
 - **Testing:** Hardhat Toolbox (Chai, Mocha)
-- **Network:** Polygon Amoy Testnet (primary), EDUChain Testnet (experimental)
+- **Network:** EDUChain Testnet
 - **Contract:** ERC1155 `UGMJournalBadges.sol` for achievement NFTs
 
 ### AI Engine (Experimental)
@@ -282,7 +282,7 @@ Organized with npm/yarn workspaces for streamlined dependency management across 
   - Google Cloud (for OAuth Credentials)
   - LLM Providers (Google Gemini API key; optional configuration for the local Gemma service)
   - Redis Cloud (or local connection details)
-  - Blockchain Testnet (e.g., Alchemy/Infura API Key for Polygon Amoy) + Private Key for Deployer/Minter Wallet
+  - Blockchain Testnet (e.g., Alchemy/Infura API Key for EDU Chain) + Private Key for Deployer/Minter Wallet
   - Email Service (e.g., Gmail App Password or Resend API Key if used)
 
 ### Setup Steps

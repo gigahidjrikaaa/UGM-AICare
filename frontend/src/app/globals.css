@@ -26,6 +26,18 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Accessibility: Reduce motion for users who prefer it */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
 @property --angle {
   syntax: '<angle>';
   initial-value: 0deg;
@@ -222,4 +234,21 @@ body {
 * {
   scrollbar-width: thin; /* "auto" or "thin" */
   scrollbar-color: rgba(255, 202, 64, 0.6) rgba(10, 42, 110, 0.1); /* thumb and track color */
+}
+
+/* Hide scrollbar utility class */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+/* Grid pattern for hero background */
+.grid-pattern {
+  background-image: linear-gradient(rgba(255, 255, 255, 0.1) 1px, transparent 1px),
+                    linear-gradient(90deg, rgba(255, 255, 255, 0.1) 1px, transparent 1px);
+  background-size: 50px 50px;
 }

@@ -37,6 +37,7 @@ module.exports = {
         'pulse-slow': 'pulse 3s ease-in-out infinite',
         'border-spin': 'borderSpin 3s linear infinite',
         'lightning-border': 'lightningBorder 2s linear infinite',
+        'shimmer': 'shimmer 2s ease-in-out infinite',
       },
       keyframes: {
         // Simplified keyframes for better performance
@@ -58,6 +59,11 @@ module.exports = {
         lightningBorder: {
           '0%, 100%': { '--angle': '0deg' },
           '50%': { '--angle': '180deg' }
+        },
+        shimmer: {
+          '0%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+          '100%': { backgroundPosition: '0% 50%' }
         }
       },
     },

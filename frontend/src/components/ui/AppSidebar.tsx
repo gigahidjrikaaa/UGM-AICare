@@ -48,9 +48,10 @@ const sidebarNavItems: NavItem[] = [
 interface AppSidebarProps {
   isOpen: boolean;
   onClose: () => void;
+  onOpenFeedback?: () => void; // Add feedback handler
 }
 
-export default function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
+export default function AppSidebar({ isOpen, onClose, onOpenFeedback }: AppSidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession(); // Get session to check role
   const isAdmin = session?.user?.role === 'admin';
@@ -128,6 +129,75 @@ export default function AppSidebar({ isOpen, onClose }: AppSidebarProps) {
                 })}
               </ul>
             </nav>
+
+            {/* Feedback Button - Visually Appealing */}
+            {onOpenFeedback && (
+              <div className="px-4 pb-3">
+                <motion.button
+                  onClick={() => {
+                    onOpenFeedback();
+                    onClose(); // Close sidebar when opening feedback
+                  }}
+                  className="w-full relative overflow-hidden group"
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  {/* Gradient Background with Animation */}
+                  <div className="absolute inset-0 bg-gradient-to-r from-[#FFCA40] via-[#FFE08C] to-[#FFCA40] bg-[length:200%_100%] [background-position:0%_50%] group-hover:animate-shimmer" />
+                  
+                  {/* Button Content */}
+                  <div className="relative flex items-center justify-center gap-3 px-4 py-3 rounded-lg">
+                    {/* Icon with pulse animation */}
+                    <motion.span
+                      className="text-2xl"
+                      animate={{ 
+                        scale: [1, 1.2, 1],
+                      }}
+                      transition={{ 
+                        repeat: Infinity, 
+                        duration: 2,
+                        ease: "easeInOut"
+                      }}
+                    >
+                      💬
+                    </motion.span>
+                    
+                    {/* Text */}
+                    <div className="flex flex-col items-start">
+                      <span className="text-[#001D58] font-semibold text-sm">
+                        Share Feedback
+                      </span>
+                      <span className="text-[#001D58]/70 text-xs">
+                        Help us improve
+                      </span>
+                    </div>
+                    
+                    {/* Arrow Icon */}
+                    <motion.span 
+                      className="ml-auto text-[#001D58]"
+                      initial={{ x: 0 }}
+                      whileHover={{ x: 3 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      →
+                    </motion.span>
+                  </div>
+                  
+                  {/* Shine effect overlay */}
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                    initial={{ x: '-100%' }}
+                    animate={{ x: '200%' }}
+                    transition={{
+                      repeat: Infinity,
+                      duration: 3,
+                      ease: "linear",
+                      repeatDelay: 2
+                    }}
+                  />
+                </motion.button>
+              </div>
+            )}
 
             {/* Account Linker (optional, place where needed) */}
             <div className="p-4 border-t border-white/10 mt-auto">

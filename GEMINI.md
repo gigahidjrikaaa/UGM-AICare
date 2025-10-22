@@ -8,7 +8,7 @@ The project is a monorepo composed of three main parts:
 
 * **Frontend:** A Next.js admin dashboard and user interface.
 * **Backend:** A FastAPI application that serves as the core API and AI logic hub.
-* **Blockchain:** A Hardhat project for managing NFT-based achievement badges on the Polygon Amoy testnet.
+* **Blockchain:** A Hardhat project for managing NFT-based achievement badges on the EDU Chain testnet.
 
 ## Key Technologies
 
