@@ -47,6 +47,10 @@ export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate }) => {
   const totalSteps = plan.plan_data?.plan_steps?.length || 0;
   const completionPercentage = plan.completion_tracking?.completion_percentage || 0;
 
+  // map completionPercentage to nearest 10% class to avoid inline styles
+  const roundedProgress = Math.max(0, Math.min(100, Math.round(completionPercentage / 10) * 10));
+  const progressClass = styles[`progress${roundedProgress}`] || styles.progress0;
+
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('id-ID', {
       year: 'numeric',
@@ -100,8 +104,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate }) => {
         </div>
         <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden border border-gray-200">
           <div
-            className={`bg-gradient-to-r from-ugm-gold via-ugm-gold-light to-ugm-gold h-3 rounded-full ${styles.progressBar} relative overflow-hidden`}
-            style={{ '--progress-width': `${completionPercentage}%` } as React.CSSProperties}
+            className={`bg-gradient-to-r from-ugm-gold via-ugm-gold-light to-ugm-gold h-3 rounded-full ${styles.progressBar} ${progressClass} relative overflow-hidden`}
           >
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse" />
           </div>
