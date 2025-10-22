@@ -6,14 +6,31 @@ FastAPI service that powers the Safety Agent Suite behind UGM-AICare. The backen
 
 ## Safety Agent Suite
 
-| Agent | Scope | Highlights | Status (Sep 2025) |
-|-------|-------|------------|--------------------|
-| 🛡️ **Safety Triage Agent (STA)** | Real-time risk scoring inside the chat flow | Crisis banner orchestration, feature flags, professional referral, audit logging | API scaffolding in progress |
-| � **Support Coach Agent (SCA)** | CBT-informed coaching and micro-interventions | Empathetic dialogue, structured self-help modules, therapeutic exercises, progress tracking | Core pipeline implemented |
-| 🗂️ **Service Desk Agent (SDA)** | Operational command center for clinical staff | Case timelines, SLA monitoring, escalation workflows, clinical assignment | Data model defined, routes pending |
-| 🔍 **Insights Agent (IA)** | Privacy-preserving analytics over anonymized events | Differential privacy budgets (ε-δ), k-anonymity, aggregate trend analysis | Migration drafted, query layer pending |
+**LangGraph-Orchestrated Agent Architecture** (Implemented: October 2025)
 
-Refer to `PROJECT_SINGLE_SOURCE_OF_TRUTH.md` for the canonical roadmap and alignment guidance.
+The backend implements a **LangGraph StateGraph** orchestration system coordinating four specialized agents through deterministic state transitions and conditional routing.
+
+| Agent | Scope | Highlights | Status (Oct 2025) |
+|-------|-------|------------|--------------------|
+| 🛡️ **Safety Triage Agent (STA)** | Real-time risk scoring inside the chat flow | Crisis detection (Level 0-3), PII redaction, risk assessment with conditional routing | ✅ **LangGraph Complete** |
+| 💬 **Support Coach Agent (SCA)** | CBT-informed coaching and micro-interventions | Intervention plan generation, resource cards, therapeutic exercises, module progression | ✅ **LangGraph Complete** |
+| 🗂️ **Service Desk Agent (SDA)** | Operational command center for clinical staff | Case creation, SLA calculation, auto-assignment, priority escalation | ✅ **LangGraph Complete** |
+| 🔍 **Insights Agent (IA)** | Privacy-preserving analytics over anonymized events | k-anonymity enforcement (k≥5), allow-listed queries, differential privacy budgets | ✅ **LangGraph Complete** |
+
+**Orchestration Flow:**
+```
+User Message → STA (Triage) → [Low/Moderate] → SCA (Coach) → END
+                             → [High/Critical] → SDA (Escalate) → END
+Analytics Queries → IA (Privacy-Preserving Aggregation) → END
+```
+
+**LangGraph Components:**
+- **StateGraph**: Workflow orchestration with typed state (`SafetyAgentState`, `IAState`)
+- **Nodes**: Agent operations (e.g., `triage_node`, `generate_plan_node`, `create_case_node`)
+- **Edges**: Conditional routing based on risk level and intent classification
+- **Execution Tracking**: Real-time monitoring via `ExecutionStateTracker` with database persistence
+
+Refer to `PROJECT_SINGLE_SOURCE_OF_TRUTH.md` and `docs/langgraph-phase5-complete.md` for detailed architecture.
 
 ---
 
@@ -35,9 +52,23 @@ backend/
 ├── app/
 │   ├── agents/
 │   │   ├── sta/            # Safety Triage Agent (crisis detection)
+│   │   │   ├── sta_graph.py           # LangGraph StateGraph definition
+│   │   │   ├── sta_graph_service.py   # Service wrapper with execution tracking
+│   │   │   └── service.py             # Core triage logic
 │   │   ├── sca/            # Support Coach Agent (CBT coaching)
+│   │   │   ├── sca_graph.py           # LangGraph StateGraph definition
+│   │   │   └── service.py             # Intervention plan generation
 │   │   ├── sda/            # Service Desk Agent (case management)
-│   │   └── ia/             # Insights Agent (privacy-preserving analytics)
+│   │   │   ├── sda_graph.py           # LangGraph StateGraph definition
+│   │   │   └── service.py             # Case creation and SLA tracking
+│   │   ├── ia/             # Insights Agent (privacy-preserving analytics)
+│   │   │   ├── ia_graph.py            # LangGraph StateGraph definition
+│   │   │   ├── ia_graph_service.py    # Service wrapper
+│   │   │   └── service.py             # Analytics query execution
+│   │   ├── graph_state.py             # Shared TypedDict state schemas
+│   │   ├── orchestrator_graph.py      # Master orchestrator (STA→SCA/SDA routing)
+│   │   ├── orchestrator_graph_service.py  # Orchestrator service wrapper
+│   │   └── execution_tracker.py       # Real-time execution monitoring
 │   ├── core/
 │   │   ├── llm.py          # Gemini 2.5 API provider via LangChain
 │   │   ├── memory.py       # Conversation memory and LangGraph orchestration
@@ -180,6 +211,7 @@ Ensure tests cover new Safety Agent flows (STA/SCA/SDA/IA) before enabling relat
 - **Feature Flags:** STA feature rollout is guarded via configuration; keep defaults off until clinical review signs off.
 - **LangGraph Orchestration:** All agent coordination handled through LangGraph's stateful graph-based controller. Agent routing specifications defined in `app/agents/safety_graph_specs.py`.
 - **Monitoring:** `prometheus-fastapi-instrumentator` exposes metrics under `/metrics`; integrate with your Prometheus/Grafana stack. Configure `SENTRY_DSN` to enable error tracing.
+- **LangGraph Execution Tracking:** All agent executions tracked in `LangGraphExecution`, `NodeExecution`, and `EdgeExecution` tables. View real-time execution paths at `/admin/langgraph` dashboard (when implemented).
 
 ---
 

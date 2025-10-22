@@ -14,15 +14,30 @@ The platform centers around **Aika**, an AI companion powered by a multi-agent s
 
 ### 🛡️ Safety Agent Suite (Multi-Agent Architecture)
 
-**Four coordinated AI agents powered by LangGraph orchestration:**
+**Four coordinated AI agents powered by LangGraph StateGraph orchestration (Implemented: October 2025):**
+
+**Architecture:**
+```
+User Message → STA (Triage) → [Low/Moderate] → SCA (Coach) → END
+                             → [High/Critical] → SDA (Escalate) → END
+Analytics Queries → IA (Privacy-Preserving Aggregation) → END
+```
+
+**LangGraph Orchestration:**
+- **StateGraph Workflows**: Deterministic state machines with typed state (`SafetyAgentState`, `IAState`)
+- **Conditional Routing**: Risk-based agent selection with automatic escalation paths
+- **Execution Tracking**: Real-time monitoring with database persistence (`LangGraphExecution` tables)
+- **Error Recovery**: Graceful error handling at node level with state rollback
 
 #### 🚨 Safety Triage Agent (STA)
 
-- **Real-time Crisis Detection**: Automated risk classification and escalation routing within chat conversations
+- **Real-time Crisis Detection**: Automated risk classification (Level 0-3) and escalation routing within chat conversations
+- **PII Redaction**: Privacy-safe message processing before risk assessment
 - **Consent-Aware Disclosures**: Feature-flagged crisis protocols with human oversight
 - **Crisis Banner Orchestration**: Dynamic in-chat safety alerts and resource recommendations
 - **Audit Trail**: Complete logging of triage decisions and human handoffs
 - **Fail-Closed Design**: Defaults to human review when AI confidence is uncertain
+- **LangGraph Nodes**: `apply_redaction`, `classify_intent`, `assess_risk`, `route_to_agent`
 
 #### 💬 Support Coach Agent (SCA)
 
@@ -31,20 +46,24 @@ The platform centers around **Aika**, an AI companion powered by a multi-agent s
 - **Therapeutic Exercises**: Guides users through CBT-based exercises and structured conversation flows
 - **Intervention Plan Generation**: AI-generated evidence-based action plans stored and tracked in database
 - **Progress Tracking**: Visual progress bars and completion status for each intervention step
+- **LangGraph Nodes**: `validate_intervention_need`, `classify_intervention_type`, `generate_plan`, `persist_plan`
 
 #### 🗂️ Service Desk Agent (SDA)
 
 - **Clinical Case Management**: Operational command center for clinical staff with comprehensive case tracking
-- **SLA Monitoring**: Automated timers and escalation workflows for follow-ups
+- **SLA Monitoring**: Automated timers and escalation workflows with breach prediction
 - **Case Timelines**: Complete history of interventions, escalations, and clinical notes
 - **Workflow Automation**: Intelligent routing and assignment of cases to appropriate staff
+- **LangGraph Nodes**: `validate_escalation`, `create_case`, `calculate_sla`, `auto_assign`
 
 #### 🔍 Insights Agent (IA)
 
-- **Privacy-Preserving Analytics**: Differential privacy with ε-δ budget tracking and k-anonymity
+- **Privacy-Preserving Analytics**: k-anonymity enforcement (k≥5) with differential privacy budgets (ε-δ tracking)
+- **Allow-Listed Queries**: Only pre-approved analytics questions (6 queries: crisis_trend, dropoffs, resource_reuse, etc.)
 - **Aggregate Trend Analysis**: Population-level insights without exposing individual data
 - **Consent-Aware Reporting**: Only analyzes data with explicit user consent
 - **Resource Allocation Insights**: Data-driven recommendations for institutional planning
+- **LangGraph Nodes**: `ingest_query`, `validate_consent`, `apply_k_anonymity`, `execute_analytics`
 
 ### 🤖 Intelligent Chat Support (Aika)
 

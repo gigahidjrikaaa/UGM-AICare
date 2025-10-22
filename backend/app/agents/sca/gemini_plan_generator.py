@@ -6,6 +6,7 @@ based on user context, intent, and support plan type.
 """
 from __future__ import annotations
 
+import json
 import logging
 from typing import Any, Dict, List, Optional
 
@@ -171,6 +172,8 @@ async def generate_personalized_plan(
     Raises:
         Exception: If Gemini API fails or returns invalid response
     """
+    response_text = ""  # Initialize to avoid unbound variable error
+    
     try:
         logger.info(f"Generating personalized plan: type={plan_type}, intent={intent}")
         
@@ -193,9 +196,6 @@ async def generate_personalized_plan(
         )
         
         logger.debug(f"Gemini raw response: {response_text[:200]}...")
-        
-        # Parse JSON response
-        import json
         
         # Try to extract JSON if wrapped in markdown code blocks
         if "```json" in response_text:

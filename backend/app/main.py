@@ -22,6 +22,7 @@ from app.routes import (
     counselor,
     agents,
     agents_command,
+    agents_graph,
     surveys,
     cbt_modules,
     safety_triage,
@@ -163,6 +164,7 @@ app.include_router(admin.router)  # Admin endpoints (includes /admin/psychologis
 app.include_router(admin_insights.router)  # Admin insights endpoints
 app.include_router(agents.router)
 app.include_router(agents_command.router)
+app.include_router(agents_graph.router)  # LangGraph agent execution endpoints
 app.include_router(safety_triage.router)
 app.include_router(system.router)  # System diagnostics endpoints
 # TODO: wire new agent routers once services are implemented
