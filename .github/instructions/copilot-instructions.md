@@ -7,9 +7,9 @@ UGM-AICare is a transformative mental health AI platform implementing the **Safe
 The solution implements a coordinated system of four specialized Safety Agents:
 
 1. **🛡️ Safety Triage Agent (STA)**: Real-time conversation analysis for risk classification, routing, and redaction safeguards.
-2. **🧭 Safety Coaching Agent (SCA)**: Human-guided outreach plans, CBT resource delivery, and follow-up scheduling for escalated students.
-3. **📂 Safety Desk Agent (SDA)**: Case management desk that tracks manual escalations, assignments, and SLA compliance.
-4. **� Insights Agent (IA)**: Allow-listed analytics queries that surface privacy-preserving dashboards for administrators.
+2. **💬 Support Coach Agent (SCA)**: CBT-informed personalized coaching, brief micro-interventions, and evidence-based therapeutic guidance.
+3. **📂 Service Desk Agent (SDA)**: Case management desk that tracks manual escalations, assignments, and SLA compliance.
+4. **🔍 Insights Agent (IA)**: Privacy-preserving analytics queries with differential privacy (ε-δ budgets) and k-anonymity.
 
 > The legacy LangGraph modules (`analytics_agent.py`, `intervention_agent.py`, `triage_agent.py`) have been retired. All automation and visualization now run through the Safety Agent suite packages (`agents/sta`, `agents/sca`, `agents/sda`, `agents/ia`) and the shared graph specs in `agents/safety_graph_specs.py`.
 
@@ -19,38 +19,34 @@ This enterprise-grade application builds upon existing therapeutic modules, mult
 
 ### Technology Stack
 - **Frontend**: Next.js 15+ with TypeScript, Tailwind CSS 4, Framer Motion, NextAuth.js
-- **Backend**: FastAPI with Python 3.9+, SQLAlchemy 2+, Alembic migrations, LangChain for agent orchestration
+- **Backend**: FastAPI with Python 3.9+, SQLAlchemy 2+, Alembic migrations, LangChain with LangGraph for agent orchestration
 - **Database**: PostgreSQL with Redis for caching, session state, and agent coordination
-- **AI Integration**: Google Generative AI SDK (Gemini), optional self-hosted Gemma 3 service, and LangChain for agent workflows
-- **Orchestration**: n8n workflow automation engine for agent scheduling and coordination
+- **AI Integration**: Google Generative AI SDK (Gemini 2.5 API) with LangChain and LangGraph for multi-agent workflows
+- **Agent Orchestration**: LangGraph stateful graph-based controller for all agent routing and coordination
 - **Blockchain**: Hardhat with Solidity contracts for NFT achievement system
 - **Deployment**: Docker Compose with multi-service architecture
 
 ### Service Architecture
 ```
-┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   Frontend      │───▶│   Backend       │───▶│   Database      │
-│   (Next.js)     │    │   (FastAPI)     │    │   (PostgreSQL)  │
-│   Admin Dash    │    │   + LangChain   │    │   + Analytics   │
-└─────────────────┘    └─────────────────┘    └─────────────────┘
-         │                       │                       │
-         │              ┌─────────────────┐              │
-         └─────────────▶│     Redis       │◀─────────────┘
-                        │ Sessions+Agents │
-                        └─────────────────┘
-                                 │
-                        ┌─────────────────┐
-                        │      n8n        │
-                        │  Orchestration  │
-                        │   (Scheduling)  │
+┌─────────────────┐    ┌─────────────────────────┐    ┌─────────────────┐
+│   Frontend      │───▶│   Backend               │───▶│   Database      │
+│   (Next.js)     │    │   (FastAPI)             │    │   (PostgreSQL)  │
+│   Admin Dash    │    │   + LangGraph           │    │   + Analytics   │
+└─────────────────┘    │   Agent Orchestration   │    └─────────────────┘
+         │             └─────────────────────────┘              │
+         │                       │                              │
+         │              ┌─────────────────┐                     │
+         └─────────────▶│     Redis       │◀────────────────────┘
+                        │ Sessions+State  │
+                        │ Agent Memory    │
                         └─────────────────┘
 ```
 
 ### Safety Agent Suite Integration
 - **Safety Triage Agent (STA)**: Classifies live chat sessions, emits `TriageAssessment` records, and triggers escalations.
-- **Safety Coaching Agent (SCA)**: Coordinates guided plans, CBT resources, and human-led outreach for flagged students.
-- **Safety Desk Agent (SDA)**: Manages manual escalation queues, assignments, and SLA alerts for counsellors.
-- **Insights Agent (IA)**: Serves privacy-preserving analytics dashboards via allow-listed SQL templates.
+- **Support Coach Agent (SCA)**: Provides CBT-informed coaching, generates intervention plans, and delivers structured therapeutic exercises.
+- **Service Desk Agent (SDA)**: Manages manual escalation queues, assignments, and SLA alerts for counsellors.
+- **Insights Agent (IA)**: Serves privacy-preserving analytics dashboards with differential privacy guarantees.
 
 These Safety Agents are exposed through `/api/v1/safety-triage`, `/api/v1/admin/safety-coaching`, `/api/v1/admin/safety-desk`, and `/api/v1/admin/insights`, ensuring the admin experience aligns with the four-agent vocabulary.
 
@@ -85,23 +81,23 @@ The application's most sophisticated feature is the Safety Agent suite:
 - **Role:** Classifies live messages, redacts sensitive snippets, and determines whether to route to SCA, SDA, or automated resources.
 - **Implementation Notes:** Uses `SafetyTriageService` and a rule-based classifier today; future ML models will drop in via dependency injection.
 
-#### 🧭 Safety Coaching Agent (SCA)
+#### 💬 Support Coach Agent (SCA)
 - **Location:** `backend/app/agents/sca/`
-- **API:** `/api/agents/sca/intervene` & `/api/agents/sca/followup`
-- **Role:** Generates human-guided outreach plans, CBT resource packs, and structured follow-up cadences for escalated students.
-- **Implementation Notes:** Service functions are scaffolded with TODOs; wire in CBT orchestration, personalization, and cooldown enforcement here.
+- **API:** `/api/agents/sca/coach` & `/api/agents/sca/generate-plan`
+- **Role:** Provides CBT-informed personalized coaching through empathetic dialogue, generates evidence-based intervention plans, and guides users through structured therapeutic exercises.
+- **Implementation Notes:** Core coaching pipeline with Gemini 2.5 API integration; expand CBT module library with anxiety management, stress reduction, and thought challenging exercises.
 
-#### 📂 Safety Desk Agent (SDA)
+#### 📂 Service Desk Agent (SDA)
 - **Location:** `backend/app/agents/sda/`
 - **API:** `/api/agents/sda/cases`
-- **Role:** Provides human counsellors a queue of manual cases, tracks assignments, and enforces SLA timers.
-- **Implementation Notes:** `SafetyDeskService` is placeholder-only; integrate with case storage and `sla.py` helpers to activate the desk.
+- **Role:** Provides clinical staff with case management dashboard, tracks case assignments, enforces SLA timers, and manages escalation workflows.
+- **Implementation Notes:** `ServiceDeskService` is placeholder-only; integrate with case storage and `sla.py` helpers to activate the desk.
 
-#### 📊 Insights Agent (IA)
+#### � Insights Agent (IA)
 - **Location:** `backend/app/agents/ia/`
 - **API:** `/api/agents/ia/query`
-- **Role:** Serves allow-listed analytics questions with k-anonymity protection for admin dashboards (Safety Insights).
-- **Implementation Notes:** Implement SQL templates in `queries.py` and enforce `InsightsAgentService.query` guardrails before enabling write paths.
+- **Role:** Serves privacy-preserving analytics with differential privacy (ε-δ budgets), k-anonymity enforcement, and aggregate trend analysis for admin dashboards.
+- **Implementation Notes:** Implement privacy-preserving SQL templates in `queries.py` and enforce `InsightsAgentService.query` guardrails with ε-δ budget tracking.
 
 #### Foundational Safety Graph Specifications
 - **`safety_graph_specs.py`**: Describes the canonical node/edge layouts for STA, SCA, SDA, and IA used by the admin LangGraph viewer.
@@ -113,11 +109,11 @@ Use these specs when updating the LangGraph viewer or when introducing new orche
 #### Agent Coordination & Data Flow
 ```python
 # Workflow: STA → (SCA | SDA) → IA feedback loop
-1. STA records real-time triage assessments and risk scores.
-2. SCA builds coaching plans or manual outreach using STA outputs and CBT history.
-3. SDA tracks human escalations, assignments, and SLA follow-up for critical cases.
-4. IA aggregates anonymized signals (triage, campaigns, journals) into dashboards.
-5. Insights from IA and campaign metrics feed back into STA/SCA tuning.
+1. STA records real-time triage assessments and risk scores from chat conversations.
+2. SCA provides CBT-informed coaching, generates intervention plans, and delivers therapeutic exercises.
+3. SDA tracks clinical case escalations, staff assignments, and SLA follow-up for critical cases.
+4. IA aggregates anonymized signals (triage, coaching sessions, journals) into privacy-preserving dashboards.
+5. Insights from IA and intervention metrics feed back into STA/SCA optimization.
 ```
 
 ### Guided CBT Module System (Core User-Facing Feature)
@@ -202,37 +198,15 @@ if (session?.user?.role === "admin") { /* admin logic */ }
 - **Memory Management**: Conversation history and agent state management via Redis
 - **Background Tasks**: FastAPI BackgroundTasks for async agent operations and n8n integration
 
-### Database Schema Essentials
-```sql
--- Core user table
-users: id, google_sub, email, wallet_address, allow_email_checkins, role
-
--- Chat history (Analytics Agent data source)
-chat_messages: id, user_id, session_id, conversation_id, role, content, timestamp
-
--- Agent-specific tables
-analytics_reports: id, generated_at, timeframe, patterns, insights, status
-intervention_campaigns: id, insights_id, target_audience, content, executed_at, results
-triage_assessments: id, conversation_id, severity_level, routing_decision, timestamp
-
--- Module state (stored in Redis, feeds into Analytics)
-module_state:{user_id}:{session_id} → JSON state object
-
--- Agent coordination (Redis)
-agent_state:{agent_name} → Current agent status and coordination data
-campaign_queue → Pending intervention campaigns
-triage_alerts → Real-time severity alerts
-```
-
 ## Key Workflows
 
 ### Safety Agent Suite Collaboration Workflow
-1. **Safety Triage Agent (STA)** analyzes live sessions and writes `TriageAssessment` records.
-2. **Safety Coaching Agent (SCA)** consumes STA output, builds personalized coaching plans, and schedules human follow-ups.
-3. **Safety Desk Agent (SDA)** manages escalated cases, assigns counsellors, and tracks SLA thresholds.
-4. **Insights Agent (IA)** aggregates anonymized telemetry (triage, campaigns, journals) into dashboards with k-anonymity.
-5. **Campaign Automation**: IA signals feed SCA scheduling through the Safety Agent services and shared graph specs (no legacy LangGraph files remain).
-6. **Feedback Loop**: IA insights and campaign outcomes recalibrate STA thresholds and SCA playbooks.
+1. **Safety Triage Agent (STA)** analyzes live sessions and writes `TriageAssessment` records for crisis detection.
+2. **Support Coach Agent (SCA)** provides CBT-informed coaching, generates personalized intervention plans, and guides therapeutic exercises.
+3. **Service Desk Agent (SDA)** manages escalated cases, assigns clinical staff, and tracks SLA thresholds.
+4. **Insights Agent (IA)** aggregates anonymized telemetry (triage, coaching sessions, journals) into privacy-preserving dashboards with differential privacy (ε-δ) and k-anonymity.
+5. **Therapeutic Delivery**: SCA delivers CBT-based interventions through structured modules tracked in database.
+6. **Feedback Loop**: IA insights and intervention outcomes recalibrate STA thresholds and SCA therapeutic strategies.
 
 ### Enhanced Chat Flow with Guided Therapy & Agent Integration
 1. **Message Receipt**: `frontend/hooks/useChat.tsx` → `backend/routes/chat.py`
@@ -263,36 +237,6 @@ if await module.should_complete(module_state):
 - **Proactive Support**: Users receive targeted resources based on Analytics insights between sessions
 - **Progress Tracking**: CBT module completion streaks and therapeutic milestones via blockchain NFTs
 - **Admin Dashboard**: Enhanced with therapeutic progress monitoring, agent oversight, and campaign management
-
-## Comprehensive Documentation Structure
-
-### 📚 Primary Documentation (docs/ folder)
-This project includes extensive documentation to support development, research, and deployment:
-
-#### Core Documents
-- **[📚 Documentation Index](../../docs/README.md)**: Navigation guide for all documentation
-- **[📋 Project Single Source of Truth](../../PROJECT_SINGLE_SOURCE_OF_TRUTH.md)**: Definitive project overview and specifications
-- **[🏗️ Technical Implementation Guide](../../docs/technical-implementation-guide.md)**: Detailed architecture and agent implementation notes
-- **[🚀 Implementation Guide](../../docs/implementation-guide.md)**: Step-by-step development instructions
-- **[🧭 Insight Foundations Plan](../../docs/insight-foundations-plan.md)**: Safety Agent suite roadmap and analytics alignment
-- **[�️ Development Workflow](../../docs/development-workflow.md)**: Team collaboration and delivery processes
-
-#### Specialized Documentation
-- **[AI Integration Guide](../../docs/ai-integration-guide.md)**: LLM provider setup and configuration
-- **[API Integration Reference](../../docs/api-integration-reference.md)**: Endpoint documentation and examples
-- **[Mental Health AI Guidelines](../../docs/mental-health-ai-guidelines.md)**: Ethical considerations and response protocols
-- **[Development Workflow](../../docs/development-workflow.md)**: Team collaboration and development processes
-
-#### Quick Reference by Role
-| Role | Start With | Then Reference |
-|------|------------|----------------|
-| **Developer** | [Implementation Guide](../../docs/implementation-guide.md) | [Technical Implementation Guide](../../docs/technical-implementation-guide.md) |
-| **Researcher** | [Insight Foundations Plan](../../docs/insight-foundations-plan.md) | [Mental Health AI Guidelines](../../docs/mental-health-ai-guidelines.md) |
-| **Admin** | [Project Single Source of Truth](../../PROJECT_SINGLE_SOURCE_OF_TRUTH.md) | [API Integration Reference](../../docs/api-integration-reference.md) |
-| **New Team Member** | [Documentation Index](../../docs/README.md) | [Implementation Guide](../../docs/implementation-guide.md) |
-
-### 🎯 Single Source of Truth
-The root [PROJECT_SINGLE_SOURCE_OF_TRUTH.md](../../PROJECT_SINGLE_SOURCE_OF_TRUTH.md) serves as the definitive reference for all UGM-AICare development activities and GitHub Copilot Agent interactions.
 
 ## Code Quality Standards
 
@@ -372,17 +316,17 @@ docker-compose up -d
 1. Create agent class in `backend/app/agents/new_agent.py` extending base agent patterns
 2. Implement LangChain integration with required methods: `execute`, `process_data`, `coordinate`
 3. Add agent endpoints in `backend/app/routes/agents.py`
-4. Register agent in orchestration system (n8n workflows)
+4. Register agent in LangGraph orchestration graph with appropriate edges and conditional routing
 5. Update Redis state management for inter-agent communication
 6. Add agent monitoring to frontend admin dashboard
-7. Update agent coordination protocols and scheduling
+7. Update agent coordination protocols in `app/agents/safety_graph_specs.py`
 
 ### Enhancing Agent Coordination
 1. Update inter-agent communication protocols in `backend/app/core/agent_coordinator.py`
 2. Modify Redis state management for shared agent data
-3. Enhance n8n workflows for agent scheduling and triggers
+3. Enhance LangGraph orchestration specifications in `app/agents/safety_graph_specs.py` and `orchestrator_graph_spec.py`
 4. Update agent state monitoring in frontend dashboard
-5. Test agent collaboration scenarios end-to-end
+5. Test agent collaboration scenarios end-to-end with LangGraph debugger
 
 ### Adding New CBT Modules (Primary Development Focus)
 1. Create module class in `backend/app/cbt_modules/new_module.py`

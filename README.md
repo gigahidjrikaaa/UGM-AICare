@@ -4,11 +4,11 @@
 
 ## Overview
 
-Transforming University Mental Health Support with AI Safety Agents
+Transforming University Mental Health Support: An Agentic AI Framework for Proactive Intervention and Resource Management
 
-UGM-AICare is a comprehensive mental health platform designed specifically for university communities at Universitas Gadjah Mada. Built with a **Safety Agent Suite architecture**, it delivers proactive crisis detection, personalized coaching, operational case management, and privacy-first analytics—all under explicit professional oversight and verifiable privacy guarantees.
+UGM-AICare is a comprehensive mental health platform designed specifically for university communities at Universitas Gadjah Mada. Built with a **Safety Agent Suite architecture**, it delivers proactive crisis detection, personalized CBT-informed coaching, operational case management, and privacy-preserving analytics—all under explicit professional oversight and verifiable privacy guarantees.
 
-The platform centers around **Aika**, an AI companion powered by a multi-agent system that coordinates four specialized Safety Agents using LangGraph orchestration to provide 24/7 empathetic support, evidence-based interventions, and early warning capabilities.
+The platform centers around **Aika**, an AI companion powered by a multi-agent system orchestrated with LangGraph that coordinates four specialized agents to provide 24/7 empathetic support, evidence-based interventions, and early warning capabilities.
 
 ## 🌟 Core Features
 
@@ -26,32 +26,32 @@ The platform centers around **Aika**, an AI companion powered by a multi-agent s
 
 #### 💬 Support Coach Agent (SCA)
 
-- **Personalized Intervention Plans**: Evidence-based action plans with step-by-step guidance
-- **Automated Plan Generation**: AI-generated interventions stored and tracked in database
+- **CBT-Informed Coaching**: Personalized, evidence-based mental health coaching with empathetic dialogue
+- **Brief Micro-Interventions**: Structured self-help modules (anxiety management, stress reduction, thought challenging)
+- **Therapeutic Exercises**: Guides users through CBT-based exercises and structured conversation flows
+- **Intervention Plan Generation**: AI-generated evidence-based action plans stored and tracked in database
 - **Progress Tracking**: Visual progress bars and completion status for each intervention step
-- **Curated Action Cards**: Event-triggered outreach with consent-aware distribution
-- **Throttled Delivery**: Prevents notification fatigue with intelligent pacing
 
 #### 🗂️ Service Desk Agent (SDA)
 
-- **Case Management Dashboard**: Operational command center for clinical staff
-- **SLA Tracking**: Automated timers and escalation ladders for follow-ups
-- **Case Timelines**: Complete history of interventions and escalations
-- **Interoperability Hooks**: Integration points for campus systems
+- **Clinical Case Management**: Operational command center for clinical staff with comprehensive case tracking
+- **SLA Monitoring**: Automated timers and escalation workflows for follow-ups
+- **Case Timelines**: Complete history of interventions, escalations, and clinical notes
+- **Workflow Automation**: Intelligent routing and assignment of cases to appropriate staff
 
-#### 🔍 Intelligence Analytics (IA)
+#### 🔍 Insights Agent (IA)
 
-- **Privacy-Respecting Analytics**: Differential privacy with ε-δ budget tracking
-- **Consent-Aware Dimensions**: Only analyzes data with explicit consent
-- **Redaction Policies**: Clinical approval checkpoints for sensitive insights
-- **Anonymized Event Analysis**: Aggregate trends without exposing individual data
+- **Privacy-Preserving Analytics**: Differential privacy with ε-δ budget tracking and k-anonymity
+- **Aggregate Trend Analysis**: Population-level insights without exposing individual data
+- **Consent-Aware Reporting**: Only analyzes data with explicit user consent
+- **Resource Allocation Insights**: Data-driven recommendations for institutional planning
 
 ### 🤖 Intelligent Chat Support (Aika)
 
 - **AI-Powered Conversations:**
-  - Empathetic, context-aware responses using Large Language Models (Google Gemini or locally hosted Gemma 3)
-  - Multi-agent orchestration via LangGraph for intent-based routing
-  - Real-time safety monitoring and crisis escalation
+  - Empathetic, context-aware responses using Large Language Models (Google Gemini 2.5 API)
+  - Multi-agent orchestration via LangGraph for intelligent agent routing
+  - Real-time safety monitoring and automated crisis escalation
 
 - **Guided Chat Modules:**
   - Structured conversational flows (e.g., Thought Record, Problem Breakdown)
@@ -82,16 +82,16 @@ The platform centers around **Aika**, an AI companion powered by a multi-agent s
 
 ### 📚 Evidence-Based Resources & Interventions
 
-- **Intervention Plan System:**
+- **CBT-Informed Intervention System:**
   - Database-backed storage and tracking of intervention plans
-  - Step-by-step guidance with visual progress indicators
-  - Automated generation via Support Coach Agent (SCA)
-  - Manual creation and editing by clinical staff
+  - Structured self-help modules with step-by-step guidance
+  - Automated generation via Support Coach Agent (SCA) using evidence-based techniques
+  - Manual creation and editing by clinical staff with therapeutic frameworks
 
-- **Curated Content:**
+- **Clinical Content Library:**
   - Mental health resources based on Indonesian clinical guidelines (JUKNIS P2 Gangguan Mental Emosional)
   - Crisis support with immediate access to emergency resources and helplines
-  - Personalized recommendations with ethical guardrails
+  - CBT exercises and therapeutic interventions with ethical guardrails
 
 ### 🎮 Gamification & Engagement
 
@@ -114,9 +114,9 @@ The platform centers around **Aika**, an AI companion powered by a multi-agent s
 
 ### 👨‍⚕️ Admin Features
 
-- **Safety Desk Dashboard:** Monitor active cases, SLA compliance, and escalation queues
-- **Insights Dashboard:** Privacy-preserving analytics with differential privacy
-- **Intervention Plan Management:** Track and manage automated and manual plans
+- **Service Desk Dashboard:** Monitor active cases, SLA compliance, and escalation queues
+- **Insights Dashboard:** Privacy-preserving analytics with differential privacy (ε-δ budgets)
+- **Intervention Plan Management:** Track and manage automated and manual CBT-based plans
 - **Resource Management:** Comprehensive tools for managing mental health resources
 - **Role-Based Access Control (RBAC):** Secure permissions for clinical staff and administrators
 
@@ -147,14 +147,13 @@ Organized with npm/yarn workspaces for streamlined dependency management across 
 - **Database:** PostgreSQL with asyncpg driver
 - **Caching/Session State:** Redis (via `redis-py` asyncio)
 - **AI/ML Framework:** LangChain with LangGraph for multi-agent orchestration
-- **LLM Providers:** Google Gemini (hosted) and local Gemma 3 pipelines
-- **Agent Orchestration:** LangGraph as "Central Nervous System" for Safety Agent routing
-- **Task Automation:** N8N for peripheral automation workflows
+- **LLM Provider:** Google Gemini 2.5 API (primary model for all agents)
+- **Agent Orchestration:** LangGraph with stateful graph-based controller for all agent coordination and routing
 - **Background Jobs:** APScheduler for scheduled tasks (email check-ins, analytics)
 - **Authentication:** JWT validation with NextAuth integration
 - **API Documentation:** Auto-generated OpenAPI/Swagger documentation
 - **Authentication:** JWT (`python-jose`), Passlib for password hashing
-- **LLM Integration:** Google Generative AI SDK (Gemini) and `httpx` for optional Gemma 3 service
+- **LLM Integration:** Google Generative AI SDK (Gemini 2.5 API)
 - **Task Scheduling:** APScheduler for background jobs
 - **Validation:** Pydantic for request/response schema validation
 - **Email:** SMTP integration via `smtplib` and `email` modules
@@ -181,10 +180,10 @@ Organized with npm/yarn workspaces for streamlined dependency management across 
 │   ├── alembic/      # Database migration scripts
 │   ├── app/          # Main application source code
 │   │   ├── agents/       # Safety Agent Suite (STA, SCA, SDA, IA)
-│   │   │   ├── sta/        # Safety Triage Agent
-│   │   │   ├── sca/        # Support Coach Agent
-│   │   │   ├── sda/        # Service Desk Agent
-│   │   │   ├── ia/         # Intelligence Analytics
+│   │   │   ├── sta/        # Safety Triage Agent (crisis detection)
+│   │   │   ├── sca/        # Support Coach Agent (CBT coaching)
+│   │   │   ├── sda/        # Service Desk Agent (case management)
+│   │   │   ├── ia/         # Insights Agent (analytics)
 │   │   │   └── tools/      # Shared agent utilities
 │   │   ├── core/         # Core utilities (auth, DB, RBAC, events)
 │   │   ├── database/     # SQLAlchemy setup, base models
@@ -221,7 +220,7 @@ Organized with npm/yarn workspaces for streamlined dependency management across 
 │   │   │   │   ├── resources/  # Intervention plans & resources
 │   │   │   │   └── dashboard/  # User dashboard
 │   │   │   └── (admin)/      # Admin routes (protected)
-│   │   │       └── safety-desk/  # Safety Desk dashboard (planned)
+│   │   │       └── service-desk/  # Service Desk dashboard (planned)
 │   │   ├── components/ # Reusable React components
 │   │   │   ├── features/   # Feature-specific components
 │   │   │   │   ├── chat/     # Chat UI components
@@ -240,7 +239,7 @@ Organized with npm/yarn workspaces for streamlined dependency management across 
 │   ├── refactor_plan.md               # Safety Agent implementation plan
 │   ├── DEPRECATED.md                  # Index of retired documentation
 │   ├── mental-health-ai-guidelines.md # Ethics & clinical playbooks
-│   ├── hybrid-architecture-guide.md   # LangGraph + N8N architecture
+│   ├── hybrid-architecture-guide.md   # LangGraph agent orchestration
 │   └── ...
 │
 ├── ai/               # AI/ML Experimentation & Training
@@ -425,7 +424,7 @@ Create the necessary `.env` (for backend/blockchain) and `.env.local` (for front
 
 - **Root Layout:** `frontend/src/app/layout.tsx` - NextAuth SessionProvider, i18n, and global providers
 - **App Layout:** `frontend/src/components/layout/AppLayout.tsx` - Header, Sidebar, Footer with conditional blurring and feedback modal
-- **Admin Routes:** Protected admin dashboards under `frontend/src/app/(admin)/` (Safety Desk planned)
+- **Admin Routes:** Protected admin dashboards under `frontend/src/app/(admin)/` (Service Desk, Insights Dashboard)
 - **User Routes:** Main application under `frontend/src/app/(main)/` (chat, resources, dashboard)
 
 ## 🚀 Deployment
@@ -460,7 +459,7 @@ docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
 
 - **Feature Flags:** Enable/disable individual agents (STA, SCA, SDA, IA) via environment variables
 - **LangGraph Configuration:** Configure agent routing and orchestration parameters
-- **Privacy Settings:** Set differential privacy budgets (ε-δ) for Analytics Agent
+- **Privacy Settings:** Set differential privacy budgets (ε-δ) and k-anonymity thresholds for Insights Agent
 - **Consent Policies:** Configure consent workflows and withdrawal handling
 - **Crisis Protocols:** Customize escalation thresholds and human oversight triggers
 
@@ -471,7 +470,7 @@ For detailed documentation on specific aspects of the project:
 - **[Safety Agent Refactor Plan](docs/refactor_plan.md)** - Implementation roadmap and technical specifications
 - **[Project Single Source of Truth](PROJECT_SINGLE_SOURCE_OF_TRUTH.md)** - Canonical architecture reference
 - **[Mental Health AI Guidelines](docs/mental-health-ai-guidelines.md)** - Ethics, crisis playbooks, and cultural context
-- **[Hybrid Architecture Guide](docs/hybrid-architecture-guide.md)** - LangGraph + N8N architecture details
+- **[Hybrid Architecture Guide](docs/hybrid-architecture-guide.md)** - LangGraph agent orchestration architecture
 - **[Deprecated Documentation](docs/DEPRECATED.md)** - Index of retired documentation (do not reference)
 
 ## 🧪 Testing
@@ -503,13 +502,13 @@ npx hardhat test
 
 1. **User starts chat** with Aika through the web interface
 2. **Real-time monitoring:** Safety Triage Agent (STA) analyzes messages for crisis signals
-3. **Intent classification:** LangGraph orchestrator routes to appropriate agent:
-   - Crisis detected → **STA** escalates with crisis resources
-   - Coaching needed → **SCA** generates personalized intervention plan
-   - Case management → **SDA** creates case timeline (admin view)
-   - Analytics query → **IA** provides privacy-preserving insights (admin view)
-4. **Intervention delivery:** Plans stored in database, displayed with progress tracking
-5. **Continuous monitoring:** Ongoing support with consent-aware data collection
+3. **Intelligent routing:** LangGraph orchestrator routes to appropriate agent:
+   - Crisis detected → **STA** escalates with crisis resources and professional referral
+   - Coaching needed → **SCA** provides CBT-informed coaching and generates intervention plan
+   - Case management → **SDA** creates case timeline and assigns to clinical staff (admin view)
+   - Analytics query → **IA** provides privacy-preserving aggregate insights (admin view)
+4. **Intervention delivery:** CBT-based plans stored in database, displayed with progress tracking
+5. **Continuous monitoring:** Ongoing support with consent-aware data collection and human oversight
 
 ### Safety Agent Workflow
 
@@ -519,10 +518,11 @@ User Message → LangGraph Orchestrator
     ┌─────────┴─────────┬──────────┬──────────┐
     ↓                   ↓          ↓          ↓
    STA                 SCA        SDA        IA
-(Crisis Triage)   (Coaching)  (Cases)  (Analytics)
+(Crisis Triage)   (CBT Coaching) (Case Mgmt) (Analytics)
     ↓                   ↓          ↓          ↓
-Crisis Banner    Intervention   Case      Insights
-& Resources         Plans      Timeline   Dashboard
+Crisis Banner    CBT-Informed   Clinical   Privacy-
+& Resources      Interventions  Workflows  Preserving
+                                           Insights
 ```
 
 ### Privacy & Consent Flow

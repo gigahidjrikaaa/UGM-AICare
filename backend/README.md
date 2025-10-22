@@ -1,6 +1,6 @@
 # UGM-AICare Backend
 
-FastAPI service that powers the Safety Agent Suite behind UGM-AICare. The backend orchestrates crisis-aware chat, consent-driven outreach, safety desk workflows, and privacy-first insights for university mental health support. Hosted Google Gemini models provide empathetic conversations, while an optional self-managed Gemma 3 runtime can be plugged into the same abstraction.
+FastAPI service that powers the Safety Agent Suite behind UGM-AICare. The backend orchestrates crisis detection, CBT-informed coaching, clinical case management, and privacy-preserving analytics for university mental health support. Google Gemini 2.5 API provides empathetic conversations and evidence-based interventions through LangGraph-orchestrated agents.
 
 ---
 
@@ -8,10 +8,10 @@ FastAPI service that powers the Safety Agent Suite behind UGM-AICare. The backen
 
 | Agent | Scope | Highlights | Status (Sep 2025) |
 |-------|-------|------------|--------------------|
-| 🛡️ **Safety Triage Agent (STA)** | Real-time risk scoring inside the chat flow | Crisis banner orchestration, feature flags, human hand-off logging | API scaffolding in progress |
-| 📣 **Safety Campaign Agent (SCA)** | Consent-aware outreach and Action Cards | Evidence-backed content library, throttled dispatch, audit trails | Content pipeline design drafted |
-| 🗂️ **Safety Desk Agent (SDA)** | Operational cockpit for clinical staff | Case timelines, SLA tracking, interoperability hooks | Data model defined, routes pending |
-| 🔍 **Insights Agent (IA)** | Privacy-preserving analytics over anonymised events | Differential privacy budgets, consent dimensions, redaction policies | Migration drafted, query layer pending |
+| 🛡️ **Safety Triage Agent (STA)** | Real-time risk scoring inside the chat flow | Crisis banner orchestration, feature flags, professional referral, audit logging | API scaffolding in progress |
+| � **Support Coach Agent (SCA)** | CBT-informed coaching and micro-interventions | Empathetic dialogue, structured self-help modules, therapeutic exercises, progress tracking | Core pipeline implemented |
+| 🗂️ **Service Desk Agent (SDA)** | Operational command center for clinical staff | Case timelines, SLA monitoring, escalation workflows, clinical assignment | Data model defined, routes pending |
+| 🔍 **Insights Agent (IA)** | Privacy-preserving analytics over anonymized events | Differential privacy budgets (ε-δ), k-anonymity, aggregate trend analysis | Migration drafted, query layer pending |
 
 Refer to `PROJECT_SINGLE_SOURCE_OF_TRUTH.md` for the canonical roadmap and alignment guidance.
 
@@ -19,11 +19,11 @@ Refer to `PROJECT_SINGLE_SOURCE_OF_TRUTH.md` for the canonical roadmap and align
 
 ## Core Capabilities
 
-- **Safety-first chat** with Gemini/Gemma responses, sentiment signals, and STA risk scoring
+- **Safety-first chat** with Gemini 2.5 API responses, real-time risk monitoring, and STA crisis detection
+- **CBT-informed coaching** via SCA with evidence-based therapeutic interventions and progress tracking
 - **User & consent management** via JWT-secured APIs and append-only consent ledgers
-- **Campaign orchestration** for Action Cards and n8n-triggered outreach (SCA)
-- **Case operations** with SDA scaffolding for clinical oversight and SLA enforcement
-- **Insights pipeline** prepared for differential privacy queries and audit-ready reporting
+- **Clinical case management** with SDA scaffolding for case oversight and SLA enforcement
+- **Privacy-preserving insights** with IA differential privacy queries and audit-ready reporting
 - **Observability hooks** for structured logging, monitoring, and privacy budget events
 
 ---
@@ -34,13 +34,13 @@ Refer to `PROJECT_SINGLE_SOURCE_OF_TRUTH.md` for the canonical roadmap and align
 backend/
 ├── app/
 │   ├── agents/
-│   │   ├── sta/            # Safety Triage Agent flows
-│   │   ├── sca/            # Safety Campaign Agent utilities
-│   │   ├── sda/            # Safety Desk Agent prototypes
-│   │   └── ia/             # Insights Agent scaffolding
+│   │   ├── sta/            # Safety Triage Agent (crisis detection)
+│   │   ├── sca/            # Support Coach Agent (CBT coaching)
+│   │   ├── sda/            # Service Desk Agent (case management)
+│   │   └── ia/             # Insights Agent (privacy-preserving analytics)
 │   ├── core/
-│   │   ├── llm.py          # Gemini & Gemma provider abstraction via LangChain
-│   │   ├── memory.py       # Conversation memory orchestration
+│   │   ├── llm.py          # Gemini 2.5 API provider via LangChain
+│   │   ├── memory.py       # Conversation memory and LangGraph orchestration
 │   │   └── policy.py       # Redaction + consent policy helpers (in progress)
 │   ├── database/           # Async SQLAlchemy session and migrations helpers
 │   ├── routes/             # FastAPI routers (chat, users, safety endpoints)
@@ -64,7 +64,9 @@ backend/
 - **Runtime:** Python 3.11+ with FastAPI, asynchronous SQLAlchemy, and LangChain
 - **Data Layer:** PostgreSQL, Redis (session state + feature flags), deterministic hashing for privacy
 - **LLM Providers:** Google Gemini (hosted) and optional Gemma 3 runtime wired through `core/llm.py`
-- **Messaging & Tasks:** Celery / Redis queues, n8n webhooks, email/SMS connectors
+- **Authentication & Sessions:** JWT validation, NextAuth sync endpoints, Redis for sessions
+- **Messaging & Tasks:** Redis queues, APScheduler for background tasks, email/SMS connectors
+- **Feature Flags & Config:** Runtime toggles for STA/SCA/SDA/IA activation and environment-driven configs
 - **Observability:** Structured logging (JSON), Prometheus instrumentation, optional Sentry integration
 - **Security:** JWT auth, parameterised queries, configurable CORS, consent & redaction guardrails
 
@@ -176,9 +178,8 @@ Ensure tests cover new Safety Agent flows (STA/SCA/SDA/IA) before enabling relat
 
 - **Migrations:** Alembic revisions live inside `alembic/versions/`. Follow the schema rollout sequence defined in `PROJECT_SINGLE_SOURCE_OF_TRUTH.md` (Database → Agents → Frontend → Playbooks).
 - **Feature Flags:** STA feature rollout is guarded via configuration; keep defaults off until clinical review signs off.
-- **Gemma Runtime:** Update the `gemma_api_url` inside `app/core/llm.py` to point at your deployment (Docker service name by default). The LangChain loader automatically falls back to Gemini if Gemma is unavailable.
+- **LangGraph Orchestration:** All agent coordination handled through LangGraph's stateful graph-based controller. Agent routing specifications defined in `app/agents/safety_graph_specs.py`.
 - **Monitoring:** `prometheus-fastapi-instrumentator` exposes metrics under `/metrics`; integrate with your Prometheus/Grafana stack. Configure `SENTRY_DSN` to enable error tracing.
-- **n8n & Webhooks:** Secure `INTERNAL_API_KEY` and whitelist IPs when exposing webhook endpoints.
 
 ---
 
@@ -190,7 +191,7 @@ Ensure tests cover new Safety Agent flows (STA/SCA/SDA/IA) before enabling relat
 | Database connection errors | Verify PostgreSQL is running, confirm async URL uses `postgresql+asyncpg://`, rerun migrations. |
 | Redis unreachable | Ensure Redis server is accessible; for local dev you can set `REDIS_HOST=localhost` and start a local instance. The app falls back to in-memory cache but disables queue-backed features. |
 | Gemini API failures | Confirm `GOOGLE_GENAI_API_KEY`, project access, and region; inspect logged safety block reasons. |
-| Gemma service timeouts | Validate container/service health, endpoint URL, and that requests adhere to your rate limits. |
+| LangGraph orchestration errors | Check agent graph specifications in `app/agents/safety_graph_specs.py` and validate node/edge configurations in logs. |
 
 ---
 
