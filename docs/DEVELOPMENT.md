@@ -7,22 +7,25 @@ This project includes a `docker-compose.override.yml` file that automatically en
 ### Quick Start
 
 1. **Start services in development mode:**
+
    ```bash
    docker-compose up
    ```
-   
+
    The override file is automatically loaded and enables:
    - Backend hot-reload on code changes
    - Frontend hot-reload with Next.js dev server
    - Volume mounts for instant code updates
 
 2. **Rebuild only when dependencies change:**
+
    ```bash
    # Only needed when package.json or requirements.txt changes
    docker-compose up --build
    ```
 
 3. **View logs:**
+
    ```bash
    docker-compose logs -f backend
    docker-compose logs -f frontend
@@ -31,12 +34,14 @@ This project includes a `docker-compose.override.yml` file that automatically en
 ### What's Different in Development Mode?
 
 **Backend:**
+
 - Gunicorn runs with `--reload` flag
 - Source code mounted as volume (`./backend:/app`)
 - Single worker for faster restarts
 - Extended timeout (120s)
 
 **Frontend:**
+
 - Next.js dev server (`npm run dev`)
 - Source code mounted as volume (`./frontend:/app`)
 - Node modules preserved in anonymous volume
@@ -58,16 +63,19 @@ docker-compose up
 ### Troubleshooting
 
 **Changes not reflecting:**
+
 - Ensure you're editing files in the correct directory
 - Check if file watching is working: `docker-compose logs -f backend`
 - On Windows, file watching might be slower due to WSL/Docker Desktop
 
 **Performance issues:**
+
 - Reduce number of files being watched
 - Use `.dockerignore` to exclude unnecessary files
 - Consider increasing Docker Desktop resources
 
 **Permission errors:**
+
 - On Linux, you might need to match UID/GID in containers
 - Use `chown` to fix file ownership if needed
 
