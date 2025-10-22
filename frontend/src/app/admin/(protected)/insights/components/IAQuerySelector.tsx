@@ -74,44 +74,44 @@ export function IAQuerySelector({ onExecute, loading }: IAQuerySelectorProps) {
   const selectedQueryInfo = ALLOW_LISTED_QUERIES.find((q) => q.value === selectedQuery);
 
   return (
-    <div className="bg-white rounded-lg shadow">
-      <div className="p-6 border-b border-gray-200">
-        <h2 className="text-xl font-semibold text-gray-900">Run Allow-Listed Query</h2>
-        <p className="text-sm text-gray-600 mt-1">Execute privacy-preserving analytics queries</p>
+    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden">
+      <div className="p-5 border-b border-white/10">
+        <h2 className="text-lg font-semibold text-white">Run Allow-Listed Query</h2>
+        <p className="text-xs text-white/60 mt-1">Execute privacy-preserving analytics queries</p>
       </div>
       
-      <div className="p-6">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="p-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div>
-            <label htmlFor="query-select" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="query-select" className="block text-xs font-medium text-white/70 mb-2">
               Select Query
             </label>
             <select
               id="query-select"
               value={selectedQuery}
               onChange={(e) => setSelectedQuery(e.target.value)}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="block w-full rounded-lg bg-white/10 border border-white/20 text-white text-sm py-2.5 px-3 focus:border-[#FFCA40] focus:ring-1 focus:ring-[#FFCA40] disabled:opacity-50 disabled:cursor-not-allowed"
               disabled={loading}
             >
-              <option value="">-- Select a query --</option>
+              <option value="" className="bg-[#001d58]">-- Select a query --</option>
               {ALLOW_LISTED_QUERIES.map((query) => (
-                <option key={query.value} value={query.value}>
+                <option key={query.value} value={query.value} className="bg-[#001d58]">
                   {query.label}
                 </option>
               ))}
             </select>
             {selectedQueryInfo && (
-              <p className="mt-2 text-sm text-gray-500">
+              <p className="mt-2 text-xs text-white/60">
                 {selectedQueryInfo.description}
               </p>
             )}
-            <p className="mt-2 text-xs text-gray-500">
+            <p className="mt-2 text-xs text-emerald-400/80">
               ✓ All queries enforce k-anonymity (k≥5) and differential privacy
             </p>
           </div>
           
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-xs font-medium text-white/70 mb-2">
               Date Range (Optional)
             </label>
             <div className="grid grid-cols-2 gap-3">
@@ -122,7 +122,7 @@ export function IAQuerySelector({ onExecute, loading }: IAQuerySelectorProps) {
                   type="date"
                   value={startDate}
                   onChange={(e) => setStartDate(e.target.value)}
-                  className="block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="block w-full rounded-lg bg-white/10 border border-white/20 text-white text-sm py-2 px-3 focus:border-[#FFCA40] focus:ring-1 focus:ring-[#FFCA40] disabled:opacity-50"
                   placeholder="Start date"
                   disabled={loading}
                 />
@@ -134,7 +134,7 @@ export function IAQuerySelector({ onExecute, loading }: IAQuerySelectorProps) {
                   type="date"
                   value={endDate}
                   onChange={(e) => setEndDate(e.target.value)}
-                  className="block w-full rounded-md border-gray-300 shadow-sm text-sm focus:border-blue-500 focus:ring-blue-500"
+                  className="block w-full rounded-lg bg-white/10 border border-white/20 text-white text-sm py-2 px-3 focus:border-[#FFCA40] focus:ring-1 focus:ring-[#FFCA40] disabled:opacity-50"
                   placeholder="End date"
                   disabled={loading}
                 />
@@ -143,32 +143,32 @@ export function IAQuerySelector({ onExecute, loading }: IAQuerySelectorProps) {
           </div>
         </div>
         
-        <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="mt-5 grid grid-cols-1 md:grid-cols-2 gap-5">
           <div>
-            <label htmlFor="severity-filter" className="block text-sm font-medium text-gray-700 mb-2">
+            <label htmlFor="severity-filter" className="block text-xs font-medium text-white/70 mb-2">
               Severity Filter (Optional)
             </label>
             <select
               id="severity-filter"
               value={severity}
               onChange={(e) => setSeverity(e.target.value)}
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className="block w-full rounded-lg bg-white/10 border border-white/20 text-white text-sm py-2.5 px-3 focus:border-[#FFCA40] focus:ring-1 focus:ring-[#FFCA40] disabled:opacity-50"
               disabled={loading}
             >
-              <option value="">All Severities</option>
-              <option value="low">Low</option>
-              <option value="moderate">Moderate</option>
-              <option value="high">High</option>
-              <option value="critical">Critical</option>
+              <option value="" className="bg-[#001d58]">All Severities</option>
+              <option value="low" className="bg-[#001d58]">Low</option>
+              <option value="moderate" className="bg-[#001d58]">Moderate</option>
+              <option value="high" className="bg-[#001d58]">High</option>
+              <option value="critical" className="bg-[#001d58]">Critical</option>
             </select>
           </div>
         </div>
         
-        <div className="mt-6 flex items-center gap-4">
+        <div className="mt-5 flex items-center gap-3">
           <button
             onClick={handleExecute}
             disabled={!selectedQuery || loading}
-            className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            className="px-5 py-2.5 bg-[#FFCA40] text-white text-sm rounded-lg hover:bg-[#FFD55C] font-medium disabled:bg-white/10 disabled:cursor-not-allowed transition-colors"
           >
             {loading ? (
               <span className="flex items-center gap-2">
@@ -192,7 +192,7 @@ export function IAQuerySelector({ onExecute, loading }: IAQuerySelectorProps) {
                 setSeverity('');
               }}
               disabled={loading}
-              className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+              className="px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-sm font-medium text-white/80 hover:bg-white/10 disabled:opacity-50 transition-colors"
             >
               Clear
             </button>

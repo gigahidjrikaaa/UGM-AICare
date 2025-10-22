@@ -71,14 +71,15 @@ async def init_db():
 
     logger.info(f"Database initialized with asyncpg: {DATABASE_URL}")
 
-    from app.services.admin_bootstrap import ensure_default_admin
+    from app.services.admin_bootstrap import ensure_default_admin, ensure_default_counselor
 
     async with AsyncSessionLocal() as session:
         try:
             await ensure_default_admin(session)
+            await ensure_default_counselor(session)
         except Exception as exc:
             await session.rollback()
-            logger.error(f"Failed to ensure default admin user: {exc}")
+            logger.error(f"Failed to ensure default users: {exc}")
 
 async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
     """Async database dependency for FastAPI"""

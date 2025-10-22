@@ -71,3 +71,49 @@ async def ensure_default_admin(db: AsyncSession) -> None:
     except Exception as exc:
         await db.rollback()
         logger.error(f"Failed to create default admin user: {exc}")
+
+
+async def ensure_default_counselor(db: AsyncSession) -> None:
+    """Ensure at least one counselor account exists; bootstrap from env if missing."""
+    stmt_existing = select(User).where(User.role == "counselor").limit(1)
+    result_existing = await db.execute(stmt_existing)
+    existing_counselor = result_existing.scalar_one_or_none()
+    if existing_counselor:
+        logger.info("Counselor account already present; skipping bootstrap.")
+        return
+
+    counselor_email = os.getenv("COUNSELOR_EMAIL")
+    counselor_password = os.getenv("COUNSELOR_PASSWORD")
+    counselor_name = os.getenv("COUNSELOR_NAME", "Default Counselor")
+
+    if not counselor_email or not counselor_password:
+        logger.warning("COUNSELOR_EMAIL or COUNSELOR_PASSWORD not set; cannot create default counselor user.")
+        return
+
+    try:
+        encrypted_email = _maybe_encrypt(counselor_email)
+        encrypted_name = _maybe_encrypt(counselor_name)
+    except ValueError:
+        return
+
+    password_hash = _hash_password(counselor_password)
+
+    counselor_user = User(
+        email=encrypted_email,
+        password_hash=password_hash,
+        role="counselor",
+        is_active=True,
+        email_verified=True,
+        name=encrypted_name,
+        created_at=datetime.utcnow(),
+        last_login=None,
+    )
+
+    db.add(counselor_user)
+    try:
+        await db.commit()
+        await db.refresh(counselor_user)
+        logger.info("Default counselor user created from environment configuration.")
+    except Exception as exc:
+        await db.rollback()
+        logger.error(f"Failed to create default counselor user: {exc}")

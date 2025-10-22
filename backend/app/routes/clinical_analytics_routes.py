@@ -18,7 +18,7 @@ from ..models import User
 logger = logging.getLogger(__name__)
 
 # Create router for clinical analytics endpoints
-router = APIRouter(prefix="/api/admin/clinical-analytics", tags=["Clinical Analytics"])
+router = APIRouter(prefix="/api/v1/clinical-analytics", tags=["Clinical Analytics"])
 
 
 @router.get("/treatment-outcomes")

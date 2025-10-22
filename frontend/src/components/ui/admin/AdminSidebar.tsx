@@ -11,12 +11,18 @@ import {
   FiShield,
   FiLogOut,
   FiHelpCircle,
-  FiFileText,
   FiHeart,
   FiUser,
-  FiCpu,
   FiUserCheck,
   FiSend,
+  FiBarChart2,
+  FiClipboard,
+  FiActivity,
+  FiBookOpen,
+  FiTrendingUp,
+  FiBriefcase,
+  FiMonitor,
+  FiTarget,
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink'; // Assuming SidebarLink component exists
 
@@ -29,26 +35,27 @@ const navGroups = [
       { name: 'Psychologists', icon: <FiUserCheck size={18}/>, href: '/admin/psychologists' },
       { name: 'Appointments', icon: <FiCalendar size={18}/>, href: '/admin/appointments' },
       { name: 'Conversations', icon: <FiMessageSquare size={18}/>, href: '/admin/conversations' },
-      { name: 'Content Resources', icon: <FiFileText size={18}/>, href: '/admin/content-resources' },
-      { name: 'Surveys', icon: <FiFileText size={18}/>, href: '/admin/surveys' },
+      { name: 'Content Resources', icon: <FiBookOpen size={18}/>, href: '/admin/content-resources' },
+      { name: 'Surveys', icon: <FiClipboard size={18}/>, href: '/admin/surveys' },
       { name: 'CBT Modules', icon: <FiHeart size={18}/>, href: '/admin/cbt-modules' },
     ]
   },
   {
     label: 'Agents & Intelligence',
     items: [
-      { name: 'Dashboard', icon: <FiShield size={18}/>, href: '/admin/dashboard' },
+      { name: 'Dashboard', icon: <FiBarChart2 size={18}/>, href: '/admin/dashboard' },
       { name: 'Cases', icon: <FiShield size={18}/>, href: '/admin/cases' },
-      { name: 'Service Desk', icon: <FiShield size={18}/>, href: '/admin/service-desk' },
+      { name: 'Service Desk', icon: <FiBriefcase size={18}/>, href: '/admin/service-desk' },
       { name: 'SCA Outreach', icon: <FiSend size={18}/>, href: '/admin/campaigns' },
-      { name: 'LangGraph Monitoring', icon: <FiCpu size={18}/>, href: '/admin/langgraph' },
-      { name: 'Agents Command Center', icon: <FiCpu size={18}/>, href: '/admin/agents-command-center' },
+      { name: 'Insights Analytics', icon: <FiTrendingUp size={18}/>, href: '/admin/insights' },
+      { name: 'LangGraph Monitoring', icon: <FiActivity size={18}/>, href: '/admin/langgraph' },
+      { name: 'Agents Command Center', icon: <FiMonitor size={18}/>, href: '/admin/agents-command-center' },
     ]
   },
   {
     label: 'Development Tools',
     items: [
-      { name: 'Testing Scenarios', icon: <FiHelpCircle size={18}/>, href: '/admin/testing' },
+      { name: 'Testing Scenarios', icon: <FiTarget size={18}/>, href: '/admin/testing' },
     ]
   }
 ];

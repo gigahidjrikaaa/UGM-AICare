@@ -155,14 +155,14 @@ export function AnalyticsOverview({ days }: AnalyticsOverviewProps) {
                     <span className="font-semibold">{node.execution_count.toLocaleString()}</span> executions
                   </div>
                   <div>
-                    <span className="font-semibold">{node.avg_time_ms.toFixed(0)}ms</span> avg
+                    <span className="font-semibold">{node.avg_time_ms?.toFixed(0) ?? 'N/A'}ms</span> avg
                   </div>
                   <div>
                     <span className={`font-semibold ${
-                      node.success_rate_percent >= 95 ? 'text-green-600' :
-                      node.success_rate_percent >= 70 ? 'text-yellow-600' : 'text-red-600'
+                      (node.success_rate_percent ?? 0) >= 95 ? 'text-green-600' :
+                      (node.success_rate_percent ?? 0) >= 70 ? 'text-yellow-600' : 'text-red-600'
                     }`}>
-                      {node.success_rate_percent.toFixed(1)}%
+                      {node.success_rate_percent?.toFixed(1) ?? 'N/A'}%
                     </span> success
                   </div>
                 </div>
