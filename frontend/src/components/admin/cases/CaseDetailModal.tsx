@@ -84,6 +84,7 @@ export default function CaseDetailModal({
     switch (status) {
       case 'new': return 'text-blue-600 bg-blue-100 dark:bg-blue-900 dark:text-blue-200';
       case 'in_progress': return 'text-purple-600 bg-purple-100 dark:bg-purple-900 dark:text-purple-200';
+      case 'waiting': return 'text-amber-600 bg-amber-100 dark:bg-amber-900 dark:text-amber-200';
       case 'resolved': return 'text-green-600 bg-green-100 dark:bg-green-900 dark:text-green-200';
       case 'closed': return 'text-gray-600 bg-gray-100 dark:bg-gray-900 dark:text-gray-200';
       default: return 'text-gray-600 bg-gray-100 dark:bg-gray-900 dark:text-gray-200';
@@ -306,7 +307,12 @@ export default function CaseDetailModal({
                       caseDetail.assignments.map((assignment) => (
                         <div key={assignment.id} className="bg-gray-50 dark:bg-gray-900 p-4 rounded-lg">
                           <p className="text-gray-900 dark:text-gray-100 font-medium">
-                            Assigned to: {assignment.assigned_to}
+                            Assigned to: {assignment.assigned_to ?? 'Unassigned'}
+                            {assignment.assignee_role && (
+                              <span className="ml-2 text-sm text-gray-500 dark:text-gray-400">
+                                ({assignment.assignee_role})
+                              </span>
+                            )}
                           </p>
                           {assignment.previous_assignee && (
                             <p className="text-sm text-gray-600 dark:text-gray-400">

@@ -5,8 +5,10 @@
 
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { assignCase } from '@/services/adminCaseApi';
+import { listAgentUsers } from '@/services/adminAgentApi';
+import type { AgentUserSummary } from '@/types/admin/agentUsers';
 import toast from 'react-hot-toast';
 
 interface CaseAssignmentProps {
@@ -24,34 +26,85 @@ export default function CaseAssignment({
   onClose,
   onSuccess,
 }: CaseAssignmentProps) {
-  const [assignee, setAssignee] = useState('');
+  const [selectedOption, setSelectedOption] = useState<string>('');
+  const [customAssignee, setCustomAssignee] = useState('');
   const [reason, setReason] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [agentUsers, setAgentUsers] = useState<AgentUserSummary[]>([]);
+  const [agentsLoading, setAgentsLoading] = useState(false);
 
-  // Predefined counselors (in real app, fetch from API)
-  const counselors = [
-    'counselor1',
-    'counselor2',
-    'counselor3',
-    'dr.smith',
-    'dr.jones',
-  ];
+  useEffect(() => {
+    if (!isOpen) {
+      setSelectedOption('');
+      setCustomAssignee('');
+      setReason('');
+      return;
+    }
+
+    setSelectedOption(currentAssignee ?? '');
+    setCustomAssignee('');
+    setReason('');
+    setAgentsLoading(true);
+
+    listAgentUsers()
+      .then((agents) => {
+        setAgentUsers(agents);
+      })
+      .catch((error) => {
+        console.error('Failed to load agent users:', error);
+        toast.error('Unable to load counselor list. You can still enter an ID manually.');
+        setAgentUsers([]);
+      })
+      .finally(() => setAgentsLoading(false));
+  }, [isOpen, currentAssignee]);
+
+  const availableAgentOptions = useMemo(() => {
+    const ids = new Set(agentUsers.map((agent) => agent.id));
+    const options = [...agentUsers];
+    if (currentAssignee && !ids.has(currentAssignee)) {
+      options.push({ id: currentAssignee, role: 'unknown', created_at: new Date().toISOString() });
+    }
+    return options;
+  }, [agentUsers, currentAssignee]);
+
+  const hasValidAssignee = (() => {
+    if (selectedOption === '__unassign__') return true;
+    if (selectedOption === '__custom__') return customAssignee.trim().length > 0;
+    return selectedOption.trim().length > 0;
+  })();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!assignee.trim()) {
-      toast.error('Please select or enter a counselor');
+    let targetAssignee: string | null;
+    if (selectedOption === '__unassign__') {
+      targetAssignee = null;
+    } else if (selectedOption === '__custom__') {
+      const trimmed = customAssignee.trim();
+      if (!trimmed) {
+        toast.error('Please enter an agent ID');
+        return;
+      }
+      targetAssignee = trimmed;
+    } else if (selectedOption.trim()) {
+      targetAssignee = selectedOption.trim();
+    } else {
+      toast.error('Please choose an assignee');
       return;
     }
 
     setSubmitting(true);
     try {
       await assignCase(caseId, {
-        assigned_to: assignee,
+        assigned_to: targetAssignee,
         reason: reason.trim() || undefined,
       });
-      toast.success(`Case ${currentAssignee ? 'reassigned' : 'assigned'} to ${assignee}`);
+      const actionLabel = targetAssignee
+        ? currentAssignee
+          ? `reassigned to ${targetAssignee}`
+          : `assigned to ${targetAssignee}`
+        : 'unassigned';
+      toast.success(`Case ${actionLabel}`);
       onSuccess();
       onClose();
     } catch (error) {
@@ -63,6 +116,8 @@ export default function CaseAssignment({
   };
 
   if (!isOpen) return null;
+
+  const disableSubmit = submitting || !hasValidAssignee;
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
@@ -91,32 +146,36 @@ export default function CaseAssignment({
             <label htmlFor="case-assignee" className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
               Assign To <span className="text-red-500">*</span>
             </label>
+            {agentsLoading && (
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Loading counselors...</p>
+            )}
             <select
               id="case-assignee"
-              value={assignee}
-              onChange={(e) => setAssignee(e.target.value)}
+              value={selectedOption}
+              onChange={(e) => setSelectedOption(e.target.value)}
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
               required
             >
               <option value="">Select counselor...</option>
-              {counselors.map((counselor) => (
-                <option key={counselor} value={counselor}>
-                  {counselor}
+              {availableAgentOptions.map((agent) => (
+                <option key={agent.id} value={agent.id}>
+                  {agent.id} ({agent.role})
                 </option>
               ))}
-              <option value="custom">Custom (type below)</option>
+              <option value="__custom__">Enter custom ID...</option>
+              {currentAssignee && <option value="__unassign__">Unassign case</option>}
             </select>
           </div>
 
-          {assignee === 'custom' && (
+          {selectedOption === '__custom__' && (
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Counselor ID/Username
               </label>
               <input
                 type="text"
-                value={reason}
-                onChange={(e) => setAssignee(e.target.value)}
+                value={customAssignee}
+                onChange={(e) => setCustomAssignee(e.target.value)}
                 placeholder="Enter counselor ID or username"
                 className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-gray-100"
                 required
@@ -175,7 +234,7 @@ export default function CaseAssignment({
             </button>
             <button
               type="submit"
-              disabled={submitting || !assignee.trim()}
+              disabled={disableSubmit}
               className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-md hover:bg-purple-700 disabled:opacity-50"
             >
               {submitting ? 'Processing...' : currentAssignee ? 'Reassign' : 'Assign'}

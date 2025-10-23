@@ -30,6 +30,7 @@ from app.schemas.admin.cases import (
 )
 from app.services.agent_orchestrator import AgentOrchestrator
 from app.services.event_bus import EventType, publish_event
+from app.models.agent_user import AgentUser
 
 logger = logging.getLogger(__name__)
 
@@ -326,17 +327,19 @@ async def get_case_detail(
         # Get assignment history
         assignments_result = await db.execute(
             select(CaseAssignment)
+            .options(selectinload(CaseAssignment.assignee))
             .where(CaseAssignment.case_id == case.id)
             .order_by(CaseAssignment.assigned_at.desc())
         )
         assignments = [
             CaseAssignmentSummary(
-                id=a.id,
+                id=str(a.id),
                 assigned_to=a.assigned_to,
                 assigned_by=a.assigned_by,
                 assigned_at=a.assigned_at,
                 previous_assignee=a.previous_assignee,
-                reassignment_reason=a.reassignment_reason
+                reassignment_reason=a.reassignment_reason,
+                assignee_role=a.assignee.role if a.assignee else None,
             )
             for a in assignments_result.scalars().all()
         ]
@@ -466,7 +469,8 @@ async def update_case_status(
         # Validate workflow transitions (except emergency close)
         if payload.status != 'closed':
             valid_transitions = {
-                'new': ['in_progress'],
+                'new': ['waiting', 'in_progress'],
+                'waiting': ['in_progress'],
                 'in_progress': ['resolved'],
                 'resolved': ['closed'],
                 'closed': []  # Cannot transition from closed
@@ -486,7 +490,6 @@ async def update_case_status(
         
         # Update status
         case.status = CaseStatusEnum[payload.status]
-        case.updated_at = datetime.utcnow()
         
         # Add note if provided
         if payload.note:
@@ -552,53 +555,71 @@ async def assign_case(
         
         previous_assignee = case.assigned_to
         is_reassignment = previous_assignee is not None
-        
+
+        raw_assignee = (payload.assigned_to or "").strip()
+        assignee_id: str | None
+        if not raw_assignee or raw_assignee.lower() in {"unassigned", "none", "null"}:
+            assignee_id = None
+            assignee_model = None
+        else:
+            assignee_result = await db.execute(
+                select(AgentUser).where(AgentUser.id == raw_assignee)
+            )
+            assignee_model = assignee_result.scalar_one_or_none()
+            if assignee_model is None:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Unknown assignee '{raw_assignee}'",
+                )
+            assignee_id = assignee_model.id
+
         # Update case assignment
-        case.assigned_to = payload.assigned_to
-        case.updated_at = datetime.utcnow()
-        
+        case.assigned_to = assignee_id
+
         # Create assignment audit record
         assignment = CaseAssignment(
             case_id=case.id,
-            assigned_to=payload.assigned_to,
+            assigned_to=assignee_id,
             assigned_by=getattr(admin_user, "id", None),
-            assigned_at=datetime.utcnow(),
             previous_assignee=previous_assignee,
-            reassignment_reason=payload.reason if is_reassignment else None
+            reassignment_reason=payload.reason if is_reassignment else None,
         )
         db.add(assignment)
-        
+
         # Add note
         action = "reassigned" if is_reassignment else "assigned"
-        note_text = f"Case {action} to {payload.assigned_to}"
+        if assignee_id is None:
+            action = "unassigned" if is_reassignment else "set to unassigned"
+        target_label = assignee_id or "Unassigned"
+        note_text = f"Case {action} to {target_label}"
         if payload.reason:
             note_text += f": {payload.reason}"
-        
+
         note = CaseNote(
             case_id=case.id,
             note=note_text,
             author_id=getattr(admin_user, "id", None)
         )
         db.add(note)
-        
+
         await db.commit()
         await db.refresh(case)
-        
+
         # Emit event
         await publish_event(
             event_type=EventType.CASE_ASSIGNED,
             source_agent='sda',
             data={
                 'case_id': str(case.id),
-                'assigned_to': payload.assigned_to,
+                'assigned_to': assignee_id,
                 'assigned_by': getattr(admin_user, "id", None),
                 'is_reassignment': is_reassignment,
                 'previous_assignee': previous_assignee
             }
         )
-        
-        logger.info(f"Case {case_id} assigned to {payload.assigned_to}")
-        
+
+        logger.info(f"Case {case_id} assigned to {target_label}")
+
         return {
             "case_id": str(case.id),
             "assigned_to": case.assigned_to,

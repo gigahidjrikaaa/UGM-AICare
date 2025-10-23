@@ -77,6 +77,8 @@ export default function CaseListTable({
         return `${baseClasses} bg-blue-500/20 text-blue-300 border-blue-500/40`;
       case 'in_progress':
         return `${baseClasses} bg-purple-500/20 text-purple-300 border-purple-500/40`;
+      case 'waiting':
+        return `${baseClasses} bg-amber-500/20 text-amber-300 border-amber-500/40`;
       case 'resolved':
         return `${baseClasses} bg-green-500/20 text-green-300 border-green-500/40`;
       case 'closed':

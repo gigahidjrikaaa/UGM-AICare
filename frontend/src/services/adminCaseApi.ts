@@ -68,7 +68,7 @@ export const updateCaseStatus = async (
 export const assignCase = async (
   caseId: string,
   payload: CaseAssignmentUpdate
-): Promise<{ case_id: string; assigned_to: string; message?: string }> => {
+): Promise<{ case_id: string; assigned_to: string | null; message?: string }> => {
   const response = await apiClient.put(`${BASE_PATH}/${caseId}/assign`, payload);
   return response.data;
 };

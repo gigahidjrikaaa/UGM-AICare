@@ -76,6 +76,7 @@ from .profile import (
     AdminPasswordChangeResponse,
 )
 from .users import UserDetailResponse, UserListItem, UserStats, UsersResponse
+from .agent_users import AgentUserSummary, AgentUserCreate, AgentUserUpdateRole
 from .triage import (
     SeverityBreakdown,
     ProcessingMetrics,
@@ -154,6 +155,9 @@ __all__ = [
     "UserListItem",
     "UserStats",
     "UsersResponse",
+    "AgentUserSummary",
+    "AgentUserCreate",
+    "AgentUserUpdateRole",
     "SeverityBreakdown",
     "ProcessingMetrics",
     "RiskTrendPoint",

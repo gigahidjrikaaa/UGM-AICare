@@ -46,7 +46,7 @@ export interface SLABreachData {
   link: string;
   timestamp: string;
   case_id: string;
-  assigned_to: string;
+  assigned_to: string | null;
   breach_time?: string;
 }
 

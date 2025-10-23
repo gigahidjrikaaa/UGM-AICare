@@ -4,7 +4,7 @@
  */
 
 // === Case Enums ===
-export type CaseStatus = 'new' | 'in_progress' | 'resolved' | 'closed';
+export type CaseStatus = 'new' | 'in_progress' | 'waiting' | 'resolved' | 'closed';
 export type CaseSeverity = 'low' | 'med' | 'high' | 'critical';
 export type SLAStatus = 'safe' | 'warning' | 'critical' | 'breached';
 
@@ -21,11 +21,12 @@ export interface TriageAssessmentSummary {
 // === Case Assignment ===
 export interface CaseAssignmentSummary {
   id: string; // UUID
-  assigned_to: string;
+  assigned_to: string | null;
   assigned_by: number | null;
   assigned_at: string;
   previous_assignee: string | null;
   reassignment_reason: string | null;
+  assignee_role: string | null;
 }
 
 // === Case List Item ===
@@ -117,7 +118,7 @@ export interface CaseStatusUpdate {
 }
 
 export interface CaseAssignmentUpdate {
-  assigned_to: string;
+  assigned_to: string | null;
   reason?: string;
 }
 

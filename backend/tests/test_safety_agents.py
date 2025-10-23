@@ -25,6 +25,8 @@ from app.agents.sta.service import SafetyTriageService  # noqa: E402
 from app.core.events import AgentEvent  # noqa: E402
 from app.models import (  # noqa: E402
 	Case,
+	CaseAssignment,
+	CaseNote,
 	CaseSeverityEnum,
 	CaseStatusEnum,
 	InterventionCampaignExecution,
@@ -33,6 +35,7 @@ from app.models import (  # noqa: E402
 	TriageAssessment,
 	User,
 )
+from app.models.agent_user import AgentRoleEnum, AgentUser  # noqa: E402
 
 from sqlalchemy.dialects.sqlite import base as sqlite_base  # noqa: E402
 
@@ -55,7 +58,10 @@ def _enum_str(value: Any) -> str:
 
 TABLES = [
 	User.__table__,
+	AgentUser.__table__,
 	Case.__table__,
+	CaseNote.__table__,
+	CaseAssignment.__table__,
 	TriageAssessment.__table__,
 	Conversation.__table__,
 	InterventionCampaign.__table__,
@@ -177,6 +183,9 @@ async def test_safety_desk_service_assign_and_close_case() -> None:
 
 	try:
 		async with session_factory() as session:
+			session.add(AgentUser(id="counselor-1", role=AgentRoleEnum.counselor))
+			await session.flush()
+
 			case = Case(
 				status=CaseStatusEnum.new,
 				severity=CaseSeverityEnum.high,
@@ -202,6 +211,14 @@ async def test_safety_desk_service_assign_and_close_case() -> None:
 			assigned_to = cast(str | None, updated_case.assigned_to)
 			assert assigned_to == "counselor-1"
 			assert _enum_str(updated_case.status) == CaseStatusEnum.in_progress.value
+
+			assignments = (await session.execute(select(CaseAssignment))).scalars().all()
+			assert assignments, "Assignment audit record should be created"
+			assert assignments[0].assigned_to == "counselor-1"
+
+			notes = (await session.execute(select(CaseNote))).scalars().all()
+			assert notes, "Assignment note should be created"
+			assert "counselor-1" in notes[0].note
 
 			close_response = await service.close_case(
 				SDACloseRequest(case_id=str(case.id), closure_reason="Resolved")
@@ -286,7 +303,7 @@ async def test_insights_agent_service_runs_core_queries() -> None:
 					created_at=now - timedelta(hours=5),
 				),
 			]
-			session.add_all(executions)
+		session.add_all(executions)
 
 			conversations = [
 				Conversation(

@@ -9,12 +9,14 @@ from typing import TYPE_CHECKING, Optional
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from sqlalchemy.sql import func
 
 from app.database import Base
 
 if TYPE_CHECKING:
     from .cases import Case
     from .user import User
+    from .agent_user import AgentUser
 
 
 class SystemSettings(Base):
@@ -33,7 +35,12 @@ class SystemSettings(Base):
     
     # Audit trail
     updated_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default='now()', onupdate=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        onupdate=func.now(),
+    )
     
     # Relationships
     updater: Mapped[Optional["User"]] = relationship("User", foreign_keys=[updated_by])
@@ -69,7 +76,12 @@ class AgentHealthLog(Base):
     error_details: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     
     # Timestamp
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default='now()', index=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+        index=True,
+    )
 
     def __repr__(self) -> str:
         return f"<AgentHealthLog(id={self.id}, agent={self.agent_name}, status={self.status})>"
@@ -87,17 +99,34 @@ class CaseAssignment(Base):
     case_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('cases.id', ondelete='CASCADE'), nullable=False, index=True)
     
     # Assignment details
-    assigned_to: Mapped[str] = mapped_column(String(255), nullable=False)
+    assigned_to: Mapped[Optional[str]] = mapped_column(
+        String(255),
+        ForeignKey("agent_users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     assigned_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
-    assigned_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default='now()')
+    assigned_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True),
+        nullable=False,
+        server_default=func.now(),
+    )
     
     # Reassignment tracking
     reassignment_reason: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     previous_assignee: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     
     # Relationships
-    case: Mapped["Case"] = relationship("Case", foreign_keys=[case_id])
+    case: Mapped["Case"] = relationship(
+        "Case",
+        foreign_keys=[case_id],
+        back_populates="assignments",
+    )
     assigner: Mapped[Optional["User"]] = relationship("User", foreign_keys=[assigned_by])
+    assignee: Mapped[Optional["AgentUser"]] = relationship(
+        "AgentUser",
+        foreign_keys=[assigned_to],
+    )
 
     def __repr__(self) -> str:
         return f"<CaseAssignment(id={self.id}, case_id={self.case_id}, assigned_to={self.assigned_to})>"

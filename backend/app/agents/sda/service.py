@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from __future__ import annotations
-
 from datetime import datetime
 from typing import cast
 from uuid import UUID
@@ -19,7 +17,8 @@ from app.agents.sda.schemas import (
     SDAListCasesResponse,
 )
 from app.database import get_async_db
-from app.models import Case, CaseSeverityEnum, CaseStatusEnum
+from app.models import Case, CaseAssignment, CaseNote, CaseSeverityEnum, CaseStatusEnum
+from app.models.agent_user import AgentUser
 
 
 class SafetyDeskService:
@@ -44,21 +43,51 @@ class SafetyDeskService:
 
     async def assign_case(self, payload: SDAAssignRequest) -> SDAAssignResponse:
         case = await self._get_case_or_404(payload.case_id)
-        case.assigned_to = payload.assignee_id  # type: ignore[assignment]
+
+        previous_assignee = cast(str | None, getattr(case, "assigned_to", None))
+
+        assignee_result = await self._session.execute(
+            select(AgentUser).where(AgentUser.id == payload.assignee_id)
+        )
+        assignee = assignee_result.scalar_one_or_none()
+        if assignee is None:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Unknown assignee '{payload.assignee_id}'",
+            )
+
+        case.assigned_to = assignee.id  # type: ignore[assignment]
         if case.status in {CaseStatusEnum.new, CaseStatusEnum.waiting}:
             case.status = CaseStatusEnum.in_progress  # type: ignore[assignment]
-        case.updated_at = datetime.utcnow()  # type: ignore[assignment]
         self._session.add(case)
+
+        self._session.add(
+            CaseAssignment(
+                case_id=case.id,
+                assigned_to=assignee.id,
+                assigned_by=None,
+                previous_assignee=previous_assignee,
+            )
+        )
+        self._session.add(
+            CaseNote(
+                case_id=case.id,
+                note=f"Case auto-assigned to {assignee.id} by Safety Desk Agent",
+                author_id=None,
+            )
+        )
+
         await self._session.commit()
-        return SDAAssignResponse(case_id=str(case.id), assigned_to=payload.assignee_id)
+        await self._session.refresh(case)
+        return SDAAssignResponse(case_id=str(case.id), assigned_to=assignee.id)
 
     async def close_case(self, payload: SDACloseRequest) -> SDACloseResponse:
         case = await self._get_case_or_404(payload.case_id)
         case.status = CaseStatusEnum.closed  # type: ignore[assignment]
         case.closure_reason = payload.closure_reason  # type: ignore[assignment]
-        case.updated_at = datetime.utcnow()  # type: ignore[assignment]
         self._session.add(case)
         await self._session.commit()
+        await self._session.refresh(case)
         status_value = case.status.value if isinstance(case.status, CaseStatusEnum) else CaseStatusEnum.new.value
         closed_at = cast(datetime, case.updated_at)
         return SDACloseResponse(case_id=str(case.id), status=status_value, closed_at=closed_at)

@@ -39,12 +39,13 @@ class TriageAssessmentSummary(BaseModel):
 
 class CaseAssignmentSummary(BaseModel):
     """Summary of case assignment."""
-    id: int
-    assigned_to: str
+    id: str
+    assigned_to: str | None
     assigned_by: int | None
     assigned_at: datetime
     previous_assignee: str | None = None
     reassignment_reason: str | None = None
+    assignee_role: str | None = None
     
     model_config = ConfigDict(from_attributes=True)
 
@@ -126,13 +127,13 @@ class CaseDetailResponse(BaseModel):
 
 class CaseStatusUpdate(BaseModel):
     """Request to update case status."""
-    status: str = Field(..., description="New status: new, in_progress, resolved, closed")
+    status: str = Field(..., description="New status: new, in_progress, waiting, resolved, closed")
     note: str | None = Field(None, description="Optional note explaining status change")
 
 
 class CaseAssignmentUpdate(BaseModel):
     """Request to assign/reassign case."""
-    assigned_to: str = Field(..., description="Counselor identifier to assign case to")
+    assigned_to: str | None = Field(None, description="Agent user identifier to assign case to (None to unassign)")
     reason: str | None = Field(None, description="Optional reason for assignment/reassignment")
 
 

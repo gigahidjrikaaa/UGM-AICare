@@ -13,12 +13,44 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.models import Appointment, Conversation, JournalEntry, User, UserBadge
-from app.schemas.admin import UserDetailResponse, UserListItem, UsersResponse
+from app.models.agent_user import AgentUser
+from app.schemas.admin import (
+    AgentUserSummary,
+    UserDetailResponse,
+    UserListItem,
+    UsersResponse,
+)
 from .utils import decrypt_user_email, get_user_stats, build_avatar_url, decrypt_user_field
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Admin - Users"])
+
+
+@router.get("/agent-users", response_model=List[AgentUserSummary])
+async def list_agent_users(
+    role: Optional[str] = Query(None, description="Filter by agent role"),
+    search: Optional[str] = Query(None, description="Search by agent identifier"),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user),
+) -> List[AgentUserSummary]:
+    """Return agent/counselor accounts available for assignments."""
+    logger.info(
+        "Admin %s requesting agent users (role=%s, search=%s)",
+        admin_user.id,
+        role,
+        search,
+    )
+
+    stmt = select(AgentUser).order_by(AgentUser.created_at.desc())
+    if role:
+        stmt = stmt.where(AgentUser.role == role)
+    if search:
+        stmt = stmt.where(AgentUser.id.ilike(f"%{search}%"))
+
+    result = await db.execute(stmt)
+    agents = result.scalars().all()
+    return [AgentUserSummary.model_validate(agent) for agent in agents]
 
 
 @router.get("/users", response_model=UsersResponse)

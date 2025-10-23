@@ -58,7 +58,7 @@ from .messages import Message, MessageRoleEnum
 from .consents import Consent, ConsentScopeEnum
 from .cases import Case, CaseNote, CaseStatusEnum, CaseSeverityEnum
 from .resources import Resource
-from .users import AgentUser, AgentRoleEnum
+from .agent_user import AgentUser, AgentRoleEnum
 
 # Admin infrastructure models (Phase 1)
 from .insights import InsightsReport
