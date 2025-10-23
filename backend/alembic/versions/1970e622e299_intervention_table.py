@@ -63,27 +63,6 @@ def upgrade():
                    existing_type=postgresql.TIMESTAMP(),
                    nullable=False)
     
-    if 'email_groups' in inspector.get_table_names():
-        op.alter_column('email_groups', 'created_at',
-                   existing_type=postgresql.TIMESTAMP(),
-                   nullable=False)
-        op.alter_column('email_groups', 'updated_at',
-                   existing_type=postgresql.TIMESTAMP(),
-                   nullable=False)
-    
-    if 'email_logs' in inspector.get_table_names():
-        op.alter_column('email_logs', 'created_at',
-                   existing_type=postgresql.TIMESTAMP(),
-                   nullable=False)
-    
-    if 'email_templates' in inspector.get_table_names():
-        op.alter_column('email_templates', 'created_at',
-                   existing_type=postgresql.TIMESTAMP(),
-                   nullable=False)
-        op.alter_column('email_templates', 'updated_at',
-                   existing_type=postgresql.TIMESTAMP(),
-                   nullable=False)
-    
     if 'flagged_sessions' in inspector.get_table_names():
         op.alter_column('flagged_sessions', 'status',
                    existing_type=sa.VARCHAR(),
@@ -203,21 +182,6 @@ def downgrade():
                nullable=True)
     op.alter_column('flagged_sessions', 'status',
                existing_type=sa.VARCHAR(),
-               nullable=True)
-    op.alter_column('email_templates', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True)
-    op.alter_column('email_templates', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True)
-    op.alter_column('email_logs', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True)
-    op.alter_column('email_groups', 'updated_at',
-               existing_type=postgresql.TIMESTAMP(),
-               nullable=True)
-    op.alter_column('email_groups', 'created_at',
-               existing_type=postgresql.TIMESTAMP(),
                nullable=True)
     op.alter_column('campaign_executions', 'updated_at',
                existing_type=postgresql.TIMESTAMP(),

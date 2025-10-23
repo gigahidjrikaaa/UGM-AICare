@@ -7,7 +7,6 @@ This package contains database models organized by domain:
 - appointments: Appointment scheduling and psychologist management
 - feedback: User feedback and survey models
 - content: Educational content and CBT modules
-- email: Email system and template models
 - social: Social media and gamification models
 - interventions: Automated intervention campaigns and plans
 - agents: Agent execution tracking
@@ -31,7 +30,6 @@ from .feedback import Feedback, Survey, SurveyQuestion, SurveyResponse, SurveyAn
 
 # Content and learning models
 from .content import ContentResource, CbtModule, CbtModuleStep
-from .email import EmailTemplate, EmailGroup, EmailRecipient, EmailLog
 from .social import Tweet, UserBadge
 
 # Intervention models
@@ -99,12 +97,6 @@ __all__ = [
     "ContentResource",
     "CbtModule",
     "CbtModuleStep",
-
-    # Email Models
-    "EmailTemplate",
-    "EmailGroup",
-    "EmailRecipient",
-    "EmailLog",
 
     # Social Models
     "Tweet",

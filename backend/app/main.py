@@ -6,7 +6,6 @@ from app.database import init_db, close_db
 from sqlalchemy import text
 from app.routes import (
     auth,
-    email,
     chat,
     feedback,
     link_did,
@@ -151,7 +150,6 @@ app.include_router(chat.router)
 app.include_router(feedback.router)
 app.include_router(link_did.router)
 
-app.include_router(email.router)
 app.include_router(journal.router)
 app.include_router(journal_prompts.router)
 app.include_router(internal.router)
