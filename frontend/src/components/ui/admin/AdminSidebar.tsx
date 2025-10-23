@@ -32,7 +32,7 @@ const navGroups = [
     label: 'People & Content',
     items: [
       { name: 'Users', icon: <FiUsers size={18}/>, href: '/admin/users' },
-      { name: 'Psychologists', icon: <FiUserCheck size={18}/>, href: '/admin/psychologists' },
+      { name: 'Counselors', icon: <FiUserCheck size={18}/>, href: '/admin/counselors' },
       { name: 'Appointments', icon: <FiCalendar size={18}/>, href: '/admin/appointments' },
       { name: 'Conversations', icon: <FiMessageSquare size={18}/>, href: '/admin/conversations' },
       { name: 'Content Resources', icon: <FiBookOpen size={18}/>, href: '/admin/content-resources' },

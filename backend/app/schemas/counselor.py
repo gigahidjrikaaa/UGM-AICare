@@ -1,4 +1,4 @@
-"""Psychologist profile schemas for admin and counselor management."""
+"""Counselor profile schemas for admin and counselor management."""
 
 from typing import Optional, List, Dict, Any
 from pydantic import BaseModel, Field, field_validator
@@ -32,11 +32,11 @@ class AvailabilitySlot(BaseModel):
 
 
 # ========================================
-# Base Psychologist Schemas
+# Base Counselor Schemas
 # ========================================
 
-class PsychologistBase(BaseModel):
-    """Base schema for psychologist data."""
+class CounselorBase(BaseModel):
+    """Base schema for Counselor data."""
     name: str = Field(..., min_length=1, max_length=255)
     specialization: Optional[str] = Field(None, max_length=255)
     image_url: Optional[str] = None
@@ -54,16 +54,16 @@ class PsychologistBase(BaseModel):
         return v
 
 
-class PsychologistCreate(PsychologistBase):
-    """Schema for creating a psychologist profile (admin only)."""
-    user_id: int = Field(..., description="User ID to link psychologist profile to")
+class CounselorCreate(CounselorBase):
+    """Schema for creating a Counselor profile (admin only)."""
+    user_id: int = Field(..., description="User ID to link Counselor profile to")
     education: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     certifications: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
     availability_schedule: Optional[List[Dict[str, Any]]] = Field(default_factory=list)
 
 
-class PsychologistUpdate(BaseModel):
-    """Schema for updating psychologist profile."""
+class CounselorUpdate(BaseModel):
+    """Schema for updating Counselor profile."""
     name: Optional[str] = Field(None, min_length=1, max_length=255)
     specialization: Optional[str] = Field(None, max_length=255)
     image_url: Optional[str] = None
@@ -77,8 +77,8 @@ class PsychologistUpdate(BaseModel):
     availability_schedule: Optional[List[Dict[str, Any]]] = None
 
 
-class PsychologistAvailabilityToggle(BaseModel):
-    """Schema for toggling psychologist availability."""
+class CounselorAvailabilityToggle(BaseModel):
+    """Schema for toggling Counselor availability."""
     is_available: bool
 
 
@@ -87,7 +87,7 @@ class PsychologistAvailabilityToggle(BaseModel):
 # ========================================
 
 class UserBasicInfo(BaseModel):
-    """Basic user information for psychologist response."""
+    """Basic user information for Counselor response."""
     id: int
     email: str
     name: Optional[str] = None
@@ -98,8 +98,8 @@ class UserBasicInfo(BaseModel):
         from_attributes = True
 
 
-class PsychologistResponse(PsychologistBase):
-    """Complete psychologist profile response."""
+class CounselorResponse(CounselorBase):
+    """Complete Counselor profile response."""
     id: int
     user_id: Optional[int] = None
     rating: float = 0.0
@@ -115,8 +115,8 @@ class PsychologistResponse(PsychologistBase):
         from_attributes = True
 
 
-class PsychologistListItem(BaseModel):
-    """Simplified psychologist info for list views."""
+class CounselorListItem(BaseModel):
+    """Simplified Counselor info for list views."""
     id: int
     user_id: Optional[int] = None
     name: str
@@ -132,9 +132,9 @@ class PsychologistListItem(BaseModel):
         from_attributes = True
 
 
-class PsychologistListResponse(BaseModel):
-    """Paginated list of psychologists."""
-    psychologists: List[PsychologistListItem]
+class CounselorListResponse(BaseModel):
+    """Paginated list of counselors."""
+    counselors: List[CounselorListItem]
     total: int
     page: int
     page_size: int
@@ -145,8 +145,8 @@ class PsychologistListResponse(BaseModel):
 # Statistics Schemas
 # ========================================
 
-class PsychologistStats(BaseModel):
-    """Statistics for a psychologist."""
+class CounselorStats(BaseModel):
+    """Statistics for a Counselor."""
     total_appointments: int
     upcoming_appointments: int
     completed_appointments: int
@@ -159,11 +159,10 @@ class PsychologistStats(BaseModel):
 class CounselorDashboardStats(BaseModel):
     """Dashboard statistics for counselor role."""
     profile_completion_percentage: float
-    total_appointments: int
     this_week_appointments: int
-    this_month_appointments: int
-    completed_appointments: int
-    cancelled_rate: float
+    upcoming_appointments: int
+    total_revenue: float
     average_rating: float
     total_reviews: int
-    total_revenue: float
+    total_patients: int
+    total_completed_appointments: int

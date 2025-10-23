@@ -180,7 +180,7 @@ export default function AppointmentManagementPage() {
 
   const exportCSV = () => {
     const rows = filteredAppointments;
-    const header = ['ID', 'Patient Email', 'Psychologist', 'Type', 'Date & Time', 'Status', 'Notes', 'Created At'];
+    const header = ['ID', 'Patient Email', 'Counselor', 'Type', 'Date & Time', 'Status', 'Notes', 'Created At'];
     const lines = rows.map(a => [
       a.id,
       a.user.email || 'N/A',
@@ -552,7 +552,7 @@ export default function AppointmentManagementPage() {
                         Patient
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
-                        Psychologist
+                        Counselor
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-white/60 uppercase tracking-wider">
                         Date & Time
@@ -720,9 +720,9 @@ export default function AppointmentManagementPage() {
                   </div>
                 </div>
 
-                {/* Psychologist Info */}
+                {/* Counselor Info */}
                 <div className="bg-white/5 border border-white/10 rounded-lg p-4">
-                  <div className="text-xs uppercase tracking-wide text-white/60 mb-3">Psychologist</div>
+                  <div className="text-xs uppercase tracking-wide text-white/60 mb-3">Counselor</div>
                   <div className="flex items-center gap-4">
                     <div className="relative h-16 w-16 rounded-full overflow-hidden border border-white/15 bg-white/5 flex-shrink-0">
                       {selectedAppt.psychologist.image_url ? (

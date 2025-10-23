@@ -13,8 +13,8 @@ export interface InsightsReport {
   period_start: string;
   period_end: string;
   summary: string | null;
-  trending_topics: any;
-  sentiment_data: any;
+  trending_topics: Record<string, unknown> | null;
+  sentiment_data: Record<string, unknown> | null;
   high_risk_count: number;
   assessment_count: number;
   generated_at: string;

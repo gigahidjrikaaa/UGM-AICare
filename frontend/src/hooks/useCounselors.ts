@@ -1,4 +1,4 @@
-// hooks/usePsychologists.ts
+// hooks/useCounselors.ts
 'use client';
 
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -9,10 +9,7 @@ import { toast } from 'react-hot-toast';
 // ADMIN HOOKS
 // ========================================
 
-/**
- * Hook to list all psychologists with filters
- */
-export function usePsychologists(params?: {
+export function useAdminCounselors(params?: {
   page?: number;
   page_size?: number;
   search?: string;
@@ -20,84 +17,69 @@ export function usePsychologists(params?: {
   specialization?: string;
 }) {
   return useQuery({
-    queryKey: ['psychologists', params],
-    queryFn: () => api.listPsychologists(params),
+    queryKey: ['admin-counselors', params],
+    queryFn: () => api.listCounselors(params),
     staleTime: 30000, // 30 seconds
   });
 }
 
-/**
- * Hook to get single psychologist
- */
-export function usePsychologist(id: number | null) {
+export function useAdminCounselor(id: number | null) {
   return useQuery({
-    queryKey: ['psychologist', id],
-    queryFn: () => api.getAdminPsychologist(id!),
+    queryKey: ['admin-counselor', id],
+    queryFn: () => api.getAdminCounselor(id!),
     enabled: !!id,
   });
 }
 
-/**
- * Hook to get psychologist statistics
- */
-export function usePsychologistStats(id: number | null) {
+export function useAdminCounselorStats(id: number | null) {
   return useQuery({
-    queryKey: ['psychologist-stats', id],
-    queryFn: () => api.getPsychologistStats(id!),
+    queryKey: ['admin-counselor-stats', id],
+    queryFn: () => api.getCounselorStatsAdmin(id!),
     enabled: !!id,
   });
 }
 
-/**
- * Hook to create psychologist
- */
-export function useCreatePsychologist() {
+export function useCreateCounselor() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: api.createPsychologist,
+    mutationFn: api.createCounselor,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['psychologists'] });
-      toast.success('Psychologist profile created successfully');
+      queryClient.invalidateQueries({ queryKey: ['admin-counselors'] });
+      toast.success('Counselor profile created successfully');
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to create psychologist profile');
+      toast.error(error.message || 'Failed to create counselor profile');
     },
   });
 }
 
-/**
- * Hook to update psychologist
- */
-export function useUpdatePsychologist() {
+export function useUpdateCounselor() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, data }: { id: number; data: api.PsychologistUpdate }) =>
-      api.updatePsychologist(id, data),
+    mutationFn: ({ id, data }: { id: number; data: api.CounselorUpdate }) =>
+      api.updateCounselor(id, data),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['psychologists'] });
-      queryClient.invalidateQueries({ queryKey: ['psychologist', variables.id] });
-      toast.success('Psychologist profile updated successfully');
+      queryClient.invalidateQueries({ queryKey: ['admin-counselors'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-counselor', variables.id] });
+      toast.success('Counselor profile updated successfully');
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to update psychologist profile');
+      toast.error(error.message || 'Failed to update counselor profile');
     },
   });
 }
 
-/**
- * Hook to toggle psychologist availability
- */
-export function useTogglePsychologistAvailability() {
+export function useToggleCounselorAvailabilityAdmin() {
   const queryClient = useQueryClient();
 
   return useMutation({
     mutationFn: ({ id, is_available }: { id: number; is_available: boolean }) =>
-      api.togglePsychologistAvailability(id, is_available),
+      api.toggleCounselorAvailabilityAdmin(id, is_available),
     onSuccess: (_, variables) => {
-      queryClient.invalidateQueries({ queryKey: ['psychologists'] });
-      queryClient.invalidateQueries({ queryKey: ['psychologist', variables.id] });
+      queryClient.invalidateQueries({ queryKey: ['admin-counselors'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-counselor', variables.id] });
       toast.success('Availability updated successfully');
     },
     onError: (error: Error) => {
@@ -106,20 +88,17 @@ export function useTogglePsychologistAvailability() {
   });
 }
 
-/**
- * Hook to delete psychologist
- */
-export function useDeletePsychologist() {
+export function useDeleteCounselor() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: api.deletePsychologist,
+    mutationFn: api.deleteCounselor,
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['psychologists'] });
-      toast.success('Psychologist profile deleted successfully');
+      queryClient.invalidateQueries({ queryKey: ['admin-counselors'] });
+      toast.success('Counselor profile deleted successfully');
     },
     onError: (error: Error) => {
-      toast.error(error.message || 'Failed to delete psychologist profile');
+      toast.error(error.message || 'Failed to delete counselor profile');
     },
   });
 }

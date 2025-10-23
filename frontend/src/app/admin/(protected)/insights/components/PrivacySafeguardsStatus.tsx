@@ -9,6 +9,7 @@
 
 'use client';
 
+import { FiCheck, FiX } from 'react-icons/fi';
 import { usePrivacyStatus } from '../hooks/usePrivacyStatus';
 
 export function PrivacySafeguardsStatus() {
@@ -40,13 +41,12 @@ export function PrivacySafeguardsStatus() {
   const epsilonPercent = (status.epsilon_used / status.epsilon_total) * 100;
   const consentPercent = (status.consented_users / status.total_users) * 100;
 
-  const getStatusIcon = (compliant: boolean) => {
-    return compliant ? (
-      <span className="text-emerald-400 text-sm">✓</span>
+  const getStatusIcon = (compliant: boolean) =>
+    compliant ? (
+      <FiCheck className="text-emerald-400" />
     ) : (
-      <span className="text-red-400 text-sm">✗</span>
+      <FiX className="text-red-400" />
     );
-  };
 
   return (
     <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden">
@@ -66,7 +66,7 @@ export function PrivacySafeguardsStatus() {
             <p className="text-2xl font-bold text-white">k = {status.k_value}</p>
             <p className="text-xs text-white/50 mt-1">Threshold: k ≥ {status.k_threshold}</p>
             <div className="mt-3 h-1.5 bg-white/10 rounded-full overflow-hidden">
-              {/* eslint-disable-next-line react/no-unknown-property */}
+              
               <div 
                 className={`h-full transition-all duration-300 ${
                   status.k_value >= status.k_threshold ? 'bg-emerald-500' : 'bg-red-500'
@@ -92,7 +92,7 @@ export function PrivacySafeguardsStatus() {
               {((1 - epsilonPercent / 100) * 100).toFixed(0)}% remaining
             </p>
             <div className="mt-3 h-1.5 bg-white/10 rounded-full overflow-hidden">
-              {/* eslint-disable-next-line react/no-unknown-property */}
+              
               <div 
                 className={`h-full transition-all duration-300 ${
                   epsilonPercent < 80 ? 'bg-blue-500' : epsilonPercent < 95 ? 'bg-yellow-500' : 'bg-red-500'
@@ -116,7 +116,7 @@ export function PrivacySafeguardsStatus() {
             </p>
             <p className="text-xs text-white/50 mt-1">Users opted in</p>
             <div className="mt-3 h-1.5 bg-white/10 rounded-full overflow-hidden">
-              {/* eslint-disable-next-line react/no-unknown-property */}
+              
               <div 
                 className="h-full bg-[#FFCA40] transition-all duration-300"
                 style={{ width: `${consentPercent}%` }}
@@ -131,3 +131,8 @@ export function PrivacySafeguardsStatus() {
     </div>
   );
 }
+
+
+
+
+

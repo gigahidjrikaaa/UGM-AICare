@@ -17,7 +17,6 @@ from app.routes import (
     session_events,
     appointments,
     admin,
-    admin_psychologists,
     counselor,
     agents,
     agents_command,
@@ -31,6 +30,7 @@ from app.routes import (
     langgraph_analytics,
 )
 from app.routes.admin import insights as admin_insights
+from app.routes.admin import counselors as admin_counselors
 from app.agents.sta.router import router as sta_router
 from app.agents.sca.router import router as sca_router
 from app.agents.sda.router import router as sda_router
@@ -157,9 +157,9 @@ app.include_router(session_events.session_event_router) # This will have prefix 
 app.include_router(summary.activity_router) # This will have prefix /api/v1/activity-summary
 app.include_router(summary.user_data_router)  # This will have prefix /api/v1/user
 app.include_router(profile.router)
-app.include_router(admin_psychologists.router, prefix="/api/v1")  # Admin psychologist management (MUST be before admin.router to avoid route conflicts)
+app.include_router(admin_counselors.router, prefix="/api/v1")  # Admin counselor management (MUST be before admin.router to avoid route conflicts)
 app.include_router(counselor.router, prefix="/api/v1")  # Counselor self-management
-app.include_router(admin.router)  # Admin endpoints (includes /admin/psychologists - old endpoint)
+app.include_router(admin.router)  # Admin endpoints (includes /admin/counselors and other admin routes)
 app.include_router(admin_insights.router)  # Admin insights endpoints
 app.include_router(agents.router)
 app.include_router(agents_command.router)

@@ -15,12 +15,17 @@ from .appointments import (
     AppointmentResponse,
     AppointmentUpdate,
     AppointmentUser,
-    PsychologistResponse,
     TherapistScheduleCreate,
     TherapistScheduleResponse,
     TherapistScheduleUpdate,
     TherapistSummary,
-    # removed unmatched closing parenthesis
+)
+from app.schemas.counselor import (
+    CounselorResponse,
+    CounselorListResponse,
+    CounselorListItem,
+    CounselorAvailabilityToggle,
+    CounselorStats,
 )
 from .content_resources import (
     ContentResourceCreate,
@@ -104,7 +109,11 @@ __all__ = [
     "AppointmentResponse",
     "AppointmentUpdate",
     "AppointmentUser",
-    "PsychologistResponse",
+    "CounselorResponse",
+    "CounselorListResponse",
+    "CounselorListItem",
+    "CounselorAvailabilityToggle",
+    "CounselorStats",
 
     "TherapistSummary",
     "TherapistScheduleCreate",
@@ -169,6 +178,7 @@ __all__ = [
     "TriageTestRequest",
     "TriageTestResponse",
 ]
+
 
 
 

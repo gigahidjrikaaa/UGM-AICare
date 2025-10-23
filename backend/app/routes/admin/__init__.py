@@ -10,6 +10,7 @@ from .profile import router as profile_router
 from .dashboard import router as dashboard_router
 from .interventions import router as interventions_router
 from .cases import router as cases_router
+from .counselors import router as counselors_router
 from .system import router as system_router
 from .users import router as users_router
 from .testing import router as testing_router
@@ -29,6 +30,7 @@ router.include_router(users_router)
 router.include_router(dashboard_router)
 router.include_router(interventions_router)
 router.include_router(cases_router)
+router.include_router(counselors_router)
 router.include_router(testing_router)
 router.include_router(insights_router)
 router.include_router(alerts_router)
@@ -43,5 +45,6 @@ __all__ = [
     "flags",
     "profile",
     "system",
+    "counselors",
     "users",
 ]

@@ -96,9 +96,9 @@ export function ExecuteCampaignModal({ campaign, onClose, onSuccess }: ExecuteCa
                   <span className="text-white/60">Target Audience:</span>
                   {/* campaign.target_audience may be a string or an object from backend */}
                   {(() => {
-                    const audience = campaign.target_audience as unknown;
+                    const audience = campaign.target_audience;
                     return (
-                      <span className="text-white font-medium capitalize">{formatTargetAudience(audience as any)}</span>
+                      <span className="text-white font-medium capitalize">{formatTargetAudience(audience)}</span>
                     );
                   })()}
                 </div>

@@ -1,5 +1,4 @@
 /* eslint-disable react/forbid-component-props */
-/* eslint-disable react/forbid-dom-props */
 'use client';
 
 import { useEffect, useState } from 'react';

@@ -341,7 +341,7 @@ export interface CounselorUser {
   created_at: string;
 }
 
-export interface PsychologistCreate {
+export interface CounselorCreate {
   user_id: number;
   name: string;
   specialization?: string;
@@ -356,7 +356,7 @@ export interface PsychologistCreate {
   availability_schedule?: AvailabilitySchedule[];
 }
 
-export interface PsychologistUpdate {
+export interface CounselorUpdate {
   name?: string;
   specialization?: string;
   image_url?: string;
@@ -377,7 +377,7 @@ export interface Education {
   field_of_study?: string;
 }
 
-export interface PsychologistResponse {
+export interface CounselorResponse {
   id: number;
   user_id?: number;
   name: string;
@@ -403,15 +403,15 @@ export interface PsychologistResponse {
   };
 }
 
-export interface PsychologistListResponse {
-  psychologists: PsychologistResponse[];
+export interface CounselorListResponse {
+  counselors: CounselorResponse[];
   total: number;
   page: number;
   page_size: number;
   total_pages: number;
 }
 
-export interface PsychologistStats {
+export interface CounselorStats {
   total_appointments: number;
   upcoming_appointments: number;
   completed_appointments: number;
@@ -422,15 +422,15 @@ export interface PsychologistStats {
 }
 
 /**
- * List all psychologists (Admin)
+ * List all counselors (Admin)
  */
-export async function listPsychologists(params?: {
+export async function listCounselors(params?: {
   page?: number;
   page_size?: number;
   search?: string;
   is_available?: boolean;
   specialization?: string;
-}): Promise<PsychologistListResponse> {
+}): Promise<CounselorListResponse> {
   const queryParams = new URLSearchParams();
   if (params?.page) queryParams.append('page', params.page.toString());
   if (params?.page_size) queryParams.append('page_size', params.page_size.toString());
@@ -439,94 +439,106 @@ export async function listPsychologists(params?: {
   if (params?.specialization) queryParams.append('specialization', params.specialization);
 
   const response = await fetch(
-    `${API_BASE}/api/v1/admin/psychologists?${queryParams.toString()}`,
+    `${API_BASE}/api/v1/admin/counselors?${queryParams.toString()}`,
     {
       headers: await getAuthHeaders(),
       credentials: 'include'
     }
   );
   
-  return handleResponse<PsychologistListResponse>(response);
+  return handleResponse<CounselorListResponse>(response);
 }
 
 /**
- * Get single psychologist with full details (Admin only)
+ * Get single counselor with full details (Admin only)
  */
-export async function getAdminPsychologist(id: number): Promise<PsychologistResponse> {
-  const response = await fetch(`${API_BASE}/api/v1/admin/psychologists/${id}`, {
+export async function getAdminCounselor(id: number): Promise<CounselorResponse> {
+  const response = await fetch(`${API_BASE}/api/v1/admin/counselors/${id}`, {
     headers: await getAuthHeaders(),
     credentials: 'include'
   });
   
-  return handleResponse<PsychologistResponse>(response);
+  return handleResponse<CounselorResponse>(response);
 }
 
 /**
- * Create psychologist profile (Admin)
+ * Create counselor profile (Admin)
  */
-export async function createPsychologist(data: PsychologistCreate): Promise<PsychologistResponse> {
-  const response = await fetch(`${API_BASE}/api/v1/admin/psychologists`, {
+export async function createCounselor(data: CounselorCreate): Promise<CounselorResponse> {
+  const response = await fetch(`${API_BASE}/api/v1/admin/counselors`, {
     method: 'POST',
     headers: await getAuthHeaders(),
     credentials: 'include',
     body: JSON.stringify(data)
   });
   
-  return handleResponse<PsychologistResponse>(response);
+  return handleResponse<CounselorResponse>(response);
 }
 
 /**
- * Update psychologist profile (Admin)
+ * Update counselor profile (Admin)
  */
-export async function updatePsychologist(
+export async function updateCounselor(
   id: number,
-  data: PsychologistUpdate
-): Promise<PsychologistResponse> {
-  const response = await fetch(`${API_BASE}/api/v1/admin/psychologists/${id}`, {
+  data: CounselorUpdate
+): Promise<CounselorResponse> {
+  const response = await fetch(`${API_BASE}/api/v1/admin/counselors/${id}`, {
     method: 'PUT',
     headers: await getAuthHeaders(),
     credentials: 'include',
     body: JSON.stringify(data)
   });
   
-  return handleResponse<PsychologistResponse>(response);
+  return handleResponse<CounselorResponse>(response);
 }
 
 /**
- * Toggle psychologist availability (Admin)
+ * Toggle counselor availability (Admin)
  */
-export async function togglePsychologistAvailability(
+export async function toggleCounselorAvailabilityAdmin(
   id: number,
   is_available: boolean
-): Promise<PsychologistResponse> {
-  const response = await fetch(`${API_BASE}/api/v1/admin/psychologists/${id}/availability`, {
+): Promise<CounselorResponse> {
+  const response = await fetch(`${API_BASE}/api/v1/admin/counselors/${id}/availability`, {
     method: 'PATCH',
     headers: await getAuthHeaders(),
     credentials: 'include',
     body: JSON.stringify({ is_available })
   });
   
-  return handleResponse<PsychologistResponse>(response);
+  return handleResponse<CounselorResponse>(response);
 }
 
 /**
- * Get counselor users (users with counselor role) (Admin)
+ * Get counselor users (Admin) - filtered from user directory.
  */
 export async function getCounselorUsers(): Promise<CounselorUser[]> {
-  const response = await fetch(`${API_BASE}/api/v1/admin/users?role=counselor`, {
+  const params = new URLSearchParams({ page: '1', limit: '100' });
+
+  const response = await fetch(`${API_BASE}/api/v1/admin/users?${params.toString()}`, {
     headers: await getAuthHeaders(),
-    credentials: 'include'
+    credentials: 'include',
   });
-  
-  const data = await handleResponse<{ users: CounselorUser[] }>(response);
-  return data.users;
+
+  const data = await handleResponse<{
+    users: Array<{ id: number; email?: string; name?: string | null; role?: string; created_at?: string }>;
+  }>(response);
+
+  return data.users
+    .filter((user) => user.role === 'counselor')
+    .map((user) => ({
+      id: user.id,
+      email: user.email,
+      name: user.name ?? user.email ?? `Counselor ${user.id}`,
+      created_at: user.created_at ?? new Date().toISOString(),
+    }));
 }
 
 /**
- * Delete psychologist profile (Admin)
+ * Delete counselor profile (Admin)
  */
-export async function deletePsychologist(id: number): Promise<void> {
-  const response = await fetch(`${API_BASE}/api/v1/admin/psychologists/${id}`, {
+export async function deleteCounselor(id: number): Promise<void> {
+  const response = await fetch(`${API_BASE}/api/v1/admin/counselors/${id}`, {
     method: 'DELETE',
     headers: await getAuthHeaders(),
     credentials: 'include'
@@ -536,15 +548,15 @@ export async function deletePsychologist(id: number): Promise<void> {
 }
 
 /**
- * Get psychologist statistics (Admin)
+ * Get counselor statistics (Admin)
  */
-export async function getPsychologistStats(id: number): Promise<PsychologistStats> {
-  const response = await fetch(`${API_BASE}/api/v1/admin/psychologists/${id}/stats`, {
+export async function getCounselorStatsAdmin(id: number): Promise<CounselorStats> {
+  const response = await fetch(`${API_BASE}/api/v1/admin/counselors/${id}/stats`, {
     headers: await getAuthHeaders(),
     credentials: 'include'
   });
   
-  return handleResponse<PsychologistStats>(response);
+  return handleResponse<CounselorStats>(response);
 }
 
 // ========================================
@@ -565,21 +577,21 @@ export interface CounselorDashboardStats {
 /**
  * Get own profile (Counselor)
  */
-export async function getCounselorProfile(): Promise<PsychologistResponse> {
+export async function getCounselorProfile(): Promise<CounselorResponse> {
   const response = await fetch(`${API_BASE}/api/v1/counselor/profile`, {
     headers: await getAuthHeaders(),
     credentials: 'include'
   });
   
-  return handleResponse<PsychologistResponse>(response);
+  return handleResponse<CounselorResponse>(response);
 }
 
 /**
  * Update own profile (Counselor)
  */
 export async function updateCounselorProfile(
-  data: PsychologistUpdate
-): Promise<PsychologistResponse> {
+  data: CounselorUpdate
+): Promise<CounselorResponse> {
   const response = await fetch(`${API_BASE}/api/v1/counselor/profile`, {
     method: 'PUT',
     headers: await getAuthHeaders(),
@@ -587,7 +599,7 @@ export async function updateCounselorProfile(
     body: JSON.stringify(data)
   });
   
-  return handleResponse<PsychologistResponse>(response);
+  return handleResponse<CounselorResponse>(response);
 }
 
 /**
@@ -595,7 +607,7 @@ export async function updateCounselorProfile(
  */
 export async function toggleCounselorAvailability(
   is_available: boolean
-): Promise<PsychologistResponse> {
+): Promise<CounselorResponse> {
   const response = await fetch(`${API_BASE}/api/v1/counselor/profile/availability`, {
     method: 'PATCH',
     headers: await getAuthHeaders(),
@@ -603,7 +615,7 @@ export async function toggleCounselorAvailability(
     body: JSON.stringify({ is_available })
   });
   
-  return handleResponse<PsychologistResponse>(response);
+  return handleResponse<CounselorResponse>(response);
 }
 
 /**

@@ -27,7 +27,7 @@ export interface AlertData {
   case_id?: string;
   report_id?: string;
   user_hash?: string;
-  [key: string]: any;
+  [key: string]: string | number | boolean | null | undefined;
 }
 
 export interface CaseUpdatedData {
@@ -83,7 +83,7 @@ export type SSEEventType =
   | 'ping'
   | 'message';
 
-export interface SSEEvent<T = any> {
+export interface SSEEvent<T = unknown> {
   id?: string;
   type: SSEEventType;
   data: T;

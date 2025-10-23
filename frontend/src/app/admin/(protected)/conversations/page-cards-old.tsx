@@ -10,7 +10,7 @@ import { useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { 
   FiMessageSquare, FiSearch, FiFilter, FiDownload, FiAlertTriangle,
-  FiClock, FiUser, FiBarChart2, FiTrendingUp, FiActivity, FiEye, FiGrid, FiList
+  FiClock, FiUser, FiBarChart2, FiTrendingUp, FiActivity, FiEye, 
 } from 'react-icons/fi';
 import { apiCall, authenticatedFetch } from '@/utils/adminApi';
 
@@ -42,7 +42,7 @@ interface SessionsResponse {
 }
 
 interface ConversationsResponse {
-  conversations: any[];
+  conversations: ConversationSession[];
   total_count: number;
   stats: ConversationStats;
 }
@@ -281,7 +281,7 @@ export default function ConversationsPage() {
       setFlagOpen(false);
       alert('Session flagged successfully');
       loadData();
-    } catch (error) {
+    } catch {
       alert(error instanceof Error ? error.message : 'Failed to flag session');
     }
   };
@@ -302,7 +302,7 @@ export default function ConversationsPage() {
       document.body.appendChild(a);
       a.click();
       a.remove();
-    } catch (error) {
+    } catch {
       alert('Export failed');
     }
   };
