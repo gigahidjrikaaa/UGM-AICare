@@ -281,8 +281,14 @@ export default function ConversationsPage() {
       setFlagOpen(false);
       alert('Session flagged successfully');
       loadData();
-    } catch {
-      alert(error instanceof Error ? error.message : 'Failed to flag session');
+    } catch (err: unknown) {
+      // Safely derive a user-facing message from the caught value and avoid instanceof on non-object types
+      console.error('Flagging session failed', err);
+      const msg =
+        err instanceof Error ? err.message :
+        typeof err === 'string' ? err :
+        'Failed to flag session';
+      alert(msg);
     }
   };
 

@@ -20,6 +20,8 @@ import {
   FiTrendingUp,
   FiActivity,
   FiEye,
+  FiList,
+  FiGrid,
 } from 'react-icons/fi';
 import { apiCall, authenticatedFetch } from '@/utils/adminApi';
 
@@ -193,8 +195,13 @@ export default function ConversationsPage() {
       setFlagOpen(false);
       alert('Session flagged successfully');
       loadData();
-    } catch {
-      alert(error instanceof Error ? error.message : 'Failed to flag session');
+    } catch (err: unknown) {
+      // Safely derive a user-facing message from the caught value
+      const msg =
+        err instanceof Error ? err.message :
+        typeof err === 'string' ? err :
+        'Failed to flag session';
+      alert(msg);
     }
   };
 
@@ -357,14 +364,17 @@ export default function ConversationsPage() {
           <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-5">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
               <div>
-                <label className="block text-xs font-medium text-white/70 mb-2">
+                <label htmlFor="searchTerm" className="block text-xs font-medium text-white/70 mb-2">
                   Search Sessions
                 </label>
                 <div className="relative">
                   <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40" />
                   <input
+                    id="searchTerm"
                     type="text"
                     placeholder="Session ID..."
+                    aria-label="Search sessions by session id"
+                    title="Search sessions by session id"
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
                     className="w-full pl-10 pr-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:ring-1 focus:ring-[#FFCA40] transition-all"
@@ -373,12 +383,15 @@ export default function ConversationsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-white/70 mb-2">
+                <label htmlFor="userHashFilter" className="block text-xs font-medium text-white/70 mb-2">
                   User Hash
                 </label>
                 <input
+                  id="userHashFilter"
                   type="text"
                   placeholder="Filter by user..."
+                  aria-label="Filter by user hash"
+                  title="Filter by user hash"
                   value={userHashFilter}
                   onChange={(e) => setUserHashFilter(e.target.value)}
                   className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:ring-1 focus:ring-[#FFCA40] transition-all"
@@ -386,11 +399,14 @@ export default function ConversationsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-white/70 mb-2">
+                <label htmlFor="dateFrom" className="block text-xs font-medium text-white/70 mb-2">
                   From Date
                 </label>
                 <input
+                  id="dateFrom"
                   type="date"
+                  aria-label="Filter from date"
+                  title="Filter from date"
                   value={dateFrom}
                   onChange={(e) => setDateFrom(e.target.value)}
                   className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white focus:border-[#FFCA40] focus:ring-1 focus:ring-[#FFCA40] transition-all"
@@ -398,11 +414,14 @@ export default function ConversationsPage() {
               </div>
 
               <div>
-                <label className="block text-xs font-medium text-white/70 mb-2">
+                <label htmlFor="dateTo" className="block text-xs font-medium text-white/70 mb-2">
                   To Date
                 </label>
                 <input
+                  id="dateTo"
                   type="date"
+                  aria-label="Filter to date"
+                  title="Filter to date"
                   value={dateTo}
                   onChange={(e) => setDateTo(e.target.value)}
                   className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white focus:border-[#FFCA40] focus:ring-1 focus:ring-[#FFCA40] transition-all"
@@ -666,32 +685,38 @@ export default function ConversationsPage() {
               </h3>
               <div className="space-y-4 mb-6">
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-2">
+                  <label htmlFor="flagSessionId" className="block text-sm font-medium text-white/70 mb-2">
                     Session ID
                   </label>
-                  <div className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white/90 font-mono">
+                  <div id="flagSessionId" className="px-3 py-2 bg-white/5 border border-white/10 rounded-lg text-sm text-white/90 font-mono">
                     {flagSessionId}
                   </div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-2">
+                  <label htmlFor="flagReason" className="block text-sm font-medium text-white/70 mb-2">
                     Reason
                   </label>
                   <textarea
+                    id="flagReason"
                     value={flagReason}
                     onChange={(e) => setFlagReason(e.target.value)}
                     rows={4}
+                    aria-label="Reason for flagging the session"
+                    title="Reason for flagging the session"
                     className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:ring-1 focus:ring-[#FFCA40] transition-all resize-none"
                     placeholder="Describe why this session is being flagged..."
                   />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-white/70 mb-2">
+                  <label htmlFor="flagTags" className="block text-sm font-medium text-white/70 mb-2">
                     Tags (comma-separated)
                   </label>
                   <input
+                    id="flagTags"
                     value={flagTags}
                     onChange={(e) => setFlagTags(e.target.value)}
+                    aria-label="Tags for the flag, comma separated"
+                    title="Tags for the flag, comma separated"
                     className="w-full px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:ring-1 focus:ring-[#FFCA40] transition-all"
                     placeholder="crisis, escalation, urgent..."
                   />
