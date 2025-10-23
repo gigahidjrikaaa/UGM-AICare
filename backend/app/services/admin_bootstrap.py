@@ -30,22 +30,37 @@ def _maybe_encrypt(value: str | None) -> str | None:
 
 async def ensure_default_admin(db: AsyncSession) -> None:
     """Ensure at least one admin account exists; bootstrap from env if missing."""
-    stmt_existing = select(User).where(User.role == "admin").limit(1)
-    result_existing = await db.execute(stmt_existing)
-    existing_admin = result_existing.scalar_one_or_none()
-    if existing_admin:
-        logger.info("Admin account already present; skipping bootstrap.")
+    admin_email = os.getenv("ADMIN_EMAIL")
+
+    if not admin_email:
+        logger.warning("ADMIN_EMAIL not set; cannot check for existing admin user.")
         return
 
-    admin_email = os.getenv("ADMIN_EMAIL")
+    # Check if admin account already exists by role
+    stmt_existing_role = select(User).where(User.role == "admin").limit(1)
+    result_existing_role = await db.execute(stmt_existing_role)
+    existing_admin_by_role = result_existing_role.scalar_one_or_none()
+
+    # Check if account already exists with this email (regardless of role)
+    encrypted_email = _maybe_encrypt(admin_email)
+    if encrypted_email:
+        stmt_existing_email = select(User).where(User.email == encrypted_email).limit(1)
+        result_existing_email = await db.execute(stmt_existing_email)
+        existing_admin_by_email = result_existing_email.scalar_one_or_none()
+    else:
+        existing_admin_by_email = None
+
+    if existing_admin_by_role or existing_admin_by_email:
+        logger.info("Admin account already present (by role or email); skipping bootstrap.")
+        return
+
     admin_password = os.getenv("ADMIN_PASSWORD")
 
-    if not admin_email or not admin_password:
-        logger.warning("ADMIN_EMAIL or ADMIN_PASSWORD not set; cannot create default admin user.")
+    if not admin_password:
+        logger.warning("ADMIN_PASSWORD not set; cannot create default admin user.")
         return
 
     try:
-        encrypted_email = _maybe_encrypt(admin_email)
         encrypted_name = _maybe_encrypt("Administrator")
     except ValueError:
         return
@@ -75,23 +90,38 @@ async def ensure_default_admin(db: AsyncSession) -> None:
 
 async def ensure_default_counselor(db: AsyncSession) -> None:
     """Ensure at least one counselor account exists; bootstrap from env if missing."""
-    stmt_existing = select(User).where(User.role == "counselor").limit(1)
-    result_existing = await db.execute(stmt_existing)
-    existing_counselor = result_existing.scalar_one_or_none()
-    if existing_counselor:
-        logger.info("Counselor account already present; skipping bootstrap.")
+    counselor_email = os.getenv("COUNSELOR_EMAIL")
+
+    if not counselor_email:
+        logger.warning("COUNSELOR_EMAIL not set; cannot check for existing counselor user.")
         return
 
-    counselor_email = os.getenv("COUNSELOR_EMAIL")
+    # Check if counselor account already exists by role
+    stmt_existing_role = select(User).where(User.role == "counselor").limit(1)
+    result_existing_role = await db.execute(stmt_existing_role)
+    existing_counselor_by_role = result_existing_role.scalar_one_or_none()
+
+    # Check if account already exists with this email (regardless of role)
+    encrypted_email = _maybe_encrypt(counselor_email)
+    if encrypted_email:
+        stmt_existing_email = select(User).where(User.email == encrypted_email).limit(1)
+        result_existing_email = await db.execute(stmt_existing_email)
+        existing_counselor_by_email = result_existing_email.scalar_one_or_none()
+    else:
+        existing_counselor_by_email = None
+
+    if existing_counselor_by_role or existing_counselor_by_email:
+        logger.info("Counselor account already present (by role or email); skipping bootstrap.")
+        return
+
     counselor_password = os.getenv("COUNSELOR_PASSWORD")
     counselor_name = os.getenv("COUNSELOR_NAME", "Default Counselor")
 
-    if not counselor_email or not counselor_password:
-        logger.warning("COUNSELOR_EMAIL or COUNSELOR_PASSWORD not set; cannot create default counselor user.")
+    if not counselor_password:
+        logger.warning("COUNSELOR_PASSWORD not set; cannot create default counselor user.")
         return
 
     try:
-        encrypted_email = _maybe_encrypt(counselor_email)
         encrypted_name = _maybe_encrypt(counselor_name)
     except ValueError:
         return

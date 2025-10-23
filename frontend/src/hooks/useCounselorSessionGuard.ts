@@ -29,7 +29,9 @@ export function useCounselorSessionGuard(options: SessionGuardOptions = {}) {
     if (status === 'unauthenticated') {
       setIsValid(false);
       setIsLoading(false);
-      router.push(`${redirectPath}?sessionExpired=true`);
+      // Redirect to site-wide sign-in page with a callback to return the user to the counselor area after login
+      const callback = encodeURIComponent(redirectPath || '/counselor/dashboard');
+      router.push(`/api/auth/signin?callbackUrl=${callback}`);
       return;
     }
 

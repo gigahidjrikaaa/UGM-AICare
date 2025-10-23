@@ -6,6 +6,8 @@ import CounselorSidebar from '@/components/ui/counselor/CounselorSidebar';
 import CounselorFooter from '@/components/ui/counselor/CounselorFooter';
 import { useCounselorSessionGuard } from '@/hooks/useCounselorSessionGuard';
 import { useSessionExpiry } from '@/hooks/useSessionExpiry';
+import { useRouter } from 'next/navigation';
+import { useEffect } from 'react';
 
 export default function CounselorLayout({ children }: { children: ReactNode }) {
   // Monitor for backend token expiry
@@ -18,6 +20,14 @@ export default function CounselorLayout({ children }: { children: ReactNode }) {
       console.log('Counselor session expired. User will be redirected to login.');
     },
   });
+  // Router and effect must be declared unconditionally (hooks rules)
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!isLoading && !isValid) {
+      router.push('/access-denied');
+    }
+  }, [isLoading, isValid, router]);
 
   if (isLoading) {
     return (
@@ -31,14 +41,7 @@ export default function CounselorLayout({ children }: { children: ReactNode }) {
   }
 
   if (!isValid) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] flex items-center justify-center">
-        <div className="flex flex-col items-center">
-          <div className="text-white text-lg mb-2">Session Expired</div>
-          <div className="text-white/60 text-sm">Redirecting to login...</div>
-        </div>
-      </div>
-    );
+    return null;
   }
 
   return (
