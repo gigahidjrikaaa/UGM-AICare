@@ -91,8 +91,11 @@ export function CampaignHistoryModal({ campaign, isOpen, onClose }: CampaignHist
             <button
               onClick={onClose}
               className="p-2 hover:bg-white/10 text-white/60 hover:text-white rounded-lg transition-colors"
+              aria-label="Close campaign history modal"
+              title="Close campaign history modal"
             >
               <X className="w-6 h-6" />
+              <span className="sr-only">Close campaign history modal</span>
             </button>
           </div>
         </div>

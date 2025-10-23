@@ -11,8 +11,13 @@ export default function CounselorHeader() {
   return (
     <header className="h-16 bg-white/5 backdrop-blur-sm border-b border-white/10 px-4 md:px-6 flex items-center justify-between sticky top-0 z-10">
       <div className="flex items-center gap-4">
-        <button className="md:hidden text-white/80 hover:text-white">
+        <button
+          className="md:hidden text-white/80 hover:text-white"
+          aria-label="Open sidebar menu"
+          title="Open sidebar menu"
+        >
           <FiMenu size={24} />
+          <span className="sr-only">Open sidebar menu</span>
         </button>
         <div>
           <h1 className="text-sm font-medium text-white/60">Welcome back,</h1>
@@ -22,8 +27,13 @@ export default function CounselorHeader() {
 
       <div className="flex items-center gap-4">
         {/* Notifications */}
-        <button className="relative p-2 text-white/70 hover:text-white transition-colors">
+        <button
+          className="relative p-2 text-white/70 hover:text-white transition-colors"
+          aria-label="View notifications"
+          title="View notifications"
+        >
           <FiBell size={20} />
+          <span className="sr-only">View notifications</span>
           {notificationCount > 0 && (
             <span className="absolute top-0 right-0 w-5 h-5 bg-red-500 text-white text-xs rounded-full flex items-center justify-center">
               {notificationCount}

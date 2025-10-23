@@ -103,7 +103,7 @@ export default function CounselorLoginPage() {
               <FiHeart className="w-8 h-8 text-[#001d58]" />
             </div>
           </div>
-          <h1 className="text-3xl font-bold text-white mb-2">Counselor Portal</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">Counselor Panel</h1>
           <p className="text-white/60 text-sm">UGM AICare Clinical Access</p>
         </div>
 
@@ -209,7 +209,7 @@ export default function CounselorLoginPage() {
               ) : (
                 <>
                   <FiLogIn className="w-5 h-5" />
-                  <span>Sign In to Portal</span>
+                  <span>Sign In to Panel</span>
                 </>
               )}
             </button>
