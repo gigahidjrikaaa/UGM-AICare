@@ -16,6 +16,7 @@ export {
   FiEdit3, FiPlus, FiTrendingUp, FiExternalLink,
   FiGlobe, FiAlertTriangle, FiUserPlus, FiFilter,
   FiDownload, FiMoreHorizontal, FiEdit, FiPlayCircle,
+  FiRefreshCcw, FiPlay, FiPause, FiLayers,
   FiZap, FiCompass, FiTarget
 } from 'react-icons/fi';
 

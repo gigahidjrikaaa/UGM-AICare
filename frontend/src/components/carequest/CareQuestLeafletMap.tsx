@@ -25,18 +25,18 @@ export interface FacultyArea {
   coordinates: LatLngExpression[];
 }
 
-interface HarmonyLeafletMapProps {
+interface CareQuestLeafletMapProps {
   campusCenter: LatLngExpression;
   campusBounds: LatLngBoundsExpression;
   minZoom?: number;
   maxZoom?: number;
   facultyAreas: FacultyArea[];
-  nodes?: HarmonyNodeMarker[];
+  nodes?: CareQuestNodeMarker[];
   className?: string;
   mapProps?: Partial<MapContainerProps>;
 }
 
-function HarmonyLeafletMapComponent({
+function CareQuestLeafletMapComponent({
   campusCenter,
   campusBounds,
   minZoom = 16,
@@ -45,7 +45,7 @@ function HarmonyLeafletMapComponent({
   nodes = [],
   className,
   mapProps,
-}: HarmonyLeafletMapProps) {
+}: CareQuestLeafletMapProps) {
   return (
     <MapContainer
       center={campusCenter}
@@ -138,7 +138,7 @@ function HarmonyLeafletMapComponent({
             <div className="space-y-2 text-left">
               <div>
                 <p className="text-[10px] uppercase tracking-[0.3em] text-[#0b2b68]/60">
-                  {node.zone ?? "Harmony Node"}
+                  {node.zone ?? "CareQuest Node"}
                 </p>
                 <p className="text-sm font-semibold text-[#001d58]">{node.name}</p>
               </div>
@@ -163,11 +163,11 @@ function HarmonyLeafletMapComponent({
   );
 }
 
-export const HarmonyLeafletMap = memo(HarmonyLeafletMapComponent);
+export const CareQuestLeafletMap = memo(CareQuestLeafletMapComponent);
 
-export default HarmonyLeafletMap;
+export default CareQuestLeafletMap;
 
-export interface HarmonyNodeMarker {
+export interface CareQuestNodeMarker {
   id: string;
   name: string;
   description?: string;

@@ -6,12 +6,13 @@ import QuestHud from "@/components/quests/QuestHud";
 import QuestDialogueWindow from "@/components/quests/QuestDialogueWindow";
 import { FiShield, FiUsers, FiBell, FiCompass, FiChevronDown } from "@/icons";
 import { cn } from "@/lib/utils";
-import { HarmonyLeafletMap, FacultyArea } from "@/components/harmony-map/HarmonyLeafletMap";
+import { CareQuestLeafletMap, FacultyArea } from "@/components/carequest/CareQuestLeafletMap";
+import BreathingCircleMiniGame from "@/components/carequest/BreathingCircleMiniGame";
 import type { LatLngExpression, LatLngBoundsExpression } from "leaflet";
 
 type NodeStatus = "stable" | "threatened" | "cleansing";
 
-interface HarmonyNode {
+interface CareQuestNode {
   id: string;
   name: string;
   zone: string;
@@ -28,7 +29,7 @@ interface HarmonyNode {
   position: LatLngExpression;
 }
 
-const HARMONY_NODES: HarmonyNode[] = [
+const CAREQUEST_NODES: CareQuestNode[] = [
   {
     id: "library-courtyard",
     name: "Central Library Courtyard",
@@ -108,7 +109,7 @@ const FACULTY_AREAS: FacultyArea[] = [
     fillOpacity: 0.32,
     coordinates: [
       [-7.76964, 110.38197],
-      [-7.77047, 110.38170],
+      [-7.77047, 110.3817],
       [-7.77079, 110.38285],
       [-7.76988, 110.38316],
     ],
@@ -123,7 +124,7 @@ const FACULTY_AREAS: FacultyArea[] = [
       [-7.76903, 110.37624],
       [-7.76975, 110.37589],
       [-7.77002, 110.37703],
-      [-7.76930, 110.37731],
+      [-7.7693, 110.37731],
     ],
   },
   {
@@ -135,8 +136,8 @@ const FACULTY_AREAS: FacultyArea[] = [
     coordinates: [
       [-7.76524, 110.37402],
       [-7.76641, 110.37415],
-      [-7.76652, 110.37550],
-      [-7.76530, 110.37533],
+      [-7.76652, 110.3755],
+      [-7.7653, 110.37533],
     ],
   },
   {
@@ -206,12 +207,12 @@ const INITIAL_PANEL_STATE: Record<PanelKey, boolean> = {
   dialogue: false,
 };
 
-export default function HarmonyMapPage() {
-  const [selectedNodeId, setSelectedNodeId] = useState<string>(HARMONY_NODES[0]?.id ?? "");
+export default function CareQuestPage() {
+  const [selectedNodeId, setSelectedNodeId] = useState<string>(CAREQUEST_NODES[0]?.id ?? "");
   const [panelState, setPanelState] = useState<Record<PanelKey, boolean>>(INITIAL_PANEL_STATE);
 
   const selectedNode = useMemo(
-    () => HARMONY_NODES.find((node) => node.id === selectedNodeId) ?? null,
+    () => CAREQUEST_NODES.find((node) => node.id === selectedNodeId) ?? null,
     [selectedNodeId],
   );
 
@@ -232,13 +233,13 @@ export default function HarmonyMapPage() {
   }, []);
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-[#010a1f] text-white">
+    <div className="relative min-h-[calc(100vh-88px)] w-full overflow-hidden bg-[#010a1f] text-white md:min-h-[calc(100vh-96px)]">
       <div className="absolute inset-0 z-0">
-        <HarmonyLeafletMap
+        <CareQuestLeafletMap
           campusCenter={CAMPUS_CENTER}
           campusBounds={CAMPUS_BOUNDS}
           facultyAreas={FACULTY_AREAS}
-          nodes={HARMONY_NODES.map((node) => ({
+          nodes={CAREQUEST_NODES.map((node) => ({
             id: node.id,
             name: node.name,
             description: node.description,
@@ -273,10 +274,10 @@ export default function HarmonyMapPage() {
       <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(circle_at_bottom,_rgba(255,202,64,0.2),_transparent_60%)]" />
 
       <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
-        <div className="space-y-4 px-4 pt-28 sm:px-6 sm:pt-32">
+        <div className="space-y-4 px-4 pt-20 sm:px-6 sm:pt-24">
           <div className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-[#021230]/80 px-4 py-3 text-xs uppercase tracking-[0.35em] text-white/70 backdrop-blur">
             <FiCompass className="h-4 w-4 text-[#FFCA40]" />
-            Harmony Map • UGM Campus Twin
+            CareQuest • UGM Campus Twin
           </div>
 
           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
@@ -287,9 +288,9 @@ export default function HarmonyMapPage() {
                   onClick={() => togglePanel("questHud")}
                   className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-semibold text-white transition hover:bg-white/5"
                   aria-expanded={panelState.questHud}
-                  aria-controls="harmony-tracker-panel"
+                  aria-controls="carequest-tracker-panel"
                 >
-                  <span className="uppercase tracking-[0.18em] text-white/70">Harmony Tracker HUD</span>
+                  <span className="uppercase tracking-[0.18em] text-white/70">CareQuest Tracker HUD</span>
                   <motion.span
                     animate={{ rotate: panelState.questHud ? 0 : -90 }}
                     transition={{ duration: 0.2 }}
@@ -302,7 +303,7 @@ export default function HarmonyMapPage() {
                   {panelState.questHud ? (
                     <motion.div
                       key="questHudContent"
-                      id="harmony-tracker-panel"
+                      id="carequest-tracker-panel"
                       initial={{ height: 0, opacity: 0 }}
                       animate={{ height: "auto", opacity: 1 }}
                       exit={{ height: 0, opacity: 0 }}
@@ -337,7 +338,7 @@ export default function HarmonyMapPage() {
                     <div>
                       <p className="text-xs uppercase tracking-[0.3em] text-white/50">Node Intel</p>
                       <h2 className="text-lg font-semibold text-white">
-                        {selectedNode ? selectedNode.name : "Select a Harmony Node"}
+                        {selectedNode ? selectedNode.name : "Select a CareQuest Node"}
                       </h2>
                     </div>
                   </div>
@@ -393,10 +394,13 @@ export default function HarmonyMapPage() {
                               <p>Guild Control • <span className="text-white/80">{selectedNode.guildControl}</span></p>
                               <p>Gloom Level • <span className="text-white/80">{selectedNode.gloomLevel}%</span></p>
                             </div>
+                            {selectedNode.id === "library-courtyard" ? (
+                              <BreathingCircleMiniGame className="mt-4" />
+                            ) : null}
                           </>
                         ) : (
                           <p className="text-sm text-white/60">
-                            Select a Harmony Node on the map to view its quest details and Gloom status.
+                            Select a CareQuest Node on the map to view its quest details and Gloom status.
                           </p>
                         )}
                       </div>
@@ -404,9 +408,7 @@ export default function HarmonyMapPage() {
                   ) : null}
                 </AnimatePresence>
               </motion.section>
-            </div>
 
-            <div className="pointer-events-auto flex w-full flex-col gap-4 xl:max-w-[360px]">
               <motion.section
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -468,7 +470,9 @@ export default function HarmonyMapPage() {
                   ) : null}
                 </AnimatePresence>
               </motion.section>
+            </div>
 
+            <div className="pointer-events-auto flex w-full flex-col gap-4 xl:max-w-[360px]">
               <motion.section
                 initial={{ opacity: 0, y: 12 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -553,7 +557,7 @@ export default function HarmonyMapPage() {
                 onClick={() => togglePanel("dialogue")}
                 className="flex items-center gap-2 rounded-full border border-white/15 bg-[#021230]/80 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.2em] text-white/70 transition hover:border-white/30 hover:text-white"
                 aria-expanded={panelState.dialogue}
-                aria-controls="harmony-dialogue-panel"
+                aria-controls="carequest-dialogue-panel"
               >
                 Dialogue
                 <motion.span
@@ -569,7 +573,7 @@ export default function HarmonyMapPage() {
               {panelState.dialogue ? (
                 <motion.div
                   key="dialogueContent"
-                  id="harmony-dialogue-panel"
+                  id="carequest-dialogue-panel"
                   initial={{ height: 0, opacity: 0, y: 12 }}
                   animate={{ height: "auto", opacity: 1, y: 0 }}
                   exit={{ height: 0, opacity: 0, y: 12 }}
@@ -579,7 +583,7 @@ export default function HarmonyMapPage() {
                   <QuestDialogueWindow
                     lines={dialogueLines}
                     tone={selectedNode?.status === "threatened" ? "urgent" : "supportive"}
-                    title={selectedNode?.name ?? "Harmony Node"}
+                    title={selectedNode?.name ?? "CareQuest Node"}
                   />
                 </motion.div>
               ) : null}
@@ -589,7 +593,6 @@ export default function HarmonyMapPage() {
       )}
     </div>
   );
-
 }
 
 function LegendDot({ colorClass, label }: { colorClass: string; label: string }) {
