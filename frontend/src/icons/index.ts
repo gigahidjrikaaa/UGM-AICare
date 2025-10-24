@@ -16,7 +16,7 @@ export {
   FiEdit3, FiPlus, FiTrendingUp, FiExternalLink,
   FiGlobe, FiAlertTriangle, FiUserPlus, FiFilter,
   FiDownload, FiMoreHorizontal, FiEdit, FiPlayCircle,
-  FiZap
+  FiZap, FiCompass, FiTarget
 } from 'react-icons/fi';
 
 // React Icons - Font Awesome (Fa)

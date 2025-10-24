@@ -28,6 +28,9 @@ const apiClient = axios.create({
   headers: { 'Content-Type': 'application/json', },
 });
 
+let hasTriggeredSignOut = false;
+const AUTH_ROUTE_PREFIXES = ["/signin", "/signup", "/auth"];
+
 // Add request interceptor to attach JWT token to every request
 // This will be called before every request to the backend
 apiClient.interceptors.request.use(
@@ -49,9 +52,20 @@ apiClient.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.response?.status === 401) {
-      // Handle unauthorized access, e.g., redirect to login
       console.error("API request Unauthorized (401):", error.response.data?.detail);
-      signOut({ callbackUrl: '/signin' });
+      if (typeof window !== "undefined") {
+        const pathname = window.location.pathname;
+        const onAuthRoute = AUTH_ROUTE_PREFIXES.some((prefix) => pathname.startsWith(prefix));
+        if (onAuthRoute) {
+          return Promise.reject(error);
+        }
+      }
+      if (!hasTriggeredSignOut) {
+        hasTriggeredSignOut = true;
+        signOut({ callbackUrl: '/signin' }).finally(() => {
+          hasTriggeredSignOut = false;
+        });
+      }
     }
      // Log other errors
      if (axios.isAxiosError(error)) {

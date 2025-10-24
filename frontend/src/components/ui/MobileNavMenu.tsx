@@ -10,6 +10,7 @@ import {
   BsQuestionCircle, 
   FiActivity, 
   FiBookOpen, 
+  FiMapPin, 
   FiInfo 
 } from '@/icons';
 import AccountLinker from '@/components/AccountLinker'; //
@@ -23,6 +24,7 @@ interface MobileNavMenuProps {
 // Define navigation items with updated icons and links
 const mobileNavItems = [
     { href: "/dashboard", label: "Home", icon: <FiBookOpen size={18} /> },
+    { href: "/harmony-map", label: "Harmony Map", icon: <FiMapPin size={18} /> },
     { href: "/about", label: "About", icon: <FiInfo size={18} /> },
     { href: "/aika", label: "Talk to Aika", icon: <BsChatDots size={18} /> },
     { href: "/journaling", label: "Journaling", icon: <FiActivity size={18} /> },

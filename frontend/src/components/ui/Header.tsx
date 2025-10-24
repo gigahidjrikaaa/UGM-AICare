@@ -109,6 +109,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
           <nav className="hidden md:flex items-center gap-6">
             {[
               { href: "/dashboard", label: "Home" },
+              { href: "/harmony-map", label: "Harmony Map" },
               { href: "/about", label: "About" },
               { href: "/journaling", label: "Journaling" },
               { href: "/appointments", label: "Appointments" },
@@ -247,3 +248,4 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
   </>
   );
 }
+
