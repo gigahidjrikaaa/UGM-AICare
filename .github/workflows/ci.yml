@@ -7,6 +7,12 @@ on:
   pull_request:
     branches:
       - main
+  workflow_dispatch:
+    inputs:
+      rollback_sha:
+        description: 'Git SHA to rollback to (optional)'
+        required: false
+        type: string
 
 jobs:
   build-test-scan-push:
@@ -14,6 +20,7 @@ jobs:
     permissions:
       contents: read
       packages: write # To push images to GHCR
+    if: github.event_name == 'push' || github.event_name == 'pull_request' || (github.event_name == 'workflow_dispatch' && !github.event.inputs.rollback_sha)
 
     steps:
       - name: Checkout repository
@@ -22,12 +29,12 @@ jobs:
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20' # Or appropriate version for your frontend
+          node-version: '20'
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
-          python-version: '3.9' # Or appropriate version for your backend
+          python-version: '3.9'
 
       - name: Install backend dependencies
         run: pip install -r backend/requirements.txt
@@ -36,7 +43,6 @@ jobs:
       - name: Run backend tests (pytest)
         run: pytest
         working-directory: ./backend
-        # continue-on-error: true # Uncomment if you want to allow build even if tests fail
 
       - name: Install frontend dependencies
         run: npm install
@@ -45,7 +51,6 @@ jobs:
       - name: Run frontend tests (npm test)
         run: npm test
         working-directory: ./frontend
-        # continue-on-error: true # Uncomment if you want to allow build even if tests fail
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -57,7 +62,7 @@ jobs:
       - name: Build and push backend image
         uses: docker/build-push-action@v5
         with:
-          context: ./backend/app # Path to the directory containing the Dockerfile
+          context: ./backend/app
           file: ./infra/docker/backend.Dockerfile
           push: true
           tags: |
@@ -67,7 +72,7 @@ jobs:
       - name: Build and push frontend image
         uses: docker/build-push-action@v5
         with:
-          context: ./frontend # Path to the directory containing the Dockerfile
+          context: ./frontend
           file: ./infra/docker/frontend.Dockerfile
           push: true
           tags: |
@@ -79,15 +84,70 @@ jobs:
         with:
           image-ref: 'ghcr.io/${{ github.repository }}/backend:${{ github.sha }}'
           format: 'table'
-          exit-code: '1' # Fail on vulnerabilities
+          exit-code: '1'
           severity: 'HIGH,CRITICAL'
-          ignore-unfixed: true # Only fail on fixed vulnerabilities
+          ignore-unfixed: true
 
       - name: Run Trivy vulnerability scan on frontend image
         uses: aquasecurity/trivy-action@master
         with:
           image-ref: 'ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}'
           format: 'table'
-          exit-code: '1' # Fail on vulnerabilities
+          exit-code: '1'
           severity: 'HIGH,CRITICAL'
-          ignore-unfixed: true # Only fail on fixed vulnerabilities
+          ignore-unfixed: true
+
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production
+    needs: build-test-scan-push
+    if: (github.event_name == 'push' && github.ref == 'refs/heads/main') || (github.event_name == 'workflow_dispatch' && !github.event.inputs.rollback_sha)
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_SSH_HOST }}
+          username: ${{ secrets.VM_SSH_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          script: |
+            export GHCR_USER=${{ github.actor }}
+            export GHCR_TOKEN=${{ secrets.GITHUB_TOKEN }}
+            
+            cd ${{ secrets.VM_PROJECT_PATH }}
+            
+            if [ -n "${{ secrets.ENV_FILE_PRODUCTION }}" ]; then
+              echo "${{ secrets.ENV_FILE_PRODUCTION }}" > .env
+            fi
+            
+            ./infra/scripts/deploy.sh ${{ github.sha }}
+
+  rollback:
+    runs-on: ubuntu-latest
+    environment: production
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.rollback_sha
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Rollback to previous SHA
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_SSH_HOST }}
+          username: ${{ secrets.VM_SSH_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          script: |
+            export GHCR_USER=${{ github.actor }}
+            export GHCR_TOKEN=${{ secrets.GITHUB_TOKEN }}
+            
+            cd ${{ secrets.VM_PROJECT_PATH }}
+            
+            if [ -n "${{ secrets.ENV_FILE_PRODUCTION }}" ]; then
+              echo "${{ secrets.ENV_FILE_PRODUCTION }}" > .env
+            fi
+            
+            ./infra/scripts/deploy.sh ${{ github.event.inputs.rollback_sha }}
