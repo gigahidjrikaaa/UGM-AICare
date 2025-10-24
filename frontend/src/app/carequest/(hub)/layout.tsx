@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FiMapPin, FiUsers, FiActivity, FiLayers } from "@/icons";
+import { FiMapPin, FiUsers, FiActivity, FiLayers, FiArrowLeft } from "@/icons";
 import { cn } from "@/lib/utils";
 
 const NAV_ITEMS = [
@@ -17,12 +17,21 @@ export default function CareQuestHubLayout({ children }: { children: React.React
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#010a1f] text-white">
-      <header className="fixed left-0 right-0 top-0 z-40 flex items-center justify-between border-b border-white/10 bg-[#010a1f]/85 px-4 py-3 backdrop-blur md:px-8">
-        <div>
-          <p className="text-xs uppercase tracking-[0.3em] text-white/50">CareQuest Hub</p>
-          <h1 className="text-lg font-semibold text-white">Play to Care • Guild Ecosystem</h1>
+      <header className="fixed left-0 right-0 top-0 z-40 flex flex-col gap-3 border-b border-white/10 bg-[#010a1f]/90 px-4 py-4 backdrop-blur lg:flex-row lg:items-center lg:justify-between lg:px-8 lg:py-5">
+        <div className="flex items-center gap-4">
+          <Link
+            href="/dashboard"
+            className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/5 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.22em] text-white/70 transition hover:border-white/30 hover:text-white"
+          >
+            <FiArrowLeft className="h-4 w-4" />
+            Back to AICare
+          </Link>
+          <div>
+            <p className="text-xs uppercase tracking-[0.3em] text-white/50">CareQuest Hub</p>
+            <h1 className="text-lg font-semibold text-white">Play to Care • Guild Ecosystem</h1>
+          </div>
         </div>
-        <nav className="flex items-center gap-2">
+        <nav className="flex flex-wrap items-center gap-2">
           {NAV_ITEMS.map(({ href, label, icon: Icon, comingSoon, activeMatch }) => {
             const isActive = href ? activeMatch?.test(pathname) : false;
             const baseClasses =

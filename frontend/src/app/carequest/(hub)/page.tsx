@@ -1,10 +1,18 @@
 'use client';
 
-import { useCallback, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import QuestHud from "@/components/quests/QuestHud";
 import QuestDialogueWindow from "@/components/quests/QuestDialogueWindow";
-import { FiShield, FiUsers, FiBell, FiCompass, FiChevronDown } from "@/icons";
+import {
+  FiShield,
+  FiUsers,
+  FiBell,
+  FiCompass,
+  FiActivity,
+  FiMessageSquare,
+  FiX,
+} from "@/icons";
 import { cn } from "@/lib/utils";
 import { CareQuestLeafletMap, FacultyArea } from "@/components/carequest/CareQuestLeafletMap";
 import BreathingCircleMiniGame from "@/components/carequest/BreathingCircleMiniGame";
@@ -197,19 +205,24 @@ const STATUS_STYLES: Record<NodeStatus, { label: string; className: string }> = 
   cleansing: { label: "Cleansing", className: "from-sky-400/40 to-sky-400/10 shadow-sky-500/30" },
 };
 
-const PANEL_KEYS = ["questHud", "nodeIntel", "gloomAlerts", "alliedCohorts", "dialogue"] as const;
-type PanelKey = (typeof PANEL_KEYS)[number];
-const INITIAL_PANEL_STATE: Record<PanelKey, boolean> = {
-  questHud: false,
-  nodeIntel: false,
-  gloomAlerts: false,
-  alliedCohorts: false,
-  dialogue: false,
-};
+type HubModalKey = "questHud" | "nodeIntel" | "gloomAlerts" | "alliedCohorts" | "dialogue";
+
+const ACTION_BUTTONS: Array<{
+  key: HubModalKey;
+  label: string;
+  description: string;
+  icon: React.ComponentType<{ className?: string }>;
+}> = [
+  { key: "questHud", label: "Tracker", description: "Harmony, JOY & streaks", icon: FiActivity },
+  { key: "nodeIntel", label: "Node Intel", description: "Selected node intel", icon: FiShield },
+  { key: "gloomAlerts", label: "Alerts", description: "Live dispatch feed", icon: FiBell },
+  { key: "alliedCohorts", label: "Guilds", description: "Guild resonance", icon: FiUsers },
+  { key: "dialogue", label: "Dialogue", description: "Aika briefing", icon: FiMessageSquare },
+];
 
 export default function CareQuestPage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string>(CAREQUEST_NODES[0]?.id ?? "");
-  const [panelState, setPanelState] = useState<Record<PanelKey, boolean>>(INITIAL_PANEL_STATE);
+  const [openModal, setOpenModal] = useState<HubModalKey | null>(null);
 
   const selectedNode = useMemo(
     () => CAREQUEST_NODES.find((node) => node.id === selectedNodeId) ?? null,
@@ -228,9 +241,103 @@ export default function CareQuestPage() {
     ];
   }, [selectedNode]);
 
-  const togglePanel = useCallback((key: PanelKey) => {
-    setPanelState((prev) => ({ ...prev, [key]: !prev[key] }));
-  }, []);
+  const renderModalContent = (key: HubModalKey) => {
+    switch (key) {
+      case "questHud":
+        return <QuestHud className="!mx-0 !mb-0 !mt-0 w-full" />;
+      case "nodeIntel":
+        if (!selectedNode) {
+          return <p className="text-sm text-white/70">Select a CareQuest node to view its intel and active quest.</p>;
+        }
+        return (
+          <div className="space-y-4 text-sm text-white/80">
+            <div
+              className={cn(
+                "flex items-center justify-between rounded-2xl border border-white/10 bg-gradient-to-r px-3 py-2 text-xs uppercase tracking-wide text-white shadow-inner shadow-[#00153a]/30",
+                STATUS_STYLES[selectedNode.status].className,
+              )}
+            >
+              <span>{selectedNode.zone}</span>
+              <span className="font-semibold text-white">{STATUS_STYLES[selectedNode.status].label}</span>
+            </div>
+            <p>{selectedNode.description}</p>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm">
+              <p className="text-xs uppercase tracking-wide text-white/50">Active Quest</p>
+              <p className="mt-1 font-semibold text-white">{selectedNode.activeQuest.title}</p>
+              <p className="mt-1 text-white/70">{selectedNode.activeQuest.summary}</p>
+              <div className="mt-3 space-y-2 text-xs">
+                <p className="rounded-xl bg-[#FFCA40]/10 px-3 py-2 text-[#FFCA40]">
+                  Action • {selectedNode.activeQuest.action}
+                </p>
+                <p className="rounded-xl bg-[#3BA7B5]/10 px-3 py-2 text-[#5EEAD4]">
+                  Reward • {selectedNode.activeQuest.reward}
+                </p>
+              </div>
+            </div>
+            <div className="grid gap-2 text-xs uppercase tracking-wide text-white/60 sm:grid-cols-2">
+              <p>Guild Control • <span className="text-white/80">{selectedNode.guildControl}</span></p>
+              <p>Gloom Level • <span className="text-white/80">{selectedNode.gloomLevel}%</span></p>
+            </div>
+            {selectedNode.id === "library-courtyard" ? (
+              <BreathingCircleMiniGame className="mt-2" />
+            ) : null}
+          </div>
+        );
+      case "gloomAlerts":
+        return (
+          <div className="space-y-3 text-sm text-white/70">
+            {LIVE_EVENTS.map((event) => (
+              <div
+                key={event.id}
+                className="rounded-2xl border border-white/10 bg-[#01122a]/80 px-4 py-3 shadow-inner shadow-[#001324]/40"
+              >
+                <p className="text-xs uppercase tracking-wide text-[#FFCA40]">{event.time}</p>
+                <p className="mt-1 font-semibold text-white">{event.title}</p>
+                <p className="text-xs text-white/60">{event.location}</p>
+                <button className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:border-white/30 hover:text-white">
+                  {event.callToAction}
+                </button>
+              </div>
+            ))}
+          </div>
+        );
+      case "alliedCohorts":
+        return (
+          <div className="space-y-3 text-sm text-white/70">
+            {GUILD_STATUS.map((guild) => (
+              <div
+                key={guild.name}
+                className="rounded-2xl border border-white/10 bg-[#010c20]/85 px-4 py-3 shadow-inner shadow-[#00152f]/40"
+              >
+                <p className="text-white font-semibold">{guild.name}</p>
+                <p className="text-xs uppercase tracking-[0.2em] text-white/50">
+                  {guild.membersOnline} online • Harmony {guild.harmonyContribution.toLocaleString()}
+                </p>
+                <p className="mt-2 text-xs text-white/60">
+                  Compassion Reserve • {guild.compassionReserve.toLocaleString()}
+                </p>
+              </div>
+            ))}
+          </div>
+        );
+      case "dialogue":
+        if (!dialogueLines.length) {
+          return <p className="text-sm text-white/70">No dialogue briefing available yet. Sync a node to unlock.</p>;
+        }
+        return (
+          <QuestDialogueWindow
+            lines={dialogueLines}
+            tone={selectedNode?.status === "threatened" ? "urgent" : "supportive"}
+            title={selectedNode?.name ?? "CareQuest Node"}
+          />
+        );
+      default:
+        return null;
+    }
+  };
+
+  const activeButton = openModal ? ACTION_BUTTONS.find((btn) => btn.key === openModal) : null;
+  const isDialogueAvailable = dialogueLines.length > 0;
 
   return (
     <div className="relative min-h-[calc(100vh-88px)] w-full overflow-hidden bg-[#010a1f] text-white md:min-h-[calc(100vh-96px)]">
@@ -273,324 +380,93 @@ export default function CareQuestPage() {
       <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(circle_at_top,_rgba(59,167,181,0.25),_transparent_55%)]" />
       <div className="pointer-events-none absolute inset-0 z-10 bg-[radial-gradient(circle_at_bottom,_rgba(255,202,64,0.2),_transparent_60%)]" />
 
-      <div className="pointer-events-none absolute inset-0 z-20 flex flex-col justify-between">
-        <div className="space-y-4 px-4 pt-20 sm:px-6 sm:pt-24">
-          <div className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-[#021230]/80 px-4 py-3 text-xs uppercase tracking-[0.35em] text-white/70 backdrop-blur">
+      <div className="pointer-events-none absolute inset-0 z-20">
+        <div className="pointer-events-auto absolute left-4 top-6 flex flex-col gap-4 sm:left-6 sm:top-8">
+          <div className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-[#021230]/80 px-4 py-2 text-xs uppercase tracking-[0.32em] text-white/70 backdrop-blur">
             <FiCompass className="h-4 w-4 text-[#FFCA40]" />
-            CareQuest • UGM Campus Twin
+            CareQuest Map
           </div>
 
-          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-            <div className="pointer-events-auto flex w-full flex-col gap-4 xl:max-w-[420px]">
-              <div className="overflow-hidden rounded-[28px] border border-white/10 bg-[#021230]/80 shadow-[0_16px_38px_rgba(4,20,54,0.35)] backdrop-blur">
-                <button
-                  type="button"
-                  onClick={() => togglePanel("questHud")}
-                  className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left text-sm font-semibold text-white transition hover:bg-white/5"
-                  aria-expanded={panelState.questHud}
-                  aria-controls="carequest-tracker-panel"
-                >
-                  <span className="uppercase tracking-[0.18em] text-white/70">CareQuest Tracker HUD</span>
-                  <motion.span
-                    animate={{ rotate: panelState.questHud ? 0 : -90 }}
-                    transition={{ duration: 0.2 }}
-                    className="rounded-full border border-white/20 bg-white/10 p-1 text-white/80"
-                  >
-                    <FiChevronDown className="h-4 w-4" />
-                  </motion.span>
-                </button>
-                <AnimatePresence initial={false}>
-                  {panelState.questHud ? (
-                    <motion.div
-                      key="questHudContent"
-                      id="carequest-tracker-panel"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.22, ease: "easeOut" }}
-                      className="overflow-hidden"
-                    >
-                      <div className="px-3 pb-4 pt-2">
-                        <QuestHud className="!mx-0 !mb-0 !mt-0 w-full" />
-                      </div>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
-              </div>
-
-              <motion.section
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25 }}
-                className="overflow-hidden rounded-[28px] border border-white/10 bg-gradient-to-br from-[#041a3c]/80 via-[#01122a]/90 to-[#021230]/80 shadow-[0_16px_40px_rgba(4,20,54,0.36)] backdrop-blur"
-              >
-                <button
-                  type="button"
-                  onClick={() => togglePanel("nodeIntel")}
-                  className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
-                  aria-expanded={panelState.nodeIntel}
-                  aria-controls="node-intel-panel"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-2xl bg-[#FFCA40]/15 p-3 text-[#FFCA40]">
-                      <FiShield className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.3em] text-white/50">Node Intel</p>
-                      <h2 className="text-lg font-semibold text-white">
-                        {selectedNode ? selectedNode.name : "Select a CareQuest Node"}
-                      </h2>
-                    </div>
-                  </div>
-                  <motion.span
-                    animate={{ rotate: panelState.nodeIntel ? 0 : -90 }}
-                    transition={{ duration: 0.2 }}
-                    className="rounded-full border border-white/20 bg-white/10 p-1 text-white/80"
-                  >
-                    <FiChevronDown className="h-4 w-4" />
-                  </motion.span>
-                </button>
-
-                <AnimatePresence initial={false}>
-                  {panelState.nodeIntel ? (
-                    <motion.div
-                      key="nodeIntelContent"
-                      id="node-intel-panel"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.22, ease: "easeOut" }}
-                      className="overflow-hidden border-t border-white/10 bg-white/5"
-                    >
-                      <div className="space-y-3 px-5 pb-5 pt-4 text-sm text-white/80">
-                        {selectedNode ? (
-                          <>
-                            <div
-                              className={cn(
-                                "flex items-center justify-between rounded-2xl border border-white/10 bg-gradient-to-r px-3 py-2 text-xs uppercase tracking-wide text-white shadow-inner shadow-[#00153a]/30",
-                                STATUS_STYLES[selectedNode.status].className,
-                              )}
-                            >
-                              <span>{selectedNode.zone}</span>
-                              <span className="font-semibold text-white">
-                                {STATUS_STYLES[selectedNode.status].label}
-                              </span>
-                            </div>
-                            <p>{selectedNode.description}</p>
-                            <div className="rounded-2xl border border-white/10 bg-white/5 p-3 text-sm">
-                              <p className="text-xs uppercase tracking-wide text-white/50">Active Quest</p>
-                              <p className="mt-1 font-semibold text-white">{selectedNode.activeQuest.title}</p>
-                              <p className="mt-1 text-white/70">{selectedNode.activeQuest.summary}</p>
-                              <div className="mt-3 space-y-2 text-xs">
-                                <p className="rounded-xl bg-[#FFCA40]/10 px-3 py-2 text-[#FFCA40]">
-                                  Action • {selectedNode.activeQuest.action}
-                                </p>
-                                <p className="rounded-xl bg-[#3BA7B5]/10 px-3 py-2 text-[#5EEAD4]">
-                                  Reward • {selectedNode.activeQuest.reward}
-                                </p>
-                              </div>
-                            </div>
-                            <div className="grid gap-2 text-xs uppercase tracking-wide text-white/60">
-                              <p>Guild Control • <span className="text-white/80">{selectedNode.guildControl}</span></p>
-                              <p>Gloom Level • <span className="text-white/80">{selectedNode.gloomLevel}%</span></p>
-                            </div>
-                            {selectedNode.id === "library-courtyard" ? (
-                              <BreathingCircleMiniGame className="mt-4" />
-                            ) : null}
-                          </>
-                        ) : (
-                          <p className="text-sm text-white/60">
-                            Select a CareQuest Node on the map to view its quest details and Gloom status.
-                          </p>
-                        )}
-                      </div>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
-              </motion.section>
-
-              <motion.section
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, delay: 0.05 }}
-                className="overflow-hidden rounded-[28px] border border-white/10 bg-white/5 shadow-[0_14px_32px_rgba(4,16,40,0.35)] backdrop-blur"
-              >
-                <button
-                  type="button"
-                  onClick={() => togglePanel("gloomAlerts")}
-                  className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
-                  aria-expanded={panelState.gloomAlerts}
-                  aria-controls="gloom-alerts-panel"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-2xl bg-[#FFCA40]/15 p-3 text-[#FFCA40]">
-                      <FiBell className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.3em] text-white/50">Live Dispatch</p>
-                      <h2 className="text-lg font-semibold text-white">Gloom Alerts</h2>
-                    </div>
-                  </div>
-                  <motion.span
-                    animate={{ rotate: panelState.gloomAlerts ? 0 : -90 }}
-                    transition={{ duration: 0.2 }}
-                    className="rounded-full border border-white/20 bg-white/10 p-1 text-white/80"
-                  >
-                    <FiChevronDown className="h-4 w-4" />
-                  </motion.span>
-                </button>
-
-                <AnimatePresence initial={false}>
-                  {panelState.gloomAlerts ? (
-                    <motion.div
-                      key="gloomAlertsContent"
-                      id="gloom-alerts-panel"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.22, ease: "easeOut" }}
-                      className="overflow-hidden border-t border-white/10 bg-[#01122a]/40"
-                    >
-                      <div className="space-y-3 px-5 pb-5 pt-4">
-                        {LIVE_EVENTS.map((event) => (
-                          <div
-                            key={event.id}
-                            className="rounded-2xl border border-white/10 bg-[#01122a]/80 px-4 py-3 text-sm text-white/70 shadow-inner shadow-[#001324]/40"
-                          >
-                            <p className="text-xs uppercase tracking-wide text-[#FFCA40]">{event.time}</p>
-                            <p className="mt-1 font-semibold text-white">{event.title}</p>
-                            <p className="text-xs text-white/60">{event.location}</p>
-                            <button className="mt-3 inline-flex items-center gap-2 rounded-full border border-white/15 px-3 py-1.5 text-xs font-medium text-white/80 transition hover:border-white/30 hover:text-white">
-                              {event.callToAction}
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
-              </motion.section>
+          {selectedNode ? (
+            <div className="max-w-xs rounded-2xl border border-white/10 bg-[#021230]/70 px-4 py-3 text-xs text-white/70 shadow-[0_10px_24px_rgba(2,16,45,0.45)] backdrop-blur">
+              <p className="text-sm font-semibold text-white">{selectedNode.name}</p>
+              <p className="uppercase tracking-[0.2em] text-white/50">{selectedNode.zone}</p>
+              <p className="mt-2 line-clamp-3">{selectedNode.description}</p>
             </div>
-
-            <div className="pointer-events-auto flex w-full flex-col gap-4 xl:max-w-[360px]">
-              <motion.section
-                initial={{ opacity: 0, y: 12 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.25, delay: 0.1 }}
-                className="overflow-hidden rounded-[28px] border border-white/10 bg-white/5 shadow-[0_12px_30px_rgba(4,12,32,0.32)] backdrop-blur"
-              >
-                <button
-                  type="button"
-                  onClick={() => togglePanel("alliedCohorts")}
-                  className="flex w-full items-center justify-between gap-3 px-5 py-4 text-left"
-                  aria-expanded={panelState.alliedCohorts}
-                  aria-controls="allied-cohorts-panel"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="rounded-2xl bg-[#FFCA40]/15 p-3 text-[#FFCA40]">
-                      <FiUsers className="h-5 w-5" />
-                    </div>
-                    <div>
-                      <p className="text-xs uppercase tracking-[0.3em] text-white/50">Guild Resonance</p>
-                      <h2 className="text-lg font-semibold text-white">Allied Cohorts</h2>
-                    </div>
-                  </div>
-                  <motion.span
-                    animate={{ rotate: panelState.alliedCohorts ? 0 : -90 }}
-                    transition={{ duration: 0.2 }}
-                    className="rounded-full border border-white/20 bg-white/10 p-1 text-white/80"
-                  >
-                    <FiChevronDown className="h-4 w-4" />
-                  </motion.span>
-                </button>
-                <AnimatePresence initial={false}>
-                  {panelState.alliedCohorts ? (
-                    <motion.div
-                      key="alliedCohortsContent"
-                      id="allied-cohorts-panel"
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.22, ease: "easeOut" }}
-                      className="overflow-hidden border-t border-white/10 bg-[#010c20]/60"
-                    >
-                      <div className="space-y-3 px-5 pb-5 pt-4">
-                        {GUILD_STATUS.map((guild) => (
-                          <div
-                            key={guild.name}
-                            className="rounded-2xl border border-white/10 bg-[#010c20]/85 px-4 py-3 text-sm text-white/70"
-                          >
-                            <p className="text-white font-semibold">{guild.name}</p>
-                            <div className="mt-2 grid grid-cols-2 gap-2 text-xs uppercase tracking-wide text-white/50">
-                              <span>Online • <span className="text-white/70">{guild.membersOnline}</span></span>
-                              <span>Harmony • <span className="text-[#5EEAD4]">{guild.harmonyContribution}</span></span>
-                              <span>Compassion Reserve • <span className="text-[#FFCA40]">{guild.compassionReserve}</span></span>
-                              <span className="text-[#A78BFA]">Boost • 1.2x Care yield</span>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </motion.div>
-                  ) : null}
-                </AnimatePresence>
-              </motion.section>
-            </div>
-          </div>
+          ) : null}
         </div>
 
-        <div className="px-4 pb-6 sm:px-6">
-          <div className="pointer-events-auto inline-flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-[#021230]/80 px-4 py-3 text-xs text-white/70 backdrop-blur">
-            <LegendDot colorClass="bg-emerald-400" label="Stable node" />
-            <LegendDot colorClass="bg-amber-400" label="Threatened node" />
-            <LegendDot colorClass="bg-sky-400" label="Cleansing raid" />
-            <LegendDot colorClass="bg-[#FFCA40]" label="Selected node" />
-          </div>
+        <div className="pointer-events-auto absolute right-4 top-6 flex flex-col items-end gap-2 sm:right-6 sm:top-8">
+          {ACTION_BUTTONS.map(({ key, label, description, icon: Icon }) => {
+            const disabled = key === "dialogue" && !isDialogueAvailable;
+            return (
+              <button
+                key={key}
+                type="button"
+                onClick={() => setOpenModal(key)}
+                disabled={disabled}
+                className={cn(
+                  "group flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
+                  disabled
+                    ? "cursor-not-allowed border-white/10 bg-white/5 text-white/35"
+                    : "border-white/15 bg-white/5 text-white/70 hover:border-white/35 hover:text-white",
+                )}
+              >
+                <Icon className="h-4 w-4" />
+                <span className="hidden sm:inline">{label}</span>
+                <span className="sr-only sm:not-sr-only">{description}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="pointer-events-auto absolute bottom-6 left-4 flex flex-wrap items-center gap-3 rounded-2xl border border-white/10 bg-[#021230]/80 px-4 py-3 text-xs text-white/70 backdrop-blur sm:left-6">
+          <LegendDot colorClass="bg-emerald-400" label="Stable" />
+          <LegendDot colorClass="bg-amber-400" label="Threatened" />
+          <LegendDot colorClass="bg-sky-400" label="Cleansing" />
+          <LegendDot colorClass="bg-[#FFCA40]" label="Selected" />
         </div>
       </div>
 
-      {dialogueLines.length > 0 && (
-        <div className="pointer-events-none absolute bottom-6 left-1/2 z-30 w-[min(880px,92vw)] -translate-x-1/2">
-          <div className="pointer-events-auto">
-            <div className="mb-2 flex justify-end">
+      <AnimatePresence>
+        {openModal ? (
+          <motion.div
+            key="carequest-modal"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 flex items-center justify-center bg-[#010a1f]/75 backdrop-blur"
+            onClick={() => setOpenModal(null)}
+          >
+            <motion.div
+              initial={{ y: 24, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 24, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="relative w-[min(640px,90vw)] rounded-[28px] border border-white/10 bg-[#020a1d]/95 p-6 text-white shadow-[0_20px_60px_rgba(3,12,32,0.55)]"
+              onClick={(event) => event.stopPropagation()}
+            >
               <button
                 type="button"
-                onClick={() => togglePanel("dialogue")}
-                className="flex items-center gap-2 rounded-full border border-white/15 bg-[#021230]/80 px-3 py-1.5 text-xs font-medium uppercase tracking-[0.2em] text-white/70 transition hover:border-white/30 hover:text-white"
-                aria-expanded={panelState.dialogue}
-                aria-controls="carequest-dialogue-panel"
+                onClick={() => setOpenModal(null)}
+                className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/60 transition hover:border-white/40 hover:text-white"
               >
-                Dialogue
-                <motion.span
-                  animate={{ rotate: panelState.dialogue ? 0 : -90 }}
-                  transition={{ duration: 0.2 }}
-                  className="rounded-full border border-white/20 bg-white/10 p-1 text-white/80"
-                >
-                  <FiChevronDown className="h-3 w-3" />
-                </motion.span>
+                <FiX className="h-4 w-4" />
               </button>
-            </div>
-            <AnimatePresence initial={false}>
-              {panelState.dialogue ? (
-                <motion.div
-                  key="dialogueContent"
-                  id="carequest-dialogue-panel"
-                  initial={{ height: 0, opacity: 0, y: 12 }}
-                  animate={{ height: "auto", opacity: 1, y: 0 }}
-                  exit={{ height: 0, opacity: 0, y: 12 }}
-                  transition={{ duration: 0.22, ease: "easeOut" }}
-                  className="overflow-hidden"
-                >
-                  <QuestDialogueWindow
-                    lines={dialogueLines}
-                    tone={selectedNode?.status === "threatened" ? "urgent" : "supportive"}
-                    title={selectedNode?.name ?? "CareQuest Node"}
-                  />
-                </motion.div>
+              {activeButton ? (
+                <div className="mb-4 flex items-center gap-3">
+                  <activeButton.icon className="h-5 w-5 text-[#5eead4]" />
+                  <div>
+                    <p className="text-xs uppercase tracking-[0.3em] text-white/50">{activeButton.label}</p>
+                    <h2 className="text-lg font-semibold text-white">{activeButton.description}</h2>
+                  </div>
+                </div>
               ) : null}
-            </AnimatePresence>
-          </div>
-        </div>
-      )}
+              <div className="space-y-4 text-sm text-white/80">{renderModalContent(openModal)}</div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
     </div>
   );
 }
