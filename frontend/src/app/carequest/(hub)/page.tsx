@@ -112,7 +112,7 @@ const FACULTY_AREAS: FacultyArea[] = [
   {
     id: "engineering",
     name: "Faculty of Engineering",
-    description: "Innovation Hive: supports resilience quests and productivity rituals.",
+    description: "Innovation Hive: resilience quests, synchronized Pomodoro raids, and productivity rituals.",
     color: "#60A5FA",
     fillOpacity: 0.32,
     coordinates: [
@@ -125,7 +125,7 @@ const FACULTY_AREAS: FacultyArea[] = [
   {
     id: "medicine",
     name: "Faculty of Medicine",
-    description: "Mindful care zone nurturing Compassion Mode activations.",
+    description: "Mindful care zone nurturing Compassion Mode activations and peer healing sessions.",
     color: "#F87171",
     fillOpacity: 0.3,
     coordinates: [
@@ -138,7 +138,7 @@ const FACULTY_AREAS: FacultyArea[] = [
   {
     id: "arts",
     name: "Faculty of Arts & Humanities",
-    description: "Creative quests unlock expressive therapy and avatar cosmetics.",
+    description: "Creative quests unlocking expressive therapy, avatar cosmetics, and empathy showcases.",
     color: "#FBBF24",
     fillOpacity: 0.28,
     coordinates: [
@@ -151,7 +151,7 @@ const FACULTY_AREAS: FacultyArea[] = [
   {
     id: "economics",
     name: "Faculty of Economics & Business",
-    description: "Hosts community quests focused on financial wellbeing and peer mentorship.",
+    description: "Community quests focused on financial wellbeing, mentorship, and cooperative guild investments.",
     color: "#34D399",
     fillOpacity: 0.3,
     coordinates: [
@@ -223,6 +223,7 @@ const ACTION_BUTTONS: Array<{
 export default function CareQuestPage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string>(CAREQUEST_NODES[0]?.id ?? "");
   const [openModal, setOpenModal] = useState<HubModalKey | null>(null);
+  const [selectedArea, setSelectedArea] = useState<FacultyArea | null>(null);
 
   const selectedNode = useMemo(
     () => CAREQUEST_NODES.find((node) => node.id === selectedNodeId) ?? null,
@@ -374,6 +375,7 @@ export default function CareQuestPage() {
           maxZoom={18}
           className="h-full w-full"
           mapProps={{ zoomSnap: 0.25 }}
+          onAreaSelect={setSelectedArea}
         />
       </div>
 
@@ -399,6 +401,7 @@ export default function CareQuestPage() {
         <div className="pointer-events-auto absolute right-4 top-6 flex flex-col items-end gap-2 sm:right-6 sm:top-8">
           {ACTION_BUTTONS.map(({ key, label, description, icon: Icon }) => {
             const disabled = key === "dialogue" && !isDialogueAvailable;
+            const isActive = openModal === key;
             return (
               <button
                 key={key}
@@ -408,8 +411,10 @@ export default function CareQuestPage() {
                 className={cn(
                   "group flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.2em] transition",
                   disabled
-                    ? "cursor-not-allowed border-white/10 bg-white/5 text-white/35"
-                    : "border-white/15 bg-white/5 text-white/70 hover:border-white/35 hover:text-white",
+                    ? "cursor-not-allowed border-[#1E3A8A]/20 bg-[#0b1535] text-[#3f5fbe]/50"
+                    : isActive
+                    ? "border-[#2563EB]/70 bg-[#1E3A8A]/70 text-[#BFDBFE] shadow-[0_8px_20px_rgba(30,58,138,0.35)]"
+                    : "border-[#1E40AF]/45 bg-[#0b1535]/85 text-[#93C5FD] hover:border-[#2563EB]/70 hover:bg-[#15306a] hover:text-white",
                 )}
               >
                 <Icon className="h-4 w-4" />
@@ -455,7 +460,7 @@ export default function CareQuestPage() {
               </button>
               {activeButton ? (
                 <div className="mb-4 flex items-center gap-3">
-                  <activeButton.icon className="h-5 w-5 text-[#5eead4]" />
+                  <activeButton.icon className="h-5 w-5 text-[#60A5FA]" />
                   <div>
                     <p className="text-xs uppercase tracking-[0.3em] text-white/50">{activeButton.label}</p>
                     <h2 className="text-lg font-semibold text-white">{activeButton.description}</h2>
@@ -463,6 +468,43 @@ export default function CareQuestPage() {
                 </div>
               ) : null}
               <div className="space-y-4 text-sm text-white/80">{renderModalContent(openModal)}</div>
+            </motion.div>
+          </motion.div>
+        ) : null}
+      </AnimatePresence>
+      <AnimatePresence>
+        {selectedArea ? (
+          <motion.div
+            key="carequest-area"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="fixed inset-0 z-40 flex items-center justify-center bg-[#010a1f]/75 backdrop-blur"
+            onClick={() => setSelectedArea(null)}
+          >
+            <motion.div
+              initial={{ y: 24, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              exit={{ y: 24, opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="relative w-[min(560px,90vw)] rounded-[28px] border border-white/10 bg-[#020a1d]/95 p-6 text-white shadow-[0_20px_60px_rgba(3,12,32,0.55)]"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <button
+                type="button"
+                onClick={() => setSelectedArea(null)}
+                className="absolute right-4 top-4 inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/15 bg-white/5 text-white/60 transition hover:border-white/40 hover:text-white"
+              >
+                <FiX className="h-4 w-4" />
+              </button>
+              <div className="flex flex-col gap-2">
+                <p className="text-xs uppercase tracking-[0.3em] text-white/50">Highlighted Faculty</p>
+                <h2 className="text-lg font-semibold text-white">{selectedArea.name}</h2>
+                <p className="text-sm text-white/75">{selectedArea.description}</p>
+              </div>
+              <div className="mt-4 rounded-2xl border border-[#2563EB]/40 bg-[#1E3A8A]/30 px-4 py-3 text-xs text-[#BFDBFE]">
+                Explore CareQuest activities tied to this zone via the map nodes or upcoming activities page.
+              </div>
             </motion.div>
           </motion.div>
         ) : null}

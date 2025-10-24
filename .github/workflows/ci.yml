@@ -70,8 +70,8 @@ jobs:
           file: ./infra/docker/backend.Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
-            ghcr.io/${{ github.repository }}/backend:latest
+            ghcr.io/${{ github.repository | lower }}/backend:${{ github.sha }}
+            ghcr.io/${{ github.repository | lower }}/backend:latest
 
       - name: Build and push frontend image
         uses: docker/build-push-action@v5
@@ -80,8 +80,8 @@ jobs:
           file: ./infra/docker/frontend.Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}
-            ghcr.io/${{ github.repository }}/frontend:latest
+            ghcr.io/${{ github.repository | lower }}/frontend:${{ github.sha }}
+            ghcr.io/${{ github.repository | lower }}/frontend:latest
 
       - name: Run Trivy vulnerability scan on backend image
         uses: aquasecurity/trivy-action@master

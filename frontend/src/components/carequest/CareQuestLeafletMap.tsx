@@ -34,6 +34,7 @@ interface CareQuestLeafletMapProps {
   nodes?: CareQuestNodeMarker[];
   className?: string;
   mapProps?: Partial<MapContainerProps>;
+  onAreaSelect?: (area: FacultyArea) => void;
 }
 
 function CareQuestLeafletMapComponent({
@@ -45,6 +46,7 @@ function CareQuestLeafletMapComponent({
   nodes = [],
   className,
   mapProps,
+  onAreaSelect,
 }: CareQuestLeafletMapProps) {
   return (
     <MapContainer
@@ -79,6 +81,9 @@ function CareQuestLeafletMapComponent({
             opacity: 0.9,
             fillOpacity: area.fillOpacity ?? 0.25,
             dashArray: "8 6",
+          }}
+          eventHandlers={{
+            click: () => onAreaSelect?.(area),
           }}
         >
           <Tooltip direction="top" offset={[0, -8]} opacity={0.9} permanent className="bg-[#021230]/90 text-white">
