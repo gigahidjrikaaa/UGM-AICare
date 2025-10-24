@@ -7,7 +7,8 @@
         "dev:docker": "next dev",
         "build": "next build",
         "start": "next start",
-        "lint": "next lint"
+        "lint": "next lint",
+        "test": "echo \"No frontend tests configured\""
     },
     "dependencies": {
         "@headlessui/react": "^2.2.1",
