@@ -81,6 +81,7 @@ pydantic-settings==2.0.3
 tenacity==8.2.3  # For retrying operations
 pytz==2023.3     # For timezone handling
 rich==13.5.2     # For better console output
+typing-extensions
 
 # Monitoring
 prometheus-fastapi-instrumentator==6.1.0

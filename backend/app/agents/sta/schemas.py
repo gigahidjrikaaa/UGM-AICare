@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Literal, Optional
+from typing import Dict, Literal, Optional, Union
 
 from pydantic import BaseModel, Field
 
@@ -13,7 +13,7 @@ SupportPlanType = Literal['calm_down', 'break_down_problem', 'general_coping', '
 class STAClassifyRequest(BaseModel):
     session_id: str = Field(..., min_length=1)
     text: str = Field(..., min_length=1)
-    meta: dict[str, str | int | float] | None = None
+    meta: Optional[Dict[str, Union[str, int, float]]] = None
 
 
 class STAClassifyResponse(BaseModel):

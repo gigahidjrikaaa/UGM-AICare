@@ -5,7 +5,8 @@ graphs (STA, SCA, SDA, IA) and the master orchestrator.
 """
 from __future__ import annotations
 
-from typing import TypedDict, Optional, List, Dict, Any, Literal, NotRequired
+from typing import TypedDict, Optional, List, Dict, Any, Literal
+from typing_extensions import NotRequired
 from datetime import datetime
 
 

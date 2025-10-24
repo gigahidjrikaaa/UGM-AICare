@@ -51,7 +51,7 @@ class LangGraphEdge(BaseModel):
     """Edge representation for LangGraph state inspection."""
     source: str
     target: str
-    data: Dict[str, Any] | None = None
+    data: Optional[Dict[str, Any]] = None
 
 
 class LangGraphState(BaseModel):

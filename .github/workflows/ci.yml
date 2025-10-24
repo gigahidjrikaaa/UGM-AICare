@@ -41,6 +41,10 @@ jobs:
         working-directory: ./backend
 
       - name: Run backend tests (pytest)
+        env:
+          DATABASE_URL: "sqlite+aiosqlite:///test.db"
+          EMAIL_ENCRYPTION_KEY: "example_encryption_key"
+          JWT_SECRET_KEY: "example_nextauth_secret"
         run: pytest
         working-directory: ./backend
 

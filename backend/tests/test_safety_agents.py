@@ -284,26 +284,26 @@ async def test_insights_agent_service_runs_core_queries() -> None:
 				description="",
 				content={"steps": []},
 			)
-		session.add(campaign)
-		await session.flush()
+			session.add(campaign)
+			await session.flush()
 
-		executions = [
-			InterventionCampaignExecution(
-				campaign_id=campaign.id,
-				user_id=user_primary.id,
-				status="completed",
-				engagement_score=0.85,
-				created_at=now - timedelta(hours=3),
-			),
-			InterventionCampaignExecution(
-				campaign_id=campaign.id,
-				user_id=user_secondary.id,
-				status="sent",
-				engagement_score=0.5,
+			executions = [
+				InterventionCampaignExecution(
+					campaign_id=campaign.id,
+					user_id=user_primary.id,
+					status="completed",
+					engagement_score=0.85,
+					created_at=now - timedelta(hours=3),
+				),
+				InterventionCampaignExecution(
+					campaign_id=campaign.id,
+					user_id=user_secondary.id,
+					status="sent",
+					engagement_score=0.5,
 					created_at=now - timedelta(hours=5),
 				),
 			]
-		session.add_all(executions)
+			session.add_all(executions)
 
 			conversations = [
 				Conversation(
