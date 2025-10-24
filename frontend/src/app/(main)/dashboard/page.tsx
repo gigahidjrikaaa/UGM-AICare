@@ -13,8 +13,10 @@ import {
   FiClock,
   FiRefreshCw,
   FiTrendingUp,
+  FiZap,
 } from "@/icons";
 import WalletLinkButton from "@/components/ui/WalletLinkButton";
+import QuestBoard from "@/components/quests/QuestBoard";
 import apiClient, { fetchUserProfileOverview } from "@/services/api";
 import type { TimelineEntry, UserProfileOverviewResponse } from "@/types/profile";
 
@@ -296,6 +298,8 @@ export default function DashboardPage() {
           </div>
         </header>
 
+        <QuestBoard />
+
         <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
           {quickActions.map((action) => (
             <QuickActionCard key={action.href} action={action} />
@@ -440,3 +444,5 @@ export default function DashboardPage() {
     </main>
   );
 }
+
+

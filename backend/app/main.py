@@ -16,6 +16,7 @@ from app.routes import (
     profile,
     session_events,
     appointments,
+    quests,
     admin,
     counselor,
     agents,
@@ -157,6 +158,7 @@ app.include_router(session_events.session_event_router) # This will have prefix 
 app.include_router(summary.activity_router) # This will have prefix /api/v1/activity-summary
 app.include_router(summary.user_data_router)  # This will have prefix /api/v1/user
 app.include_router(profile.router)
+app.include_router(quests.router)
 app.include_router(admin_counselors.router, prefix="/api/v1")  # Admin counselor management (MUST be before admin.router to avoid route conflicts)
 app.include_router(counselor.router, prefix="/api/v1")  # Counselor self-management
 app.include_router(admin.router)  # Admin endpoints (includes /admin/counselors and other admin routes)

@@ -1224,7 +1224,8 @@ function CreateCounselorModal({ onClose }: { onClose: () => void }) {
   };
 
   const handleSubmit = (event: React.FormEvent) => {
-    event.preventDefault();\r\nif (!selectedUserId) {
+    event.preventDefault();
+    if (!selectedUserId) {
       toast.error('Please select a counselor user');
       return;
     }

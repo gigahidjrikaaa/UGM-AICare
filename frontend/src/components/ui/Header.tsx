@@ -6,9 +6,10 @@ import Image from "next/image";
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { HiMenu, HiChevronDown } from "@/icons";
+import { useWellnessState } from "@/hooks/useQuests";
 // --- Import the new MobileNavMenu ---
-import MobileNavMenu from './MobileNavMenu';
-import ProfileDropdown from './ProfileDropdown';
+import MobileNavMenu from "./MobileNavMenu";
+import ProfileDropdown from "./ProfileDropdown";
 
 // --- Define Props: Need handler to toggle sidebar state in parent ---
 interface HeaderProps {
@@ -17,6 +18,7 @@ interface HeaderProps {
 
 export default function Header({ onToggleSidebar }: HeaderProps) {
   const { data: session, status } = useSession();
+  const { data: wellness } = useWellnessState();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -161,7 +163,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
           </div>
 
           {/* Right side: User Profile / Sign In Button - Clean Modern Style */}
-          <div className="flex items-center">
+          <div className="flex items-center gap-3">
             {status === "authenticated" && session?.user ? (
               <div className="relative">
                 {/* Profile Button - Minimal Glassmorphism */}
@@ -205,6 +207,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
                 <ProfileDropdown
                   isOpen={isProfileOpen}
                   user={session.user}
+                  wellness={wellness}
                   onClose={() => setIsProfileOpen(false)}
                   onSignOut={handleSignOut}
                 />

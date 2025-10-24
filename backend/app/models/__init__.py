@@ -64,6 +64,19 @@ from .agent_user import AgentUser, AgentRoleEnum
 from .insights import InsightsReport
 from .campaign import Campaign, CampaignTrigger, CampaignMetrics, SCACampaignExecution
 from .system import SystemSettings, AgentHealthLog, CaseAssignment
+from .quests import (
+    QuestTemplate,
+    QuestInstance,
+    QuestCategoryEnum,
+    QuestDifficultyEnum,
+    QuestStatusEnum,
+    PlayerWellnessState,
+    RewardLedgerEntry,
+    AttestationRecord,
+    AttestationStatusEnum,
+    ComplianceAuditLog,
+    QuestAnalyticsEvent,
+)
 
 # Real-time alert models (Phase 4)
 from .alerts import Alert, AlertType, AlertSeverity
@@ -148,11 +161,25 @@ __all__ = [
     "CampaignMetrics",
     "SCACampaignExecution",
     "SystemSettings",
-    "AgentHealthLog",
+   "AgentHealthLog",
     "CaseAssignment",
+
+    # Quest & Wellness Models
+    "QuestTemplate",
+    "QuestInstance",
+    "QuestCategoryEnum",
+    "QuestDifficultyEnum",
+    "QuestStatusEnum",
+    "PlayerWellnessState",
+    "RewardLedgerEntry",
+    "AttestationRecord",
+    "AttestationStatusEnum",
+    "ComplianceAuditLog",
+    "QuestAnalyticsEvent",
 
     # Real-time Alert Models (Phase 4)
     "Alert",
     "AlertType",
     "AlertSeverity",
 ]
+

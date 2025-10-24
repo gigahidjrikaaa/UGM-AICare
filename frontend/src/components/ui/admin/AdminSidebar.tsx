@@ -23,6 +23,7 @@ import {
   FiBriefcase,
   FiMonitor,
   FiTarget,
+  FiZap,
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink'; // Assuming SidebarLink component exists
 
@@ -47,6 +48,7 @@ const navGroups = [
       { name: 'Cases', icon: <FiShield size={18}/>, href: '/admin/cases' },
       { name: 'Service Desk', icon: <FiBriefcase size={18}/>, href: '/admin/service-desk' },
       { name: 'SCA Outreach', icon: <FiSend size={18}/>, href: '/admin/campaigns' },
+      { name: 'Quest Templates', icon: <FiZap size={18}/>, href: '/admin/quests' },
       { name: 'Insights Analytics', icon: <FiTrendingUp size={18}/>, href: '/admin/insights' },
       { name: 'LangGraph Monitoring', icon: <FiActivity size={18}/>, href: '/admin/langgraph' },
       { name: 'Agents Command Center', icon: <FiMonitor size={18}/>, href: '/admin/agents-command-center' },
@@ -136,5 +138,6 @@ export default function AdminSidebar() {
     </aside>
   );
 }
+
 
 

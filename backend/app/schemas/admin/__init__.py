@@ -94,6 +94,12 @@ from .triage import (
     TriageTestRequest,
     TriageTestResponse,
 )
+from .quests import (
+    QuestTemplateCreate,
+    QuestTemplateListResponse,
+    QuestTemplateResponse,
+    QuestTemplateUpdate,
+)
 
 __all__ = [
     "AnalyticsResponse",
@@ -177,6 +183,10 @@ __all__ = [
     "TriageAssessmentListResponse",
     "TriageTestRequest",
     "TriageTestResponse",
+    "QuestTemplateCreate",
+    "QuestTemplateListResponse",
+    "QuestTemplateResponse",
+    "QuestTemplateUpdate",
 ]
 
 

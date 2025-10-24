@@ -38,10 +38,15 @@ class EventType(str, Enum):
     # Campaign events
     CAMPAIGN_EXECUTED = "campaign_executed"
     CAMPAIGN_MESSAGE_SENT = "campaign_message_sent"
-    
+
     # Agent health events
     AGENT_ERROR = "agent_error"
     AGENT_DEGRADED = "agent_degraded"
+
+    # Quest events
+    QUEST_ISSUED = "quest_issued"
+    QUEST_COMPLETED = "quest_completed"
+    QUEST_ANALYTICS = "quest_analytics"
 
 
 @dataclass

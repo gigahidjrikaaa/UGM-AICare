@@ -81,6 +81,17 @@ async def init_db():
             await session.rollback()
             logger.error(f"Failed to ensure default users: {exc}")
 
+    from app.services.quest_engine_service import QuestEngineService
+
+    async with AsyncSessionLocal() as session:
+        try:
+            quest_service = QuestEngineService(session)
+            await quest_service.ensure_default_templates()
+            await session.commit()
+        except Exception as exc:
+            await session.rollback()
+            logger.error(f"Failed to seed default quest templates: {exc}")
+
 async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
     """Async database dependency for FastAPI"""
     async with AsyncSessionLocal() as session:

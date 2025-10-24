@@ -108,20 +108,7 @@ async def generate_gemini_response(
         logger.info(f"Sending request to Gemini API (Model: {model}, Tools: {bool(tools)})")
         logger.info(f"🔍 [DEBUG] system_prompt parameter received: {repr(system_prompt)[:200]}")
 
-        # Handle system prompt - convert to structured content if provided
         gemini_model_args: Dict[str, Any] = {"model_name": model}
-        if system_prompt:
-            logger.info(f"🤖 Gemini system_instruction being set: {system_prompt[:100]}...")
-            gemini_model_args["system_instruction"] = cast(
-                content_types.ContentDict,
-                {
-                    "role": "system",
-                    "parts": [_make_text_part(system_prompt)],
-                },
-            )
-        else:
-            logger.warning("⚠️ No system_prompt provided to Gemini API!")
-        
         # Add tools if provided
         if tools:
             gemini_model_args["tools"] = tools
@@ -134,10 +121,17 @@ async def generate_gemini_response(
 
         # Convert history and extract the latest user prompt
         if not history or history[-1]['role'] != 'user':
-             return "Error: Conversation history must end with a user message."
-        
+            return "Error: Conversation history must end with a user message."
+
         last_user_prompt = history[-1]['content']
-        gemini_history = _convert_history_for_gemini(history[:-1]) # Pass history *before* the last prompt
+
+        prefix_history: List[Dict[str, str]] = []
+        if system_prompt:
+            logger.info(f"🤖 Gemini system prompt applied: {system_prompt[:100]}...")
+            prefix_history.append({"role": "user", "content": system_prompt})
+
+        conversation_before_latest = prefix_history + history[:-1]
+        gemini_history = _convert_history_for_gemini(conversation_before_latest)
 
         generation_config = genai_types.GenerationConfig(
             max_output_tokens=max_tokens,
@@ -155,30 +149,26 @@ async def generate_gemini_response(
         # Start a chat session if there's history
         chat_session = None
         if gemini_history:
-             chat_session = gemini_model.start_chat(history=gemini_history)
-             response = await chat_session.send_message_async( # Use async method
-                 cast(
-                     content_types.ContentDict,
-                     {"role": "user", "parts": [_make_text_part(last_user_prompt)]},
-                 ),
-                 generation_config=generation_config,
-                 safety_settings=safety_settings,
-                 # stream=False # Set to True for streaming later
-             )
+            chat_session = gemini_model.start_chat(history=gemini_history)
+            response = await chat_session.send_message_async(  # Use async method
+                cast(
+                    content_types.ContentDict,
+                    {"role": "user", "parts": [_make_text_part(last_user_prompt)]},
+                ),
+                generation_config=generation_config,
+                safety_settings=safety_settings,
+                # stream=False # Set to True for streaming later
+            )
         else:
-             # If no history, just generate content from the single prompt
-             response = await gemini_model.generate_content_async( # Use async method
-                 [
-                     cast(
-                         content_types.ContentDict,
-                         {"role": "user", "parts": [_make_text_part(last_user_prompt)]},
-                     )
-                 ],
-                 generation_config=generation_config,
-                 safety_settings=safety_settings,
-                 # stream=False
-             )
-
+            initial_prompt_parts = _convert_history_for_gemini(
+                prefix_history + [{"role": "user", "content": last_user_prompt}]
+            )
+            response = await gemini_model.generate_content_async(  # Use async method
+                initial_prompt_parts,
+                generation_config=generation_config,
+                safety_settings=safety_settings,
+                # stream=False
+            )
 
         # Handle potential blocks or errors (check response structure)
         try:
@@ -256,14 +246,6 @@ async def stream_gemini_response(
         raise RuntimeError("google.generativeai.GenerativeModel is not available in the installed SDK")
 
     gemini_model_args: Dict[str, Any] = {"model_name": model}
-    if system_prompt:
-        gemini_model_args["system_instruction"] = cast(
-            content_types.ContentDict,
-            {
-                "role": "system",
-                "parts": [_make_text_part(system_prompt)],
-            },
-        )
     
     # Add tools if provided
     if tools:

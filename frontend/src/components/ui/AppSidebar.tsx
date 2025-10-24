@@ -16,6 +16,7 @@ import {
   FiBookOpen, 
   FiUser,
   FiGrid,
+  FiZap,
   HiX
 } from '@/icons';
 import AccountLinker from '@/components/AccountLinker';
@@ -33,6 +34,7 @@ const sidebarNavItems: NavItem[] = [
   { href: "/dashboard", label: "Dashboard", icon: <FiGrid size={18} /> },
   { href: "/aika", label: "Talk to Aika", icon: <BsChatDots size={18} /> },
   { href: "/journaling", label: "Journaling", icon: <FiActivity size={18} /> },
+  { href: "/quests", label: "Quest Board", icon: <FiZap size={18} /> },
   { href: "/appointments", label: "Appointments", icon: <BsCalendar size={18} /> },
   { href: "/profile", label: "Profile", icon: <FiUser size={18} /> },
   { href: "/resources", label: "Resources", icon: <FiBookOpen size={18} /> },

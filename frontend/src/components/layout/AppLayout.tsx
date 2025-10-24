@@ -10,6 +10,7 @@ import Header from '@/components/ui/Header';
 import AppSidebar from '@/components/ui/AppSidebar';
 import Footer from '@/components/ui/Footer';
 import FeedbackForm from '@/components/features/feedback/FeedBackForm';
+import QuestHud from '@/components/quests/QuestHud';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import { cn } from '@/lib/utils';
 import NoSsr from '@/components/layout/NoSsr';
@@ -92,6 +93,11 @@ export default function AppLayout({ children }: AppLayoutProps) {
           // Add top padding for sticky header on standard pages, skip for full-screen pages
           !isFullScreenPage && "pt-16"
         )}>
+            {status === 'authenticated' && !isFullScreenPage && (
+              <NoSsr>
+                <QuestHud className="px-3 pt-4 md:px-6" />
+              </NoSsr>
+            )}
             <div className="min-h-screen">
               {children}
             </div>
