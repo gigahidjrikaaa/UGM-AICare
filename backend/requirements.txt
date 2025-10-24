@@ -1,3 +1,6 @@
+# Use CPU-only PyTorch wheels to avoid pulling CUDA dependencies
+--extra-index-url https://download.pytorch.org/whl/cpu
+
 # Web Framework
 fastapi>=0.115.5
 uvicorn
@@ -36,6 +39,7 @@ pytest==7.4.2
 pytest-asyncio==0.21.1
 
 # AI and ML
+torch==2.4.0+cpu  # Force CPU build to avoid CUDA-only wheel downloads
 tiktoken==0.5.1  # For token counting with OpenAI models
 openai==1.3.5    # For OpenAI API integration
 anthropic==0.5.0 # For Claude models integration
