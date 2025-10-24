@@ -476,6 +476,105 @@ docker-compose up
 docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
 ```
 
+### Container-First CI/CD Deployment
+
+This project implements a robust, container-first Continuous Integration/Continuous Deployment (CI/CD) pipeline designed to automate the build, test, security scan, and deployment processes for the UGM-AICare application. Leveraging **GitHub Actions** for orchestration, **Docker** for containerization, **GitHub Container Registry (GHCR)** for image storage, and **Trivy** for vulnerability scanning, this system ensures consistent, secure, and efficient deployments to a single Virtual Machine (VM). This setup assumes an external reverse proxy (e.g., Nginx) is already configured on the VM to handle domain routing and HTTPS.
+
+**Purpose and Benefits:**
+*   **Automation:** Automates repetitive tasks, reducing manual errors and freeing up development time.
+*   **Consistency:** Ensures that every deployment follows the same standardized process, leading to reliable and predictable outcomes.
+*   **Speed:** Accelerates the delivery of new features and bug fixes to production.
+*   **Quality & Security:** Integrates automated testing and vulnerability scanning early in the pipeline to catch issues before deployment.
+*   **Reproducibility:** Docker images tagged with Git SHAs ensure that any version of the application can be precisely reproduced.
+*   **Rollback Capability:** Provides a straightforward mechanism to revert to previous stable versions in case of issues.
+
+**How the CI/CD Works (High-Level Flow):**
+
+The CI/CD pipeline is divided into two main stages: Continuous Integration (CI) and Continuous Deployment (CD).
+
+1.  **Continuous Integration (CI) - Build, Test, Scan, Push:**
+    *   **Trigger:** Every `push` or `pull_request` to the `main` branch.
+    *   **Process:**
+        *   The code is checked out.
+        *   Backend (Python/FastAPI) and Frontend (Node.js/Next.js) dependencies are installed.
+        *   Automated unit and integration tests are executed for both services.
+        *   Docker images for the backend and frontend are built using dedicated Dockerfiles (`infra/docker/`).
+        *   These images are then scanned for known vulnerabilities using **Trivy**.
+        *   Finally, the scanned images are pushed to **GitHub Container Registry (GHCR)**, tagged with the unique Git commit SHA and `:latest`.
+
+2.  **Continuous Deployment (CD) - Deploy to VM:**
+    *   **Trigger:** A successful `push` to the `main` branch, or a manual `workflow_dispatch` trigger.
+    *   **Process:**
+        *   The GitHub Action securely connects to the target VM via SSH using `appleboy/ssh-action`.
+        *   On the VM, the `infra/scripts/deploy.sh` script is executed.
+        *   This script logs into GHCR, pulls the Docker images corresponding to the deployed Git SHA.
+        *   It then runs database migrations using `infra/scripts/migrate.sh`.
+        *   Finally, it orchestrates the application services (backend, frontend, database, Redis, MinIO) using **Docker Compose V2** (`infra/compose/docker-compose.prod.yml`), bringing them up in detached mode.
+        *   Automated health checks verify the successful startup of the deployed services by checking the locally exposed ports (8000 for backend, 4000 for frontend).
+
+**Technologies Used:**
+*   **GitHub Actions:** Orchestrates the entire CI/CD pipeline.
+*   **Docker:** Containerization of backend and frontend services.
+*   **Docker Compose V2:** Defines and runs multi-container Docker applications on the VM.
+*   **GitHub Container Registry (GHCR):** Securely stores and serves Docker images.
+*   **Trivy:** Comprehensive vulnerability scanner for Docker images.
+*   **SSH (via `appleboy/ssh-action`):** Secure remote execution on the deployment VM.
+*   **Bash Scripting:** For custom deployment and migration logic (`infra/scripts/`).
+
+**VM Prerequisites:**
+
+To successfully deploy to your VM, ensure the following are installed and configured:
+
+- **Docker:** Latest version.
+- **Docker Compose V2:** Ensure `docker compose` command is available (not `docker-compose`).
+- **Firewall:** Configure firewall rules to allow incoming traffic on ports 8000 (backend) and 4000 (frontend), or any other ports you configure.
+- **Deploy User:** A dedicated SSH user with appropriate permissions to manage Docker and the project directory (`VM_PROJECT_PATH`).
+- **Project Path:** The `VM_PROJECT_PATH` on the VM should be the root directory where the repository is cloned.
+- **Reverse Proxy Configuration (Nginx/Apache):** You will need to configure your existing Nginx (or other reverse proxy) to forward traffic from your domain (e.g., `aicare.sumbu.xyz`) to the Docker containers running on `localhost:4000` (frontend) and `localhost:8000` (backend). This includes handling HTTPS/SSL termination at the Nginx level.
+
+**Required GitHub Secrets:**
+
+The following secrets must be configured in your GitHub repository settings (`Settings > Secrets and variables > Actions`):
+
+- `VM_SSH_HOST`: The IP address or hostname of your deployment VM.
+- `VM_SSH_USER`: The SSH username for connecting to the VM.
+- `VM_SSH_PRIVATE_KEY`: The SSH private key (PEM format) for authentication.
+- `VM_PROJECT_PATH`: The absolute path to the project directory on the VM (e.g., `/opt/ugm-aicare`).
+- `ENV_FILE_PRODUCTION`: (Optional, but highly recommended) A multi-line secret containing the entire `.env` file content for production. This will be written to a `.env` file in the `VM_PROJECT_PATH` on the VM during deployment.
+
+**Health Endpoints and Expected Ports:**
+
+- **Backend:** `http://<VM_IP_OR_HOSTNAME>:8000/health` (assuming a `/health` endpoint is implemented).
+- **Frontend:** `http://<VM_IP_OR_HOSTNAME>:4000`
+
+**Rollback Procedure:**
+
+To rollback to a previous deployment:
+
+1. Go to the `Actions` tab in your GitHub repository.
+2. Select the `CD Pipeline - Deploy to VM` workflow.
+3. Click on `Run workflow` from the `workflow_dispatch` dropdown.
+4. Enter the `Git SHA` of the commit you wish to rollback to in the `rollback_sha` input field.
+5. Click `Run workflow`. The workflow will then pull and deploy the specified older version of the application.
+
+**Local Development with Docker Compose:**
+
+For local development, you can use `docker-compose.dev.yml` which includes `build` contexts and volume mounts for live reloading:
+
+```bash
+docker compose -f docker-compose.dev.yml up --build
+```
+
+This will build the images locally and mount your source code, allowing for immediate changes to be reflected without rebuilding containers.
+
+### Cleanup Notes
+
+With the introduction of `docker-compose.dev.yml` and the new CI/CD pipeline, some existing files in the project root become redundant.
+
+- **`docker-compose.yml`**: This file has been removed as its functionality is now split between `infra/compose/docker-compose.prod.yml` (for production deployments) and `docker-compose.dev.yml` (for local development).
+- **`backend/run_migrations.sh`**: This empty script has been removed. The actual migration logic is located at `scripts/run_migrations.sh` and is now orchestrated via `infra/scripts/migrate.sh`.
+- **Other root-level scripts (`deploy-prod.sh`, `dev.bat`, `dev.sh`, `start-dev.sh`):** These scripts are likely superseded by the new CI/CD workflows and `docker-compose.dev.yml`. While not removed in this PR to avoid breaking existing local workflows, it is recommended to review and remove them if they are no longer needed.
+
 ### Safety Agent Configuration
 
 - **Feature Flags:** Enable/disable individual agents (STA, SCA, SDA, IA) via environment variables

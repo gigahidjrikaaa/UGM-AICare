@@ -1,0 +1,93 @@
+name: CI/CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build-test-scan-push:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write # To push images to GHCR
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20' # Or appropriate version for your frontend
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.9' # Or appropriate version for your backend
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+        working-directory: ./backend
+
+      - name: Run backend tests (pytest)
+        run: pytest
+        working-directory: ./backend
+        # continue-on-error: true # Uncomment if you want to allow build even if tests fail
+
+      - name: Install frontend dependencies
+        run: npm install
+        working-directory: ./frontend
+
+      - name: Run frontend tests (npm test)
+        run: npm test
+        working-directory: ./frontend
+        # continue-on-error: true # Uncomment if you want to allow build even if tests fail
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend/app # Path to the directory containing the Dockerfile
+          file: ./infra/docker/backend.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/backend:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/backend:latest
+
+      - name: Build and push frontend image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend # Path to the directory containing the Dockerfile
+          file: ./infra/docker/frontend.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}
+            ghcr.io/${{ github.repository }}/frontend:latest
+
+      - name: Run Trivy vulnerability scan on backend image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'ghcr.io/${{ github.repository }}/backend:${{ github.sha }}'
+          format: 'table'
+          exit-code: '1' # Fail on vulnerabilities
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: true # Only fail on fixed vulnerabilities
+
+      - name: Run Trivy vulnerability scan on frontend image
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'ghcr.io/${{ github.repository }}/frontend:${{ github.sha }}'
+          format: 'table'
+          exit-code: '1' # Fail on vulnerabilities
+          severity: 'HIGH,CRITICAL'
+          ignore-unfixed: true # Only fail on fixed vulnerabilities

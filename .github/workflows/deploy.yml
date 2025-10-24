@@ -1,0 +1,74 @@
+name: CD Pipeline - Deploy to VM
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      rollback_sha:
+        description: 'Git SHA to rollback to (optional)'
+        required: false
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: production # Or your desired environment name
+    needs: build-test-scan-push # Ensure CI job completes successfully first
+    if: github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !github.event.inputs.rollback_sha) # Only deploy on push to main or manual trigger without rollback_sha
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Deploy to VM
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_SSH_HOST }}
+          username: ${{ secrets.VM_SSH_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          script: |
+            export GHCR_USER=${{ github.actor }}
+            export GHCR_TOKEN=${{ secrets.GITHUB_TOKEN }}
+            
+            # Navigate to the project path on the VM
+            cd ${{ secrets.VM_PROJECT_PATH }}
+            
+            # Write .env file from secret if provided
+            if [ -n "${{ secrets.ENV_FILE_PRODUCTION }}" ]; then
+              echo "${{ secrets.ENV_FILE_PRODUCTION }}" > .env
+            fi
+            
+            # Run the deploy script
+            ./infra/scripts/deploy.sh ${{ github.sha }}
+
+  rollback:
+    runs-on: ubuntu-latest
+    environment: production # Or your desired environment name
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.rollback_sha # Only run rollback job if rollback_sha is provided
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Rollback to previous SHA
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: ${{ secrets.VM_SSH_HOST }}
+          username: ${{ secrets.VM_SSH_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          script: |
+            export GHCR_USER=${{ github.actor }}
+            export GHCR_TOKEN=${{ secrets.GITHUB_TOKEN }}
+            
+            # Navigate to the project path on the VM
+            cd ${{ secrets.VM_PROJECT_PATH }}
+            
+            # Write .env file from secret if provided
+            if [ -n "${{ secrets.ENV_FILE_PRODUCTION }}" ]; then
+              echo "${{ secrets.ENV_FILE_PRODUCTION }}" > .env
+            fi
+            
+            # Run the deploy script with the rollback SHA
+            ./infra/scripts/deploy.sh ${{ github.event.inputs.rollback_sha }}
