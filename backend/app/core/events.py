@@ -19,7 +19,7 @@ from app.models import (
 )
 
 
-@dataclass(slots=True)
+@dataclass()
 class AgentEvent:
     agent: AgentNameEnum
     step: str
@@ -27,7 +27,7 @@ class AgentEvent:
     ts: datetime
 
 
-@dataclass(slots=True)
+@dataclass()
 class AgentMessageRecord:
     session_id: str
     role: MessageRoleEnum
@@ -37,7 +37,7 @@ class AgentMessageRecord:
     ts: Optional[datetime] = None
 
 
-@dataclass(slots=True)
+@dataclass()
 class SafetyCaseRecord:
     user_hash: str
     session_id: Optional[str]

@@ -44,7 +44,7 @@ jobs:
         env:
           DATABASE_URL: "sqlite+aiosqlite:///test.db"
           EMAIL_ENCRYPTION_KEY: "example_encryption_key"
-          JWT_SECRET_KEY: "example_nextauth_secret"
+          JWT_SECRET_KEY: "a_very_long_and_secure_secret_key_for_testing_purposes"
         run: pytest
         working-directory: ./backend
 

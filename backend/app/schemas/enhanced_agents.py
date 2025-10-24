@@ -61,7 +61,7 @@ class EnhancedLangGraphEdge(BaseModel):
     """Enhanced edge with execution state and conditional styling."""
     source: str
     target: str
-    data: Dict[str, Any] | None = None
+    data: Optional[Dict[str, Any]] = None
     edge_type: EdgeType = EdgeType.NORMAL
     condition: Optional[str] = None
     execution_state: Optional[EdgeExecutionState] = None

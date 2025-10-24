@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
+from typing import List, Optional, Dict, Union
 
 from pydantic import BaseModel, Field
 
@@ -9,7 +9,7 @@ from pydantic import BaseModel, Field
 class SCAInterveneRequest(BaseModel):
     session_id: str = Field(..., min_length=1)
     intent: str = Field(..., min_length=1)
-    options: dict[str, int | str | float] = Field(default_factory=dict)
+    options: Optional[Dict[str, Union[int, str, float]]] = None
     consent_followup: Optional[bool] = None
 
 
