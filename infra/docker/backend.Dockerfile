@@ -6,12 +6,17 @@ FROM python:3.11-slim-bookworm as builder
 
 WORKDIR /app
 
-# Install essential build tools
+# Install essential build tools (Rust needed for cryptography, bcrypt)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc python3-dev build-essential curl && \
-    curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable && \
+    apt-get install -y --no-install-recommends \
+    gcc g++ python3-dev build-essential curl && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
+
+# Install Rust (required for cryptography package)
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
+    sh -s -- -y --default-toolchain stable --profile minimal && \
+    rm -rf /root/.cargo/registry
 
 # Add Rust to PATH
 ENV PATH="/root/.cargo/bin:${PATH}"
@@ -19,31 +24,32 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # Copy only the requirements file to leverage Docker cache
 COPY requirements.txt .
 
-# Install Python dependencies and compile them into wheels
-RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
-
+# Use BuildKit cache mount for pip to speed up repeated builds
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip wheel --wheel-dir /app/wheels -r requirements.txt
 
 # ---- ONNX Model Build Stage ----
 FROM python:3.11-slim-bookworm as model-builder
 
 WORKDIR /app
 
-# Install pip and wheel tools, then install torch from the PyTorch index
-# and install the rest (transformers, onnxruntime) from PyPI. Using a
-# separate install avoids overriding the default PyPI index with
-# --index-url which caused "No matching distribution found for transformers".
-RUN python -m pip install --upgrade pip setuptools wheel && \
-    python -m pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
+# Install only minimal dependencies needed for model export
+# Use BuildKit cache mount to speed up pip installs
+RUN --mount=type=cache,target=/root/.cache/pip \
+    python -m pip install --upgrade pip setuptools wheel && \
+    python -m pip install --index-url https://download.pytorch.org/whl/cpu \
         torch>=2.0.0 && \
-    python -m pip install --no-cache-dir \
+    python -m pip install \
         transformers>=4.41.0 \
         onnxruntime>=1.16.0
 
 # Copy model export script
 COPY scripts/ensure_onnx_model.py scripts/
 
-# Build ONNX model (downloads from HuggingFace and exports)
-RUN python scripts/ensure_onnx_model.py || echo "⚠️ ONNX model build failed, will retry at runtime"
+# Build ONNX model with caching support
+# The HuggingFace cache will be preserved across builds with BuildKit
+RUN --mount=type=cache,target=/root/.cache/huggingface \
+    python scripts/ensure_onnx_model.py || echo "⚠️ ONNX model build failed, will retry at runtime"
 
 
 # ---- Final Stage (production) ----
@@ -68,9 +74,12 @@ COPY --from=builder /app/wheels /wheels
 COPY --from=model-builder /app/models/onnx /app/models/onnx
 
 # Install Python dependencies from wheels (EXCLUDING torch - not needed at runtime!)
-RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels \
-    && python -m spacy download xx_ent_wiki_sm || true \
-    && python -m spacy download en_core_web_sm || true
+# Use cache mount for faster pip operations
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --no-index --find-links=/wheels /wheels/* && \
+    rm -rf /wheels && \
+    python -m spacy download xx_ent_wiki_sm || true && \
+    python -m spacy download en_core_web_sm || true
 
 # Copy the entire application code from the build context (./backend)
 COPY --chown=appuser:appgroup . .
