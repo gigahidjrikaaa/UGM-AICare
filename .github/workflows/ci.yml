@@ -409,6 +409,10 @@ jobs:
             
             cd ${{ secrets.VM_PROJECT_PATH }}
             
+            # Pull latest code to ensure we have the latest deploy scripts
+            git fetch origin
+            git reset --hard origin/main
+            
             if [ -n "${{ secrets.ENV_FILE_PRODUCTION }}" ]; then
               echo "${{ secrets.ENV_FILE_PRODUCTION }}" > .env
             fi
@@ -440,6 +444,10 @@ jobs:
             export GHCR_REPOSITORY_OWNER=${{ steps.rollback_lowercase.outputs.owner }}
             
             cd ${{ secrets.VM_PROJECT_PATH }}
+            
+            # Pull latest code to ensure we have the latest deploy scripts
+            git fetch origin
+            git reset --hard origin/main
             
             if [ -n "${{ secrets.ENV_FILE_PRODUCTION }}" ]; then
               echo "${{ secrets.ENV_FILE_PRODUCTION }}" > .env
