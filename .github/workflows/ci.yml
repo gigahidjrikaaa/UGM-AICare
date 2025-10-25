@@ -392,6 +392,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set lowercase repository owner for deploy
+        id: deploy_lowercase
+        run: echo "owner=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
       - name: Deploy to VM
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -401,7 +405,7 @@ jobs:
           script: |
             export GHCR_USER=${{ github.actor }}
             export GHCR_TOKEN=${{ secrets.GITHUB_TOKEN }}
-            export GHCR_REPOSITORY_OWNER=${{ github.repository_owner }}
+            export GHCR_REPOSITORY_OWNER=${{ steps.deploy_lowercase.outputs.owner }}
             
             cd ${{ secrets.VM_PROJECT_PATH }}
             
@@ -420,6 +424,10 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set lowercase repository owner for rollback
+        id: rollback_lowercase
+        run: echo "owner=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
       - name: Rollback to previous SHA
         uses: appleboy/ssh-action@v1.0.3
         with:
@@ -429,7 +437,7 @@ jobs:
           script: |
             export GHCR_USER=${{ github.actor }}
             export GHCR_TOKEN=${{ secrets.GITHUB_TOKEN }}
-            export GHCR_REPOSITORY_OWNER=${{ github.repository_owner }}
+            export GHCR_REPOSITORY_OWNER=${{ steps.rollback_lowercase.outputs.owner }}
             
             cd ${{ secrets.VM_PROJECT_PATH }}
             
