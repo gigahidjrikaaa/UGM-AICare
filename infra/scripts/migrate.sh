@@ -10,25 +10,34 @@ if [[ -z "${DATABASE_URL:-}" ]]; then
   exit 1
 fi
 
-# Navigate to the project root
-# The script expects to be run from the project root or have ROOT_DIR set correctly
-# We'll assume it's run from the VM_PROJECT_PATH, which is the project root.
-# The original script calculates ROOT_DIR relative to itself, so we need to adjust.
-# For simplicity, we'll just call the original script from the project root.
+echo "[migrate.sh] DATABASE_URL is set: ${DATABASE_URL%@*}@***" # Hide password
 
-echo "[migrate.sh] Navigating to project root..."
-# Assuming the current working directory is the project root when this script is executed on the VM.
-# If not, this needs to be adjusted. For now, we'll assume it is.
+# Check if we should run migrations inside Docker container or directly
+# If backend container is running, use it; otherwise run directly (for local dev)
+BACKEND_CONTAINER=$(docker ps --filter "name=backend" --format "{{.Names}}" | head -n 1)
 
-# Execute the main migration script
-echo "[migrate.sh] Executing UGM-AICare/scripts/run_migrations.sh..."
-# The original script expects to find .env in ROOT_DIR, and backend/alembic.ini in BACKEND_DIR
-# We need to ensure these paths are correctly resolved.
-# The original script sets ROOT_DIR based on its own location.
-# If we call it from the project root, its ROOT_DIR will be the project root.
-# So, we just need to make sure the DATABASE_URL is exported.
-
-export DATABASE_URL="${DATABASE_URL}"
-bash scripts/run_migrations.sh
-
-echo "[migrate.sh] Database migration completed."
+if [[ -n "$BACKEND_CONTAINER" ]]; then
+  echo "[migrate.sh] Running migrations inside Docker container: $BACKEND_CONTAINER"
+  
+  # Run alembic upgrade inside the container
+  docker exec -e DATABASE_URL="$DATABASE_URL" "$BACKEND_CONTAINER" \
+    bash -c "cd /app && alembic upgrade head"
+  
+  echo "[migrate.sh] Database migration completed (via Docker)."
+else
+  echo "[migrate.sh] No backend container found, running migrations directly on host..."
+  echo "[migrate.sh] This requires Python, alembic, and dependencies installed locally."
+  
+  # Navigate to project root if not already there
+  if [[ ! -f "scripts/run_migrations.sh" ]]; then
+    echo "[migrate.sh] ERROR: scripts/run_migrations.sh not found. Are you in the project root?" >&2
+    exit 1
+  fi
+  
+  # Execute the main migration script
+  echo "[migrate.sh] Executing scripts/run_migrations.sh..."
+  export DATABASE_URL="${DATABASE_URL}"
+  bash scripts/run_migrations.sh
+  
+  echo "[migrate.sh] Database migration completed (direct)."
+fi

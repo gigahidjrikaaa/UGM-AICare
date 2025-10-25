@@ -69,7 +69,28 @@ else
   echo "[deploy.sh] ENV_FILE_PRODUCTION secret not provided, assuming .env exists or is not needed."
 fi
 
-# 4. Run DB migrations
+# 4. Bring up services with docker compose (moved before migrations)
+echo "[deploy.sh] Bringing up services with docker-compose.prod.yml..."
+# Stop and remove old containers, then start new ones
+docker compose -f infra/compose/docker-compose.prod.yml down || true # Ignore errors if containers don't exist
+
+# Clean up stopped containers before starting new ones
+echo "[deploy.sh] Cleaning up stopped containers..."
+docker container prune -f || true
+
+# Export environment variables for docker compose
+export GIT_SHA="$GIT_SHA"
+export GHCR_REPOSITORY_OWNER="$GHCR_REPOSITORY_OWNER_LOWER"
+
+# Start new containers
+docker compose -f infra/compose/docker-compose.prod.yml up -d
+echo "[deploy.sh] Services started."
+
+# Wait a bit for containers to be ready
+echo "[deploy.sh] Waiting for containers to be ready..."
+sleep 5
+
+# 5. Run DB migrations (after containers are up)
 echo "[deploy.sh] Running database migrations..."
 # Extract DATABASE_URL from .env if it exists
 if [[ -f ".env" ]]; then
@@ -82,15 +103,11 @@ if [[ -f ".env" ]]; then
   fi
 fi
 
-# Execute the migration script
+# Execute the migration script (will run inside Docker container)
 ./infra/scripts/migrate.sh
 echo "[deploy.sh] Database migrations completed."
 
-# 5. Clean up stopped containers before starting new ones
-echo "[deploy.sh] Cleaning up stopped containers..."
-docker container prune -f || true
-
-# 6. Bring up services with docker compose
+# 6. Health check endpoints
 echo "[deploy.sh] Bringing up services with docker-compose.prod.yml..."
 # Stop and remove old containers, then start new ones
 docker compose -f infra/compose/docker-compose.prod.yml down || true # Ignore errors if containers don't exist
@@ -101,9 +118,9 @@ export GHCR_REPOSITORY_OWNER="$GHCR_REPOSITORY_OWNER_LOWER"
 
 # Start new containers
 docker compose -f infra/compose/docker-compose.prod.yml up -d
-echo "[deploy.sh] Services started."
+echo "[deploy.sh] Database migrations completed."
 
-# 7. Health check endpoints
+# 6. Health check endpoints
 echo "[deploy.sh] Performing health checks..."
 # Example health checks (replace with actual application endpoints)
 # For backend:

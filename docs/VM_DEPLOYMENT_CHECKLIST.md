@@ -394,6 +394,10 @@ echo "🚀 VM is ready for deployment!"
 **Cause:** `alembic.ini` is gitignored and not on VM  
 **Fix:** Create `backend/alembic.ini` using the commands above
 
+### Error: "alembic: command not found"
+**Cause:** Migrations being run before Docker containers are started  
+**Fix:** This has been fixed in the deployment script - migrations now run inside the Docker container after services start. Update your deployment scripts by pulling latest changes.
+
 ### Error: "DATABASE_URL not set"
 **Cause:** `.env` file missing or incomplete  
 **Fix:** Ensure `.env` exists with valid `DATABASE_URL`
