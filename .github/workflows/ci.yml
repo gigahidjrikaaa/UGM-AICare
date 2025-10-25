@@ -170,6 +170,7 @@ jobs:
           script: |
             export GHCR_USER=${{ github.actor }}
             export GHCR_TOKEN=${{ secrets.GITHUB_TOKEN }}
+            export GHCR_REPOSITORY_OWNER=${{ github.repository_owner }}
             
             cd ${{ secrets.VM_PROJECT_PATH }}
             
@@ -197,6 +198,7 @@ jobs:
           script: |
             export GHCR_USER=${{ github.actor }}
             export GHCR_TOKEN=${{ secrets.GITHUB_TOKEN }}
+            export GHCR_REPOSITORY_OWNER=${{ github.repository_owner }}
             
             cd ${{ secrets.VM_PROJECT_PATH }}
             
