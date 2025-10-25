@@ -77,10 +77,20 @@ export GIT_SHA="$GIT_SHA"
 export GHCR_REPOSITORY_OWNER="$GHCR_REPOSITORY_OWNER_LOWER"
 
 # Load all variables from .env file so docker-compose can use them
+# Use a safer method that handles comments, empty lines, and malformed entries
 if [[ -f ".env" ]]; then
   echo "[deploy.sh] Loading environment variables from .env..."
   set -a  # Automatically export all variables
-  source .env
+  # Only source lines that are valid key=value pairs (ignore comments and empty lines)
+  while IFS= read -r line; do
+    # Skip comments and empty lines
+    [[ "$line" =~ ^[[:space:]]*# ]] && continue
+    [[ -z "$line" ]] && continue
+    # Only export if line contains '=' and looks like a valid assignment
+    if [[ "$line" =~ ^[A-Za-z_][A-Za-z0-9_]*= ]]; then
+      export "$line"
+    fi
+  done < .env
   set +a  # Stop auto-exporting
 fi
 

@@ -423,6 +423,14 @@ echo "🚀 VM is ready for deployment!"
 **Cause:** This error is expected and can be ignored - the deployment script passes `.env` via `--env-file` flag  
 **Fix:** No action needed if deployment succeeds. If it fails, ensure `.env` exists in project root.
 
+### Error: "SOME_VAR: command not found" during .env loading
+**Cause:** Malformed `.env` file with lines missing `=` sign or values  
+**Fix:** Check your `.env` file for:
+- Lines without equals sign: `SOME_VAR` (should be `SOME_VAR=value` or remove)
+- Empty variable declarations: `SOME_VAR=` (add a value or comment out)
+- Special characters not properly quoted
+- Update deployment scripts by pulling latest changes (now handles this gracefully)
+
 ### Error: "DATABASE_URL not set"
 **Cause:** `.env` file missing or incomplete  
 **Fix:** Ensure `.env` exists with valid `DATABASE_URL`
