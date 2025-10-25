@@ -283,16 +283,17 @@ class RateLimiter:
         """Get rate limiter statistics.
         
         Returns:
-            Dictionary with hit_count and block_count
+            Dictionary with hit_count, block_count, and block_rate (as percentage)
         """
+        total = self._hit_count + self._block_count
         return {
             "enabled": self.enabled,
-            "total_checks": self._hit_count + self._block_count,
+            "total_checks": total,
             "allowed": self._hit_count,
             "blocked": self._block_count,
             "block_rate": (
-                self._block_count / (self._hit_count + self._block_count)
-                if (self._hit_count + self._block_count) > 0
+                (self._block_count / total) * 100
+                if total > 0
                 else 0.0
             )
         }
