@@ -137,32 +137,32 @@ jobs:
       - name: Free up disk space
         run: |
           echo "=== Disk space before cleanup ==="
-          df -h
-          echo ""
+          df -h / | awk 'NR==1 || /\/$/'
           
-          echo "=== Removing unnecessary packages ==="
-          sudo rm -rf /usr/share/dotnet
-          sudo rm -rf /usr/local/lib/android
-          sudo rm -rf /opt/ghc
-          sudo rm -rf /opt/hostedtoolcache/CodeQL
-          sudo rm -rf "$AGENT_TOOLSDIRECTORY"
+          # Quick directory removal (fast, no package manager overhead)
+          echo "=== Removing unnecessary directories ==="
+          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
+            /opt/hostedtoolcache/CodeQL "$AGENT_TOOLSDIRECTORY" \
+            /usr/share/swift /usr/local/julia* /opt/microsoft
           
+          # Docker cleanup (often reclaims 5-10 GB)
           echo "=== Cleaning up Docker ==="
-          docker system prune -af --volumes
+          docker system prune -af --volumes 2>/dev/null || true
           
+          # Only remove packages that are commonly installed and large
+          # Using a single apt-get command is much faster than multiple
           echo "=== Removing large packages ==="
-          sudo apt-get remove -y '^dotnet-.*' || true
-          sudo apt-get remove -y '^llvm-.*' || true
-          sudo apt-get remove -y 'php.*' || true
-          sudo apt-get remove -y '^mongodb-.*' || true
-          sudo apt-get remove -y '^mysql-.*' || true
-          sudo apt-get remove -y azure-cli google-chrome-stable firefox powershell mono-devel || true
-          sudo apt-get autoremove -y
+          sudo apt-get remove -y --purge \
+            azure-cli google-chrome-stable firefox powershell \
+            'llvm-*' 'clang-*' 'php*' \
+            mysql-server* mysql-client* \
+            2>/dev/null || true
+          
+          sudo apt-get autoremove -y 2>/dev/null || true
           sudo apt-get clean
           
-          echo ""
           echo "=== Disk space after cleanup ==="
-          df -h
+          df -h / | awk 'NR==1 || /\/$/'
 
       - name: Set lowercase repository owner
         id: lowercase
