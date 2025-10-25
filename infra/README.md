@@ -3,6 +3,7 @@
 This guide provides a step-by-step tutorial on how to deploy the UGM-AICare project to a Virtual Machine (VM) using the provided infrastructure scripts and GitHub Actions workflows. This setup assumes an external reverse proxy (e.g., Nginx) is already configured on the VM to handle domain routing and HTTPS.
 
 **📋 Quick Links:**
+
 - [VM Deployment Checklist](../docs/VM_DEPLOYMENT_CHECKLIST.md) - Required files that are gitignored
 - [Disk Cleanup Script](./scripts/cleanup-docker.sh) - Manual Docker cleanup utility
 
@@ -10,17 +11,17 @@ This guide provides a step-by-step tutorial on how to deploy the UGM-AICare proj
 
 Before you begin, ensure your target VM meets the following requirements:
 
-* **Operating System:** A Linux-based OS (e.g., Ubuntu Server, CentOS).
-* **Docker:** Install the latest version of Docker.
-  * [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
-  * [Install Docker Engine on CentOS](https://docs.docker.com/engine/install/centos/)
-* **Docker Compose V2:** Ensure `docker compose` command is available (not `docker-compose`). Docker Compose V2 is usually installed with Docker Desktop or can be installed separately.
-  * [Install Docker Compose](https://docs.docker.com/compose/install/)
-* **Firewall Configuration:** Configure your VM's firewall to allow incoming traffic on the necessary ports:
-  * **Port 8000:** For the Backend (FastAPI) service.
-  * **Port 4000:** For the Frontend (Next.js) service.
-  * **Port 22:** For SSH access.
-  * Example (UFW on Ubuntu):
+- **Operating System:** A Linux-based OS (e.g., Ubuntu Server, CentOS).
+- **Docker:** Install the latest version of Docker.
+  - [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
+  - [Install Docker Engine on CentOS](https://docs.docker.com/engine/install/centos/)
+- **Docker Compose V2:** Ensure `docker compose` command is available (not `docker-compose`). Docker Compose V2 is usually installed with Docker Desktop or can be installed separately.
+  - [Install Docker Compose](https://docs.docker.com/compose/install/)
+- **Firewall Configuration:** Configure your VM's firewall to allow incoming traffic on the necessary ports:
+  - **Port 8000:** For the Backend (FastAPI) service.
+  - **Port 4000:** For the Frontend (Next.js) service.
+  - **Port 22:** For SSH access.
+  - Example (UFW on Ubuntu):
 
         ```bash
         sudo ufw allow 8000/tcp
@@ -29,7 +30,7 @@ Before you begin, ensure your target VM meets the following requirements:
         sudo ufw enable
         ```
 
-* **Deploy User:** Create a dedicated SSH user on the VM with appropriate permissions to manage Docker and the project directory. This user should have `sudo` privileges for Docker commands without requiring a password (e.g., by adding them to the `docker` group).
+- **Deploy User:** Create a dedicated SSH user on the VM with appropriate permissions to manage Docker and the project directory. This user should have `sudo` privileges for Docker commands without requiring a password (e.g., by adding them to the `docker` group).
 
     **Generating SSH Key Pair:**
 
@@ -87,18 +88,18 @@ Before you begin, ensure your target VM meets the following requirements:
 
         ```
 
-* **Project Path:** Decide on an absolute path on the VM where the project repository will be cloned (e.g., `/opt/ugm-aicare`). Ensure the `deployuser` has write permissions to this directory.
-* **Reverse Proxy Configuration (Nginx/Apache):** You will need to configure your existing Nginx (or other reverse proxy) to forward traffic from your domain (e.g., `aicare.sumbu.xyz`) to the Docker containers running on `localhost:4000` (frontend) and `localhost:8000` (backend). This includes handling HTTPS/SSL termination at the Nginx level.
+- **Project Path:** Decide on an absolute path on the VM where the project repository will be cloned (e.g., `/opt/ugm-aicare`). Ensure the `deployuser` has write permissions to this directory.
+- **Reverse Proxy Configuration (Nginx/Apache):** You will need to configure your existing Nginx (or other reverse proxy) to forward traffic from your domain (e.g., `aicare.sumbu.xyz`) to the Docker containers running on `localhost:4000` (frontend) and `localhost:8000` (backend). This includes handling HTTPS/SSL termination at the Nginx level.
 
 ## 2. GitHub Secrets Configuration
 
 The deployment process relies on GitHub Secrets to securely store sensitive information. Configure the following secrets in your GitHub repository settings (`Settings > Secrets and variables > Actions`):
 
-* **`VM_SSH_HOST`**: The IP address or hostname of your deployment VM.
-* **`VM_SSH_USER`**: The SSH username for connecting to the VM (e.g., `deployuser`).
-* **`VM_SSH_PRIVATE_KEY`**: The SSH private key (PEM format) for authentication. Ensure this key corresponds to the public key added to your `deployuser`'s `authorized_keys` file on the VM.
-* **`VM_PROJECT_PATH`**: The absolute path to the project directory on the VM (e.g., `/opt/ugm-aicare`). This is where the repository will be cloned and managed.
-* **`ENV_FILE_PRODUCTION`**: (Optional, but highly recommended) A multi-line secret containing the entire `.env` file content for your production environment. This secret will be written to a `.env` file in the `VM_PROJECT_PATH` on the VM during deployment, providing necessary environment variables for your services (e.g., `DATABASE_URL`, `POSTGRES_USER`, `REDIS_HOST`, `MINIO_ACCESS_KEY`, etc.).
+- **`VM_SSH_HOST`**: The IP address or hostname of your deployment VM.
+- **`VM_SSH_USER`**: The SSH username for connecting to the VM (e.g., `deployuser`).
+- **`VM_SSH_PRIVATE_KEY`**: The SSH private key (PEM format) for authentication. Ensure this key corresponds to the public key added to your `deployuser`'s `authorized_keys` file on the VM.
+- **`VM_PROJECT_PATH`**: The absolute path to the project directory on the VM (e.g., `/opt/ugm-aicare`). This is where the repository will be cloned and managed.
+- **`ENV_FILE_PRODUCTION`**: (Optional, but highly recommended) A multi-line secret containing the entire `.env` file content for your production environment. This secret will be written to a `.env` file in the `VM_PROJECT_PATH` on the VM during deployment, providing necessary environment variables for your services (e.g., `DATABASE_URL`, `POSTGRES_USER`, `REDIS_HOST`, `MINIO_ACCESS_KEY`, etc.).
 
 ## 3. Deployment Steps (using GitHub Actions)
 
@@ -114,11 +115,11 @@ Any `push` event to the `main` branch will automatically trigger the `CD Pipelin
 4. Write the `ENV_FILE_PRODUCTION` secret to a `.env` file.
 5. Execute the `./infra/scripts/deploy.sh` script with the latest commit SHA.
 6. The `deploy.sh` script will then:
-    * Log in to GHCR.
-    * Pull the latest `backend` and `frontend` Docker images.
-    * Run database migrations using `./infra/scripts/migrate.sh`.
-    * Bring up the services using `docker compose -f infra/compose/docker-compose.prod.yml` up -d.
-    * Perform health checks against the locally exposed service ports.
+    - Log in to GHCR.
+    - Pull the latest `backend` and `frontend` Docker images.
+    - Run database migrations using `./infra/scripts/migrate.sh`.
+    - Bring up the services using `docker compose -f infra/compose/docker-compose.prod.yml` up -d.
+    - Perform health checks against the locally exposed service ports.
 
 ### Manual Deployment
 
@@ -151,7 +152,7 @@ It may be necessary to change the default exposed ports (4000 for frontend, 8000
 
 The exposed ports for the `frontend` and `backend` services are defined in `infra/compose/docker-compose.prod.yml` within the `ports` section of each service.
 
-* **Frontend:**
+- **Frontend:**
 
         ```yaml
         frontend:
@@ -161,7 +162,7 @@ The exposed ports for the `frontend` and `backend` services are defined in `infr
 
     To change the host port (e.g., to 4001), modify this line to `- "4001:3000"`. The container port (3000) should generally remain unchanged unless you modify the frontend Dockerfile.
 
-* **Backend:**
+- **Backend:**
 
         ```yaml
         backend:
@@ -203,8 +204,8 @@ For temporary changes, local testing, or specific VM setups where you don't want
 
 Environment variables like `FRONTEND_URL`, `BACKEND_URL`, `ALLOWED_ORIGINS`, and `NEXT_PUBLIC_API_URL` are crucial for inter-service communication and external access.
 
-* These variables are loaded from the `.env` file (generated from `ENV_FILE_PRODUCTION` secret) at the root of your `VM_PROJECT_PATH`.
-* Ensure that the values in your `ENV_FILE_PRODUCTION` secret correctly reflect the ports and domains your Nginx is configured to use. For example, if Nginx exposes your frontend on `https://your-domain.com` and your backend API on `https://your-domain.com/api`, then your `.env` should contain:
+- These variables are loaded from the `.env` file (generated from `ENV_FILE_PRODUCTION` secret) at the root of your `VM_PROJECT_PATH`.
+- Ensure that the values in your `ENV_FILE_PRODUCTION` secret correctly reflect the ports and domains your Nginx is configured to use. For example, if Nginx exposes your frontend on `https://your-domain.com` and your backend API on `https://your-domain.com/api`, then your `.env` should contain:
 
         ```
         FRONTEND_URL=https://your-domain.com
@@ -246,6 +247,7 @@ crontab -e
 ```
 
 **What the cleanup does:**
+
 - Removes stopped containers
 - Removes dangling images (untagged)
 - Removes unused volumes and networks
@@ -254,29 +256,36 @@ crontab -e
 - Removes container logs older than 7 days
 
 ### SSH Connection Issues
+
 ### SSH Connection Issues
-  * Verify `VM_SSH_HOST`, `VM_SSH_USER`, and `VM_SSH_PRIVATE_KEY` secrets are correct.
-  * Ensure the public key corresponding to `VM_SSH_PRIVATE_KEY` is correctly added to `~/.ssh/authorized_keys` for the `deployuser` on the VM.
-  * Check VM firewall rules (Port 22).
+
+- Verify `VM_SSH_HOST`, `VM_SSH_USER`, and `VM_SSH_PRIVATE_KEY` secrets are correct.
+- Ensure the public key corresponding to `VM_SSH_PRIVATE_KEY` is correctly added to `~/.ssh/authorized_keys` for the `deployuser` on the VM.
+- Check VM firewall rules (Port 22).
 
 ### Docker/Docker Compose Issues
-  * Ensure Docker and Docker Compose V2 are correctly installed and running on the VM.
-  * Verify the `deployuser` is part of the `docker` group and can run Docker commands without `sudo`.
+
+- Ensure Docker and Docker Compose V2 are correctly installed and running on the VM.
+- Verify the `deployuser` is part of the `docker` group and can run Docker commands without `sudo`.
 
 ### Environment Variables (`.env`) Issues
-  * Double-check the `ENV_FILE_PRODUCTION` secret for correct syntax and all required variables.
-  * Ensure there are no hidden characters (like carriage returns) in the secret that might corrupt the `.env` file on Linux.
+
+- Double-check the `ENV_FILE_PRODUCTION` secret for correct syntax and all required variables.
+- Ensure there are no hidden characters (like carriage returns) in the secret that might corrupt the `.env` file on Linux.
 
 ### Migration Failures
-  * Check the logs of the `deploy` workflow for output from `infra/scripts/migrate.sh`.
-  * Ensure `DATABASE_URL` in your `.env` file is correct and the database service is healthy.
+
+- Check the logs of the `deploy` workflow for output from `infra/scripts/migrate.sh`.
+- Ensure `DATABASE_URL` in your `.env` file is correct and the database service is healthy.
 
 ### Application Health Check Failures
-  * Verify the application logs of the `backend` and `frontend` containers on the VM for errors.
-  * Check VM firewall rules for ports 8000 and 4000.
-  * Ensure the services are actually listening on the expected ports inside the Docker containers.
+
+- Verify the application logs of the `backend` and `frontend` containers on the VM for errors.
+- Check VM firewall rules for ports 8000 and 4000.
+- Ensure the services are actually listening on the expected ports inside the Docker containers.
 
 ### Nginx/Reverse Proxy Issues
-  * Ensure Nginx is running and correctly configured to proxy requests to `localhost:4000` (frontend) and `localhost:8000` (backend).
-  * Verify Nginx's SSL configuration is correct and certificates are valid.
-  * Check Nginx access and error logs for clues.
+
+- Ensure Nginx is running and correctly configured to proxy requests to `localhost:4000` (frontend) and `localhost:8000` (backend).
+- Verify Nginx's SSL configuration is correct and certificates are valid.
+- Check Nginx access and error logs for clues.
