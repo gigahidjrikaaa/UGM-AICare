@@ -124,7 +124,7 @@ jobs:
     needs: [detect-changes, test-backend]
     if: |
       always() && 
-      (needs.detect-changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch') &&
+      (needs.detect-changes.outputs.backend == 'true' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) &&
       (needs.test-backend.result == 'success' || needs.test-backend.result == 'skipped')
     permissions:
       contents: read
@@ -211,7 +211,7 @@ jobs:
     needs: [detect-changes, test-frontend]
     if: |
       always() && 
-      (needs.detect-changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch') &&
+      (needs.detect-changes.outputs.frontend == 'true' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')) &&
       (needs.test-frontend.result == 'success' || needs.test-frontend.result == 'skipped')
     permissions:
       contents: read
