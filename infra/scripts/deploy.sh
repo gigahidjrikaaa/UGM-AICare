@@ -16,10 +16,16 @@ echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 echo "[deploy.sh] GHCR login successful."
 
 # 2. Pull images
-echo "[deploy.sh] Pulling backend image: ghcr.io/gigahidjrikaaa/UGM-AICare/backend:$GIT_SHA"
-docker pull ghcr.io/gigahidjrikaaa/UGM-AICare/backend:"$GIT_SHA"
-echo "[deploy.sh] Pulling frontend image: ghcr.io/gigahidjrikaaa/UGM-AICare/frontend:$GIT_SHA"
-docker pull ghcr.io/gigahidjrikaaa/UGM-AICare/frontend:"$GIT_SHA"
+GHCR_REPOSITORY_OWNER_LOWER=${GHCR_REPOSITORY_OWNER:-gigahidjrikaaa}
+GHCR_REPOSITORY_OWNER_LOWER=${GHCR_REPOSITORY_OWNER_LOWER,,} # GHCR requires lowercase
+
+BACKEND_IMAGE="ghcr.io/${GHCR_REPOSITORY_OWNER_LOWER}/backend:${GIT_SHA}"
+FRONTEND_IMAGE="ghcr.io/${GHCR_REPOSITORY_OWNER_LOWER}/frontend:${GIT_SHA}"
+
+echo "[deploy.sh] Pulling backend image: $BACKEND_IMAGE"
+docker pull "$BACKEND_IMAGE"
+echo "[deploy.sh] Pulling frontend image: $FRONTEND_IMAGE"
+docker pull "$FRONTEND_IMAGE"
 echo "[deploy.sh] Images pulled successfully."
 
 # 3. Write/refresh .env from secret if provided
