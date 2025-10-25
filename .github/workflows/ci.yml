@@ -416,6 +416,9 @@ jobs:
             git fetch origin
             git reset --hard origin/main
             
+            # Ensure scripts have execute permissions
+            chmod +x ./infra/scripts/*.sh
+            
             if [ -n "${{ secrets.ENV_FILE_PRODUCTION }}" ]; then
               echo "${{ secrets.ENV_FILE_PRODUCTION }}" > .env
             fi
@@ -454,6 +457,9 @@ jobs:
             # Pull latest code to ensure we have the latest deploy scripts
             git fetch origin
             git reset --hard origin/main
+            
+            # Ensure scripts have execute permissions
+            chmod +x ./infra/scripts/*.sh
             
             if [ -n "${{ secrets.ENV_FILE_PRODUCTION }}" ]; then
               echo "${{ secrets.ENV_FILE_PRODUCTION }}" > .env
