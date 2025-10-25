@@ -28,11 +28,16 @@ FROM python:3.11-slim-bookworm as model-builder
 
 WORKDIR /app
 
-# Install only dependencies needed for ONNX model export
-RUN pip install --no-cache-dir \
-    torch>=2.0.0 --index-url https://download.pytorch.org/whl/cpu \
-    transformers>=4.41.0 \
-    onnxruntime>=1.16.0
+# Install pip and wheel tools, then install torch from the PyTorch index
+# and install the rest (transformers, onnxruntime) from PyPI. Using a
+# separate install avoids overriding the default PyPI index with
+# --index-url which caused "No matching distribution found for transformers".
+RUN python -m pip install --upgrade pip setuptools wheel && \
+    python -m pip install --no-cache-dir --index-url https://download.pytorch.org/whl/cpu \
+        torch>=2.0.0 && \
+    python -m pip install --no-cache-dir \
+        transformers>=4.41.0 \
+        onnxruntime>=1.16.0
 
 # Copy model export script
 COPY scripts/ensure_onnx_model.py scripts/
