@@ -23,6 +23,24 @@ COPY requirements.txt .
 RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
 
 
+# ---- ONNX Model Build Stage ----
+FROM python:3.11-slim-bookworm as model-builder
+
+WORKDIR /app
+
+# Install only dependencies needed for ONNX model export
+RUN pip install --no-cache-dir \
+    torch>=2.0.0 --index-url https://download.pytorch.org/whl/cpu \
+    transformers>=4.41.0 \
+    onnxruntime>=1.16.0
+
+# Copy model export script
+COPY scripts/ensure_onnx_model.py scripts/
+
+# Build ONNX model (downloads from HuggingFace and exports)
+RUN python scripts/ensure_onnx_model.py || echo "⚠️ ONNX model build failed, will retry at runtime"
+
+
 # ---- Final Stage (production) ----
 FROM python:3.11-slim-bookworm
 
@@ -41,20 +59,16 @@ RUN apt-get update &&     apt-get install -y --no-install-recommends libpq5 dos2
 # Copy pre-compiled wheels from the builder stage
 COPY --from=builder /app/wheels /wheels
 
-# Install Python dependencies from wheels
+# Copy ONNX model from model-builder stage (if successful)
+COPY --from=model-builder /app/models/onnx /app/models/onnx
+
+# Install Python dependencies from wheels (EXCLUDING torch - not needed at runtime!)
 RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels \
     && python -m spacy download xx_ent_wiki_sm || true \
     && python -m spacy download en_core_web_sm || true
 
 # Copy the entire application code from the build context (./backend)
 COPY --chown=appuser:appgroup . .
-
-# --- Add this line for debugging ---
-RUN ls -laR /app
-
-# Auto-build ONNX model if missing (downloads from HuggingFace on first run)
-# This ensures the model is available even if not committed to git
-RUN python scripts/ensure_onnx_model.py || echo "⚠️ ONNX model build skipped (optional)"
 
 # Find, convert line endings, and set permissions for all shell scripts
 # This is still needed for the 'migrate' service which uses wait-for-it.sh
