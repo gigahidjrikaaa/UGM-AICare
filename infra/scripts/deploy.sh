@@ -17,8 +17,12 @@ echo "[deploy.sh] GHCR login successful."
 
 # 2. Pull images
 # Convert repository owner to lowercase (Docker requires lowercase)
-GHCR_REPOSITORY_OWNER_LOWER=${GHCR_REPOSITORY_OWNER:-gigahidjrikaaa}
-GHCR_REPOSITORY_OWNER_LOWER=$(echo "$GHCR_REPOSITORY_OWNER_LOWER" | tr '[:upper:]' '[:lower:]')
+# Extract ONLY the owner part (in case full repo path was passed)
+GHCR_REPOSITORY_OWNER_RAW=${GHCR_REPOSITORY_OWNER:-gigahidjrikaaa}
+# Remove any repository name if accidentally included (gigahidjrikaaa/UGM-AICare -> gigahidjrikaaa)
+GHCR_REPOSITORY_OWNER_CLEAN=$(echo "$GHCR_REPOSITORY_OWNER_RAW" | cut -d'/' -f1)
+# Convert to lowercase
+GHCR_REPOSITORY_OWNER_LOWER=$(echo "$GHCR_REPOSITORY_OWNER_CLEAN" | tr '[:upper:]' '[:lower:]')
 
 # Image names: ghcr.io/owner/image:tag (NOT ghcr.io/owner/repo/image:tag)
 BACKEND_IMAGE="ghcr.io/${GHCR_REPOSITORY_OWNER_LOWER}/backend:${GIT_SHA}"
