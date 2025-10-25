@@ -15,8 +15,11 @@ This document lists all files that are `.gitignore`d but **required** on the pro
 
 **Contains:**
 ```bash
-# Database
+# Database (Required for docker-compose)
 DATABASE_URL=postgresql+asyncpg://user:password@host:port/dbname
+POSTGRES_DB=your_database_name
+POSTGRES_USER=your_db_username
+POSTGRES_PASSWORD=your_db_password
 
 # Security
 JWT_SECRET_KEY=your-secret-key-here
@@ -29,6 +32,17 @@ GEMINI_API_KEY=your-gemini-api-key
 REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=optional-redis-password
+
+# Google OAuth (Required for docker-compose)
+GOOGLE_CLIENT_ID=your-google-client-id
+GOOGLE_CLIENT_SECRET=your-google-client-secret
+
+# MinIO (Optional - has defaults)
+MINIO_ENDPOINT=minio:9000
+MINIO_ACCESS_KEY=minioadmin
+MINIO_SECRET_KEY=minioadmin
+MINIO_BUCKET=content-resources
+MINIO_SECURE=false
 
 # Rate Limiting
 RATE_LIMIT_ENABLED=true
@@ -397,6 +411,17 @@ echo "🚀 VM is ready for deployment!"
 ### Error: "alembic: command not found"
 **Cause:** Migrations being run before Docker containers are started  
 **Fix:** This has been fixed in the deployment script - migrations now run inside the Docker container after services start. Update your deployment scripts by pulling latest changes.
+
+### Error: "The \"POSTGRES_DB\" variable is not set"
+**Cause:** Required environment variables missing from `.env` file  
+**Fix:** Ensure your `.env` file contains all required variables:
+- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` (for database)
+- `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (for OAuth)
+- `GIT_SHA` is auto-set by deployment script
+
+### Error: "env file .../infra/compose/.env not found"
+**Cause:** This error is expected and can be ignored - the deployment script passes `.env` via `--env-file` flag  
+**Fix:** No action needed if deployment succeeds. If it fails, ensure `.env` exists in project root.
 
 ### Error: "DATABASE_URL not set"
 **Cause:** `.env` file missing or incomplete  

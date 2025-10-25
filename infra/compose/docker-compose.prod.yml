@@ -69,8 +69,7 @@ services:
     image: ghcr.io/${GHCR_REPOSITORY_OWNER:-gigahidjrikaaa}/backend:${GIT_SHA}
     ports: # Expose this service directly to the host
       - "8000:8000"
-    env_file:
-      - .env # Load environment variables from .env file in root
+    # env_file is passed via --env-file flag in deploy.sh
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       FRONTEND_URL: http://localhost:4000 # Reverted
@@ -108,8 +107,7 @@ services:
     image: ghcr.io/${GHCR_REPOSITORY_OWNER:-gigahidjrikaaa}/frontend:${GIT_SHA}
     ports: # Expose this service directly to the host
       - "4000:3000"
-    env_file:
-      - .env # For any runtime ENV vars Next.js server might need
+    # env_file is passed via --env-file flag in deploy.sh
     environment:
       NODE_ENV: production
       PORT: 3000

@@ -71,6 +71,19 @@ fi
 
 # 4. Bring up services with docker compose (moved before migrations)
 echo "[deploy.sh] Bringing up services with docker-compose.prod.yml..."
+
+# Export environment variables for docker compose
+export GIT_SHA="$GIT_SHA"
+export GHCR_REPOSITORY_OWNER="$GHCR_REPOSITORY_OWNER_LOWER"
+
+# Load all variables from .env file so docker-compose can use them
+if [[ -f ".env" ]]; then
+  echo "[deploy.sh] Loading environment variables from .env..."
+  set -a  # Automatically export all variables
+  source .env
+  set +a  # Stop auto-exporting
+fi
+
 # Stop and remove old containers, then start new ones
 docker compose -f infra/compose/docker-compose.prod.yml down || true # Ignore errors if containers don't exist
 
@@ -78,12 +91,8 @@ docker compose -f infra/compose/docker-compose.prod.yml down || true # Ignore er
 echo "[deploy.sh] Cleaning up stopped containers..."
 docker container prune -f || true
 
-# Export environment variables for docker compose
-export GIT_SHA="$GIT_SHA"
-export GHCR_REPOSITORY_OWNER="$GHCR_REPOSITORY_OWNER_LOWER"
-
-# Start new containers
-docker compose -f infra/compose/docker-compose.prod.yml up -d
+# Start new containers (pass --env-file to use root .env)
+docker compose -f infra/compose/docker-compose.prod.yml --env-file .env up -d
 echo "[deploy.sh] Services started."
 
 # Wait a bit for containers to be ready
