@@ -1,4 +1,3 @@
-/* eslint-disable react/forbid-component-props */
 'use client';
 
 import { useEffect, useState } from 'react';
@@ -25,7 +24,7 @@ export function CampaignMetricsModal({ campaignId, campaignName, onClose }: Camp
         setLoading(true);
         const data = await getCampaignMetrics(campaignId);
         setMetrics(data);
-      } catch (err) {
+      } catch (err: unknown) {
         setError(err instanceof Error ? err.message : 'Failed to load metrics');
       } finally {
         setLoading(false);

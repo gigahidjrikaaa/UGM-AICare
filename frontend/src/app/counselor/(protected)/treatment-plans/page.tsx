@@ -10,6 +10,7 @@ import {
   FiPlus,
   FiTrendingUp,
   FiAlertCircle,
+  FiAlertTriangle,
 } from 'react-icons/fi';
 
 interface TreatmentPlan {
@@ -37,6 +38,7 @@ const statusColors = {
 export default function CounselorTreatmentPlansPage() {
   const [plans, setPlans] = useState<TreatmentPlan[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
   useEffect(() => {
@@ -129,6 +131,26 @@ export default function CounselorTreatmentPlansPage() {
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFCA40] mb-4"></div>
           <p className="text-white/70">Loading treatment plans...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="text-red-400 mb-4">
+            <FiAlertTriangle className="w-12 h-12 mx-auto" />
+          </div>
+          <p className="text-red-300 font-semibold mb-2">Failed to load treatment plans</p>
+          <p className="text-red-300/70 text-sm mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-sm text-red-300 transition-all"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );

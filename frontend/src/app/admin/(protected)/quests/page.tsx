@@ -78,10 +78,14 @@ export default function AdminQuestTemplatesPage() {
     onSuccess: () => {
       toast.success('Quest template created');
       queryClient.invalidateQueries({ queryKey });
-      setFormState(defaultForm);
+      resetForm();
     },
-    onError: (error: any) => {
-      const message = error?.response?.data?.detail ?? 'Failed to create quest template';
+    onError: (error: unknown) => {
+      const message =
+        typeof error === 'object' && error !== null && 'response' in error
+          ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail ??
+            'Failed to create quest template'
+          : 'Failed to create quest template';
       toast.error(message);
     },
   });
@@ -93,12 +97,15 @@ export default function AdminQuestTemplatesPage() {
       toast.success('Quest template updated');
       queryClient.invalidateQueries({ queryKey });
       if (editingTemplate && editingTemplate.id === variables.id) {
-        setEditingTemplate(null);
-        setFormState(defaultForm);
+        resetForm();
       }
     },
-    onError: (error: any) => {
-      const message = error?.response?.data?.detail ?? 'Failed to update quest template';
+    onError: (error: unknown) => {
+      const message =
+        typeof error === 'object' && error !== null && 'response' in error
+          ? (error as { response?: { data?: { detail?: string } } }).response?.data?.detail ??
+            'Failed to update quest template'
+          : 'Failed to update quest template';
       toast.error(message);
     },
   });
@@ -152,7 +159,8 @@ export default function AdminQuestTemplatesPage() {
         return null;
       }
       return parsed;
-    } catch (err) {
+    } catch (error: unknown) {
+      console.error(error);
       toast.error('Invalid JSON in extra metadata');
       return null;
     }
@@ -394,7 +402,7 @@ export default function AdminQuestTemplatesPage() {
             <button
               type="submit"
               className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#FFCA40] to-[#FFB347] px-4 py-2 text-sm font-semibold text-[#001d58] shadow-[0_12px_30px_rgba(255,202,64,0.35)] transition hover:shadow-[0_16px_35px_rgba(255,202,64,0.45)] focus:outline-none focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:ring-[#FFCA40]/60 focus-visible:ring-offset-[#00112e]"
-              disabled={createMutation.isLoading || updateMutation.isLoading}
+              disabled={createMutation.isPending || updateMutation.isPending}
             >
               {editingTemplate ? <FiCheck className="h-4 w-4" /> : <FiPlus className="h-4 w-4" />}
               {editingTemplate ? 'Save Changes' : 'Create Template'}
@@ -572,3 +580,7 @@ export default function AdminQuestTemplatesPage() {
     </div>
   );
 }
+
+
+
+

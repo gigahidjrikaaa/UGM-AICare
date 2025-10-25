@@ -88,7 +88,7 @@ export default function ServiceDeskClient() {
     debug: process.env.NODE_ENV === 'development',
   });
 
-  const handleCreateCase = useCallback(async (request: SDAGraphRequest) => {
+  const handleCreateCase = useCallback<(request: SDAGraphRequest) => Promise<void>>(async (request) => {
     setLoading(true);
     try {
       // Import dynamically to avoid SSR issues
@@ -110,8 +110,6 @@ export default function ServiceDeskClient() {
         created_at: new Date().toISOString(),
         status: 'new',
       }, ...prev].slice(0, 10));
-
-      return result;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       toast.error(`❌ Failed to create case: ${errorMessage}`);
@@ -248,3 +246,4 @@ export default function ServiceDeskClient() {
     </div>
   );
 }
+

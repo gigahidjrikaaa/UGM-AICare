@@ -20,10 +20,7 @@ interface ProfileDropdownProps {
 export default function ProfileDropdown({ isOpen, user, wellness, onClose, onSignOut }: ProfileDropdownProps) {
   const { data: quests } = useTodayQuests();
   const activeQuest = quests?.find((quest) => quest.status === "active");
-  const questDisplayName =
-    activeQuest?.template.name && activeQuest.template.name.length > 22
-      ?  `${activeQuest.template.name.slice(0, 19)}…` 
-      : activeQuest?.template.name;
+
 
   const quickTiles = [
     {

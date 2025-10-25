@@ -335,7 +335,7 @@ export interface TimeSlot {
 
 export interface CounselorUser {
   id: number;
-  email: string;
+  email?: string;
   name?: string;
   avatar_url?: string;
   created_at: string;

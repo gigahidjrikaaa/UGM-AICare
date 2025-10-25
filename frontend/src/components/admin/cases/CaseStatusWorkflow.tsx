@@ -31,8 +31,9 @@ export default function CaseStatusWorkflow({
 
   const getAvailableStatuses = (): CaseStatus[] => {
     const transitions: Record<CaseStatus, CaseStatus[]> = {
-      new: ['in_progress', 'closed'],
-      in_progress: ['resolved', 'closed'],
+      new: ['in_progress', 'waiting', 'closed'],
+      in_progress: ['waiting', 'resolved', 'closed'],
+      waiting: ['in_progress', 'resolved', 'closed'],
       resolved: ['closed'],
       closed: [],
     };

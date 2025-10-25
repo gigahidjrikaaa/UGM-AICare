@@ -12,6 +12,7 @@ import {
   FiX,
   FiCalendar,
   FiClock,
+  FiAlertTriangle,
 } from 'react-icons/fi';
 import { apiCall } from '@/utils/adminApi';
 
@@ -41,6 +42,7 @@ interface CounselorProfile {
 export default function CounselorProfilePage() {
   const [profile, setProfile] = useState<CounselorProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editedProfile, setEditedProfile] = useState<CounselorProfile | null>(null);
 
@@ -113,6 +115,26 @@ export default function CounselorProfilePage() {
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFCA40] mb-4"></div>
           <p className="text-white/70">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="text-center">
+          <div className="text-red-400 mb-4">
+            <FiAlertTriangle className="w-12 h-12 mx-auto" />
+          </div>
+          <p className="text-red-300 font-semibold mb-2">Failed to load profile</p>
+          <p className="text-red-300/70 text-sm mb-4">{error}</p>
+          <button
+            onClick={() => window.location.reload()}
+            className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-sm text-red-300 transition-all"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );

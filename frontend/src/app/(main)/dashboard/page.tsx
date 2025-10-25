@@ -13,7 +13,6 @@ import {
   FiClock,
   FiRefreshCw,
   FiTrendingUp,
-  FiZap,
 } from "@/icons";
 import WalletLinkButton from "@/components/ui/WalletLinkButton";
 import QuestBoard from "@/components/quests/QuestBoard";
