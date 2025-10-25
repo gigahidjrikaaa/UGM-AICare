@@ -52,6 +52,10 @@ COPY --chown=appuser:appgroup . .
 # --- Add this line for debugging ---
 RUN ls -laR /app
 
+# Auto-build ONNX model if missing (downloads from HuggingFace on first run)
+# This ensures the model is available even if not committed to git
+RUN python scripts/ensure_onnx_model.py || echo "⚠️ ONNX model build skipped (optional)"
+
 # Find, convert line endings, and set permissions for all shell scripts
 # This is still needed for the 'migrate' service which uses wait-for-it.sh
 RUN find /app/scripts -name "*.sh" -exec dos2unix {} + -exec chmod +x {} +

@@ -16,22 +16,22 @@ backend_path = Path(__file__).parent.parent / "backend"
 sys.path.insert(0, str(backend_path))
 
 from app.agents.sta.classifiers import SafetyTriageClassifier
-from app.agents.sta.ml_classifier import HybridClassifier, SemanticCrisisClassifier
+from app.agents.sta.ml_classifier_onnx import ONNXHybridClassifier, ONNXSemanticClassifier
 from app.agents.sta.schemas import STAClassifyRequest
 
 
 async def test_ml_classifier():
     """Test ML semantic classifier."""
     print("\n" + "=" * 70)
-    print("TEST 1: ML Semantic Classifier")
+    print("TEST 1: ML Semantic Classifier (ONNX)")
     print("=" * 70)
     
     try:
-        ml_classifier = SemanticCrisisClassifier()
+        ml_classifier = ONNXSemanticClassifier()
         
         if not ml_classifier.is_available():
             print("❌ ML classifier not available")
-            print("   Install sentence-transformers: pip install sentence-transformers")
+            print("   Install onnxruntime: pip install onnxruntime optimum[onnxruntime]")
             return False
         
         print("✅ ML classifier loaded successfully")
@@ -69,7 +69,7 @@ async def test_ml_classifier():
         
     except ImportError as e:
         print(f"❌ Import error: {e}")
-        print("   Install sentence-transformers: pip install sentence-transformers")
+        print("   Install onnxruntime: pip install onnxruntime optimum[onnxruntime]")
         return False
     except Exception as e:
         print(f"❌ Error: {e}")
@@ -81,7 +81,7 @@ async def test_ml_classifier():
 async def test_hybrid_classifier():
     """Test hybrid classifier (rule-based + ML)."""
     print("\n" + "=" * 70)
-    print("TEST 2: Hybrid Classifier (Rule-based + ML)")
+    print("TEST 2: Hybrid Classifier (Rule-based + ML ONNX)")
     print("=" * 70)
     
     try:
@@ -89,18 +89,18 @@ async def test_hybrid_classifier():
         rule_classifier = SafetyTriageClassifier()
         
         try:
-            semantic_classifier = SemanticCrisisClassifier()
-            hybrid = HybridClassifier(
+            semantic_classifier = ONNXSemanticClassifier()
+            hybrid = ONNXHybridClassifier(
                 rule_classifier=rule_classifier,
-                semantic_classifier=semantic_classifier
+                onnx_classifier=semantic_classifier
             )
             print("✅ Hybrid classifier initialized (Rule-based + ML)")
         except Exception as e:
             print(f"⚠️  ML not available: {e}")
             print("   Using rule-based only")
-            hybrid = HybridClassifier(
+            hybrid = ONNXHybridClassifier(
                 rule_classifier=rule_classifier,
-                semantic_classifier=None
+                onnx_classifier=None
             )
         
         print()
@@ -182,14 +182,14 @@ async def test_hybrid_classifier():
 async def test_comparative_analysis():
     """Compare rule-based vs ML performance."""
     print("\n" + "=" * 70)
-    print("TEST 3: Comparative Analysis (Rule-based vs ML)")
+    print("TEST 3: Comparative Analysis (Rule-based vs ML ONNX)")
     print("=" * 70)
     
     try:
         rule_classifier = SafetyTriageClassifier()
         
         try:
-            ml_classifier = SemanticCrisisClassifier()
+            ml_classifier = ONNXSemanticClassifier()
             if not ml_classifier.is_available():
                 print("⚠️  ML classifier not available, skipping comparison")
                 return True

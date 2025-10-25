@@ -16,9 +16,11 @@ echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 echo "[deploy.sh] GHCR login successful."
 
 # 2. Pull images
+# Convert repository owner to lowercase (Docker requires lowercase)
 GHCR_REPOSITORY_OWNER_LOWER=${GHCR_REPOSITORY_OWNER:-gigahidjrikaaa}
-GHCR_REPOSITORY_OWNER_LOWER=${GHCR_REPOSITORY_OWNER_LOWER,,} # GHCR requires lowercase
+GHCR_REPOSITORY_OWNER_LOWER=$(echo "$GHCR_REPOSITORY_OWNER_LOWER" | tr '[:upper:]' '[:lower:]')
 
+# Image names: ghcr.io/owner/image:tag (NOT ghcr.io/owner/repo/image:tag)
 BACKEND_IMAGE="ghcr.io/${GHCR_REPOSITORY_OWNER_LOWER}/backend:${GIT_SHA}"
 FRONTEND_IMAGE="ghcr.io/${GHCR_REPOSITORY_OWNER_LOWER}/frontend:${GIT_SHA}"
 
@@ -59,8 +61,12 @@ echo "[deploy.sh] Bringing up services with docker-compose.prod.yml..."
 # Stop and remove old containers, then start new ones
 docker compose -f infra/compose/docker-compose.prod.yml down || true # Ignore errors if containers don't exist
 
-# Pass GIT_SHA as environment variable to docker compose
-GIT_SHA="$GIT_SHA" docker compose -f infra/compose/docker-compose.prod.yml up -d
+# Export environment variables for docker compose
+export GIT_SHA="$GIT_SHA"
+export GHCR_REPOSITORY_OWNER="$GHCR_REPOSITORY_OWNER_LOWER"
+
+# Start new containers
+docker compose -f infra/compose/docker-compose.prod.yml up -d
 echo "[deploy.sh] Services started."
 
 # 6. Health check endpoints

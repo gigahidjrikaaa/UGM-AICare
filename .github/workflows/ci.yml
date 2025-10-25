@@ -56,6 +56,10 @@ jobs:
         run: npm test
         working-directory: ./frontend
 
+      - name: Set lowercase repository owner
+        id: lowercase
+        run: echo "owner=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -70,8 +74,8 @@ jobs:
           file: ./infra/docker/backend.Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/backend:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/backend:latest
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/backend:${{ github.sha }}
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/backend:latest
 
       - name: Build and push frontend image
         uses: docker/build-push-action@v5
@@ -80,13 +84,13 @@ jobs:
           file: ./infra/docker/frontend.Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ github.repository_owner }}/frontend:${{ github.sha }}
-            ghcr.io/${{ github.repository_owner }}/frontend:latest
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/frontend:${{ github.sha }}
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/frontend:latest
 
       - name: Run Trivy vulnerability scan on backend image
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'ghcr.io/${{ github.repository_owner }}/backend:${{ github.sha }}'
+          image-ref: 'ghcr.io/${{ steps.lowercase.outputs.owner }}/backend:${{ github.sha }}'
           format: 'json'
           output: 'trivy-backend-results.json'
           exit-code: '0' # Don't fail on vulnerabilities
@@ -126,7 +130,7 @@ jobs:
       - name: Run Trivy vulnerability scan on frontend image
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'ghcr.io/${{ github.repository_owner }}/frontend:${{ github.sha }}'
+          image-ref: 'ghcr.io/${{ steps.lowercase.outputs.owner }}/frontend:${{ github.sha }}'
           format: 'json'
           output: 'trivy-frontend-results.json'
           exit-code: '0'

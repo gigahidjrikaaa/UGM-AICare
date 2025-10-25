@@ -60,3 +60,8 @@ backend/*.db
 alembic.ini
 alembic/*.ini
 backend/*.ini
+
+# ONNX Models - Large binary files (502 MB), auto-downloaded on build
+# These are automatically rebuilt from HuggingFace during Docker build
+# See: backend/scripts/ensure_onnx_model.py
+backend/models/onnx/

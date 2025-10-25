@@ -66,7 +66,7 @@ services:
   #################
   backend:
     container_name: ugm_aicare_backend
-    image: ghcr.io/gigahidjrikaaa/UGM-AICare/backend:${GIT_SHA}
+    image: ghcr.io/${GHCR_REPOSITORY_OWNER:-gigahidjrikaaa}/backend:${GIT_SHA}
     ports: # Expose this service directly to the host
       - "8000:8000"
     env_file:
@@ -105,7 +105,7 @@ services:
   #################
   frontend:
     container_name: ugm_aicare_frontend
-    image: ghcr.io/gigahidjrikaaa/UGM-AICare/frontend:${GIT_SHA}
+    image: ghcr.io/${GHCR_REPOSITORY_OWNER:-gigahidjrikaaa}/frontend:${GIT_SHA}
     ports: # Expose this service directly to the host
       - "4000:3000"
     env_file:
