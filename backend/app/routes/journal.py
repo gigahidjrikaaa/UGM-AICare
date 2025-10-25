@@ -101,6 +101,12 @@ async def create_or_update_journal_entry(
         await db.refresh(existing_entry)
         saved_entry = existing_entry
         await invalidate_user_personal_context(current_user.id)
+        
+        # Invalidate journal cache
+        from app.core.cache import get_cache_service
+        cache = get_cache_service()
+        await cache.delete_pattern(f"cache:journals:{current_user.id}:*")
+        await cache.delete_pattern(f"cache:journal_highlights:{current_user.id}:*")
     else:
         # Create new entry
         new_entry_data = entry_data.dict()
@@ -116,6 +122,12 @@ async def create_or_update_journal_entry(
             await db.refresh(new_entry)
             saved_entry = new_entry
             await invalidate_user_personal_context(current_user.id)
+            
+            # Invalidate journal cache
+            from app.core.cache import get_cache_service
+            cache = get_cache_service()
+            await cache.delete_pattern(f"cache:journals:{current_user.id}:*")
+            await cache.delete_pattern(f"cache:journal_highlights:{current_user.id}:*")
         except Exception as e:
              await db.rollback()
              raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Entry for this date might already exist or another error occurred.")

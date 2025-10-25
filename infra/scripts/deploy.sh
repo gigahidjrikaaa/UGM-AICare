@@ -10,7 +10,24 @@ fi
 
 echo "[deploy.sh] Starting deployment for GIT_SHA: $GIT_SHA"
 
-# 1. Docker login to GHCR
+# 1. Clean up disk space before deployment
+echo "[deploy.sh] Checking disk space..."
+df -h / | awk 'NR==1 || /\/$/'
+
+echo "[deploy.sh] Cleaning up Docker resources to free disk space..."
+# Remove stopped containers
+docker container prune -f || true
+# Remove dangling images (untagged)
+docker image prune -f || true
+# Remove unused networks
+docker network prune -f || true
+# Remove build cache (keep recent layers)
+docker builder prune -f --keep-storage=5GB || true
+
+echo "[deploy.sh] Disk space after cleanup:"
+df -h / | awk 'NR==1 || /\/$/'
+
+# 2. Docker login to GHCR
 echo "[deploy.sh] Logging into GHCR..."
 echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
 echo "[deploy.sh] GHCR login successful."
@@ -33,6 +50,15 @@ docker pull "$BACKEND_IMAGE"
 echo "[deploy.sh] Pulling frontend image: $FRONTEND_IMAGE"
 docker pull "$FRONTEND_IMAGE"
 echo "[deploy.sh] Images pulled successfully."
+
+# Clean up old images after pulling new ones (keep last 3 versions)
+echo "[deploy.sh] Removing old backend images (keeping last 3)..."
+docker images "ghcr.io/${GHCR_REPOSITORY_OWNER_LOWER}/backend" --format "{{.ID}} {{.Tag}}" | \
+  grep -v "latest" | grep -v "$GIT_SHA" | tail -n +4 | awk '{print $1}' | xargs -r docker rmi -f || true
+
+echo "[deploy.sh] Removing old frontend images (keeping last 3)..."
+docker images "ghcr.io/${GHCR_REPOSITORY_OWNER_LOWER}/frontend" --format "{{.ID}} {{.Tag}}" | \
+  grep -v "latest" | grep -v "$GIT_SHA" | tail -n +4 | awk '{print $1}' | xargs -r docker rmi -f || true
 
 # 3. Write/refresh .env from secret if provided
 if [[ -n "${ENV_FILE_PRODUCTION:-}" ]]; then
@@ -60,7 +86,11 @@ fi
 ./infra/scripts/migrate.sh
 echo "[deploy.sh] Database migrations completed."
 
-# 5. Bring up services with docker compose
+# 5. Clean up stopped containers before starting new ones
+echo "[deploy.sh] Cleaning up stopped containers..."
+docker container prune -f || true
+
+# 6. Bring up services with docker compose
 echo "[deploy.sh] Bringing up services with docker-compose.prod.yml..."
 # Stop and remove old containers, then start new ones
 docker compose -f infra/compose/docker-compose.prod.yml down || true # Ignore errors if containers don't exist
@@ -73,7 +103,7 @@ export GHCR_REPOSITORY_OWNER="$GHCR_REPOSITORY_OWNER_LOWER"
 docker compose -f infra/compose/docker-compose.prod.yml up -d
 echo "[deploy.sh] Services started."
 
-# 6. Health check endpoints
+# 7. Health check endpoints
 echo "[deploy.sh] Performing health checks..."
 # Example health checks (replace with actual application endpoints)
 # For backend:

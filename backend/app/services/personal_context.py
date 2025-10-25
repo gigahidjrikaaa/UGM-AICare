@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import Appointment, JournalEntry, User, UserSummary
 from app.utils.security_utils import decrypt_data
+from app.core.cache import cached, get_cache_service
+from app.core.settings import settings
 
 _CACHE_TTL = timedelta(minutes=5)
 _context_cache: Dict[int, Tuple[str, datetime]] = {}
@@ -26,7 +28,9 @@ def _safe_decrypt(value: Optional[str]) -> Optional[str]:
         return None
 
 
+@cached(key_prefix="user_summary", ttl=settings.cache_user_summary_ttl)
 async def _get_latest_summary(db: AsyncSession, user_id: int) -> Optional[str]:
+    """Get latest user summary with Redis caching."""
     stmt = (
         select(UserSummary.summary_text)
         .where(UserSummary.user_id == user_id)
@@ -40,7 +44,9 @@ async def _get_latest_summary(db: AsyncSession, user_id: int) -> Optional[str]:
     return None
 
 
+@cached(key_prefix="journal_highlights", ttl=settings.cache_journal_ttl)
 async def _get_recent_journal_highlights(db: AsyncSession, user_id: int, limit: int = 2) -> List[str]:
+    """Get recent journal highlights with Redis caching."""
     stmt = (
         select(JournalEntry.content)
         .where(JournalEntry.user_id == user_id)
@@ -114,8 +120,14 @@ async def build_user_personal_context(db: AsyncSession, user: User) -> str:
 
 
 async def invalidate_user_personal_context(user_id: int) -> None:
+    """Invalidate user personal context cache (both in-memory and Redis)."""
+    # Clear in-memory cache
     async with _cache_lock:
         _context_cache.pop(user_id, None)
+    
+    # Clear Redis cache for user
+    from app.core.cache import invalidate_user_cache
+    await invalidate_user_cache(user_id)
 
 
 async def _compute_personal_context(db: AsyncSession, user: User) -> str:

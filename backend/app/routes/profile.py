@@ -408,6 +408,11 @@ async def update_profile_overview(
             db.add(current_user)
             await db.commit()
             await db.refresh(current_user)
+            
+            # Invalidate user cache after profile update
+            from app.core.cache import invalidate_user_cache
+            await invalidate_user_cache(current_user.id)
+            logger.info(f"Invalidated cache for user {current_user.id} after profile update")
     except HTTPException:
         raise
     except Exception as exc:  # pragma: no cover - defensive logging

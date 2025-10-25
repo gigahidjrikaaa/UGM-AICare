@@ -23,6 +23,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app import auth_utils
 from app.core import llm
 from app.core.tools import get_aika_tools
+from app.core.rate_limiter import check_rate_limit_dependency, get_rate_limiter
 from app.database import get_async_db
 from app.dependencies import get_current_active_user
 from app.models import Conversation, User, UserSummary
@@ -198,7 +199,7 @@ async def _streaming_tool_aware_llm_responder(
     return response_text
 
 
-@router.post("/chat", response_model=ChatResponse)
+@router.post("/chat", response_model=ChatResponse, dependencies=[Depends(check_rate_limit_dependency)])
 async def handle_chat_request(
     request: ChatRequest = Body(...),
     current_user: User = Depends(get_current_active_user),
@@ -355,6 +356,29 @@ async def chat_ws(
 
             session_id = chat_request.session_id
             conversation_id = chat_request.conversation_id
+
+            # Rate limiting check for WebSocket
+            rate_limiter = get_rate_limiter()
+            role = "admin" if user.is_admin else "student"
+            is_allowed, remaining, reset_timestamp = await rate_limiter.check_rate_limit(
+                user_id=user.id,
+                endpoint="chat",
+                role=role
+            )
+            
+            if not is_allowed:
+                # Send rate limit error to client
+                retry_after = max(1, reset_timestamp - int(datetime.now().timestamp()))
+                await websocket.send_json({
+                    "type": "error",
+                    "detail": {
+                        "error": "Rate limit exceeded",
+                        "message": f"Too many requests. Please try again in {retry_after} seconds.",
+                        "retry_after": retry_after,
+                        "reset_at": reset_timestamp,
+                    }
+                })
+                continue
 
             # DEBUG: Log system prompt flow
             logger.info(f"🎭 [WebSocket] System prompt from frontend: {chat_request.system_prompt[:100] if chat_request.system_prompt else 'None'}...")

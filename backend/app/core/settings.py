@@ -48,6 +48,34 @@ class Settings(BaseSettings):
     redis_username: Optional[str] = Field(None, alias="REDIS_USERNAME")
     redis_password: Optional[str] = Field(None, alias="REDIS_PASSWORD")
     
+    # Rate Limiting Configuration
+    rate_limit_enabled: bool = Field(True, alias="RATE_LIMIT_ENABLED")
+    rate_limit_bypass_admin: bool = Field(True, alias="RATE_LIMIT_BYPASS_ADMIN")
+    
+    # Rate limits for students
+    rate_limit_chat_per_minute_student: int = Field(10, alias="RATE_LIMIT_CHAT_PER_MINUTE_STUDENT")
+    rate_limit_chat_per_hour_student: int = Field(100, alias="RATE_LIMIT_CHAT_PER_HOUR_STUDENT")
+    rate_limit_chat_per_day_student: int = Field(500, alias="RATE_LIMIT_CHAT_PER_DAY_STUDENT")
+    
+    # Rate limits for counsellors
+    rate_limit_chat_per_minute_counsellor: int = Field(30, alias="RATE_LIMIT_CHAT_PER_MINUTE_COUNSELLOR")
+    rate_limit_chat_per_hour_counsellor: int = Field(300, alias="RATE_LIMIT_CHAT_PER_HOUR_COUNSELLOR")
+    rate_limit_chat_per_day_counsellor: int = Field(2000, alias="RATE_LIMIT_CHAT_PER_DAY_COUNSELLOR")
+    
+    # Rate limits for analytics endpoints
+    rate_limit_analytics_per_minute_student: int = Field(5, alias="RATE_LIMIT_ANALYTICS_PER_MINUTE_STUDENT")
+    rate_limit_analytics_per_hour_student: int = Field(30, alias="RATE_LIMIT_ANALYTICS_PER_HOUR_STUDENT")
+    rate_limit_analytics_per_day_student: int = Field(100, alias="RATE_LIMIT_ANALYTICS_PER_DAY_STUDENT")
+    
+    # Caching Configuration
+    cache_enabled: bool = Field(True, alias="CACHE_ENABLED")
+    cache_default_ttl: int = Field(3600, alias="CACHE_DEFAULT_TTL")  # 1 hour
+    cache_user_summary_ttl: int = Field(1800, alias="CACHE_USER_SUMMARY_TTL")  # 30 minutes
+    cache_journal_ttl: int = Field(900, alias="CACHE_JOURNAL_TTL")  # 15 minutes
+    cache_resource_ttl: int = Field(86400, alias="CACHE_RESOURCE_TTL")  # 24 hours
+    cache_cbt_module_ttl: int = Field(86400, alias="CACHE_CBT_MODULE_TTL")  # 24 hours
+    cache_user_profile_ttl: int = Field(3600, alias="CACHE_USER_PROFILE_TTL")  # 1 hour
+    
     # Celery Configuration
     celery_broker_url: Optional[str] = Field(None, alias="CELERY_BROKER_URL")
     celery_result_backend: Optional[str] = Field(None, alias="CELERY_RESULT_BACKEND")

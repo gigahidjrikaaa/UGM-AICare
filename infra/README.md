@@ -213,24 +213,66 @@ Environment variables like `FRONTEND_URL`, `BACKEND_URL`, `ALLOWED_ORIGINS`, and
 
 ## 7. Troubleshooting Tips
 
-* **SSH Connection Issues:**
+### Disk Space Issues
+
+**Problem:** Deployment fails with "no space left on device" error.
+
+**Solution:** The deployment script now includes automatic cleanup, but you may need to run manual cleanup on the VM:
+
+```bash
+# SSH into your VM
+ssh deployuser@your_vm_ip_address
+
+# Navigate to project directory
+cd /path/to/project
+
+# Run the cleanup script
+chmod +x ./infra/scripts/cleanup-docker.sh
+./infra/scripts/cleanup-docker.sh
+```
+
+**Automated Cleanup (Recommended):** Add a cron job to run cleanup weekly:
+
+```bash
+# Edit crontab
+crontab -e
+
+# Add this line to run cleanup every Sunday at 2 AM
+0 2 * * 0 /path/to/project/infra/scripts/cleanup-docker.sh >> /var/log/docker-cleanup.log 2>&1
+```
+
+**What the cleanup does:**
+- Removes stopped containers
+- Removes dangling images (untagged)
+- Removes unused volumes and networks
+- Removes old Docker images (keeps last 5 versions)
+- Removes build cache (keeps 5GB)
+- Removes container logs older than 7 days
+
+### SSH Connection Issues
+### SSH Connection Issues
   * Verify `VM_SSH_HOST`, `VM_SSH_USER`, and `VM_SSH_PRIVATE_KEY` secrets are correct.
   * Ensure the public key corresponding to `VM_SSH_PRIVATE_KEY` is correctly added to `~/.ssh/authorized_keys` for the `deployuser` on the VM.
   * Check VM firewall rules (Port 22).
-* **Docker/Docker Compose Issues:**
+
+### Docker/Docker Compose Issues
   * Ensure Docker and Docker Compose V2 are correctly installed and running on the VM.
   * Verify the `deployuser` is part of the `docker` group and can run Docker commands without `sudo`.
-* **Environment Variables (`.env`) Issues:**
+
+### Environment Variables (`.env`) Issues
   * Double-check the `ENV_FILE_PRODUCTION` secret for correct syntax and all required variables.
   * Ensure there are no hidden characters (like carriage returns) in the secret that might corrupt the `.env` file on Linux.
-* **Migration Failures:**
+
+### Migration Failures
   * Check the logs of the `deploy` workflow for output from `infra/scripts/migrate.sh`.
   * Ensure `DATABASE_URL` in your `.env` file is correct and the database service is healthy.
-* **Application Health Check Failures:**
+
+### Application Health Check Failures
   * Verify the application logs of the `backend` and `frontend` containers on the VM for errors.
   * Check VM firewall rules for ports 8000 and 4000.
   * Ensure the services are actually listening on the expected ports inside the Docker containers.
-* **Nginx/Reverse Proxy Issues:**
+
+### Nginx/Reverse Proxy Issues
   * Ensure Nginx is running and correctly configured to proxy requests to `localhost:4000` (frontend) and `localhost:8000` (backend).
   * Verify Nginx's SSL configuration is correct and certificates are valid.
   * Check Nginx access and error logs for clues.

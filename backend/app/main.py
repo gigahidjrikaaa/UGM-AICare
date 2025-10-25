@@ -268,16 +268,32 @@ async def db_health_check():
 
 @app.get("/health/redis")
 async def redis_health_check():
-    """Redis health check endpoint"""
+    """Redis health check endpoint with rate limiter and cache metrics"""
     logger.info("Redis health check endpoint accessed")
     try:
-        # Assuming you have a Redis client instance named `redis_client`
-        redis_client = await get_redis_client()  # Replace with your actual Redis client initialization
+        # Check Redis connection
+        redis_client = await get_redis_client()
         pong = await redis_client.ping()
-        if pong:
-            return {"status": "healthy", "redis_status": "connected"}
-        else:
+        
+        if not pong:
             return {"status": "unhealthy", "redis_status": "not connected"}
+        
+        # Get rate limiter stats
+        from app.core.rate_limiter import get_rate_limiter
+        rate_limiter = get_rate_limiter()
+        rate_limiter_stats = await rate_limiter.get_stats()
+        
+        # Get cache stats
+        from app.core.cache import get_cache_service
+        cache_service = get_cache_service()
+        cache_stats = await cache_service.get_stats()
+        
+        return {
+            "status": "healthy",
+            "redis_status": "connected",
+            "rate_limiter": rate_limiter_stats,
+            "cache": cache_stats,
+        }
     except Exception as e:
         logger.error(f"Redis health check failed: {e}")
         return {"status": "unhealthy", "redis_status": str(e)}
