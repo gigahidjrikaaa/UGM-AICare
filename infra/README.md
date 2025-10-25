@@ -2,6 +2,10 @@
 
 This guide provides a step-by-step tutorial on how to deploy the UGM-AICare project to a Virtual Machine (VM) using the provided infrastructure scripts and GitHub Actions workflows. This setup assumes an external reverse proxy (e.g., Nginx) is already configured on the VM to handle domain routing and HTTPS.
 
+**📋 Quick Links:**
+- [VM Deployment Checklist](../docs/VM_DEPLOYMENT_CHECKLIST.md) - Required files that are gitignored
+- [Disk Cleanup Script](./scripts/cleanup-docker.sh) - Manual Docker cleanup utility
+
 ## 1. VM Prerequisites
 
 Before you begin, ensure your target VM meets the following requirements:
