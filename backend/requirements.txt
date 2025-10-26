@@ -48,6 +48,13 @@ langgraph
 
 # ONNX Runtime for Crisis Detection (3-5x faster, 96% smaller than PyTorch)
 # Replaces: torch (800+ MB) + sentence-transformers
+onnxruntime
+onnx  # For ONNX model optimization
+
+# Blockchain Integration
+web3>=6.0.0  # Web3.py for Ethereum/SOMNIA blockchain interaction
+eth-account>=0.10.0  # For Ethereum account management
+eth-utils>=2.0.0  # Ethereum utility functions
 onnxruntime>=1.16.0  # Optimized inference runtime (~15 MB vs 800+ MB PyTorch)
 transformers>=4.41.0  # For tokenizer (still needed, but much lighter without torch)
 

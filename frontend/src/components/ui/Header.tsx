@@ -110,6 +110,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
             {[
               { href: "/dashboard", label: "Home" },
               { href: "/carequest", label: "CareQuest", useLogo: true },
+              { href: "/caretoken", label: "$CARE Token", highlight: true },
               { href: "/about", label: "About" },
               { href: "/journaling", label: "Journaling" },
               { href: "/appointments", label: "Appointments" },
@@ -118,7 +119,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
               <motion.div key={i} className="relative">
                 <Link 
                   href={link.href} 
-                  className="relative text-white/70 hover:text-white transition-all duration-300 text-sm font-medium tracking-wide group py-2"
+                  className={`relative ${link.highlight ? 'text-[#FFCA40] hover:text-[#FFD700]' : 'text-white/70 hover:text-white'} transition-all duration-300 text-sm font-medium tracking-wide group py-2`}
                 >
                   {link.useLogo ? (
                     <motion.div

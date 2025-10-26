@@ -11,7 +11,8 @@ import {
   FiActivity, 
   FiBookOpen, 
   FiMapPin, 
-  FiInfo 
+  FiInfo,
+  FaCoins
 } from '@/icons';
 import AccountLinker from '@/components/AccountLinker'; //
 
@@ -25,6 +26,7 @@ interface MobileNavMenuProps {
 const mobileNavItems = [
     { href: "/dashboard", label: "Home", icon: <FiBookOpen size={18} /> },
     { href: "/carequest", label: "CareQuest", icon: <FiMapPin size={18} /> },
+    { href: "/caretoken", label: "$CARE Token", icon: <FaCoins size={18} />, highlight: true },
     { href: "/about", label: "About", icon: <FiInfo size={18} /> },
     { href: "/aika", label: "Talk to Aika", icon: <BsChatDots size={18} /> },
     { href: "/journaling", label: "Journaling", icon: <FiActivity size={18} /> },

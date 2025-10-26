@@ -17,7 +17,7 @@ export {
   FiGlobe, FiAlertTriangle, FiUserPlus, FiFilter,
   FiDownload, FiMoreHorizontal, FiEdit, FiPlayCircle,
   FiRefreshCcw, FiPlay, FiPause, FiLayers, FiSmile,
-  FiZap, FiCompass, FiTarget
+  FiZap, FiCompass, FiTarget, FiGift, FiDollarSign
 } from 'react-icons/fi';
 
 // React Icons - Font Awesome (Fa)
@@ -26,7 +26,9 @@ export {
   FaGoogle, FaFacebookF, FaTwitter, FaInstagram,
   FaLinkedinIn, FaYoutube, FaArrowLeft, FaRobot,
   FaHeart, FaSearch, FaStar, FaMagic, FaSpinner,
-  FaCheckCircle, FaExclamationCircle, FaExclamationTriangle
+  FaCheckCircle, FaExclamationCircle, FaExclamationTriangle,
+  FaShoppingCart, FaTicketAlt, FaGraduationCap, FaHandHoldingHeart,
+  FaCoins
 } from 'react-icons/fa';
 
 // React Icons - Heroicons (Hi)
