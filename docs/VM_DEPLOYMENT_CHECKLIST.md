@@ -475,6 +475,19 @@ git pull origin main  # Get latest Dockerfile
 # CI will rebuild images automatically
 ```
 
+### Error: "connection to server at localhost, port 5432 failed" (Alembic)
+**Cause:** Migration script overriding container's DATABASE_URL with host's DATABASE_URL  
+**Fix:** Updated migrate.sh to use container's existing DATABASE_URL (points to 'db' service, not localhost)
+```bash
+git pull origin main  # Get latest migrate.sh
+./infra/scripts/deploy.sh  # Redeploy
+```
+
+**Why this happens:**  
+- Inside Docker: DATABASE_URL = `postgresql+asyncpg://user:pass@db:5432/dbname` ✅
+- On host: DATABASE_URL = `postgresql+asyncpg://user:pass@localhost:5432/dbname` ❌
+- Old migrate.sh was passing host's DATABASE_URL to container, breaking migrations
+
 ---
 
 ## 📚 Related Documentation
