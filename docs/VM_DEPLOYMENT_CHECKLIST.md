@@ -36,8 +36,12 @@ REDIS_PASSWORD=optional-redis-password
 # JWT Secret (Required - generate with: openssl rand -hex 32)
 JWT_SECRET_KEY=your-jwt-secret-key-here
 
+# Email Encryption Key (Required - generate with: openssl rand -hex 32)
+EMAIL_ENCRYPTION_KEY=your-email-encryption-key-here
+
 # Gemini API (Required for AI functionality)
 GEMINI_API_KEY=your-gemini-api-key-here
+GOOGLE_GENAI_API_KEY=your-gemini-api-key-here  # Same as above, different name
 
 # Google OAuth (Required for authentication)
 GOOGLE_CLIENT_ID=your-google-client-id
@@ -453,6 +457,23 @@ echo "🚀 VM is ready for deployment!"
 - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
 
 These variables MUST be in the `.env` file for docker-compose to substitute them into the container.
+
+### Error: "EMAIL_ENCRYPTION_KEY: Field required [type=missing]"
+**Cause:** Pydantic Settings validation error - EMAIL_ENCRYPTION_KEY is required  
+**Fix:** Add to `.env`:
+```bash
+EMAIL_ENCRYPTION_KEY=$(openssl rand -hex 32)
+```
+
+This key is used to encrypt user email addresses in the database for privacy compliance.
+
+### Error: "No 'script_location' key found in configuration" (Alembic)
+**Cause:** alembic.ini missing or malformed in Docker container  
+**Fix:** The Dockerfile now auto-generates alembic.ini if missing. Rebuild images:
+```bash
+git pull origin main  # Get latest Dockerfile
+# CI will rebuild images automatically
+```
 
 ---
 

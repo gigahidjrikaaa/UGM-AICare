@@ -84,6 +84,52 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Copy the entire application code from the build context (./backend)
 COPY --chown=appuser:appgroup . .
 
+# Create alembic.ini if it doesn't exist (it's in .gitignore)
+# This ensures migrations can run inside the container
+RUN if [ ! -f /app/alembic.ini ]; then \
+      echo "[alembic]" > /app/alembic.ini && \
+      echo "script_location = alembic" >> /app/alembic.ini && \
+      echo "prepend_sys_path = ." >> /app/alembic.ini && \
+      echo "" >> /app/alembic.ini && \
+      echo "[alembic:exclude]" >> /app/alembic.ini && \
+      echo "tables = spatial_ref_sys" >> /app/alembic.ini && \
+      echo "" >> /app/alembic.ini && \
+      echo "[loggers]" >> /app/alembic.ini && \
+      echo "keys = root,sqlalchemy,alembic" >> /app/alembic.ini && \
+      echo "" >> /app/alembic.ini && \
+      echo "[handlers]" >> /app/alembic.ini && \
+      echo "keys = console" >> /app/alembic.ini && \
+      echo "" >> /app/alembic.ini && \
+      echo "[formatters]" >> /app/alembic.ini && \
+      echo "keys = generic" >> /app/alembic.ini && \
+      echo "" >> /app/alembic.ini && \
+      echo "[logger_root]" >> /app/alembic.ini && \
+      echo "level = WARN" >> /app/alembic.ini && \
+      echo "handlers = console" >> /app/alembic.ini && \
+      echo "qualname =" >> /app/alembic.ini && \
+      echo "" >> /app/alembic.ini && \
+      echo "[logger_sqlalchemy]" >> /app/alembic.ini && \
+      echo "level = WARN" >> /app/alembic.ini && \
+      echo "handlers =" >> /app/alembic.ini && \
+      echo "qualname = sqlalchemy.engine" >> /app/alembic.ini && \
+      echo "" >> /app/alembic.ini && \
+      echo "[logger_alembic]" >> /app/alembic.ini && \
+      echo "level = INFO" >> /app/alembic.ini && \
+      echo "handlers =" >> /app/alembic.ini && \
+      echo "qualname = alembic" >> /app/alembic.ini && \
+      echo "" >> /app/alembic.ini && \
+      echo "[handler_console]" >> /app/alembic.ini && \
+      echo "class = StreamHandler" >> /app/alembic.ini && \
+      echo "args = (sys.stderr,)" >> /app/alembic.ini && \
+      echo "level = NOTSET" >> /app/alembic.ini && \
+      echo "formatter = generic" >> /app/alembic.ini && \
+      echo "" >> /app/alembic.ini && \
+      echo "[formatter_generic]" >> /app/alembic.ini && \
+      echo "format = %%(levelname)-5.5s [%%(name)s] %%(message)s" >> /app/alembic.ini && \
+      echo "datefmt = %%H:%%M:%%S" >> /app/alembic.ini && \
+      chown appuser:appgroup /app/alembic.ini; \
+    fi
+
 # Find, convert line endings, and set permissions for all shell scripts
 # This is still needed for the 'migrate' service which uses wait-for-it.sh
 RUN find /app/scripts -name "*.sh" -exec dos2unix {} + -exec chmod +x {} +

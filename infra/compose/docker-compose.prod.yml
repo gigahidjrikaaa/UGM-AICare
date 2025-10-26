@@ -87,11 +87,18 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-content-resources}
       MINIO_SECURE: ${MINIO_SECURE:-false}
-      # Critical auth/API keys from .env
+      # Critical auth/API keys from .env (REQUIRED)
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      EMAIL_ENCRYPTION_KEY: ${EMAIL_ENCRYPTION_KEY}
+      GOOGLE_GENAI_API_KEY: ${GOOGLE_GENAI_API_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      # Optional API keys
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+      AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
+      AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
+      AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-}
     depends_on:
       db:
         condition: service_healthy
