@@ -17,6 +17,7 @@ from app.schemas.quests import (
     QuestInstanceResponse,
     RewardSummaryResponse,
     WellnessStateResponse,
+    WellnessStateUpdate,
 )
 from app.services.dialogue_orchestrator_service import DialogueOrchestratorService
 from app.services.quest_engine_service import QuestEngineService
@@ -144,3 +145,41 @@ async def get_daily_message(
     quests = await orchestrator.fetch_recent_quests(current_user.id, limit=3)
     message = await orchestrator.build_daily_check_in(current_user, quests, state)
     return message
+
+
+@router.patch("/state/update", response_model=WellnessStateResponse)
+async def update_wellness_state(
+    update: WellnessStateUpdate,
+    session: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_active_user),
+) -> WellnessStateResponse:
+    """Update wellness state with deltas from CareQuest idle game."""
+    engine = QuestEngineService(session)
+    state = await engine.get_or_create_wellness_state(current_user.id)
+    
+    # Update joy and harmony (stored as columns)
+    state.joy_balance = max(0.0, state.joy_balance + update.joy_delta)
+    state.harmony_score = max(0.0, state.harmony_score + update.harmony_delta)
+    
+    # Update care (stored in extra_data)
+    extra = dict(getattr(state, "extra_data", {}) or {})
+    current_care = float(extra.get("care_balance", 0.0))
+    extra["care_balance"] = max(0.0, current_care + update.care_delta)
+    state.extra_data = extra
+    
+    try:
+        await session.commit()
+        await session.refresh(state)
+    except Exception:
+        await session.rollback()
+        raise
+    
+    care_balance = float(extra.get("care_balance", 0.0))
+    return WellnessStateResponse(
+        current_streak=state.current_streak,
+        longest_streak=state.longest_streak,
+        harmony_score=state.harmony_score,
+        joy_balance=state.joy_balance,
+        care_balance=care_balance,
+        compassion_mode_active=state.compassion_mode_active,
+    )

@@ -60,3 +60,10 @@ class WellnessStateResponse(BaseModel):
     joy_balance: float
     care_balance: float
     compassion_mode_active: bool
+
+
+class WellnessStateUpdate(BaseModel):
+    """Schema for updating wellness state from CareQuest game."""
+    joy_delta: float = 0.0
+    care_delta: float = 0.0
+    harmony_delta: float = 0.0

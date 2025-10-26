@@ -220,7 +220,7 @@ const ACTION_BUTTONS: Array<{
   { key: "dialogue", label: "Dialogue", description: "Aika briefing", icon: FiMessageSquare },
 ];
 
-export default function CareQuestPage() {
+export default function CareQuestMapPage() {
   const [selectedNodeId, setSelectedNodeId] = useState<string>(CAREQUEST_NODES[0]?.id ?? "");
   const [openModal, setOpenModal] = useState<HubModalKey | null>(null);
   const [selectedArea, setSelectedArea] = useState<FacultyArea | null>(null);

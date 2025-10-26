@@ -22,10 +22,10 @@ import { useWellnessState } from "@/hooks/useQuests";
 import ProfileDropdown from "@/components/ui/ProfileDropdown";
 
 const NAV_ITEMS = [
-  { href: "/carequest", label: "Map", icon: FiMapPin, activeMatch: /^\/carequest(?:\/)?$/ },
+  { href: "/carequest", label: "Gameplay", icon: FiActivity, activeMatch: /^\/carequest(?:\/)?$/ },
+  { href: "/carequest/map", label: "Map", icon: FiMapPin, activeMatch: /^\/carequest\/map/ },
   { href: "/carequest/guilds", label: "Guilds", icon: FiUsers, activeMatch: /^\/carequest\/guilds/ },
-  { href: "/carequest/activities", label: "Activities", icon: FiActivity, activeMatch: /^\/carequest\/activities/ },
-  { href: null, label: "Arcade", icon: FiLayers, comingSoon: true },
+  { href: "/carequest/activities", label: "Activities", icon: FiLayers, activeMatch: /^\/carequest\/activities/ },
 ];
 
 const formatMetric = (value: number | null | undefined, digits = 1) =>
@@ -135,7 +135,7 @@ export default function CareQuestHubLayout({ children }: { children: React.React
           </div>
 
           <nav className="flex flex-wrap items-center gap-2">
-            {NAV_ITEMS.map(({ href, label, icon: Icon, comingSoon, activeMatch }) => {
+            {NAV_ITEMS.map(({ href, label, icon: Icon, activeMatch }) => {
               const isActive = href ? activeMatch?.test(pathname) : false;
               const baseClasses =
                 "group flex items-center gap-2 rounded-full border px-3 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition";
@@ -160,7 +160,6 @@ export default function CareQuestHubLayout({ children }: { children: React.React
               return (
                 <span
                   key={label}
-                  title={comingSoon ? "Coming soon" : undefined}
                   className={cn(baseClasses, "cursor-not-allowed border-white/10 bg-white/5 text-white/40")}
                 >
                   <Icon className="h-4 w-4" />

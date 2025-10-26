@@ -1,0 +1,308 @@
+{
+  "sentences": {
+    "affirmations": [
+      {
+        "id": "aff_001",
+        "text_en": "I am worthy of love and care",
+        "text_id": "Saya layak mendapat cinta dan perhatian",
+        "category": "self-worth",
+        "difficulty": 1,
+        "words": 6,
+        "tags": ["basic", "self-compassion"]
+      },
+      {
+        "id": "aff_002",
+        "text_en": "I am enough just as I am",
+        "text_id": "Saya sudah cukup apa adanya",
+        "category": "self-acceptance",
+        "difficulty": 1,
+        "words": 6,
+        "tags": ["basic", "acceptance"]
+      },
+      {
+        "id": "aff_003",
+        "text_en": "My feelings are valid and important",
+        "text_id": "Perasaan saya valid dan penting",
+        "category": "emotional-validation",
+        "difficulty": 1,
+        "words": 6,
+        "tags": ["basic", "validation"]
+      },
+      {
+        "id": "aff_004",
+        "text_en": "I choose peace over worry",
+        "text_id": "Saya memilih kedamaian dari kekhawatiran",
+        "category": "anxiety-management",
+        "difficulty": 1,
+        "words": 5,
+        "tags": ["basic", "anxiety"]
+      },
+      {
+        "id": "aff_005",
+        "text_en": "Today I will be kind to myself",
+        "text_id": "Hari ini saya akan baik pada diri sendiri",
+        "category": "self-compassion",
+        "difficulty": 1,
+        "words": 7,
+        "tags": ["basic", "kindness"]
+      }
+    ],
+    "coping_statements": [
+      {
+        "id": "cope_001",
+        "text_en": "This feeling will pass eventually",
+        "text_id": "Perasaan ini akan berlalu pada waktunya",
+        "category": "emotional-regulation",
+        "difficulty": 2,
+        "words": 6,
+        "tags": ["intermediate", "emotions", "impermanence"]
+      },
+      {
+        "id": "cope_002",
+        "text_en": "I can handle one thing at a time",
+        "text_id": "Saya bisa menangani satu hal pada satu waktu",
+        "category": "stress-management",
+        "difficulty": 2,
+        "words": 8,
+        "tags": ["intermediate", "stress", "focus"]
+      },
+      {
+        "id": "cope_003",
+        "text_en": "My breath is my anchor to the present",
+        "text_id": "Napas saya adalah jangkar ke saat ini",
+        "category": "mindfulness",
+        "difficulty": 2,
+        "words": 8,
+        "tags": ["intermediate", "breathing", "grounding"]
+      },
+      {
+        "id": "cope_004",
+        "text_en": "It is okay to ask for help when needed",
+        "text_id": "Tidak apa meminta bantuan saat dibutuhkan",
+        "category": "help-seeking",
+        "difficulty": 2,
+        "words": 9,
+        "tags": ["intermediate", "support", "vulnerability"]
+      },
+      {
+        "id": "cope_005",
+        "text_en": "I am learning and growing every day",
+        "text_id": "Saya belajar dan berkembang setiap hari",
+        "category": "growth-mindset",
+        "difficulty": 2,
+        "words": 7,
+        "tags": ["intermediate", "growth", "learning"]
+      }
+    ],
+    "cbt_reframes": [
+      {
+        "id": "cbt_001",
+        "text_en": "I choose to respond with calm and clarity",
+        "text_id": "Saya memilih merespons dengan tenang dan jelas",
+        "category": "cognitive-restructuring",
+        "difficulty": 3,
+        "words": 8,
+        "tags": ["advanced", "cbt", "response"]
+      },
+      {
+        "id": "cbt_002",
+        "text_en": "My thoughts are not facts, they are just thoughts",
+        "text_id": "Pikiran saya bukan fakta, hanya pikiran saja",
+        "category": "cognitive-defusion",
+        "difficulty": 3,
+        "words": 10,
+        "tags": ["advanced", "cbt", "thoughts"]
+      },
+      {
+        "id": "cbt_003",
+        "text_en": "I can observe my anxiety without becoming it",
+        "text_id": "Saya bisa mengamati kecemasan tanpa menjadi itu",
+        "category": "mindful-observation",
+        "difficulty": 3,
+        "words": 9,
+        "tags": ["advanced", "anxiety", "mindfulness"]
+      },
+      {
+        "id": "cbt_004",
+        "text_en": "Progress is not linear and that is okay",
+        "text_id": "Kemajuan tidak linear dan itu tidak apa-apa",
+        "category": "acceptance",
+        "difficulty": 3,
+        "words": 8,
+        "tags": ["advanced", "progress", "acceptance"]
+      },
+      {
+        "id": "cbt_005",
+        "text_en": "I am capable of handling difficult emotions",
+        "text_id": "Saya mampu menangani emosi yang sulit",
+        "category": "emotional-competence",
+        "difficulty": 3,
+        "words": 7,
+        "tags": ["advanced", "emotions", "capability"]
+      }
+    ],
+    "wisdom_quotes": [
+      {
+        "id": "wisdom_001",
+        "text_en": "The only way out is through acceptance and action",
+        "text_id": "Satu-satunya jalan keluar adalah menerima dan bertindak",
+        "category": "wisdom",
+        "difficulty": 4,
+        "words": 10,
+        "tags": ["expert", "acceptance", "action"],
+        "source": "Mental health principle"
+      },
+      {
+        "id": "wisdom_002",
+        "text_en": "Vulnerability is not weakness, it is courage to be authentic",
+        "text_id": "Kerentanan bukan kelemahan, tetapi keberanian untuk autentik",
+        "category": "vulnerability",
+        "difficulty": 4,
+        "words": 11,
+        "tags": ["expert", "vulnerability", "courage"],
+        "source": "Brené Brown concept"
+      },
+      {
+        "id": "wisdom_003",
+        "text_en": "Self-compassion is treating yourself like you would a good friend",
+        "text_id": "Belas kasih diri adalah memperlakukan diri seperti sahabat baik",
+        "category": "self-compassion",
+        "difficulty": 4,
+        "words": 11,
+        "tags": ["expert", "compassion", "friendship"],
+        "source": "Kristin Neff"
+      },
+      {
+        "id": "wisdom_004",
+        "text_en": "You cannot control the waves but you can learn to surf",
+        "text_id": "Anda tak bisa kontrol ombak namun bisa belajar berselancar",
+        "category": "acceptance",
+        "difficulty": 4,
+        "words": 12,
+        "tags": ["expert", "control", "adaptation"],
+        "source": "Jon Kabat-Zinn"
+      },
+      {
+        "id": "wisdom_005",
+        "text_en": "Between stimulus and response there is a space for choice",
+        "text_id": "Antara stimulus dan respons ada ruang untuk memilih",
+        "category": "mindfulness",
+        "difficulty": 4,
+        "words": 11,
+        "tags": ["expert", "choice", "awareness"],
+        "source": "Viktor Frankl"
+      }
+    ],
+    "indonesian_sayings": [
+      {
+        "id": "indo_001",
+        "text_en": "After hardship comes ease, patience brings reward",
+        "text_id": "Sesudah kesulitan ada kemudahan, kesabaran membawa hasil",
+        "category": "resilience",
+        "difficulty": 5,
+        "words": 8,
+        "tags": ["master", "patience", "reward"],
+        "cultural": "Indonesian wisdom"
+      },
+      {
+        "id": "indo_002",
+        "text_en": "Small steps forward are still progress worth celebrating",
+        "text_id": "Langkah kecil maju tetap kemajuan yang patut dirayakan",
+        "category": "progress",
+        "difficulty": 5,
+        "words": 9,
+        "tags": ["master", "progress", "celebration"],
+        "cultural": "Growth mindset"
+      },
+      {
+        "id": "indo_003",
+        "text_en": "Your mental health is just as important as physical health",
+        "text_id": "Kesehatan mental sama pentingnya dengan kesehatan fisik",
+        "category": "mental-health-awareness",
+        "difficulty": 5,
+        "words": 10,
+        "tags": ["master", "health", "importance"],
+        "cultural": "Mental health advocacy"
+      },
+      {
+        "id": "indo_004",
+        "text_en": "It takes courage to ask for help and strength to accept it",
+        "text_id": "Butuh keberanian meminta bantuan dan kekuatan menerimanya",
+        "category": "help-seeking",
+        "difficulty": 5,
+        "words": 13,
+        "tags": ["master", "courage", "help"],
+        "cultural": "Overcoming stigma"
+      },
+      {
+        "id": "indo_005",
+        "text_en": "Tak ada rotan akar pun jadi, resilience means finding strength within",
+        "text_id": "Tak ada rotan akar pun jadi, ketahanan berarti temukan kekuatan dalam diri",
+        "category": "resilience",
+        "difficulty": 6,
+        "words": 14,
+        "tags": ["master", "resilience", "proverb"],
+        "cultural": "Indonesian proverb"
+      }
+    ]
+  },
+  "difficulty_mapping": {
+    "1": {
+      "rank": "Struggling",
+      "harmony_range": "0-99",
+      "word_range": "3-6",
+      "categories": ["affirmations"],
+      "typing_speed_target": "30-40 WPM"
+    },
+    "2": {
+      "rank": "Growing",
+      "harmony_range": "100-499",
+      "word_range": "6-9",
+      "categories": ["affirmations", "coping_statements"],
+      "typing_speed_target": "40-50 WPM"
+    },
+    "3": {
+      "rank": "Balanced",
+      "harmony_range": "500-1499",
+      "word_range": "8-12",
+      "categories": ["coping_statements", "cbt_reframes"],
+      "typing_speed_target": "50-60 WPM"
+    },
+    "4": {
+      "rank": "Thriving",
+      "harmony_range": "1500-4999",
+      "word_range": "10-15",
+      "categories": ["cbt_reframes", "wisdom_quotes"],
+      "typing_speed_target": "60-70 WPM"
+    },
+    "5": {
+      "rank": "Flourishing",
+      "harmony_range": "5000-14999",
+      "word_range": "12-18",
+      "categories": ["wisdom_quotes", "indonesian_sayings"],
+      "typing_speed_target": "70-80 WPM"
+    },
+    "6": {
+      "rank": "Masterful",
+      "harmony_range": "15000+",
+      "word_range": "15-30",
+      "categories": ["indonesian_sayings"],
+      "typing_speed_target": "80+ WPM"
+    }
+  },
+  "gameplay_config": {
+    "base_damage_per_wpm": 0.5,
+    "accuracy_multiplier": "damage × accuracy_percentage",
+    "perfect_accuracy_bonus": 1.5,
+    "combo_system": {
+      "3_correct": 1.1,
+      "5_correct": 1.25,
+      "10_correct": 1.5,
+      "20_correct": 2.0
+    },
+    "critical_hit": {
+      "trigger": "100% accuracy on sentence",
+      "multiplier": 2.5
+    }
+  }
+}

@@ -38,3 +38,18 @@ export async function fetchDailyMessage(): Promise<DailyMessage> {
   return data;
 }
 
+export interface UpdateWellnessPayload {
+  joy_delta?: number;
+  care_delta?: number;
+  harmony_delta?: number;
+}
+
+export async function updateWellnessState(
+  payload: UpdateWellnessPayload
+): Promise<WellnessState> {
+  const { data } = await apiClient.patch<WellnessState>(
+    "/quests/state/update",
+    payload
+  );
+  return data;
+}

@@ -13,6 +13,7 @@ Implemented 11 new tools for the Safety Agent Suite (STA, SCA, SDA) to enhance a
 ### 🛡️ STA (Safety Triage Agent) - 4 Tools
 
 #### 1. `get_recent_risk_history`
+
 - **Purpose:** Query past `TriageAssessment` records to detect escalating risk patterns
 - **Key Features:**
   - Filters by date range (days_ago) and severity level
@@ -21,6 +22,7 @@ Implemented 11 new tools for the Safety Agent Suite (STA, SCA, SDA) to enhance a
 - **Status:** ✅ Implemented
 
 #### 2. `get_user_consent_status`
+
 - **Purpose:** Check user consent permissions before escalation or data sharing
 - **Key Features:**
   - Validates consent for 'ops', 'followup', 'research' scopes
@@ -30,6 +32,7 @@ Implemented 11 new tools for the Safety Agent Suite (STA, SCA, SDA) to enhance a
 - **⚠️ TODO:** Verify user_hash → user_id mapping in Consent model (currently using user_id as subject_id)
 
 #### 3. `get_active_cases_for_user`
+
 - **Purpose:** Check for existing active cases to prevent duplicate escalations
 - **Key Features:**
   - Filters by status (new, in_progress, waiting)
@@ -39,6 +42,7 @@ Implemented 11 new tools for the Safety Agent Suite (STA, SCA, SDA) to enhance a
 - **⚠️ TODO:** Verify user_hash generation logic aligns with case creation (currently using user_id as user_hash)
 
 #### 4. `get_crisis_resources`
+
 - **Purpose:** Fetch emergency hotlines and crisis resources by severity
 - **Key Features:**
   - Filters by severity ('high' or 'critical')
@@ -52,6 +56,7 @@ Implemented 11 new tools for the Safety Agent Suite (STA, SCA, SDA) to enhance a
 ### 💬 SCA (Support Coach Agent) - 3 Tools
 
 #### 5. `get_intervention_history`
+
 - **Purpose:** Retrieve past intervention plans and completion rates
 - **Key Features:**
   - Queries `InterventionPlanRecord` with completion statistics
@@ -60,6 +65,7 @@ Implemented 11 new tools for the Safety Agent Suite (STA, SCA, SDA) to enhance a
 - **Status:** ✅ Implemented
 
 #### 6. `get_user_preferences`
+
 - **Purpose:** Fetch user therapeutic preferences for personalization
 - **Key Features:**
   - Returns basic profile info (name, university, major)
@@ -73,6 +79,7 @@ Implemented 11 new tools for the Safety Agent Suite (STA, SCA, SDA) to enhance a
   - `preferred_exercises` (e.g., "breathing", "grounding")
 
 #### 7. `search_therapeutic_exercises`
+
 - **Purpose:** Find exercises/techniques by intent or mood
 - **Key Features:**
   - Searches ContentResource by type, tags, title, description
@@ -85,6 +92,7 @@ Implemented 11 new tools for the Safety Agent Suite (STA, SCA, SDA) to enhance a
 ### 🗂️ SDA (Service Desk Agent) - 4 Tools
 
 #### 8. `get_case_assignment_recommendations`
+
 - **Purpose:** Suggest counselors for case assignment by workload
 - **Key Features:**
   - Ranks AgentUser (counselors) by active case count
@@ -93,6 +101,7 @@ Implemented 11 new tools for the Safety Agent Suite (STA, SCA, SDA) to enhance a
 - **Status:** ✅ Implemented
 
 #### 9. `get_sla_breach_predictions`
+
 - **Purpose:** Identify cases at risk of SLA breach for proactive alerts
 - **Key Features:**
   - Predicts breaches within N hours (default: 24)
@@ -101,6 +110,7 @@ Implemented 11 new tools for the Safety Agent Suite (STA, SCA, SDA) to enhance a
 - **Status:** ✅ Implemented
 
 #### 10. `get_case_notes_summary`
+
 - **Purpose:** Retrieve case history and notes for counselor context
 - **Key Features:**
   - Validates case_id as UUID
@@ -109,6 +119,7 @@ Implemented 11 new tools for the Safety Agent Suite (STA, SCA, SDA) to enhance a
 - **Status:** ✅ Implemented
 
 #### 11. `get_counselor_workload`
+
 - **Purpose:** Check current case load per counselor for load balancing
 - **Key Features:**
   - Counts active cases per counselor
@@ -163,6 +174,7 @@ Implemented 11 new tools for the Safety Agent Suite (STA, SCA, SDA) to enhance a
    - `get_user_preferences`: Add dedicated preference fields to User model
    - **Location:** Line 1098
    - **Missing Fields:**
+
      ```python
      preferred_language: Optional[str]  # 'id', 'en'
      communication_style: Optional[str]  # 'formal', 'casual', 'empathetic'
@@ -173,6 +185,7 @@ Implemented 11 new tools for the Safety Agent Suite (STA, SCA, SDA) to enhance a
 4. **CBT Module Progress Tracking** (SCA)
    - Note: `get_cbt_module_progress` was NOT implemented due to missing tracking table
    - **Required:** Create `cbt_module_user_state` table with:
+
      ```sql
      - user_id
      - module_id

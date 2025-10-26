@@ -3,6 +3,7 @@
 
 set -e
 
+COMPOSE_FILE="docker-compose.dev.yml"
 OVERRIDE_FILE="docker-compose.override.yml"
 BACKUP_FILE="docker-compose.override.yml.disabled"
 
@@ -33,7 +34,7 @@ show_help() {
 case "${1:-}" in
     up)
         echo "🚀 Starting development environment..."
-        docker-compose up -d
+        docker-compose -f "$COMPOSE_FILE" up -d
         echo ""
         echo "✅ Services started!"
         echo "   Frontend: http://localhost:4000"
@@ -45,27 +46,27 @@ case "${1:-}" in
     
     down)
         echo "🛑 Stopping services..."
-        docker-compose down
+        docker-compose -f "$COMPOSE_FILE" down
         echo "✅ Services stopped"
         ;;
     
     restart)
         echo "🔄 Restarting services..."
-        docker-compose restart
+        docker-compose -f "$COMPOSE_FILE" restart
         echo "✅ Services restarted"
         ;;
     
     logs)
         if [ -n "${2:-}" ]; then
-            docker-compose logs -f "$2"
+            docker-compose -f "$COMPOSE_FILE" logs -f "$2"
         else
-            docker-compose logs -f
+            docker-compose -f "$COMPOSE_FILE" logs -f
         fi
         ;;
     
     build)
         echo "🔨 Rebuilding containers..."
-        docker-compose up --build -d
+        docker-compose -f "$COMPOSE_FILE" up --build -d
         echo "✅ Rebuild complete"
         ;;
     
@@ -90,7 +91,7 @@ case "${1:-}" in
         else
             echo "ℹ️  Already in development mode"
         fi
-        docker-compose up -d
+        docker-compose -f "$COMPOSE_FILE" up -d
         ;;
     
     clean)
@@ -98,7 +99,7 @@ case "${1:-}" in
         read -p "This will remove all containers and volumes. Continue? (y/N) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            docker-compose down -v
+            docker-compose -f "$COMPOSE_FILE" down -v
             echo "✅ Cleanup complete"
         else
             echo "❌ Cancelled"
@@ -106,7 +107,7 @@ case "${1:-}" in
         ;;
     
     status)
-        docker-compose ps
+        docker-compose -f "$COMPOSE_FILE" ps
         ;;
     
     help|--help|-h|"")

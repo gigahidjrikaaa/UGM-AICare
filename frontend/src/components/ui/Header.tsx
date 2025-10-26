@@ -109,7 +109,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
           <nav className="hidden md:flex items-center gap-6">
             {[
               { href: "/dashboard", label: "Home" },
-              { href: "/carequest", label: "CareQuest" },
+              { href: "/carequest", label: "CareQuest", useLogo: true },
               { href: "/about", label: "About" },
               { href: "/journaling", label: "Journaling" },
               { href: "/appointments", label: "Appointments" },
@@ -120,7 +120,66 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
                   href={link.href} 
                   className="relative text-white/70 hover:text-white transition-all duration-300 text-sm font-medium tracking-wide group py-2"
                 >
-                  <span className="relative z-10">{link.label}</span>
+                  {link.useLogo ? (
+                    <motion.div
+                      className="relative z-10 flex items-center gap-2"
+                      whileHover={{ scale: 1.05 }}
+                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                    >
+                      <motion.div
+                        className="relative"
+                        animate={{
+                          filter: [
+                            "drop-shadow(0 0 2px rgba(94,234,212,0.3))",
+                            "drop-shadow(0 0 8px rgba(94,234,212,0.6)) drop-shadow(0 0 12px rgba(94,234,212,0.4))",
+                            "drop-shadow(0 0 2px rgba(94,234,212,0.3))"
+                          ]
+                        }}
+                        transition={{
+                          duration: 2,
+                          repeat: Infinity,
+                          ease: "easeInOut"
+                        }}
+                        whileHover={{
+                          filter: "drop-shadow(0 0 12px rgba(94,234,212,0.8)) drop-shadow(0 0 20px rgba(94,234,212,0.5))",
+                          rotate: [0, -5, 5, -5, 0],
+                          transition: {
+                            rotate: {
+                              duration: 0.5,
+                              ease: "easeInOut"
+                            },
+                            filter: {
+                              duration: 0.3
+                            }
+                          }
+                        }}
+                      >
+                        <Image
+                          src="/carequest-logo.png"
+                          alt="CareQuest Logo"
+                          width={24}
+                          height={24}
+                          className="relative"
+                        />
+                        {/* Animated glow rings */}
+                        <motion.div
+                          className="absolute inset-0 rounded-full bg-[#5EEAD4]/20 blur-md opacity-0 group-hover:opacity-100"
+                          animate={{
+                            scale: [1, 1.3, 1],
+                            opacity: [0, 0.5, 0]
+                          }}
+                          transition={{
+                            duration: 2,
+                            repeat: Infinity,
+                            ease: "easeInOut"
+                          }}
+                        />
+                      </motion.div>
+                      <span>{link.label}</span>
+                    </motion.div>
+                  ) : (
+                    <span className="relative z-10">{link.label}</span>
+                  )}
                   
                   {/* Animated underline */}
                   <motion.div
@@ -134,7 +193,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
                   <motion.div
                     className="absolute inset-0 bg-white/5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 -mx-2 -my-1"
                     whileHover={{ 
-                      boxShadow: "0 0 20px rgba(255,202,64,0.1)"
+                      boxShadow: link.useLogo ? "0 0 30px rgba(94,234,212,0.15)" : "0 0 20px rgba(255,202,64,0.1)"
                     }}
                   />
                 </Link>

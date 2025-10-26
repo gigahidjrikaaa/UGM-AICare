@@ -1,7 +1,7 @@
 # UGM-AICare Quest – Game Design Document (GDD)
 
-*Version:* 0.9  
-*Date:* 23 October 2025  
+*Version:* 1.0 (CareQuest Hub Added)  
+*Date:* 26 October 2025  
 *Authors:* UGM-AICare Hackathon Team (Product, Design, Engineering)  
 *Project Codename:* “UGM-AICare Quest”  
 *Target Hackathon:* Infinity Hackathon OJK – Ekraf (Game-Fi Subtheme)  
@@ -213,6 +213,355 @@ Accessibility: Provide Bahasa Indonesia & English localization, colorblind-frien
 - **Path Selection**: Players choose specialization paths (Seer, Resonator, Pathfinder) influencing skill unlocks, quest focus, and narrative arcs.
 - **Difficulty Modulation**: Manual adjustment for quest intensity, enabling slower pacing without losing streaks.
 - **Cross-Platform Choice**: Seamless continue on mobile/desktop; offline journaling mode syncs later to support low-connectivity users.
+
+---
+
+### 5.4 CareQuest Hub – Typing Combat System
+
+The **CareQuest Hub** is a supplementary mini-game experience within the UGM-AICare Quest ecosystem. It combines **TypeRacer-style typing mechanics** with **idle clicker progression** to create an engaging, therapeutic gameplay loop where players type mental health affirmations and CBT phrases to defeat "Gloom" manifestations while earning `JOY`, `CARE`, and Harmony resources.
+
+#### 5.4.1 Design Philosophy
+
+**Why Typing Instead of Clicking?**
+
+- **Therapeutic Reinforcement**: Typing positive affirmations and CBT reframes creates active cognitive engagement, strengthening neural pathways associated with self-compassion and emotional regulation (CBT repetition principle).
+- **Skill Development**: Players improve typing speed while simultaneously learning Indonesian and English mental health vocabulary.
+- **Meaningful Interaction**: Active typing requires focus and comprehension, preventing mindless grinding common in idle clickers.
+- **Educational Integration**: Sentences can be sourced directly from active CBT modules, creating synergy with counselor-led therapy content.
+- **Cultural Relevance**: Bilingual sentence database (Indonesian/English) supports language learning and culturally-appropriate mental health messaging for UGM students.
+
+#### 5.4.2 Core Typing Mechanics
+
+**Attack Flow:**
+
+1. **Monster Appears**: Player encounters a Gloom manifestation (e.g., "Anxiety Goblin", "Stress Slime").
+2. **Sentence Display**: System presents a mental health affirmation or CBT phrase matched to player's Harmony rank.
+3. **Typing Input**: Player types the sentence character-by-character with real-time visual feedback.
+4. **Damage Calculation**: Upon completion, damage is calculated based on typing speed (WPM), accuracy, upgrades, and combo multipliers.
+5. **Reward Distribution**: Defeated monsters grant `JOY`, `CARE`, and Harmony score; resources sync with main quest system.
+
+**Typing Validation:**
+
+- **Character-by-Character Feedback**: Each typed character is immediately validated:
+  - ✅ **Green**: Correct character
+  - ❌ **Red + Shake**: Incorrect character (breaks combo, reduces accuracy)
+  - ⏳ **Gray**: Not yet typed
+- **No Copy-Paste**: Input validation prevents paste events to ensure authentic engagement.
+- **Case Sensitivity**: Configurable per sentence (default: case-insensitive for accessibility).
+- **Punctuation Required**: Commas, periods, and apostrophes must be typed correctly.
+
+**Performance Metrics:**
+
+```
+WPM (Words Per Minute) = (Total Characters / 5) / (Time in Minutes)
+Accuracy = (Correct Characters / Total Characters) × 100%
+Mistakes = Count of Incorrect Keystrokes
+```
+
+#### 5.4.3 Damage Calculation System
+
+**Base Damage Formula:**
+
+```
+Base Damage = (WPM / 60) × 0.5 × Accuracy Multiplier
+Accuracy Multiplier = Accuracy Percentage (0.0 to 1.0)
+```
+
+**Total Damage Formula:**
+
+```
+Total Damage = Base Damage × Upgrade Multiplier × Combo Multiplier × Critical Multiplier
+```
+
+**Example Calculation:**
+
+```
+Given:
+- WPM: 72
+- Accuracy: 95% (0.95)
+- Typing Power Upgrade: Level 5 (2.0x)
+- Combo: 10 consecutive correct (1.5x)
+- Critical Hit: Perfect accuracy (2.5x)
+
+Calculation:
+Base = (72 / 60) × 0.5 × 0.95 = 0.57
+Total = 0.57 × 2.0 × 1.5 × 2.5 = 4.28 damage
+```
+
+**Multiplier Systems:**
+
+| Multiplier Type | Trigger Condition | Effect | Notes |
+|----------------|-------------------|--------|-------|
+| **Accuracy** | Per sentence | 0% to 100% scaling | Linear scaling; 50% accuracy = 50% damage |
+| **Perfect Bonus** | 100% accuracy | +50% base damage | Encourages precision over speed |
+| **Combo (3x)** | 3 consecutive perfect | 1.1x | Resets on any mistake or timeout |
+| **Combo (5x)** | 5 consecutive perfect | 1.25x | Encourages streak maintenance |
+| **Combo (10x)** | 10 consecutive perfect | 1.5x | Significant skill reward |
+| **Combo (20x)** | 20 consecutive perfect | 2.0x | Master-level achievement |
+| **Critical Hit** | 100% accuracy | 2.5x total damage | Golden sparkle animation |
+| **Auto-Healer** | Passive (upgrade) | +X DPS while idle | Idle game component |
+
+**Combo Break Conditions:**
+
+- Any typing mistake (wrong character)
+- Taking longer than 15 seconds per sentence
+- Manually skipping a sentence (if feature added)
+
+#### 5.4.4 Monster & Boss System
+
+**Monster Categories:**
+
+| Type | HP Range | Appearance Rate | Reward Multiplier | Design Intent |
+|------|----------|-----------------|-------------------|---------------|
+| **Common** | 50-150 HP | 80% of spawns | 1.0x | Quick defeats for steady progression |
+| **Boss** | 500-2000 HP | Every 10th stage | 5.0x to 10.0x | Multi-sentence challenges requiring sustained focus |
+
+**Monster Progression:**
+
+```
+Monster HP = Base HP × (1 + Stage × 0.2) × Type Multiplier
+
+Example:
+Stage 5 Anxiety Goblin (Common, Base HP = 100):
+HP = 100 × (1 + 5 × 0.2) × 1.0 = 200 HP
+
+Stage 5 Exam Week Demon (Boss, Base HP = 500):
+HP = 500 × (1 + 5 × 0.2) × 3.0 = 3000 HP
+```
+
+**Monster Types & Thematic Alignment:**
+
+*Common Monsters (5 types):*
+
+1. **Anxiety Goblin** – Blue-purple, represents worry and fear
+2. **Stress Slime** – Green-yellow, represents overwhelm and fatigue
+3. **Burnout Beast** – Orange-red, represents exhaustion and depletion
+4. **Procrastination Imp** – Pink-purple, represents avoidance and delay
+5. **Loneliness Wraith** – Gray-blue, represents isolation and disconnection
+
+*Boss Monsters (5 types):*
+
+1. **Exam Week Demon** – Red-purple, academic pressure personified
+2. **Thesis Dragon** – Blue-gold, represents research anxiety and perfectionism
+3. **Social Pressure Titan** – Multi-colored, crowd expectations manifestation
+4. **Perfectionism Hydra** – Purple-gold, multi-headed self-criticism
+5. **Imposter Syndrome Leviathan** – Dark blue-black, deep self-doubt serpent
+
+**Boss Mechanics:**
+
+- Require typing **3-5 sentences consecutively** to defeat
+- HP bar divided into segments (one per sentence)
+- Bonus rewards for maintaining perfect accuracy across all segments
+- Special animations for boss defeat (particle effects, celebration toast)
+
+#### 5.4.5 Sentence Database Structure
+
+**Difficulty Tiers (1-6) Mapped to Harmony Ranks:**
+
+| Difficulty | Harmony Range | Word Count | Sentence Categories | Target WPM | Example |
+|-----------|---------------|------------|---------------------|------------|---------|
+| **1** (Struggling) | 0-99 | 3-6 words | Affirmations | 30-40 | "I am enough today" |
+| **2** (Growing) | 100-499 | 6-9 words | Affirmations, Coping | 40-50 | "This feeling will pass eventually" |
+| **3** (Balanced) | 500-1499 | 8-12 words | Coping, CBT Reframes | 50-60 | "I choose to respond with calm" |
+| **4** (Thriving) | 1500-4999 | 10-15 words | CBT, Wisdom Quotes | 60-70 | "My worth is not defined by expectations" |
+| **5** (Flourishing) | 5000-14999 | 12-18 words | Wisdom, Indonesian Sayings | 70-80 | "Progress is not linear and that is okay" |
+| **6** (Masterful) | 15000+ | 15-30 words | Indonesian Proverbs, Complex CBT | 80+ | "Tak ada rotan akar pun jadi - resilience means finding strength within" |
+
+**Sentence Categories:**
+
+1. **Affirmations** (Difficulty 1-2): Basic self-worth and self-acceptance statements
+2. **Coping Statements** (Difficulty 2-3): Emotional regulation and stress management phrases
+3. **CBT Reframes** (Difficulty 3-4): Cognitive restructuring and thought challenging
+4. **Wisdom Quotes** (Difficulty 4-5): Mental health principles from established frameworks
+5. **Indonesian Sayings** (Difficulty 5-6): Cultural proverbs and bilingual mental health vocabulary
+
+**Bilingual Support:**
+
+- Each sentence has `text_en` (English) and `text_id` (Indonesian Bahasa) versions
+- Players can toggle language preference in settings
+- Mixed-language sentences at higher difficulties (e.g., Indonesian proverb with English explanation)
+
+**Sentence Selection Algorithm:**
+
+```
+1. Determine player's current Harmony rank
+2. Map rank to difficulty tier (1-6)
+3. Retrieve allowed sentence categories for that tier
+4. Filter by language preference
+5. Exclude recently typed sentences (72-hour cooldown)
+6. Randomly select from weighted pool (therapeutic value weighted)
+7. Return sentence object with metadata (id, category, difficulty, words)
+```
+
+#### 5.4.6 Progression & Upgrade System
+
+**Player Resources:**
+
+- **`JOY`** (Primary): Earned from monster defeats, spent on most upgrades
+- **`CARE`** (Secondary): Earned from bosses and perfect streaks, spent on rare upgrades
+- **Harmony Score** (Prestige): Increases with consistent play, unlocks higher difficulty tiers
+
+**Upgrade Types:**
+
+| Upgrade Name | Icon | Description | Base Cost | Scaling | Currency | Effect |
+|-------------|------|-------------|-----------|---------|----------|--------|
+| **Typing Power** | ✏️ | Damage per word typed | 10 `JOY` | 1.15^level | `JOY` | +20% base damage per level |
+| **Auto-Healer** | ⚡ | Passive DPS while resting | 50 `JOY` | 1.15^level | `JOY` | +0.5 DPS per level (idle component) |
+| **Critical Insight** | 🎯 | Perfect accuracy bonus | 100 `JOY` | 1.18^level | `JOY` | +5% crit multiplier per level |
+| **Combo Mastery** | 📈 | Combo multipliers increased | 200 `JOY` | 1.20^level | Harmony | +15% to all combo bonuses |
+
+**Upgrade Cost Formula:**
+
+```
+Cost = Base Cost × (Scaling Factor ^ Current Level)
+
+Example (Typing Power at Level 5):
+Cost = 10 × (1.15 ^ 5) = 10 × 2.011 = 20.11 ≈ 20 JOY
+```
+
+**Stage Progression:**
+
+- **Stage** = Number of monsters defeated
+- **Stage 10, 20, 30...**: Boss encounter (higher rewards)
+- **Stage 50+**: "Harmony Rank Up" evaluation (increase difficulty tier if Harmony threshold met)
+- **No stage cap**: Infinite progression with exponential scaling
+
+**Prestige System (Future):**
+
+- At Harmony Rank 6, option to "Ascend" (reset stage to 1, keep upgrades, gain permanent multipliers)
+- Not included in MVP but designed for extensibility
+
+#### 5.4.7 Integration with Main Quest System
+
+**Resource Synchronization:**
+
+- **Bi-directional Sync**: CareQuest Hub earnings automatically update player's main quest wallet (`JOY`, `CARE`, Harmony).
+- **Sync Frequency**: Every 5 seconds while active, on game exit, and on quest completion in main system.
+- **API Endpoint**: `PATCH /api/v1/quests/state/update` accepts delta updates (`joy_delta`, `care_delta`, `harmony_delta`).
+- **Conflict Resolution**: Server-authoritative; client state reconciled on next sync.
+
+**Cross-System Incentives:**
+
+- **Daily Quest Bonus**: "Play 10 minutes of CareQuest Hub" quest awards bonus `JOY` (encourages engagement).
+- **Typing Mastery Badges**: Achievements in hub (e.g., "10,000 words typed") displayed in main profile.
+- **Sentence Unlocks**: Completing specific main quests unlocks exclusive sentence categories in hub.
+- **Counselor Integration**: Counselors can assign "Practice these affirmations in CareQuest Hub" as therapy homework.
+
+**Analytics Integration:**
+
+- Hub gameplay metrics (WPM, accuracy, session duration) feed into player wellness analytics.
+- Insights Agent can correlate typing patterns with mood trends (e.g., "Accuracy drops 20% during exam weeks").
+- Aggregate data informs sentence database curation (popular categories, difficulty appropriateness).
+
+#### 5.4.8 User Experience Flow
+
+**First-Time User Flow:**
+
+1. **Onboarding Tutorial**: Guided walkthrough typing 3 simple affirmations with visual callouts explaining mechanics.
+2. **Difficulty Calibration**: System observes initial WPM and accuracy, adjusts starting Harmony rank accordingly.
+3. **Reward Explanation**: First monster defeat triggers detailed breakdown of damage calculation and resource earnings.
+4. **Upgrade Unlock**: After Stage 3, unlock first upgrade with tutorial tooltip.
+5. **Main Quest Link**: Toast notification: "Your JOY earnings are now available in your main quest wallet!"
+
+**Returning Player Flow:**
+
+1. Load saved game state from localStorage and backend wellness API.
+2. Display current stage, Harmony rank, and available resources.
+3. Present current monster with pre-selected sentence.
+4. Auto-resume with Auto-Healer passive damage accumulation displayed.
+
+**Session End Flow:**
+
+1. **Progress Summary**: Modal showing session stats (words typed, monsters defeated, resources earned, WPM average).
+2. **Milestone Achievements**: If any milestones reached (e.g., "50 perfect sentences"), display celebratory animation.
+3. **Sync Confirmation**: "Your progress has been saved and synced to your main profile."
+4. **Encouragement**: Aika-style supportive message ("Great focus today! Your typing improved by 5 WPM.").
+
+#### 5.4.9 Therapeutic Benefits & Design Rationale
+
+**Evidence-Based Design:**
+
+1. **Repetition & Neuroplasticity**: Typing affirmations repeatedly creates stronger memory encoding compared to passive reading (cognitive science principle).
+2. **Dual-Task Engagement**: Combining motor skills (typing) with cognitive processing (comprehension) enhances learning retention.
+3. **Flow State Induction**: Balanced challenge (sentence difficulty matches skill) creates immersive therapeutic engagement.
+4. **Immediate Feedback Loop**: Real-time accuracy indicators provide behavior reinforcement, crucial for habit formation.
+5. **Gamified Exposure Therapy**: Repeated exposure to positive self-statements in low-stakes environment reduces resistance to therapeutic concepts.
+
+**Differentiation from Mindless Clicking:**
+
+| Aspect | Traditional Idle Clicker | CareQuest Typing Hub |
+|--------|-------------------------|---------------------|
+| **Engagement** | Mindless repetition | Active cognitive processing |
+| **Skill Development** | None | Typing speed + mental health literacy |
+| **Therapeutic Value** | Zero | High (CBT reinforcement) |
+| **Educational** | No learning | Bilingual vocabulary + coping strategies |
+| **Burnout Risk** | High (repetitive strain) | Low (varied content, skill practice) |
+| **Accessibility** | Limited | Screen reader compatible, adjustable difficulty |
+
+**Mental Health Safeguards:**
+
+- **No Punishment for Mistakes**: Low accuracy reduces damage but never penalizes with loss of resources or negative feedback.
+- **Compassion Mode Trigger**: If player struggles with accuracy (<50% for 5 consecutive sentences), system offers easier alternatives or break suggestion.
+- **No Time Pressure**: While WPM affects damage, there's no countdown timer causing anxiety.
+- **Positive Framing Only**: All UI text uses supportive language ("Keep practicing!" vs "You failed").
+- **Opt-Out Anytime**: Players can exit mid-session without penalty; progress auto-saves.
+
+#### 5.4.10 Technical Specifications
+
+**Performance Requirements:**
+
+- **Input Latency**: <50ms between keystroke and visual feedback
+- **WPM Calculation**: Real-time update every 500ms
+- **Animation Frame Rate**: 60 FPS for smooth character transitions and damage numbers
+- **Background Sync**: Non-blocking API calls every 5 seconds
+- **Offline Support**: Full gameplay available offline; sync queue on reconnection
+
+**Data Structures:**
+
+```typescript
+interface TypingGameState {
+  stage: number;
+  currentMonster: Monster | null;
+  currentSentence: Sentence;
+  typedText: string;
+  typingStartTime: number | null;
+  currentWPM: number;
+  accuracy: number;
+  combo: number;
+  highestCombo: number;
+  upgrades: {
+    typingPower: { level: number; value: number };
+    autoHealer: { level: number; value: number };
+    criticalInsight: { level: number; value: number };
+    comboMastery: { level: number; value: number };
+  };
+  resources: {
+    joy: number;
+    care: number;
+    harmony: number;
+  };
+  statistics: {
+    totalWordsTyped: number;
+    averageWPM: number;
+    perfectSentences: number;
+    monstersDefeated: number;
+    bossesDefeated: number;
+  };
+}
+```
+
+**API Endpoints:**
+
+- `GET /api/v1/carequest-hub/state` – Retrieve player's hub game state
+- `PATCH /api/v1/carequest-hub/state` – Update game state (full snapshot)
+- `GET /api/v1/carequest-hub/sentences?difficulty={1-6}&language={en|id}` – Fetch sentence pool
+- `POST /api/v1/carequest-hub/session-end` – Submit session analytics
+
+**Browser Compatibility:**
+
+- Chrome/Edge 90+, Firefox 88+, Safari 14+
+- Mobile: iOS 14+ Safari, Android Chrome 90+
+- PWA-ready for offline play
 
 ---
 
