@@ -33,7 +33,13 @@ REDIS_HOST=localhost
 REDIS_PORT=6379
 REDIS_PASSWORD=optional-redis-password
 
-# Google OAuth (Required for docker-compose)
+# JWT Secret (Required - generate with: openssl rand -hex 32)
+JWT_SECRET_KEY=your-jwt-secret-key-here
+
+# Gemini API (Required for AI functionality)
+GEMINI_API_KEY=your-gemini-api-key-here
+
+# Google OAuth (Required for authentication)
 GOOGLE_CLIENT_ID=your-google-client-id
 GOOGLE_CLIENT_SECRET=your-google-client-secret
 
@@ -438,6 +444,15 @@ echo "🚀 VM is ready for deployment!"
 ### Error: "Permission denied: backend/logs/"
 **Cause:** Logs directory doesn't exist or wrong permissions  
 **Fix:** `mkdir -p backend/logs && chmod 755 backend/logs`
+
+### Error: "JWT_SECRET_KEY environment variable is not set!"
+**Cause:** Critical environment variables not passed to backend container  
+**Fix:** Ensure `.env` contains:
+- `JWT_SECRET_KEY` (generate with: `openssl rand -hex 32`)
+- `GEMINI_API_KEY`
+- `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
+
+These variables MUST be in the `.env` file for docker-compose to substitute them into the container.
 
 ---
 

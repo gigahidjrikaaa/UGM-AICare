@@ -87,6 +87,11 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-content-resources}
       MINIO_SECURE: ${MINIO_SECURE:-false}
+      # Critical auth/API keys from .env
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      GEMINI_API_KEY: ${GEMINI_API_KEY}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
     depends_on:
       db:
         condition: service_healthy
