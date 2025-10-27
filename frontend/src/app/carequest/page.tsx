@@ -141,7 +141,7 @@ export default function CareQuestPage() {
             </h2>
             <div className="max-w-4xl mx-auto">
               <p className="text-lg text-gray-700 mb-8 leading-relaxed text-center">
-                CareQuest is <strong>one component</strong> of UGM-AICare's comprehensive mental health platform 
+                CareQuest is <strong>one component</strong> of UGM-AICare&apos;s comprehensive mental health platform 
                 for Indonesian university students.
               </p>
 
@@ -268,7 +268,7 @@ export default function CareQuestPage() {
                       </ul>
                       <p className="text-gray-700 mt-3">
                         <strong>What It Does:</strong> Spend $CARE in the <strong>Block Market</strong> for 
-                        real-world rewards (café vouchers, UGM merchandise, bookstore credits). It's your 
+                        real-world rewards (café vouchers, UGM merchandise, bookstore credits). It&apos;s your 
                         bridge between virtual progress and tangible benefits.
                       </p>
                     </div>

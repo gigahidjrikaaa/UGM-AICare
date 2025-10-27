@@ -100,40 +100,49 @@ def upgrade() -> None:
             ondelete="SET NULL",
         )
 
-    with op.batch_alter_table("case_notes") as batch:
-        batch.alter_column(
-            "created_at",
-            existing_type=sa.DateTime(timezone=True),
-            server_default=sa.text("CURRENT_TIMESTAMP"),
-        )
-        batch.create_foreign_key(
-            "case_notes_author_id_fkey",
-            "users",
-            ["author_id"],
-            ["id"],
-            ondelete="SET NULL",
-        )
+    # Check if case_notes table exists before altering it
+    inspector = sa.inspect(conn)
+    if 'case_notes' in inspector.get_table_names():
+        with op.batch_alter_table("case_notes") as batch:
+            batch.alter_column(
+                "created_at",
+                existing_type=sa.DateTime(timezone=True),
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+            )
+            batch.create_foreign_key(
+                "case_notes_author_id_fkey",
+                "users",
+                ["author_id"],
+                ["id"],
+                ondelete="SET NULL",
+            )
 
-    with op.batch_alter_table("agent_users") as batch:
-        batch.alter_column(
-            "created_at",
-            existing_type=sa.DateTime(timezone=True),
-            server_default=sa.text("CURRENT_TIMESTAMP"),
-        )
+    # Check if agent_users table exists before altering it
+    if 'agent_users' in inspector.get_table_names():
+        with op.batch_alter_table("agent_users") as batch:
+            batch.alter_column(
+                "created_at",
+                existing_type=sa.DateTime(timezone=True),
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+            )
 
-    with op.batch_alter_table("system_settings") as batch:
-        batch.alter_column(
-            "updated_at",
-            existing_type=sa.DateTime(timezone=True),
-            server_default=sa.text("CURRENT_TIMESTAMP"),
-        )
+    # Check if system_settings table exists before altering it
+    if 'system_settings' in inspector.get_table_names():
+        with op.batch_alter_table("system_settings") as batch:
+            batch.alter_column(
+                "updated_at",
+                existing_type=sa.DateTime(timezone=True),
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+            )
 
-    with op.batch_alter_table("agent_health_logs") as batch:
-        batch.alter_column(
-            "created_at",
-            existing_type=sa.DateTime(timezone=True),
-            server_default=sa.text("CURRENT_TIMESTAMP"),
-        )
+    # Check if agent_health_logs table exists before altering it
+    if 'agent_health_logs' in inspector.get_table_names():
+        with op.batch_alter_table("agent_health_logs") as batch:
+            batch.alter_column(
+                "created_at",
+                existing_type=sa.DateTime(timezone=True),
+                server_default=sa.text("CURRENT_TIMESTAMP"),
+            )
 
 
 def downgrade() -> None:

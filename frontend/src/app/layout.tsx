@@ -3,6 +3,7 @@ import "./globals.css";
 import { Inter } from 'next/font/google'
 import ClientProvider from "@/components/auth/ClientProvider";
 import QueryProvider from "@/components/providers/QueryProvider";
+import { Web3Provider } from "@/providers/Web3Provider";
 import { Suspense } from "react";
 import GlobalSkeleton from "@/components/ui/GlobalSkeleton";
 import { ClientOnlyToaster } from "@/components/ui/ClientOnlyToaster";
@@ -64,27 +65,29 @@ export default async function RootLayout({
         className={`${inter.className} flex flex-col h-full`}
         suppressHydrationWarning={true}
       >
-        <ClientProvider>
-          <QueryProvider>
-            <HydrationSafeWrapper>
-                <Suspense fallback={<GlobalSkeleton />}>
-                  {/* AppLayout is removed from here, children are rendered directly */}
-                  {children}
-                  <ClientOnlyToaster
-                    position="top-right"
-                    reverseOrder={false}
-                    toastOptions={{
-                      duration: 5000,
-                      style: {
-                        background: 'rgba(54, 54, 54, 0.7)',
-                        color: '#fff',
-                      },
-                    }}
-                  />
-                </Suspense>
-            </HydrationSafeWrapper>
-          </QueryProvider>
-        </ClientProvider>
+        <Web3Provider>
+          <ClientProvider>
+            <QueryProvider>
+              <HydrationSafeWrapper>
+                  <Suspense fallback={<GlobalSkeleton />}>
+                    {/* AppLayout is removed from here, children are rendered directly */}
+                    {children}
+                    <ClientOnlyToaster
+                      position="top-right"
+                      reverseOrder={false}
+                      toastOptions={{
+                        duration: 5000,
+                        style: {
+                          background: 'rgba(54, 54, 54, 0.7)',
+                          color: '#fff',
+                        },
+                      }}
+                    />
+                  </Suspense>
+              </HydrationSafeWrapper>
+            </QueryProvider>
+          </ClientProvider>
+        </Web3Provider>
       </body>
     </html>
   );

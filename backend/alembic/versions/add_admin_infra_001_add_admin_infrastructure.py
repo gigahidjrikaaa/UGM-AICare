@@ -19,6 +19,38 @@ depends_on = None
 
 
 def upgrade():
+    # 0. Create triage_assessments table if it doesn't exist
+    # This table is required for admin dashboard queries and must exist before creating indexes
+    from sqlalchemy import inspect
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    existing_tables = inspector.get_table_names()
+    
+    if 'triage_assessments' not in existing_tables:
+        op.create_table(
+            'triage_assessments',
+            sa.Column('id', sa.Integer(), nullable=False),
+            sa.Column('conversation_id', sa.Integer(), nullable=True),
+            sa.Column('user_id', sa.Integer(), nullable=True),
+            sa.Column('risk_score', sa.Float(), nullable=False),
+            sa.Column('confidence_score', sa.Float(), nullable=False),
+            sa.Column('severity_level', sa.String(50), nullable=False),
+            sa.Column('risk_factors', sa.JSON(), nullable=True),
+            sa.Column('recommended_action', sa.String(100), nullable=True),
+            sa.Column('assessment_data', sa.JSON(), nullable=True),
+            sa.Column('processing_time_ms', sa.Integer(), nullable=True),
+            sa.Column('created_at', sa.DateTime(), nullable=False, server_default=sa.func.now()),
+            sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now(), onupdate=sa.func.now()),
+            sa.PrimaryKeyConstraint('id'),
+            sa.ForeignKeyConstraint(['conversation_id'], ['conversations.id'], ),
+            sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
+        )
+        op.create_index('ix_triage_assessments_id', 'triage_assessments', ['id'])
+        op.create_index('ix_triage_assessments_conversation_id', 'triage_assessments', ['conversation_id'])
+        op.create_index('ix_triage_assessments_user_id', 'triage_assessments', ['user_id'])
+        op.create_index('ix_triage_assessments_severity_level', 'triage_assessments', ['severity_level'])
+        op.create_index('ix_triage_assessments_created_at', 'triage_assessments', ['created_at'])
+    
     # 1. Create insights_reports table
     op.create_table(
         'insights_reports',
@@ -131,9 +163,18 @@ def upgrade():
         op.add_column('cases', sa.Column('conversation_id', sa.Integer(), sa.ForeignKey('conversations.id', ondelete='SET NULL'), nullable=True))
         op.create_index('idx_cases_conversation_id', 'cases', ['conversation_id'])
     
-    # 10. Add index to triage_assessments for better dashboard query performance
-    op.create_index('idx_triage_severity_level', 'triage_assessments', ['severity_level'])
-    op.create_index('idx_triage_created_at', 'triage_assessments', ['created_at'])
+    # 10. Add additional indexes to triage_assessments for better dashboard query performance
+    # (Basic indexes were created with the table above)
+    # Only create these additional indexes if they don't exist
+    try:
+        op.create_index('idx_triage_severity_level', 'triage_assessments', ['severity_level'], unique=False)
+    except Exception:
+        pass  # Index may already exist
+    
+    try:
+        op.create_index('idx_triage_created_at', 'triage_assessments', ['created_at'], unique=False)
+    except Exception:
+        pass  # Index may already exist
     
     # 11. Insert default system settings
     op.execute("""
@@ -150,9 +191,9 @@ def upgrade():
 
 
 def downgrade():
-    # Drop indexes first
-    op.drop_index('idx_triage_created_at', 'triage_assessments')
-    op.drop_index('idx_triage_severity_level', 'triage_assessments')
+    # Drop indexes first (with if_exists to handle optional indexes)
+    op.drop_index('idx_triage_created_at', 'triage_assessments', if_exists=True)
+    op.drop_index('idx_triage_severity_level', 'triage_assessments', if_exists=True)
     op.drop_index('idx_cases_conversation_id', 'cases', if_exists=True)
     op.drop_column('cases', 'conversation_id', if_exists=True)
     op.drop_index('idx_cases_assigned_to', 'cases')
@@ -168,3 +209,7 @@ def downgrade():
     op.drop_table('campaign_triggers')
     op.drop_table('campaigns')
     op.drop_table('insights_reports')
+    
+    # Note: We do NOT drop triage_assessments here as it may have been created 
+    # in a different migration or may be needed by other parts of the system
+    # If you need to remove it, create a separate migration

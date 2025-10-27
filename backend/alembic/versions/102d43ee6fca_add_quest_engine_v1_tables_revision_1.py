@@ -38,40 +38,40 @@ def downgrade() -> None:
 def schema_upgrade() -> None:
     bind = op.get_bind()
 
-    quest_category_enum = sa.Enum(
-        "wellness",
-        "reflection",
-        "social",
-        "support",
-        "learning",
-        name="questcategoryenum",
-    )
-    quest_difficulty_enum = sa.Enum(
-        "easy",
-        "standard",
-        "challenge",
-        name="questdifficultyenum",
-    )
-    quest_status_enum = sa.Enum(
-        "active",
-        "completed",
-        "expired",
-        "cancelled",
-        name="queststatusenum",
-    )
-    attestation_status_enum = sa.Enum(
-        "pending",
-        "queued",
-        "confirmed",
-        "failed",
-        name="attestationstatusenum",
-    )
+    # Create enums using PostgreSQL-safe approach
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE questcategoryenum AS ENUM ('wellness', 'reflection', 'social', 'support', 'learning');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
+    
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE questdifficultyenum AS ENUM ('easy', 'standard', 'challenge');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
+    
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE queststatusenum AS ENUM ('active', 'completed', 'expired', 'cancelled');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
+    
+    op.execute("""
+        DO $$ BEGIN
+            CREATE TYPE attestationstatusenum AS ENUM ('pending', 'queued', 'confirmed', 'failed');
+        EXCEPTION
+            WHEN duplicate_object THEN null;
+        END $$;
+    """)
 
-    quest_category_enum.create(bind, checkfirst=True)
-    quest_difficulty_enum.create(bind, checkfirst=True)
-    quest_status_enum.create(bind, checkfirst=True)
-    attestation_status_enum.create(bind, checkfirst=True)
-
+    # Define enum columns (types already exist, so create_type=False)
     quest_category_enum_col = sa.Enum(
         "wellness",
         "reflection",
