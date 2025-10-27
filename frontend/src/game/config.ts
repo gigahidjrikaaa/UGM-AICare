@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 
 export const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO, // WebGL with canvas fallback

@@ -1,4 +1,4 @@
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import { TypingEngine } from '../systems/TypingEngine';
 import { CombatSystem } from '../systems/CombatSystem';
 import { EventBridge } from '../utils/EventBridge';

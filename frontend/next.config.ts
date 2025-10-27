@@ -4,6 +4,31 @@ const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
   
+  // Webpack configuration to handle optional dependencies
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  webpack: (config: any) => {
+    // Ignore missing optional dependencies that are not needed in browser
+    if (!config.resolve) config.resolve = {};
+    if (!config.resolve.fallback) config.resolve.fallback = {};
+    
+    config.resolve.fallback = {
+      ...config.resolve.fallback,
+      fs: false,
+      net: false,
+      tls: false,
+    };
+
+    // Ignore specific module warnings for optional dependencies
+    if (!config.ignoreWarnings) config.ignoreWarnings = [];
+    config.ignoreWarnings.push(
+      /Critical dependency: require function is used in a way in which dependencies cannot be statically extracted/,
+      /Module not found: Can't resolve '@react-native-async-storage\/async-storage'/,
+      /Module not found: Can't resolve 'pino-pretty'/
+    );
+
+    return config;
+  },
+  
   // Bundle optimization
   experimental: {
     // Optimize package imports for better tree shaking

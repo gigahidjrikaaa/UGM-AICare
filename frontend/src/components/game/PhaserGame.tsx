@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Phaser from 'phaser';
+import * as Phaser from 'phaser';
 import { GAME_CONFIG } from '@/game/config';
 import { BootScene } from '@/game/scenes/BootScene';
 import { WorldMapScene } from '@/game/scenes/WorldMapScene';

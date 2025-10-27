@@ -25,6 +25,9 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
   const [locale, setLocaleState] = useState<Locale>('en');
 
   useEffect(() => {
+    // Only access localStorage on client side
+    if (typeof window === 'undefined') return;
+    
     try {
       const saved = (localStorage.getItem(STORAGE_KEY) as Locale | null) || null;
       if (saved === 'en' || saved === 'id') setLocaleState(saved);
@@ -33,6 +36,9 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
 
   const setLocale = (loc: Locale) => {
     setLocaleState(loc);
+    // Only access localStorage on client side
+    if (typeof window === 'undefined') return;
+    
     try { localStorage.setItem(STORAGE_KEY, loc); } catch {}
   };
 
