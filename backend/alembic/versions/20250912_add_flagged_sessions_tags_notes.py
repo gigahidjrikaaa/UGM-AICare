@@ -1,7 +1,7 @@
 """add flagged_sessions tags and notes
 
 Revision ID: add_flagged_sessions_tags_notes
-Revises: 
+Revises: 92227960c1f8
 Create Date: 2025-09-12
 """
 
@@ -10,7 +10,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = 'add_flagged_sessions_tags_notes'
-down_revision = None
+down_revision = '92227960c1f8'  # Fixed: was None, now points to users table creation
 branch_labels = None
 depends_on = None
 

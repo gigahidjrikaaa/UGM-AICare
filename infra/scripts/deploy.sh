@@ -105,9 +105,47 @@ docker container prune -f || true
 docker compose -f infra/compose/docker-compose.prod.yml --env-file .env up -d
 echo "[deploy.sh] Services started."
 
-# Wait a bit for containers to be ready
-echo "[deploy.sh] Waiting for containers to be ready..."
-sleep 5
+# Wait for database to be ready
+echo "[deploy.sh] Waiting for database to be ready..."
+MAX_DB_WAIT=30
+DB_READY=false
+for i in $(seq 1 $MAX_DB_WAIT); do
+  if docker compose -f infra/compose/docker-compose.prod.yml exec -T db pg_isready -U "${POSTGRES_USER:-postgres}" > /dev/null 2>&1; then
+    echo "[deploy.sh] Database is ready."
+    DB_READY=true
+    break
+  fi
+  echo "[deploy.sh] Waiting for database... ($i/$MAX_DB_WAIT)"
+  sleep 2
+done
+
+if [[ "$DB_READY" == "false" ]]; then
+  echo "[deploy.sh] ERROR: Database failed to become ready after ${MAX_DB_WAIT} attempts."
+  echo "[deploy.sh] Showing database logs:"
+  docker compose -f infra/compose/docker-compose.prod.yml logs db --tail 50
+  exit 1
+fi
+
+# Wait for backend container to be ready
+echo "[deploy.sh] Waiting for backend container to be ready..."
+MAX_BACKEND_WAIT=30
+BACKEND_READY=false
+for i in $(seq 1 $MAX_BACKEND_WAIT); do
+  if docker compose -f infra/compose/docker-compose.prod.yml exec -T backend echo "ready" > /dev/null 2>&1; then
+    echo "[deploy.sh] Backend container is ready."
+    BACKEND_READY=true
+    break
+  fi
+  echo "[deploy.sh] Waiting for backend container... ($i/$MAX_BACKEND_WAIT)"
+  sleep 2
+done
+
+if [[ "$BACKEND_READY" == "false" ]]; then
+  echo "[deploy.sh] ERROR: Backend container failed to become ready."
+  echo "[deploy.sh] Showing backend logs:"
+  docker compose -f infra/compose/docker-compose.prod.yml logs backend --tail 50
+  exit 1
+fi
 
 # 5. Run DB migrations (after containers are up)
 echo "[deploy.sh] Running database migrations..."
@@ -122,22 +160,17 @@ if [[ -f ".env" ]]; then
   fi
 fi
 
-# Execute the migration script (will run inside Docker container)
-./infra/scripts/migrate.sh
-echo "[deploy.sh] Database migrations completed."
-
-# 6. Health check endpoints
-echo "[deploy.sh] Bringing up services with docker-compose.prod.yml..."
-# Stop and remove old containers, then start new ones
-docker compose -f infra/compose/docker-compose.prod.yml down || true # Ignore errors if containers don't exist
-
-# Export environment variables for docker compose
-export GIT_SHA="$GIT_SHA"
-export GHCR_REPOSITORY_OWNER="$GHCR_REPOSITORY_OWNER_LOWER"
-
-# Start new containers
-docker compose -f infra/compose/docker-compose.prod.yml up -d
-echo "[deploy.sh] Database migrations completed."
+# Execute the safe migration script (will run inside Docker container)
+# This handles both fresh databases and existing schemas gracefully
+chmod +x ./infra/scripts/migrate-safe.sh
+if ./infra/scripts/migrate-safe.sh; then
+  echo "[deploy.sh] Database migrations completed successfully."
+else
+  echo "[deploy.sh] ERROR: Database migration failed!"
+  echo "[deploy.sh] Showing backend logs:"
+  docker compose -f infra/compose/docker-compose.prod.yml logs backend --tail 100
+  exit 1
+fi
 
 # 6. Health check endpoints
 echo "[deploy.sh] Performing health checks..."
