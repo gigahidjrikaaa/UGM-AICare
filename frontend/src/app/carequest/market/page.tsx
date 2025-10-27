@@ -1,15 +1,17 @@
 'use client';
 
 import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { ShoppingBag, Wallet, Sparkles, Tag, Package, Gift } from 'lucide-react';
 
 /**
- * Block Market Page
+ * Block Market Page - RPG Shop Redesign
  * 
  * Features:
- * - Spend $CARE tokens on real-world rewards
- * - Vouchers (cafe, bookstore, etc.)
- * - UGM merchandise
- * - Purchase history
+ * - RPG shop interface with item rarity
+ * - Animated purchase effects
+ * - Inventory-style grid
+ * - Wallet display with $CARE token animations
  */
 
 interface MarketItem {
@@ -17,47 +19,116 @@ interface MarketItem {
   name: string;
   description: string;
   price: number;
-  category: 'voucher' | 'merch';
+  category: 'voucher' | 'merch' | 'powerup';
+  rarity: 'common' | 'rare' | 'epic' | 'legendary';
   imageUrl?: string;
+  icon: string;
   stock: number;
 }
 
+const rarityConfig = {
+  common: {
+    gradient: 'from-gray-400 to-gray-600',
+    glow: 'shadow-gray-400/30',
+    border: 'border-gray-400/50',
+    text: 'text-gray-300',
+    bg: 'bg-gray-500/20',
+  },
+  rare: {
+    gradient: 'from-aurora-blue to-blue-600',
+    glow: 'shadow-aurora-blue/50',
+    border: 'border-aurora-blue/70',
+    text: 'text-aurora-blue',
+    bg: 'bg-aurora-blue/20',
+  },
+  epic: {
+    gradient: 'from-aurora-purple to-purple-600',
+    glow: 'shadow-aurora-purple/50',
+    border: 'border-aurora-purple/70',
+    text: 'text-aurora-purple',
+    bg: 'bg-aurora-purple/20',
+  },
+  legendary: {
+    gradient: 'from-ugm-gold via-yellow-400 to-ugm-gold',
+    glow: 'shadow-ugm-gold/60',
+    border: 'border-ugm-gold',
+    text: 'text-ugm-gold',
+    bg: 'bg-ugm-gold/20',
+  },
+};
+
+const categories = [
+  { id: 'all', label: 'All Items', icon: Package },
+  { id: 'voucher', label: 'Vouchers', icon: Gift },
+  { id: 'merch', label: 'Merchandise', icon: Tag },
+  { id: 'powerup', label: 'Power-ups', icon: Sparkles },
+];
+
 export default function BlockMarketPage() {
-  const [activeCategory, setActiveCategory] = useState<'all' | 'voucher' | 'merch'>('all');
+  const [activeCategory, setActiveCategory] = useState<'all' | 'voucher' | 'merch' | 'powerup'>('all');
+  const [balance] = useState(1250);
 
   // TODO: Fetch from backend
   const mockItems: MarketItem[] = [
     {
       id: '1',
-      name: 'Cafe Voucher - Rp 25.000',
-      description: 'Redeem at selected cafes around UGM campus',
+      name: 'Cafe Voucher',
+      description: 'Redeem Rp 25.000 at selected cafes around UGM campus. Enjoy your favorite coffee!',
       price: 50,
       category: 'voucher',
+      rarity: 'common',
+      icon: '☕',
       stock: 100,
     },
     {
       id: '2',
-      name: 'Bookstore Voucher - Rp 50.000',
-      description: 'Use at UGM bookstore for textbooks and supplies',
+      name: 'Bookstore Voucher',
+      description: 'Rp 50.000 voucher for UGM bookstore. Get textbooks and supplies.',
       price: 100,
       category: 'voucher',
+      rarity: 'rare',
+      icon: '📚',
       stock: 50,
     },
     {
       id: '3',
       name: 'UGM T-Shirt',
-      description: 'Official UGM-AICare branded t-shirt (Size: M, L, XL)',
+      description: 'Official UGM-AICare branded t-shirt. Available in M, L, XL.',
       price: 200,
       category: 'merch',
+      rarity: 'rare',
+      icon: '👕',
       stock: 25,
     },
     {
       id: '4',
       name: 'UGM Tote Bag',
-      description: 'Eco-friendly canvas tote bag with UGM logo',
+      description: 'Eco-friendly canvas tote bag with UGM logo. Stylish and sustainable.',
       price: 150,
       category: 'merch',
+      rarity: 'common',
+      icon: '👜',
       stock: 30,
+    },
+    {
+      id: '5',
+      name: 'XP Boost Potion',
+      description: 'Double XP for 24 hours! Complete quests faster and level up quickly.',
+      price: 300,
+      category: 'powerup',
+      rarity: 'epic',
+      icon: '⚗️',
+      stock: 15,
+    },
+    {
+      id: '6',
+      name: 'Legendary Quest Unlock',
+      description: 'Unlock exclusive legendary-tier therapeutic quests with massive rewards.',
+      price: 500,
+      category: 'powerup',
+      rarity: 'legendary',
+      icon: '🔑',
+      stock: 5,
     },
   ];
 
@@ -65,117 +136,226 @@ export default function BlockMarketPage() {
     (item) => activeCategory === 'all' || item.category === activeCategory
   );
 
+  const handlePurchase = (item: MarketItem) => {
+    if (balance >= item.price) {
+      alert(`Purchasing ${item.name}... (Coming soon)`);
+    } else {
+      alert('Not enough $CARE tokens!');
+    }
+  };
+
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Block Market</h1>
-        <p className="text-gray-600">
-          Spend your <span className="font-semibold text-green-600">$CARE</span> tokens on
-          real-world vouchers and UGM merchandise
-        </p>
-      </div>
-
-      {/* Wallet balance */}
-      <div className="bg-gradient-to-r from-green-500 to-emerald-600 rounded-lg p-6 mb-8 text-white shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm opacity-90 mb-1">Your $CARE Balance</div>
-            <div className="text-4xl font-bold">1,250 $CARE</div>
-          </div>
-          <div className="text-right">
-            <div className="text-sm opacity-90 mb-1">Total Spent</div>
-            <div className="text-2xl font-semibold">500 $CARE</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Category filters */}
-      <div className="flex space-x-4 mb-6">
-        <button
-          onClick={() => setActiveCategory('all')}
-          className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
-            activeCategory === 'all'
-              ? 'bg-blue-500 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          All Items
-        </button>
-        <button
-          onClick={() => setActiveCategory('voucher')}
-          className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
-            activeCategory === 'voucher'
-              ? 'bg-blue-500 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          Vouchers
-        </button>
-        <button
-          onClick={() => setActiveCategory('merch')}
-          className={`px-6 py-2 rounded-lg font-semibold transition-colors ${
-            activeCategory === 'merch'
-              ? 'bg-blue-500 text-white'
-              : 'bg-gray-200 text-gray-700 hover:bg-gray-300'
-          }`}
-        >
-          Merchandise
-        </button>
-      </div>
-
-      {/* Items grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {filteredItems.map((item) => (
-          <div
-            key={item.id}
-            className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
-          >
-            {/* Image placeholder */}
-            <div className="h-48 bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center">
-              <div className="text-6xl">
-                {item.category === 'voucher' ? '🎟️' : '🎽'}
-              </div>
-            </div>
-
-            {/* Content */}
-            <div className="p-4">
-              <div className="flex items-start justify-between mb-2">
-                <h3 className="text-lg font-semibold text-gray-900">{item.name}</h3>
-                <span className="px-2 py-1 bg-blue-100 text-blue-800 text-xs font-semibold rounded">
-                  {item.category}
-                </span>
-              </div>
-              
-              <p className="text-sm text-gray-600 mb-4">{item.description}</p>
-
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-2xl font-bold text-green-600">
-                    {item.price} $CARE
-                  </div>
-                  <div className="text-xs text-gray-500">
-                    {item.stock} in stock
-                  </div>
-                </div>
-                <button className="px-4 py-2 bg-green-500 text-white rounded-lg hover:bg-green-600 transition-colors font-semibold">
-                  Purchase
-                </button>
-              </div>
-            </div>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-ugm-blue via-ugm-blue-dark to-black">
+      {/* Animated background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        {[...Array(15)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-1 h-1 bg-ugm-gold/20 rounded-full"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+            }}
+            animate={{
+              y: [0, -25, 0],
+              opacity: [0.2, 0.7, 0.2],
+            }}
+            transition={{
+              duration: 3 + Math.random() * 2,
+              repeat: Infinity,
+              delay: Math.random() * 2,
+            }}
+          />
         ))}
       </div>
 
-      {/* Coming soon notice */}
-      <div className="mt-12 bg-yellow-50 border border-yellow-200 rounded-lg p-6 text-center">
-        <div className="text-yellow-800 font-semibold mb-2">
-          🚧 Block Market Coming Soon
-        </div>
-        <p className="text-sm text-yellow-700">
-          The marketplace is currently in development. Purchase functionality will be available in
-          the next update.
-        </p>
+      <div className="container mx-auto px-6 py-12 max-w-7xl relative z-10">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 text-center"
+        >
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <ShoppingBag className="w-12 h-12 text-ugm-gold" />
+            <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-ugm-gold via-yellow-300 to-ugm-gold">
+              Block Market
+            </h1>
+            <ShoppingBag className="w-12 h-12 text-ugm-gold" />
+          </div>
+          <p className="text-xl text-gray-300">
+            Trade Your $CARE Tokens for Real-World Rewards
+          </p>
+        </motion.div>
+
+        {/* Wallet Balance */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 }}
+          className="bg-gradient-to-br from-green-500/20 to-emerald-600/20 backdrop-blur-md rounded-2xl border-2 border-green-500/30 p-6 mb-8 shadow-2xl shadow-green-500/20"
+        >
+          <div className="flex items-center justify-between flex-wrap gap-6">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-green-500 to-emerald-600 flex items-center justify-center shadow-lg shadow-green-500/30">
+                <Wallet className="w-8 h-8 text-white" />
+              </div>
+              <div>
+                <div className="text-sm text-green-300 mb-1">Your $CARE Balance</div>
+                <motion.div
+                  className="text-5xl font-black text-green-400"
+                  animate={{ scale: [1, 1.05, 1] }}
+                  transition={{ duration: 2, repeat: Infinity }}
+                >
+                  {balance} $CARE
+                </motion.div>
+              </div>
+            </div>
+            
+            <div className="flex gap-8">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-white mb-1">500</div>
+                <div className="text-sm text-gray-300">Total Spent</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-ugm-gold mb-1">12</div>
+                <div className="text-sm text-gray-300">Items Owned</div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Category Filters */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mb-8"
+        >
+          <div className="flex gap-3 flex-wrap">
+            {categories.map((category) => {
+              const Icon = category.icon;
+              const isActive = activeCategory === category.id;
+              
+              return (
+                <motion.button
+                  key={category.id}
+                  onClick={() => setActiveCategory(category.id as typeof activeCategory)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`
+                    px-6 py-3 rounded-xl font-bold transition-all flex items-center gap-2
+                    ${isActive
+                      ? 'bg-gradient-to-r from-ugm-gold to-yellow-500 text-ugm-blue-dark shadow-lg shadow-ugm-gold/50'
+                      : 'bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 border border-white/20'
+                    }
+                  `}
+                >
+                  <Icon className="w-5 h-5" />
+                  {category.label}
+                </motion.button>
+              );
+            })}
+          </div>
+        </motion.div>
+
+        {/* Items Grid */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+        >
+          {filteredItems.map((item, index) => {
+            const rarity = rarityConfig[item.rarity];
+            const canAfford = balance >= item.price;
+            
+            return (
+              <motion.div
+                key={item.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 + index * 0.1 }}
+                whileHover={{ scale: 1.03, y: -8 }}
+                className={`relative overflow-hidden rounded-xl border-2 backdrop-blur-sm ${rarity.border} ${rarity.glow} shadow-xl`}
+              >
+                {/* Rarity glow animation */}
+                {item.rarity === 'legendary' && (
+                  <motion.div
+                    className="absolute inset-0 bg-gradient-to-r from-ugm-gold/10 via-transparent to-ugm-gold/10"
+                    animate={{ rotate: 360 }}
+                    transition={{ duration: 8, repeat: Infinity, ease: 'linear' }}
+                  />
+                )}
+
+                {/* Item card content */}
+                <div className={`relative bg-gradient-to-br from-ugm-blue/80 to-ugm-blue-dark/80 p-6`}>
+                  {/* Rarity badge */}
+                  <div className="absolute top-3 right-3 z-10">
+                    <div className={`px-3 py-1 rounded-full text-xs font-bold uppercase ${rarity.bg} ${rarity.text} border ${rarity.border}`}>
+                      {item.rarity}
+                    </div>
+                  </div>
+
+                  {/* Item icon */}
+                  <div className={`w-24 h-24 mx-auto mb-4 rounded-xl bg-gradient-to-br ${rarity.gradient} flex items-center justify-center text-5xl shadow-lg`}>
+                    {item.icon}
+                  </div>
+
+                  {/* Item info */}
+                  <h3 className="text-xl font-bold text-white mb-2 text-center">{item.name}</h3>
+                  <p className="text-sm text-gray-300 mb-4 text-center min-h-12">{item.description}</p>
+
+                  {/* Stock indicator */}
+                  <div className="flex items-center justify-center gap-2 mb-4">
+                    <Package className="w-4 h-4 text-gray-400" />
+                    <span className="text-xs text-gray-400">{item.stock} in stock</span>
+                  </div>
+
+                  {/* Price and purchase */}
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-center gap-2">
+                      <Wallet className="w-5 h-5 text-green-400" />
+                      <span className="text-3xl font-black text-green-400">{item.price}</span>
+                      <span className="text-sm text-green-400 font-bold">$CARE</span>
+                    </div>
+
+                    <motion.button
+                      onClick={() => handlePurchase(item)}
+                      whileHover={canAfford ? { scale: 1.05 } : {}}
+                      whileTap={canAfford ? { scale: 0.95 } : {}}
+                      disabled={!canAfford}
+                      className={`w-full py-3 rounded-xl font-bold transition-all ${
+                        canAfford
+                          ? 'bg-gradient-to-r from-green-500 to-emerald-600 text-white shadow-lg hover:shadow-green-500/50'
+                          : 'bg-gray-600/50 text-gray-400 cursor-not-allowed'
+                      }`}
+                    >
+                      {canAfford ? '💰 Purchase' : '🔒 Not Enough $CARE'}
+                    </motion.button>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </motion.div>
+
+        {/* Coming Soon Banner */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mt-12 bg-yellow-500/10 border border-yellow-500/30 rounded-2xl p-8 text-center backdrop-blur-md"
+        >
+          <div className="text-6xl mb-4">🚧</div>
+          <h3 className="text-2xl font-bold text-yellow-400 mb-3">
+            Marketplace Coming Soon
+          </h3>
+          <p className="text-gray-300 max-w-2xl mx-auto">
+            Purchase functionality is currently in development. Soon you&apos;ll be able to redeem your $CARE tokens
+            for real vouchers and UGM merchandise delivered right to campus!
+          </p>
+        </motion.div>
       </div>
     </div>
   );

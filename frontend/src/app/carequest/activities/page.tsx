@@ -1,14 +1,18 @@
 'use client';
 
+import { useState } from 'react';
+import { motion } from 'framer-motion';
+import { Sparkles, Brain, BookOpen, Heart, Dumbbell, Filter } from 'lucide-react';
+import { QuestCard } from '@/components/carequest/QuestCard';
+
 /**
- * Activities Page
+ * Activities Page - RPG Redesign
  * 
  * Features:
- * - Mini-games callable from main webapp
- * - Mindfulness exercises
- * - CBT workshops
- * - Mood journaling
- * - Breathing exercises
+ * - Quest-style activity cards with XP rewards
+ * - Category filtering with game-style tabs
+ * - Daily streak tracker
+ * - Animated hover effects
  */
 
 interface Activity {
@@ -16,80 +20,125 @@ interface Activity {
   title: string;
   description: string;
   duration: string;
-  category: 'mindfulness' | 'cbt' | 'journal' | 'exercise';
+  category: 'mindfulness' | 'cbt' | 'journal' | 'exercise' | 'all';
   rewards: {
+    xp: number;
     joy?: number;
     care?: number;
     harmony?: number;
   };
+  difficulty: 'easy' | 'medium' | 'hard' | 'legendary';
   icon: string;
-  color: string;
+  completed?: boolean;
+  progress?: number;
 }
 
+const categories = [
+  { id: 'all' as const, label: 'All Quests', icon: Sparkles, color: 'ugm-gold' },
+  { id: 'mindfulness' as const, label: 'Mindfulness', icon: Heart, color: 'aurora-pink' },
+  { id: 'cbt' as const, label: 'CBT', icon: Brain, color: 'aurora-purple' },
+  { id: 'journal' as const, label: 'Journaling', icon: BookOpen, color: 'aurora-blue' },
+  { id: 'exercise' as const, label: 'Exercises', icon: Dumbbell, color: 'aurora-cyan' },
+];
+
 export default function ActivitiesPage() {
+  const [selectedCategory, setSelectedCategory] = useState<Activity['category']>('all');
+
   // TODO: Fetch from backend
   const activities: Activity[] = [
     {
       id: '1',
-      title: 'Daily Mindfulness',
-      description: 'Complete a 5-minute guided breathing exercise to center yourself',
+      title: 'Morning Mindfulness Meditation',
+      description: 'Complete a 5-minute guided breathing exercise to center yourself and start your day with calm.',
       duration: '5 min',
       category: 'mindfulness',
-      rewards: { joy: 10, harmony: 2 },
+      rewards: { xp: 50, joy: 10, harmony: 2 },
+      difficulty: 'easy',
       icon: '🧘',
-      color: 'bg-blue-500',
+      completed: true,
     },
     {
       id: '2',
-      title: 'Mood Journal',
-      description: 'Record your emotions and reflect on your day',
+      title: 'Daily Mood Journal',
+      description: 'Record your emotions and reflect on your day. Track patterns in your mental health journey.',
       duration: '10 min',
       category: 'journal',
-      rewards: { care: 15, harmony: 3 },
+      rewards: { xp: 75, care: 15, harmony: 3 },
+      difficulty: 'easy',
       icon: '📔',
-      color: 'bg-green-500',
+      progress: 65,
     },
     {
       id: '3',
       title: 'CBT Thought Challenge',
-      description: 'Practice cognitive restructuring with guided prompts',
+      description: 'Practice cognitive restructuring with guided prompts. Challenge negative thought patterns.',
       duration: '15 min',
       category: 'cbt',
-      rewards: { joy: 20, care: 10, harmony: 5 },
+      rewards: { xp: 150, joy: 20, care: 10, harmony: 5 },
+      difficulty: 'medium',
       icon: '🧠',
-      color: 'bg-purple-500',
+      progress: 0,
     },
     {
       id: '4',
-      title: 'Box Breathing',
-      description: 'Four-square breathing technique for instant calm',
+      title: 'Box Breathing Exercise',
+      description: 'Four-square breathing technique for instant calm. Perfect for managing stress in the moment.',
       duration: '3 min',
       category: 'exercise',
-      rewards: { joy: 5, harmony: 1 },
+      rewards: { xp: 40, joy: 5, harmony: 1 },
+      difficulty: 'easy',
       icon: '💨',
-      color: 'bg-cyan-500',
+      progress: 0,
     },
     {
       id: '5',
       title: 'Gratitude Practice',
-      description: 'Write down three things you are grateful for today',
+      description: 'Write down three things you are grateful for today. Cultivate positive thinking.',
       duration: '5 min',
       category: 'journal',
-      rewards: { joy: 15, care: 5 },
+      rewards: { xp: 60, joy: 15, care: 5 },
+      difficulty: 'easy',
       icon: '🙏',
-      color: 'bg-yellow-500',
+      completed: true,
     },
     {
       id: '6',
       title: 'Progressive Muscle Relaxation',
-      description: 'Systematically tense and relax muscle groups',
+      description: 'Systematically tense and relax muscle groups to release physical tension.',
       duration: '12 min',
       category: 'exercise',
-      rewards: { joy: 18, harmony: 4 },
+      rewards: { xp: 100, joy: 18, harmony: 4 },
+      difficulty: 'medium',
       icon: '💪',
-      color: 'bg-red-500',
+      progress: 30,
+    },
+    {
+      id: '7',
+      title: 'Cognitive Distortion Slayer',
+      description: 'Identify and defeat all 10 cognitive distortions in this advanced CBT challenge.',
+      duration: '20 min',
+      category: 'cbt',
+      rewards: { xp: 250, joy: 30, care: 20, harmony: 10 },
+      difficulty: 'hard',
+      icon: '⚔️',
+      progress: 0,
+    },
+    {
+      id: '8',
+      title: 'Master Meditation Marathon',
+      description: 'Complete a 30-minute deep meditation session. Only for experienced practitioners.',
+      duration: '30 min',
+      category: 'mindfulness',
+      rewards: { xp: 500, joy: 50, harmony: 15 },
+      difficulty: 'legendary',
+      icon: '🏆',
+      progress: 0,
     },
   ];
+
+  const filteredActivities = selectedCategory === 'all' 
+    ? activities 
+    : activities.filter(a => a.category === selectedCategory);
 
   const handleStartActivity = (activityId: string) => {
     console.log(`Starting activity: ${activityId}`);
@@ -98,95 +147,167 @@ export default function ActivitiesPage() {
   };
 
   return (
-    <div className="container mx-auto p-6 max-w-6xl">
-      {/* Header */}
-      <div className="mb-8">
-        <h1 className="text-4xl font-bold text-gray-900 mb-2">Activities & Mini-Games</h1>
-        <p className="text-gray-600">
-          Engage in therapeutic activities to improve your mental wellbeing and earn rewards
-        </p>
-      </div>
-
-      {/* Daily streak */}
-      <div className="bg-gradient-to-r from-orange-400 to-pink-500 rounded-lg p-6 mb-8 text-white shadow-lg">
-        <div className="flex items-center justify-between">
-          <div>
-            <div className="text-sm opacity-90 mb-1">Your Daily Streak</div>
-            <div className="text-4xl font-bold">7 Days 🔥</div>
-          </div>
-          <div className="text-right">
-            <div className="text-sm opacity-90 mb-1">Activities Completed</div>
-            <div className="text-2xl font-semibold">23 Total</div>
-          </div>
-        </div>
-      </div>
-
-      {/* Activities grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {activities.map((activity) => (
-          <div
-            key={activity.id}
-            className="bg-white rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow"
-          >
-            {/* Header */}
-            <div className={`${activity.color} p-6 text-white`}>
-              <div className="text-5xl mb-3 text-center">{activity.icon}</div>
-              <h3 className="text-xl font-bold text-center">{activity.title}</h3>
-            </div>
-
-            {/* Content */}
-            <div className="p-4">
-              <p className="text-sm text-gray-600 mb-4 min-h-12">
-                {activity.description}
-              </p>
-
-              {/* Metadata */}
-              <div className="flex items-center justify-between mb-4 text-sm">
-                <div className="flex items-center space-x-2">
-                  <span className="text-gray-500">⏱️</span>
-                  <span className="text-gray-700 font-medium">{activity.duration}</span>
-                </div>
-                <span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs font-semibold rounded">
-                  {activity.category}
-                </span>
-              </div>
-
-              {/* Rewards */}
-              <div className="flex items-center space-x-3 mb-4 text-sm">
-                <span className="text-gray-500">Rewards:</span>
-                {activity.rewards.joy && (
-                  <span className="text-yellow-600 font-semibold">+{activity.rewards.joy} JOY</span>
-                )}
-                {activity.rewards.care && (
-                  <span className="text-green-600 font-semibold">+{activity.rewards.care} CARE</span>
-                )}
-                {activity.rewards.harmony && (
-                  <span className="text-purple-600 font-semibold">
-                    +{activity.rewards.harmony} Harmony
-                  </span>
-                )}
-              </div>
-
-              {/* Action button */}
-              <button
-                onClick={() => handleStartActivity(activity.id)}
-                className={`w-full ${activity.color} text-white py-3 rounded-lg font-semibold hover:opacity-90 transition-opacity`}
-              >
-                Start Activity
-              </button>
-            </div>
-          </div>
+    <div className="min-h-screen bg-gradient-to-br from-ugm-blue via-ugm-blue-dark to-black">
+      {/* Animated background */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        {[...Array(20)].map((_, i) => (
+          <motion.div
+            key={i}
+            className="absolute w-1 h-1 bg-ugm-gold/20 rounded-full"
+            style={{
+              left: `${Math.random() * 100}%`,
+              top: `${Math.random() * 100}%`,
+            }}
+            animate={{
+              y: [0, -30, 0],
+              opacity: [0.2, 0.7, 0.2],
+            }}
+            transition={{
+              duration: 3 + Math.random() * 2,
+              repeat: Infinity,
+              delay: Math.random() * 2,
+            }}
+          />
         ))}
       </div>
 
-      {/* Coming soon notice */}
-      <div className="mt-12 bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-        <div className="text-blue-800 font-semibold mb-2">
-          🎮 More Activities Coming Soon
-        </div>
-        <p className="text-sm text-blue-700">
-          We are developing more interactive mini-games and therapeutic activities. Stay tuned!
-        </p>
+      <div className="container mx-auto px-6 py-12 max-w-7xl relative z-10">
+        {/* Header */}
+        <motion.div
+          initial={{ opacity: 0, y: -20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 text-center"
+        >
+          <div className="flex items-center justify-center gap-3 mb-4">
+            <Sparkles className="w-12 h-12 text-ugm-gold" />
+            <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-ugm-gold via-yellow-300 to-ugm-gold">
+              Quest Board
+            </h1>
+            <Sparkles className="w-12 h-12 text-ugm-gold" />
+          </div>
+          <p className="text-xl text-gray-300">
+            Complete Therapeutic Quests to Earn XP and Improve Your Wellbeing
+          </p>
+        </motion.div>
+
+        {/* Daily Streak Banner */}
+        <motion.div
+          initial={{ opacity: 0, scale: 0.95 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ delay: 0.2 }}
+          className="bg-gradient-to-br from-orange-500/20 to-pink-500/20 backdrop-blur-md rounded-2xl border-2 border-orange-500/30 p-6 mb-8 shadow-2xl shadow-orange-500/20"
+        >
+          <div className="flex items-center justify-between flex-wrap gap-6">
+            <div className="flex items-center gap-4">
+              <motion.div
+                animate={{ rotate: [0, 10, -10, 0] }}
+                transition={{ duration: 2, repeat: Infinity }}
+                className="text-6xl"
+              >
+                🔥
+              </motion.div>
+              <div>
+                <div className="text-sm text-orange-300 mb-1">Your Daily Streak</div>
+                <div className="text-5xl font-black text-orange-400">7 Days</div>
+              </div>
+            </div>
+            
+            <div className="flex gap-8">
+              <div className="text-center">
+                <div className="text-3xl font-bold text-white mb-1">23</div>
+                <div className="text-sm text-gray-300">Quests Complete</div>
+              </div>
+              <div className="text-center">
+                <div className="text-3xl font-bold text-ugm-gold mb-1">1,450</div>
+                <div className="text-sm text-gray-300">Total XP Earned</div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Category Filters */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.3 }}
+          className="mb-8"
+        >
+          <div className="flex items-center gap-3 mb-4">
+            <Filter className="w-6 h-6 text-ugm-gold" />
+            <h2 className="text-2xl font-bold text-white">Filter by Category</h2>
+          </div>
+          
+          <div className="flex gap-3 flex-wrap">
+            {categories.map((category) => {
+              const Icon = category.icon;
+              const isActive = selectedCategory === category.id;
+              
+              return (
+                <motion.button
+                  key={category.id}
+                  onClick={() => setSelectedCategory(category.id)}
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  className={`
+                    px-6 py-3 rounded-xl font-bold transition-all flex items-center gap-2
+                    ${isActive
+                      ? 'bg-gradient-to-r from-ugm-gold to-yellow-500 text-ugm-blue-dark shadow-lg shadow-ugm-gold/50'
+                      : 'bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 border border-white/20'
+                    }
+                  `}
+                >
+                  <Icon className="w-5 h-5" />
+                  {category.label}
+                </motion.button>
+              );
+            })}
+          </div>
+        </motion.div>
+
+        {/* Activities Grid */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 0.4 }}
+          className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+        >
+          {filteredActivities.map((activity, index) => (
+            <motion.div
+              key={activity.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 + index * 0.1 }}
+            >
+              <QuestCard
+                title={activity.title}
+                description={activity.description}
+                xpReward={activity.rewards.xp}
+                progress={activity.progress || 0}
+                difficulty={activity.difficulty}
+                category={activity.category}
+                completed={activity.completed}
+                onClick={() => handleStartActivity(activity.id)}
+              />
+            </motion.div>
+          ))}
+        </motion.div>
+
+        {/* Coming Soon Banner */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          className="mt-12 bg-aurora-blue/10 border border-aurora-blue/30 rounded-2xl p-8 text-center backdrop-blur-md"
+        >
+          <div className="text-6xl mb-4">🎮</div>
+          <h3 className="text-2xl font-bold text-aurora-blue mb-3">
+            More Quests Coming Soon
+          </h3>
+          <p className="text-gray-300 max-w-2xl mx-auto">
+            We are developing more interactive mini-games and therapeutic activities. 
+            From typing combat to puzzle challenges, your mental health journey is about to get even more engaging!
+          </p>
+        </motion.div>
       </div>
     </div>
   );
