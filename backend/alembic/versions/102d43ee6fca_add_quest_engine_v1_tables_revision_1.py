@@ -37,8 +37,11 @@ def downgrade() -> None:
 
 def schema_upgrade() -> None:
     bind = op.get_bind()
-
-    # Create enums using PostgreSQL-safe approach
+    
+    from sqlalchemy import inspect
+    from sqlalchemy.dialects.postgresql import ENUM
+    
+    # Create enums using PostgreSQL-safe approach (only if they don't exist)
     op.execute("""
         DO $$ BEGIN
             CREATE TYPE questcategoryenum AS ENUM ('wellness', 'reflection', 'social', 'support', 'learning');
@@ -71,8 +74,9 @@ def schema_upgrade() -> None:
         END $$;
     """)
 
-    # Define enum columns (types already exist, so create_type=False)
-    quest_category_enum_col = sa.Enum(
+    # Define enum columns using ENUM type that won't try to recreate
+    # Use postgresql.ENUM explicitly and ensure create_type=False
+    quest_category_enum_col = ENUM(
         "wellness",
         "reflection",
         "social",
@@ -80,23 +84,26 @@ def schema_upgrade() -> None:
         "learning",
         name="questcategoryenum",
         create_type=False,
+        schema=None,
     )
-    quest_difficulty_enum_col = sa.Enum(
+    quest_difficulty_enum_col = ENUM(
         "easy",
         "standard",
         "challenge",
         name="questdifficultyenum",
         create_type=False,
+        schema=None,
     )
-    quest_status_enum_col = sa.Enum(
+    quest_status_enum_col = ENUM(
         "active",
         "completed",
         "expired",
         "cancelled",
         name="queststatusenum",
         create_type=False,
+        schema=None,
     )
-    attestation_status_enum_col = sa.Enum(
+    attestation_status_enum_col = ENUM(
         "pending",
         "queued",
         "confirmed",
