@@ -7,6 +7,19 @@ import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import { defineChain } from 'viem';
 import { useState, useEffect } from 'react';
 
+// Polyfill localStorage for server-side rendering
+if (typeof window === 'undefined') {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  (global as any).localStorage = {
+    getItem: () => null,
+    setItem: () => {},
+    removeItem: () => {},
+    clear: () => {},
+    key: () => null,
+    length: 0,
+  };
+}
+
 // Define SOMNIA Testnet (Chain ID: 50312)
 const somniaTestnet = defineChain({
   id: 50312,
@@ -59,10 +72,20 @@ const config = getDefaultConfig({
   projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_PROJECT_ID_HERE',
   chains: [somniaTestnet, somniaMainnet],
   ssr: true, // Enable Server-Side Rendering for Next.js
+  // @ts-expect-error - Suppress WalletConnect localStorage warnings
+  storage: typeof window !== 'undefined' ? window.localStorage : undefined,
 });
 
 // React Query client for state management
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Suppress query errors in console during development
+      retry: false,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
 /**
  * Web3Provider
@@ -76,13 +99,30 @@ const queryClient = new QueryClient();
  */
 export function Web3Provider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
+  const [error, setError] = useState<Error | null>(null);
 
   useEffect(() => {
-    setMounted(true);
+    try {
+      // Verify localStorage is available
+      if (typeof window !== 'undefined' && window.localStorage) {
+        setMounted(true);
+      }
+    } catch (err) {
+      console.error('Web3Provider initialization error:', err);
+      setError(err as Error);
+      // Still mount but without wallet functionality
+      setMounted(true);
+    }
   }, []);
 
   // Don't render wallet providers during SSR to prevent localStorage errors
   if (!mounted) {
+    return <>{children}</>;
+  }
+
+  // If there's an error, render children without wallet providers
+  if (error) {
+    console.warn('Web3 functionality disabled due to initialization error:', error.message);
     return <>{children}</>;
   }
 

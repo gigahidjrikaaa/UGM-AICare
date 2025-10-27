@@ -16,14 +16,34 @@ const nextConfig = {
       fs: false,
       net: false,
       tls: false,
+      crypto: false,
+      stream: false,
+      http: false,
+      https: false,
+      zlib: false,
+      path: false,
+      os: false,
     };
+
+    // Externalize problematic dependencies for Web3
+    config.externals = config.externals || [];
+    config.externals.push({
+      'pino-pretty': 'pino-pretty',
+      '@react-native-async-storage/async-storage': '@react-native-async-storage/async-storage',
+      'utf-8-validate': 'utf-8-validate',
+      'bufferutil': 'bufferutil',
+      'encoding': 'encoding',
+    });
 
     // Ignore specific module warnings for optional dependencies
     if (!config.ignoreWarnings) config.ignoreWarnings = [];
     config.ignoreWarnings.push(
       /Critical dependency: require function is used in a way in which dependencies cannot be statically extracted/,
       /Module not found: Can't resolve '@react-native-async-storage\/async-storage'/,
-      /Module not found: Can't resolve 'pino-pretty'/
+      /Module not found: Can't resolve 'pino-pretty'/,
+      /Module not found: Can't resolve 'utf-8-validate'/,
+      /Module not found: Can't resolve 'bufferutil'/,
+      /Module not found: Can't resolve 'encoding'/,
     );
 
     return config;

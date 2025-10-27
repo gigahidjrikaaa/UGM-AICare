@@ -4,8 +4,10 @@ import { useEffect, useRef, useState } from 'react';
 import * as Phaser from 'phaser';
 import { GAME_CONFIG } from '@/game/config';
 import { BootScene } from '@/game/scenes/BootScene';
+import { MenuScene } from '@/game/scenes/MenuScene';
 import { WorldMapScene } from '@/game/scenes/WorldMapScene';
 import { CombatScene } from '@/game/scenes/CombatScene';
+import { CareQuestHubScene } from '@/game/scenes/CareQuestHubScene';
 import { EventBridge } from '@/game/utils/EventBridge';
 import { useGameStore } from '@/store/gameStore';
 import toast from 'react-hot-toast';
@@ -36,7 +38,7 @@ export function PhaserGame() {
     const config: Phaser.Types.Core.GameConfig = {
       ...GAME_CONFIG,
       parent: containerRef.current,
-      scene: [BootScene, WorldMapScene, CombatScene],
+      scene: [BootScene, MenuScene, WorldMapScene, CombatScene, CareQuestHubScene],
     };
 
     gameRef.current = new Phaser.Game(config);

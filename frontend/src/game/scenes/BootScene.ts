@@ -16,22 +16,32 @@ export class BootScene extends Phaser.Scene {
   preload() {
     console.log('[BootScene] Loading assets...');
 
-    // Loading bar UI
+    // Loading bar UI with UGM design system
     const progressBar = this.add.graphics();
     const progressBox = this.add.graphics();
-    progressBox.fillStyle(0x222222, 0.8);
-    progressBox.fillRect(440, 320, 400, 50);
+    
+    // Progress box - UGM Blue with Gold border
+    progressBox.fillStyle(0x001d58, 0.9);
+    progressBox.lineStyle(3, 0xffca40, 0.8); // Gold border
+    progressBox.fillRoundedRect(440, 320, 400, 50, 8);
+    progressBox.strokeRoundedRect(440, 320, 400, 50, 8);
 
+    // Loading text - UGM Gold
     const loadingText = this.add.text(640, 280, 'Loading CareQuest...', {
-      fontSize: '20px',
-      color: '#ffffff',
+      fontSize: '24px',
+      fontStyle: 'bold',
+      color: '#FFCA40', // UGM Gold
     }).setOrigin(0.5);
 
-    // Progress events
+    // Progress events - Gold gradient with glow
     this.load.on('progress', (value: number) => {
       progressBar.clear();
-      progressBar.fillStyle(0xffffff, 1);
-      progressBar.fillRect(450, 330, 380 * value, 30);
+      progressBar.fillGradientStyle(0xffca40, 0xffca40, 0xffb020, 0xffb020, 1);
+      progressBar.fillRoundedRect(450, 330, 380 * value, 30, 4);
+      
+      // Add glow effect
+      progressBar.lineStyle(2, 0xffca40, 0.6);
+      progressBar.strokeRoundedRect(450, 330, 380 * value, 30, 4);
     });
 
     this.load.on('complete', () => {
@@ -73,8 +83,8 @@ export class BootScene extends Phaser.Scene {
   }
 
   create() {
-    console.log('[BootScene] Assets loaded, transitioning to WorldMapScene');
-    this.scene.start('WorldMapScene');
+    console.log('[BootScene] Assets loaded, transitioning to MenuScene');
+    this.scene.start('MenuScene');
   }
 
   /**

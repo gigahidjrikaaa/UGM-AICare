@@ -194,6 +194,9 @@ export class CareQuestHubScene extends Phaser.Scene {
     // Create upgrade panel
     this.createUpgradePanel();
 
+    // Create exit button
+    this.createExitButton();
+
     // Create particle system for effects
     this.particleEmitter = this.add.particles(0, 0, 'particle', {
       speed: { min: 100, max: 200 },
@@ -240,8 +243,8 @@ export class CareQuestHubScene extends Phaser.Scene {
       ease: 'Sine.easeInOut',
     });
 
-    // HP Bar background
-    this.add.rectangle(640, 320, 400, 30, 0x333333).setStrokeStyle(2, 0xffffff);
+    // HP Bar background with UGM styling
+    this.add.rectangle(640, 320, 400, 30, 0x001d58).setStrokeStyle(3, 0xffca40);
 
     // HP Bar
     this.monsterHPBar = this.add.graphics();
@@ -338,17 +341,17 @@ export class CareQuestHubScene extends Phaser.Scene {
   }
 
   /**
-   * Create upgrade button
+   * Create upgrade button with UGM styling
    */
   private createUpgradeButton(upgradeKey: keyof typeof this.gameState.upgrades, name: string, icon: string, y: number): Phaser.GameObjects.Container {
     const container = this.add.container(175, y);
 
-    const bg = this.add.rectangle(0, 0, 320, 35, 0x333333)
-      .setStrokeStyle(1, 0xFFCA40)
+    const bg = this.add.rectangle(0, 0, 320, 35, 0x001d58)
+      .setStrokeStyle(2, 0xFFCA40)
       .setInteractive({ useHandCursor: true })
       .on('pointerdown', () => this.purchaseUpgrade(upgradeKey))
-      .on('pointerover', () => bg.setFillStyle(0x444444))
-      .on('pointerout', () => bg.setFillStyle(0x333333));
+      .on('pointerover', () => bg.setFillStyle(0x00308f))
+      .on('pointerout', () => bg.setFillStyle(0x001d58));
 
     const text = this.add.text(-140, 0, `${icon} ${name} Lv.${this.gameState.upgrades[upgradeKey].level}`, {
       fontSize: '14px',
@@ -367,6 +370,36 @@ export class CareQuestHubScene extends Phaser.Scene {
     this.registry.set(`${upgradeKey}Cost`, costText);
 
     return container;
+  }
+
+  /**
+   * Create exit button to return to menu
+   */
+  private createExitButton(): void {
+    const button = this.add.container(1180, 50);
+
+    const bg = this.add.rectangle(0, 0, 140, 45, 0x001d58)
+      .setStrokeStyle(2, 0xffca40)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        this.saveGameState();
+        this.scene.start('MenuScene');
+      })
+      .on('pointerover', () => bg.setFillStyle(0x00308f))
+      .on('pointerout', () => bg.setFillStyle(0x001d58));
+
+    const text = this.add.text(0, 0, '🏠 Menu', {
+      fontSize: '18px',
+      color: '#FFCA40',
+      fontStyle: 'bold',
+    }).setOrigin(0.5, 0.5);
+
+    const hint = this.add.text(0, 25, 'or press ESC', {
+      fontSize: '10px',
+      color: '#ffffff',
+    }).setOrigin(0.5, 0.5).setAlpha(0.6);
+
+    button.add([bg, text, hint]);
   }
 
   /**
@@ -402,7 +435,7 @@ export class CareQuestHubScene extends Phaser.Scene {
     // ESC to return to main menu
     if (event.key === 'Escape') {
       this.saveGameState();
-      this.scene.start('WorldMapScene');
+      this.scene.start('MenuScene');
       return;
     }
 
@@ -681,12 +714,13 @@ export class CareQuestHubScene extends Phaser.Scene {
   }
 
   /**
-   * Update monster HP bar
+   * Update monster HP bar with UGM color scheme
    */
   private updateMonsterHP(): void {
     const hpPercentage = this.gameState.monster.hp / this.gameState.monster.maxHp;
     const barWidth = 400 * hpPercentage;
-    const color = hpPercentage > 0.5 ? 0x00ff00 : hpPercentage > 0.25 ? 0xffff00 : 0xff0000;
+    // UGM Gold gradient - brighter when high HP, darker when low
+    const color = hpPercentage > 0.5 ? 0xffca40 : hpPercentage > 0.25 ? 0xffb020 : 0xff4400;
 
     this.monsterHPBar.clear();
     this.monsterHPBar.fillStyle(color);

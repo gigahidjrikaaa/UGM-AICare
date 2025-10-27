@@ -13,35 +13,49 @@ show_help() {
     echo "Usage: ./dev.sh [command]"
     echo ""
     echo "Commands:"
-    echo "  up              Start in development mode (hot-reload enabled)"
+    echo "  up              Start in development mode (HOT RELOAD enabled)"
     echo "  down            Stop all services"
     echo "  restart         Restart all services"
-    echo "  logs [service]  View logs (optionally for specific service)"
+    echo "  logs [service]  View logs with follow mode (Ctrl+C to exit)"
     echo "  build           Rebuild containers (needed after dependency changes)"
+    echo "  rebuild-fast    Quick rebuild (no cache, parallel build)"
     echo "  prod            Run in production mode (disable hot-reload)"
     echo "  dev             Re-enable development mode"
     echo "  clean           Stop and remove all containers, volumes"
     echo "  status          Show running containers"
     echo ""
+    echo "Hot Reload Features:"
+    echo "  • Backend:  Uvicorn auto-reloads on Python file changes"
+    echo "  • Frontend: Next.js Fast Refresh on save"
+    echo "  • No need to restart containers when editing code!"
+    echo ""
     echo "Examples:"
-    echo "  ./dev.sh up              # Start development environment"
-    echo "  ./dev.sh logs backend    # View backend logs"
-    echo "  ./dev.sh prod            # Switch to production mode"
+    echo "  ./dev.sh up              # Start with hot reload"
+    echo "  ./dev.sh logs backend    # Watch backend logs"
+    echo "  ./dev.sh logs frontend   # Watch frontend logs"
     echo "  ./dev.sh build           # Rebuild after npm/pip install"
     echo ""
 }
 
 case "${1:-}" in
     up)
-        echo "🚀 Starting development environment..."
+        echo "🚀 Starting development environment with HOT RELOAD..."
+        echo ""
+        echo "📝 Changes to your code will automatically reload:"
+        echo "   • Backend: Python files in /backend/app/"
+        echo "   • Frontend: TypeScript/React files in /frontend/src/"
+        echo ""
         docker-compose -f "$COMPOSE_FILE" up -d
         echo ""
         echo "✅ Services started!"
-        echo "   Frontend: http://localhost:4000"
-        echo "   Backend:  http://localhost:8000"
+        echo "   Frontend: http://localhost:4000 (Next.js dev server)"
+        echo "   Backend:  http://localhost:8000 (Uvicorn with --reload)"
         echo "   API Docs: http://localhost:8000/docs"
         echo ""
-        echo "View logs: ./dev.sh logs"
+        echo "💡 Tip: Watch logs in real-time:"
+        echo "   ./dev.sh logs -f"
+        echo ""
+        echo "🔄 Hot reload is enabled. Edit your code and save!"
         ;;
     
     down)
@@ -68,6 +82,19 @@ case "${1:-}" in
         echo "🔨 Rebuilding containers..."
         docker-compose -f "$COMPOSE_FILE" up --build -d
         echo "✅ Rebuild complete"
+        ;;
+    
+    rebuild-fast)
+        echo "⚡ Fast rebuild (no cache, parallel build)..."
+        echo "   This will rebuild only changed layers"
+        echo ""
+        docker-compose -f "$COMPOSE_FILE" build --parallel --no-cache backend frontend
+        echo ""
+        echo "🚀 Restarting services..."
+        docker-compose -f "$COMPOSE_FILE" up -d backend frontend
+        echo ""
+        echo "✅ Fast rebuild complete!"
+        echo "   Backend and frontend have been rebuilt and restarted"
         ;;
     
     prod)

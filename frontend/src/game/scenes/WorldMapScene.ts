@@ -57,6 +57,12 @@ export class WorldMapScene extends Phaser.Scene {
       padding: { x: 10, y: 5 },
     }).setOrigin(0.5);
 
+    // ESC key handler
+    this.input.keyboard?.on('keydown-ESC', () => {
+      console.log('[WorldMapScene] ESC pressed, returning to menu');
+      this.scene.start('MenuScene');
+    });
+
     // Notify React
     this.eventBridge.emit('game:sceneChanged', { scene: 'WorldMap' });
   }

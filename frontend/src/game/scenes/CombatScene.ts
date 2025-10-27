@@ -140,10 +140,10 @@ export class CombatScene extends Phaser.Scene {
    * Handle keyboard input for typing
    */
   private handleTyping(event: KeyboardEvent) {
-    // ESC to flee
+    // ESC to flee back to menu
     if (event.key === 'Escape') {
-      console.log('[CombatScene] Fleeing combat');
-      this.scene.start('WorldMapScene');
+      console.log('[CombatScene] Fleeing combat, returning to menu');
+      this.scene.start('MenuScene');
       return;
     }
 
@@ -327,9 +327,9 @@ export class CombatScene extends Phaser.Scene {
     // Emit to React for backend sync
     this.eventBridge.emit('combat:victory', { rewards, finalWPM, finalAccuracy, difficulty: this.difficulty });
 
-    // Return to world map after 3 seconds
+    // Return to menu after 3 seconds
     this.time.delayedCall(3000, () => {
-      this.scene.start('WorldMapScene');
+      this.scene.start('MenuScene');
     });
   }
 }
