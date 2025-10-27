@@ -5,6 +5,7 @@ import { getDefaultConfig, RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import { WagmiProvider } from 'wagmi';
 import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
 import { defineChain } from 'viem';
+import { useState, useEffect } from 'react';
 
 // Define SOMNIA Testnet (Chain ID: 50312)
 const somniaTestnet = defineChain({
@@ -69,9 +70,22 @@ const queryClient = new QueryClient();
  * Wraps the application with wagmi, RainbowKit, and React Query providers.
  * This enables multi-wallet support (MetaMask, WalletConnect, Coinbase Wallet, etc.)
  * 
+ * Only mounts on client-side to prevent localStorage access during SSR
+ * 
  * @param children - React children to wrap with providers
  */
 export function Web3Provider({ children }: { children: React.ReactNode }) {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Don't render wallet providers during SSR to prevent localStorage errors
+  if (!mounted) {
+    return <>{children}</>;
+  }
+
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
