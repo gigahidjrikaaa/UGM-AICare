@@ -6,7 +6,7 @@ const nextConfig = {
   
   // Webpack configuration to handle optional dependencies
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  webpack: (config: any) => {
+  webpack: (config: any, { dev, isServer }: any) => {
     // Ignore missing optional dependencies that are not needed in browser
     if (!config.resolve) config.resolve = {};
     if (!config.resolve.fallback) config.resolve.fallback = {};
@@ -45,6 +45,15 @@ const nextConfig = {
       /Module not found: Can't resolve 'bufferutil'/,
       /Module not found: Can't resolve 'encoding'/,
     );
+
+    // Fix for Next.js 15.5.x webpack minification bug
+    // Disable the buggy minification plugin in production builds
+    if (!dev && !isServer) {
+      config.optimization = config.optimization || {};
+      config.optimization.minimize = true;
+      // Use terser instead of the buggy Next.js minifier
+      config.optimization.minimizer = config.optimization.minimizer || [];
+    }
 
     return config;
   },

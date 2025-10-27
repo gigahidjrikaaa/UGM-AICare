@@ -18,7 +18,8 @@ show_help() {
     echo "  restart         Restart all services"
     echo "  logs [service]  View logs with follow mode (Ctrl+C to exit)"
     echo "  build           Rebuild containers (needed after dependency changes)"
-    echo "  rebuild-fast    Quick rebuild (no cache, parallel build)"
+    echo "  rebuild-fast    Quick rebuild (parallel, uses cache)"
+    echo "  rebuild-clean   Clean rebuild (no cache, slower but fresh)"
     echo "  prod            Run in production mode (disable hot-reload)"
     echo "  dev             Re-enable development mode"
     echo "  clean           Stop and remove all containers, volumes"
@@ -85,16 +86,28 @@ case "${1:-}" in
         ;;
     
     rebuild-fast)
-        echo "⚡ Fast rebuild (no cache, parallel build)..."
-        echo "   This will rebuild only changed layers"
+        echo "⚡ Fast rebuild (parallel build, use cache)..."
+        echo "   This will rebuild with Docker cache for faster builds"
         echo ""
-        docker-compose -f "$COMPOSE_FILE" build --parallel --no-cache backend frontend
+        docker-compose -f "$COMPOSE_FILE" build --parallel backend frontend
         echo ""
         echo "🚀 Restarting services..."
         docker-compose -f "$COMPOSE_FILE" up -d backend frontend
         echo ""
         echo "✅ Fast rebuild complete!"
         echo "   Backend and frontend have been rebuilt and restarted"
+        ;;
+    
+    rebuild-clean)
+        echo "🧹 Clean rebuild (no cache, parallel build)..."
+        echo "   Warning: This will take longer but ensures a fresh build"
+        echo ""
+        docker-compose -f "$COMPOSE_FILE" build --parallel --no-cache backend frontend
+        echo ""
+        echo "🚀 Restarting services..."
+        docker-compose -f "$COMPOSE_FILE" up -d backend frontend
+        echo ""
+        echo "✅ Clean rebuild complete!"
         ;;
     
     prod)

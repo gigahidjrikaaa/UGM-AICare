@@ -3,9 +3,9 @@
 import '@rainbow-me/rainbowkit/styles.css';
 import { getDefaultConfig, RainbowKitProvider } from '@rainbow-me/rainbowkit';
 import { WagmiProvider } from 'wagmi';
-import { QueryClientProvider, QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { defineChain } from 'viem';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 
 // Polyfill localStorage for server-side rendering
 if (typeof window === 'undefined') {
@@ -72,19 +72,6 @@ const config = getDefaultConfig({
   projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_PROJECT_ID_HERE',
   chains: [somniaTestnet, somniaMainnet],
   ssr: true, // Enable Server-Side Rendering for Next.js
-  // @ts-expect-error - Suppress WalletConnect localStorage warnings
-  storage: typeof window !== 'undefined' ? window.localStorage : undefined,
-});
-
-// React Query client for state management
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      // Suppress query errors in console during development
-      retry: false,
-      refetchOnWindowFocus: false,
-    },
-  },
 });
 
 /**
@@ -100,6 +87,17 @@ const queryClient = new QueryClient({
 export function Web3Provider({ children }: { children: React.ReactNode }) {
   const [mounted, setMounted] = useState(false);
   const [error, setError] = useState<Error | null>(null);
+
+  // Create QueryClient instance with useMemo to prevent recreation on hot reload
+  const queryClient = useMemo(() => new QueryClient({
+    defaultOptions: {
+      queries: {
+        // Suppress query errors in console during development
+        retry: false,
+        refetchOnWindowFocus: false,
+      },
+    },
+  }), []);
 
   useEffect(() => {
     try {

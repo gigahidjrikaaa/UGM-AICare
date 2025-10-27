@@ -35,7 +35,8 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 
 # Install production dependencies only
-RUN npm ci
+# Clean install to ensure exact versions from package-lock.json
+RUN npm ci --prefer-offline --no-audit
 
 # Copy the rest of the source code
 COPY . .
