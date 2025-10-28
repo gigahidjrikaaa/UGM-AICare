@@ -10,7 +10,6 @@ from pydantic_settings import BaseSettings
 class Settings(BaseSettings):
     # Database Configuration
     database_url: str = Field(..., alias="DATABASE_URL")
-    database_url_sync: Optional[str] = Field(None, alias="DATABASE_URL_SYNC")
     
     # Advanced Settings (with defaults)
     debug_sql: bool = Field(False, alias="DEBUG_SQL")

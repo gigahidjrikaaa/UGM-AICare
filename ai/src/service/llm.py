@@ -5,10 +5,15 @@ import re
 import json
 import logging
 from pydantic import BaseModel
-from typing import List, Dict
+from typing import List, Dict, Union, Optional, Any
 
-from src.config import Config
-from src.model.schema import Entity, Relation, EntityRelationResponse, EvaluationDataset
+try:
+    from src.config import Config
+    from src.model.schema import Entity, Relation, EntityRelationResponse, EvaluationDataset
+except ImportError:
+    # Handle case when running from different directory
+    from config import Config
+    from model.schema import Entity, Relation, EntityRelationResponse, EvaluationDataset
 
 logger = logging.getLogger(__name__)
 
@@ -22,10 +27,10 @@ class LLMService:
     
 
     @staticmethod
-    def string_to_json(input: str) -> list[dict] | dict:
+    def string_to_json(input: str) -> Union[List[Dict], Dict]:
         return json.loads(re.sub(r"```json|```", "", input).strip())
 
-    async def query_classification(self, query: str) -> dict:
+    async def query_classification(self, query: str) -> Dict:
         try:
             prompt = f"""
             Tugas: Klasifikasikan kueri pengguna ke dalam kategori 'entity_query' atau 'path_query', dan ekstrak semua entitas yang relevan.
@@ -76,11 +81,21 @@ class LLMService:
             )
 
             response  = self.string_to_json(input=result.candidates[0].content.parts[0].text)
+            
+            # Ensure we always return a dict
+            if isinstance(response, list):
+                # If it's a list with one item, return that item
+                if len(response) == 1:
+                    return response[0]
+                # Otherwise, wrap it in a dict with category and entities
+                return {"category": "entity_query", "entities": []}
+            
             return response
         except Exception as e:
             logger.error(f"Error classifying query: {e}")
+            return {"category": "entity_query", "entities": []}
 
-    async def answer_query_with_knowledge_retrieval(self, query: str, knowledge: list[dict]) -> str:
+    async def answer_query_with_knowledge_retrieval(self, query: str, knowledge: List[Dict]) -> str:
         try:
             prompt = f"""
             Kueri:
@@ -113,6 +128,7 @@ class LLMService:
             return response.candidates[0].content.parts[0].text
         except Exception as e:
             logger.error(f"Failed to answer question: {e}")
+            return "Maaf, terjadi kesalahan saat memproses pertanyaan Anda."
     
     async def generate_response_rag_vector(self, query: str, retrieved_docs: List[Dict]) -> str:
         """Generate response using OpenAI API"""
@@ -159,7 +175,7 @@ class LLMService:
             print(f"Error generating response: {e}")
             return f"Sorry, I encountered an error while generating the response: {str(e)}"
 
-    async def extract_entities(self, text: str) -> list[dict]:
+    async def extract_entities(self, text: str) -> List[Dict]:
         """Extract entites within document using LLM approaches"""
         try:
             config = types.GenerateContentConfig(
@@ -193,14 +209,19 @@ class LLMService:
             )
 
             res = self.string_to_json(response.candidates[0].content.parts[0].text)
+            
+            # Ensure we always return a list
+            if isinstance(res, dict):
+                res = [res]
+            
             logger.info(f"Extracted {len(res)} entities from Document")
             return res
 
         except Exception as e:
-            logger(f"Failed to extract entities: {e}")
-            return None 
+            logger.error(f"Failed to extract entities: {e}")
+            return [] 
         
-    async def extract_relations(self, text: str, entities: list) -> list[dict]:
+    async def extract_relations(self, text: str, entities: List) -> List[Dict]:
         """Extract relations between entities using LLM approaches"""
 
         try:
@@ -236,12 +257,16 @@ class LLMService:
 
             res = self.string_to_json(response.candidates[0].content.parts[0].text)
 
+            # Ensure we always return a list
+            if isinstance(res, dict):
+                res = [res]
+
             logger.info(f"Extracted {len(res)} relations from Document")
             
             return res
         except Exception as e:
-            print(f"[ERROR] Failed to extract relations: {e}")
-            return None
+            logger.error(f"Failed to extract relations: {e}")
+            return []
         
     
     async def extract_entities_and_relations(self, text: str, chunk_id: str) -> EntityRelationResponse:
@@ -487,7 +512,7 @@ class LLMService:
             print(f"[ERROR] Failed to get embeddings: {e}")
             return []
 
-    async def generate_evaluation_dataset(self, doc: str, nodes: List[Entity], minimum: int = 20) -> list[EvaluationDataset]:
+    async def generate_evaluation_dataset(self, doc: str, nodes: List[Entity], minimum: int = 20) -> List[EvaluationDataset]:
         """Generates the dataset using the Gemini model."""
         try:
             nodes_str = json.dumps([node.model_dump() for node in nodes], indent=2)
@@ -536,20 +561,36 @@ class LLMService:
             Sekarang, hasilkan minimal {minimum} contoh baru yang unik berdasarkan semua aturan dan konteks yang diberikan. Pastikan output Anda adalah sebuah list JSON tunggal.
             """
 
-            messages = [
+            messages: List[Dict[str, Any]] = [
                 {"role": "user", "content": prompt}
             ]
 
             class Output(BaseModel):
                 data: List[EvaluationDataset]
 
-            response = self.openai_client.chat.completions.parse(
-            model='o4-mini',
-            messages=messages,
-            response_format=Output
-            )
-
-            content = response.choices[0].message.parsed
+            try:
+                # Try using beta.chat.completions.parse for structured outputs
+                response = self.openai_client.beta.chat.completions.parse(
+                    model='gpt-4o-mini',
+                    messages=messages,  # type: ignore
+                    response_format=Output
+                )
+                content = response.choices[0].message.parsed
+            except (AttributeError, TypeError):
+                # Fallback for older OpenAI SDK versions or if beta API is not available
+                # Use standard completion with JSON mode and manual parsing
+                response = self.openai_client.chat.completions.create(
+                    model='gpt-4o-mini',
+                    messages=messages,  # type: ignore
+                    response_format={"type": "json_object"}
+                )
+                message_content = response.choices[0].message.content
+                if message_content:
+                    content_json = json.loads(message_content)
+                    content = Output(**content_json)
+                else:
+                    logger.warning("Received empty response from OpenAI API")
+                    return []
 
             if not content:
                 logger.warning("Received empty parsed content from OpenAI API")

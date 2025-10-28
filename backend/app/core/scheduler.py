@@ -1,6 +1,6 @@
 # backend/app/core/scheduler.py
 from typing import Optional
-from apscheduler.schedulers.background import BackgroundScheduler # type: ignore
+from apscheduler.schedulers.asyncio import AsyncIOScheduler  # Changed from BackgroundScheduler
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.database import AsyncSessionLocal # Factory to create async sessions for jobs
@@ -12,22 +12,19 @@ from datetime import datetime, time as dt_time, timedelta, date
 import random
 import os
 import logging
-import time
 import asyncio
 from dotenv import load_dotenv
 
 load_dotenv()
 logger = logging.getLogger(__name__)
 
-# Use timezone relevant to your users (e.g., WIB)
-scheduler = BackgroundScheduler(timezone="Asia/Jakarta")
+# Use AsyncIOScheduler to work properly with FastAPI's event loop
+scheduler = AsyncIOScheduler(timezone="Asia/Jakarta")
 CHECKIN_JOB_ID = "proactive_checkin_job"
 
-def send_proactive_checkins():
+# Remove the sync wrapper, use async directly
+async def send_proactive_checkins():
     """Scheduled job to find inactive users and send check-in emails."""
-    asyncio.run(async_send_proactive_checkins())
-
-async def async_send_proactive_checkins():
     """Async implementation of the scheduled job."""
     logger.info("Scheduler: Running proactive check-in job...")
     async with AsyncSessionLocal() as db:
@@ -85,17 +82,14 @@ async def async_send_proactive_checkins():
 
                 # Send the email via the utility function
                 send_email(recipient_email=decrypted_email, subject=subject, html_content=html_body)
-                time.sleep(1) # Optional: Rate limit to avoid hitting SMTP limits
+                await asyncio.sleep(1) # Use async sleep instead of time.sleep
                 logger.info(f"Scheduler: Check-in email sent to {user.id} ({decrypted_email}).")
 
         except Exception as e:
             logger.error(f"Scheduler: Error during check-in job execution: {e}", exc_info=True)
 
-def generate_weekly_ia_report():
+async def generate_weekly_ia_report():
     """Scheduled job to generate weekly IA insights report."""
-    asyncio.run(async_generate_weekly_ia_report())
-
-async def async_generate_weekly_ia_report():
     """Async implementation of the weekly IA report job."""
     logger.info("Scheduler: Running weekly IA report generation...")
     async with AsyncSessionLocal() as db:

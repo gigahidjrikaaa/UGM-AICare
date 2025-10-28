@@ -134,35 +134,18 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      # OPTIMIZATION: Fast disk cleanup using dedicated action (saves 2-3 minutes)
       - name: Free up disk space
-        run: |
-          echo "=== Disk space before cleanup ==="
-          df -h / | awk 'NR==1 || /\/$/'
-          
-          # Quick directory removal (fast, no package manager overhead)
-          echo "=== Removing unnecessary directories ==="
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc \
-            /opt/hostedtoolcache/CodeQL "$AGENT_TOOLSDIRECTORY" \
-            /usr/share/swift /usr/local/julia* /opt/microsoft
-          
-          # Docker cleanup (often reclaims 5-10 GB)
-          echo "=== Cleaning up Docker ==="
-          docker system prune -af --volumes 2>/dev/null || true
-          
-          # Only remove packages that are commonly installed and large
-          # Using a single apt-get command is much faster than multiple
-          echo "=== Removing large packages ==="
-          sudo apt-get remove -y --purge \
-            azure-cli google-chrome-stable firefox powershell \
-            'llvm-*' 'clang-*' 'php*' \
-            mysql-server* mysql-client* \
-            2>/dev/null || true
-          
-          sudo apt-get autoremove -y 2>/dev/null || true
-          sudo apt-get clean
-          
-          echo "=== Disk space after cleanup ==="
-          df -h / | awk 'NR==1 || /\/$/'
+        uses: jlumbroso/free-disk-space@main
+        with:
+          # Options (all true by default, customize to speed up further)
+          tool-cache: true          # Remove tool cache (~20 GB, fast)
+          android: true             # Remove Android SDK (~15 GB, fast)
+          dotnet: true              # Remove .NET runtime (~3 GB, fast)
+          haskell: true             # Remove Haskell (~2 GB, fast)
+          large-packages: true      # Remove large packages (slow, but reclaims ~10 GB)
+          docker-images: true       # Remove Docker images (~4 GB, medium speed)
+          swap-storage: false       # Keep swap (we might need it)
 
       - name: Set lowercase repository owner
         id: lowercase
@@ -195,13 +178,15 @@ jobs:
           build-args: |
             BUILDKIT_INLINE_CACHE=1
 
-      - name: Clean up Docker build cache
-        if: always()
-        run: |
-          echo "=== Cleaning up Docker to free space ==="
-          docker system prune -af --volumes
-          echo "=== Disk space after Docker cleanup ==="
-          df -h
+      # Optional: Additional cleanup after build (already done in free-disk-space action)
+      # Uncomment if you need extra space for subsequent steps
+      # - name: Clean up Docker build cache
+      #   if: always()
+      #   run: |
+      #     echo "=== Cleaning up Docker to free space ==="
+      #     docker system prune -af --volumes
+      #     echo "=== Disk space after Docker cleanup ==="
+      #     df -h
 
   # ========================================
   # OPTIMIZATION 3: Parallel Jobs - Build Frontend
