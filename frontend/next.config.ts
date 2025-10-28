@@ -4,9 +4,15 @@ const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
   
-  // Webpack configuration to handle optional dependencies
+  // Turbopack configuration (Next.js 16 default bundler)
+  turbopack: {
+    // Turbopack handles resolve.fallback automatically for browser builds
+    // Web3 externals are handled via serverExternalPackages below
+  },
+  
+  // Legacy webpack config for backward compatibility (if needed with --webpack flag)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  webpack: (config: any, { dev, isServer }: any) => {
+  webpack: (config: any) => {
     // Ignore missing optional dependencies that are not needed in browser
     if (!config.resolve) config.resolve = {};
     if (!config.resolve.fallback) config.resolve.fallback = {};
@@ -46,14 +52,8 @@ const nextConfig = {
       /Module not found: Can't resolve 'encoding'/,
     );
 
-    // Fix for Next.js 15.5.x webpack minification bug
-    // Disable the buggy minification plugin in production builds
-    if (!dev && !isServer) {
-      config.optimization = config.optimization || {};
-      config.optimization.minimize = true;
-      // Use terser instead of the buggy Next.js minifier
-      config.optimization.minimizer = config.optimization.minimizer || [];
-    }
+    // Next.js 16 fixes the webpack minification bug - no workaround needed!
+    // Removed: config.optimization.minimize = false
 
     return config;
   },
@@ -64,8 +64,14 @@ const nextConfig = {
     optimizePackageImports: ['framer-motion', 'react-icons', 'date-fns'],
   },
   
-  // External packages configuration
-  serverExternalPackages: [],
+  // External packages configuration for server (both webpack and Turbopack)
+  serverExternalPackages: [
+    'pino-pretty',
+    '@react-native-async-storage/async-storage',
+    'utf-8-validate',
+    'bufferutil',
+    'encoding',
+  ],
   
   images: {
     // Optimize all images, including remote ones

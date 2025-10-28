@@ -53,7 +53,7 @@ async def get_today_quests(
     )
     result = await session.execute(stmt)
     quests = list(result.scalars().unique())
-    return quests
+    return [QuestInstanceResponse.from_orm(q) for q in quests]
 
 
 @router.post("/{quest_id}/complete", response_model=QuestCompletionResponse, status_code=status.HTTP_200_OK)
