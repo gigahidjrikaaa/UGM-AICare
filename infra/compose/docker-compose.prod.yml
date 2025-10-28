@@ -123,10 +123,26 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      # NextAuth.js Configuration (REQUIRED)
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
+      NEXTAUTH_URL: ${NEXTAUTH_URL}
+      # OAuth Providers
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      # Backend API URLs
       INTERNAL_API_URL: http://backend:8000 # Internal communication within Docker network
       NEXT_PUBLIC_API_URL: http://localhost:8000/api # Reverted
+      NEXT_PUBLIC_BACKEND_BASE: ${NEXT_PUBLIC_BACKEND_BASE:-http://localhost:8000}
+      NEXT_PUBLIC_BACKEND_WS_BASE: ${NEXT_PUBLIC_BACKEND_WS_BASE:-ws://localhost:8000}
+      # Internal API Key for backend communication
+      INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
+      # Admin Credentials
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      # Wallet Integration
+      NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID: ${NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID:-}
+      # Environment
+      APP_ENV: production
     depends_on:
       - backend
     restart: unless-stopped

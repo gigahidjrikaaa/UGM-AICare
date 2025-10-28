@@ -18,10 +18,10 @@ export default function CareQuestWorldPage() {
   const { joy, care } = useGameStore();
 
   return (
-    <div className="relative w-full h-screen overflow-hidden bg-gradient-to-br from-ugm-blue to-ugm-blue-dark">
+    <div className="min-h-screen bg-gradient-to-br from-gray-900 via-ugm-blue-dark to-ugm-blue flex flex-col">
       {/* Header */}
-      <div className="absolute top-0 left-0 right-0 z-10 bg-gradient-to-b from-black/60 to-transparent backdrop-blur-sm">
-        <div className="container mx-auto px-4 py-4">
+      <header className="bg-gradient-to-r from-ugm-blue to-ugm-blue-dark border-b-2 border-ugm-gold/30 backdrop-blur-sm">
+        <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             {/* Breadcrumb */}
             <Link 
@@ -40,37 +40,59 @@ export default function CareQuestWorldPage() {
 
             {/* Resource Display */}
             <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-ugm-blue/80 border border-ugm-gold/30 rounded-lg">
-                <Heart className="w-4 h-4 text-pink-400" />
-                <span className="text-sm font-semibold text-white">{joy}</span>
+              <div className="flex items-center gap-2 px-4 py-2 bg-ugm-blue/80 border border-ugm-gold/30 rounded-lg shadow-lg">
+                <Heart className="w-5 h-5 text-pink-400" />
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-300">JOY</span>
+                  <span className="text-sm font-bold text-white">{joy}</span>
+                </div>
               </div>
-              <div className="flex items-center gap-2 px-3 py-1.5 bg-ugm-blue/80 border border-ugm-gold/30 rounded-lg">
-                <Sparkles className="w-4 h-4 text-blue-400" />
-                <span className="text-sm font-semibold text-white">{care}</span>
+              <div className="flex items-center gap-2 px-4 py-2 bg-ugm-blue/80 border border-ugm-gold/30 rounded-lg shadow-lg">
+                <Sparkles className="w-5 h-5 text-blue-400" />
+                <div className="flex flex-col">
+                  <span className="text-xs text-gray-300">$CARE</span>
+                  <span className="text-sm font-bold text-white">{care}</span>
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
+      </header>
 
-      {/* Instructions Panel (Bottom Left) */}
-      <div className="absolute bottom-4 left-4 z-10 max-w-md">
-        <div className="bg-ugm-blue/90 border-2 border-ugm-gold/40 rounded-xl p-4 backdrop-blur-md shadow-2xl">
-          <h3 className="text-lg font-bold text-ugm-gold mb-2 flex items-center gap-2">
-            <Gamepad2 className="w-5 h-5" />
-            Game Controls
-          </h3>
-          <div className="space-y-1 text-sm text-white/90">
-            <p><kbd className="px-2 py-0.5 bg-ugm-gold/20 rounded text-ugm-gold font-mono text-xs">←↑↓→</kbd> Move around</p>
-            <p><kbd className="px-2 py-0.5 bg-ugm-gold/20 rounded text-ugm-gold font-mono text-xs">SPACE</kbd> Interact with NPCs</p>
-            <p><kbd className="px-2 py-0.5 bg-ugm-gold/20 rounded text-ugm-gold font-mono text-xs">ESC</kbd> Return to menu</p>
-            <p className="text-xs text-white/60 mt-2">Select your scene from the menu to begin!</p>
+      {/* Main Game Container */}
+      <main className="flex-1 container mx-auto px-6 py-6 flex flex-col">
+        {/* Game Window */}
+        <div className="flex-1 bg-gray-900 rounded-xl shadow-2xl border-2 border-ugm-gold/40 overflow-hidden relative">
+          <PhaserGame />
+        </div>
+
+        {/* Controls Info */}
+        <div className="mt-4 bg-ugm-blue/90 border-2 border-ugm-gold/40 rounded-xl p-4 backdrop-blur-md shadow-xl">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Gamepad2 className="w-5 h-5 text-ugm-gold" />
+              <h3 className="text-lg font-bold text-ugm-gold">Game Controls</h3>
+            </div>
+            <div className="flex items-center gap-4 text-sm text-white/90">
+              <div className="flex items-center gap-2">
+                <kbd className="px-3 py-1.5 bg-ugm-gold/20 rounded text-ugm-gold font-mono text-xs font-bold border border-ugm-gold/30">←↑↓→</kbd>
+                <span>Move</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <kbd className="px-3 py-1.5 bg-ugm-gold/20 rounded text-ugm-gold font-mono text-xs font-bold border border-ugm-gold/30">SPACE</kbd>
+                <span>Interact</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <kbd className="px-3 py-1.5 bg-ugm-gold/20 rounded text-ugm-gold font-mono text-xs font-bold border border-ugm-gold/30">ESC</kbd>
+                <span>Menu</span>
+              </div>
+              <div className="text-xs text-white/60 ml-4">
+                💡 Select your scene from the menu to begin!
+              </div>
+            </div>
           </div>
         </div>
-      </div>
-
-      {/* Phaser Game Canvas */}
-      <PhaserGame />
+      </main>
     </div>
   );
 }

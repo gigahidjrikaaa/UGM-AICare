@@ -95,7 +95,7 @@ export function PhaserGame() {
   }, [updateWellnessFromGame]);
 
   return (
-    <div className="relative w-full h-screen bg-gray-900">
+    <div className="relative w-full h-full flex items-center justify-center bg-gray-900">
       {/* Loading overlay */}
       {isLoading && (
         <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 z-50">
@@ -108,15 +108,15 @@ export function PhaserGame() {
         </div>
       )}
 
-      {/* Phaser canvas container */}
+      {/* Phaser canvas container - Contained with max dimensions */}
       <div
         ref={containerRef}
         id="phaser-game-container"
-        className="w-full h-full"
+        className="w-full h-full max-w-[1920px] max-h-[1080px] rounded-lg overflow-hidden shadow-2xl border-2 border-gray-700 aspect-video"
       />
 
-      {/* React UI overlays */}
-      <div className="absolute top-4 left-4 bg-black bg-opacity-70 text-white p-4 rounded-lg shadow-lg">
+      {/* React UI overlays - Positioned inside game window */}
+      <div className="absolute top-6 left-6 bg-black bg-opacity-70 text-white p-4 rounded-lg shadow-lg z-10">
         <div className="text-sm font-semibold mb-2">CareQuest Game Info</div>
         <div className="text-xs space-y-1">
           <p>
@@ -133,9 +133,10 @@ export function PhaserGame() {
 
       {/* Debug: Game status */}
       {process.env.NODE_ENV === 'development' && (
-        <div className="absolute bottom-4 right-4 bg-black bg-opacity-70 text-white p-3 rounded text-xs font-mono">
+        <div className="absolute bottom-6 right-6 bg-black bg-opacity-70 text-white p-3 rounded text-xs font-mono z-10">
           <div>Phaser {Phaser.VERSION}</div>
           <div>Scene: {currentScene}</div>
+          <div>Resolution: 1920x1080</div>
           <div>FPS Target: 60</div>
         </div>
       )}
