@@ -4,34 +4,43 @@ from fastapi import FastAPI, Request as FastAPIRequest # type: ignore
 from datetime import datetime, timezone
 from app.database import init_db, close_db
 from sqlalchemy import text
+# Cross-cutting routes (auth, user, internal, admin, system)
 from app.routes import (
     auth,
-    chat,
-    feedback,
     link_did,
     internal,
+    profile,
+    admin,
+    system,
+)
+from app.routes.admin import insights as admin_insights
+from app.routes.admin import counselors as admin_counselors
+
+# Mental health domain routes
+from app.domains.mental_health.routes import (
+    chat,
+    feedback,
     journal,
     journal_prompts,
     summary,
-    profile,
     session_events,
     appointments,
     quests,
-    admin,
     counselor,
     agents,
     agents_command,
     agents_graph,
     surveys,
-    cbt_modules,
+    # cbt_modules - DEPRECATED: Use SCA intervention plans instead
     safety_triage,
     clinical_analytics_routes,
-    system,
     intervention_plans,
     langgraph_analytics,
 )
-from app.routes.admin import insights as admin_insights
-from app.routes.admin import counselors as admin_counselors
+
+# Finance domain routes
+from app.domains.finance import finance_router
+from app.domains.blockchain import blockchain_router  # Blockchain domain routes
 from app.agents.sta.router import router as sta_router
 from app.agents.sca.router import router as sca_router
 from app.agents.sda.router import router as sda_router
@@ -89,11 +98,15 @@ async def lifespan(app: FastAPI):
     logger.info("Starting application lifespan...")
     # Initialize the database
     await init_db()
-    # Initialize blockchain connection
-    from app.core.blockchain_utils import init_blockchain
-    await init_blockchain()
+    # Initialize blockchain connection (EDU Chain NFT)
+    from app.blockchain import init_nft_client
+    await init_nft_client()
     # Start the background scheduler
     start_scheduler()
+    # Start the finance revenue scheduler
+    from app.domains.finance import start_scheduler as start_finance_scheduler
+    start_finance_scheduler()
+    logger.info("Finance revenue scheduler started")
     # Initialize event bus subscriptions for SSE broadcasting
     from app.services.event_sse_bridge import initialize_event_subscriptions
     await initialize_event_subscriptions()
@@ -101,6 +114,10 @@ async def lifespan(app: FastAPI):
     # Clean up resources on shutdown
     logger.info("Shutting down application lifespan...")
     shutdown_scheduler()
+    # Stop the finance revenue scheduler
+    from app.domains.finance import stop_scheduler as stop_finance_scheduler
+    stop_finance_scheduler()
+    logger.info("Finance revenue scheduler stopped")
     # Close database connections
     await close_db()
 
@@ -178,8 +195,10 @@ app.include_router(intervention_plans.router)  # Intervention plan records
 app.include_router(appointments.router)
 app.include_router(surveys.router)
 app.include_router(surveys.user_router)
-app.include_router(cbt_modules.router)
+# app.include_router(cbt_modules.router) - DEPRECATED: Use /api/v1/agents/sca for CBT-based intervention plans
 app.include_router(clinical_analytics_routes.router)  # New clinical analytics endpoints
+app.include_router(finance_router, prefix="/api/v1/finance", tags=["Finance"])  # Finance domain routes
+app.include_router(blockchain_router, prefix="/api/v1/blockchain", tags=["Blockchain"])  # Blockchain domain routes
 # logger.info(f"List of routers (/api/v1): {app.routes}")
 logger.info(f"Allowed origins: {origins}")
 

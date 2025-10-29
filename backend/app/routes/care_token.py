@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 from typing import Optional
 from decimal import Decimal
 
-from app.services.care_token_service import get_care_token_service, CareTokenService
+from app.domains.finance.services.care_token_service import get_care_token_service, CareTokenService
 from app.dependencies import get_current_active_user
 from app.models.user import User
 

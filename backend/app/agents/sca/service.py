@@ -52,7 +52,35 @@ _FALLBACK_PLAN = [
 
 
 class SupportCoachService:
-    """Generates structured follow-up plans and emits Insights Agent telemetry."""
+    """
+    Support Coach Agent (SCA) - Generates structured therapeutic intervention plans.
+    
+    Supports multiple evidence-based approaches:
+    - Crisis Management: calm_down, break_down_problem, general_coping
+    - CBT Interventions: cognitive_restructuring, behavioral_activation
+    
+    CBT Integration (replacing legacy CBT modules):
+    The SCA now incorporates Cognitive Behavioral Therapy principles through
+    AI-generated personalized plans. These plans follow established CBT frameworks
+    while adapting to each user's specific situation.
+    
+    Available Plan Types:
+    - calm_down: Anxiety and panic management (breathing, grounding)
+    - break_down_problem: Problem-solving for overwhelming situations
+    - general_coping: General stress management and resilience
+    - cognitive_restructuring: CBT thought challenging and reframing
+    - behavioral_activation: CBT activity scheduling for depression/low motivation
+    
+    Usage:
+        # For AI-powered CBT plan:
+        response = await sca_service.intervene(
+            payload=request,
+            use_gemini_plan=True,
+            plan_type="cognitive_restructuring",
+            user_message="I failed my exam and I'm a complete failure",
+            sta_context={"risk_level": 2}
+        )
+    """
 
     def __init__(
         self,
@@ -73,7 +101,12 @@ class SupportCoachService:
         Args:
             payload: Standard SCA intervention request
             use_gemini_plan: If True, generate personalized plan with Gemini AI
-            plan_type: Type of plan ("calm_down", "break_down_problem", "general_coping")
+            plan_type: Type of plan:
+                - "calm_down": Anxiety/panic management
+                - "break_down_problem": Problem-solving
+                - "general_coping": General stress management
+                - "cognitive_restructuring": CBT thought challenging (replaces legacy CBT module)
+                - "behavioral_activation": CBT activity scheduling (replaces legacy CBT module)
             user_message: Original user message for context (required if use_gemini_plan=True)
             sta_context: Additional context from STA (risk_level, etc.)
         

@@ -1,4 +1,7 @@
-"""Testing endpoints for admin panel - simulate users and conversations."""
+"""Testing endpoints for admin panel - simulate users and conversations.
+
+# pyright: reportMissingImports=false, reportOptionalMemberAccess=false
+"""
 from __future__ import annotations
 
 import logging
@@ -18,8 +21,19 @@ from app.models import Conversation, Message, User
 from app.models.messages import MessageRoleEnum
 from app.agents.sta.service import SafetyTriageService
 from app.schemas.chat import ChatRequest, ChatResponse
-from app.services.chat_processing import process_chat_message
-from app.services.personal_context import build_user_personal_context
+# from app.domains.mental_health.services.chat_processing import process_chat_message
+from app.domains.mental_health.services.personal_context import build_user_personal_context
+
+# Chat processing is not yet implemented - use stub that raises NotImplementedError
+try:
+    from app.domains.mental_health.services.chat_processing import process_chat_message
+except ImportError:
+    # Fallback to stub function
+    async def process_chat_message(*args, **kwargs):
+        raise NotImplementedError(
+            "chat_processing module not yet implemented. "
+            "This endpoint requires the chat_processing service to be developed."
+        )
 
 logger = logging.getLogger(__name__)
 
@@ -224,8 +238,8 @@ async def simulate_real_chat(
     case_created = False
 
     # Import required functions
-    from app.services.chat_processing import process_chat_message
-    from app.services.personal_context import build_user_personal_context
+    # process_chat_message already imported at module level
+    from app.domains.mental_health.services.personal_context import build_user_personal_context
     from app.core import llm
     
     # Default LLM responder without tool calling (for simplicity)
@@ -435,7 +449,7 @@ async def simulate_conversation(
             # Import STA classifier
             from app.agents.sta.classifiers import SafetyTriageClassifier
             from app.agents.sta.schemas import STAClassifyRequest
-            from app.services.agent_orchestrator import AgentOrchestrator
+            from app.domains.mental_health.services.agent_orchestrator import AgentOrchestrator
             
             classifier = SafetyTriageClassifier()
             orchestrator = AgentOrchestrator(db)

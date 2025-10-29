@@ -1,0 +1,330 @@
+# Blockchain Module Documentation
+
+## Overview
+
+The **blockchain/** module consolidates all smart contract interactions for the UGM-AICare platform, providing a clean separation of concerns from business logic.
+
+## 📁 Module Structure
+
+```plaintext
+backend/app/blockchain/
+├── __init__.py                  # Module exports
+├── base_web3.py                 # Base Web3 client with shared utilities
+├── care_token_client.py         # CARE token operations (mint, balance, transfer)
+├── oracle_client.py             # PlatformRevenueOracle interactions
+└── staking_client.py            # CareStakingHalal operations
+```
+
+## 🎯 Purpose
+
+This module handles:
+
+- **CARE Token Operations**: Minting, transfers, balance queries
+- **Revenue Oracle**: Submit monthly revenue reports to blockchain
+- **Staking Contract**: Query TVL, staker positions, profit distributions
+- **Web3 Utilities**: Connection management, transaction signing, gas estimation
+
+## 🔧 Base Web3 Client
+
+Located: `app/blockchain/base_web3.py`
+
+All blockchain clients extend `BaseWeb3Client` for shared functionality:
+
+### Features
+
+- Web3 connection management (SOMNIA network)
+- POA middleware injection
+- Transaction signing and submission
+- Gas estimation with 20% safety buffer
+- Retry logic with exponential backoff
+- Address checksum conversion
+- Wei ↔ Ether conversions
+
+### Usage
+
+```python
+from app.blockchain.base_web3 import BaseWeb3Client
+
+client = BaseWeb3Client()
+
+# Get balance
+balance = client.get_balance("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb9")
+
+# Convert units
+wei = client.to_wei(1.5, 'ether')
+ether = client.from_wei(1500000000000000000)
+```
+
+## 🪙 CARE Token Client
+
+Located: `app/blockchain/care_token_client.py`
+
+### Features
+
+- Mint tokens via CareTokenController (14 categories)
+- Check token balances
+- Query token information (name, symbol, supply, etc.)
+- Transfer tokens
+
+### Usage
+
+```python
+from app.blockchain import CareTokenClient
+
+token_client = CareTokenClient()
+
+# Get balance
+balance = await token_client.get_balance("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb9")
+print(f"Balance: {balance} CARE")
+
+# Mint tokens for community staking (category 1)
+result = await token_client.mint_for_category(
+    category=1,
+    to="0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb9",
+    amount=1000 * (10 ** 18),  # 1000 CARE in wei
+    reason="Monthly staking rewards"
+)
+
+# Get token info
+info = await token_client.get_token_info()
+```
+
+### Mint Categories
+
+Per `CareTokenController.sol`:
+
+0. **Platform Operations**: Operational expenses
+1. **Community Staking**: Staking pool allocations
+2. **Rewards**: User rewards (quest completion, milestones)
+3. **Team**: Team allocations (vested)
+4. **Advisors**: Advisor allocations (vested)
+5. **Marketing**: Marketing campaigns, airdrops
+6. **Partnerships**: Strategic partnerships
+7. **Development**: Core development team
+8. **Treasury**: Protocol treasury
+9. **Research**: Research grants, academic partnerships
+10. **Charity**: Charitable initiatives
+11. **Emergency**: Emergency reserves
+12. **Liquidity**: DEX liquidity provision
+13. **Governance**: Governance incentives
+
+Each category requires specific role permissions (e.g., `COMMUNITY_MINTER_ROLE` for staking).
+
+## 📊 Platform Revenue Oracle Client
+
+Located: `app/blockchain/oracle_client.py`
+
+### Features
+
+- Submit monthly revenue reports
+- Query historical reports
+- Approve reports (multi-sig workflow)
+
+### Usage
+
+```python
+from app.blockchain import OracleClient
+
+oracle_client = OracleClient()
+
+# Submit monthly report
+result = await oracle_client.submit_monthly_report(
+    month_yyyymm=202510,
+    total_revenue_wei=14000 * (10 ** 18),
+    total_expenses_wei=3000 * (10 ** 18),
+    breakdown_tuple=(5000, 3000, 1500, 2500, 2000)  # In wei
+)
+
+# Query historical report
+report = await oracle_client.get_report(month_yyyymm=202510)
+
+# Approve report (multi-sig)
+result = await oracle_client.approve_report(month_yyyymm=202510)
+```
+
+## 🥩 Staking Client
+
+Located: `app/blockchain/staking_client.py`
+
+### Features
+
+- Query Total Value Locked (TVL)
+- Get staker position details
+- Query tier distribution (planned)
+
+### Usage
+
+```python
+from app.blockchain import StakingClient
+
+staking_client = StakingClient()
+
+# Get TVL
+tvl = await staking_client.get_tvl()
+print(f"TVL: {tvl['tvl_formatted']}")
+
+# Get staker position
+position = await staking_client.get_staker_position("0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb9")
+print(f"Tier: {position['tier_name']}")
+print(f"Staked: {position['staked_amount_care']} CARE")
+print(f"Profit Share: {position['profit_share_percent']}%")
+```
+
+### Staking Tiers
+
+Per `CareStakingHalal.sol`:
+
+- **Bronze**: 25,000-99,999 CARE (25% profit share)
+- **Silver**: 100,000-499,999 CARE (30% profit share)
+- **Gold**: 500,000-999,999 CARE (35% profit share)
+- **Platinum**: 1,000,000+ CARE (40% profit share)
+
+## 🔐 Environment Variables
+
+### Required
+
+```bash
+# SOMNIA Network
+SOMNIA_RPC_URL=https://api.infra.mainnet.somnia.network/
+
+# Contract Addresses
+CARE_TOKEN_ADDRESS=0x...
+CARE_TOKEN_CONTROLLER_ADDRESS=0x...
+PLATFORM_REVENUE_ORACLE_ADDRESS=0x...
+CARE_STAKING_HALAL_ADDRESS=0x...
+
+# Private Keys (keep secure!)
+CARE_MINTER_PRIVATE_KEY=0x...
+FINANCE_TEAM_PRIVATE_KEY=0x...
+```
+
+### Network Info
+
+- **Chain ID**: 5031 (SOMNIA Mainnet)
+- **Native Token**: STT (SOMNIA Test Token)
+- **Block Time**: ~2 seconds
+- **Consensus**: Proof of Authority (POA)
+
+## 🛠️ Transaction Handling
+
+### Gas Management
+
+```python
+# Automatic gas estimation with 20% buffer
+gas = await client.estimate_gas(transaction)
+
+# Manual gas settings
+transaction['gas'] = 500000
+transaction['gasPrice'] = await client.get_gas_price()
+```
+
+### Retry Logic
+
+All transactions automatically retry up to 3 times with exponential backoff:
+
+- Attempt 1: Immediate
+- Attempt 2: Wait 2 seconds
+- Attempt 3: Wait 4 seconds
+
+### Error Handling
+
+```python
+try:
+    result = await client.send_transaction(...)
+    if result:
+        print(f"Success! Tx: {result['tx_hash']}")
+    else:
+        print("Transaction failed")
+except Exception as e:
+    logger.error(f"Error: {e}")
+```
+
+## 📝 Contract ABIs
+
+### Loading ABIs
+
+ABIs are loaded from compiled Hardhat artifacts:
+
+```plaintext
+blockchain/artifacts/contracts/
+├── CareToken.sol/CareToken.json
+├── CareTokenController.sol/CareTokenController.json
+├── PlatformRevenueOracle.sol/PlatformRevenueOracle.json
+└── CareStakingHalal.sol/CareStakingHalal.json
+```
+
+If artifacts aren't available, clients fall back to minimal ABIs for basic operations.
+
+### Updating ABIs
+
+After contract changes:
+
+```bash
+cd blockchain/
+npx hardhat compile
+# ABIs automatically updated in artifacts/
+```
+
+## 🧪 Testing
+
+### Unit Tests
+
+Create `backend/tests/blockchain/` with:
+
+- `test_base_web3.py`: Test Web3 connection and utilities
+- `test_care_token_client.py`: Test token operations
+- `test_oracle_client.py`: Test revenue oracle
+- `test_staking_client.py`: Test staking queries
+
+### Integration Tests
+
+- Test against SOMNIA testnet
+- Mock Web3 responses for unit tests
+- Verify transaction receipts
+
+## ⚠️ Production Considerations
+
+1. **Private Key Security**
+   - Use hardware wallets or secure key management systems
+   - Never commit private keys to version control
+   - Rotate keys periodically
+
+2. **Gas Price Monitoring**
+   - Implement dynamic gas price strategies
+   - Set maximum gas price limits
+   - Monitor for gas price spikes
+
+3. **Transaction Monitoring**
+   - Log all transactions to database
+   - Implement transaction status tracking
+   - Set up alerts for failed transactions
+
+4. **Rate Limiting**
+   - Implement rate limits for RPC calls
+   - Use backup RPC URLs for failover
+   - Cache blockchain data when possible
+
+## 🔗 Integration with Finance Module
+
+The finance module uses blockchain clients for revenue reporting:
+
+```python
+# In app/finance/revenue_tracker.py
+from app.blockchain import OracleClient
+
+oracle_client = OracleClient()
+result = await oracle_client.submit_monthly_report(...)
+```
+
+## 📚 Related Documentation
+
+- **Finance Module**: `backend/app/finance/README.md`
+- **Smart Contracts**: `blockchain/README.md`
+- **Deployment Scripts**: `blockchain/scripts/`
+- **API Reference**: Auto-generated at `/docs`
+
+---
+
+**Last Updated**: October 28, 2025  
+**Module Version**: 1.0.0  
+**Status**: ✅ Production Ready

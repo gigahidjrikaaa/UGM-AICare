@@ -81,7 +81,7 @@ async def init_db():
             await session.rollback()
             logger.error(f"Failed to ensure default users: {exc}")
 
-    from app.services.quest_engine_service import QuestEngineService
+    from app.domains.mental_health.services.quest_engine_service import QuestEngineService
 
     async with AsyncSessionLocal() as session:
         try:

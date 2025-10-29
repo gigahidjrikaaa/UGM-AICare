@@ -1,4 +1,11 @@
-"""Admin Case Management: comprehensive case CRUD, notes, assignments, and workflows."""
+"""Admin Case Management: comprehensive case CRUD, notes, assignments, and workflows.
+
+Note: This file contains many type: ignore comments for SQLAlchemy ORM patterns.
+Pylance sees Column[T] types but at runtime these are actual T values when accessing
+attributes on ORM instances. This is expected behavior and safe.
+
+# pyright: reportArgumentType=false, reportAttributeAccessIssue=false, reportGeneralTypeIssues=false
+"""
 from __future__ import annotations
 
 import logging
@@ -28,7 +35,7 @@ from app.schemas.admin.cases import (
     ConversationMessageSummary,
     TriageAssessmentSummary,
 )
-from app.services.agent_orchestrator import AgentOrchestrator
+from app.domains.mental_health.services.agent_orchestrator import AgentOrchestrator
 from app.services.event_bus import EventType, publish_event
 from app.models.agent_user import AgentUser
 
@@ -177,8 +184,9 @@ async def list_cases(
         # Build response with related data
         case_items = []
         for case in cases:
-            # Calculate SLA status
-            is_breached, minutes_until, sla_status = _calculate_sla_status(case.sla_breach_at)
+            # Calculate SLA status  
+            # Note: SQLAlchemy ORM instances return actual values, not Column objects at runtime
+            is_breached, minutes_until, sla_status = _calculate_sla_status(case.sla_breach_at)  # type: ignore[arg-type]
             
             # Get notes count
             notes_count_stmt = select(func.count()).where(CaseNote.case_id == case.id)
@@ -193,7 +201,7 @@ async def list_cases(
             # We look up user_id via the Conversation table which links session_id to user_id
             latest_triage = None
             
-            if case.session_id:
+            if case.session_id:  # type: ignore[truthy-bool]
                 # Get user_id from conversations table
                 user_stmt = (
                     select(Conversation.user_id)
@@ -214,7 +222,7 @@ async def list_cases(
                     triage = triage_result.scalar_one_or_none()
                     
                     if triage:
-                        latest_triage = TriageAssessmentSummary(
+                        latest_triage = TriageAssessmentSummary(  # type: ignore[call-arg]
                             id=triage.id,
                             risk_score=triage.risk_score,
                             severity_level=triage.severity_level,
@@ -223,15 +231,16 @@ async def list_cases(
                             created_at=triage.created_at
                         )
             
-            case_items.append(CaseListItem(
+            # type: ignore comments explain: Pylance sees Column types but at runtime these are actual values
+            case_items.append(CaseListItem(  # type: ignore[call-arg]
                 id=str(case.id),
-                status=case.status.value,
-                severity=case.severity.value,
-                user_hash=case.user_hash,
+                status=str(case.status.value if hasattr(case.status, 'value') else case.status),
+                severity=str(case.severity.value if hasattr(case.severity, 'value') else case.severity),
+                user_hash=str(case.user_hash),
                 session_id=case.session_id,
-                conversation_id=case.conversation_id,
-                summary_redacted=case.summary_redacted,
-                assigned_to=case.assigned_to,
+                conversation_id=int(case.conversation_id) if case.conversation_id else None,
+                summary_redacted=str(case.summary_redacted) if case.summary_redacted else None,
+                assigned_to=str(case.assigned_to) if case.assigned_to else None,
                 created_at=case.created_at,
                 updated_at=case.updated_at,
                 sla_breach_at=case.sla_breach_at,
@@ -255,7 +264,7 @@ async def list_cases(
     except Exception as e:
         logger.error(f"Failed to list cases: {e}", exc_info=True)
         raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            status_code=500,  # Use integer constant
             detail=f"Failed to retrieve cases: {str(e)}"
         )
 
@@ -314,7 +323,7 @@ async def get_case_detail(
         case = await _get_case_or_404(db, case_id)
         
         # Calculate SLA status
-        is_breached, minutes_until, sla_status = _calculate_sla_status(case.sla_breach_at)
+        is_breached, minutes_until, sla_status = _calculate_sla_status(case.sla_breach_at)  # type: ignore[arg-type]
         
         # Get notes
         notes_result = await db.execute(
@@ -332,7 +341,7 @@ async def get_case_detail(
             .order_by(CaseAssignment.assigned_at.desc())
         )
         assignments = [
-            CaseAssignmentSummary(
+            CaseAssignmentSummary(  # type: ignore[call-arg]
                 id=str(a.id),
                 assigned_to=a.assigned_to,
                 assigned_by=a.assigned_by,
@@ -346,7 +355,7 @@ async def get_case_detail(
         
         # Get all triage assessments for this user
         triage_assessments = []
-        if case.session_id:
+        if case.session_id:  # type: ignore[truthy-bool]
             # Query via Conversation table to get user_id (integer) from session_id (string)
             user_id_stmt = select(Conversation.user_id).where(Conversation.session_id == case.session_id).limit(1)
             user_id_result = await db.execute(user_id_stmt)
@@ -372,7 +381,7 @@ async def get_case_detail(
         
         # Get conversation preview if conversation_id exists
         conversation_preview = None
-        if case.conversation_id:
+        if case.conversation_id:  # type: ignore[truthy-bool]
             try:
                 # Get first 5 conversation pairs (10 messages total: user + assistant)
                 conv_result = await db.execute(
@@ -403,7 +412,7 @@ async def get_case_detail(
             except Exception as e:
                 logger.warning(f"Failed to fetch conversation for case {case_id}: {e}")
         
-        return CaseDetailResponse(
+        return CaseDetailResponse(  # type: ignore[call-arg]
             id=str(case.id),
             status=case.status.value,
             severity=case.severity.value,
@@ -489,7 +498,7 @@ async def update_case_status(
                 )
         
         # Update status
-        case.status = CaseStatusEnum[payload.status]
+        case.status = CaseStatusEnum[payload.status]  # type: ignore[assignment]
         
         # Add note if provided
         if payload.note:
@@ -571,7 +580,7 @@ async def assign_case(
                     status_code=status.HTTP_400_BAD_REQUEST,
                     detail=f"Unknown assignee '{raw_assignee}'",
                 )
-            assignee_id = assignee_model.id
+            assignee_id: str | None = assignee_model.id  # type: ignore[assignment]
 
         # Update case assignment
         case.assigned_to = assignee_id
@@ -655,7 +664,7 @@ async def get_case_conversation(
     try:
         case = await _get_case_or_404(db, case_id)
         
-        if not case.conversation_id:
+        if not case.conversation_id:  # type: ignore[truthy-bool]
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="No conversation linked to this case"

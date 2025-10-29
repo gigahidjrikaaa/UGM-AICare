@@ -31,7 +31,10 @@ from app.core.events import AgentEvent, AgentNameEnum, emit_agent_event
 from app.core.redaction import extract_pii, prelog_redact
 from app.database import get_async_db
 from app.models import Case, CaseSeverityEnum, CaseStatusEnum, TriageAssessment
-from app.services.agent_orchestrator import AgentOrchestrator
+from app.domains.mental_health.services.agent_orchestrator import AgentOrchestrator
+import logging
+
+logger = logging.getLogger(__name__)
 
 Severity = str
 Recommendation = str
@@ -102,6 +105,10 @@ class SafetyTriageService:
             # Use orchestrator for case creation if high/critical severity
             if self._orchestrator and severity in ('high', 'critical'):
                 await self._session.flush()  # Ensure assessment has an ID
+                # Ensure user_hash is not None before passing
+                if user_hash is None:
+                    logger.error("❌ user_hash is None, cannot proceed with orchestrator")
+                    raise ValueError("user_hash cannot be None for high/critical severity")
                 await self._orchestrator.handle_sta_classification(
                     triage_assessment=assessment,
                     user_hash=user_hash,
@@ -298,12 +305,11 @@ def get_safety_triage_service(
     
     Returns SafetyTriageService with best available classifier.
     """
-    import logging
-    logger = logging.getLogger(__name__)
+    # Logger already imported at module level
     
     # Try ML classifier first (ONNX or PyTorch)
     try:
-        if ML_BACKEND == "none":
+        if ML_BACKEND == "none" or ONNXSemanticClassifier is None:
             raise ImportError("No ML backend available")
         
         # Use pure ML classifier (not hybrid)

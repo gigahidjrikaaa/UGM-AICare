@@ -186,6 +186,257 @@ const HeroSection = () => {
   );
 };
 
+// ============ SHARIA COMPLIANCE SECTION ============
+const ShariaComplianceSection = () => {
+  const ref = useRef(null);
+  const isInView = useInView(ref, { once: true, margin: "-100px" });
+
+  return (
+    <section ref={ref} className="py-24 bg-gradient-to-b from-ugm-blue-dark via-ugm-blue to-ugm-blue-dark relative overflow-hidden">
+      {/* Background decorations */}
+      <div className="absolute inset-0">
+        <div className="absolute top-20 left-10 w-72 h-72 bg-ugm-gold/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-ugm-gold/5 rounded-full blur-3xl"></div>
+      </div>
+
+      <div className="container mx-auto px-6 relative z-10">
+        {/* Section Header */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6 }}
+          className="text-center mb-16"
+        >
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-ugm-gold/10 rounded-full border border-ugm-gold/30 mb-4">
+            <FiShield className="text-ugm-gold" />
+            <span className="text-ugm-gold text-sm font-semibold">SHARIA-COMPLIANT</span>
+          </div>
+          <h2 className="text-4xl md:text-5xl font-bold mb-4">
+            <span className="bg-gradient-to-r from-ugm-gold via-yellow-400 to-ugm-gold bg-clip-text text-transparent">
+              Halal Staking & Ethical Finance
+            </span>
+          </h2>
+          <p className="text-white/80 text-lg max-w-3xl mx-auto">
+            $CARE staking follows Islamic finance principles with <strong>no interest (riba)</strong>, 
+            using Mudarabah profit-sharing partnerships for transparent and ethical rewards
+          </p>
+        </motion.div>
+
+        {/* Compliance Badges */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.2 }}
+          className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-16 max-w-5xl mx-auto"
+        >
+          {[
+            {
+              icon: <FiShield className="text-5xl" />,
+              title: "Halal Certified",
+              description: "Reviewed by Shariah scholars for compliance",
+              color: "from-green-500 to-emerald-600"
+            },
+            {
+              icon: <FiCheck className="text-5xl" />,
+              title: "Riba-Free",
+              description: "No interest - only profit-sharing from real revenue",
+              color: "from-ugm-gold to-yellow-500"
+            },
+            {
+              icon: <FaHeart className="text-5xl" />,
+              title: "Ethical Finance",
+              description: "Mudarabah partnership model with risk-sharing",
+              color: "from-blue-500 to-cyan-600"
+            }
+          ].map((badge, index) => (
+            <motion.div
+              key={index}
+              initial={{ opacity: 0, scale: 0.8 }}
+              animate={isInView ? { opacity: 1, scale: 1 } : {}}
+              transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
+              className="bg-white/5 backdrop-blur-md rounded-2xl p-8 border border-ugm-gold/20 hover:border-ugm-gold/50 transition-all group hover:scale-105"
+            >
+              <div className={`w-20 h-20 bg-gradient-to-br ${badge.color} rounded-full flex items-center justify-center mx-auto mb-4 text-white group-hover:rotate-6 transition-transform shadow-2xl shadow-ugm-gold/20`}>
+                {badge.icon}
+              </div>
+              <h3 className="text-2xl font-bold text-white text-center mb-3">{badge.title}</h3>
+              <p className="text-white/70 text-center">{badge.description}</p>
+            </motion.div>
+          ))}
+        </motion.div>
+
+        {/* How It Works */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.6 }}
+          className="bg-white/5 backdrop-blur-md rounded-3xl p-10 border border-ugm-gold/10 max-w-5xl mx-auto"
+        >
+          <div className="flex items-center gap-3 mb-6">
+            <div className="w-10 h-10 bg-gradient-to-br from-ugm-gold to-yellow-500 rounded-lg flex items-center justify-center">
+              <FiZap className="text-white text-xl" />
+            </div>
+            <h3 className="text-3xl font-bold text-ugm-gold">How Mudarabah Works</h3>
+          </div>
+          
+          <div className="grid md:grid-cols-2 gap-6">
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-ugm-gold/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                  <span className="text-ugm-gold font-bold">1</span>
+                </div>
+                <div>
+                  <h4 className="text-white font-semibold mb-1">Stakers Provide Capital</h4>
+                  <p className="text-white/70 text-sm">You stake CARE tokens as capital (Rabbul Mal) in the partnership</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-ugm-gold/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                  <span className="text-ugm-gold font-bold">2</span>
+                </div>
+                <div>
+                  <h4 className="text-white font-semibold mb-1">Platform Manages Operations</h4>
+                  <p className="text-white/70 text-sm">UGM-AICare manages staking operations as the Mudarib (entrepreneur)</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-ugm-gold/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                  <span className="text-ugm-gold font-bold">3</span>
+                </div>
+                <div>
+                  <h4 className="text-white font-semibold mb-1">Profits from Real Revenue</h4>
+                  <p className="text-white/70 text-sm">Returns come from actual platform fees, subscriptions, and services</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-ugm-gold/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                  <span className="text-ugm-gold font-bold">4</span>
+                </div>
+                <div>
+                  <h4 className="text-white font-semibold mb-1">Profit-Sharing Distribution</h4>
+                  <p className="text-white/70 text-sm">Profits split 60-90% to stakers based on tier (Bronze/Silver/Gold/Platinum)</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-ugm-gold/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                  <span className="text-ugm-gold font-bold">5</span>
+                </div>
+                <div>
+                  <h4 className="text-white font-semibold mb-1">Fair Risk-Sharing</h4>
+                  <p className="text-white/70 text-sm">No guaranteed returns - both parties share risk and reward equally</p>
+                </div>
+              </div>
+
+              <div className="flex items-start gap-3">
+                <div className="w-8 h-8 bg-ugm-gold/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                  <span className="text-ugm-gold font-bold">6</span>
+                </div>
+                <div>
+                  <h4 className="text-white font-semibold mb-1">Transparent On-Chain</h4>
+                  <p className="text-white/70 text-sm">All profits verified by multi-sig oracle and recorded on blockchain</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Key Differences */}
+          <div className="mt-8 pt-8 border-t border-ugm-gold/20">
+            <h4 className="text-xl font-bold text-ugm-gold mb-4 flex items-center gap-2">
+              <FiArrowRight />
+              Key Differences from Traditional DeFi
+            </h4>
+            <div className="grid md:grid-cols-3 gap-4">
+              <div className="bg-black/20 rounded-lg p-4 border border-red-500/30">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-red-500 text-xl">❌</span>
+                  <span className="text-white/60 font-semibold">Traditional Staking</span>
+                </div>
+                <ul className="text-white/50 text-sm space-y-1">
+                  <li>• Fixed APY (interest-based)</li>
+                  <li>• Minted rewards = inflation</li>
+                  <li>• Guaranteed returns = riba</li>
+                </ul>
+              </div>
+
+              <div className="bg-black/20 rounded-lg p-4 border border-green-500/30 md:col-span-2">
+                <div className="flex items-center gap-2 mb-2">
+                  <span className="text-green-500 text-xl">✅</span>
+                  <span className="text-white font-semibold">CARE Halal Staking</span>
+                </div>
+                <ul className="text-white/70 text-sm space-y-1">
+                  <li>• Variable profit-sharing (60-90% based on tier)</li>
+                  <li>• Real platform revenue = sustainable</li>
+                  <li>• Risk-shared partnership = halal</li>
+                  <li>• Monthly transparent settlement via oracle</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Staking Tiers Preview */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={isInView ? { opacity: 1, y: 0 } : {}}
+          transition={{ duration: 0.6, delay: 0.8 }}
+          className="mt-16 text-center"
+        >
+          <h3 className="text-2xl font-bold text-white mb-8">Participation-Based Tiers</h3>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+            {[
+              { tier: "Bronze", min: "1K", share: "60%", activities: "0", color: "from-amber-600 to-amber-800" },
+              { tier: "Silver", min: "10K", share: "70%", activities: "5", color: "from-gray-400 to-gray-600" },
+              { tier: "Gold", min: "50K", share: "80%", activities: "15", color: "from-yellow-400 to-yellow-600" },
+              { tier: "Platinum", min: "100K", share: "90%", activities: "30", color: "from-purple-400 to-purple-600" }
+            ].map((tier, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, scale: 0.8 }}
+                animate={isInView ? { opacity: 1, scale: 1 } : {}}
+                transition={{ duration: 0.4, delay: 0.9 + index * 0.1 }}
+                className={`bg-gradient-to-br ${tier.color} rounded-xl p-4 text-white shadow-lg hover:scale-105 transition-transform`}
+              >
+                <div className="font-bold text-lg mb-2">{tier.tier}</div>
+                <div className="text-xs opacity-90 space-y-1">
+                  <div>Min: {tier.min} CARE</div>
+                  <div>Share: {tier.share}</div>
+                  <div>Activities: {tier.activities}</div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+          <p className="text-white/60 text-sm mt-6 max-w-2xl mx-auto">
+            Higher tiers earn greater profit shares and unlock fee waivers + governance voting rights
+          </p>
+        </motion.div>
+
+        {/* CTA */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={isInView ? { opacity: 1 } : {}}
+          transition={{ duration: 0.6, delay: 1.2 }}
+          className="text-center mt-12"
+        >
+          <Link
+            href="/docs/SHARIA_COMPLIANT_STAKING_DESIGN.md"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-ugm-gold to-yellow-500 text-ugm-blue-dark rounded-full font-bold hover:scale-105 transition-all shadow-2xl shadow-ugm-gold/50"
+          >
+            <FiFileText />
+            Read Full Sharia Compliance Design
+            <FiExternalLink />
+          </Link>
+        </motion.div>
+      </div>
+    </section>
+  );
+};
+
 // ============ TOKENOMICS SECTION ============
 const TokenomicsSection = () => {
   const ref = useRef(null);
@@ -810,6 +1061,7 @@ export default function CareTokenPage() {
   return (
     <main className="min-h-screen bg-black">
       <HeroSection />
+      <ShariaComplianceSection />
       <TokenomicsSection />
       <UseCasesSection />
       <WhitepaperSection />

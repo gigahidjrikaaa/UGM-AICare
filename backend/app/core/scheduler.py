@@ -7,7 +7,7 @@ from app.database import AsyncSessionLocal # Factory to create async sessions fo
 from app.models import User
 from app.utils.security_utils import decrypt_data
 from app.utils.email_utils import send_email
-from app.services.insights_service import InsightsService
+from app.domains.mental_health.services.insights_service import InsightsService
 from datetime import datetime, time as dt_time, timedelta, date
 import random
 import os

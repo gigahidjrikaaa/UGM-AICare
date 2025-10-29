@@ -28,9 +28,9 @@ from app.schemas.admin.campaigns import (
     TargetAudiencePreviewResponse,
     UserEngagementRecord,
 )
-from app.services.campaign_execution_service import CampaignExecutionService
-from app.services.campaign_service import CampaignService
-from app.services.campaign_trigger_evaluator import TriggerEvaluator
+from app.domains.mental_health.services.campaign_execution_service import CampaignExecutionService
+from app.domains.mental_health.services.campaign_service import CampaignService
+from app.domains.mental_health.services.campaign_trigger_evaluator import TriggerEvaluator
 
 router = APIRouter(prefix="/campaigns", tags=["Admin - Campaigns"])
 
@@ -441,7 +441,7 @@ async def generate_campaign_with_ai(
     This is a preview endpoint - no campaign is created yet.
     Use the returned configuration to create the campaign via POST /campaigns.
     """
-    from app.services.ai_campaign_generator import AICampaignGenerator
+    from app.domains.mental_health.services.ai_campaign_generator import AICampaignGenerator
     
     config = await AICampaignGenerator.generate_campaign_config(
         campaign_name=campaign_name,
@@ -477,7 +477,7 @@ async def generate_campaign_from_insights(
     This is a preview endpoint - no campaign is created yet.
     Use the returned configuration to create the campaign via POST /campaigns.
     """
-    from app.services.ai_campaign_generator import AICampaignGenerator
+    from app.domains.mental_health.services.ai_campaign_generator import AICampaignGenerator
     
     # Generate campaign name based on insights
     campaign_name = f"Insights-Driven Campaign - {date.today().strftime('%Y-%m-%d')}"
