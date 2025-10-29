@@ -31,9 +31,19 @@ class UUID(TypeDecorator):
     impl = String
     cache_ok = True
 
+    def __init__(self, as_uuid=True):
+        """Initialize UUID type.
+        
+        Args:
+            as_uuid: Compatibility parameter for PostgreSQL UUID type.
+                     Always returns UUID objects regardless of this setting.
+        """
+        self.as_uuid = as_uuid
+        super().__init__(length=36)
+
     def load_dialect_impl(self, dialect):
         if dialect.name == 'postgresql':
-            return dialect.type_descriptor(PG_UUID())
+            return dialect.type_descriptor(PG_UUID(as_uuid=self.as_uuid))
         else:
             return dialect.type_descriptor(String(36))
 
@@ -41,7 +51,7 @@ class UUID(TypeDecorator):
         if value is None:
             return value
         elif dialect.name == 'postgresql':
-            return str(value)
+            return str(value) if not self.as_uuid else value
         else:
             if isinstance(value, uuid_module.UUID):
                 return str(value)
