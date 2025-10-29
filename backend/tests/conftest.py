@@ -18,8 +18,9 @@ from typing import AsyncGenerator, Generator
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import StaticPool
-from sqlalchemy import TypeDecorator, String
-from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+from sqlalchemy import TypeDecorator, String, Text
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID, JSONB as PG_JSONB
+import json
 
 # Custom UUID type that works with SQLite for testing
 class UUID(TypeDecorator):
@@ -65,9 +66,61 @@ class UUID(TypeDecorator):
         return uuid_module.UUID(value)
 
 
-# Monkey patch SQLAlchemy's UUID type for testing with SQLite
+# Custom JSONB type that works with SQLite for testing
+class JSONB(TypeDecorator):
+    """Platform-independent JSONB type.
+    
+    Uses PostgreSQL's JSONB type when available, otherwise uses
+    TEXT to store JSON as strings in SQLite.
+    """
+    impl = Text
+    cache_ok = True
+
+    def __init__(self, astext_type=None):
+        """Initialize JSONB type.
+        
+        Args:
+            astext_type: Compatibility parameter for PostgreSQL JSONB type.
+        """
+        self.astext_type = astext_type
+        super().__init__()
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(PG_JSONB(astext_type=self.astext_type))
+        else:
+            return dialect.type_descriptor(Text())
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        if dialect.name == 'postgresql':
+            return value
+        else:
+            # For SQLite, serialize to JSON string
+            if isinstance(value, (dict, list)):
+                return json.dumps(value)
+            return value
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        if dialect.name == 'postgresql':
+            return value
+        else:
+            # For SQLite, deserialize from JSON string
+            if isinstance(value, str):
+                try:
+                    return json.loads(value)
+                except json.JSONDecodeError:
+                    return value
+            return value
+
+
+# Monkey patch SQLAlchemy's UUID and JSONB types for testing with SQLite
 import sqlalchemy.dialects.postgresql as postgresql
 postgresql.UUID = UUID
+postgresql.JSONB = JSONB
 
 # Add backend directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
