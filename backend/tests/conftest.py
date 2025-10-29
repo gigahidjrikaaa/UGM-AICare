@@ -13,10 +13,51 @@ import os
 import sys
 import pytest
 import asyncio
+import uuid as uuid_module
 from typing import AsyncGenerator, Generator
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine, async_sessionmaker
 from sqlalchemy.pool import StaticPool
+from sqlalchemy import TypeDecorator, String
+from sqlalchemy.dialects.postgresql import UUID as PG_UUID
+
+# Custom UUID type that works with SQLite for testing
+class UUID(TypeDecorator):
+    """Platform-independent UUID type.
+    
+    Uses PostgreSQL's UUID type when available, otherwise uses
+    String(36) to store UUID as strings in SQLite.
+    """
+    impl = String
+    cache_ok = True
+
+    def load_dialect_impl(self, dialect):
+        if dialect.name == 'postgresql':
+            return dialect.type_descriptor(PG_UUID())
+        else:
+            return dialect.type_descriptor(String(36))
+
+    def process_bind_param(self, value, dialect):
+        if value is None:
+            return value
+        elif dialect.name == 'postgresql':
+            return str(value)
+        else:
+            if isinstance(value, uuid_module.UUID):
+                return str(value)
+            return value
+
+    def process_result_value(self, value, dialect):
+        if value is None:
+            return value
+        if isinstance(value, uuid_module.UUID):
+            return value
+        return uuid_module.UUID(value)
+
+
+# Monkey patch SQLAlchemy's UUID type for testing with SQLite
+import sqlalchemy.dialects.postgresql as postgresql
+postgresql.UUID = UUID
 
 # Add backend directory to path
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
