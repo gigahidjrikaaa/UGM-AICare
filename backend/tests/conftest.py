@@ -201,6 +201,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 @pytest.fixture
 async def test_user(db_session: AsyncSession) -> User:
     """Create a test user in the database."""
+    from datetime import datetime
     user = User(
         email="test@ugm.ac.id",
         name="Test User",
@@ -209,7 +210,7 @@ async def test_user(db_session: AsyncSession) -> User:
         google_sub="test_google_sub_123",
         role="student",
         is_active=True,
-        created_at=asyncio.get_event_loop().time(),
+        created_at=datetime.now(),
     )
     db_session.add(user)
     await db_session.commit()
@@ -220,6 +221,7 @@ async def test_user(db_session: AsyncSession) -> User:
 @pytest.fixture
 async def admin_user(db_session: AsyncSession) -> User:
     """Create an admin user in the database."""
+    from datetime import datetime
     user = User(
         email="admin@ugm.ac.id",
         name="Admin User",
@@ -228,7 +230,7 @@ async def admin_user(db_session: AsyncSession) -> User:
         google_sub="admin_google_sub_456",
         role="admin",
         is_active=True,
-        created_at=asyncio.get_event_loop().time(),
+        created_at=datetime.now(),
     )
     db_session.add(user)
     await db_session.commit()
@@ -239,6 +241,7 @@ async def admin_user(db_session: AsyncSession) -> User:
 @pytest.fixture
 async def counselor_user(db_session: AsyncSession) -> User:
     """Create a counselor user in the database."""
+    from datetime import datetime
     user = User(
         email="counselor@ugm.ac.id",
         name="Counselor User",
@@ -247,7 +250,7 @@ async def counselor_user(db_session: AsyncSession) -> User:
         google_sub="counselor_google_sub_789",
         role="counselor",
         is_active=True,
-        created_at=asyncio.get_event_loop().time(),
+        created_at=datetime.now(),
     )
     db_session.add(user)
     await db_session.commit()
