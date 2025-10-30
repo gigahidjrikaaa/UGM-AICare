@@ -22,6 +22,7 @@ export function useAikaChat({ sessionId, showAgentActivity = true, showRiskIndic
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [activeAgents, setActiveAgents] = useState<string[]>([]);
   const lastConversationIdRef = useRef<string | null>(null);
   const [lastMetadata, setLastMetadata] = useState<AikaMetadata | null>(null);
 
@@ -35,6 +36,7 @@ export function useAikaChat({ sessionId, showAgentActivity = true, showRiskIndic
     showToasts: true,
     onAgentActivity: (agents) => {
       console.log('🤖 Aika consulted agents:', agents);
+      setActiveAgents(agents);
     },
     onRiskDetected: (assessment) => {
       console.log('⚠️ Risk detected:', assessment);
@@ -105,6 +107,7 @@ export function useAikaChat({ sessionId, showAgentActivity = true, showRiskIndic
       setMessages((prev) => [...prev, newUserMessage]);
       setInputValue('');
       setIsLoading(true);
+      setActiveAgents([]); // Reset active agents
 
       try {
         // Prepare conversation history for Aika
@@ -121,7 +124,7 @@ export function useAikaChat({ sessionId, showAgentActivity = true, showRiskIndic
         const aikaResponse = await sendToAika(
           userMessageContent,
           historyForAika,
-          'student' // Default role, can be dynamic based on user
+          'user' // 'user' for students, can be 'counselor' or 'admin' based on user role
         );
 
         if (!aikaResponse) {
@@ -165,6 +168,7 @@ export function useAikaChat({ sessionId, showAgentActivity = true, showRiskIndic
         setMessages((prev) => [...prev, errorMessage]);
       } finally {
         setIsLoading(false);
+        setActiveAgents([]); // Clear active agents when done
       }
     },
     [
@@ -189,6 +193,7 @@ export function useAikaChat({ sessionId, showAgentActivity = true, showRiskIndic
     messages,
     inputValue,
     isLoading: isLoading || aikaLoading,
+    activeAgents,
     error: aikaError,
     lastMetadata,
     handleInputChange,

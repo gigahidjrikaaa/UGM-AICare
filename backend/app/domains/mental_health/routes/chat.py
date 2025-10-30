@@ -29,22 +29,128 @@ from app.database import get_async_db
 from app.dependencies import get_current_active_user
 from app.models import User  # Core model
 from app.domains.mental_health.models import Conversation, UserSummary
-from app.domains.mental_health.schemas.chat import ChatRequest, ChatResponse, ConversationHistoryItem
-# Note: chat_processing module needs to be created - using stub functions
+from app.domains.mental_health.schemas.chat import ChatRequest, ChatResponse, ConversationHistoryItem, AikaRequest, AikaResponse
+# Note: Integrating with LangGraph AikaOrchestrator for chat processing
 from app.domains.mental_health.services.personal_context import (
     build_user_personal_context,
     invalidate_user_personal_context,
 )
 from app.domains.mental_health.services.tool_calling import generate_with_tools
+from dataclasses import dataclass
+from typing import Optional, List, Dict, Any
 
-# Temporary stub functions until chat_processing module is created
+
+@dataclass
+class ChatProcessingResult:
+    """Result from chat message processing."""
+    response_text: str
+    provider_used: str = "google"
+    model_used: str = "gemini_google"  # ✅ Fixed: Valid model name
+    final_history: List[ConversationHistoryItem] = None
+
+    module_completed_id: Optional[int] = None
+    intervention_plan: Optional[Dict[str, Any]] = None
+    
+    def __post_init__(self):
+        if self.final_history is None:
+            self.final_history = []
+
+
 async def process_chat_event(*args, **kwargs):
-    """Stub function - needs implementation in chat_processing.py"""
-    raise NotImplementedError("process_chat_event not yet implemented")
+    """Process chat events (e.g., typing indicators)."""
+    # Events don't need LangGraph processing
+    return ChatProcessingResult(
+        response_text="",
+        final_history=[],
+    )
 
-async def process_chat_message(*args, **kwargs):
-    """Stub function - needs implementation in chat_processing.py"""
-    raise NotImplementedError("process_chat_message not yet implemented")
+
+async def process_chat_message(
+    request: ChatRequest,
+    current_user: User,
+    db: AsyncSession,
+    session_id: str,
+    conversation_id: int,
+    active_system_prompt: Optional[str] = None,
+    schedule_summary: Any = None,
+    summarize_now: bool = False,
+    llm_responder: Any = None,
+) -> ChatProcessingResult:
+    """Process chat message using AikaOrchestrator (LangGraph workflow).
+    
+    This integrates the legacy /chat endpoint with the new LangGraph-based
+    Aika Meta-Agent architecture for consistent behavior across all endpoints.
+    """
+    try:
+        # Determine user role for routing
+        user_role = "user"  # Default to student
+        if hasattr(current_user, 'role'):
+            if current_user.role == "admin":
+                user_role = "admin"
+            elif current_user.role == "counselor":
+                user_role = "counselor"
+        
+        # Convert history to Aika format
+        conversation_history = []
+        if request.history:
+            for item in request.history:
+                if isinstance(item, dict):
+                    conversation_history.append(item)
+                else:
+                    conversation_history.append({
+                        "role": item.role,
+                        "content": item.content,
+                    })
+        
+        # Initialize Aika orchestrator
+        aika = AikaOrchestrator(db=db)
+        
+        # Process through LangGraph workflow
+        logger.info(
+            f"Processing message via AikaOrchestrator for user {current_user.id}"
+        )
+        
+        result = await aika.process_message(
+            user_id=current_user.id,
+            user_role=user_role,
+            message=request.message,
+            session_id=session_id,
+            conversation_history=conversation_history,
+        )
+        
+        # Convert Aika response to legacy format
+        # Note: ConversationHistoryItem requires timestamp and session_id
+        # For simplicity, we'll return history as dicts instead of schema objects
+        updated_history = conversation_history + [
+            {"role": "user", "content": request.message},
+            {"role": "assistant", "content": result["response"]},
+        ]
+        
+        # Convert to schema objects with required fields
+        now = datetime.now()
+        history_items = []
+        for h in updated_history:
+            history_items.append(
+                ConversationHistoryItem(
+                    role=h["role"],
+                    content=h["content"],
+                    timestamp=now,
+                    session_id=session_id,
+                )
+            )
+        
+        return ChatProcessingResult(
+            response_text=result["response"],
+            provider_used="aika-langgraph",
+            model_used="gemini_google",  # ✅ Fixed: Valid model name
+            final_history=history_items,
+            module_completed_id=None,
+            intervention_plan=result.get("metadata", {}).get("intervention_plan"),
+        )
+        
+    except Exception as e:
+        logger.error(f"Error in process_chat_message: {e}", exc_info=True)
+        raise
 
 logger = logging.getLogger(__name__)
 
@@ -209,12 +315,12 @@ async def _streaming_tool_aware_llm_responder(
 
 # ===================== NEW: AIKA META-AGENT ENDPOINT =====================
 
-@router.post("/aika", dependencies=[Depends(check_rate_limit_dependency)])
+@router.post("/aika", response_model=AikaResponse, dependencies=[Depends(check_rate_limit_dependency)])
 async def handle_aika_request(
-    request: ChatRequest = Body(...),
+    request: AikaRequest = Body(...),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_db),
-) -> Dict:
+) -> AikaResponse:
     """
     🌟 Aika Meta-Agent Endpoint
     
@@ -222,7 +328,7 @@ async def handle_aika_request(
     which intelligently coordinates STA, SCA, SDA, and IA based on user role.
     
     **User Roles:**
-    - `user` (students): Safety triage → Coaching → Escalation if needed
+    - `student`: Safety triage → Coaching → Escalation if needed
     - `admin`: Analytics and administrative actions
     - `counselor`: Case management and clinical insights
     
@@ -241,53 +347,37 @@ async def handle_aika_request(
     ```
     
     Args:
-        request: Chat request with message and history
-        current_user: Authenticated user
+        request: AikaRequest with message and conversation history
+        current_user: Authenticated user (auto-injected from token)
         db: Database session
         
     Returns:
-        Dict with Aika's response and metadata
+        AikaResponse with Aika's response and metadata
     """
     
     try:
-        # Determine user role for routing
-        # In production, this should check actual role from database
-        user_role = "user"  # Default to student
-        
-        if hasattr(current_user, 'role'):
-            if current_user.role == "admin":
-                user_role = "admin"
-            elif current_user.role == "counselor":
-                user_role = "counselor"
-        
-        # Convert history from schema format to dict format
-        conversation_history = []
-        if request.history:
-            for item in request.history:
-                if isinstance(item, dict):
-                    conversation_history.append(item)
-                else:
-                    # Pydantic model
-                    conversation_history.append({
-                        "role": item.role,
-                        "content": item.content,
-                    })
+        # Validate user_id matches authenticated user
+        if request.user_id != current_user.id:
+            raise HTTPException(
+                status_code=403,
+                detail="user_id in request must match authenticated user"
+            )
         
         # Initialize Aika orchestrator
         aika = AikaOrchestrator(db=db)
         
         # Process message through orchestration graph
         logger.info(
-            f"✨ Aika processing request from {user_role} user {current_user.id}: "
+            f"✨ Aika processing request from {request.role} user {current_user.id}: "
             f"{request.message[:50]}..."
         )
         
         result = await aika.process_message(
-            user_id=current_user.id,
-            user_role=user_role,
+            user_id=request.user_id,
+            user_role=request.role,
             message=request.message,
             session_id=request.session_id,
-            conversation_history=conversation_history,
+            conversation_history=request.conversation_history,
         )
         
         logger.info(
@@ -295,22 +385,33 @@ async def handle_aika_request(
             f"time={result['metadata']['processing_time_ms']:.2f}ms"
         )
         
-        return result
+        return AikaResponse(
+            success=result["success"],
+            response=result["response"],
+            metadata=result["metadata"],
+        )
         
-    except ValueError as exc:
-        logger.warning(f"Value error in /aika endpoint: {exc}", exc_info=True)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
     except HTTPException:
         raise
+    except ValueError as exc:
+        logger.warning(f"Value error in /aika endpoint: {exc}", exc_info=True)
+        return AikaResponse(
+            success=False,
+            response="",
+            metadata={},
+            error=str(exc),
+        )
     except Exception as exc:
         logger.error(
             f"Unhandled exception in /aika endpoint for user {current_user.id}: {exc}",
             exc_info=True,
         )
-        raise HTTPException(
-            status_code=500,
-            detail=f"Internal server error: {str(exc)}"
-        ) from exc
+        return AikaResponse(
+            success=False,
+            response="",
+            metadata={},
+            error="Internal server error",
+        )
 
 
 # ===================== EXISTING LEGACY CHAT ENDPOINT =====================
@@ -475,7 +576,8 @@ async def chat_ws(
 
             # Rate limiting check for WebSocket
             rate_limiter = get_rate_limiter()
-            role = "admin" if user.is_admin else "student"
+            # ✅ FIX: Use role attribute instead of is_admin
+            role = "admin" if (hasattr(user, 'role') and user.role == "admin") else "student"
             is_allowed, remaining, reset_timestamp = await rate_limiter.check_rate_limit(
                 user_id=user.id,
                 endpoint="chat",
@@ -535,16 +637,9 @@ async def chat_ws(
             async def stream_callback(chunk: str) -> None:
                 await emit_token(chunk, session_id=session_id, conversation_id=conversation_id)
 
-            # Use tool-aware streaming responder by default
-            async def tool_aware_streaming_responder(hist, sysprompt, req, callback):
-                return await _streaming_tool_aware_llm_responder(
-                    history=hist,
-                    system_prompt=sysprompt,
-                    request=req,
-                    db=db,
-                    user_id=user.id,
-                    stream_callback=callback,
-                )
+            # ✅ NOTE: AikaOrchestrator doesn't support streaming yet
+            # The stream_callback is not used in the LangGraph workflow
+            # Future enhancement: Add streaming support to orchestrator
 
             try:
                 result = await process_chat_message(
@@ -556,8 +651,7 @@ async def chat_ws(
                     active_system_prompt=active_system_prompt,
                     schedule_summary=None,
                     summarize_now=summarize_and_save,
-                    llm_responder=tool_aware_streaming_responder,
-                    stream_callback=stream_callback,
+                    llm_responder=None,  # Not used with AikaOrchestrator
                 )
             except HTTPException as exc:
                 await websocket.send_json({"type": "error", "detail": exc.detail})

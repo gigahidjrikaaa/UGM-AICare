@@ -137,3 +137,49 @@ class ConversationHistoryItem(BaseModel):
     content: str
     timestamp: datetime
     session_id: str # Include session ID for grouping
+
+
+#? --- Aika Meta-Agent Request/Response Models ---
+
+class AikaRequest(BaseModel):
+    """Request schema for Aika Meta-Agent endpoint.
+    
+    This schema is designed to work with the LangGraph-based orchestrator
+    and matches the frontend's expected request format.
+    """
+    user_id: int = Field(..., description="User ID from session")
+    role: Literal['user', 'counselor', 'admin'] = Field(
+        default='user',
+        description="User's role for routing (user=student/counselor/admin)"
+    )
+    message: str = Field(..., min_length=1, description="User's message")
+    conversation_history: List[Dict[str, str]] = Field(
+        default_factory=list,
+        description="Conversation history as list of {role, content} dicts"
+    )
+    session_id: Optional[str] = Field(
+        None,
+        description="Optional session ID for continuity (auto-generated if not provided)"
+    )
+    
+    model_config = {
+        "protected_namespaces": ()
+    }
+
+
+class AikaResponse(BaseModel):
+    """Response schema for Aika Meta-Agent endpoint.
+    
+    Returns Aika's response along with metadata about agent coordination.
+    """
+    success: bool = Field(..., description="Whether request succeeded")
+    response: str = Field(..., description="Aika's response text")
+    metadata: Dict[str, Any] = Field(
+        ...,
+        description="Metadata including agents_invoked, risk_level, processing_time_ms, etc."
+    )
+    error: Optional[str] = Field(None, description="Error message if success=false")
+    
+    model_config = {
+        "protected_namespaces": ()
+    }

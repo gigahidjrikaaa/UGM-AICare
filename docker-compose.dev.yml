@@ -97,7 +97,7 @@ services:
     command: >
       bash -c "
         echo '🚀 Starting backend with hot reload...' &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app --reload-exclude '/app/app/agents/shared/tools/*' --log-level info
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app --log-level info
       "
     ports:
       - "8000:8000"
@@ -170,6 +170,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       INTERNAL_API_URL: http://backend:8000

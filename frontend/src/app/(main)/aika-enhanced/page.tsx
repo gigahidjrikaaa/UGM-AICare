@@ -28,6 +28,7 @@ import { ChatInput } from '@/components/features/chat/ChatInput';
 import { AIKA_MEMORY_NOTE } from '@/constants/chat';
 import { InterventionPlansSidebar } from '@/components/features/chat/InterventionPlansSidebar';
 import { useInterventionPlans } from '@/hooks/useInterventionPlans';
+import { AikaLoadingBubble } from '@/components/features/aika/AikaLoadingBubble';
 import {
   AgentActivityBadge,
   RiskLevelIndicator,
@@ -127,6 +128,7 @@ export default function AikaEnhancedPage() {
     messages,
     inputValue,
     isLoading,
+    activeAgents,
     error,
     lastMetadata,
     handleInputChange,
@@ -196,6 +198,13 @@ export default function AikaEnhancedPage() {
               messages={messages}
               chatContainerRef={chatContainerRef}
             />
+            
+            {/* Loading indicator with agent activity */}
+            {isLoading && (
+              <div className="px-4 pb-4">
+                <AikaLoadingBubble activeAgents={activeAgents} />
+              </div>
+            )}
             
             {/* Chat Input - using original component */}
             <div className="p-4">

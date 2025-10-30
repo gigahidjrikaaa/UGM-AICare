@@ -171,7 +171,7 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
             
             intent_response = await generate_response(
                 history=[{"role": "user", "content": intent_prompt}],
-                model="gemini-2.0-flash-exp",
+                model="gemini_google",
                 temperature=0.3,
             )
             
@@ -660,26 +660,29 @@ Kamu sangat berharga, dan dunia lebih baik dengan kehadiranmu. 🌟
             # Calculate total processing time
             total_time_ms = (time.time() - start_time) * 1000
             
+            # ✅ FIX: final_state is a dict, not an object - access with dict keys
+            agents_invoked = final_state.get("agents_invoked", [])
+            
             logger.info(
                 f"✅ Aika processed message in {total_time_ms:.2f}ms "
-                f"(agents: {', '.join(final_state.agents_invoked)})"
+                f"(agents: {', '.join(agents_invoked)})"
             )
             
             # Return response
             return {
                 "success": True,
-                "response": final_state.response,
+                "response": final_state.get("response", ""),
                 "metadata": {
-                    "session_id": final_state.session_id,
-                    "user_role": final_state.user_role,
-                    "intent": final_state.intent,
-                    "agents_invoked": final_state.agents_invoked,
+                    "session_id": final_state.get("session_id", ""),
+                    "user_role": final_state.get("user_role", ""),
+                    "intent": final_state.get("intent", ""),
+                    "agents_invoked": agents_invoked,
                     "processing_time_ms": total_time_ms,
-                    "risk_level": final_state.risk_level,
-                    "escalation_needed": final_state.escalation_needed,
-                    "actions_taken": final_state.actions_taken,
+                    "risk_level": final_state.get("risk_level", ""),
+                    "escalation_needed": final_state.get("escalation_needed", False),
+                    "actions_taken": final_state.get("actions_taken", []),
                 },
-                "errors": final_state.errors if final_state.errors else None,
+                "errors": final_state.get("errors") if final_state.get("errors") else None,
             }
             
         except Exception as e:

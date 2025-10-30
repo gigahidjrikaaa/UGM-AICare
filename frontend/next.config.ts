@@ -68,18 +68,6 @@ const nextConfig = {
   experimental: {
     // Optimize package imports for better tree shaking
     optimizePackageImports: ['framer-motion', 'react-icons', 'date-fns', 'lucide-react', 'recharts'],
-    // Speed up dev server
-    turbo: {
-      // Enable turbopack optimizations
-      rules: {
-        '*.svg': {
-          loaders: ['@svgr/webpack'],
-          as: '*.js',
-        },
-      },
-    },
-    // Use SWC minifier (faster than Terser)
-    swcMinify: true,
     // Reduce memory usage
     workerThreads: false,
     // Enable faster refresh

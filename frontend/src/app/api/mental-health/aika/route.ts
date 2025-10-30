@@ -9,14 +9,16 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_BACKEND_URL || 'http://localhost:8000';
+// For server-side API routes in Docker, use internal Docker network name
+// For local development outside Docker, use localhost
+const BACKEND_URL = process.env.INTERNAL_API_URL || 'http://backend:8000';
 
 export async function POST(request: NextRequest) {
   try {
     // Get session for authentication
     const session = await getServerSession(authOptions);
 
-    if (!session?.user?.id) {
+    if (!session?.user?.id || !session?.accessToken) {
       return NextResponse.json(
         { success: false, error: 'Unauthorized' },
         { status: 401 }
@@ -25,7 +27,7 @@ export async function POST(request: NextRequest) {
 
     // Parse request body
     const body = await request.json();
-    const { message, conversation_history, role = 'student' } = body;
+    const { message, conversation_history, role = 'user' } = body;
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
@@ -37,23 +39,28 @@ export async function POST(request: NextRequest) {
     // Prepare request to backend Aika endpoint
     const backendRequest = {
       user_id: parseInt(session.user.id),
-      role,
+      role, // 'user' for students, 'counselor', or 'admin'
       message,
       conversation_history: conversation_history || [],
     };
 
-    // Call backend Aika API
+    // Call backend Aika API with authentication
     const response = await fetch(`${BACKEND_URL}/api/v1/aika`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        // Add any authentication headers needed by backend
+        'Authorization': `Bearer ${session.accessToken}`,
       },
       body: JSON.stringify(backendRequest),
     });
 
     if (!response.ok) {
       const errorData = await response.json().catch(() => ({ error: 'Backend error' }));
+      console.error('Backend error response:', {
+        status: response.status,
+        statusText: response.statusText,
+        error: errorData,
+      });
       return NextResponse.json(
         { success: false, error: errorData.error || `Backend returned ${response.status}` },
         { status: response.status }

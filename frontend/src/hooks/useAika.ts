@@ -6,7 +6,7 @@
  * 
  * Features:
  * - Unified API endpoint (/api/v1/aika)
- * - Role-based routing (student/admin/counselor)
+ * - Role-based routing (user=student/admin/counselor)
  * - Agent activity tracking
  * - Risk assessment monitoring
  * - Escalation notifications
@@ -31,7 +31,7 @@ export interface AikaRiskAssessment {
 
 export interface AikaMetadata {
   session_id: string;
-  user_role: 'student' | 'admin' | 'counselor';
+  user_role: 'user' | 'admin' | 'counselor';
   intent: string;
   agents_invoked: string[];  // e.g., ["STA", "SCA"]
   actions_taken: string[];   // e.g., ["assess_risk", "provide_cbt_support"]
@@ -50,7 +50,7 @@ export interface AikaResponse {
 
 export interface AikaRequest {
   user_id: number;
-  role: 'student' | 'admin' | 'counselor';
+  role: 'user' | 'admin' | 'counselor';
   message: string;
   conversation_history: AikaMessage[];
 }
@@ -81,7 +81,7 @@ export function useAika(options: UseAikaOptions = {}) {
   const sendMessage = useCallback(async (
     message: string,
     conversationHistory: AikaMessage[] = [],
-    role: 'student' | 'admin' | 'counselor' = 'student',
+    role: 'user' | 'admin' | 'counselor' = 'user',
   ): Promise<AikaResponse | null> => {
     if (!session?.user?.id) {
       const errorMsg = 'User not authenticated';
@@ -146,9 +146,17 @@ export function useAika(options: UseAikaOptions = {}) {
               { duration: 6000 }
             );
           } else if (risk_level === 'high') {
-            toast.warning(
+            toast(
               '⚠️ Keselamatanmu penting. Pertimbangkan untuk menghubungi layanan dukungan.',
-              { duration: 5000 }
+              { 
+                duration: 5000,
+                icon: '⚠️',
+                style: {
+                  background: '#FEF3C7',
+                  color: '#92400E',
+                  border: '1px solid #FCD34D'
+                }
+              }
             );
           }
         }
@@ -171,9 +179,12 @@ export function useAika(options: UseAikaOptions = {}) {
       // Show multi-agent activity
       if (showToasts && data.metadata.agents_invoked.length > 1) {
         const agentNames = data.metadata.agents_invoked.join(', ');
-        toast.info(
+        toast(
           `Aika berkonsultasi dengan: ${agentNames}`,
-          { duration: 3000 }
+          { 
+            duration: 3000,
+            icon: '🤖',
+          }
         );
       }
 

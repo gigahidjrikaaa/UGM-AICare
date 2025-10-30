@@ -17,10 +17,11 @@ import type { UserProfileOverviewResponse, UserProfileOverviewUpdate } from '@/t
 import { getSession, signOut } from 'next-auth/react';
 
 // Define the base URL for your backend API
-const API_BASE_URL =
-  typeof window !== 'undefined' && window.location.hostname === 'localhost'
-    ? 'http://localhost:8000/api/v1' // Local development
-    : process.env.INTERNAL_API_URL + '/api/v1'; // Docker or production
+// Use NEXT_PUBLIC_API_URL for client-side requests (browser)
+// INTERNAL_API_URL is only for server-side requests (SSR/API routes)
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
+  ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1`
+  : 'http://localhost:8000/api/v1'; // Fallback for local development
 
 
 const apiClient = axios.create({
