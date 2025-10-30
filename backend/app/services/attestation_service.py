@@ -8,7 +8,8 @@ from typing import Dict, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import AttestationRecord, AttestationStatusEnum, QuestInstance, User
+from app.models import AttestationRecord, AttestationStatusEnum, User  # Core models
+from app.domains.mental_health.models import QuestInstance
 from app.services.compliance_service import record_audit_event
 
 logger = logging.getLogger(__name__)

@@ -88,26 +88,26 @@ class TestRoleBasedAccess:
     @pytest.mark.asyncio
     async def test_student_access_own_data(self, client: AsyncClient, auth_headers: dict):
         """Test student can access their own data."""
-        response = await client.get("/api/profile", headers=auth_headers)
+        response = await client.get("/api/v1/profile/overview", headers=auth_headers)
         assert response.status_code == 200
     
     @pytest.mark.asyncio
     async def test_student_cannot_access_admin(self, client: AsyncClient, auth_headers: dict):
         """Test student cannot access admin endpoints."""
-        response = await client.get("/api/admin/users", headers=auth_headers)
+        response = await client.get("/api/v1/admin/users", headers=auth_headers)
         assert response.status_code in [401, 403]
     
     @pytest.mark.asyncio
     async def test_admin_access_admin_endpoints(self, client: AsyncClient, admin_headers: dict):
         """Test admin can access admin endpoints."""
-        response = await client.get("/api/admin/users", headers=admin_headers)
+        response = await client.get("/api/v1/admin/users", headers=admin_headers)
         assert response.status_code == 200
     
     @pytest.mark.asyncio
     async def test_counselor_access_student_data(self, client: AsyncClient, counselor_headers: dict):
         """Test counselor can access appropriate student data."""
         # Counselors should be able to access assigned student profiles
-        response = await client.get("/api/counselor/dashboard", headers=counselor_headers)
+        response = await client.get("/api/v1/counselor/dashboard", headers=counselor_headers)
         assert response.status_code in [200, 404]  # 404 if no assignments yet
 
 
@@ -124,20 +124,20 @@ class TestAuthenticationFlow:
     @pytest.mark.asyncio
     async def test_protected_route_without_token(self, client: AsyncClient):
         """Test accessing protected route without token."""
-        response = await client.get("/api/profile")
+        response = await client.get("/api/v1/profile/overview")
         assert response.status_code == 401
     
     @pytest.mark.asyncio
     async def test_protected_route_with_invalid_token(self, client: AsyncClient):
         """Test accessing protected route with invalid token."""
         headers = {"Authorization": "Bearer invalid_token"}
-        response = await client.get("/api/profile", headers=headers)
+        response = await client.get("/api/v1/profile/overview", headers=headers)
         assert response.status_code == 401
     
     @pytest.mark.asyncio
     async def test_protected_route_with_valid_token(self, client: AsyncClient, auth_headers: dict):
         """Test accessing protected route with valid token."""
-        response = await client.get("/api/profile", headers=auth_headers)
+        response = await client.get("/api/v1/profile/overview", headers=auth_headers)
         assert response.status_code == 200
 
 
@@ -162,8 +162,8 @@ class TestSessionManagement:
         headers = {"Authorization": f"Bearer {test_token}"}
         
         # Make multiple concurrent requests
-        response1 = await client.get("/api/profile", headers=headers)
-        response2 = await client.get("/api/profile", headers=headers)
+        response1 = await client.get("/api/v1/profile/overview", headers=headers)
+        response2 = await client.get("/api/v1/profile/overview", headers=headers)
         
         assert response1.status_code == 200
         assert response2.status_code == 200

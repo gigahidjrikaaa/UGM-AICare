@@ -15,11 +15,12 @@ show_help() {
     echo "Commands:"
     echo "  up              Start in development mode (HOT RELOAD enabled)"
     echo "  down            Stop all services"
-    echo "  restart         Restart all services"
+    echo "  restart [svc]   Restart all services or specific service (backend/frontend)"
     echo "  logs [service]  View logs with follow mode (Ctrl+C to exit)"
     echo "  build           Rebuild containers (needed after dependency changes)"
     echo "  rebuild-fast    Quick rebuild (parallel, uses cache)"
     echo "  rebuild-clean   Clean rebuild (no cache, slower but fresh)"
+    echo "  clear-cache     Clear Next.js and Docker build cache"
     echo "  prod            Run in production mode (disable hot-reload)"
     echo "  dev             Re-enable development mode"
     echo "  clean           Stop and remove all containers, volumes"
@@ -35,6 +36,12 @@ show_help() {
     echo "  ./dev.sh logs backend    # Watch backend logs"
     echo "  ./dev.sh logs frontend   # Watch frontend logs"
     echo "  ./dev.sh build           # Rebuild after npm/pip install"
+    echo "  ./dev.sh clear-cache     # Clear caches if builds are slow"
+    echo ""
+    echo "Performance Tips:"
+    echo "  • First build? Run 'clear-cache' to remove old artifacts"
+    echo "  • Slow frontend? Turbopack is enabled by default (up to 700x faster)"
+    echo "  • After dependency changes: Use 'rebuild-fast' not 'build'"
     echo ""
 }
 
@@ -67,7 +74,13 @@ case "${1:-}" in
     
     restart)
         echo "🔄 Restarting services..."
-        docker-compose -f "$COMPOSE_FILE" restart
+        if [ -n "${2:-}" ]; then
+            echo "   Restarting $2..."
+            docker-compose -f "$COMPOSE_FILE" restart "$2"
+        else
+            echo "   Restarting all services..."
+            docker-compose -f "$COMPOSE_FILE" restart
+        fi
         echo "✅ Services restarted"
         ;;
     
@@ -89,7 +102,8 @@ case "${1:-}" in
         echo "⚡ Fast rebuild (parallel build, use cache)..."
         echo "   This will rebuild with Docker cache for faster builds"
         echo ""
-        docker-compose -f "$COMPOSE_FILE" build --parallel backend frontend
+        # Use BuildKit for faster builds
+        COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 docker-compose -f "$COMPOSE_FILE" build --parallel backend frontend
         echo ""
         echo "🚀 Restarting services..."
         docker-compose -f "$COMPOSE_FILE" up -d backend frontend
@@ -102,12 +116,30 @@ case "${1:-}" in
         echo "🧹 Clean rebuild (no cache, parallel build)..."
         echo "   Warning: This will take longer but ensures a fresh build"
         echo ""
-        docker-compose -f "$COMPOSE_FILE" build --parallel --no-cache backend frontend
+        COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 docker-compose -f "$COMPOSE_FILE" build --parallel --no-cache backend frontend
         echo ""
         echo "🚀 Restarting services..."
         docker-compose -f "$COMPOSE_FILE" up -d backend frontend
         echo ""
         echo "✅ Clean rebuild complete!"
+        ;;
+    
+    clear-cache)
+        echo "🧹 Clearing build caches..."
+        echo ""
+        echo "1️⃣ Clearing Next.js cache..."
+        rm -rf ./frontend/.next
+        echo "   ✓ Next.js .next directory removed"
+        echo ""
+        echo "2️⃣ Clearing Docker BuildKit cache..."
+        docker builder prune -f
+        echo "   ✓ Docker build cache cleared"
+        echo ""
+        echo "3️⃣ Clearing node_modules/.cache (if exists)..."
+        rm -rf ./frontend/node_modules/.cache
+        echo "   ✓ Node cache cleared"
+        echo ""
+        echo "✅ All caches cleared! Run './dev.sh up' for fresh start"
         ;;
     
     prod)

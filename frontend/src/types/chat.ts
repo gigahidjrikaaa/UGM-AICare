@@ -36,6 +36,24 @@ export interface Message {
   metadata?: Record<string, unknown>; // To store things like module_id for event messages
   timestamp: Date;
   interventionPlan?: InterventionPlan; // SCA-generated support plan
+  isError?: boolean; // For error messages
+  aikaMetadata?: {
+    // Aika Meta-Agent metadata
+    session_id: string;
+    user_role: string;
+    intent: string;
+    agents_invoked: string[];
+    actions_taken: string[];
+    processing_time_ms: number;
+    risk_assessment?: {
+      risk_level: string;
+      risk_score: number;
+      confidence: number;
+      risk_factors: string[];
+    };
+    escalation_triggered: boolean;
+    case_id?: string;
+  };
 }
 
 export type ChatMode = 'standard' | 'summarize' | 'rag' | `module:${string}`; // Example

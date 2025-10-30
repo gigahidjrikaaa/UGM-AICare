@@ -61,7 +61,8 @@ transformers>=4.41.0  # For tokenizer (still needed, but much lighter without to
 # Torch - Only needed for ONNX export (can be removed after first build)
 # The ensure_onnx_model.py script will download the model and export to ONNX
 # After that, torch can be uninstalled - runtime only needs onnxruntime
-torch>=2.0.0 --index-url https://download.pytorch.org/whl/cpu  # CPU-only version (smaller)
+# CPU-only version to avoid 2GB+ CUDA downloads
+torch>=2.0.0
 
 # Statistical Analysis and Privacy
 numpy>=1.24.0

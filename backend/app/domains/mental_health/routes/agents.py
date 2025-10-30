@@ -10,7 +10,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
-from app.models import AgentMessage, AgentRun
+from app.domains.mental_health.models import AgentMessage, AgentRun
 
 
 logger = logging.getLogger(__name__)

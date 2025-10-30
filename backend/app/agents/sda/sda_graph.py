@@ -18,7 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agents.graph_state import SDAState
 from app.agents.execution_tracker import execution_tracker
 from app.core.settings import get_settings
-from app.models import Case, CaseSeverityEnum, CaseStatusEnum
+from app.domains.mental_health.models import Case, CaseSeverityEnum, CaseStatusEnum
 from app.services.event_bus import EventType, publish_event
 
 logger = logging.getLogger(__name__)

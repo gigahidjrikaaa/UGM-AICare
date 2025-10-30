@@ -9,7 +9,8 @@ from typing import Optional
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Conversation, JournalEntry, User, UserBadge
+from app.models import User, UserBadge  # Core models
+from app.domains.mental_health.models import Conversation, JournalEntry
 from app.schemas.admin import UserStats
 from app.utils.security_utils import decrypt_data
 

@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.agents.ia.queries import ALLOWED_QUERIES
 from app.agents.ia.schemas import IAQueryRequest, IAQueryResponse
 from app.database import get_async_db
-from app.models import (
-    InterventionCampaignExecution,
+from app.domains.mental_health.models import (
+    CampaignExecution as InterventionCampaignExecution,  # Alias for backward compatibility
     Conversation,
     TriageAssessment,
 )

@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, or_
 from app.database import get_async_db
 from app import models
-from app.schemas import appointments as schemas
+from app.domains.mental_health.schemas import appointments as schemas
 from app.dependencies import get_current_active_user
 from typing import List, Optional
 from datetime import datetime, timedelta

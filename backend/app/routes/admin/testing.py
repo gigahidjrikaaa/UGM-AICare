@@ -17,10 +17,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
 from app.dependencies import get_admin_user
-from app.models import Conversation, Message, User
-from app.models.messages import MessageRoleEnum
+from app.models import User  # Core model
+from app.domains.mental_health.models import Conversation, Message
+from app.domains.mental_health.models.messages import MessageRoleEnum
 from app.agents.sta.service import SafetyTriageService
-from app.schemas.chat import ChatRequest, ChatResponse
+from app.domains.mental_health.schemas.chat import ChatRequest, ChatResponse
 # from app.domains.mental_health.services.chat_processing import process_chat_message
 from app.domains.mental_health.services.personal_context import build_user_personal_context
 
@@ -323,7 +324,7 @@ Tujuan utamamu adalah menjadi pendengar yang baik, suportif, hangat, dan tidak m
 
     # After all messages, check if a case was created (from STA classification)
     # Query for recent triage assessments for this session
-    from app.models import TriageAssessment, Case
+    from app.domains.mental_health.models import TriageAssessment, Case
     from sqlalchemy import desc
     
     triage_result = await db.execute(
@@ -473,7 +474,7 @@ async def simulate_conversation(
             sta_response = await sta_service.classify(payload=sta_request)
             
             # Query for the created triage assessment
-            from app.models import TriageAssessment
+            from app.domains.mental_health.models import TriageAssessment
             from sqlalchemy import desc
             
             triage_result = await db.execute(

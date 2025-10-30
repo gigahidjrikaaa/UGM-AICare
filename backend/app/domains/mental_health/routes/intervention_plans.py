@@ -7,7 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_async_db
 from app.core.auth import get_current_user
 from app.models.user import User
-from app.schemas.intervention_plans import (
+from app.domains.mental_health.schemas.intervention_plans import (
     InterventionPlanRecordCreate,
     InterventionPlanRecordResponse,
     InterventionPlanListResponse,

@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.redaction import prelog_redact
 from app.database import AsyncSessionLocal
-from app.models import (
+from app.domains.mental_health.models import (
     AgentNameEnum,
     Case,
     CaseSeverityEnum,

@@ -9,7 +9,7 @@ from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 
-from app.schemas.enhanced_agents import (
+from app.domains.mental_health.schemas.enhanced_agents import (
     GraphExecutionState,
     NodeExecutionState, 
     EdgeExecutionState,

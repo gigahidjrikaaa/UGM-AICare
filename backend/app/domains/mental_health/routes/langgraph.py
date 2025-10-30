@@ -13,8 +13,8 @@ from app.agents.safety_graph_specs import (
 from app.agents.execution_tracker import execution_tracker
 from app.dependencies import get_admin_user
 from app.models import User
-from app.schemas.agents import LangGraphEdge, LangGraphNode, LangGraphState
-from app.schemas.enhanced_agents import (
+from app.domains.mental_health.schemas.agents import LangGraphEdge, LangGraphNode, LangGraphState
+from app.domains.mental_health.schemas.enhanced_agents import (
     EnhancedLangGraphState, 
     EnhancedLangGraphNode, 
     EnhancedLangGraphEdge,

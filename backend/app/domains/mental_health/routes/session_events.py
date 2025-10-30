@@ -2,7 +2,8 @@ from fastapi import APIRouter, Depends, BackgroundTasks, HTTPException, status
 from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_async_db
-from app.models import Conversation, User, UserSummary # Assuming User is needed for auth
+from app.models import User  # Core model
+from app.domains.mental_health.models import Conversation, UserSummary
 from app.dependencies import get_current_active_user # If you want to ensure only an authenticated user can end their own session
 from app.domains.mental_health.routes.chat import summarize_and_save
 from sqlalchemy import select, desc

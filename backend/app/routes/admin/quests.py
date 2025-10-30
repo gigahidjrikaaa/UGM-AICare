@@ -9,7 +9,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
 from app.dependencies import get_admin_user
-from app.models import QuestTemplate, User
+from app.models import User  # Core model
+from app.domains.mental_health.models import QuestTemplate
 from app.schemas.admin.quests import (
     QuestTemplateCreate,
     QuestTemplateListResponse,

@@ -10,8 +10,9 @@ from typing import Set, Optional, Any, cast
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
 
-from app.models import User, JournalEntry, Conversation
-from app.models.assessments import TriageAssessment
+from app.models import User  # Core model
+from app.domains.mental_health.models import JournalEntry, Conversation
+from app.domains.mental_health.models.assessments import TriageAssessment
 from app.schemas.user import UserStatsResponse
 
 logger = logging.getLogger(__name__)

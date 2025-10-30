@@ -8,7 +8,8 @@ import asyncio
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Appointment, JournalEntry, User, UserSummary
+from app.models import User  # Core model
+from app.domains.mental_health.models import Appointment, JournalEntry, UserSummary
 from app.utils.security_utils import decrypt_data
 from app.core.cache import cached, get_cache_service
 from app.core.settings import settings

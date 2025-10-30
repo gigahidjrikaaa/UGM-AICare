@@ -38,8 +38,8 @@ from app.domains.mental_health.routes import (
     langgraph_analytics,
 )
 
-# Finance domain routes
-from app.domains.finance import finance_router
+# Finance domain routes (commented out - domain incomplete)
+# from app.domains.finance import finance_router
 from app.domains.blockchain import blockchain_router  # Blockchain domain routes
 from app.agents.sta.router import router as sta_router
 from app.agents.sca.router import router as sca_router
@@ -197,7 +197,7 @@ app.include_router(surveys.router)
 app.include_router(surveys.user_router)
 # app.include_router(cbt_modules.router) - DEPRECATED: Use /api/v1/agents/sca for CBT-based intervention plans
 app.include_router(clinical_analytics_routes.router)  # New clinical analytics endpoints
-app.include_router(finance_router, prefix="/api/v1/finance", tags=["Finance"])  # Finance domain routes
+# app.include_router(finance_router, prefix="/api/v1/finance", tags=["Finance"])  # Finance domain routes (commented out - domain incomplete)
 app.include_router(blockchain_router, prefix="/api/v1/blockchain", tags=["Blockchain"])  # Blockchain domain routes
 # logger.info(f"List of routers (/api/v1): {app.routes}")
 logger.info(f"Allowed origins: {origins}")

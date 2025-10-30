@@ -9,7 +9,7 @@ from datetime import datetime
 
 if TYPE_CHECKING:
     from .conversations import Conversation
-    from .user import User
+    from app.models.user import User
 
 class TriageAssessment(Base):
     """Risk assessment and triage results."""

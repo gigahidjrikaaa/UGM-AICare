@@ -261,19 +261,19 @@ async def counselor_user(db_session: AsyncSession) -> User:
 @pytest.fixture
 def test_token(test_user: User) -> str:
     """Generate a JWT token for the test user."""
-    return create_access_token(data={"sub": test_user.email, "user_id": test_user.id})
+    return create_access_token(data={"sub": str(test_user.id), "user_id": test_user.id, "role": test_user.role})
 
 
 @pytest.fixture
 def admin_token(admin_user: User) -> str:
     """Generate a JWT token for the admin user."""
-    return create_access_token(data={"sub": admin_user.email, "user_id": admin_user.id})
+    return create_access_token(data={"sub": str(admin_user.id), "user_id": admin_user.id, "role": admin_user.role})
 
 
 @pytest.fixture
 def counselor_token(counselor_user: User) -> str:
     """Generate a JWT token for the counselor user."""
-    return create_access_token(data={"sub": counselor_user.email, "user_id": counselor_user.id})
+    return create_access_token(data={"sub": str(counselor_user.id), "user_id": counselor_user.id, "role": counselor_user.role})
 
 
 @pytest.fixture

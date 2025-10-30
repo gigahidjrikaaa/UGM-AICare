@@ -5,8 +5,8 @@ from typing import Sequence, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import desc, select, func
 
-from app.models.interventions import InterventionPlanRecord, InterventionPlanStepCompletion
-from app.schemas.intervention_plans import (
+from app.domains.mental_health.models import InterventionPlanRecord, InterventionPlanStepCompletion
+from app.domains.mental_health.schemas.intervention_plans import (
     InterventionPlanRecordCreate,
     InterventionPlanRecordUpdate,
     CompletionTracking,

@@ -22,7 +22,7 @@ class TestJournalCreation:
         }
         
         response = await client.post(
-            "/api/journals",
+            "/api/v1/journal",
             headers=auth_headers,
             json=journal_data,
         )
@@ -43,7 +43,7 @@ class TestJournalCreation:
         }
         
         response = await client.post(
-            "/api/journals",
+            "/api/v1/journal",
             headers=auth_headers,
             json=journal_data,
         )
@@ -62,7 +62,7 @@ class TestJournalCreation:
         }
         
         response = await client.post(
-            "/api/journals",
+            "/api/v1/journal",
             headers=auth_headers,
             json=journal_data,
         )
@@ -80,7 +80,7 @@ class TestJournalCreation:
         }
         
         response = await client.post(
-            "/api/journals",
+            "/api/v1/journal",
             headers=auth_headers,
             json=journal_data,
         )
@@ -96,12 +96,12 @@ class TestJournalRetrieval:
         """Test retrieving all user journals."""
         # Create a journal first
         await client.post(
-            "/api/journals",
+            "/api/v1/journal",
             headers=auth_headers,
             json={"content": "Test entry", "mood": "neutral"},
         )
         
-        response = await client.get("/api/journals", headers=auth_headers)
+        response = await client.get("/api/v1/journal", headers=auth_headers)
         
         assert response.status_code == 200
         data = response.json()
@@ -113,7 +113,7 @@ class TestJournalRetrieval:
         """Test retrieving a specific journal entry."""
         # Create journal
         create_response = await client.post(
-            "/api/journals",
+            "/api/v1/journal",
             headers=auth_headers,
             json={"content": "Specific entry", "mood": "happy"},
         )
@@ -121,7 +121,7 @@ class TestJournalRetrieval:
         
         # Retrieve it
         response = await client.get(
-            f"/api/journals/{journal_id}",
+            f"/api/v1/journal/{journal_id}",
             headers=auth_headers,
         )
         
@@ -134,7 +134,7 @@ class TestJournalRetrieval:
         """Test filtering journals by date range."""
         # Create journal
         await client.post(
-            "/api/journals",
+            "/api/v1/journal",
             headers=auth_headers,
             json={"content": "Date range test", "mood": "neutral"},
         )
@@ -144,7 +144,7 @@ class TestJournalRetrieval:
         end_date = today + timedelta(days=1)
         
         response = await client.get(
-            "/api/journals",
+            "/api/v1/journal",
             headers=auth_headers,
             params={
                 "start_date": start_date.isoformat(),
@@ -161,18 +161,18 @@ class TestJournalRetrieval:
         """Test filtering journals by mood."""
         # Create journals with different moods
         await client.post(
-            "/api/journals",
+            "/api/v1/journal",
             headers=auth_headers,
             json={"content": "Happy entry", "mood": "happy"},
         )
         await client.post(
-            "/api/journals",
+            "/api/v1/journal",
             headers=auth_headers,
             json={"content": "Sad entry", "mood": "sad"},
         )
         
         response = await client.get(
-            "/api/journals",
+            "/api/v1/journal",
             headers=auth_headers,
             params={"mood": "happy"},
         )
@@ -190,7 +190,7 @@ class TestJournalUpdating:
         """Test updating journal content."""
         # Create journal
         create_response = await client.post(
-            "/api/journals",
+            "/api/v1/journal",
             headers=auth_headers,
             json={"content": "Original content", "mood": "neutral"},
         )
@@ -198,7 +198,7 @@ class TestJournalUpdating:
         
         # Update it
         response = await client.put(
-            f"/api/journals/{journal_id}",
+            f"/api/v1/journal/{journal_id}",
             headers=auth_headers,
             json={"content": "Updated content", "mood": "happy"},
         )
@@ -213,7 +213,7 @@ class TestJournalUpdating:
         """Test changing journal privacy setting."""
         # Create public journal
         create_response = await client.post(
-            "/api/journals",
+            "/api/v1/journal",
             headers=auth_headers,
             json={"content": "Public entry", "mood": "neutral", "is_private": False},
         )
@@ -221,7 +221,7 @@ class TestJournalUpdating:
         
         # Make it private
         response = await client.put(
-            f"/api/journals/{journal_id}",
+            f"/api/v1/journal/{journal_id}",
             headers=auth_headers,
             json={"is_private": True},
         )
@@ -239,7 +239,7 @@ class TestJournalDeletion:
         """Test deleting a journal entry."""
         # Create journal
         create_response = await client.post(
-            "/api/journals",
+            "/api/v1/journal",
             headers=auth_headers,
             json={"content": "To be deleted", "mood": "neutral"},
         )
@@ -247,7 +247,7 @@ class TestJournalDeletion:
         
         # Delete it
         response = await client.delete(
-            f"/api/journals/{journal_id}",
+            f"/api/v1/journal/{journal_id}",
             headers=auth_headers,
         )
         
@@ -255,7 +255,7 @@ class TestJournalDeletion:
         
         # Verify it's gone
         get_response = await client.get(
-            f"/api/journals/{journal_id}",
+            f"/api/v1/journal/{journal_id}",
             headers=auth_headers,
         )
         assert get_response.status_code == 404
@@ -271,13 +271,13 @@ class TestMoodTracking:
         moods = ["happy", "sad", "anxious", "calm", "happy"]
         for mood in moods:
             await client.post(
-                "/api/journals",
+                "/api/v1/journal",
                 headers=auth_headers,
                 json={"content": f"{mood} entry", "mood": mood},
             )
         
         response = await client.get(
-            "/api/journals/mood-stats",
+            "/api/v1/journal/mood-stats",
             headers=auth_headers,
         )
         
@@ -289,7 +289,7 @@ class TestMoodTracking:
     async def test_mood_trends(self, client: AsyncClient, auth_headers: dict):
         """Test getting mood trends over time."""
         response = await client.get(
-            "/api/journals/mood-trends",
+            "/api/v1/journal/mood-trends",
             headers=auth_headers,
             params={"period": "week"},
         )
@@ -307,7 +307,7 @@ class TestJournalSecurity:
         """Test that users cannot access other users' journals."""
         # Attempt to access a journal that doesn't exist or belongs to another user
         response = await client.get(
-            "/api/journals/99999",
+            "/api/v1/journal/99999",
             headers=auth_headers,
         )
         
@@ -316,11 +316,11 @@ class TestJournalSecurity:
     @pytest.mark.asyncio
     async def test_journal_requires_authentication(self, client: AsyncClient):
         """Test that journal endpoints require authentication."""
-        response = await client.get("/api/journals")
+        response = await client.get("/api/v1/journal")
         assert response.status_code == 401
         
         response = await client.post(
-            "/api/journals",
+            "/api/v1/journal",
             json={"content": "Test", "mood": "neutral"},
         )
         assert response.status_code == 401
@@ -330,7 +330,7 @@ class TestJournalSecurity:
         """Test that private journals are excluded from analytics."""
         # Create private journal
         await client.post(
-            "/api/journals",
+            "/api/v1/journal",
             headers=auth_headers,
             json={
                 "content": "Private entry",
@@ -351,7 +351,7 @@ class TestJournalPrompts:
     async def test_get_daily_prompt(self, client: AsyncClient, auth_headers: dict):
         """Test getting daily journal prompt."""
         response = await client.get(
-            "/api/journal-prompts/daily",
+            "/api/v1/journal-prompts/daily",
             headers=auth_headers,
         )
         
@@ -364,14 +364,14 @@ class TestJournalPrompts:
         """Test creating journal entry from prompt."""
         # Get prompt
         prompt_response = await client.get(
-            "/api/journal-prompts/daily",
+            "/api/v1/journal-prompts/daily",
             headers=auth_headers,
         )
         prompt_data = prompt_response.json()
         
         # Create entry with prompt_id
         response = await client.post(
-            "/api/journals",
+            "/api/v1/journal",
             headers=auth_headers,
             json={
                 "content": "Response to prompt",

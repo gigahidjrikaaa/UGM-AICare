@@ -10,7 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
 from app.dependencies import get_admin_user
-from app.models import InterventionCampaignExecution, InterventionCampaign
+from app.domains.mental_health.models import CampaignExecution, InterventionCampaign
 from app.schemas.admin.interventions import (
     InterventionCampaignCreate,
     InterventionCampaignListResponse,

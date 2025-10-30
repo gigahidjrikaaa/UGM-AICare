@@ -12,7 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
 from app.dependencies import get_admin_user
-from app.models import Appointment, Conversation, JournalEntry, User, UserBadge
+from app.models import User, UserBadge  # Core models
+from app.domains.mental_health.models import Appointment, Conversation, JournalEntry
 from app.models.agent_user import AgentUser
 from app.schemas.admin import (
     AgentUserSummary,

@@ -18,11 +18,8 @@ from datetime import datetime, timedelta
 from sqlalchemy import select, desc, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import (
-    Conversation,
-    Message,
-    User
-)
+from app.models import User  # Core model
+from app.domains.mental_health.models import Conversation, Message
 from app.agents.shared.tools import tool_registry
 
 import logging

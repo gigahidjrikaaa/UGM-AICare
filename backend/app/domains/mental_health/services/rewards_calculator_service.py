@@ -7,7 +7,7 @@ from typing import Dict, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import (
+from app.domains.mental_health.models import (
     PlayerWellnessState,
     QuestDifficultyEnum,
     QuestInstance,

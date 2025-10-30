@@ -4,7 +4,8 @@ from typing import Dict
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import TriageAssessment, User
+from app.models import User  # Core model
+from app.domains.mental_health.models import TriageAssessment
 
 __all__ = [
     "extract_timeframe_days",

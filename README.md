@@ -1,6 +1,29 @@
-# UGM-AICare: Aika - Your Mental Health Companion
+# UGM-AICare: Aika - Your Mental Health Companion 🌟
 
 ![UGM-AICare Logo](frontend/public/aicare_logo.png)
+
+## 🎭 Meet Aika (愛佳)
+
+**Aika** is the unified AI consciousness of UGM-AICare—a meta-agent orchestrator that coordinates four specialized agents to provide comprehensive mental health support across the university community.
+
+**Name Meaning:**
+- 愛 (Ai) = Love, affection
+- 佳 (Ka) = Excellent, beautiful
+
+**What Makes Aika Special:**
+- 🎯 **One AI Personality, Multiple Capabilities**: Unified experience across student chat, admin operations, and clinical support
+- 🔄 **Intelligent Role-Based Routing**: Adapts behavior based on user role (student/admin/counselor)
+- 🤝 **Multi-Agent Coordination**: Orchestrates STA, SCA, SDA, and IA through LangGraph workflows
+- 🧠 **Context-Aware**: Maintains conversation history and personalizes responses
+- 🌏 **Culturally Sensitive**: Built for Indonesian university mental health context
+
+**For Students:** "Hai! Aku Aika. Aku di sini untuk mendengarkan dan mendukungmu."  
+**For Admins:** "Hello! I'm Aika, your administrative assistant."  
+**For Counselors:** "Hi! I'm Aika, your clinical assistant."
+
+→ **[Read Full Aika Architecture](docs/AIKA_META_AGENT_ARCHITECTURE.md)**
+
+---
 
 ## Overview
 

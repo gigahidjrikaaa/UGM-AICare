@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.aika.tools import execute_tool_call, get_aika_tools
 from app.core import llm
-from app.schemas.chat import ChatRequest
+from app.domains.mental_health.schemas.chat import ChatRequest
 
 logger = logging.getLogger(__name__)
 

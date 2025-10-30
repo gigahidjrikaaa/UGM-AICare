@@ -10,9 +10,9 @@ from sqlalchemy.orm import joinedload
 
 from app.database import get_async_db
 from app.dependencies import get_current_active_user
-from app.models.appointments import Psychologist as CounselorProfile, Appointment
+from app.domains.mental_health.models import Psychologist as CounselorProfile, Appointment
 from app.models.user import User
-from app.schemas.appointments import AppointmentWithUser
+from app.domains.mental_health.schemas.appointments import AppointmentWithUser
 from app.schemas.counselor import (
     CounselorAvailabilityToggle,
     CounselorDashboardStats,

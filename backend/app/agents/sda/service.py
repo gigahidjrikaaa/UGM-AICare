@@ -17,7 +17,8 @@ from app.agents.sda.schemas import (
     SDAListCasesResponse,
 )
 from app.database import get_async_db
-from app.models import Case, CaseAssignment, CaseNote, CaseSeverityEnum, CaseStatusEnum
+from app.models import CaseAssignment  # Core infrastructure model
+from app.domains.mental_health.models import Case, CaseNote, CaseSeverityEnum, CaseStatusEnum
 from app.models.agent_user import AgentUser
 
 

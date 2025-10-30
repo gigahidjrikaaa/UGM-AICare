@@ -6,7 +6,7 @@ from typing import Any, Dict, Optional
 from pydantic import BaseModel, Field
 from pydantic.config import ConfigDict
 
-from app.models import QuestDifficultyEnum, QuestCategoryEnum, QuestStatusEnum
+from app.domains.mental_health.models import QuestDifficultyEnum, QuestCategoryEnum, QuestStatusEnum
 
 
 class QuestTemplateResponse(BaseModel):

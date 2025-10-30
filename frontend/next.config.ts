@@ -4,6 +4,12 @@ const nextConfig = {
   reactStrictMode: true,
   output: 'standalone',
   
+  // Development optimizations
+  devIndicators: {
+    buildActivity: true,
+    buildActivityPosition: 'bottom-right',
+  },
+  
   // Turbopack configuration (Next.js 16 default bundler)
   turbopack: {
     // Turbopack handles resolve.fallback automatically for browser builds
@@ -61,7 +67,23 @@ const nextConfig = {
   // Bundle optimization
   experimental: {
     // Optimize package imports for better tree shaking
-    optimizePackageImports: ['framer-motion', 'react-icons', 'date-fns'],
+    optimizePackageImports: ['framer-motion', 'react-icons', 'date-fns', 'lucide-react', 'recharts'],
+    // Speed up dev server
+    turbo: {
+      // Enable turbopack optimizations
+      rules: {
+        '*.svg': {
+          loaders: ['@svgr/webpack'],
+          as: '*.js',
+        },
+      },
+    },
+    // Use SWC minifier (faster than Terser)
+    swcMinify: true,
+    // Reduce memory usage
+    workerThreads: false,
+    // Enable faster refresh
+    webVitalsAttribution: ['CLS', 'LCP'],
   },
   
   // External packages configuration for server (both webpack and Turbopack)
@@ -114,6 +136,18 @@ const nextConfig = {
     // Remove console.logs in production
     removeConsole: process.env.NODE_ENV === 'production',
   },
+  
+  // Production-only optimizations (skip in dev)
+  ...(process.env.NODE_ENV === 'production' && {
+    compress: true,
+    poweredByHeader: false,
+  }),
+  
+  // Development-only optimizations
+  ...(process.env.NODE_ENV === 'development' && {
+    // Disable static optimization during dev for faster builds
+    staticPageGenerationTimeout: 1000,
+  }),
 };
 
 module.exports = nextConfig;

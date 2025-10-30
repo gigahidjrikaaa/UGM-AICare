@@ -31,7 +31,7 @@ from app.agents.sta.schemas import (
     STAClassifyResponse,
 )
 from app.agents.sta.service import SafetyTriageService
-from app.schemas.intervention_plans import (
+from app.domains.mental_health.schemas.intervention_plans import (
     InterventionPlanRecordCreate,
     InterventionPlanData,
     PlanStep,
@@ -320,9 +320,9 @@ class AgentIntegrationService:
         """
         try:
             # Convert SCA response objects to intervention plan schema format
-            from app.schemas.intervention_plans import PlanStep as InterventionPlanStep
-            from app.schemas.intervention_plans import ResourceCard as InterventionResourceCard
-            from app.schemas.intervention_plans import NextCheckIn as InterventionNextCheckIn
+            from app.domains.mental_health.schemas.intervention_plans import PlanStep as InterventionPlanStep
+            from app.domains.mental_health.schemas.intervention_plans import ResourceCard as InterventionResourceCard
+            from app.domains.mental_health.schemas.intervention_plans import NextCheckIn as InterventionNextCheckIn
             
             # Convert plan steps (SCA uses id/label, we use title/description)
             plan_steps = [

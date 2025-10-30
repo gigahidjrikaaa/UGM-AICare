@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
 from app.dependencies import get_admin_user
-from app.models import Conversation, FlaggedSession
-from app.models import User
+from app.domains.mental_health.models import Conversation
+from app.models import FlaggedSession, User  # Core models
 from app.schemas.admin import (
     FlagCreate,
     FlagResponse,

@@ -16,7 +16,7 @@ from datetime import datetime
 from sqlalchemy import select, desc, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import (
+from app.domains.mental_health.models import (
     Case,
     CaseStatusEnum,
     CaseSeverityEnum

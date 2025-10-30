@@ -18,7 +18,7 @@ from PyPDF2 import PdfReader
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import ContentResource
+from app.domains.mental_health.models import ContentResource
 
 logger = logging.getLogger(__name__)
 

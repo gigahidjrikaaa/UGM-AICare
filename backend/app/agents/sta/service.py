@@ -30,7 +30,7 @@ except ImportError:
 from app.core.events import AgentEvent, AgentNameEnum, emit_agent_event
 from app.core.redaction import extract_pii, prelog_redact
 from app.database import get_async_db
-from app.models import Case, CaseSeverityEnum, CaseStatusEnum, TriageAssessment
+from app.domains.mental_health.models import Case, CaseSeverityEnum, CaseStatusEnum, TriageAssessment
 from app.domains.mental_health.services.agent_orchestrator import AgentOrchestrator
 import logging
 

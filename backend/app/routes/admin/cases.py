@@ -20,8 +20,8 @@ from sqlalchemy.orm import joinedload, selectinload
 
 from app.database import get_async_db
 from app.dependencies import get_admin_user
-from app.models import Case, CaseAssignment, CaseNote, CaseStatusEnum, TriageAssessment
-from app.models.conversations import Conversation
+from app.models import CaseAssignment  # Core infrastructure model
+from app.domains.mental_health.models import Case, CaseNote, CaseStatusEnum, TriageAssessment, Conversation
 from app.schemas.admin.cases import (
     CaseAssignmentSummary,
     CaseAssignmentUpdate,

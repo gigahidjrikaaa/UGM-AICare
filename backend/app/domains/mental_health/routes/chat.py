@@ -22,12 +22,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app import auth_utils
 from app.agents.aika.tools import get_aika_tools
+from app.agents.aika import AikaOrchestrator  # ✨ New: Meta-Agent Orchestrator
 from app.core import llm
 from app.core.rate_limiter import check_rate_limit_dependency, get_rate_limiter
 from app.database import get_async_db
 from app.dependencies import get_current_active_user
-from app.models import Conversation, User, UserSummary
-from app.schemas.chat import ChatRequest, ChatResponse, ConversationHistoryItem
+from app.models import User  # Core model
+from app.domains.mental_health.models import Conversation, UserSummary
+from app.domains.mental_health.schemas.chat import ChatRequest, ChatResponse, ConversationHistoryItem
 # Note: chat_processing module needs to be created - using stub functions
 from app.domains.mental_health.services.personal_context import (
     build_user_personal_context,
@@ -204,6 +206,114 @@ async def _streaming_tool_aware_llm_responder(
     
     return response_text
 
+
+# ===================== NEW: AIKA META-AGENT ENDPOINT =====================
+
+@router.post("/aika", dependencies=[Depends(check_rate_limit_dependency)])
+async def handle_aika_request(
+    request: ChatRequest = Body(...),
+    current_user: User = Depends(get_current_active_user),
+    db: AsyncSession = Depends(get_async_db),
+) -> Dict:
+    """
+    🌟 Aika Meta-Agent Endpoint
+    
+    This endpoint routes requests through Aika's orchestration graph,
+    which intelligently coordinates STA, SCA, SDA, and IA based on user role.
+    
+    **User Roles:**
+    - `user` (students): Safety triage → Coaching → Escalation if needed
+    - `admin`: Analytics and administrative actions
+    - `counselor`: Case management and clinical insights
+    
+    **Response Format:**
+    ```json
+    {
+        "success": true,
+        "response": "Aika's response",
+        "metadata": {
+            "session_id": "...",
+            "agents_invoked": ["STA", "SCA"],
+            "risk_level": "low",
+            "processing_time_ms": 1234.56
+        }
+    }
+    ```
+    
+    Args:
+        request: Chat request with message and history
+        current_user: Authenticated user
+        db: Database session
+        
+    Returns:
+        Dict with Aika's response and metadata
+    """
+    
+    try:
+        # Determine user role for routing
+        # In production, this should check actual role from database
+        user_role = "user"  # Default to student
+        
+        if hasattr(current_user, 'role'):
+            if current_user.role == "admin":
+                user_role = "admin"
+            elif current_user.role == "counselor":
+                user_role = "counselor"
+        
+        # Convert history from schema format to dict format
+        conversation_history = []
+        if request.history:
+            for item in request.history:
+                if isinstance(item, dict):
+                    conversation_history.append(item)
+                else:
+                    # Pydantic model
+                    conversation_history.append({
+                        "role": item.role,
+                        "content": item.content,
+                    })
+        
+        # Initialize Aika orchestrator
+        aika = AikaOrchestrator(db=db)
+        
+        # Process message through orchestration graph
+        logger.info(
+            f"✨ Aika processing request from {user_role} user {current_user.id}: "
+            f"{request.message[:50]}..."
+        )
+        
+        result = await aika.process_message(
+            user_id=current_user.id,
+            user_role=user_role,
+            message=request.message,
+            session_id=request.session_id,
+            conversation_history=conversation_history,
+        )
+        
+        logger.info(
+            f"✅ Aika completed: agents={result['metadata']['agents_invoked']}, "
+            f"time={result['metadata']['processing_time_ms']:.2f}ms"
+        )
+        
+        return result
+        
+    except ValueError as exc:
+        logger.warning(f"Value error in /aika endpoint: {exc}", exc_info=True)
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(
+            f"Unhandled exception in /aika endpoint for user {current_user.id}: {exc}",
+            exc_info=True,
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Internal server error: {str(exc)}"
+        ) from exc
+
+
+# ===================== EXISTING LEGACY CHAT ENDPOINT =====================
 
 @router.post("/chat", response_model=ChatResponse, dependencies=[Depends(check_rate_limit_dependency)])
 async def handle_chat_request(

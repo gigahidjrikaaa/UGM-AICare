@@ -14,10 +14,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.settings import get_settings
-from app.models import (
-    AgentHealthLog,
+from app.models import AgentHealthLog, CaseAssignment  # Core infrastructure models
+from app.domains.mental_health.models import (
     Case,
-    CaseAssignment,
     CaseSeverityEnum,
     CaseStatusEnum,
     TriageAssessment,

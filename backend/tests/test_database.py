@@ -11,9 +11,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.user import User
-from app.models.conversations import Conversation
-from app.models.messages import Message
-from app.models.journal import JournalEntry
+from app.domains.mental_health.models import Conversation, Message, JournalEntry
 
 
 class TestUserModel:

@@ -8,7 +8,8 @@ from typing import List, Optional, Dict, Any, Set, Union, Union
 import logging
 
 from app.database import get_async_db
-from app.models import User, Survey, SurveyQuestion, SurveyAnswer, SurveyResponse
+from app.models import User  # Core model
+from app.domains.mental_health.models import Survey, SurveyQuestion, SurveyAnswer, SurveyResponse
 from app.dependencies import get_current_active_user, get_admin_user
 
 logger = logging.getLogger(__name__)

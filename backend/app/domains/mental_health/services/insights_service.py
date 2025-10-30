@@ -13,7 +13,8 @@ from uuid import UUID, uuid4
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import InsightsReport, TriageAssessment
+from app.models import InsightsReport  # Core infrastructure model
+from app.domains.mental_health.models import TriageAssessment
 from app.services.event_bus import publish_event, EventType
 
 logger = logging.getLogger(__name__)

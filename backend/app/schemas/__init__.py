@@ -1,4 +1,8 @@
-from .agents import (
+"""Core schemas only. Domain-specific schemas are in app.domains.mental_health.schemas."""
+from .docs import ModuleDoc, EndpointDoc, EndpointExample
+
+# Import from domain for backward compatibility with existing code
+from app.domains.mental_health.schemas.agents import (
     TriageRequest,
     TriageResponse,
     TriageMessage,
@@ -8,10 +12,9 @@ from .agents import (
     LangGraphEdge,
     LangGraphState,
 )
-from .docs import ModuleDoc, EndpointDoc, EndpointExample
 
 __all__ = [
-    # Agent Schemas
+    # Agent Schemas (from mental_health domain)
     "TriageRequest",
     "TriageResponse",
     "TriageMessage",
@@ -21,7 +24,7 @@ __all__ = [
     "LangGraphEdge",
     "LangGraphState",
 
-    # Documentation Schemas
+    # Documentation Schemas (core)
     "ModuleDoc",
     "EndpointDoc",
     "EndpointExample",

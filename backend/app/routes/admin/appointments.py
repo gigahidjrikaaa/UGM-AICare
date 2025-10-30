@@ -13,13 +13,15 @@ from sqlalchemy.orm import selectinload
 from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.models import (
+    TherapistSchedule,
+    User,
+    UserBadge,
+)  # Core models
+from app.domains.mental_health.models import (
     Appointment,
     Conversation,
     JournalEntry,
     Psychologist,
-    TherapistSchedule,
-    User,
-    UserBadge,
 )
 from app.routes.admin.utils import (
     decrypt_user_email,

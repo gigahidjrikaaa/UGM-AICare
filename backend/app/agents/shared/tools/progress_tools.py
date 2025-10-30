@@ -22,14 +22,14 @@ from typing import Any, Dict, List, Optional
 from sqlalchemy import desc, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import (
+from app.models import UserBadge  # Core model
+from app.domains.mental_health.models import (
     Appointment,
     InterventionPlanRecord,
     InterventionPlanStepCompletion,
     JournalEntry,
     QuestInstance,
     QuestStatusEnum,
-    UserBadge,
 )
 
 from . import tool_registry

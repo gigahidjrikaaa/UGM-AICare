@@ -20,7 +20,14 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 COPY requirements.txt .
 
 # Install Python dependencies and compile them into wheels
-RUN pip wheel --no-cache-dir --wheel-dir /app/wheels -r requirements.txt
+# Use cache mount to speed up pip downloads (especially large packages like PyTorch)
+# Install CPU-only PyTorch to avoid 2GB+ CUDA libraries (saves ~2GB)
+RUN --mount=type=cache,target=/root/.cache/pip \
+    # First, install CPU-only PyTorch explicitly
+    pip install --index-url https://download.pytorch.org/whl/cpu \
+        torch>=2.0.0 torchvision torchaudio && \
+    # Then install other dependencies (will skip torch since already installed)
+    pip wheel --wheel-dir /app/wheels -r requirements.txt
 
 
 # ---- Final Stage (production) ----

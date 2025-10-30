@@ -7,7 +7,7 @@ from app.database import Base
 from datetime import datetime
 
 if TYPE_CHECKING:
-    from .user import User
+    from app.models.user import User
 
 class Conversation(Base):
     """User conversation history."""

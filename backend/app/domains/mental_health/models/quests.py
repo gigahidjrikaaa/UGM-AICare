@@ -61,10 +61,10 @@ class QuestTemplate(Base):
     short_description: Mapped[str] = mapped_column(String(255), nullable=False)
     long_description: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
     category: Mapped[QuestCategoryEnum] = mapped_column(
-        SqlEnum(QuestCategoryEnum), default=QuestCategoryEnum.WELLNESS, nullable=False
+        SqlEnum(QuestCategoryEnum, values_callable=lambda x: [e.value for e in x]), default=QuestCategoryEnum.WELLNESS, nullable=False
     )
     difficulty: Mapped[QuestDifficultyEnum] = mapped_column(
-        SqlEnum(QuestDifficultyEnum), default=QuestDifficultyEnum.STANDARD, nullable=False
+        SqlEnum(QuestDifficultyEnum, values_callable=lambda x: [e.value for e in x]), default=QuestDifficultyEnum.STANDARD, nullable=False
     )
     recommended_duration_minutes: Mapped[int] = mapped_column(Integer, default=10, nullable=False)
     base_xp: Mapped[int] = mapped_column(Integer, default=25, nullable=False)
@@ -92,7 +92,7 @@ class QuestInstance(Base):
     user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     template_id: Mapped[int] = mapped_column(ForeignKey("quest_templates.id", ondelete="CASCADE"), nullable=False)
     status: Mapped[QuestStatusEnum] = mapped_column(
-        SqlEnum(QuestStatusEnum), default=QuestStatusEnum.ACTIVE, nullable=False
+        SqlEnum(QuestStatusEnum, values_callable=lambda x: [e.value for e in x]), default=QuestStatusEnum.ACTIVE, nullable=False
     )
     issued_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     expires_at: Mapped[datetime] = mapped_column(DateTime, nullable=False)
@@ -183,7 +183,7 @@ class AttestationRecord(Base):
     counselor_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
     hashed_payload: Mapped[str] = mapped_column(String(256), nullable=False)
     status: Mapped[AttestationStatusEnum] = mapped_column(
-        SqlEnum(AttestationStatusEnum), default=AttestationStatusEnum.PENDING, nullable=False
+        SqlEnum(AttestationStatusEnum, values_callable=lambda x: [e.value for e in x]), default=AttestationStatusEnum.PENDING, nullable=False
     )
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
     processed_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)

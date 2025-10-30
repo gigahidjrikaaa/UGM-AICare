@@ -16,8 +16,8 @@ from datetime import datetime, timedelta
 from sqlalchemy import select, func, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import (
-    User,
+from app.models import User  # Core model
+from app.domains.mental_health.models import (
     Conversation,
     Message,
     JournalEntry,

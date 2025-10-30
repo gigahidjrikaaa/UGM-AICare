@@ -6,9 +6,10 @@ from typing import Literal, Optional, Any
 from datetime import datetime
 
 from app.database import get_async_db
-from app.models import Feedback, User
+from app.models import User  # Core model
+from app.domains.mental_health.models import Feedback
 from app.dependencies import get_current_active_user
-from app.schemas.feedback import FeedbackCreate, FeedbackResponse
+from app.domains.mental_health.schemas.feedback import FeedbackCreate, FeedbackResponse
 import logging
 
 logger = logging.getLogger(__name__)

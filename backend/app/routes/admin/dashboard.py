@@ -11,13 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
 from app.dependencies import get_admin_user
-from app.models import (
+from app.models import InsightsReport  # Core infrastructure model
+from app.domains.mental_health.models import (
     Appointment,
     Case,
     CaseSeverityEnum,
     CaseStatusEnum,
     TriageAssessment,
-    InsightsReport,
 )
 from app.schemas.admin.dashboard import (
     AlertItem,

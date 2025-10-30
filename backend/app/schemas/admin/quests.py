@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.models import QuestCategoryEnum, QuestDifficultyEnum
+from app.domains.mental_health.models import QuestCategoryEnum, QuestDifficultyEnum
 
 
 class QuestTemplateBase(BaseModel):

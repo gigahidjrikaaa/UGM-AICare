@@ -5,7 +5,7 @@ from typing import Any, Dict, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import QuestAnalyticsEvent, QuestInstance
+from app.domains.mental_health.models import QuestAnalyticsEvent, QuestInstance
 from app.services.event_bus import EventType, publish_event
 
 logger = logging.getLogger(__name__)

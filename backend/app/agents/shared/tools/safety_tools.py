@@ -19,13 +19,13 @@ from datetime import datetime, timedelta
 from sqlalchemy import select, desc, and_
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import (
+from app.models import User  # Core model
+from app.domains.mental_health.models import (
     TriageAssessment,
     Case,
     CaseStatusEnum,
     CaseSeverityEnum,
     ContentResource,
-    User
 )
 from app.agents.shared.tools import tool_registry
 

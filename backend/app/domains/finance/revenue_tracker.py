@@ -48,13 +48,13 @@ from app.blockchain.somnia import OracleClient
 
 logger = logging.getLogger(__name__)
 
-# Database - async_session_maker import wrapped in try/except
+# Database - AsyncSessionLocal import wrapped in try/except
 # This may not be available in all configurations
 try:
-    from app.database import async_session_maker  # type: ignore
+    from app.database import AsyncSessionLocal as async_session_maker  # type: ignore
 except ImportError:
     async_session_maker = None  # type: ignore
-    logger.warning("⚠️  async_session_maker not found in app.database")
+    logger.warning("⚠️  AsyncSessionLocal not found in app.database")
 
 logger = logging.getLogger(__name__)
 

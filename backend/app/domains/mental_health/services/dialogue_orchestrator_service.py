@@ -10,7 +10,8 @@ from sqlalchemy.orm import selectinload
 
 from app.core import llm
 from app.core.redaction import sanitize_text
-from app.models import PlayerWellnessState, QuestInstance, QuestStatusEnum, User
+from app.models import User  # Core model
+from app.domains.mental_health.models import PlayerWellnessState, QuestInstance, QuestStatusEnum
 
 logger = logging.getLogger(__name__)
 

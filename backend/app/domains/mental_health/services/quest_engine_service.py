@@ -9,14 +9,14 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models import (
+from app.models import User  # Core model
+from app.domains.mental_health.models import (
     QuestTemplate,
     QuestInstance,
     QuestCategoryEnum,
     QuestDifficultyEnum,
     QuestStatusEnum,
     PlayerWellnessState,
-    User,
 )
 from app.domains.mental_health.services.quest_analytics_service import record_quest_event
 
@@ -92,8 +92,8 @@ class QuestEngineService:
                 name=str(template_payload["name"]),
                 short_description=str(template_payload["short_description"]),
                 long_description=str(template_payload["long_description"]),
-                category=str(template_payload["category"]),
-                difficulty=str(template_payload["difficulty"]),
+                category=template_payload["category"],  # Pass enum directly
+                difficulty=template_payload["difficulty"],  # Pass enum directly
                 recommended_duration_minutes=int(str(template_payload["recommended_duration_minutes"])),
                 base_xp=int(str(template_payload["base_xp"])),
                 base_joy=int(str(template_payload["base_joy"])),

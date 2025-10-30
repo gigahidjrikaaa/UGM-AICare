@@ -7,8 +7,9 @@ from datetime import date, datetime # Import date
 from typing import List, Optional, cast as typing_cast
 
 from app.database import get_async_db, AsyncSessionLocal
-from app.models import User, JournalEntry, JournalReflectionPoint
-from app.schemas.journal import JournalEntryCreate, JournalEntryResponse, JournalReflectionPointCreate
+from app.models import User  # Core model
+from app.domains.mental_health.models import JournalEntry, JournalReflectionPoint
+from app.domains.mental_health.schemas.journal import JournalEntryCreate, JournalEntryResponse, JournalReflectionPointCreate
 from app.core.llm import generate_response, LLMProvider
 from app.dependencies import get_current_active_user # Use your auth dependency
 from app.domains.mental_health.services.personal_context import invalidate_user_personal_context

@@ -7,7 +7,7 @@ from sqlalchemy.orm import joinedload
 from typing import Optional
 from app.database import get_async_db
 from app.models.user import User
-from app.models.appointments import Psychologist as CounselorProfile, Appointment
+from app.domains.mental_health.models import Psychologist as CounselorProfile, Appointment
 from app.schemas.counselor import (
     CounselorCreate,
     CounselorUpdate,

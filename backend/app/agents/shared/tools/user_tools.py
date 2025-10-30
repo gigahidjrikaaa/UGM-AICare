@@ -18,7 +18,8 @@ from typing import Any, Dict, Optional
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import Consent, ConsentScopeEnum, User, UserSummary
+from app.models import User  # Core models
+from app.domains.mental_health.models import Consent, ConsentScopeEnum, UserSummary
 
 from . import tool_registry
 

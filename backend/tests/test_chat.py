@@ -17,7 +17,7 @@ class TestConversationManagement:
     async def test_create_new_conversation(self, client: AsyncClient, auth_headers: dict):
         """Test creating a new conversation."""
         response = await client.post(
-            "/api/conversations",
+            "/api/v1/chat",
             headers=auth_headers,
             json={"title": "My First Chat"},
         )
@@ -30,7 +30,7 @@ class TestConversationManagement:
     @pytest.mark.asyncio
     async def test_list_user_conversations(self, client: AsyncClient, auth_headers: dict):
         """Test listing all user conversations."""
-        response = await client.get("/api/conversations", headers=auth_headers)
+        response = await client.get("/api/v1/chat", headers=auth_headers)
         
         assert response.status_code == 200
         data = response.json()
@@ -41,7 +41,7 @@ class TestConversationManagement:
         """Test retrieving a specific conversation."""
         # First create a conversation
         create_response = await client.post(
-            "/api/conversations",
+            "/api/v1/chat",
             headers=auth_headers,
             json={"title": "Test Conversation"},
         )
@@ -49,7 +49,7 @@ class TestConversationManagement:
         
         # Then retrieve it
         response = await client.get(
-            f"/api/conversations/{conversation_id}",
+            f"/api/v1/chat/{conversation_id}",
             headers=auth_headers,
         )
         
@@ -62,7 +62,7 @@ class TestConversationManagement:
         """Test updating conversation details."""
         # Create conversation
         create_response = await client.post(
-            "/api/conversations",
+            "/api/v1/chat",
             headers=auth_headers,
             json={"title": "Original Title"},
         )
@@ -70,7 +70,7 @@ class TestConversationManagement:
         
         # Update it
         response = await client.put(
-            f"/api/conversations/{conversation_id}",
+            f"/api/v1/chat/{conversation_id}",
             headers=auth_headers,
             json={"title": "Updated Title"},
         )
@@ -84,7 +84,7 @@ class TestConversationManagement:
         """Test deleting a conversation."""
         # Create conversation
         create_response = await client.post(
-            "/api/conversations",
+            "/api/v1/chat",
             headers=auth_headers,
             json={"title": "To Be Deleted"},
         )
@@ -92,7 +92,7 @@ class TestConversationManagement:
         
         # Delete it
         response = await client.delete(
-            f"/api/conversations/{conversation_id}",
+            f"/api/v1/chat/{conversation_id}",
             headers=auth_headers,
         )
         
@@ -107,7 +107,7 @@ class TestMessageSending:
         """Test sending a chat message."""
         # Create conversation first
         conv_response = await client.post(
-            "/api/conversations",
+            "/api/v1/chat",
             headers=auth_headers,
             json={"title": "Chat Test"},
         )
@@ -132,7 +132,7 @@ class TestMessageSending:
         """Test retrieving all messages in a conversation."""
         # Create conversation and send message
         conv_response = await client.post(
-            "/api/conversations",
+            "/api/v1/chat",
             headers=auth_headers,
             json={"title": "Message History Test"},
         )
@@ -149,7 +149,7 @@ class TestMessageSending:
         
         # Get messages
         response = await client.get(
-            f"/api/conversations/{conversation_id}/messages",
+            f"/api/v1/chat/{conversation_id}/messages",
             headers=auth_headers,
         )
         
@@ -179,7 +179,7 @@ class TestAIResponses:
     async def test_ai_response_generation(self, client: AsyncClient, auth_headers: dict):
         """Test that AI generates appropriate responses."""
         conv_response = await client.post(
-            "/api/conversations",
+            "/api/v1/chat",
             headers=auth_headers,
             json={"title": "AI Test"},
         )
@@ -204,7 +204,7 @@ class TestAIResponses:
     async def test_context_awareness(self, client: AsyncClient, auth_headers: dict):
         """Test that AI maintains conversation context."""
         conv_response = await client.post(
-            "/api/conversations",
+            "/api/v1/chat",
             headers=auth_headers,
             json={"title": "Context Test"},
         )
@@ -241,7 +241,7 @@ class TestMessageMetadata:
     async def test_message_timestamps(self, client: AsyncClient, auth_headers: dict):
         """Test that messages have proper timestamps."""
         conv_response = await client.post(
-            "/api/conversations",
+            "/api/v1/chat",
             headers=auth_headers,
             json={"title": "Timestamp Test"},
         )
@@ -258,7 +258,7 @@ class TestMessageMetadata:
         
         # Get messages to check timestamps
         messages_response = await client.get(
-            f"/api/conversations/{conversation_id}/messages",
+            f"/api/v1/chat/{conversation_id}/messages",
             headers=auth_headers,
         )
         
@@ -270,7 +270,7 @@ class TestMessageMetadata:
     async def test_message_sender_tracking(self, client: AsyncClient, auth_headers: dict):
         """Test that message sender is tracked."""
         conv_response = await client.post(
-            "/api/conversations",
+            "/api/v1/chat",
             headers=auth_headers,
             json={"title": "Sender Test"},
         )
@@ -287,7 +287,7 @@ class TestMessageMetadata:
         
         # Get messages
         messages_response = await client.get(
-            f"/api/conversations/{conversation_id}/messages",
+            f"/api/v1/chat/{conversation_id}/messages",
             headers=auth_headers,
         )
         
@@ -305,7 +305,7 @@ class TestChatSecurity:
         # This would require two different users
         # For now, test that accessing non-existent conversation returns 404
         response = await client.get(
-            "/api/conversations/99999",
+            "/api/v1/chat/99999",
             headers=auth_headers,
         )
         
@@ -316,7 +316,7 @@ class TestChatSecurity:
         """Test that conversations are isolated between users."""
         # Create conversation for test user
         conv_response = await client.post(
-            "/api/conversations",
+            "/api/v1/chat",
             headers=auth_headers,
             json={"title": "Private Conversation"},
         )
@@ -334,7 +334,7 @@ class TestChatSecurity:
         
         # Verify message is retrievable by owner
         response = await client.get(
-            f"/api/conversations/{conversation_id}/messages",
+            f"/api/v1/chat/{conversation_id}/messages",
             headers=auth_headers,
         )
         assert response.status_code == 200

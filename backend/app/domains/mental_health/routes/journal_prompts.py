@@ -4,8 +4,9 @@ from sqlalchemy import select
 from typing import List
 
 from app.database import get_async_db
-from app.models import JournalPrompt, User, JournalReflectionPoint
-from app.schemas.journal import (
+from app.models import User  # Core model
+from app.domains.mental_health.models import JournalPrompt, JournalReflectionPoint
+from app.domains.mental_health.schemas.journal import (
     JournalPromptCreate,
     JournalPromptResponse,
     JournalPromptUpdate,

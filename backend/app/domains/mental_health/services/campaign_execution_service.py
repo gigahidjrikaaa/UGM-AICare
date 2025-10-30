@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.campaign import Campaign
 from app.models.campaign import SCACampaignExecution
-from app.models.cases import Case
+from app.domains.mental_health.models import Case
 from app.models.user import User
 from app.domains.mental_health.services.campaign_service import CampaignService
 
@@ -191,7 +191,7 @@ class CampaignExecutionService:
         risk_level = target_criteria.get("risk_level")
         if risk_level:
             # Get users with open cases at specified risk level
-            from app.models.cases import Case
+            from app.domains.mental_health.models import Case
             
             subquery = (
                 select(Case.user_id)
@@ -209,7 +209,7 @@ class CampaignExecutionService:
         # Filter by has_open_case
         has_open_case = target_criteria.get("has_open_case")
         if has_open_case is not None:
-            from app.models.cases import Case
+            from app.domains.mental_health.models import Case
             
             subquery = (
                 select(Case.user_id)

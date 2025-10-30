@@ -19,7 +19,7 @@ from app.agents.graph_state import SCAState
 from app.agents.sca.service import SupportCoachService
 from app.agents.sca.schemas import SCAInterveneRequest
 from app.agents.execution_tracker import execution_tracker
-from app.models import InterventionPlanRecord
+from app.domains.mental_health.models import InterventionPlanRecord
 
 logger = logging.getLogger(__name__)
 

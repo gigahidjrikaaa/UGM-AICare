@@ -10,8 +10,9 @@ from sqlalchemy.orm import selectinload
 
 from app.database import get_async_db
 from app.dependencies import get_current_active_user
-from app.models import QuestInstance, QuestStatusEnum, User
-from app.schemas.quests import (
+from app.models import User  # Core model
+from app.domains.mental_health.models import QuestInstance, QuestStatusEnum
+from app.domains.mental_health.schemas.quests import (
     QuestCompletionRequest,
     QuestCompletionResponse,
     QuestInstanceResponse,
