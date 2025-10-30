@@ -102,6 +102,12 @@ class AikaState(BaseModel):
     risk_level: Optional[Literal["low", "moderate", "high", "critical"]] = None
     risk_factors: List[str] = Field(default_factory=list)
     
+    # Intervention plan (if created)
+    intervention_plan: Optional[Dict[str, Any]] = Field(
+        default=None,
+        description="Intervention plan created by SCA if user needs structured guidance"
+    )
+    
     # Error handling
     errors: List[str] = Field(
         default_factory=list,

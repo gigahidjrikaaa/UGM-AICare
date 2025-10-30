@@ -56,12 +56,18 @@ class SafetyTriageAgent:
             severity_map = {0: "low", 1: "moderate", 2: "high", 3: "critical"}
             severity = severity_map.get(result.risk_level, "low")
             
+            # Convert diagnostic_notes from string to list
+            risk_factors = []
+            if result.diagnostic_notes:
+                # Split by semicolon since classifiers.py joins with "; "
+                risk_factors = [note.strip() for note in result.diagnostic_notes.split(";")]
+            
             # Convert to dict format for orchestrator
             return {
                 "risk_level": severity,
                 "risk_score": result.risk_level / 3.0,  # Normalize to 0-1
                 "confidence": 0.7,  # Default confidence
-                "risk_factors": result.diagnostic_notes or [],
+                "risk_factors": risk_factors,  # Now properly a list
                 "recommended_action": result.next_step or "deliver_self_help_pack",
                 "intent": result.intent,
                 "next_step": result.next_step,
@@ -143,6 +149,7 @@ Provide empathetic, supportive response in Indonesian.
             max_iterations = 3
             iteration = 0
             actions_taken = []
+            intervention_plan_created = None  # Track if intervention plan was created
             
             while iteration < max_iterations:
                 iteration += 1
@@ -173,12 +180,19 @@ Provide empathetic, supportive response in Indonesian.
                 # If no tool calls, we're done
                 if not tool_calls:
                     logger.info(f"✅ SCA completed after {iteration} iteration(s)")
-                    return {
+                    
+                    result = {
                         "response": response_text or "Aku di sini untuk mendengarkanmu. Ceritakan lebih lanjut?",
                         "actions": actions_taken if actions_taken else ["provided_emotional_support"],
                         "coaching_type": "cbt_informed",
                         "tools_used": actions_taken,
                     }
+                    
+                    # Include intervention plan if created
+                    if intervention_plan_created:
+                        result["intervention_plan"] = intervention_plan_created
+                    
+                    return result
                 
                 # Execute tool calls
                 logger.info(f"🔧 SCA executing {len(tool_calls)} tool call(s)")
@@ -197,6 +211,12 @@ Provide empathetic, supportive response in Indonesian.
                             db=self.db,
                             user_id=str(user_id)
                         )
+                        
+                        # Check if intervention plan was created
+                        if tool_name == "create_intervention_plan" and result.get("success"):
+                            intervention_plan_created = result.get("plan_data")
+                            logger.info(f"  ✅ Intervention plan created: {result.get('plan_title')}")
+                        
                         tool_results.append({
                             "function_call": tool_call,
                             "function_response": {"name": tool_name, "response": result}
@@ -225,12 +245,19 @@ Provide empathetic, supportive response in Indonesian.
             logger.warning(f"⚠️  SCA reached max iterations ({max_iterations})")
             # Ensure response_text is defined
             final_response = response_text if 'response_text' in locals() else "Aku di sini untuk mendengarkanmu. Ceritakan lebih lanjut?"
-            return {
+            
+            result = {
                 "response": final_response,
                 "actions": actions_taken if actions_taken else ["provided_emotional_support"],
                 "coaching_type": "cbt_informed",
                 "tools_used": actions_taken,
             }
+            
+            # Include intervention plan if created
+            if intervention_plan_created:
+                result["intervention_plan"] = intervention_plan_created
+            
+            return result
             
         except Exception as e:
             logger.error(f"❌ SCA coaching error: {e}", exc_info=True)

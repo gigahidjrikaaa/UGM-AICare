@@ -47,6 +47,111 @@ def _make_text_part(text: str) -> content_types.PartDict:
     return cast(content_types.PartDict, {"text": text})
 
 
+def _convert_tool_schemas_for_gemini(tool_wrappers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Convert tool schemas to format compatible with old google-generativeai SDK.
+    
+    Expected input format: [{"function_declarations": [{"name": ..., "description": ..., "parameters": ...}]}]
+    
+    The old SDK expects:
+    1. Type values to be uppercase strings: "OBJECT", "STRING", "INTEGER", etc.
+    2. Only standard FunctionDeclaration fields: name, description, parameters
+    3. Only standard Schema fields in parameters: type, properties, required, items, enum, description
+    4. No extra fields like "category", "examples", "default", etc.
+    
+    Args:
+        tool_wrappers: List of tool wrapper dicts containing function_declarations
+        
+    Returns:
+        List of cleaned tool wrappers with uppercase type values
+    """
+    # Fields allowed in Schema proto (parameters and nested properties)
+    SCHEMA_ALLOWED_FIELDS = {"type", "description", "properties", "required", "items", "enum", "format"}
+    # Fields allowed in FunctionDeclaration proto
+    FUNCTION_ALLOWED_FIELDS = {"name", "description", "parameters"}
+    
+    def convert_types(obj: Any) -> Any:
+        """Recursively convert type strings to uppercase"""
+        if isinstance(obj, dict):
+            result = {}
+            for key, value in obj.items():
+                if key == "type" and isinstance(value, str):
+                    # Convert lowercase types to uppercase
+                    result[key] = value.upper()
+                else:
+                    result[key] = convert_types(value)
+            return result
+        elif isinstance(obj, list):
+            return [convert_types(item) for item in obj]
+        else:
+            return obj
+    
+    def clean_schema(schema: Any, path: str = "") -> Any:
+        """Recursively clean schema objects, removing non-standard fields"""
+        if isinstance(schema, dict):
+            cleaned = {}
+            for key, value in schema.items():
+                if key in SCHEMA_ALLOWED_FIELDS:
+                    # Recursively clean nested schemas
+                    if key == "properties" and isinstance(value, dict):
+                        # Clean each property schema
+                        cleaned[key] = {k: clean_schema(v, f"{path}.{k}") for k, v in value.items()}
+                    elif key == "items" and isinstance(value, dict):
+                        # Clean array item schema
+                        cleaned[key] = clean_schema(value, f"{path}.items")
+                    else:
+                        cleaned[key] = value
+                else:
+                    logger.debug(f"Removing non-standard Schema field '{key}' from {path or 'root'}")
+            return cleaned
+        elif isinstance(schema, list):
+            return [clean_schema(item, path) for item in schema]
+        else:
+            return schema
+    
+    def clean_function_declaration(func_decl: Dict[str, Any]) -> Dict[str, Any]:
+        """Remove non-standard fields from function declaration"""
+        cleaned = {}
+        tool_name = func_decl.get('name', 'unknown')
+        
+        for key, value in func_decl.items():
+            if key in FUNCTION_ALLOWED_FIELDS:
+                if key == "parameters" and isinstance(value, dict):
+                    # Deep clean the parameters schema
+                    cleaned[key] = clean_schema(value, f"tool:{tool_name}")
+                else:
+                    cleaned[key] = value
+            else:
+                logger.debug(f"Removing non-standard FunctionDeclaration field '{key}' from tool '{tool_name}'")
+        
+        return cleaned
+    
+    # Process each tool wrapper
+    result = []
+    for wrapper in tool_wrappers:
+        if "function_declarations" in wrapper:
+            # Extract function declarations
+            func_decls = wrapper["function_declarations"]
+            
+            # Convert types and clean each function declaration
+            converted_decls = []
+            for decl in func_decls:
+                # First convert types to uppercase
+                converted = convert_types(decl)
+                # Then remove non-standard fields (including from nested schemas)
+                cleaned = clean_function_declaration(converted)
+                converted_decls.append(cleaned)
+            
+            # Rebuild wrapper
+            result.append({"function_declarations": converted_decls})
+        else:
+            # Not a standard wrapper, just convert types
+            result.append(convert_types(wrapper))
+    
+    logger.debug(f"Converted and cleaned {len(tool_wrappers)} tool wrappers for Gemini")
+    return result
+
+
 def _convert_history_for_gemini(history: List[Dict[str, str]]) -> List[content_types.ContentDict]:
     gemini_history: List[content_types.ContentDict] = []
     for msg in history:
@@ -109,10 +214,11 @@ async def generate_gemini_response(
         logger.info(f"🔍 [DEBUG] system_prompt parameter received: {repr(system_prompt)[:200]}")
 
         gemini_model_args: Dict[str, Any] = {"model_name": model}
-        # Add tools if provided
+        # Add tools if provided - convert schemas to uppercase type format
         if tools:
-            gemini_model_args["tools"] = tools
-            logger.debug(f"Enabled {len(tools)} tool(s) for this request")
+            converted_tools = _convert_tool_schemas_for_gemini(tools)
+            gemini_model_args["tools"] = converted_tools
+            logger.debug(f"Enabled {len(tools)} tool(s) for this request with converted schemas")
 
         generative_model_cls = getattr(genai, "GenerativeModel", None)
         if generative_model_cls is None:

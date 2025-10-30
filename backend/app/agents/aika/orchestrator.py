@@ -233,6 +233,7 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         """
         try:
             logger.info("🚨 Invoking Safety Triage Agent...")
+            logger.info("🔍 STA: Analyzing message for safety concerns...")
             
             # Call STA
             triage_result = await self.sta.assess_message(
@@ -269,6 +270,7 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         """
         try:
             logger.info("💙 Invoking Support Coach Agent...")
+            logger.info("💙 SCA: Planning personalized support response...")
             
             # Call SCA with system prompt
             system_prompt = AIKA_SYSTEM_PROMPTS["student"]
@@ -285,6 +287,11 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
             state.response = coaching_result.get("response")
             state.actions_taken.extend(coaching_result.get("actions", []))
             state.agents_invoked.append("SCA")
+            
+            # Include intervention plan if created
+            if "intervention_plan" in coaching_result:
+                state.intervention_plan = coaching_result["intervention_plan"]
+                logger.info("💙 SCA created intervention plan for user")
             
             logger.info("💙 SCA provided coaching response")
             
@@ -303,6 +310,7 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         """
         try:
             logger.info("🚑 Invoking Service Desk Agent for crisis escalation...")
+            logger.info("🚑 SDA: Finding the perfect counselor match...")
             
             # Call SDA to create urgent case
             service_result = await self.sda.create_urgent_case(
@@ -653,6 +661,8 @@ Kamu sangat berharga, dan dunia lebih baik dengan kehadiranmu. 🌟
         )
         
         try:
+            logger.info("✨ Aika: Consulting with specialized agents...")
+            
             # Run through orchestration graph
             config = {"configurable": {"thread_id": initial_state.session_id}}
             final_state = await self.graph.ainvoke(initial_state, config)
@@ -669,7 +679,7 @@ Kamu sangat berharga, dan dunia lebih baik dengan kehadiranmu. 🌟
             )
             
             # Return response
-            return {
+            result = {
                 "success": True,
                 "response": final_state.get("response", ""),
                 "metadata": {
@@ -685,10 +695,30 @@ Kamu sangat berharga, dan dunia lebih baik dengan kehadiranmu. 🌟
                 "errors": final_state.get("errors") if final_state.get("errors") else None,
             }
             
+            # Include intervention plan if created
+            if final_state.get("intervention_plan"):
+                result["intervention_plan"] = final_state["intervention_plan"]
+            
+            return result
+            
         except Exception as e:
             logger.error(f"❌ Aika orchestration error: {e}", exc_info=True)
+            
+            # Calculate processing time even for errors
+            total_time_ms = (time.time() - start_time) * 1000
+            
             return {
                 "success": False,
                 "error": str(e),
                 "response": self._generate_error_response(initial_state),
+                "metadata": {
+                    "session_id": initial_state.session_id,
+                    "user_role": initial_state.user_role,
+                    "intent": initial_state.intent or "unknown",
+                    "agents_invoked": initial_state.agents_invoked,
+                    "processing_time_ms": total_time_ms,
+                    "risk_level": initial_state.risk_level or "unknown",
+                    "escalation_needed": False,
+                    "actions_taken": [],
+                },
             }

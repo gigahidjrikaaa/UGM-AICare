@@ -380,15 +380,19 @@ async def handle_aika_request(
             conversation_history=request.conversation_history,
         )
         
-        logger.info(
-            f"✅ Aika completed: agents={result['metadata']['agents_invoked']}, "
-            f"time={result['metadata']['processing_time_ms']:.2f}ms"
-        )
+        # Safe logging with metadata check
+        if "metadata" in result:
+            logger.info(
+                f"✅ Aika completed: agents={result['metadata']['agents_invoked']}, "
+                f"time={result['metadata']['processing_time_ms']:.2f}ms"
+            )
+        else:
+            logger.warning(f"⚠️ Aika returned without metadata (error occurred)")
         
         return AikaResponse(
-            success=result["success"],
-            response=result["response"],
-            metadata=result["metadata"],
+            success=result.get("success", False),
+            response=result.get("response", ""),
+            metadata=result.get("metadata", {}),
         )
         
     except HTTPException:

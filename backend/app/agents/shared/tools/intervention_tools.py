@@ -170,6 +170,117 @@ async def get_intervention_plan_details(
         }
 
 
+async def create_intervention_plan(
+    db: AsyncSession,
+    user_id: str,
+    plan_title: str,
+    plan_steps: List[Dict[str, Any]],
+    resource_cards: Optional[List[Dict[str, str]]] = None,
+    next_check_in: Optional[Dict[str, str]] = None,
+    risk_level: Optional[int] = None,
+    session_id: Optional[str] = None
+) -> Dict[str, Any]:
+    """
+    Create a new intervention plan for user.
+    
+    Creates a structured guided self-help plan with steps and resources.
+    SENSITIVE DATA - creates treatment record.
+    
+    Args:
+        user_id: User's database ID
+        plan_title: Title of the intervention plan
+        plan_steps: List of steps with title and description
+        resource_cards: Optional resource cards with title, url, description
+        next_check_in: Optional check-in info with timeframe and method
+        risk_level: Optional risk level (0-3)
+        session_id: Optional session ID
+        
+    Returns:
+        Dict with created plan details or error
+    """
+    try:
+        from app.domains.mental_health.schemas.intervention_plans import (
+            InterventionPlanRecordCreate,
+            InterventionPlanData,
+            PlanStep,
+            ResourceCard,
+            NextCheckIn
+        )
+        from app.domains.mental_health.services.intervention_plan_service import InterventionPlanService
+        
+        # Convert plan_steps to PlanStep objects
+        steps = [
+            PlanStep(
+                title=step.get("title", step.get("label", "")),
+                description=step.get("description", ""),
+                completed=False
+            )
+            for step in plan_steps
+        ]
+        
+        # Convert resource_cards if provided
+        resources = []
+        if resource_cards:
+            resources = [
+                ResourceCard(
+                    title=card.get("title", ""),
+                    url=card.get("url", ""),
+                    description=card.get("description", card.get("summary", ""))
+                )
+                for card in resource_cards
+            ]
+        
+        # Create next_check_in if provided
+        check_in = None
+        if next_check_in:
+            check_in = NextCheckIn(
+                timeframe=next_check_in.get("timeframe", "1 hari"),
+                method=next_check_in.get("method", "chat")
+            )
+        
+        # Create InterventionPlanData
+        plan_data = InterventionPlanData(
+            plan_steps=steps,
+            resource_cards=resources,
+            next_check_in=check_in
+        )
+        
+        # Create InterventionPlanRecordCreate
+        plan_create = InterventionPlanRecordCreate(
+            user_id=int(user_id),
+            session_id=session_id,
+            plan_title=plan_title,
+            risk_level=risk_level,
+            plan_data=plan_data,
+            total_steps=len(steps)
+        )
+        
+        # Create plan record
+        plan_record = await InterventionPlanService.create_plan(db, plan_create)
+        
+        logger.info(f"✅ Created intervention plan {plan_record.id} for user {user_id}")
+        
+        return {
+            "success": True,
+            "plan_id": plan_record.id,
+            "plan_title": plan_record.plan_title,
+            "total_steps": plan_record.total_steps,
+            "created_at": plan_record.created_at.isoformat(),
+            "plan_data": {
+                "plan_steps": [{"title": s.title, "description": s.description} for s in plan_data.plan_steps],
+                "resource_cards": [{"title": r.title, "url": r.url, "description": r.description} for r in plan_data.resource_cards],
+                "next_check_in": {"timeframe": check_in.timeframe, "method": check_in.method} if check_in else None
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"❌ Error creating intervention plan: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e)
+        }
+
+
 # ============================================================================
 # GEMINI FUNCTION CALLING SCHEMAS
 # ============================================================================
@@ -209,6 +320,86 @@ get_intervention_plan_details_schema = {
     }
 }
 
+create_intervention_plan_schema = {
+    "name": "create_intervention_plan",
+    "description": "Create a guided self-help intervention plan with steps and resources for the user. Use this when user needs structured support or coping strategies. SENSITIVE DATA - creates treatment record.",
+    "parameters": {
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "string",
+                "description": "User's database ID"
+            },
+            "plan_title": {
+                "type": "string",
+                "description": "Title of the intervention plan (e.g., 'Strategi Mengatasi Kecemasan', 'Panduan Mengelola Stres Akademik')"
+            },
+            "plan_steps": {
+                "type": "array",
+                "description": "List of action steps with title and description",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": "Step title/action"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Detailed description of the step"
+                        }
+                    },
+                    "required": ["title", "description"]
+                }
+            },
+            "resource_cards": {
+                "type": "array",
+                "description": "Optional resource cards with helpful links",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": "Resource title"
+                        },
+                        "url": {
+                            "type": "string",
+                            "description": "URL to resource"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Resource description"
+                        }
+                    }
+                }
+            },
+            "next_check_in": {
+                "type": "object",
+                "description": "Optional check-in schedule",
+                "properties": {
+                    "timeframe": {
+                        "type": "string",
+                        "description": "When to check in (e.g., '1 hari', '3 hari', '1 minggu')"
+                    },
+                    "method": {
+                        "type": "string",
+                        "description": "How to check in (e.g., 'chat', 'form')"
+                    }
+                }
+            },
+            "risk_level": {
+                "type": "integer",
+                "description": "Risk level 0-3 (0=none, 1=low, 2=moderate, 3=high)"
+            },
+            "session_id": {
+                "type": "string",
+                "description": "Optional session ID"
+            }
+        },
+        "required": ["user_id", "plan_title", "plan_steps"]
+    }
+}
+
 
 # ============================================================================
 # REGISTER TOOLS WITH CENTRAL REGISTRY
@@ -228,4 +419,11 @@ tool_registry.register(
     category="intervention"
 )
 
-logger.info("🔧 Registered 2 intervention tools in 'intervention' category")
+tool_registry.register(
+    name="create_intervention_plan",
+    func=create_intervention_plan,
+    schema=create_intervention_plan_schema,
+    category="intervention"
+)
+
+logger.info("🔧 Registered 3 intervention tools in 'intervention' category")
