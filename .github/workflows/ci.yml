@@ -202,17 +202,19 @@ jobs:
         with:
           python-version: '3.11'
 
-      # OPTIMIZATION 1: Dependency Caching - pip
-      - name: Cache pip dependencies
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v3
+
+      - name: Cache uv dependencies
         uses: actions/cache@v3
         with:
-          path: ~/.cache/pip
-          key: ${{ runner.os }}-pip-${{ hashFiles('backend/requirements.txt') }}
+          path: ~/.cache/uv
+          key: ${{ runner.os }}-uv-${{ hashFiles('backend/requirements.txt') }}
           restore-keys: |
-            ${{ runner.os }}-pip-
+            ${{ runner.os }}-uv-
 
       - name: Install backend dependencies
-        run: pip install -r requirements.txt
+        run: uv pip install --system -r requirements.txt
         working-directory: ./backend
 
       - name: Run backend tests (pytest)
@@ -456,19 +458,6 @@ jobs:
             echo "ℹ️ Tests were skipped. Building anyway." >> $GITHUB_STEP_SUMMARY
           fi
           echo "" >> $GITHUB_STEP_SUMMARY
-
-      # OPTIMIZATION: Fast disk cleanup using dedicated action (saves 2-3 minutes)
-      - name: Free up disk space
-        uses: jlumbroso/free-disk-space@main
-        with:
-          # Options (all true by default, customize to speed up further)
-          tool-cache: true          # Remove tool cache (~20 GB, fast)
-          android: true             # Remove Android SDK (~15 GB, fast)
-          dotnet: true              # Remove .NET runtime (~3 GB, fast)
-          haskell: true             # Remove Haskell (~2 GB, fast)
-          large-packages: true      # Remove large packages (slow, but reclaims ~10 GB)
-          docker-images: true       # Remove Docker images (~4 GB, medium speed)
-          swap-storage: false       # Keep swap (we might need it)
 
       - name: Set lowercase repository owner
         id: lowercase
@@ -886,4 +875,3 @@ jobs:
             fi
             
             ./infra/scripts/deploy.sh ${{ github.event.inputs.rollback_sha }}
-
