@@ -49,14 +49,13 @@ langfuse>=2.0.0  # LLM observability and agent tracing
 
 # ONNX Runtime for Crisis Detection (3-5x faster, 96% smaller than PyTorch)
 # Replaces: torch (800+ MB) + sentence-transformers
-onnxruntime
-onnx  # For ONNX model optimization
+onnxruntime>=1.16.0  # Optimized inference runtime (~15 MB vs 800+ MB PyTorch)
+onnx>=1.15.0  # For ONNX model optimization (use >=1.15 for pre-built wheels)
 
 # Blockchain Integration
 web3>=6.0.0  # Web3.py for Ethereum/SOMNIA blockchain interaction
 eth-account>=0.10.0  # For Ethereum account management
 eth-utils>=2.0.0  # Ethereum utility functions
-onnxruntime>=1.16.0  # Optimized inference runtime (~15 MB vs 800+ MB PyTorch)
 transformers>=4.41.0  # For tokenizer (still needed, but much lighter without torch)
 
 # Torch - Only needed for ONNX export (can be removed after first build)

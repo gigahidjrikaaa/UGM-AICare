@@ -6,10 +6,10 @@ FROM python:3.11-slim-bookworm as builder
 
 WORKDIR /app
 
-# Install essential build tools (Rust needed for cryptography, bcrypt)
+# Install essential build tools (Rust needed for cryptography, bcrypt; cmake for onnx)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
-    gcc g++ python3-dev build-essential curl && \
+    gcc g++ python3-dev build-essential curl cmake && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
