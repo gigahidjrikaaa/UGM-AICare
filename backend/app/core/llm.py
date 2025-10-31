@@ -4,9 +4,9 @@ import os
 import httpx
 from typing import Any, AsyncIterator, cast
 
-import google.generativeai as genai
-import google.generativeai.types as genai_types
-from google.generativeai.types import HarmBlockThreshold, HarmCategory, content_types
+# NEW SDK imports
+from google import genai
+from google.genai import types
 from dotenv import load_dotenv
 import logging
 from typing import List, Dict, Literal, Optional, Tuple
@@ -24,80 +24,114 @@ GOOGLE_API_KEY = os.environ.get("GOOGLE_GENAI_API_KEY")
 DEFAULT_GEMINI_MODEL = "gemini-2.0-flash" 
 DEFAULT_GEMMA_LOCAL_MODEL = "gemma-3-12b-it-gguf"
 
-# Configure Gemini client (do this once at module load)
-if GOOGLE_API_KEY:
-    try:
-        configure_fn = getattr(genai, "configure", None)
-        if callable(configure_fn):
-            configure_fn(api_key=GOOGLE_API_KEY)
-            logger.info("Google Generative AI SDK configured successfully.")
-        else:
-            logger.error("google.generativeai.configure is unavailable; Gemini support disabled.")
-    except Exception as e:
-        logger.error(f"Failed to configure Google Generative AI SDK: {e}")
-else:
-    logger.warning("GOOGLE_API_KEY not found. Gemini API will not be available.")
+# --- Client Singleton ---
+_gemini_client: Optional[genai.Client] = None
+
+def get_gemini_client() -> genai.Client:
+    """Get or create Gemini client instance (singleton pattern).
+    
+    This replaces the old global genai.configure() pattern with a client-based approach.
+    The client is created once and reused across the application.
+    
+    Returns:
+        genai.Client: Initialized Gemini client
+        
+    Raises:
+        ValueError: If GOOGLE_API_KEY is not configured
+    """
+    global _gemini_client
+    if _gemini_client is None:
+        if not GOOGLE_API_KEY:
+            logger.error("GOOGLE_API_KEY not found. Gemini API will not be available.")
+            raise ValueError("Google API key not configured.")
+        try:
+            _gemini_client = genai.Client(api_key=GOOGLE_API_KEY)
+            logger.info("Gemini client initialized successfully with new google-genai SDK.")
+        except Exception as e:
+            logger.error(f"Failed to initialize Gemini client: {e}")
+            raise
+    return _gemini_client
 
 # --- Provider Type ---
 LLMProvider = Literal['gemini', 'gemma_local']
 
-# --- Helper: Convert Generic History to Gemini Format ---
-# Gemini expects alternating user/model roles, and uses 'model' instead of 'assistant'
-def _make_text_part(text: str) -> content_types.PartDict:
-    return cast(content_types.PartDict, {"text": text})
-
-
-def _convert_tool_schemas_for_gemini(tool_wrappers: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+# --- Helper: Convert Generic History to New SDK Format ---
+def _convert_history_to_contents(history: List[Dict[str, str]]) -> List[types.Content]:
+    """Convert generic history format to new SDK Content objects.
+    
+    Args:
+        history: List of {'role': 'user'|'assistant', 'content': str}
+        
+    Returns:
+        List of types.Content objects
     """
-    Convert tool schemas to format compatible with old google-generativeai SDK.
+    contents: List[types.Content] = []
+    for msg in history:
+        role = msg.get("role")
+        content = msg.get("content")
+        if not content:
+            continue
+        
+        # Map 'assistant' to 'model' for Gemini
+        gemini_role = "model" if role == "assistant" else "user"
+        
+        contents.append(
+            types.Content(
+                role=gemini_role,
+                parts=[types.Part.from_text(text=content)]  # keyword argument
+            )
+        )
+    return contents
+
+
+def _convert_tool_schemas_for_new_sdk(tool_wrappers: List[Dict[str, Any]]) -> List[types.Tool]:
+    """Convert tool schemas to new google-genai SDK format.
+    
+    The new SDK uses:
+    - types.Tool with function_declarations
+    - types.FunctionDeclaration for each tool
+    - Lowercase type names: "object", "string", "integer" (not "OBJECT", "STRING")
+    - Pydantic-based validation
     
     Expected input format: [{"function_declarations": [{"name": ..., "description": ..., "parameters": ...}]}]
-    
-    The old SDK expects:
-    1. Type values to be uppercase strings: "OBJECT", "STRING", "INTEGER", etc.
-    2. Only standard FunctionDeclaration fields: name, description, parameters
-    3. Only standard Schema fields in parameters: type, properties, required, items, enum, description
-    4. No extra fields like "category", "examples", "default", etc.
     
     Args:
         tool_wrappers: List of tool wrapper dicts containing function_declarations
         
     Returns:
-        List of cleaned tool wrappers with uppercase type values
+        List of types.Tool objects compatible with new SDK
     """
-    # Fields allowed in Schema proto (parameters and nested properties)
+    # Fields allowed in Schema (parameters and nested properties)
     SCHEMA_ALLOWED_FIELDS = {"type", "description", "properties", "required", "items", "enum", "format"}
-    # Fields allowed in FunctionDeclaration proto
+    # Fields allowed in FunctionDeclaration
     FUNCTION_ALLOWED_FIELDS = {"name", "description", "parameters"}
     
-    def convert_types(obj: Any) -> Any:
-        """Recursively convert type strings to uppercase"""
+    def convert_types_to_lowercase(obj: Any) -> Any:
+        """Recursively convert type strings to lowercase (new SDK requirement)."""
         if isinstance(obj, dict):
             result = {}
             for key, value in obj.items():
                 if key == "type" and isinstance(value, str):
-                    # Convert lowercase types to uppercase
-                    result[key] = value.upper()
+                    # Convert "STRING" -> "string", "OBJECT" -> "object"
+                    result[key] = value.lower()
                 else:
-                    result[key] = convert_types(value)
+                    result[key] = convert_types_to_lowercase(value)
             return result
         elif isinstance(obj, list):
-            return [convert_types(item) for item in obj]
+            return [convert_types_to_lowercase(item) for item in obj]
         else:
             return obj
     
     def clean_schema(schema: Any, path: str = "") -> Any:
-        """Recursively clean schema objects, removing non-standard fields"""
+        """Recursively clean schema objects, removing non-standard fields."""
         if isinstance(schema, dict):
             cleaned = {}
             for key, value in schema.items():
                 if key in SCHEMA_ALLOWED_FIELDS:
                     # Recursively clean nested schemas
                     if key == "properties" and isinstance(value, dict):
-                        # Clean each property schema
                         cleaned[key] = {k: clean_schema(v, f"{path}.{k}") for k, v in value.items()}
                     elif key == "items" and isinstance(value, dict):
-                        # Clean array item schema
                         cleaned[key] = clean_schema(value, f"{path}.items")
                     else:
                         cleaned[key] = value
@@ -110,7 +144,7 @@ def _convert_tool_schemas_for_gemini(tool_wrappers: List[Dict[str, Any]]) -> Lis
             return schema
     
     def clean_function_declaration(func_decl: Dict[str, Any]) -> Dict[str, Any]:
-        """Remove non-standard fields from function declaration"""
+        """Remove non-standard fields from function declaration."""
         cleaned = {}
         tool_name = func_decl.get('name', 'unknown')
         
@@ -126,70 +160,58 @@ def _convert_tool_schemas_for_gemini(tool_wrappers: List[Dict[str, Any]]) -> Lis
         
         return cleaned
     
-    # Process each tool wrapper
-    result = []
+    # Process each tool wrapper and convert to new SDK format
+    result: List[types.Tool] = []
     for wrapper in tool_wrappers:
-        if "function_declarations" in wrapper:
-            # Extract function declarations
-            func_decls = wrapper["function_declarations"]
+        if "function_declarations" not in wrapper:
+            logger.warning(f"Tool wrapper missing 'function_declarations': {wrapper}")
+            continue
+        
+        func_decls_list: List[types.FunctionDeclaration] = []
+        for decl in wrapper["function_declarations"]:
+            # Convert types to lowercase and clean
+            converted = convert_types_to_lowercase(decl)
+            cleaned = clean_function_declaration(converted)
             
-            # Convert types and clean each function declaration
-            converted_decls = []
-            for decl in func_decls:
-                # First convert types to uppercase
-                converted = convert_types(decl)
-                # Then remove non-standard fields (including from nested schemas)
-                cleaned = clean_function_declaration(converted)
-                converted_decls.append(cleaned)
-            
-            # Rebuild wrapper
-            result.append({"function_declarations": converted_decls})
-        else:
-            # Not a standard wrapper, just convert types
-            result.append(convert_types(wrapper))
+            # Create FunctionDeclaration object
+            try:
+                func_decl = types.FunctionDeclaration(
+                    name=cleaned["name"],
+                    description=cleaned.get("description", ""),
+                    parameters=cleaned.get("parameters", {})
+                )
+                func_decls_list.append(func_decl)
+            except Exception as e:
+                logger.error(f"Failed to create FunctionDeclaration for {cleaned.get('name')}: {e}")
+                continue
+        
+        if func_decls_list:
+            result.append(types.Tool(function_declarations=func_decls_list))
     
-    logger.debug(f"Converted and cleaned {len(tool_wrappers)} tool wrappers for Gemini")
+    logger.debug(f"Converted {len(tool_wrappers)} tool wrappers to {len(result)} Tool objects for new SDK")
     return result
 
 
-def _convert_history_for_gemini(history: List[Dict[str, str]]) -> List[content_types.ContentDict]:
-    gemini_history: List[content_types.ContentDict] = []
-    for msg in history:
-        role = msg.get("role")
-        content = msg.get("content")
-        if not content:
-            continue
-        if role == "assistant":
-            gemini_history.append(cast(
-                content_types.ContentDict,
-                {
-                "role": "model",
-                "parts": [_make_text_part(content)],
-                },
-            ))
-        elif role == "user":
-            gemini_history.append(cast(
-                content_types.ContentDict,
-                {
-                "role": "user",
-                "parts": [_make_text_part(content)],
-                },
-            ))
-    return gemini_history
 
-
-
-# --- Gemini API Function (Async) ---
+# --- Gemini API Function (Async) - Migrated to new SDK ---
 async def generate_gemini_response(
     history: List[Dict[str, str]],
     model: str = DEFAULT_GEMINI_MODEL,
     max_tokens: int = 2048,
     temperature: float = 0.7,
-    system_prompt: Optional[str] = None,  # Add system prompt handling
-    tools: Optional[List[Any]] = None,  # Add tools support
-    return_full_response: bool = False,  # Return full response object for tool calling
+    system_prompt: Optional[str] = None,
+    tools: Optional[List[Any]] = None,
+    return_full_response: bool = False,
 ) -> str | Any:
-    """Generates a response using the Google Gemini API (async).
+    """Generates a response using the Google Gemini API with new google-genai SDK.
+    
+    This function has been migrated from google-generativeai to google-genai.
+    Key changes:
+    - Uses client.models.generate_content() instead of GenerativeModel
+    - No more start_chat() - uses contents array with full history
+    - System prompt via config.system_instruction
+    - Tools via config.tools
+    - Types are lowercase ("string" not "STRING")
     
     Args:
         history: Conversation history with role and content
@@ -203,93 +225,71 @@ async def generate_gemini_response(
     Returns:
         Generated response text, or full response object if return_full_response=True
     """
-    if not GOOGLE_API_KEY:
-        # The warning during initial module load already indicated if the key was missing.
-        # This check prevents proceeding if the key was definitely not provided.
-        logger.error("Attempted to use Gemini, but GOOGLE_API_KEY was not found in environment.")
-        raise ValueError("Google API key not configured.")
-
     try:
+        client = get_gemini_client()
         logger.info(f"Sending request to Gemini API (Model: {model}, Tools: {bool(tools)})")
-        logger.info(f"🔍 [DEBUG] system_prompt parameter received: {repr(system_prompt)[:200]}")
+        if system_prompt:
+            logger.info(f"🤖 System prompt applied: {system_prompt[:100]}...")
 
-        gemini_model_args: Dict[str, Any] = {"model_name": model}
-        # Add tools if provided - convert schemas to uppercase type format
-        if tools:
-            converted_tools = _convert_tool_schemas_for_gemini(tools)
-            gemini_model_args["tools"] = converted_tools
-            logger.debug(f"Enabled {len(tools)} tool(s) for this request with converted schemas")
-
-        generative_model_cls = getattr(genai, "GenerativeModel", None)
-        if generative_model_cls is None:
-            raise RuntimeError("google.generativeai.GenerativeModel is not available in the installed SDK")
-        gemini_model = generative_model_cls(**gemini_model_args)
-
-        # Convert history and extract the latest user prompt
+        # Validate history
         if not history or history[-1]['role'] != 'user':
             return "Error: Conversation history must end with a user message."
 
-        last_user_prompt = history[-1]['content']
+        # Convert history to new SDK Content format
+        contents = _convert_history_to_contents(history)
 
-        prefix_history: List[Dict[str, str]] = []
-        if system_prompt:
-            logger.info(f"🤖 Gemini system prompt applied: {system_prompt[:100]}...")
-            prefix_history.append({"role": "user", "content": system_prompt})
-
-        conversation_before_latest = prefix_history + history[:-1]
-        gemini_history = _convert_history_for_gemini(conversation_before_latest)
-
-        generation_config = genai_types.GenerationConfig(
+        # Build generation config
+        config = types.GenerateContentConfig(
+            temperature=temperature,
             max_output_tokens=max_tokens,
-            temperature=temperature
+        )
+        
+        # Add system prompt if provided
+        if system_prompt:
+            config.system_instruction = system_prompt
+        
+        # Add tools if provided
+        if tools:
+            converted_tools = _convert_tool_schemas_for_new_sdk(tools)
+            config.tools = converted_tools
+            logger.debug(f"Enabled {len(tools)} tool(s) for this request")
+        
+        # Add safety settings
+        config.safety_settings = [
+            types.SafetySetting(
+                category='HARM_CATEGORY_HARASSMENT',
+                threshold='BLOCK_MEDIUM_AND_ABOVE'
+            ),
+            types.SafetySetting(
+                category='HARM_CATEGORY_HATE_SPEECH',
+                threshold='BLOCK_MEDIUM_AND_ABOVE'
+            ),
+            types.SafetySetting(
+                category='HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                threshold='BLOCK_MEDIUM_AND_ABOVE'
+            ),
+            types.SafetySetting(
+                category='HARM_CATEGORY_DANGEROUS_CONTENT',
+                threshold='BLOCK_MEDIUM_AND_ABOVE'
+            ),
+        ]
+
+        # Generate content with new SDK
+        response = client.models.generate_content(
+            model=model,
+            contents=contents,
+            config=config
         )
 
-        # Basic safety settings (adjust as needed)
-        safety_settings = {
-            HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-            HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-            HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-            HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        }
-
-        # Start a chat session if there's history
-        chat_session = None
-        if gemini_history:
-            chat_session = gemini_model.start_chat(history=gemini_history)
-            response = await chat_session.send_message_async(  # Use async method
-                cast(
-                    content_types.ContentDict,
-                    {"role": "user", "parts": [_make_text_part(last_user_prompt)]},
-                ),
-                generation_config=generation_config,
-                safety_settings=safety_settings,
-                # stream=False # Set to True for streaming later
-            )
-        else:
-            initial_prompt_parts = _convert_history_for_gemini(
-                prefix_history + [{"role": "user", "content": last_user_prompt}]
-            )
-            response = await gemini_model.generate_content_async(  # Use async method
-                initial_prompt_parts,
-                generation_config=generation_config,
-                safety_settings=safety_settings,
-                # stream=False
-            )
-
-        # Handle potential blocks or errors (check response structure)
+        # Return full response if requested (for tool calling)
+        if return_full_response:
+            return response
+        
+        # Extract text from response
         try:
-            # If tools are enabled and caller wants full response, return it
-            if return_full_response:
-                return response
-            
-            # Accessing response.text might raise ValueError if blocked or if it's a function call
             response_text = response.text
-            # logger.info("Received response from Gemini API.")
-            # logger.info("System Prompt: " + system_prompt)
-            # logger.info("User Prompt: " + last_user_prompt)
-            # logger.info("Response: " + response_text.strip())
             return response_text.strip()
-        except ValueError as e:
+        except (ValueError, AttributeError) as e:
             # Check if this is a function call (not an error)
             if response.candidates and len(response.candidates) > 0:
                 candidate = response.candidates[0]
@@ -299,28 +299,38 @@ async def generate_gemini_response(
                             # This is a function call, not an error
                             if return_full_response:
                                 return response
-                            # If not returning full response, this is unexpected
                             logger.error("Function call received but return_full_response=False")
                             return "Error: Function calling is not properly configured."
             
             # This is actually an error or blocked content
-            logger.warning(f"Gemini response might be blocked or empty: {e}. Checking feedback/candidates.")
-            if response.prompt_feedback and response.prompt_feedback.block_reason:
-                 reason = response.prompt_feedback.block_reason.name
-                 logger.warning(f"Gemini request blocked. Reason: {reason}")
-                 return f"Error: Request blocked by safety filters ({reason}). Please rephrase your prompt."
-            elif response.candidates and response.candidates[0].finish_reason != 'STOP':
-                 reason = response.candidates[0].finish_reason.name
-                 logger.warning(f"Gemini generation stopped unexpectedly. Reason: {reason}")
-                 return f"Error: Generation stopped ({reason})."
-            else:
-                 logger.warning(f"Gemini returned empty or invalid response. Full response obj: {response}")
-                 return "Error: Received an empty or invalid response from Gemini."
+            logger.warning(f"Gemini response might be blocked or empty: {e}")
+            
+            # Check for blocked content
+            if hasattr(response, 'prompt_feedback') and response.prompt_feedback:
+                if hasattr(response.prompt_feedback, 'block_reason') and response.prompt_feedback.block_reason:
+                    reason = str(response.prompt_feedback.block_reason)
+                    logger.warning(f"Gemini request blocked. Reason: {reason}")
+                    return f"Error: Request blocked by safety filters ({reason}). Please rephrase your prompt."
+            
+            # Check finish reason
+            if response.candidates and len(response.candidates) > 0:
+                candidate = response.candidates[0]
+                if hasattr(candidate, 'finish_reason') and candidate.finish_reason:
+                    reason = str(candidate.finish_reason)
+                    if reason != 'STOP':
+                        logger.warning(f"Gemini generation stopped unexpectedly. Reason: {reason}")
+                        return f"Error: Generation stopped ({reason})."
+            
+            logger.warning(f"Gemini returned empty or invalid response.")
+            return "Error: Received an empty or invalid response from Gemini."
         
+    except ValueError as e:
+        logger.error(f"ValueError calling Gemini API: {e}")
+        return f"Error: Invalid configuration or request. {e}"
     except Exception as e:
         logger.error(f"Error calling Gemini API: {e}", exc_info=True)
-        # More specific error handling can be added based on google.api_core.exceptions
         return f"Error: An unexpected error occurred with Gemini API. {e}"
+
 
 
 async def stream_gemini_response(
@@ -329,9 +339,15 @@ async def stream_gemini_response(
     max_tokens: int = 2048,
     temperature: float = 0.7,
     system_prompt: Optional[str] = None,
-    tools: Optional[List[Any]] = None,  # Add tools support
+    tools: Optional[List[Any]] = None,
 ) -> AsyncIterator[str]:
-    """Yield response chunks from the Gemini API.
+    """Stream response chunks from the Gemini API with new google-genai SDK.
+    
+    This function has been migrated to use client.models.generate_content_stream().
+    Key changes:
+    - No more start_chat() with stream=True
+    - Uses generate_content_stream() method directly
+    - Contents array includes full history
     
     Args:
         history: Conversation history with role and content
@@ -344,101 +360,82 @@ async def stream_gemini_response(
     Yields:
         Response text chunks
     """
-    if not GOOGLE_API_KEY:
-        raise ValueError("Google API key not configured.")
-
-    generative_model_cls = getattr(genai, "GenerativeModel", None)
-    if generative_model_cls is None:
-        raise RuntimeError("google.generativeai.GenerativeModel is not available in the installed SDK")
-
-    gemini_model_args: Dict[str, Any] = {"model_name": model}
-    
-    # Add tools if provided
-    if tools:
-        gemini_model_args["tools"] = tools
-        logger.debug(f"Enabled {len(tools)} tool(s) for streaming request")
-
-    gemini_model = generative_model_cls(**gemini_model_args)
-
-    if not history or history[-1]["role"] != "user":
-        yield "Error: Conversation history must end with a user message."
-        return
-
-    last_user_prompt = history[-1]["content"]
-    gemini_history = _convert_history_for_gemini(history[:-1])
-
-    generation_config = genai_types.GenerationConfig(
-        max_output_tokens=max_tokens,
-        temperature=temperature,
-    )
-
-    safety_settings = {
-        HarmCategory.HARM_CATEGORY_HARASSMENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        HarmCategory.HARM_CATEGORY_HATE_SPEECH: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-        HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT: HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
-    }
-
-    async def _iter_stream(stream: Any) -> AsyncIterator[str]:
-        async for chunk in stream:
-            try:
-                if hasattr(chunk, "text") and chunk.text:
-                    yield chunk.text
-                    continue
-                candidates = getattr(chunk, "candidates", None)
-                if not candidates:
-                    continue
-                for candidate in candidates:
-                    content = getattr(candidate, "content", None)
-                    parts = getattr(content, "parts", None) if content else None
-                    if not parts:
-                        continue
-                    for part in parts:
-                        text = getattr(part, "text", None) or part.get("text") if isinstance(part, dict) else None
-                        if text:
-                            yield text
-            except Exception as err:  # pragma: no cover - defensive logging
-                logger.debug("Gemini stream chunk parse failed: %s", err)
-
     try:
-        if gemini_history:
-            chat_session = gemini_model.start_chat(history=gemini_history)
-            stream = await chat_session.send_message_async(
-                cast(
-                    content_types.ContentDict,
-                    {"role": "user", "parts": [_make_text_part(last_user_prompt)]},
-                ),
-                generation_config=generation_config,
-                safety_settings=safety_settings,
-                stream=True,
-            )
-        else:
-            stream = await gemini_model.generate_content_async(
-                [
-                    cast(
-                        content_types.ContentDict,
-                        {"role": "user", "parts": [_make_text_part(last_user_prompt)]},
-                    )
-                ],
-                generation_config=generation_config,
-                safety_settings=safety_settings,
-                stream=True,
-            )
+        client = get_gemini_client()
+
+        if not history or history[-1]["role"] != "user":
+            yield "Error: Conversation history must end with a user message."
+            return
+
+        # Convert history to new SDK Content format
+        contents = _convert_history_to_contents(history)
+
+        # Build generation config
+        config = types.GenerateContentConfig(
+            temperature=temperature,
+            max_output_tokens=max_tokens,
+        )
+        
+        # Add system prompt if provided
+        if system_prompt:
+            config.system_instruction = system_prompt
+        
+        # Add tools if provided
+        if tools:
+            converted_tools = _convert_tool_schemas_for_new_sdk(tools)
+            config.tools = converted_tools
+            logger.debug(f"Enabled {len(tools)} tool(s) for streaming request")
+
+        # Add safety settings
+        config.safety_settings = [
+            types.SafetySetting(
+                category='HARM_CATEGORY_HARASSMENT',
+                threshold='BLOCK_MEDIUM_AND_ABOVE'
+            ),
+            types.SafetySetting(
+                category='HARM_CATEGORY_HATE_SPEECH',
+                threshold='BLOCK_MEDIUM_AND_ABOVE'
+            ),
+            types.SafetySetting(
+                category='HARM_CATEGORY_SEXUALLY_EXPLICIT',
+                threshold='BLOCK_MEDIUM_AND_ABOVE'
+            ),
+            types.SafetySetting(
+                category='HARM_CATEGORY_DANGEROUS_CONTENT',
+                threshold='BLOCK_MEDIUM_AND_ABOVE'
+            ),
+        ]
+
+        # Stream content with new SDK (note: this is NOT async, returns regular generator)
+        # The new SDK's generate_content_stream returns a synchronous generator
+        stream = client.models.generate_content_stream(
+            model=model,
+            contents=contents,
+            config=config
+        )
 
         yielded = False
-        async for chunk_text in _iter_stream(stream):
-            if chunk_text:
-                yielded = True
-                yield chunk_text
+        # Use regular for loop (not async for) as SDK returns sync generator
+        for chunk in stream:
+            try:
+                if hasattr(chunk, 'text') and chunk.text:
+                    yielded = True
+                    yield chunk.text
+            except (ValueError, AttributeError) as e:
+                # Chunk might not have text (could be function call or empty)
+                logger.debug(f"Gemini stream chunk parse issue: {e}")
+                continue
 
+        # If nothing was yielded, try non-streaming as fallback
         if not yielded:
+            logger.warning("No chunks yielded, falling back to non-streaming")
             fallback = await generate_gemini_response(
                 history=history,
                 model=model,
                 max_tokens=max_tokens,
                 temperature=temperature,
                 system_prompt=system_prompt,
-                tools=tools,  # Pass tools to fallback
+                tools=tools,
             )
             if fallback:
                 yield fallback

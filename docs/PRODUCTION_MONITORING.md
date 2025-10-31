@@ -1,6 +1,7 @@
 # Production Monitoring Guide for UGM-AICare
 
 ## Table of Contents
+
 1. [Logging Strategy](#logging-strategy)
 2. [Performance Monitoring](#performance-monitoring)
 3. [Infrastructure Setup](#infrastructure-setup)
@@ -13,6 +14,7 @@
 ## 1. Logging Strategy
 
 ### **Current State**
+
 - ✅ Using Python's standard `logging` module
 - ✅ Logs emitted to stdout (Docker logs)
 - ❌ No structured logging (JSON format)
@@ -21,6 +23,7 @@
 ### **Recommended: ELK Stack (Elasticsearch, Logstash, Kibana)**
 
 #### **Why ELK?**
+
 - **Elasticsearch**: Powerful search and analytics
 - **Logstash**: Log aggregation and parsing
 - **Kibana**: Beautiful visualization dashboards
@@ -28,6 +31,7 @@
 - **Scale**: Handles millions of logs/day
 
 #### **Alternative Options:**
+
 1. **Grafana Loki** (Lightweight, integrated with Grafana)
 2. **AWS CloudWatch** (If hosting on AWS)
 3. **Azure Monitor** (If hosting on Azure)
@@ -321,6 +325,7 @@ Access Kibana at: `http://localhost:5601`
 ### **Metrics to Track**
 
 #### **Application Metrics:**
+
 1. **Request Rate**: Requests per second
 2. **Response Time**: P50, P95, P99 latencies
 3. **Error Rate**: 4xx/5xx errors
@@ -330,6 +335,7 @@ Access Kibana at: `http://localhost:5601`
 7. **Tool Execution Time**: Time for each tool call
 
 #### **Infrastructure Metrics:**
+
 1. **CPU Usage**: Per container
 2. **Memory Usage**: Per container
 3. **Disk I/O**: Read/write operations
@@ -337,6 +343,7 @@ Access Kibana at: `http://localhost:5601`
 5. **Container Health**: Restart count, uptime
 
 #### **Business Metrics (Mental Health Specific):**
+
 1. **Active Users**: Daily/Weekly/Monthly active users
 2. **Crisis Escalations**: Count and response time
 3. **Intervention Plan Completion**: Success rate
@@ -346,6 +353,7 @@ Access Kibana at: `http://localhost:5601`
 ### **Recommended: Prometheus + Grafana**
 
 #### **Why Prometheus + Grafana?**
+
 - **Prometheus**: Time-series database for metrics
 - **Grafana**: Beautiful, customizable dashboards
 - **Integration**: Works seamlessly with FastAPI
@@ -1080,6 +1088,7 @@ Save this as `infra/docker/grafana/dashboards/ugm-aicare-overview.json`:
 ```
 
 Access Grafana:
+
 - URL: `http://your-server:3000`
 - Default credentials: `admin / admin123`
 - Import dashboard: Upload the JSON file
@@ -1216,11 +1225,13 @@ message: "intervention plan created"
 ## 8. Cost Estimation
 
 ### **Self-Hosted ELK + Prometheus + Grafana**
+
 - **Infrastructure**: $50-200/month (depending on traffic)
 - **Storage**: $10-50/month (for logs/metrics retention)
 - **Total**: **$60-250/month**
 
 ### **Managed Services (DataDog, NewRelic)**
+
 - **Cost**: $300-1000/month
 - **Benefit**: Zero maintenance, enterprise support
 
@@ -1243,10 +1254,10 @@ message: "intervention plan created"
 
 ## 10. Resources
 
-- **ELK Stack Docs**: https://www.elastic.co/guide/
-- **Prometheus Docs**: https://prometheus.io/docs/
-- **Grafana Docs**: https://grafana.com/docs/
-- **FastAPI Metrics**: https://github.com/trallnag/prometheus-fastapi-instrumentator
+- **ELK Stack Docs**: <https://www.elastic.co/guide/>
+- **Prometheus Docs**: <https://prometheus.io/docs/>
+- **Grafana Docs**: <https://grafana.com/docs/>
+- **FastAPI Metrics**: <https://github.com/trallnag/prometheus-fastapi-instrumentator>
 - **Mental Health Metrics**: See `docs/MENTAL_HEALTH_METRICS.md`
 
 ---

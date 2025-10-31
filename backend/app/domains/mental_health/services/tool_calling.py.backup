@@ -11,11 +11,6 @@ Best practices:
 - Comprehensive error handling
 - Tool call iteration limits to prevent infinite loops
 - Proper logging for debugging and monitoring
-
-MIGRATION NOTE: Migrated from google-generativeai to google-genai SDK
-- No more start_chat() API
-- Conversation state managed manually in contents array
-- Function responses use Part.from_function_call() and Part.from_function_response()
 """
 from __future__ import annotations
 
@@ -24,10 +19,6 @@ import logging
 from typing import Any, Callable, Dict, List, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
-
-# New SDK imports
-from google import genai
-from google.genai import types
 
 from app.agents.aika.tools import execute_tool_call, get_aika_tools
 from app.core import llm
@@ -142,71 +133,68 @@ async def generate_with_tools(
                 
                 # Tool calls were executed, add to tracking
                 tool_calls_executed.extend(tool_results)
-                logger.info(f"✓ Executed {len(tool_results)} tool(s): {', '.join([r['tool_name'] for r in tool_results])}")
                 
-                # NEW SDK: Build contents array with function call and response
-                # This replaces the old chat.send_message_async pattern
+                # For function calling, we need to continue the conversation properly
+                # Using Gemini's chat session which handles function call protocol
+                import google.generativeai as genai
+                from google.generativeai.types import content_types
                 
-                # Start with conversation history
-                contents = llm._convert_history_to_contents(conversation_history)
-                
-                # Add the model's function call parts from the response
-                if hasattr(response_obj, 'candidates') and response_obj.candidates:
-                    candidate = response_obj.candidates[0]
-                    if hasattr(candidate, 'content') and candidate.content:
-                        # Add all function call parts from model
-                        function_call_parts = []
-                        for part in candidate.content.parts:
-                            if hasattr(part, 'function_call') and part.function_call:
-                                function_call_parts.append(
-                                    types.Part.from_function_call(
-                                        name=part.function_call.name,
-                                        args=dict(part.function_call.args) if hasattr(part.function_call, 'args') else {}
-                                    )
-                                )
-                        
-                        if function_call_parts:
-                            contents.append(types.Content(role='model', parts=function_call_parts))
-                
-                # Add function responses from tool execution
+                # Build function response parts
                 function_response_parts = []
                 for result in tool_results:
-                    function_response_parts.append(
-                        types.Part.from_function_response(
-                            name=result["tool_name"],
-                            response=result["result"]
-                        )
-                    )
+                    func_response_part = {
+                        "function_response": {
+                            "name": result["tool_name"],
+                            "response": result["result"]
+                        }
+                    }
+                    function_response_parts.append(func_response_part)
+                    logger.info(f"✓ Tool {result['tool_name']} executed successfully")
                 
-                if function_response_parts:
-                    contents.append(types.Content(role='user', parts=function_response_parts))
+                # Create Gemini model
+                model_args: Dict[str, Any] = {"model_name": model_name}
+                if system_prompt:
+                    from app.core.llm import _make_text_part
+                    model_args["system_instruction"] = {
+                        "role": "system",
+                        "parts": [_make_text_part(system_prompt)],
+                    }
+                model_args["tools"] = tools  # Keep tools enabled
                 
-                # Make another API call with the updated contents to get final response
-                client = llm.get_gemini_client()
-                final_response_obj = await client.aio.models.generate_content(
-                    model=model_name,
-                    contents=contents,
-                    config=types.GenerateContentConfig(
-                        temperature=request.temperature,
-                        max_output_tokens=request.max_tokens,
-                        system_instruction=system_prompt if system_prompt else None,
-                        tools=tools,  # Keep tools available for nested calls
-                    )
+                generative_model_cls = getattr(genai, "GenerativeModel", None)
+                if generative_model_cls is None:
+                    raise RuntimeError("GenerativeModel not available")
+                
+                gemini_model = generative_model_cls(**model_args)
+                
+                # Convert history to Gemini format
+                from app.core.llm import _convert_history_for_gemini
+                gemini_history = _convert_history_for_gemini(conversation_history)
+                
+                # Start chat with history
+                chat = gemini_model.start_chat(history=gemini_history)
+                
+                # Send function responses and get final response
+                final_response_obj = await chat.send_message_async(
+                    content_types.to_content({"parts": function_response_parts})
                 )
                 
                 # Check if there are more function calls (nested tool calling)
-                # For safety, limit to max_iterations
-                response_obj = final_response_obj
-                
-                # Update conversation history with tool usage indicator
-                tool_names = [r['tool_name'] for r in tool_results]
-                conversation_history.append({
-                    "role": "assistant",
-                    "content": f"[Used tools: {', '.join(tool_names)}]"
-                })
-                
-                # Continue loop to check if final_response_obj has more tool calls
-                continue
+                try:
+                    final_text = final_response_obj.text
+                    
+                    # Add tool indicator
+                    tool_names = [tc["tool_name"] for tc in tool_calls_executed]
+                    tool_indicator = f"_🔧 Menggunakan: {', '.join(tool_names)}_\n\n"
+                    final_text = tool_indicator + final_text
+                    
+                    logger.info("Function calling complete, returning final response")
+                    return final_text, tool_calls_executed
+                    
+                except ValueError:
+                    # More function calls detected, but we'll stop here for safety
+                    logger.warning("Nested function calls detected, stopping after first iteration")
+                    return "I've gathered the information but encountered complexity. Let me know if you need anything else.", tool_calls_executed
                 
         except Exception as e:
             logger.error(f"Error in tool calling iteration {iterations}: {e}", exc_info=True)
@@ -287,58 +275,59 @@ async def _generate_streaming_with_tools(
             tool_indicator_msg = f"🔧 _Menggunakan: {', '.join(tool_names)}_\n\n"
             await stream_callback(tool_indicator_msg)
             
-            # NEW SDK: Build contents array with function call and response
-            # This replaces the old chat.send_message_async pattern
+            # For function calling, we need to use Gemini's chat session API
+            # which properly handles the function call → function response → final text flow
+            import google.generativeai as genai
+            from google.generativeai.types import content_types
             
-            # Start with conversation history
-            contents = llm._convert_history_to_contents(conversation_history)
+            # Build a proper Gemini content list with function responses
+            # The response_obj already has the function call, we need to add function response
             
-            # Add the model's function call parts from the response
-            if hasattr(response_obj, 'candidates') and response_obj.candidates:
-                candidate = response_obj.candidates[0]
-                if hasattr(candidate, 'content') and candidate.content:
-                    function_call_parts = []
-                    for part in candidate.content.parts:
-                        if hasattr(part, 'function_call') and part.function_call:
-                            function_call_parts.append(
-                                types.Part.from_function_call(
-                                    name=part.function_call.name,
-                                    args=dict(part.function_call.args) if hasattr(part.function_call, 'args') else {}
-                                )
-                            )
-                    
-                    if function_call_parts:
-                        contents.append(types.Content(role='model', parts=function_call_parts))
-            
-            # Add function responses from tool execution
+            # Convert tool results to FunctionResponse format
             function_response_parts = []
             for result in tool_results:
-                function_response_parts.append(
-                    types.Part.from_function_response(
-                        name=result["tool_name"],
-                        response=result["result"]
-                    )
-                )
+                # Create a function response part
+                func_response_part = {
+                    "function_response": {
+                        "name": result["tool_name"],
+                        "response": result["result"]
+                    }
+                }
+                function_response_parts.append(func_response_part)
                 logger.info(f"✓ Tool {result['tool_name']} executed in streaming mode")
             
-            if function_response_parts:
-                contents.append(types.Content(role='user', parts=function_response_parts))
+            # Create a Gemini model for the final response
+            model_args: Dict[str, Any] = {"model_name": model_name}
+            if system_prompt:
+                from app.core.llm import _make_text_part
+                model_args["system_instruction"] = {
+                    "role": "system",
+                    "parts": [_make_text_part(system_prompt)],
+                }
             
-            # Make API call to get final response (non-streaming for now after tool execution)
-            # Streaming after tool execution is complex and may not work well
-            client = llm.get_gemini_client()
-            final_response_obj = await client.aio.models.generate_content(
-                model=model_name,
-                contents=contents,
-                config=types.GenerateContentConfig(
-                    temperature=request.temperature,
-                    max_output_tokens=request.max_tokens,
-                    system_instruction=system_prompt if system_prompt else None,
-                )
+            # Get GenerativeModel class
+            generative_model_cls = getattr(genai, "GenerativeModel", None)
+            if generative_model_cls is None:
+                raise RuntimeError("GenerativeModel not available")
+            
+            gemini_model = generative_model_cls(**model_args)
+            
+            # Convert history to Gemini format
+            from app.core.llm import _convert_history_for_gemini
+            gemini_history = _convert_history_for_gemini(conversation_history)
+            
+            # Start chat with history
+            chat = gemini_model.start_chat(history=gemini_history)
+            
+            # Send the function responses back to the model
+            response_with_function_results = await chat.send_message_async(
+                content_types.to_content({
+                    "parts": function_response_parts
+                })
             )
             
             # Extract final text
-            final_response = final_response_obj.text
+            final_response = response_with_function_results.text
             
             # Stream the final response character by character for smooth UX
             full_text = tool_indicator_msg

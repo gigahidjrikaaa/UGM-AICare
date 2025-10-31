@@ -5,6 +5,7 @@
 ### 1. ELK Stack (Logging) - ✅ COMPLETE
 
 **Files Created:**
+
 - `docker-compose.elk.yml` - ELK stack services
 - `infra/elk/filebeat/filebeat.yml` - Log shipping configuration
 - `infra/elk/logstash/config/logstash.yml` - Logstash configuration
@@ -12,6 +13,7 @@
 - `backend/app/core/logging_config.py` - Structured JSON logging
 
 **Features:**
+
 - ✅ JSON-formatted structured logging
 - ✅ Docker container log collection
 - ✅ Automatic agent/user context extraction
@@ -20,6 +22,7 @@
 - ✅ Elasticsearch indexing: `ugm-aicare-YYYY.MM.DD`
 
 **Services:**
+
 - Elasticsearch (9200, 9300)
 - Logstash (5000, 9600)
 - Kibana (5601)
@@ -30,6 +33,7 @@
 ### 2. Prometheus + Grafana (Metrics) - ✅ COMPLETE
 
 **Files Created:**
+
 - `docker-compose.monitoring.yml` - Monitoring stack services
 - `infra/monitoring/prometheus/prometheus.yml` - Prometheus configuration
 - `infra/monitoring/prometheus/alert_rules.yml` - Alert definitions (15 rules)
@@ -40,6 +44,7 @@
 - Updated `backend/app/main.py` - Exposed /metrics endpoints
 
 **Metrics Categories:**
+
 - ✅ HTTP requests (rate, duration, status)
 - ✅ Agent performance (STA, SCA, SDA, IA processing time)
 - ✅ LLM API calls (latency, tokens, errors)
@@ -52,6 +57,7 @@
 - ✅ Cache metrics (hits, misses, hit rate)
 
 **Services:**
+
 - Prometheus (9090)
 - Grafana (3001) - Credentials: admin/admin123
 - AlertManager (9093)
@@ -61,6 +67,7 @@
 - Redis Exporter (9121) - Cache metrics
 
 **Alert Rules:**
+
 - 🚨 **Critical** (6 rules): Service down, high error rate, crisis backlog, DB pool exhaustion
 - ⚠️ **Warning** (9 rules): Slow response, high memory/CPU, slow agents, low completion rates
 - ℹ️ **Info** (2 rules): High activity, unusual patterns
@@ -70,6 +77,7 @@
 ### 3. Instrumentation - ✅ COMPLETE
 
 **Backend Updates:**
+
 - ✅ Structured JSON logging configured
 - ✅ Prometheus client installed
 - ✅ /metrics endpoint exposed
@@ -82,6 +90,7 @@
   - `@track_llm_metrics(model)`
 
 **Requirements Updated:**
+
 - `prometheus-client==0.19.0`
 - `prometheus-fastapi-instrumentator==7.1.0`
 
@@ -90,11 +99,13 @@
 ### 4. Helper Scripts - ✅ COMPLETE
 
 **Files Created:**
+
 - `scripts/start-monitoring.sh` - Start all monitoring services
 - `scripts/stop-monitoring.sh` - Stop all monitoring services
 - `infra/MONITORING_README.md` - Quick reference guide
 
 **Usage:**
+
 ```bash
 # Start monitoring
 bash scripts/start-monitoring.sh
@@ -108,11 +119,13 @@ bash scripts/stop-monitoring.sh
 ### 5. Documentation - ✅ COMPLETE
 
 **Files Created:**
+
 - `docs/PRODUCTION_MONITORING.md` - Comprehensive 800+ line guide
 - `docs/MONITORING_QUICK_REFERENCE.md` - Quick command reference
 - `infra/MONITORING_README.md` - Infrastructure setup guide
 
 **Documentation Includes:**
+
 - Architecture diagrams
 - Service descriptions
 - Configuration details
@@ -151,29 +164,34 @@ docker compose -f docker-compose.monitoring.yml up -d
 ## 📊 Metrics Available
 
 ### Agent Performance
+
 - `agent_processing_time_seconds` - Processing duration by agent
 - `agent_invocations_total` - Invocation count by agent/intent
 - `agent_errors_total` - Error count by agent/type
 - `agent_success_rate` - Success rate (0-1)
 
 ### LLM API
+
 - `llm_api_calls_total` - API call count
 - `llm_api_duration_seconds` - API latency
 - `llm_token_usage_total` - Token consumption
 - `llm_api_errors_total` - API error count
 
 ### Intervention Plans
+
 - `intervention_plans_created_total` - Plans created
 - `intervention_plan_steps_completed_total` - Steps completed
 - `intervention_plan_completion_rate` - Completion rate
 - `intervention_plan_abandonment_rate` - Abandonment rate
 
 ### Crisis Management
+
 - `crisis_escalations_total` - Escalation count
 - `crisis_response_time_seconds` - Response time
 - `safety_triage_accuracy` - STA accuracy
 
 ### User Engagement
+
 - `active_users` - Current active users
 - `daily_active_users` - DAU
 - `user_sessions_total` - Session count
@@ -187,6 +205,7 @@ docker compose -f docker-compose.monitoring.yml up -d
 ## 🔔 Alert Rules (15 Total)
 
 ### Critical Alerts (6)
+
 1. **HighErrorRate** - >5% errors for 5min → Slack + PagerDuty
 2. **BackendServiceDown** - Service down >1min → Slack + PagerDuty
 3. **DatabaseConnectionPoolLow** - >90% pool used → Slack + PagerDuty
@@ -195,6 +214,7 @@ docker compose -f docker-compose.monitoring.yml up -d
 6. **LowDiskSpace** - <15% disk space → Slack
 
 ### Warning Alerts (9)
+
 1. **SlowResponseTime** - P95 >2s for 5min
 2. **SlowAgentProcessing** - Agent P95 >5s
 3. **HighCPUUsage** - >85% CPU for 5min
@@ -209,11 +229,13 @@ docker compose -f docker-compose.monitoring.yml up -d
 ## 🎯 Next Steps
 
 ### 1. Start Monitoring Stack
+
 ```bash
 bash scripts/start-monitoring.sh
 ```
 
 ### 2. Verify Services
+
 ```bash
 # Check Elasticsearch
 curl http://localhost:9200/_cluster/health
@@ -226,16 +248,20 @@ curl http://localhost:8000/metrics
 ```
 
 ### 3. Configure Alerting
+
 Edit `infra/monitoring/alertmanager/alertmanager.yml`:
+
 - Replace `YOUR_SLACK_WEBHOOK_URL_HERE` with actual webhook
 - Uncomment PagerDuty configuration if needed
 
 ### 4. Create Grafana Dashboards
+
 - Open <http://localhost:3001> (admin/admin123)
 - Import dashboard from `infra/monitoring/grafana/dashboards/`
 - Create panels for key metrics
 
 ### 5. Set Up Kibana
+
 - Open <http://localhost:5601>
 - Create index pattern: `ugm-aicare-*`
 - Create visualizations for:
@@ -245,6 +271,7 @@ Edit `infra/monitoring/alertmanager/alertmanager.yml`:
   - Top error messages
 
 ### 6. Test Alerts
+
 ```bash
 # Simulate high error rate
 for i in {1..100}; do curl http://localhost:8000/nonexistent; done
@@ -256,6 +283,7 @@ for i in {1..100}; do curl http://localhost:8000/nonexistent; done
 ```
 
 ### 7. Add Agent Metrics
+
 Update agent adapters to use metric decorators:
 
 ```python
@@ -269,6 +297,7 @@ class SafetyTriageAgent:
 ```
 
 ### 8. Production Deployment
+
 - Update `alertmanager.yml` with production Slack webhooks
 - Set retention policies in Elasticsearch
 - Configure backup strategies

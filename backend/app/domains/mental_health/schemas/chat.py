@@ -170,13 +170,18 @@ class AikaRequest(BaseModel):
 class AikaResponse(BaseModel):
     """Response schema for Aika Meta-Agent endpoint.
     
-    Returns Aika's response along with metadata about agent coordination.
+    Returns Aika's response along with metadata about agent coordination
+    and real-time activity logs for monitoring.
     """
     success: bool = Field(..., description="Whether request succeeded")
     response: str = Field(..., description="Aika's response text")
     metadata: Dict[str, Any] = Field(
         ...,
         description="Metadata including agents_invoked, risk_level, processing_time_ms, etc."
+    )
+    activity_logs: List[Dict[str, Any]] = Field(
+        default_factory=list,
+        description="Real-time activity logs from agent execution"
     )
     error: Optional[str] = Field(None, description="Error message if success=false")
     

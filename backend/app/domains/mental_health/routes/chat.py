@@ -75,11 +75,15 @@ async def process_chat_message(
     schedule_summary: Any = None,
     summarize_now: bool = False,
     llm_responder: Any = None,
+    activity_callback: Optional[Callable] = None,  # NEW: Activity callback for WebSocket
 ) -> ChatProcessingResult:
     """Process chat message using AikaOrchestrator (LangGraph workflow).
     
     This integrates the legacy /chat endpoint with the new LangGraph-based
     Aika Meta-Agent architecture for consistent behavior across all endpoints.
+    
+    Args:
+        activity_callback: Optional callback for real-time activity streaming (WebSocket)
     """
     try:
         # Determine user role for routing
@@ -104,6 +108,10 @@ async def process_chat_message(
         
         # Initialize Aika orchestrator
         aika = AikaOrchestrator(db=db)
+        
+        # Set activity callback for real-time streaming if provided (WebSocket)
+        if activity_callback:
+            aika.set_activity_callback(activity_callback)
         
         # Process through LangGraph workflow
         logger.info(
@@ -640,6 +648,11 @@ async def chat_ws(
 
             async def stream_callback(chunk: str) -> None:
                 await emit_token(chunk, session_id=session_id, conversation_id=conversation_id)
+            
+            # Activity callback for real-time agent activity streaming
+            async def activity_callback(activity_data: dict) -> None:
+                """Send activity logs to WebSocket in real-time"""
+                await websocket.send_json(activity_data)
 
             # ✅ NOTE: AikaOrchestrator doesn't support streaming yet
             # The stream_callback is not used in the LangGraph workflow
@@ -656,6 +669,7 @@ async def chat_ws(
                     schedule_summary=None,
                     summarize_now=summarize_and_save,
                     llm_responder=None,  # Not used with AikaOrchestrator
+                    activity_callback=activity_callback,  # Enable activity streaming
                 )
             except HTTPException as exc:
                 await websocket.send_json({"type": "error", "detail": exc.detail})

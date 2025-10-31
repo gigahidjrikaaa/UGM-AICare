@@ -1,12 +1,22 @@
+# ============================================
+# UGM-AICare Backend Dependencies
+# ============================================
+# Version Pinning Strategy:
+# - Exact versions (==): Security-critical or known stable versions
+# - Constrained ranges (>=X,<Y): Allows patches, prevents breaking changes
+# - This reduces pip backtracking and ensures reproducible builds
+# - Last updated: October 31, 2025
+# ============================================
+
 # Web Framework
-fastapi>=0.115.5
-uvicorn
-pydantic>=2.9.0
+fastapi>=0.115.5,<0.116.0
+uvicorn>=0.30.0,<1.0.0
+pydantic>=2.9.0,<3.0.0
 python-multipart>=0.0.18  # Updated to fix CVE-2024-24762 and CVE-2024-53981
 
 # HTTP Client
 requests==2.31.0
-httpx
+httpx>=0.28.0,<1.0.0  # Updated for anyio>=4 compatibility
 minio==7.2.9
 beautifulsoup4==4.12.3
 
@@ -15,12 +25,12 @@ fastapi-cors==0.0.6
 
 # Database and ORM
 sqlalchemy[asyncio]==2.0.21
-alembic
+alembic>=1.13.0,<2.0.0
 redis==5.0.1
 asyncpg>=0.29.0  # Fast PostgreSQL Database Client Library for Python/asyncio
 psycopg2-binary>=2.9.0  # For Alembic migrations (sync operations)
 aiosqlite  # For async SQLite support (dev/testing only)
-aiofiles # For async file operations
+aiofiles>=23.0.0 # For async file operations
 PyPDF2==3.0.1
 
 # Authentication
@@ -32,49 +42,51 @@ hkdf
 pyOpenSSL>=23.0.0
 
 # Testing
-pytest==7.4.2
-pytest-asyncio==0.21.1
+pytest>=8.0.0
+pytest-asyncio>=0.24.0  # Updated for anyio>=4 compatibility
 
 # AI and ML
-tiktoken==0.5.1  # For token counting with OpenAI models
-openai==1.3.5    # For OpenAI API integration
-anthropic==0.5.0 # For Claude models integration
+# Google AI - NEW UNIFIED SDK (migrated from google-generativeai)
+# Old SDK deprecated Nov 30, 2025: https://pypi.org/project/google-generativeai/
+google-genai>=1.33.0
+google-api-core>=2.19.0,<3.0.0  # Constrain to avoid excessive backtracking
+protobuf>=3.20.3,<5.0.0  # Compatible with both google-genai and onnx
 
-google-generativeai
-langchain
-langchain-core
-langchain-google-genai
-langgraph
+# LangChain (pin to stable versions)
+langchain>=0.3.0,<0.4.0
+langchain-core>=0.3.0,<0.4.0
+langchain-google-genai>=2.0.0,<3.0.0
+langgraph>=0.2.0,<0.3.0
 langfuse>=2.0.0  # LLM observability and agent tracing
 
 # ONNX Runtime for Crisis Detection (3-5x faster, 96% smaller than PyTorch)
 # Replaces: torch (800+ MB) + sentence-transformers
-onnxruntime>=1.16.0  # Optimized inference runtime (~15 MB vs 800+ MB PyTorch)
-onnx>=1.15.0  # For ONNX model optimization (use >=1.15 for pre-built wheels)
+onnxruntime>=1.16.0,<2.0.0  # Optimized inference runtime
+onnx>=1.15.0,<2.0.0  # For ONNX model optimization (pre-built wheels)
 
 # Blockchain Integration
-web3>=6.0.0  # Web3.py for Ethereum/SOMNIA blockchain interaction
-eth-account>=0.10.0  # For Ethereum account management
-eth-utils>=2.0.0  # Ethereum utility functions
-transformers>=4.41.0  # For tokenizer (still needed, but much lighter without torch)
+web3>=6.0.0,<7.0.0  # Web3.py for Ethereum/SOMNIA blockchain interaction
+eth-account>=0.10.0,<1.0.0  # For Ethereum account management
+eth-utils>=2.0.0,<5.0.0  # Ethereum utility functions
+transformers>=4.41.0,<5.0.0  # For tokenizer (still needed, but much lighter without torch)
 
 # Torch - Only needed for ONNX export (can be removed after first build)
 # The ensure_onnx_model.py script will download the model and export to ONNX
 # After that, torch can be uninstalled - runtime only needs onnxruntime
 # CPU-only version to avoid 2GB+ CUDA downloads
-torch>=2.0.0
+torch>=2.0.0,<3.0.0
 
 # Statistical Analysis and Privacy
-numpy>=1.24.0
-scipy>=1.10.0
-scikit-learn>=1.3.0
-pandas>=2.0.0
+numpy>=1.24.0,<2.0.0
+scipy>=1.10.0,<2.0.0
+scikit-learn>=1.3.0,<2.0.0
+pandas>=2.0.0,<3.0.0
 
 # Differential Privacy
-diffprivlib>=0.6.0
+diffprivlib>=0.6.0,<1.0.0
 
 # Clinical Analytics
-statsmodels>=0.14.0
+statsmodels>=0.14.0,<1.0.0
 
 # Email
 email-validator==2.0.0

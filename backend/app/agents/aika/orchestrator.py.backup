@@ -13,7 +13,7 @@ All routing is handled by LangGraph with role-aware conditional edges.
 """
 
 import logging
-from typing import Dict, List, Literal, Optional, Callable
+from typing import Dict, List, Literal, Optional
 from datetime import datetime
 import time
 
@@ -23,12 +23,12 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from .state import AikaState
 from .identity import AIKA_SYSTEM_PROMPTS, AIKA_GREETINGS
-from .activity_logger import ActivityLogger
-# REFACTORED: Use real LangGraph services instead of adapters
-from app.agents.sta.sta_graph_service import STAGraphService
-from app.agents.sca.sca_graph_service import SCAGraphService
-from app.agents.sda.sda_graph_service import SDAGraphService
-from app.agents.ia.ia_graph_service import IAGraphService
+from .agent_adapters import (  # ✨ Use simplified adapters
+    SafetyTriageAgent,
+    SupportCoachAgent,
+    ServiceDeskAgent,
+    InsightsAgent,
+)
 from app.core.llm import generate_response
 from app.models.user import User
 
@@ -47,19 +47,16 @@ class AikaOrchestrator:
         """Initialize Aika with database session"""
         self.db = db
         
-        # REFACTORED: Initialize LangGraph services instead of adapters
-        self.sta_service = STAGraphService(db)
-        self.sca_service = SCAGraphService(db)
-        self.sda_service = SDAGraphService(db)
-        self.ia_service = IAGraphService(db)
-        
-        # Activity logger for real-time monitoring
-        self.activity_logger = ActivityLogger()
+        # Initialize specialized agents
+        self.sta = SafetyTriageAgent(db)
+        self.sca = SupportCoachAgent(db)
+        self.sda = ServiceDeskAgent(db)
+        self.ia = InsightsAgent(db)
         
         # Build orchestration graph
         self.graph = self._build_graph()
         
-        logger.info("SUCCESS: Aika Meta-Agent initialized with LangGraph services")
+        logger.info("✅ Aika Meta-Agent initialized with 4 specialized agents")
     
     def _build_graph(self) -> StateGraph:
         """
@@ -232,55 +229,28 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         """
         Safety Triage Agent - assess risk level.
         
-        REFACTORED: Now uses real STA graph with full workflow:
-        - PII redaction (apply_redaction node)
-        - Risk assessment (assess_risk node)
-        - Intent classification (decide_routing node)
+        STA checks for crisis indicators and classifies risk.
         """
         try:
-            self.activity_logger.log_agent_start("STA", "Analyzing message for safety concerns and risk factors")
+            logger.info("🚨 Invoking Safety Triage Agent...")
+            logger.info("🔍 STA: Analyzing message for safety concerns...")
             
-            # Call STA service with full graph execution
-            sta_state = await self.sta_service.execute(
+            # Call STA
+            triage_result = await self.sta.assess_message(
                 user_id=state.user_id,
-                session_id=state.session_id,
-                user_hash=str(state.user_id),  # Use user_id as hash for now
                 message=state.message,
-                conversation_id=state.conversation_id,
+                conversation_history=state.conversation_history,
             )
             
-            # Extract results from STA state
-            state.triage_result = {
-                "risk_level": sta_state.get("risk_level", "low"),
-                "risk_score": sta_state.get("risk_score", 0.0),
-                "risk_factors": sta_state.get("risk_factors", []),
-                "intent": sta_state.get("intent", "general"),
-                "confidence": sta_state.get("confidence", 0.0),
-                "redacted_message": sta_state.get("redacted_message", state.message),
-                "execution_path": sta_state.get("execution_path", []),
-            }
-            
-            state.risk_level = sta_state.get("risk_level", "low")
-            state.risk_factors = sta_state.get("risk_factors", [])
-            state.intent = sta_state.get("intent", "general")
+            state.triage_result = triage_result
+            state.risk_level = triage_result.get("risk_level", "low")
+            state.risk_factors = triage_result.get("risk_factors", [])
             state.agents_invoked.append("STA")
             
-            # Log risk assessment
-            self.activity_logger.log_risk_assessment(
-                risk_level=state.risk_level,
-                risk_score=sta_state.get("risk_score", 0.0),
-                risk_factors=state.risk_factors
-            )
-            
-            self.activity_logger.log_agent_complete(
-                "STA", 
-                f"Risk assessment complete: {state.risk_level}",
-                {"intent": state.intent, "execution_path": sta_state.get("execution_path", [])}
-            )
+            logger.info(f"🚨 STA assessment: Risk level = {state.risk_level}")
             
         except Exception as e:
-            self.activity_logger.log_agent_error("STA", "Safety triage failed", e)
-            logger.error(f"STA error: {e}", exc_info=True)
+            logger.error(f"❌ STA error: {e}")
             state.errors.append(f"Safety triage failed: {str(e)}")
             state.risk_level = "unknown"
         
@@ -296,70 +266,37 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         """
         Support Coach Agent - provide therapeutic support.
         
-        REFACTORED: Now uses real SCA graph with full workflow:
-        - Intervention type determination (determine_intervention_type node)
-        - Plan generation (generate_plan node)
-        - Safety review (safety_review node)
-        - Plan persistence (persist_plan node)
+        SCA provides CBT-informed coaching and emotional support.
         """
         try:
-            self.activity_logger.log_agent_start("SCA", "Generating personalized support and intervention plan")
+            logger.info("💙 Invoking Support Coach Agent...")
+            logger.info("💙 SCA: Planning personalized support response...")
             
-            # Extract triage data
-            triage_result = state.triage_result or {}
-            triage_assessment_id = triage_result.get("assessment_id")
+            # Call SCA with system prompt
+            system_prompt = AIKA_SYSTEM_PROMPTS["student"]
             
-            # Call SCA service with full graph execution
-            sca_state = await self.sca_service.execute(
+            coaching_result = await self.sca.provide_support(
                 user_id=state.user_id,
-                session_id=state.session_id,
-                user_hash=str(state.user_id),
                 message=state.message,
-                conversation_id=state.conversation_id,
-                severity=state.risk_level,
-                intent=state.intent,
-                triage_assessment_id=triage_assessment_id,
+                conversation_history=state.conversation_history,
+                risk_context=state.triage_result,
+                system_prompt=system_prompt,
             )
             
-            # Extract results from SCA state
-            state.coaching_result = {
-                "intervention_type": sca_state.get("intervention_type"),
-                "intervention_plan_id": sca_state.get("intervention_plan_id"),
-                "should_intervene": sca_state.get("should_intervene", False),
-                "safety_approved": sca_state.get("safety_approved", True),
-                "execution_path": sca_state.get("execution_path", []),
-            }
-            
-            # Build response with intervention plan if created
-            if sca_state.get("intervention_plan_id"):
-                state.response = self._build_coaching_response_with_plan(
-                    sca_state.get("intervention_type"),
-                    sca_state.get("intervention_plan_id")
-                )
-                state.intervention_plan = {"id": sca_state.get("intervention_plan_id")}
-                
-                # Log intervention creation
-                self.activity_logger.log_intervention_created(
-                    plan_id=sca_state.get("intervention_plan_id"),
-                    intervention_type=sca_state.get("intervention_type")
-                )
-            else:
-                state.response = self._build_generic_coaching_response(state.risk_level)
-            
+            state.coaching_result = coaching_result
+            state.response = coaching_result.get("response")
+            state.actions_taken.extend(coaching_result.get("actions", []))
             state.agents_invoked.append("SCA")
             
-            self.activity_logger.log_agent_complete(
-                "SCA",
-                "Coaching response generated",
-                {
-                    "has_plan": sca_state.get("intervention_plan_id") is not None,
-                    "execution_path": sca_state.get("execution_path", [])
-                }
-            )
+            # Include intervention plan if created
+            if "intervention_plan" in coaching_result:
+                state.intervention_plan = coaching_result["intervention_plan"]
+                logger.info("💙 SCA created intervention plan for user")
+            
+            logger.info("💙 SCA provided coaching response")
             
         except Exception as e:
-            self.activity_logger.log_agent_error("SCA", "Coaching generation failed", e)
-            logger.error(f"SCA error: {e}", exc_info=True)
+            logger.error(f"❌ SCA error: {e}")
             state.errors.append(f"Coaching failed: {str(e)}")
             state.response = AIKA_GREETINGS["student"]
         
@@ -369,78 +306,34 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         """
         Service Desk Agent - escalate crisis to human counselor.
         
-        REFACTORED: Now uses real SDA graph with full workflow:
-        - Case creation (create_case node)
-        - SLA calculation (calculate_sla node)
-        - Auto-assignment (auto_assign node)
-        - Notification (notify_counsellor node)
+        SDA creates urgent case and notifies counselor.
         """
         try:
-            self.activity_logger.log_agent_start("SDA", "Creating crisis case and assigning counselor")
+            logger.info("🚑 Invoking Service Desk Agent for crisis escalation...")
+            logger.info("🚑 SDA: Finding the perfect counselor match...")
             
-            # Extract triage data
-            triage_result = state.triage_result or {}
-            triage_assessment_id = triage_result.get("assessment_id")
-            risk_score = triage_result.get("risk_score", 0.0)
-            
-            # Call SDA service with full graph execution
-            sda_state = await self.sda_service.execute(
+            # Call SDA to create urgent case
+            service_result = await self.sda.create_urgent_case(
                 user_id=state.user_id,
-                session_id=state.session_id,
-                user_hash=str(state.user_id),
-                message=state.message,
-                conversation_id=state.conversation_id,
-                severity=state.risk_level,
-                intent=state.intent,
-                risk_score=risk_score,
-                triage_assessment_id=triage_assessment_id,
+                risk_level=state.risk_level,
+                risk_factors=state.risk_factors,
+                conversation_context=state.conversation_history,
             )
             
-            # Extract results from SDA state
-            state.service_result = {
-                "case_id": sda_state.get("case_id"),
-                "case_created": sda_state.get("case_created", False),
-                "sla_hours": sda_state.get("sla_hours"),
-                "sla_breach_at": sda_state.get("sla_breach_at"),
-                "assigned_counsellor_id": sda_state.get("assigned_counsellor_id"),
-                "notification_sent": sda_state.get("notification_sent", False),
-                "execution_path": sda_state.get("execution_path", []),
-            }
-            
+            state.service_result = service_result
             state.escalation_needed = True
             state.escalation_reason = "High-risk crisis detected"
             state.actions_taken.append("Created urgent case for counselor")
             state.agents_invoked.append("SDA")
             
-            # Build crisis response with case ID
-            if sda_state.get("case_created"):
-                state.response = self._build_crisis_response(sda_state.get("case_id"))
-                
-                # Log case creation
-                self.activity_logger.log_case_created(
-                    case_id=sda_state.get("case_id"),
-                    severity=state.risk_level,
-                    sla_hours=sda_state.get("sla_hours", 0)
-                )
-            else:
-                state.response = self._build_crisis_fallback_response()
-                self.activity_logger.log_warning("SDA", "Case creation failed, using fallback response")
+            # Provide immediate crisis resources
+            state.response = await self._generate_crisis_response(state)
             
-            self.activity_logger.log_agent_complete(
-                "SDA",
-                "Crisis escalation complete",
-                {
-                    "case_id": sda_state.get("case_id"),
-                    "assigned_counsellor_id": sda_state.get("assigned_counsellor_id"),
-                    "execution_path": sda_state.get("execution_path", [])
-                }
-            )
+            logger.info("🚑 SDA escalated to human counselor")
             
         except Exception as e:
-            self.activity_logger.log_agent_error("SDA", "Crisis escalation failed", e)
-            logger.error(f"SDA error: {e}", exc_info=True)
+            logger.error(f"❌ SDA error: {e}")
             state.errors.append(f"Escalation failed: {str(e)}")
-            state.response = self._build_crisis_fallback_response()
         
         return state
     
@@ -448,39 +341,29 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         """
         Insights Agent - provide analytics for admin.
         
-        REFACTORED: Uses simplified LLM for now.
-        Note: Full IA integration requires question_id mapping from admin query to predefined analytics questions.
+        IA retrieves platform metrics, trends, and insights.
         """
         try:
-            logger.info("Providing admin analytics...")
+            logger.info("📊 Invoking Insights Agent for admin analytics...")
             
-            # Use LLM to handle admin query
+            # Call IA with admin system prompt
             system_prompt = AIKA_SYSTEM_PROMPTS["admin"]
             
-            analytics_response = await generate_response(
-                history=[{
-                    "role": "system",
-                    "content": system_prompt
-                }, {
-                    "role": "user",
-                    "content": state.message
-                }],
-                model="gemini_google",
-                temperature=0.3,
+            insights_result = await self.ia.process_admin_query(
+                query=state.message,
+                user_id=state.user_id,
+                system_prompt=system_prompt,
             )
             
-            state.insights_result = {
-                "response": analytics_response,
-                "note": "Analytics via LLM (full IA integration pending)"
-            }
-            state.admin_query_result = state.insights_result
-            state.response = analytics_response
+            state.insights_result = insights_result
+            state.admin_query_result = insights_result
+            state.response = insights_result.get("response")
             state.agents_invoked.append("IA")
             
-            logger.info("Admin analytics provided")
+            logger.info("📊 IA provided analytics")
             
         except Exception as e:
-            logger.error(f"IA error: {e}", exc_info=True)
+            logger.error(f"❌ IA error: {e}")
             state.errors.append(f"Analytics failed: {str(e)}")
             state.response = "Maaf, terjadi error saat mengambil analytics."
         
@@ -490,39 +373,31 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         """
         Service Desk Agent - execute admin actions.
         
-        REFACTORED: Uses simplified LLM for admin commands.
-        Note: Dedicated admin action handler should be implemented for production.
+        SDA handles admin commands (notifications, reports, etc.)
         """
         try:
-            logger.info("Processing admin action...")
+            logger.info("⚙️ Invoking Service Desk Agent for admin actions...")
             
-            # Use LLM to handle admin command
+            # Call SDA for admin actions
             system_prompt = AIKA_SYSTEM_PROMPTS["admin"]
             
-            action_response = await generate_response(
-                history=[{
-                    "role": "system",
-                    "content": system_prompt
-                }, {
-                    "role": "user",
-                    "content": state.message
-                }],
-                model="gemini_google",
-                temperature=0.3,
+            action_result = await self.sda.execute_admin_command(
+                command=state.message,
+                user_id=state.user_id,
+                system_prompt=system_prompt,
             )
             
-            state.service_result = {
-                "response": action_response,
-                "note": "Admin action via LLM (dedicated handler pending)"
-            }
-            state.admin_action_result = state.service_result
-            state.response = action_response
+            state.service_result = action_result
+            state.admin_action_result = action_result
+            state.confirmation_required = action_result.get("requires_confirmation", False)
+            state.response = action_result.get("response")
+            state.actions_taken.extend(action_result.get("actions", []))
             state.agents_invoked.append("SDA")
             
-            logger.info("Admin action processed")
+            logger.info("⚙️ SDA executed admin action")
             
         except Exception as e:
-            logger.error(f"SDA error: {e}", exc_info=True)
+            logger.error(f"❌ SDA error: {e}")
             state.errors.append(f"Admin action failed: {str(e)}")
             state.response = "Maaf, terjadi error saat menjalankan perintah."
         
@@ -532,41 +407,29 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         """
         Service Desk Agent - provide case management for counselors.
         
-        REFACTORED: Uses SDA service methods for case listing.
-        Note: Full integration requires proper case query API.
+        SDA retrieves assigned cases, patient summaries, etc.
         """
         try:
-            logger.info("Providing counselor case management...")
+            logger.info("📋 Invoking Service Desk Agent for counselor cases...")
             
-            # Use LLM to handle counselor query
+            # Call SDA for case management
             system_prompt = AIKA_SYSTEM_PROMPTS["counselor"]
             
-            cases_response = await generate_response(
-                history=[{
-                    "role": "system",
-                    "content": system_prompt
-                }, {
-                    "role": "user",
-                    "content": state.message
-                }],
-                model="gemini_google",
-                temperature=0.3,
+            cases_result = await self.sda.get_counselor_cases(
+                counselor_id=state.user_id,
+                query=state.message,
+                system_prompt=system_prompt,
             )
             
-            state.service_result = {
-                "response": cases_response,
-                "note": "Case management via LLM"
-            }
-            state.counselor_cases_result = state.service_result
-            state.response = cases_response
+            state.service_result = cases_result
+            state.counselor_cases_result = cases_result
             state.agents_invoked.append("SDA")
             
-            logger.info("Case management info provided")
+            logger.info("📋 SDA provided case management info")
             
         except Exception as e:
-            logger.error(f"SDA error: {e}", exc_info=True)
+            logger.error(f"❌ SDA error: {e}")
             state.errors.append(f"Case management failed: {str(e)}")
-            state.response = self._build_fallback_response("counselor")
         
         return state
     
@@ -574,41 +437,34 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         """
         Insights Agent - provide clinical insights for counselors.
         
-        REFACTORED: Uses simplified LLM for clinical insights.
-        Note: Full IA integration requires question_id mapping.
+        IA provides patient patterns, treatment effectiveness, etc.
         """
         try:
-            logger.info("Providing counselor insights...")
+            logger.info("💡 Invoking Insights Agent for counselor insights...")
             
-            # Use LLM to provide clinical insights
+            # Call IA for clinical insights
             system_prompt = AIKA_SYSTEM_PROMPTS["counselor"]
             
-            insights_response = await generate_response(
-                history=[{
-                    "role": "system",
-                    "content": system_prompt
-                }, {
-                    "role": "user",
-                    "content": state.message
-                }],
-                model="gemini_google",
-                temperature=0.3,
+            insights_result = await self.ia.get_clinical_insights(
+                query=state.message,
+                counselor_id=state.user_id,
+                cases_context=state.counselor_cases_result,
+                system_prompt=system_prompt,
             )
             
-            state.insights_result = {
-                "response": insights_response,
-                "note": "Clinical insights via LLM"
-            }
-            state.counselor_insights_result = state.insights_result
-            state.response = insights_response
+            state.insights_result = insights_result
+            state.counselor_insights_result = insights_result
             state.agents_invoked.append("IA")
             
-            logger.info("Clinical insights provided")
+            # Combine case info and insights
+            state.response = self._combine_counselor_response(state)
+            
+            logger.info("💡 IA provided clinical insights")
             
         except Exception as e:
-            logger.error(f"Insights error: {e}", exc_info=True)
-            state.errors.append(f"Insights failed: {str(e)}")
-            state.response = self._build_fallback_response("counselor")
+            logger.error(f"❌ IA error: {e}")
+            state.errors.append(f"Clinical insights failed: {str(e)}")
+            state.response = state.counselor_cases_result.get("response", "")
         
         return state
     
@@ -724,64 +580,40 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
                 "has_history": False,
             }
     
-    # ===================== HELPER METHODS =====================
+    async def _generate_crisis_response(self, state: AikaState) -> str:
+        """Generate immediate crisis response with resources"""
+        return f"""
+Aku mengerti kamu sedang mengalami kesulitan yang sangat berat. Keselamatanmu adalah prioritas utama kami.
+
+**🚨 Bantuan Darurat:**
+- **Hotline Crisis Center**: 119 (24/7)
+- **Hotline Kemenkes RI**: 500-454 (24/7)
+- **Sejiwa (Into The Light)**: 119 ext. 8 (24/7)
+
+Aku sudah memberitahu counselor profesional kami. Mereka akan segera menghubungimu.
+
+Jangan ragu untuk mencari bantuan segera jika kamu dalam bahaya. Kamu tidak sendirian, dan ada banyak orang yang peduli padamu. 💙
+
+**Apa yang bisa kamu lakukan sekarang:**
+1. Hubungi hotline darurat di atas
+2. Beritahu orang terdekat yang kamu percaya
+3. Pergi ke UGD rumah sakit terdekat jika dalam bahaya langsung
+4. Tunggu counselor kami menghubungimu
+
+Kamu sangat berharga, dan dunia lebih baik dengan kehadiranmu. 🌟
+"""
     
-    def _build_coaching_response_with_plan(self, intervention_type: str, plan_id: int) -> str:
-        """Build response text when intervention plan is created."""
-        return (
-            f"Aku sudah menyiapkan rencana dukungan untuk kamu. "
-            f"Rencana ini akan membantu kamu mengatasi situasi ini dengan lebih baik. "
-            f"Kamu bisa melihat detailnya di dashboard intervention plans."
-        )
+    def _combine_counselor_response(self, state: AikaState) -> str:
+        """Combine case management and insights for counselors"""
+        cases = state.counselor_cases_result.get("response", "")
+        insights = state.counselor_insights_result.get("response", "")
+        
+        return f"{cases}\n\n---\n\n**Clinical Insights:**\n{insights}"
     
-    def _build_generic_coaching_response(self, risk_level: str) -> str:
-        """Build generic coaching response without plan."""
-        if risk_level in ["high", "critical"]:
-            return (
-                "Aku mendengarkan kamu dan peduli dengan apa yang kamu rasakan. "
-                "Situasimu terdengar berat. Aku sarankan untuk berbicara dengan konselor profesional. "
-                "Apakah kamu mau aku hubungkan dengan konselor?"
-            )
-        else:
-            return (
-                "Terima kasih sudah berbagi dengan aku. "
-                "Aku di sini untuk mendengarkan dan mendukungmu. "
-                "Bagaimana perasaanmu sekarang?"
-            )
-    
-    def _build_crisis_response(self, case_id: Optional[int] = None) -> str:
-        """Build response for crisis escalation."""
-        if case_id:
-            return (
-                "Aku sangat peduli dengan keselamatanmu. "
-                "Aku sudah menghubungkan kamu dengan tim konselor kami (Case #{case_id}). "
-                "Mereka akan segera menghubungimu. Kamu tidak sendirian. "
-                "Jika ini darurat, segera hubungi 119 atau pergi ke IGD terdekat."
-            )
-        else:
-            return self._build_crisis_fallback_response()
-    
-    def _build_crisis_fallback_response(self) -> str:
-        """Fallback crisis response when case creation fails."""
-        return (
-            "Aku sangat peduli dengan keselamatanmu. "
-            "Mohon segera hubungi konselor atau layanan krisis: "
-            "🆘 Hotline: 119 (24/7) "
-            "🏥 Atau kunjungi IGD terdekat "
-            "Kamu tidak sendirian, dan bantuannya tersedia."
-        )
-    
-    def _build_fallback_response(self, role: str) -> str:
-        """Build fallback response when agents fail."""
-        if role == "user":
-            return (
-                "Maaf, aku sedang mengalami kendala teknis. "
-                "Tapi aku tetap di sini untukmu. Coba ulangi pesanmu?"
-            )
-        elif role == "admin":
-            return "Sistem sedang mengalami kendala. Silakan coba lagi."
-        else:
-            return "I'm experiencing technical difficulties. Please try again."
+    def _generate_fallback_response(self, state: AikaState) -> str:
+        """Generate fallback response if specialized agents didn't provide one"""
+        role = state.user_role
+        return AIKA_GREETINGS.get(role, "Hello! How can I help you today?")
     
     def _generate_error_response(self, state: AikaState) -> str:
         """Generate error response"""
@@ -795,18 +627,6 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
             return "I'm experiencing technical difficulties. Please try again."
     
     # ===================== PUBLIC API =====================
-    
-    def set_activity_callback(self, callback: Callable):
-        """Set callback for real-time activity broadcasting (e.g., WebSocket)"""
-        self.activity_logger.set_callback(callback)
-    
-    def get_activity_logs(self) -> List[Dict]:
-        """Get all activity logs from current session"""
-        return self.activity_logger.get_activities()
-    
-    def clear_activity_logs(self):
-        """Clear activity log history"""
-        self.activity_logger.clear()
     
     async def process_message(
         self,
@@ -831,9 +651,6 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         """
         start_time = time.time()
         
-        # Clear previous activity logs
-        self.activity_logger.clear()
-        
         # Initialize state
         initial_state = AikaState(
             user_id=user_id,
@@ -844,7 +661,7 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         )
         
         try:
-            self.activity_logger.log_info("Aika", f"Processing message from {user_role}", {"user_id": user_id})
+            logger.info("✨ Aika: Consulting with specialized agents...")
             
             # Run through orchestration graph
             config = {"configurable": {"thread_id": initial_state.session_id}}
@@ -876,7 +693,6 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
                     "actions_taken": final_state.get("actions_taken", []),
                 },
                 "errors": final_state.get("errors") if final_state.get("errors") else None,
-                "activity_logs": self.get_activity_logs(),  # Include activity logs
             }
             
             # Include intervention plan if created

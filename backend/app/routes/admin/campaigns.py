@@ -443,7 +443,9 @@ async def generate_campaign_with_ai(
     """
     from app.domains.mental_health.services.ai_campaign_generator import AICampaignGenerator
     
-    config = await AICampaignGenerator.generate_campaign_config(
+    # Initialize generator with client
+    generator = AICampaignGenerator()
+    config = await generator.generate_campaign_config(
         campaign_name=campaign_name,
         campaign_description=campaign_description
     )
@@ -491,7 +493,9 @@ async def generate_campaign_from_insights(
     
     campaign_description = " ".join(description_parts)
     
-    config = await AICampaignGenerator.generate_campaign_config(
+    # Initialize generator with client
+    generator = AICampaignGenerator()
+    config = await generator.generate_campaign_config(
         campaign_name=campaign_name,
         campaign_description=campaign_description
     )

@@ -1,44 +1,39 @@
 /**
- * Aika Enhanced Chat Page
+ * Aika Chat with Activity Monitoring
  * 
- * This is the enhanced version of Aika chat that uses the LangGraph-orchestrated
- * Meta-Agent backend. It maintains the same UI/UX as the original Aika while
- * adding agent activity visibility.
+ * Enhanced version of Aika chat with real-time WebSocket support
+ * and comprehensive activity logging panel.
  * 
  * Features:
- * - Same polished UI as original Aika
- * - LangGraph orchestration with agent visibility
- * - Real-time agent activity badges
- * - Risk level indicators
- * - Escalation notifications
- * - Original chat components (MessageBubble, ChatInput, ChatWindow)
+ * - Real-time WebSocket messaging
+ * - Live agent activity logging
+ * - Activity panel with filtering
+ * - Agent status indicators
+ * - Performance metrics
  */
 
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Info, Settings, ClipboardList, ListChecks, Activity } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Activity, Info, ListChecks, Wifi, WifiOff } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { useAikaChat } from '@/hooks/useAikaChat';
+import { useAikaWebSocket } from '@/hooks/useAikaWebSocket';
 import { ChatWindow } from '@/components/features/chat/ChatWindow';
 import { ChatInput } from '@/components/features/chat/ChatInput';
-import { AIKA_MEMORY_NOTE } from '@/constants/chat';
 import { InterventionPlansSidebar } from '@/components/features/chat/InterventionPlansSidebar';
 import { useInterventionPlans } from '@/hooks/useInterventionPlans';
 import { AikaLoadingBubble } from '@/components/features/aika/AikaLoadingBubble';
 import {
-  AgentActivityBadge,
-  RiskLevelIndicator,
-  EscalationNotification,
-  MetadataDisplay,
   AikaAvatar,
   AikaPoweredBadge,
 } from '@/components/features/aika/AikaComponents';
-import { ActivityLogPanel, ActivityIndicator } from '@/components/features/aika/ActivityLogPanel';
-import { useActivityLog } from '@/hooks/useActivityLog';
+import {
+  ActivityLogPanel,
+  ActivityIndicator,
+} from '@/components/features/aika/ActivityLogPanel';
 
 // Loading Component
 const LoadingIndicator = () => (
@@ -57,21 +52,19 @@ const LoadingIndicator = () => (
 
 // Header Bar Component
 interface HeaderBarProps {
-  onOpenMetadata: () => void;
-  onOpenPlans: () => void;
   onToggleActivityLog: () => void;
+  onOpenPlans: () => void;
   activePlansCount: number;
-  showMetadata: boolean;
   showActivityLog: boolean;
+  isConnected: boolean;
 }
 
 function HeaderBar({
-  onOpenMetadata,
-  onOpenPlans,
   onToggleActivityLog,
+  onOpenPlans,
   activePlansCount,
-  showMetadata,
   showActivityLog,
+  isConnected,
 }: HeaderBarProps) {
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
@@ -79,9 +72,25 @@ function HeaderBar({
         <AikaAvatar />
         <div>
           <h1 className="text-base sm:text-lg font-semibold tracking-wide text-white">
-            Aika Chat (Enhanced)
+            Aika Monitor
           </h1>
-          <AikaPoweredBadge />
+          <div className="flex items-center gap-2">
+            <AikaPoweredBadge />
+            {/* Connection status */}
+            <div className="flex items-center gap-1">
+              {isConnected ? (
+                <>
+                  <Wifi className="h-3 w-3 text-green-400" />
+                  <span className="text-[10px] text-green-400">Live</span>
+                </>
+              ) : (
+                <>
+                  <WifiOff className="h-3 w-3 text-red-400" />
+                  <span className="text-[10px] text-red-400">Disconnected</span>
+                </>
+              )}
+            </div>
+          </div>
         </div>
       </div>
       <div className="flex items-center gap-2">
@@ -100,7 +109,7 @@ function HeaderBar({
             </span>
           )}
         </button>
-        
+
         {/* Activity log toggle button */}
         <button
           type="button"
@@ -109,69 +118,46 @@ function HeaderBar({
             showActivityLog ? 'bg-ugm-gold/30 ring-2 ring-ugm-gold/40' : 'bg-white/10'
           } hover:bg-white/20 text-white/80 hover:text-white text-xs focus:outline-none focus:ring-2 focus:ring-ugm-gold/40 transition`}
           aria-label="Toggle activity log"
-          title="Show/hide agent activity log"
+          title="Show/hide activity log"
         >
           <Activity className="h-4 w-4" />
         </button>
-        
-        {/* Metadata toggle button */}
-        <button
-          type="button"
-          onClick={onOpenMetadata}
-          className={`h-7 w-7 inline-flex items-center justify-center rounded-md border border-white/15 ${
-            showMetadata ? 'bg-purple-500/30' : 'bg-white/10'
-          } hover:bg-white/20 text-white/80 hover:text-white text-xs focus:outline-none focus:ring-2 focus:ring-ugm-gold/40 transition`}
-          aria-label="Toggle metadata display"
-          title="Show/hide technical details"
-        >
-          <Info className="h-4 w-4" />
-        </button>
-        
-        {/* LangGraph badge */}
+
+        {/* WebSocket badge */}
         <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-[#FFCA40]/15 text-[#FFCA40] border border-[#FFCA40]/30">
-          LangGraph
+          WebSocket
         </span>
       </div>
     </div>
   );
 }
 
-export default function AikaEnhancedPage() {
+export default function AikaMonitorPage() {
   const [mounted, setMounted] = useState(false);
   const { status } = useSession();
   const router = useRouter();
-  const [showMetadata, setShowMetadata] = useState(false);
-  const [showActivityLog, setShowActivityLog] = useState(false);
+  const [showActivityLog, setShowActivityLog] = useState(true);
   const [isPlansOpen, setIsPlansOpen] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  
+
   // Fetch intervention plans
   const { data: plansData, refetch: refetchPlans } = useInterventionPlans(true);
 
-  // Use the Aika chat hook
+  // Use WebSocket hook
   const {
     messages,
     inputValue,
     isLoading,
-    activeAgents,
-    error,
-    lastMetadata,
-    handleInputChange,
-    handleSendMessage,
-  } = useAikaChat({
-    sessionId: 'aika-session-' + new Date().getTime(),
-    showAgentActivity: true,
-    showRiskIndicators: true,
-  });
-
-  // Activity logging
-  const {
+    isConnected,
     activities,
     latestActivity,
+    activeAgents,
     isReceiving,
-  } = useActivityLog({
-    enabled: true,
-    maxLogs: 100,
+    sendMessage,
+    handleInputChange,
+  } = useAikaWebSocket({
+    sessionId: 'aika-ws-' + new Date().getTime(),
+    enableActivityLog: true,
   });
 
   useEffect(() => {
@@ -196,19 +182,18 @@ export default function AikaEnhancedPage() {
     <>
       {/* Content area */}
       <div className="min-h-screen w-full text-white flex flex-col items-center justify-center p-2 md:p-4 lg:p-6 gap-4">
-        {/* Main Layout Container */}
-        <div className="w-full max-w-7xl h-[calc(100vh-10rem)] flex gap-4">
+        {/* Main Chat Container */}
+        <div className="w-full max-w-5xl h-[calc(100vh-10rem)] flex gap-4">
           {/* Chat Panel */}
           <div className={`${showActivityLog ? 'w-2/3' : 'w-full'} flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden transition-all duration-300`}>
-            <HeaderBar 
-              onOpenMetadata={() => setShowMetadata(!showMetadata)} 
+            <HeaderBar
               onToggleActivityLog={() => setShowActivityLog(!showActivityLog)}
               onOpenPlans={() => setIsPlansOpen(true)}
               activePlansCount={plansData?.total || 0}
-              showMetadata={showMetadata}
               showActivityLog={showActivityLog}
+              isConnected={isConnected}
             />
-            
+
             <div className="flex-1 overflow-hidden flex flex-col">
               {/* Agent Activity Indicator */}
               {isReceiving && activeAgents.length > 0 && (
@@ -219,92 +204,64 @@ export default function AikaEnhancedPage() {
                   />
                 </div>
               )}
-              
-              {/* Agent Activity & Risk Display */}
-              {lastMetadata && (
-                <div className="px-4 pt-3 space-y-2">
-                  {lastMetadata.agents_invoked.length > 0 && (
-                    <AgentActivityBadge
-                      agents={lastMetadata.agents_invoked}
-                      processingTime={lastMetadata.processing_time_ms}
-                    />
-                  )}
-                  {lastMetadata.risk_assessment && lastMetadata.risk_assessment.risk_level !== 'low' && (
-                    <RiskLevelIndicator
-                      assessment={lastMetadata.risk_assessment}
-                    showFactors={lastMetadata.risk_assessment.risk_level === 'high' || lastMetadata.risk_assessment.risk_level === 'critical'}
-                  />
-                )}
-                {lastMetadata.escalation_triggered && lastMetadata.case_id && (
-                  <EscalationNotification caseId={lastMetadata.case_id} />
-                )}
-                {showMetadata && <MetadataDisplay metadata={lastMetadata} />}
+
+              {/* Chat Window */}
+              <ChatWindow messages={messages} chatContainerRef={chatContainerRef} />
+
+              {/* Loading indicator */}
+              {isLoading && (
+                <div className="px-4 pb-4">
+                  <AikaLoadingBubble activeAgents={activeAgents} />
+                </div>
+              )}
+
+              {/* Chat Input */}
+              <div className="p-4">
+                <ChatInput
+                  inputValue={inputValue}
+                  onInputChange={handleInputChange}
+                  onSendMessage={sendMessage}
+                  onStartModule={() => {}}
+                  isLoading={isLoading}
+                  currentMode="standard"
+                  availableModules={[]}
+                  isLiveTalkActive={false}
+                  toggleLiveTalk={() => {}}
+                  interruptOnEnter={false}
+                />
               </div>
-            )}
-            
-            {/* Chat Window - using original component */}
-            <ChatWindow 
-              messages={messages}
-              chatContainerRef={chatContainerRef}
-            />
-            
-            {/* Loading indicator with agent activity */}
-            {isLoading && (
-              <div className="px-4 pb-4">
-                <AikaLoadingBubble activeAgents={activeAgents} />
-              </div>
-            )}
-            
-            {/* Chat Input - using original component */}
-            <div className="p-4">
-              <ChatInput
-                inputValue={inputValue}
-                onInputChange={handleInputChange}
-                onSendMessage={handleSendMessage}
-                onStartModule={() => {}} // Disabled for now
-                isLoading={isLoading}
-                currentMode="standard"
-                availableModules={[]}
-                isLiveTalkActive={false}
-                toggleLiveTalk={() => {}} // Disabled for now
-                interruptOnEnter={false}
-              />
             </div>
           </div>
+
+          {/* Activity Log Panel */}
+          {showActivityLog && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="w-1/3 flex flex-col"
+            >
+              <ActivityLogPanel
+                activities={activities}
+                isOpen={showActivityLog}
+                onClose={() => setShowActivityLog(false)}
+                maxHeight="calc(100vh - 10rem)"
+              />
+            </motion.div>
+          )}
         </div>
 
-        {/* Activity Log Panel */}
-        {showActivityLog && (
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="w-1/3 flex flex-col"
-          >
-            <ActivityLogPanel
-              activities={activities}
-              isOpen={showActivityLog}
-              onClose={() => setShowActivityLog(false)}
-              maxHeight="calc(100vh - 10rem)"
-            />
-          </motion.div>
-        )}
-      </div>
-        
         {/* Intervention Plans Sidebar */}
-        <InterventionPlansSidebar 
-          isOpen={isPlansOpen}
-          onClose={() => setIsPlansOpen(false)}
-        />
+        <InterventionPlansSidebar isOpen={isPlansOpen} onClose={() => setIsPlansOpen(false)} />
 
         {/* Footer credit */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="pt-3 text-center text-xs text-gray-300/70"
+          className="text-center text-xs text-gray-300/70"
         >
-          <p>Disclaimer: Aika adalah AI dan bukan pengganti profesional medis.</p>
+          <p>Real-time agent activity monitoring • WebSocket enabled</p>
           <p className="mt-1">Built with ❤️ by UGM AICare Team • Powered by LangGraph</p>
         </motion.div>
       </div>

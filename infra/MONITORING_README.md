@@ -119,13 +119,13 @@ docker compose -f docker-compose.monitoring.yml down
 
 | Service | URL | Credentials |
 |---------|-----|-------------|
-| **Kibana** | http://localhost:5601 | No auth |
-| **Grafana** | http://localhost:3001 | admin / admin123 |
-| **Prometheus** | http://localhost:9090 | No auth |
-| **AlertManager** | http://localhost:9093 | No auth |
-| **Langfuse** | http://localhost:8262 | Account required (setup on first access) |
-| **Backend Metrics** | http://localhost:8000/metrics | No auth |
-| **FastAPI Metrics** | http://localhost:8000/metrics/fastapi | No auth |
+| **Kibana** | <http://localhost:5601> | No auth |
+| **Grafana** | <http://localhost:3001> | admin / admin123 |
+| **Prometheus** | <http://localhost:9090> | No auth |
+| **AlertManager** | <http://localhost:9093> | No auth |
+| **Langfuse** | <http://localhost:8262> | Account required (setup on first access) |
+| **Backend Metrics** | <http://localhost:8000/metrics> | No auth |
+| **FastAPI Metrics** | <http://localhost:8000/metrics/fastapi> | No auth |
 
 ---
 
@@ -149,6 +149,7 @@ docker compose -f docker-compose.monitoring.yml down
 ```
 
 This will:
+
 1. Create `langfuse_db` database
 2. Generate secrets and update `.env`
 3. Start Langfuse service on port 8262

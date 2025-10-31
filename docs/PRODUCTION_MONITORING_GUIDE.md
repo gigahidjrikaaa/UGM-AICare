@@ -24,12 +24,14 @@ The monitoring stack has been fully integrated into the production CI/CD pipelin
 ### Option 1: Deploy with Monitoring (Recommended)
 
 **Via CI/CD (Automatic):**
+
 ```bash
 # Push to main branch - monitoring is deployed by default
 git push origin main
 ```
 
 **Via Manual Deployment:**
+
 ```bash
 # On production server
 cd /path/to/UGM-AICare
@@ -37,6 +39,7 @@ cd /path/to/UGM-AICare
 ```
 
 **Via GitHub Actions (Manual Trigger):**
+
 1. Go to Actions → CI/CD Pipeline → Run workflow
 2. Set "Deploy monitoring stack" to `true`
 3. Click "Run workflow"
@@ -44,12 +47,14 @@ cd /path/to/UGM-AICare
 ### Option 2: Deploy Without Monitoring
 
 **Via Manual Deployment:**
+
 ```bash
 cd /path/to/UGM-AICare
 ./deploy-prod.sh deploy
 ```
 
 **Via GitHub Actions:**
+
 1. Go to Actions → CI/CD Pipeline → Run workflow
 2. Set "Deploy monitoring stack" to `false`
 3. Click "Run workflow"
@@ -121,14 +126,15 @@ After deployment with monitoring enabled:
 
 | Service | Port | URL | Credentials |
 |---------|------|-----|-------------|
-| **Kibana** (Logs) | 8254 | http://your-server:8254 | No auth |
-| **Grafana** (Metrics) | 8256 | http://your-server:8256 | admin / `GRAFANA_ADMIN_PASSWORD` |
-| **Prometheus** | 8255 | http://your-server:8255 | No auth |
-| **Langfuse** (Traces) | 8262 | http://your-server:8262 | Create on first access |
-| **AlertManager** | 8261 | http://your-server:8261 | No auth |
-| **Backend Metrics** | 8000 | http://your-server:8000/metrics | No auth |
+| **Kibana** (Logs) | 8254 | <http://your-server:8254> | No auth |
+| **Grafana** (Metrics) | 8256 | <http://your-server:8256> | admin / `GRAFANA_ADMIN_PASSWORD` |
+| **Prometheus** | 8255 | <http://your-server:8255> | No auth |
+| **Langfuse** (Traces) | 8262 | <http://your-server:8262> | Create on first access |
+| **AlertManager** | 8261 | <http://your-server:8261> | No auth |
+| **Backend Metrics** | 8000 | <http://your-server:8000/metrics> | No auth |
 
 **⚠️ Security Note:** In production, these ports should be:
+
 1. Blocked by firewall (only accessible via SSH tunnel or VPN)
 2. Behind reverse proxy with authentication
 3. Protected by network security groups
@@ -251,6 +257,7 @@ server {
    - Allows manual control of monitoring deployment
 
 2. **Deployment Step:**
+
    ```yaml
    - name: Deploy to VM
      script: |
@@ -267,6 +274,7 @@ server {
 **Enhanced with:**
 
 1. **Monitoring Parameter:**
+
    ```bash
    GIT_SHA=$1
    DEPLOY_MONITORING=${2:-false}
@@ -295,11 +303,13 @@ server {
 **Volume:** `elasticsearch_data`
 
 **Health Check:**
+
 ```bash
 curl http://localhost:8250/_cluster/health
 ```
 
 **Configuration:**
+
 - Single-node cluster
 - 512MB heap size
 - Security disabled (behind firewall)
@@ -311,6 +321,7 @@ curl http://localhost:8250/_cluster/health
 **Config:** `infra/elk/logstash/pipeline/`
 
 **Pipeline:**
+
 ```
 Filebeat → Logstash → Elasticsearch
 ```
@@ -319,7 +330,7 @@ Filebeat → Logstash → Elasticsearch
 
 **Container:** `ugm_aicare_kibana_prod`  
 **Port:** 8254  
-**URL:** http://localhost:8254
+**URL:** <http://localhost:8254>
 
 **Index Pattern:** `ugm-aicare-*`
 
@@ -329,6 +340,7 @@ Filebeat → Logstash → Elasticsearch
 **Config:** `infra/elk/filebeat/filebeat.yml`
 
 **Collects:**
+
 - Docker container logs
 - JSON-formatted application logs
 - Metadata enrichment
@@ -341,6 +353,7 @@ Filebeat → Logstash → Elasticsearch
 **Retention:** 30 days
 
 **Scrape Targets:**
+
 - Backend: `http://backend:8000/metrics`
 - Node Exporter: `http://node-exporter:9100/metrics`
 - cAdvisor: `http://cadvisor:8080/metrics`
@@ -354,9 +367,11 @@ Filebeat → Logstash → Elasticsearch
 **Volume:** `grafana_data`
 
 **Datasources:**
+
 - Prometheus (auto-provisioned)
 
 **Dashboards:**
+
 - Auto-provisioned from `infra/monitoring/grafana/dashboards/`
 
 ### 7. Langfuse (Agent Tracing)
@@ -366,17 +381,21 @@ Filebeat → Logstash → Elasticsearch
 **Database:** `langfuse_db` (PostgreSQL)
 
 **First-Time Setup:**
-1. Access http://localhost:8262
+
+1. Access <http://localhost:8262>
 2. Create admin account
 3. Create project: "ugm-aicare-agents"
 4. Go to Settings → API Keys
 5. Generate new key pair
 6. Update `.env`:
+
    ```bash
    LANGFUSE_PUBLIC_KEY=pk-lf-<your-key>
    LANGFUSE_SECRET_KEY=sk-lf-<your-key>
    ```
+
 7. Restart backend:
+
    ```bash
    docker compose -f infra/compose/docker-compose.prod.yml restart backend
    ```
@@ -392,6 +411,7 @@ docker ps --filter "name=ugm_aicare" --format "table {{.Names}}\t{{.Status}}\t{{
 ```
 
 Expected output should show:
+
 - `ugm_aicare_backend`
 - `ugm_aicare_frontend`
 - `ugm_aicare_elasticsearch_prod`
@@ -453,6 +473,7 @@ curl http://localhost:8000/metrics
 **Symptoms:** Containers exit immediately or health checks fail
 
 **Solution:**
+
 ```bash
 # Check logs
 docker logs ugm_aicare_elasticsearch_prod
@@ -475,6 +496,7 @@ docker compose -f infra/compose/docker-compose.prod.yml \
 **Symptoms:** `ERROR: database "langfuse_db" does not exist`
 
 **Solution:**
+
 ```bash
 # Create database manually
 docker exec ugm_aicare_db psql -U giga -d aicare_db -c "CREATE DATABASE langfuse_db;"
@@ -490,6 +512,7 @@ docker compose -f infra/compose/docker-compose.prod.yml \
 **Symptoms:** No metrics in Grafana for backend
 
 **Solution:**
+
 ```bash
 # Check if backend is on monitoring network
 docker inspect ugm_aicare_backend | jq '.[0].NetworkSettings.Networks'
@@ -505,6 +528,7 @@ docker compose -f infra/compose/docker-compose.prod.yml restart backend
 **Symptoms:** No logs appearing in Kibana
 
 **Solution:**
+
 ```bash
 # Check Filebeat logs
 docker logs ugm_aicare_filebeat_prod
@@ -523,6 +547,7 @@ docker compose -f infra/compose/docker-compose.prod-monitoring.yml restart fileb
 ### Regular Tasks
 
 1. **Monitor Disk Usage:**
+
    ```bash
    docker system df
    
@@ -533,6 +558,7 @@ docker compose -f infra/compose/docker-compose.prod-monitoring.yml restart fileb
 2. **Rotate Logs:**
    - Elasticsearch: Automated with 30-day retention
    - Docker logs: Configure via `/etc/docker/daemon.json`:
+
      ```json
      {
        "log-driver": "json-file",
@@ -544,12 +570,14 @@ docker compose -f infra/compose/docker-compose.prod-monitoring.yml restart fileb
      ```
 
 3. **Update Monitoring Images:**
+
    ```bash
    docker compose -f infra/compose/docker-compose.prod-monitoring.yml pull
    docker compose -f infra/compose/docker-compose.prod-monitoring.yml up -d
    ```
 
 4. **Backup Monitoring Data:**
+
    ```bash
    # Backup volumes
    docker run --rm -v prometheus_data:/data -v $(pwd):/backup \

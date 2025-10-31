@@ -1,4 +1,7 @@
-"""AI-powered campaign generation service using Gemini."""
+"""AI-powered campaign generation service using Gemini.
+
+MIGRATION NOTE: Migrated from google-generativeai to google-genai SDK (Nov 2025)
+"""
 
 from __future__ import annotations
 
@@ -6,16 +9,25 @@ import json
 import logging
 from typing import Any, Dict, Optional
 
-import google.generativeai as genai
+from google import genai
+from google.genai import types
 
 logger = logging.getLogger(__name__)
 
 
 class AICampaignGenerator:
-    """Generates complete campaign configurations using Gemini AI."""
+    """Generates complete campaign configurations using Gemini AI.
+    
+    Uses the new google-genai SDK (Client-based approach).
+    """
 
-    @staticmethod
+    def __init__(self):
+        """Initialize the campaign generator with Gemini client."""
+        from app.core.llm import get_gemini_client
+        self.client = get_gemini_client()
+
     async def generate_campaign_config(
+        self,
         campaign_name: str,
         campaign_description: str,
     ) -> Dict[str, Any]:
@@ -37,9 +49,7 @@ class AICampaignGenerator:
         """
         original_response = ""
         try:
-            # Initialize Gemini model
-            model = genai.GenerativeModel('gemini-2.0-flash-exp')
-            
+            # Build the prompt
             prompt = f"""You are a mental health campaign specialist for a university counseling system. Generate a complete campaign configuration based on the following information:
 
 **Campaign Name:** {campaign_name}
@@ -70,11 +80,11 @@ Analyze the campaign name and description, then generate a complete campaign con
 - high: Urgent outreach, high-risk situations
 
 **Template Variables Available:**
-- {{user_name}} or {{name}}: Student's name
-- {{sentiment_score}}: Current sentiment score (0.0-1.0)
-- {{risk_score}}: Risk level (LOW/MEDIUM/HIGH/CRITICAL)
-- {{case_count}}: Number of active cases
-- {{days_inactive}}: Days since last activity
+- {{{{user_name}}}} or {{{{name}}}}: Student's name
+- {{{{sentiment_score}}}}: Current sentiment score (0.0-1.0)
+- {{{{risk_score}}}}: Risk level (LOW/MEDIUM/HIGH/CRITICAL)
+- {{{{case_count}}}}: Number of active cases
+- {{{{days_inactive}}}}: Days since last activity
 
 **Instructions:**
 1. Choose the most appropriate target audience based on the campaign description
@@ -87,7 +97,7 @@ Analyze the campaign name and description, then generate a complete campaign con
 ```json
 {{
   "target_audience": "audience_type",
-  "message_template": "Personalized message using {{variables}}",
+  "message_template": "Personalized message using {{{{variables}}}}",
   "triggers": [
     {{
       "trigger_type": "type",
@@ -109,14 +119,18 @@ Analyze the campaign name and description, then generate a complete campaign con
 
 **Important:**
 - Message must be supportive, non-judgmental, and encouraging
-- Use {{variable}} syntax (double curly braces) for template variables
+- Use {{{{variable}}}} syntax (double curly braces) for template variables
 - Triggers should be realistic and actionable
 - Keep message concise (2-4 sentences)
 - Always include a call-to-action
 
 Generate the campaign configuration now:"""
-
-            response = model.generate_content(prompt)
+            
+            # Use new google-genai SDK with client
+            response = self.client.models.generate_content(
+                model='gemini-2.0-flash-exp',
+                contents=prompt,
+            )
             response_text = response.text.strip()
             original_response = response_text
             
@@ -145,12 +159,12 @@ Generate the campaign configuration now:"""
             logger.error(f"Failed to parse Gemini JSON response: {e}")
             logger.error(f"Response text: {original_response if 'original_response' in locals() else 'N/A'}")
             # Return fallback config
-            return AICampaignGenerator._get_fallback_config(
+            return self._get_fallback_config(
                 campaign_name, campaign_description
             )
         except Exception as e:
             logger.error(f"AI campaign generation failed: {e}")
-            return AICampaignGenerator._get_fallback_config(
+            return self._get_fallback_config(
                 campaign_name, campaign_description
             )
 
