@@ -1,0 +1,56 @@
+filebeat.inputs:
+  - type: container
+    paths:
+      - '/var/lib/docker/containers/*/*.log'
+    processors:
+      - add_docker_metadata:
+          host: "unix:///var/run/docker.sock"
+      
+      # Decode JSON logs from Python backend
+      - decode_json_fields:
+          fields: ["message"]
+          target: "json"
+          overwrite_keys: true
+          add_error_key: true
+      
+      # Add custom labels
+      - add_fields:
+          target: ''
+          fields:
+            environment: development
+            application: ugm-aicare
+      
+      # Drop non-backend logs (optional - comment out to capture all logs)
+      - drop_event:
+          when:
+            not:
+              or:
+                - contains:
+                    container.name: "backend"
+                - contains:
+                    container.name: "frontend"
+
+    # Only capture logs from specific containers
+    include_lines: ['.*']
+
+filebeat.config.modules:
+  path: ${path.config}/modules.d/*.yml
+  reload.enabled: false
+
+# Output to Logstash
+output.logstash:
+  hosts: ["logstash:5000"]
+  bulk_max_size: 1024
+  worker: 2
+
+# Logging configuration
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+
+# Monitoring
+monitoring.enabled: false

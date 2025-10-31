@@ -3,12 +3,17 @@
 set -euo pipefail
 
 GIT_SHA=$1
+DEPLOY_MONITORING=${2:-false}  # Optional second argument to deploy monitoring
+
 if [[ -z "$GIT_SHA" ]]; then
-  echo "Usage: $0 <GIT_SHA>"
+  echo "Usage: $0 <GIT_SHA> [DEPLOY_MONITORING]"
+  echo "  GIT_SHA: Git commit SHA to deploy"
+  echo "  DEPLOY_MONITORING: 'true' to deploy monitoring stack (default: false)"
   exit 1
 fi
 
 echo "[deploy.sh] Starting deployment for GIT_SHA: $GIT_SHA"
+echo "[deploy.sh] Deploy monitoring: $DEPLOY_MONITORING"
 
 # 1. Clean up disk space before deployment
 echo "[deploy.sh] Checking disk space..."
@@ -104,6 +109,84 @@ docker container prune -f || true
 # Start new containers (pass --env-file to use root .env)
 docker compose -f infra/compose/docker-compose.prod.yml --env-file .env up -d
 echo "[deploy.sh] Services started."
+
+# Start monitoring stack if requested
+if [[ "$DEPLOY_MONITORING" == "true" ]]; then
+  echo "[deploy.sh] Starting monitoring stack..."
+  
+  # Check if langfuse_db exists, create if not
+  echo "[deploy.sh] Checking if langfuse_db exists..."
+  DB_EXISTS=$(docker compose -f infra/compose/docker-compose.prod.yml exec -T db psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT 1 FROM pg_database WHERE datname='langfuse_db'" 2>/dev/null || echo "0")
+  
+  if [[ "$DB_EXISTS" != "1" ]]; then
+    echo "[deploy.sh] Creating langfuse_db database..."
+    docker compose -f infra/compose/docker-compose.prod.yml exec -T db psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "CREATE DATABASE langfuse_db;" || true
+    echo "[deploy.sh] langfuse_db database created."
+  else
+    echo "[deploy.sh] langfuse_db database already exists."
+  fi
+  
+  # Start monitoring services
+  docker compose -f infra/compose/docker-compose.prod.yml -f infra/compose/docker-compose.prod-monitoring.yml --env-file .env up -d
+  echo "[deploy.sh] Monitoring stack started."
+  
+  # Wait for monitoring services to be ready
+  echo "[deploy.sh] Waiting for monitoring services to be ready..."
+  sleep 15
+  
+  # Check Elasticsearch health
+  echo "[deploy.sh] Checking Elasticsearch health..."
+  ELASTICSEARCH_READY=false
+  for i in $(seq 1 12); do
+    if curl -s http://localhost:8250/_cluster/health > /dev/null 2>&1; then
+      echo "[deploy.sh] Elasticsearch is ready."
+      ELASTICSEARCH_READY=true
+      break
+    fi
+    echo "[deploy.sh] Waiting for Elasticsearch... ($i/12)"
+    sleep 5
+  done
+  
+  if [[ "$ELASTICSEARCH_READY" == "false" ]]; then
+    echo "[deploy.sh] WARNING: Elasticsearch not ready after timeout. Check logs: docker logs ugm_aicare_elasticsearch_prod"
+  fi
+  
+  # Check Prometheus health
+  echo "[deploy.sh] Checking Prometheus health..."
+  PROMETHEUS_READY=false
+  for i in $(seq 1 6); do
+    if curl -s http://localhost:8255/-/healthy > /dev/null 2>&1; then
+      echo "[deploy.sh] Prometheus is ready."
+      PROMETHEUS_READY=true
+      break
+    fi
+    echo "[deploy.sh] Waiting for Prometheus... ($i/6)"
+    sleep 5
+  done
+  
+  if [[ "$PROMETHEUS_READY" == "false" ]]; then
+    echo "[deploy.sh] WARNING: Prometheus not ready after timeout. Check logs: docker logs ugm_aicare_prometheus_prod"
+  fi
+  
+  # Check Langfuse health
+  echo "[deploy.sh] Checking Langfuse health..."
+  LANGFUSE_READY=false
+  for i in $(seq 1 12); do
+    if curl -s http://localhost:8262/api/public/health > /dev/null 2>&1; then
+      echo "[deploy.sh] Langfuse is ready."
+      LANGFUSE_READY=true
+      break
+    fi
+    echo "[deploy.sh] Waiting for Langfuse... ($i/12)"
+    sleep 5
+  done
+  
+  if [[ "$LANGFUSE_READY" == "false" ]]; then
+    echo "[deploy.sh] WARNING: Langfuse not ready after timeout. Check logs: docker logs ugm_aicare_langfuse_prod"
+  fi
+  
+  echo "[deploy.sh] Monitoring stack health checks completed."
+fi
 
 # Wait for database to be ready
 echo "[deploy.sh] Waiting for database to be ready..."
@@ -219,3 +302,32 @@ if [[ "$HEALTH_CHECK_SUCCESS" == "false" ]]; then
 fi
 
 echo "[deploy.sh] All health checks passed. Deployment successful!"
+
+# Display access information
+echo ""
+echo "========================================="
+echo "Deployment Summary"
+echo "========================================="
+echo "Application:"
+echo "  • Backend:  http://localhost:8000"
+echo "  • Frontend: http://localhost:4000"
+echo ""
+
+if [[ "$DEPLOY_MONITORING" == "true" ]]; then
+  echo "Monitoring Stack:"
+  echo "  • Kibana (Logs):       http://localhost:8254"
+  echo "  • Grafana (Metrics):   http://localhost:8256 (admin/admin123)"
+  echo "  • Prometheus:          http://localhost:8255"
+  echo "  • Langfuse (Traces):   http://localhost:8262"
+  echo "  • AlertManager:        http://localhost:8261"
+  echo ""
+  echo "Next Steps for Langfuse:"
+  echo "  1. Access http://localhost:8262"
+  echo "  2. Create account and project"
+  echo "  3. Generate API keys from Settings"
+  echo "  4. Update .env with LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY"
+  echo "  5. Restart backend: docker compose -f infra/compose/docker-compose.prod.yml restart backend"
+  echo ""
+fi
+
+echo "========================================="

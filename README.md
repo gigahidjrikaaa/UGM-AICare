@@ -7,10 +7,12 @@
 **Aika** is the unified AI consciousness of UGM-AICare—a meta-agent orchestrator that coordinates four specialized agents to provide comprehensive mental health support across the university community.
 
 **Name Meaning:**
+
 - 愛 (Ai) = Love, affection
 - 佳 (Ka) = Excellent, beautiful
 
 **What Makes Aika Special:**
+
 - 🎯 **One AI Personality, Multiple Capabilities**: Unified experience across student chat, admin operations, and clinical support
 - 🔄 **Intelligent Role-Based Routing**: Adapts behavior based on user role (student/admin/counselor)
 - 🤝 **Multi-Agent Coordination**: Orchestrates STA, SCA, SDA, and IA through LangGraph workflows
@@ -177,6 +179,7 @@ Analytics Queries → IA (Privacy-Preserving Aggregation) → END
   - **Integration:** Integrated into Safety Triage Agent (STA) LangGraph workflow
 
 **Safety Guarantees:**
+
 - **PII Redaction:** All messages redacted before ML processing
 - **Fail-Closed:** Defaults to human review if ML confidence is uncertain
 - **Audit Trail:** Every classification decision logged with similarity scores
@@ -409,7 +412,13 @@ Organized with npm/yarn workspaces for streamlined dependency management across 
     # Create .env file from .env.example and fill in variables (See Environment Variables section)
     cp .env.example .env
     nano .env # Or use your editor
+    
+    # IMPORTANT: Validate your environment variables
+    cd ..
+    ./scripts/validate-env.sh backend/.env
+    
     # Setup PostgreSQL database (create user/db if needed)
+    cd backend
     # Run database migrations
     alembic upgrade head
     # Start Redis server if running locally
@@ -560,6 +569,151 @@ docker-compose up
 # Production mode
 docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
 ```
+
+### Production Monitoring Stack 📊
+
+UGM-AICare includes a comprehensive monitoring stack for production observability:
+
+- **ELK Stack** (Logging): Elasticsearch + Logstash + Kibana + Filebeat
+- **Prometheus + Grafana** (Metrics): Time-series metrics, alerts, and dashboards
+- **Custom Instrumentation**: 50+ mental health platform-specific metrics
+
+#### Quick Start - Three Deployment Options
+
+**Option 1: Start Everything (Recommended for Full Stack Development)**
+
+```bash
+./dev.sh up-all
+# Starts: Application + ELK Stack + Prometheus + Grafana + All Exporters
+```
+
+**Option 2: Start Monitoring Separately**
+
+```bash
+# Start application first
+./dev.sh up
+
+# Start monitoring stack when needed
+./dev.sh monitoring start
+```
+
+**Option 3: Standalone Monitoring Only**
+
+```bash
+# Use dedicated monitoring script
+./monitoring.sh start
+```
+
+#### Access Points
+
+- **Kibana** (Log Visualization): <http://localhost:8254>
+- **Grafana** (Metrics Dashboards): <http://localhost:8256> (admin/admin123)
+- **Prometheus** (Metrics Query): <http://localhost:8255>
+- **AlertManager** (Alert Management): <http://localhost:8261>
+- **Elasticsearch** (Direct API): <http://localhost:8250>
+- **Backend Metrics Endpoint**: <http://localhost:8000/metrics>
+
+#### Available Monitoring Commands
+
+```bash
+# Integrated commands (via dev.sh)
+./dev.sh up-all                      # Start app + monitoring
+./dev.sh down-all                    # Stop everything
+./dev.sh monitoring start            # Start monitoring only
+./dev.sh monitoring stop             # Stop monitoring
+./dev.sh monitoring restart          # Restart monitoring
+./dev.sh monitoring logs kibana      # View Kibana logs
+./dev.sh monitoring logs prometheus  # View Prometheus logs
+./dev.sh monitoring status           # Check health of all services
+./dev.sh setup-langfuse              # Setup Langfuse for agent tracing (one-time)
+
+# Standalone commands (via monitoring.sh)
+./monitoring.sh start                # Start monitoring stack
+./monitoring.sh stop                 # Stop monitoring stack
+./monitoring.sh restart              # Restart monitoring
+./monitoring.sh logs [service]       # View logs for specific service
+./monitoring.sh status               # Show health of all services
+
+# Production deployment
+./deploy-prod.sh setup-langfuse      # Setup Langfuse on production server
+```
+
+./monitoring.sh clean                # Remove containers and volumes
+./monitoring.sh urls                 # Display all access URLs
+
+```
+
+#### Key Features
+
+**Structured Logging:**
+- JSON-formatted logs with context fields (user_id, agent, session_id, processing_time_ms)
+- Privacy-preserving user_id hashing
+- Crisis and intervention event tagging
+- Automatic log shipping from Docker containers via Filebeat
+- Centralized log aggregation in Elasticsearch
+- Indexed as `ugm-aicare-YYYY.MM.DD`
+
+**Custom Metrics (50+ metrics):**
+- HTTP: Request rate, response time, error rate
+- Agents: Processing time, invocation count, errors (STA, SCA, SDA, IA)
+- LLM: API calls, latency, token usage, model performance
+- Mental Health: Crisis escalations, intervention plans, completion rates
+- Users: Active users, session duration, retention rates
+- Counselors: Response time, case load, availability
+- Database: Query duration, connection pool, cache hit/miss
+
+**Automated Alerts (15 rules):**
+- **Critical (6)**: High error rate, service down, low DB connections, crisis backlog, high memory, low disk
+- **Warning (9)**: Slow responses, slow agents, high CPU, slow LLM, high token usage, low completion rates
+- **Info (2)**: High user activity, unusual crisis patterns
+
+**Exporters:**
+- **Node Exporter**: System metrics (CPU, memory, disk, network)
+- **cAdvisor**: Container metrics (resource usage per container)
+- **Postgres Exporter**: Database metrics (connections, queries, replication)
+- **Redis Exporter**: Cache metrics (keys, memory, hit rate)
+
+#### Health Checks
+
+All monitoring services include health checks:
+
+```bash
+# Check Elasticsearch cluster health
+curl http://localhost:8250/_cluster/health
+
+# Check Prometheus targets
+curl http://localhost:8255/api/v1/targets
+
+# Check Grafana health
+curl http://localhost:8256/api/health
+
+# Check backend metrics endpoint
+curl http://localhost:8000/metrics
+```
+
+#### Documentation
+
+For complete monitoring setup, configuration, and troubleshooting:
+
+- **[PRODUCTION_MONITORING.md](docs/PRODUCTION_MONITORING.md)** - Complete monitoring guide
+- **[MONITORING_QUICK_REFERENCE.md](docs/MONITORING_QUICK_REFERENCE.md)** - Quick reference and commands
+- **[MONITORING_IMPLEMENTATION.md](docs/MONITORING_IMPLEMENTATION.md)** - Implementation details and architecture
+
+#### Production Deployment Checklist
+
+Before deploying monitoring to production:
+
+- [ ] Update alertmanager.yml with production Slack webhook URL
+- [ ] Set Elasticsearch retention policy (recommended: 30 days)
+- [ ] Configure log rotation for disk space management
+- [ ] Set Prometheus retention: `--storage.tsdb.retention.time=30d`
+- [ ] Change Grafana admin password from default (admin/admin123)
+- [ ] Configure firewall rules (only expose necessary ports)
+- [ ] Set up SSL/TLS for Grafana and Kibana
+- [ ] Create Kibana index patterns: `ugm-aicare-*`
+- [ ] Import Grafana dashboards
+- [ ] Test alert delivery to Slack/PagerDuty
+- [ ] Set up automated backups for Elasticsearch data
 
 ### Container-First CI/CD Deployment
 

@@ -45,6 +45,7 @@ langchain
 langchain-core
 langchain-google-genai
 langgraph
+langfuse>=2.0.0  # LLM observability and agent tracing
 
 # ONNX Runtime for Crisis Detection (3-5x faster, 96% smaller than PyTorch)
 # Replaces: torch (800+ MB) + sentence-transformers
@@ -96,7 +97,8 @@ rich==13.5.2     # For better console output
 typing-extensions
 
 # Monitoring
-prometheus-fastapi-instrumentator==6.1.0
+prometheus-client==0.19.0
+prometheus-fastapi-instrumentator==7.1.0
 sentry-sdk==1.32.0
 
 # Security

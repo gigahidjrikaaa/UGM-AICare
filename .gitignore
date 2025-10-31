@@ -12,6 +12,7 @@ __pycache__/
 *.sqlite3
 .env
 .env.local
+.env.prod
 config.py
 
 # FastAPI / Pydantic cache

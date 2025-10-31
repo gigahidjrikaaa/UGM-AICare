@@ -109,6 +109,7 @@ services:
     restart: unless-stopped
     networks:
       internal_network: {}
+      monitoring: {}  # Add monitoring network for metrics/logs collection
     dns: 8.8.8.8
 
   #################
@@ -148,6 +149,7 @@ services:
     restart: unless-stopped
     networks:
       - internal_network
+      - monitoring  # Add monitoring network for metrics/logs collection
 
 # Define named volumes for data persistence
 volumes:
@@ -158,3 +160,7 @@ volumes:
 networks:
   internal_network:
     driver: bridge
+  monitoring:
+    driver: bridge
+    # This network is used by monitoring services to collect metrics and logs
+    # It's shared between docker-compose.prod.yml and docker-compose.prod-monitoring.yml

@@ -20,10 +20,10 @@ docker logs -f ugm_aicare_backend_dev --tail 100
 
 ### Metrics Access
 
-- **Prometheus**: http://your-server:9090
-- **Grafana**: http://your-server:3000
-- **Kibana**: http://your-server:5601
-- **Backend Metrics**: http://your-server:8000/metrics
+- **Prometheus**: <http://your-server:9090>
+- **Grafana**: <http://your-server:3000>
+- **Kibana**: <http://your-server:5601>
+- **Backend Metrics**: <http://your-server:8000/metrics>
 
 ### Quick Health Checks
 
@@ -43,6 +43,7 @@ curl http://localhost:9200/_cluster/health
 ## 📊 Key Metrics Dashboard
 
 ### Application Health
+
 - ✅ Request rate: < 1000 req/s (normal)
 - ✅ Error rate: < 1% (healthy)
 - ✅ P95 latency: < 2s (good)
@@ -50,12 +51,14 @@ curl http://localhost:9200/_cluster/health
 - 🚨 P95 latency: > 5s (critical)
 
 ### Agent Performance
+
 - ✅ STA: < 1s (fast)
 - ✅ SCA: < 3s (normal)
 - ✅ SDA: < 2s (good)
 - 🚨 Any agent: > 10s (investigate)
 
 ### Crisis Response
+
 - ✅ Escalation response: < 5 min (target)
 - ⚠️ Escalation response: 5-15 min (delayed)
 - 🚨 Escalation response: > 15 min (critical)
@@ -112,6 +115,7 @@ docker-compose logs backend | grep -i "out of memory"
 ## 📱 Alert Severity Levels
 
 ### 🚨 **CRITICAL** (Immediate Action Required)
+
 - Backend service down
 - Database unreachable
 - Error rate > 5%
@@ -119,6 +123,7 @@ docker-compose logs backend | grep -i "out of memory"
 - Memory usage > 95%
 
 ### ⚠️ **WARNING** (Action Required Soon)
+
 - High latency (P95 > 2s)
 - Error rate > 1%
 - Agent processing time > 5s
@@ -126,6 +131,7 @@ docker-compose logs backend | grep -i "out of memory"
 - Disk space < 20%
 
 ### ℹ️ **INFO** (Monitor)
+
 - Deployment notifications
 - Backup completion
 - Scheduled maintenance
@@ -174,6 +180,7 @@ docker-compose logs backend | grep -i "out of memory"
 ## 🔐 Access Credentials
 
 **Production Access** (Stored in Password Manager):
+
 - Grafana: `admin / [vault:grafana-admin-pass]`
 - Kibana: `elastic / [vault:elastic-pass]`
 - PostgreSQL: `giga / [vault:postgres-pass]`

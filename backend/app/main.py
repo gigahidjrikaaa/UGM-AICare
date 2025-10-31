@@ -4,6 +4,7 @@ from fastapi import FastAPI, Request as FastAPIRequest # type: ignore
 from datetime import datetime, timezone
 from app.database import init_db, close_db
 from sqlalchemy import text
+from app.core.logging_config import configure_logging, get_logger
 # Cross-cutting routes (auth, user, internal, admin, system)
 from app.routes import (
     auth,
@@ -54,6 +55,10 @@ from dotenv import load_dotenv
 
 from app.core.memory import get_redis_client
 
+# Prometheus metrics
+from prometheus_client import make_asgi_app
+from prometheus_fastapi_instrumentator import Instrumentator
+
 load_dotenv()
 
 # This call is being moved to the lifespan event handler to avoid race conditions.
@@ -61,34 +66,19 @@ load_dotenv()
 
 import httpx
 
-# Set up logging
-# Ensure logs directory exists
-log_dir = "logs" if os.getenv("APP_ENV") != "production" else "/tmp/logs"
-os.makedirs(log_dir, exist_ok=True)
-log_file = os.path.join(log_dir, "chat.log")
+# Set up structured logging
+LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
+APP_ENV = os.getenv("APP_ENV", "development")
 
-# Simplified log file existence check for clarity
-if os.getenv("APP_ENV") != "production" and not os.path.exists(log_file):
-    try:
-        # Use synchronous file creation at module level
-        with open(log_file, "w") as f:
-            f.write(f"Log file created at {datetime.now()}\n")
-    except IOError as e:
-        print(f"Warning: Could not create log file {log_file}: {e}") # Use print/stderr for early errors
+# Use JSON format in production, human-readable in development
+configure_logging(
+    log_level=LOG_LEVEL,
+    json_format=(APP_ENV == "production"),
+    log_to_file=(APP_ENV != "production"),
+    log_file_path="logs/app.log"
+)
 
-
-log_config = {
-    "level": logging.INFO,
-    "format": "%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-}
-
-# Configure file logging only if not in production OR if specifically needed
-if os.getenv("APP_ENV") != "production":
-     log_config["filename"] = log_file
-     log_config["filemode"] = "a" # Append mode
-
-logging.basicConfig(**log_config)
-logger = logging.getLogger(__name__) # Get a logger for main.py itself
+logger = get_logger(__name__)
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
@@ -130,6 +120,23 @@ app = FastAPI(
     version="0.1",
     lifespan=lifespan, # Use the async context manager for startup/shutdown
 )
+
+# ============================================
+# PROMETHEUS METRICS SETUP
+# ============================================
+
+# Instrument FastAPI app with default metrics (request duration, count, etc.)
+Instrumentator().instrument(app).expose(app, endpoint="/metrics/fastapi")
+
+# Mount prometheus metrics endpoint
+metrics_app = make_asgi_app()
+app.mount("/metrics", metrics_app)
+
+logger.info("Prometheus metrics enabled at /metrics and /metrics/fastapi")
+
+# ============================================
+# CORS MIDDLEWARE
+# ============================================
 
 # Add CORS middleware
 origins_env = os.getenv("ALLOWED_ORIGINS")
