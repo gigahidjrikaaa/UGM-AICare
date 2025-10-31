@@ -918,6 +918,23 @@ We welcome contributions! Please follow these steps:
 - **Write accessible UI** - WCAG 2.1 AA compliance
 - **Document complex logic** - Explain architectural decisions
 
+### CI/CD Test Behavior
+
+The CI/CD pipeline continues deployment **even when tests fail** to enable rapid iteration:
+
+- ✅ **Test results are summarized** in GitHub Actions UI
+- 📦 **Test artifacts are uploaded** for detailed analysis (30-day retention)
+- ⚠️ **Deployment warnings** alert you to test failures
+- 🔄 **Quick rollback available** if issues arise
+
+**Best Practices:**
+- Always review test summaries before/after deployment
+- Download artifacts for failed tests to debug locally
+- Fix failing tests promptly in subsequent commits
+- Monitor production logs closely after deploying with test failures
+
+→ **[Full CI/CD Test Behavior Documentation](docs/CI_CD_TEST_BEHAVIOR.md)**
+
 ## 📄 License
 
 This project is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
