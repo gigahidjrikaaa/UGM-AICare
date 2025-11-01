@@ -36,16 +36,34 @@ def downgrade() -> None:
 
 
 def schema_upgrade() -> None:
-    # Add updated_at column to player_wellness_state table
-    op.add_column(
-        'player_wellness_state',
-        sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now())
-    )
+    """Add updated_at column to player_wellness_state table (idempotent)."""
+    # Check if column exists before adding
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col['name'] for col in inspector.get_columns('player_wellness_state')]
+    
+    if 'updated_at' not in columns:
+        op.add_column(
+            'player_wellness_state',
+            sa.Column('updated_at', sa.DateTime(), nullable=False, server_default=sa.func.now())
+        )
+    else:
+        # Column already exists, skip migration
+        pass
 
 
 def schema_downgrade() -> None:
-    # Remove updated_at column from player_wellness_state table
-    op.drop_column('player_wellness_state', 'updated_at')
+    """Remove updated_at column from player_wellness_state table (idempotent)."""
+    # Check if column exists before dropping
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    columns = [col['name'] for col in inspector.get_columns('player_wellness_state')]
+    
+    if 'updated_at' in columns:
+        op.drop_column('player_wellness_state', 'updated_at')
+    else:
+        # Column doesn't exist, skip downgrade
+        pass
 
 
 def data_upgrade() -> None:

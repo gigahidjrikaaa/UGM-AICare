@@ -102,7 +102,7 @@ ether = client.from_wei(1500000000000000000)
 
 ## 🪙 CARE Token Client
 
-Located: `app/blockchain/care_token_client.py`
+Located: `app/domains/blockchain/care_token_client.py`
 
 ### Features
 
@@ -114,7 +114,7 @@ Located: `app/blockchain/care_token_client.py`
 ### Usage
 
 ```python
-from app.blockchain import CareTokenClient
+from app.domains.blockchain import CareTokenClient
 
 token_client = CareTokenClient()
 
@@ -157,7 +157,7 @@ Each category requires specific role permissions (e.g., `COMMUNITY_MINTER_ROLE` 
 
 ## 📊 Platform Revenue Oracle Client
 
-Located: `app/blockchain/oracle_client.py`
+Located: `app/domains/blockchain/oracle_client.py`
 
 ### Features
 
@@ -168,7 +168,7 @@ Located: `app/blockchain/oracle_client.py`
 ### Usage
 
 ```python
-from app.blockchain import OracleClient
+from app.domains.blockchain import OracleClient
 
 oracle_client = OracleClient()
 
@@ -189,7 +189,7 @@ result = await oracle_client.approve_report(month_yyyymm=202510)
 
 ## 🥩 Staking Client
 
-Located: `app/blockchain/staking_client.py`
+Located: `app/domains/blockchain/staking_client.py`
 
 ### Features
 
@@ -200,7 +200,7 @@ Located: `app/blockchain/staking_client.py`
 ### Usage
 
 ```python
-from app.blockchain import StakingClient
+from app.domains.blockchain import StakingClient
 
 staking_client = StakingClient()
 
@@ -214,6 +214,63 @@ print(f"Tier: {position['tier_name']}")
 print(f"Staked: {position['staked_amount_care']} CARE")
 print(f"Profit Share: {position['profit_share_percent']}%")
 ```
+
+---
+
+## 🎨 EDU Chain NFT Badge Client
+
+Located: `app/domains/blockchain/edu_chain/nft_client.py`
+
+### Overview
+
+The NFT badge system rewards students for completing mental health milestones on EDU Chain Testnet (L3 on Arbitrum Orbit).
+
+### Features
+
+- Mint ERC1155 achievement badges
+- Lazy initialization (connects only when needed)
+- Automatic gas estimation with fallback
+- Transaction tracking and logging
+
+### Usage
+
+```python
+from app.domains.blockchain import init_nft_client, mint_nft_badge
+
+# Initialize connection (call once at app startup)
+await init_nft_client()
+
+# Mint a badge for quest completion
+tx_hash = mint_nft_badge(
+    recipient_address="0x742d35Cc6634C0532925a3b844Bc9e7595f0bEb9",
+    badge_id=1,  # Quest completion badge
+    amount=1
+)
+
+if tx_hash:
+    print(f"✅ NFT minted! Transaction: {tx_hash}")
+else:
+    print("❌ Minting failed")
+```
+
+### Badge Types (Token IDs)
+
+- **1**: Quest Completion Badge
+- **2**: Journal Streak Badge (7 days)
+- **3**: CBT Module Completion Badge
+- **4**: Mental Health Champion Badge
+- **5**: Community Helper Badge
+- (More badge types defined in smart contract)
+
+### Environment Variables
+
+```env
+EDU_TESTNET_RPC_URL=https://rpc.open-campus-codex.gelato.digital
+NFT_CONTRACT_ADDRESS=0x...  # UGMJournalBadges contract
+BACKEND_MINTER_PRIVATE_KEY=0x...  # Backend wallet private key
+```
+
+---
 
 ### Staking Tiers
 
@@ -355,7 +412,7 @@ The finance module uses blockchain clients for revenue reporting:
 
 ```python
 # In app/finance/revenue_tracker.py
-from app.blockchain import OracleClient
+from app.domains.blockchain import OracleClient
 
 oracle_client = OracleClient()
 result = await oracle_client.submit_monthly_report(...)
