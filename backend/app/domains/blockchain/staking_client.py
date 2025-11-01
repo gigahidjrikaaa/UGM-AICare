@@ -29,10 +29,17 @@ class StakingClient(BaseWeb3Client):
         """Initialize staking client"""
         super().__init__()
         
-        # Load contract address
-        self.staking_address = self.to_checksum_address(
-            os.getenv("CARE_STAKING_HALAL_ADDRESS", "")
-        )
+        # Load contract address - validate before converting to checksum
+        staking_address_raw = os.getenv("CARE_STAKING_HALAL_ADDRESS", "").strip()
+        
+        if staking_address_raw:
+            try:
+                self.staking_address = self.to_checksum_address(staking_address_raw)
+            except ValueError as e:
+                logger.error(f"❌ Invalid CARE_STAKING_HALAL_ADDRESS: {staking_address_raw}")
+                self.staking_address = None
+        else:
+            self.staking_address = None
         
         # Load contract ABI
         self.staking_abi = self._load_staking_abi()
@@ -46,7 +53,7 @@ class StakingClient(BaseWeb3Client):
             logger.info(f"✅ CareStakingHalal loaded at {self.staking_address}")
         else:
             self.contract = None
-            logger.warning("⚠️  CARE_STAKING_HALAL_ADDRESS not set")
+            logger.warning("⚠️  CARE_STAKING_HALAL_ADDRESS not set (blockchain features disabled)")
     
     def _load_staking_abi(self) -> list:
         """Load staking contract ABI from compiled artifacts"""

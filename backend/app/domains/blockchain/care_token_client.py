@@ -30,13 +30,27 @@ class CareTokenClient(BaseWeb3Client):
         """Initialize CARE token client"""
         super().__init__()
         
-        # Load contract addresses
-        self.token_address = self.to_checksum_address(
-            os.getenv("CARE_TOKEN_ADDRESS", "")
-        )
-        self.controller_address = self.to_checksum_address(
-            os.getenv("CARE_TOKEN_CONTROLLER_ADDRESS", "")
-        )
+        # Load contract addresses - validate before converting to checksum
+        token_address_raw = os.getenv("CARE_TOKEN_ADDRESS", "").strip()
+        controller_address_raw = os.getenv("CARE_TOKEN_CONTROLLER_ADDRESS", "").strip()
+        
+        if token_address_raw:
+            try:
+                self.token_address = self.to_checksum_address(token_address_raw)
+            except ValueError as e:
+                logger.error(f"❌ Invalid CARE_TOKEN_ADDRESS: {token_address_raw}")
+                self.token_address = None
+        else:
+            self.token_address = None
+        
+        if controller_address_raw:
+            try:
+                self.controller_address = self.to_checksum_address(controller_address_raw)
+            except ValueError as e:
+                logger.error(f"❌ Invalid CARE_TOKEN_CONTROLLER_ADDRESS: {controller_address_raw}")
+                self.controller_address = None
+        else:
+            self.controller_address = None
         
         # Load contract ABIs
         self.token_abi = self._load_token_abi()
@@ -51,7 +65,7 @@ class CareTokenClient(BaseWeb3Client):
             logger.info(f"✅ CARE token loaded at {self.token_address}")
         else:
             self.token_contract = None
-            logger.warning("⚠️  CARE_TOKEN_ADDRESS not set")
+            logger.warning("⚠️  CARE_TOKEN_ADDRESS not set (blockchain features disabled)")
         
         if self.controller_address:
             self.controller_contract = self.w3.eth.contract(
@@ -61,7 +75,7 @@ class CareTokenClient(BaseWeb3Client):
             logger.info(f"✅ CARE token controller loaded at {self.controller_address}")
         else:
             self.controller_contract = None
-            logger.warning("⚠️  CARE_TOKEN_CONTROLLER_ADDRESS not set")
+            logger.warning("⚠️  CARE_TOKEN_CONTROLLER_ADDRESS not set (blockchain features disabled)")
         
         # Load minter account
         self.minter_private_key = os.getenv("CARE_MINTER_PRIVATE_KEY", "")

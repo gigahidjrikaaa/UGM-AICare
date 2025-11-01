@@ -27,12 +27,17 @@ class OracleClient(BaseWeb3Client):
         """Initialize oracle client with contract address and ABI"""
         super().__init__()
         
-        # Load contract address
-        self.oracle_address = self.to_checksum_address(
-            os.getenv("PLATFORM_REVENUE_ORACLE_ADDRESS", "")
-        )
+        # Load contract address - validate before converting to checksum
+        oracle_address_raw = os.getenv("PLATFORM_REVENUE_ORACLE_ADDRESS", "").strip()
         
-        if not self.oracle_address or self.oracle_address == self.to_checksum_address("0x" + "0" * 40):
+        if oracle_address_raw and oracle_address_raw != ("0x" + "0" * 40):
+            try:
+                self.oracle_address = self.to_checksum_address(oracle_address_raw)
+            except ValueError as e:
+                logger.error(f"❌ Invalid PLATFORM_REVENUE_ORACLE_ADDRESS: {oracle_address_raw}")
+                self.oracle_address = None
+        else:
+            self.oracle_address = None
             logger.warning("⚠️  PLATFORM_REVENUE_ORACLE_ADDRESS not set")
         
         # Load contract ABI
@@ -47,7 +52,7 @@ class OracleClient(BaseWeb3Client):
             logger.info(f"✅ PlatformRevenueOracle loaded at {self.oracle_address}")
         else:
             self.contract = None
-            logger.warning("⚠️  Oracle contract not initialized")
+            logger.warning("⚠️  Oracle contract not initialized (blockchain features disabled)")
         
         # Load finance team account
         self.finance_private_key = os.getenv("FINANCE_TEAM_PRIVATE_KEY", "")
