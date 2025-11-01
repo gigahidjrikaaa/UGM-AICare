@@ -36,8 +36,9 @@ RUN grep -v -E "^torch>=|^triton" requirements.txt > requirements-no-torch.txt
 
 # Use BuildKit cache mount for pip to speed up repeated builds
 # Build wheels ONLY for non-torch dependencies
+# --prefer-binary speeds up builds by using pre-built wheels when available
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip wheel --wheel-dir /app/wheels -r requirements-no-torch.txt
+    pip wheel --prefer-binary --wheel-dir /app/wheels -r requirements-no-torch.txt
 
 # ---- ONNX Model Build Stage ----
 FROM python:3.11-slim-bookworm as model-builder
