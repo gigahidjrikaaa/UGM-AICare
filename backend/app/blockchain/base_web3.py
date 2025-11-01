@@ -10,7 +10,7 @@ Provides common functionality for all blockchain clients:
 """
 
 from web3 import Web3
-from web3.middleware import ExtraDataToPOAMiddleware
+from web3.middleware import ExtraDataToPOAMiddleware as geth_poa_middleware
 from web3.types import TxParams
 from eth_account import Account
 from eth_typing import ChecksumAddress
@@ -38,7 +38,8 @@ class BaseWeb3Client:
         self.w3 = Web3(Web3.HTTPProvider(self.rpc_url))
         
         # Add POA middleware for EVM-compatible chains (SOMNIA uses POA consensus)
-        self.w3.middleware_onion.inject(ExtraDataToPOAMiddleware, layer=0)
+        # Note: Web3.py v6+ renamed ExtraDataToPOAMiddleware to geth_poa_middleware
+        self.w3.middleware_onion.inject(geth_poa_middleware, layer=0)
         
         # Check connection
         if not self.w3.is_connected():

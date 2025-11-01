@@ -13,6 +13,7 @@ import os
 import json
 from typing import Optional
 from web3 import Web3  # type: ignore
+from web3.middleware import geth_poa_middleware  # type: ignore
 from dotenv import load_dotenv
 import logging
 
@@ -75,9 +76,14 @@ async def init_blockchain():
     if RPC_URL and MINTER_PRIVATE_KEY and CONTRACT_ADDRESS and CONTRACT_ABI:
         try:
             w3 = Web3(Web3.HTTPProvider(RPC_URL))
+            
+            # EDU Chain is an L3 on Arbitrum Orbit - add POA middleware for testnet
+            # This handles the extraData field in block headers correctly
+            w3.middleware_onion.inject(geth_poa_middleware, layer=0)
 
             if w3.is_connected():
                 logger.info(f"✅ Connected to EDU Chain RPC: {RPC_URL}")
+                logger.info(f"   Chain ID: {w3.eth.chain_id}")
                 minter_account = w3.eth.account.from_key(MINTER_PRIVATE_KEY)
                 logger.info(f"🔑 Backend Minter Address: {minter_account.address}")
 

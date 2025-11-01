@@ -481,11 +481,11 @@ jobs:
           file: ./infra/docker/backend.Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ steps.lowercase.outputs.owner }}/backend:${{ github.sha }}
-            ghcr.io/${{ steps.lowercase.outputs.owner }}/backend:latest
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-api:${{ github.sha }}
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-api:latest
           cache-from: |
             type=gha,scope=backend
-            type=registry,ref=ghcr.io/${{ steps.lowercase.outputs.owner }}/backend:latest
+            type=registry,ref=ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-api:latest
           cache-to: type=gha,mode=max,scope=backend
           build-args: |
             BUILDKIT_INLINE_CACHE=1
@@ -552,11 +552,11 @@ jobs:
           file: ./infra/docker/frontend.Dockerfile
           push: true
           tags: |
-            ghcr.io/${{ steps.lowercase.outputs.owner }}/frontend:${{ github.sha }}
-            ghcr.io/${{ steps.lowercase.outputs.owner }}/frontend:latest
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-web:${{ github.sha }}
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-web:latest
           cache-from: |
             type=gha,scope=frontend
-            type=registry,ref=ghcr.io/${{ steps.lowercase.outputs.owner }}/frontend:latest
+            type=registry,ref=ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-web:latest
           cache-to: type=gha,mode=max,scope=frontend
           build-args: |
             BUILDKIT_INLINE_CACHE=1
@@ -590,7 +590,7 @@ jobs:
       - name: Run Trivy vulnerability scan on backend image
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'ghcr.io/${{ steps.lowercase.outputs.owner }}/backend:${{ github.sha }}'
+          image-ref: 'ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-api:${{ github.sha }}'
           format: 'json'
           output: 'trivy-backend-results.json'
           exit-code: '0'
@@ -655,7 +655,7 @@ jobs:
       - name: Run Trivy vulnerability scan on frontend image
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: 'ghcr.io/${{ steps.lowercase.outputs.owner }}/frontend:${{ github.sha }}'
+          image-ref: 'ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-web:${{ github.sha }}'
           format: 'json'
           output: 'trivy-frontend-results.json'
           exit-code: '0'

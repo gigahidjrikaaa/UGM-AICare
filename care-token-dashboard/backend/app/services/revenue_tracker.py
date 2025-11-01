@@ -23,6 +23,7 @@ from typing import Dict, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from web3 import Web3
+from web3.middleware import geth_poa_middleware
 from eth_account import Account
 from eth_typing import ChecksumAddress
 import logging
@@ -86,6 +87,16 @@ class RevenueTrackerService:
     def __init__(self):
         # Web3 configuration
         self.w3 = Web3(Web3.HTTPProvider(settings.SOMNIA_RPC_URL))
+        
+        # Add POA middleware for SOMNIA (EVM-compatible chain with POA consensus)
+        # This handles the extraData field in block headers correctly
+        self.w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+        
+        # Verify connection
+        if not self.w3.is_connected():
+            raise ConnectionError(f"Failed to connect to SOMNIA blockchain at {settings.SOMNIA_RPC_URL}")
+        
+        logger.info(f"✅ Connected to SOMNIA blockchain (Chain ID: {self.w3.eth.chain_id})")
         
         # Contract addresses
         self.oracle_address: ChecksumAddress = Web3.to_checksum_address(

@@ -47,8 +47,8 @@ GHCR_REPOSITORY_OWNER_CLEAN=$(echo "$GHCR_REPOSITORY_OWNER_RAW" | cut -d'/' -f1)
 GHCR_REPOSITORY_OWNER_LOWER=$(echo "$GHCR_REPOSITORY_OWNER_CLEAN" | tr '[:upper:]' '[:lower:]')
 
 # Image names: ghcr.io/owner/image:tag (NOT ghcr.io/owner/repo/image:tag)
-BACKEND_IMAGE="ghcr.io/${GHCR_REPOSITORY_OWNER_LOWER}/backend:${GIT_SHA}"
-FRONTEND_IMAGE="ghcr.io/${GHCR_REPOSITORY_OWNER_LOWER}/frontend:${GIT_SHA}"
+BACKEND_IMAGE="ghcr.io/${GHCR_REPOSITORY_OWNER_LOWER}/ugm-aicare-api:${GIT_SHA}"
+FRONTEND_IMAGE="ghcr.io/${GHCR_REPOSITORY_OWNER_LOWER}/ugm-aicare-web:${GIT_SHA}"
 
 echo "[deploy.sh] Pulling backend image: $BACKEND_IMAGE"
 docker pull "$BACKEND_IMAGE"
