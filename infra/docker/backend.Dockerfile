@@ -24,7 +24,14 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # Copy only the requirements file to leverage Docker cache
 COPY requirements.txt .
 
+# Install CPU-only PyTorch FIRST to avoid CUDA dependencies
+# This ensures all subsequent builds use the CPU version
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip setuptools wheel && \
+    pip install --index-url https://download.pytorch.org/whl/cpu torch>=2.0.0
+
 # Use BuildKit cache mount for pip to speed up repeated builds
+# Now build wheels for remaining dependencies (torch already installed)
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip wheel --wheel-dir /app/wheels -r requirements.txt
 

@@ -69,7 +69,13 @@ transformers>=4.41.0,<5.0.0  # For tokenizer (still needed, but much lighter wit
 # Torch - Only needed for ONNX export (can be removed after first build)
 # The ensure_onnx_model.py script will download the model and export to ONNX
 # After that, torch can be uninstalled - runtime only needs onnxruntime
-# CPU-only version to avoid 2GB+ CUDA downloads
+# 
+# IMPORTANT FOR DOCKER BUILDS:
+# In Dockerfile, torch is installed separately with --index-url https://download.pytorch.org/whl/cpu
+# to ensure CPU-only version (default from PyPI pulls 2.5GB+ of CUDA dependencies)
+# If you see nvidia-cuda-* packages being installed, the CPU version is NOT being used!
+#
+# For local development: pip install torch --index-url https://download.pytorch.org/whl/cpu
 torch>=2.0.0,<3.0.0
 
 # Statistical Analysis and Privacy
