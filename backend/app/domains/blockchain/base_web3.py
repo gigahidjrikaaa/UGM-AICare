@@ -10,10 +10,10 @@ Provides common functionality for all blockchain clients:
 """
 
 from web3 import Web3
-from web3.middleware import ExtraDataToPOAMiddleware as geth_poa_middleware
+from web3.middleware import geth_poa_middleware  # type: ignore
 from eth_account import Account
 from eth_typing import ChecksumAddress
-from typing import Optional, Dict, Any
+from typing import Optional, Dict, Any, cast
 import os
 import logging
 import time
@@ -84,7 +84,8 @@ class BaseWeb3Client:
             Estimated gas units
         """
         try:
-            gas_estimate = self.w3.eth.estimate_gas(transaction)
+            # Cast to TxParams for Web3.py type compatibility
+            gas_estimate = self.w3.eth.estimate_gas(transaction)  # type: ignore
             # Add 20% buffer for safety
             return int(gas_estimate * 1.2)
         except Exception as e:

@@ -10,7 +10,7 @@ Provides common functionality for all blockchain clients:
 """
 
 from web3 import Web3
-from web3.middleware import ExtraDataToPOAMiddleware as geth_poa_middleware
+from web3.middleware import geth_poa_middleware  # type: ignore
 from web3.types import TxParams
 from eth_account import Account
 from eth_typing import ChecksumAddress
