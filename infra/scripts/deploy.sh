@@ -50,6 +50,16 @@ GHCR_REPOSITORY_OWNER_LOWER=$(echo "$GHCR_REPOSITORY_OWNER_CLEAN" | tr '[:upper:
 BACKEND_IMAGE="ghcr.io/${GHCR_REPOSITORY_OWNER_LOWER}/ugm-aicare-api:${GIT_SHA}"
 FRONTEND_IMAGE="ghcr.io/${GHCR_REPOSITORY_OWNER_LOWER}/ugm-aicare-web:${GIT_SHA}"
 
+# Force remove old images with same SHA to prevent using stale cached images
+echo "[deploy.sh] Removing any existing images with SHA: $GIT_SHA to force fresh pull..."
+docker rmi -f "$BACKEND_IMAGE" 2>/dev/null || echo "[deploy.sh] No existing backend image with SHA: $GIT_SHA"
+docker rmi -f "$FRONTEND_IMAGE" 2>/dev/null || echo "[deploy.sh] No existing frontend image with SHA: $GIT_SHA"
+
+# Also remove 'latest' tag to ensure fresh pull
+echo "[deploy.sh] Removing 'latest' tag images to force fresh pull..."
+docker rmi -f "ghcr.io/${GHCR_REPOSITORY_OWNER_LOWER}/ugm-aicare-api:latest" 2>/dev/null || echo "[deploy.sh] No existing backend:latest image"
+docker rmi -f "ghcr.io/${GHCR_REPOSITORY_OWNER_LOWER}/ugm-aicare-web:latest" 2>/dev/null || echo "[deploy.sh] No existing frontend:latest image"
+
 echo "[deploy.sh] Pulling backend image: $BACKEND_IMAGE"
 docker pull "$BACKEND_IMAGE"
 echo "[deploy.sh] Pulling frontend image: $FRONTEND_IMAGE"

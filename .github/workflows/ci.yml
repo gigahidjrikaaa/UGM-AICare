@@ -480,6 +480,7 @@ jobs:
           context: ./backend
           file: ./infra/docker/backend.Dockerfile
           push: true
+          pull: true  # Always pull base images to ensure freshness
           tags: |
             ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-api:${{ github.sha }}
             ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-api:latest
@@ -551,6 +552,7 @@ jobs:
           context: ./frontend
           file: ./infra/docker/frontend.Dockerfile
           push: true
+          pull: true  # Always pull base images to ensure freshness
           tags: |
             ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-web:${{ github.sha }}
             ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-web:latest
