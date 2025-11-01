@@ -54,13 +54,21 @@ class OracleClient(BaseWeb3Client):
             self.contract = None
             logger.warning("⚠️  Oracle contract not initialized (blockchain features disabled)")
         
-        # Load finance team account
-        self.finance_private_key = os.getenv("FINANCE_TEAM_PRIVATE_KEY", "")
-        if self.finance_private_key:
-            self.finance_account = self.load_account(self.finance_private_key)
+        # Load finance team account - validate private key before loading
+        self.finance_private_key = os.getenv("FINANCE_TEAM_PRIVATE_KEY", "").strip()
+        if self.finance_private_key and not self.finance_private_key.startswith("YOUR_"):
+            try:
+                self.finance_account = self.load_account(self.finance_private_key)
+                logger.info("✅ Finance team account loaded")
+            except Exception as e:
+                logger.error(f"❌ Failed to load finance account: {e}")
+                self.finance_account = None
         else:
             self.finance_account = None
-            logger.warning("⚠️  FINANCE_TEAM_PRIVATE_KEY not set. Submit functions will not work.")
+            if self.finance_private_key:
+                logger.warning("⚠️  FINANCE_TEAM_PRIVATE_KEY contains placeholder value")
+            else:
+                logger.warning("⚠️  FINANCE_TEAM_PRIVATE_KEY not set. Submit functions will not work.")
     
     def _get_oracle_abi(self) -> list:
         """

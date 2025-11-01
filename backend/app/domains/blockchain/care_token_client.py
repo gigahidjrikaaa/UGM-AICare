@@ -77,13 +77,21 @@ class CareTokenClient(BaseWeb3Client):
             self.controller_contract = None
             logger.warning("⚠️  CARE_TOKEN_CONTROLLER_ADDRESS not set (blockchain features disabled)")
         
-        # Load minter account
-        self.minter_private_key = os.getenv("CARE_MINTER_PRIVATE_KEY", "")
-        if self.minter_private_key:
-            self.minter_account = self.load_account(self.minter_private_key)
+        # Load minter account - validate private key before loading
+        self.minter_private_key = os.getenv("CARE_MINTER_PRIVATE_KEY", "").strip()
+        if self.minter_private_key and not self.minter_private_key.startswith("YOUR_"):
+            try:
+                self.minter_account = self.load_account(self.minter_private_key)
+                logger.info("✅ CARE minter account loaded")
+            except Exception as e:
+                logger.error(f"❌ Failed to load minter account: {e}")
+                self.minter_account = None
         else:
             self.minter_account = None
-            logger.warning("⚠️  CARE_MINTER_PRIVATE_KEY not set. Minting disabled.")
+            if self.minter_private_key:
+                logger.warning("⚠️  CARE_MINTER_PRIVATE_KEY contains placeholder value")
+            else:
+                logger.warning("⚠️  CARE_MINTER_PRIVATE_KEY not set. Minting disabled.")
     
     def _load_token_abi(self) -> list:
         """Load CARE token ABI from compiled artifacts"""

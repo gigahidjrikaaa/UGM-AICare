@@ -73,7 +73,14 @@ async def init_blockchain():
     
     CONTRACT_ABI = await get_contract_abi()
     
-    if RPC_URL and MINTER_PRIVATE_KEY and CONTRACT_ADDRESS and CONTRACT_ABI:
+    # Validate private key before using it
+    private_key_valid = (
+        MINTER_PRIVATE_KEY and 
+        not MINTER_PRIVATE_KEY.startswith("YOUR_") and
+        len(MINTER_PRIVATE_KEY) > 0
+    )
+    
+    if RPC_URL and private_key_valid and CONTRACT_ADDRESS and CONTRACT_ABI:
         try:
             w3 = Web3(Web3.HTTPProvider(RPC_URL))
             
@@ -84,8 +91,13 @@ async def init_blockchain():
             if w3.is_connected():
                 logger.info(f"✅ Connected to EDU Chain RPC: {RPC_URL}")
                 logger.info(f"   Chain ID: {w3.eth.chain_id}")
-                minter_account = w3.eth.account.from_key(MINTER_PRIVATE_KEY)
-                logger.info(f"🔑 Backend Minter Address: {minter_account.address}")
+                
+                try:
+                    minter_account = w3.eth.account.from_key(MINTER_PRIVATE_KEY)
+                    logger.info(f"🔑 Backend Minter Address: {minter_account.address}")
+                except Exception as e:
+                    logger.error(f"❌ Failed to load minter account from private key: {e}")
+                    minter_account = None
 
                 # Load Contract
                 contract = w3.eth.contract(
@@ -107,8 +119,13 @@ async def init_blockchain():
             missing.append("EDU_TESTNET_RPC_URL")
         if not CONTRACT_ADDRESS:
             missing.append("NFT_CONTRACT_ADDRESS")
-        if not MINTER_PRIVATE_KEY:
-            missing.append("BACKEND_MINTER_PRIVATE_KEY")
+        if not private_key_valid:
+            if not MINTER_PRIVATE_KEY:
+                missing.append("BACKEND_MINTER_PRIVATE_KEY")
+            elif MINTER_PRIVATE_KEY.startswith("YOUR_"):
+                missing.append("BACKEND_MINTER_PRIVATE_KEY (contains placeholder)")
+            else:
+                missing.append("BACKEND_MINTER_PRIVATE_KEY (invalid format)")
         if not CONTRACT_ABI:
             missing.append("ABI file")
         
