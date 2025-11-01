@@ -30,10 +30,14 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip setuptools wheel && \
     pip install --index-url https://download.pytorch.org/whl/cpu torch>=2.0.0
 
+# Create requirements without torch to prevent CUDA wheel creation
+# Remove torch and triton (torch dependency) from requirements
+RUN grep -v -E "^torch>=|^triton" requirements.txt > requirements-no-torch.txt
+
 # Use BuildKit cache mount for pip to speed up repeated builds
-# Now build wheels for remaining dependencies (torch already installed)
+# Build wheels ONLY for non-torch dependencies
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip wheel --wheel-dir /app/wheels -r requirements.txt
+    pip wheel --wheel-dir /app/wheels -r requirements-no-torch.txt
 
 # ---- ONNX Model Build Stage ----
 FROM python:3.11-slim-bookworm as model-builder
@@ -80,9 +84,11 @@ COPY --from=builder /app/wheels /wheels
 # Copy ONNX model from model-builder stage (if successful)
 COPY --from=model-builder /app/models/onnx /app/models/onnx
 
-# Install Python dependencies from wheels (EXCLUDING torch - not needed at runtime!)
-# Use cache mount for faster pip operations
+# Install CPU-only PyTorch FIRST in production (since it's not in wheels)
+# Then install remaining dependencies from wheels
 RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip && \
+    pip install --index-url https://download.pytorch.org/whl/cpu torch>=2.0.0 && \
     pip install --no-index --find-links=/wheels /wheels/* && \
     rm -rf /wheels && \
     python -m spacy download xx_ent_wiki_sm || true && \
