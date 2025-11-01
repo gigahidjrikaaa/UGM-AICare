@@ -65,6 +65,7 @@ load_dotenv()
 # init_db()
 
 import httpx
+import inspect
 
 # Set up structured logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
@@ -86,11 +87,17 @@ async def lifespan(app: FastAPI):
     Handles application startup and shutdown events.
     """
     logger.info("Starting application lifespan...")
-    # Initialize the database
-    await init_db()
+    # Initialize the database (handle both sync and async implementations)
+    db_result = init_db()
+    if inspect.isawaitable(db_result):
+        await db_result
+
     # Initialize blockchain connection (EDU Chain NFT)
-    from app.blockchain import init_nft_client
-    await init_nft_client()
+    from app.domains.blockchain import init_nft_client
+    nft_result = init_nft_client()
+    if inspect.isawaitable(nft_result):
+        await nft_result
+
     # Start the background scheduler
     start_scheduler()
     # Start the finance revenue scheduler
@@ -99,7 +106,9 @@ async def lifespan(app: FastAPI):
     logger.info("Finance revenue scheduler started")
     # Initialize event bus subscriptions for SSE broadcasting
     from app.services.event_sse_bridge import initialize_event_subscriptions
-    await initialize_event_subscriptions()
+    sub_result = initialize_event_subscriptions()
+    if inspect.isawaitable(sub_result):
+        await sub_result
     yield
     # Clean up resources on shutdown
     logger.info("Shutting down application lifespan...")

@@ -256,15 +256,12 @@ except ImportError as e:
 
 # Test blockchain base imports
 try:
-    from app.blockchain.base_web3 import BaseWeb3Client
+    from app.domains.blockchain.base_web3 import BaseWeb3Client
     print('✅ BaseWeb3Client: OK')
 except ImportError as e:
     print('❌ BaseWeb3Client: FAILED')
     print(f'   Error: {e}')
     sys.exit(1)
-
-# Note: Skipping app.domains.blockchain.base_web3 - causes circular import with routes
-# This is a duplicate file that should be consolidated with app.blockchain.base_web3
 
 # Test care token service
 try:
@@ -277,7 +274,7 @@ except ImportError as e:
 
 # Test EDU Chain NFT client
 try:
-    from app.blockchain.edu_chain.nft_client import init_blockchain
+    from app.domains.blockchain.edu_chain.nft_client import init_blockchain
     print('✅ EDU Chain NFT Client: OK')
 except ImportError as e:
     print('❌ EDU Chain NFT Client: FAILED')

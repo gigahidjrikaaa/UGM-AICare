@@ -44,7 +44,7 @@ from app.domains.finance.models import (
 )
 
 # Blockchain imports
-from app.blockchain.somnia import OracleClient
+from app.domains.blockchain import OracleClient
 
 logger = logging.getLogger(__name__)
 

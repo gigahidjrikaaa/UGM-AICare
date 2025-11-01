@@ -18,7 +18,7 @@ import json
 import logging
 from pathlib import Path
 
-from app.blockchain.base_web3 import BaseWeb3Client
+from app.domains.blockchain.base_web3 import BaseWeb3Client
 
 logger = logging.getLogger(__name__)
 

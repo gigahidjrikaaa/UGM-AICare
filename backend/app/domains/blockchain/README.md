@@ -2,31 +2,76 @@
 
 ## Overview
 
-The **blockchain/** module consolidates all smart contract interactions for the UGM-AICare platform, providing a clean separation of concerns from business logic.
+The **blockchain/** module consolidates all smart contract interactions for the UGM-AICare platform across **multiple blockchains**, providing a clean separation of concerns from business logic.
+
+## 🌐 Multi-Chain Architecture
+
+UGM-AICare integrates with **two blockchains**:
+
+### 1. SOMNIA Mainnet (Chain ID: 5031)
+
+**Purpose**: Platform tokenomics and finance infrastructure
+
+**Contracts**:
+
+- **CareToken** (ERC20) - Platform utility token with role-based minting
+- **PlatformRevenueOracle** - Monthly revenue reporting with multi-sig approval
+- **CareStakingHalal** - Mudarabah-compliant profit-sharing staking system
+
+**Use Cases**:
+
+- Mint CARE tokens for rewards, staking, team allocations
+- Submit monthly revenue reports to blockchain
+- Track staking pools, TVL, and profit distributions
+
+### 2. EDU Chain Testnet
+
+**Purpose**: Achievement NFT badges for student accomplishments
+
+**Contracts**:
+
+- **UGMJournalBadges** (ERC1155) - Multi-token NFT for various achievement types
+
+**Use Cases**:
+
+- Mint NFT badges when students complete quests, journals, or milestones
+- Track user badge collections on-chain
 
 ## 📁 Module Structure
 
 ```plaintext
-backend/app/blockchain/
-├── __init__.py                  # Module exports
-├── base_web3.py                 # Base Web3 client with shared utilities
-├── care_token_client.py         # CARE token operations (mint, balance, transfer)
-├── oracle_client.py             # PlatformRevenueOracle interactions
-└── staking_client.py            # CareStakingHalal operations
+backend/app/domains/blockchain/
+├── __init__.py                  # Multi-chain exports
+├── base_web3.py                 # Shared Web3 utilities
+├── care_token_client.py         # CARE token operations (SOMNIA)
+├── oracle_client.py             # Revenue oracle (SOMNIA)
+├── staking_client.py            # Staking contract (SOMNIA)
+├── routes.py                    # FastAPI blockchain endpoints
+├── README.md                    # This file
+│
+├── edu_chain/                   # EDU Chain NFT contracts
+│   ├── __init__.py
+│   ├── nft_client.py           # NFT badge minting
+│   └── abi/
+│       └── UGMJournalBadges.json
+│
+└── models/                      # Blockchain domain models (future)
 ```
 
 ## 🎯 Purpose
 
 This module handles:
 
-- **CARE Token Operations**: Minting, transfers, balance queries
-- **Revenue Oracle**: Submit monthly revenue reports to blockchain
-- **Staking Contract**: Query TVL, staker positions, profit distributions
+- **CARE Token Operations**: Minting, transfers, balance queries (SOMNIA)
+- **Revenue Oracle**: Submit monthly revenue reports to blockchain (SOMNIA)
+- **Staking Contract**: Query TVL, staker positions, profit distributions (SOMNIA)
+- **NFT Badges**: Mint achievement NFTs for user milestones (EDU Chain)
 - **Web3 Utilities**: Connection management, transaction signing, gas estimation
+- **API Routes**: REST endpoints for blockchain operations
 
 ## 🔧 Base Web3 Client
 
-Located: `app/blockchain/base_web3.py`
+Located: `app/domains/blockchain/base_web3.py`
 
 All blockchain clients extend `BaseWeb3Client` for shared functionality:
 
@@ -43,7 +88,7 @@ All blockchain clients extend `BaseWeb3Client` for shared functionality:
 ### Usage
 
 ```python
-from app.blockchain.base_web3 import BaseWeb3Client
+from app.domains.blockchain.base_web3 import BaseWeb3Client
 
 client = BaseWeb3Client()
 

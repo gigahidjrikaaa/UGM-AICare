@@ -15,7 +15,7 @@ from typing import Optional, Dict, Any
 import os
 import logging
 
-from app.blockchain.base_web3 import BaseWeb3Client
+from app.domains.blockchain.base_web3 import BaseWeb3Client
 
 logger = logging.getLogger(__name__)
 

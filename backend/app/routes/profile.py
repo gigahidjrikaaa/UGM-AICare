@@ -11,7 +11,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.blockchain import mint_nft_badge
+from app.domains.blockchain import mint_nft_badge
 from app.database import get_async_db
 from app.dependencies import get_current_active_user
 from app.models import User, UserBadge  # Core models
