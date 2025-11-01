@@ -48,10 +48,10 @@ google-genai>=1.33.0
 google-api-core>=2.19.0,<3.0.0  # Constrain to avoid excessive backtracking
 googleapis-common-protos>=1.70.0,<2.0.0  # Explicit pin prevents resolver backtracking
 protobuf>=3.20.3,<5.0.0  # Compatible with both google-genai and onnx
-opentelemetry-sdk==1.36.0  # Align OpenTelemetry stack for Langfuse
-opentelemetry-proto==1.36.0
-opentelemetry-exporter-otlp-proto-http==1.36.0
-opentelemetry-exporter-otlp-proto-common==1.36.0
+opentelemetry-sdk==1.35.0  # Align OpenTelemetry stack for Langfuse
+opentelemetry-proto==1.35.0
+opentelemetry-exporter-otlp-proto-http==1.35.0
+opentelemetry-exporter-otlp-proto-common==1.35.0
 
 # LangGraph
 langgraph>=0.2.0,<0.3.0
