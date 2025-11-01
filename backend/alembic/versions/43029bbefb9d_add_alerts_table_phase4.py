@@ -43,7 +43,14 @@ def downgrade() -> None:
 
 def schema_upgrade() -> None:
     """Create alerts table for real-time notifications."""
-    op.create_table(
+    # Get inspector for idempotent checks
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing_tables = inspector.get_table_names()
+    
+    # Create alerts table if it doesn't exist
+    if 'alerts' not in existing_tables:
+        op.create_table(
         'alerts',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column('alert_type', sa.String(50), nullable=False),
@@ -59,16 +66,16 @@ def schema_upgrade() -> None:
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.text('now()')),
         sa.Column('expires_at', sa.DateTime(timezone=True), nullable=True),
     )
-    
-    # Create indexes for efficient queries
-    op.create_index('ix_alerts_alert_type', 'alerts', ['alert_type'])
-    op.create_index('ix_alerts_severity', 'alerts', ['severity'])
-    op.create_index('ix_alerts_entity_id', 'alerts', ['entity_id'])
-    op.create_index('ix_alerts_is_seen', 'alerts', ['is_seen'])
-    op.create_index('ix_alerts_created_at', 'alerts', ['created_at'])
-    
-    # Composite index for common query (unseen alerts ordered by time)
-    op.create_index('ix_alerts_seen_created', 'alerts', ['is_seen', 'created_at'])
+        
+        # Create indexes for efficient queries
+        op.create_index('ix_alerts_alert_type', 'alerts', ['alert_type'])
+        op.create_index('ix_alerts_severity', 'alerts', ['severity'])
+        op.create_index('ix_alerts_entity_id', 'alerts', ['entity_id'])
+        op.create_index('ix_alerts_is_seen', 'alerts', ['is_seen'])
+        op.create_index('ix_alerts_created_at', 'alerts', ['created_at'])
+        
+        # Composite index for common query (unseen alerts ordered by time)
+        op.create_index('ix_alerts_seen_created', 'alerts', ['is_seen', 'created_at'])
 
 
 def schema_downgrade() -> None:

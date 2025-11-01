@@ -51,8 +51,9 @@ def upgrade():
         op.create_index('ix_triage_assessments_severity_level', 'triage_assessments', ['severity_level'])
         op.create_index('ix_triage_assessments_created_at', 'triage_assessments', ['created_at'])
     
-    # 1. Create insights_reports table
-    op.create_table(
+    # 1. Create insights_reports table if it doesn't exist
+    if 'insights_reports' not in existing_tables:
+        op.create_table(
         'insights_reports',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
         sa.Column('report_type', sa.String(50), nullable=False, index=True),
@@ -66,9 +67,12 @@ def upgrade():
         sa.Column('generated_at', sa.DateTime(timezone=True), nullable=False, index=True),
         sa.Column('generated_by', sa.String(100), nullable=False, default='ia_agent'),
     )
+        op.create_index('ix_insights_reports_report_type', 'insights_reports', ['report_type'])
+        op.create_index('ix_insights_reports_generated_at', 'insights_reports', ['generated_at'])
     
-    # 2. Create campaigns table
-    op.create_table(
+    # 2. Create campaigns table if it doesn't exist
+    if 'campaigns' not in existing_tables:
+        op.create_table(
         'campaigns',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
         sa.Column('name', sa.String(255), nullable=False),
@@ -83,9 +87,12 @@ def upgrade():
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now(), onupdate=sa.func.now()),
         sa.Column('last_executed_at', sa.DateTime(timezone=True), nullable=True),
     )
+        op.create_index('ix_campaigns_status', 'campaigns', ['status'])
+        op.create_index('ix_campaigns_created_at', 'campaigns', ['created_at'])
     
-    # 3. Create campaign_triggers table
-    op.create_table(
+    # 3. Create campaign_triggers table if it doesn't exist
+    if 'campaign_triggers' not in existing_tables:
+        op.create_table(
         'campaign_triggers',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
         sa.Column('campaign_id', UUID(as_uuid=True), sa.ForeignKey('campaigns.id', ondelete='CASCADE'), nullable=False, index=True),
@@ -96,9 +103,11 @@ def upgrade():
         sa.Column('last_match_at', sa.DateTime(timezone=True), nullable=True),
         sa.Column('match_count', sa.Integer(), default=0),
     )
+        op.create_index('ix_campaign_triggers_campaign_id', 'campaign_triggers', ['campaign_id'])
     
-    # 4. Create campaign_metrics table
-    op.create_table(
+    # 4. Create campaign_metrics table if it doesn't exist
+    if 'campaign_metrics' not in existing_tables:
+        op.create_table(
         'campaign_metrics',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
         sa.Column('campaign_id', UUID(as_uuid=True), sa.ForeignKey('campaigns.id', ondelete='CASCADE'), nullable=False, index=True),
@@ -110,9 +119,12 @@ def upgrade():
         sa.Column('avg_sentiment_before', sa.Float(), nullable=True),
         sa.Column('avg_sentiment_after', sa.Float(), nullable=True),
     )
+        op.create_index('ix_campaign_metrics_campaign_id', 'campaign_metrics', ['campaign_id'])
+        op.create_index('ix_campaign_metrics_execution_date', 'campaign_metrics', ['execution_date'])
     
-    # 5. Create system_settings table
-    op.create_table(
+    # 5. Create system_settings table if it doesn't exist
+    if 'system_settings' not in existing_tables:
+        op.create_table(
         'system_settings',
         sa.Column('key', sa.String(255), primary_key=True),
         sa.Column('value', JSONB, nullable=False),
@@ -121,9 +133,11 @@ def upgrade():
         sa.Column('updated_by', sa.Integer(), sa.ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now(), onupdate=sa.func.now()),
     )
+        op.create_index('ix_system_settings_category', 'system_settings', ['category'])
     
-    # 6. Create agent_health_logs table
-    op.create_table(
+    # 6. Create agent_health_logs table if it doesn't exist
+    if 'agent_health_logs' not in existing_tables:
+        op.create_table(
         'agent_health_logs',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
         sa.Column('agent_name', sa.String(50), nullable=False, index=True),
@@ -135,9 +149,12 @@ def upgrade():
         sa.Column('error_details', sa.Text(), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now(), index=True),
     )
+        op.create_index('ix_agent_health_logs_agent_name', 'agent_health_logs', ['agent_name'])
+        op.create_index('ix_agent_health_logs_created_at', 'agent_health_logs', ['created_at'])
     
-    # 7. Create case_assignments table (audit trail)
-    op.create_table(
+    # 7. Create case_assignments table (audit trail) if it doesn't exist
+    if 'case_assignments' not in existing_tables:
+        op.create_table(
         'case_assignments',
         sa.Column('id', UUID(as_uuid=True), primary_key=True, default=uuid.uuid4),
         sa.Column('case_id', UUID(as_uuid=True), sa.ForeignKey('cases.id', ondelete='CASCADE'), nullable=False, index=True),
@@ -147,17 +164,22 @@ def upgrade():
         sa.Column('reassignment_reason', sa.Text(), nullable=True),
         sa.Column('previous_assignee', sa.String(255), nullable=True),
     )
+        op.create_index('ix_case_assignments_case_id', 'case_assignments', ['case_id'])
+        op.create_index('ix_case_assignments_assigned_at', 'case_assignments', ['assigned_at'])
     
     # 8. Add indexes to existing cases table for better query performance
-    op.create_index('idx_cases_status', 'cases', ['status'])
-    op.create_index('idx_cases_severity', 'cases', ['severity'])
-    op.create_index('idx_cases_created_at', 'cases', ['created_at'])
-    op.create_index('idx_cases_assigned_to', 'cases', ['assigned_to'])
+    existing_indexes = {idx['name'] for idx in inspector.get_indexes('cases')} if 'cases' in existing_tables else set()
+    if 'idx_cases_status' not in existing_indexes:
+        op.create_index('idx_cases_status', 'cases', ['status'])
+    if 'idx_cases_severity' not in existing_indexes:
+        op.create_index('idx_cases_severity', 'cases', ['severity'])
+    if 'idx_cases_created_at' not in existing_indexes:
+        op.create_index('idx_cases_created_at', 'cases', ['created_at'])
+    if 'idx_cases_assigned_to' not in existing_indexes:
+        op.create_index('idx_cases_assigned_to', 'cases', ['assigned_to'])
     
     # 9. Add conversation_id FK to cases table (optional, for linking cases to conversations)
-    conn = op.get_bind()
-    inspector = sa.inspect(conn)
-    existing_columns = {col['name'] for col in inspector.get_columns('cases')}
+    existing_columns = {col['name'] for col in inspector.get_columns('cases')} if 'cases' in existing_tables else set()
     
     if 'conversation_id' not in existing_columns:
         op.add_column('cases', sa.Column('conversation_id', sa.Integer(), sa.ForeignKey('conversations.id', ondelete='SET NULL'), nullable=True))
@@ -166,15 +188,18 @@ def upgrade():
     # 10. Add additional indexes to triage_assessments for better dashboard query performance
     # (Basic indexes were created with the table above)
     # Only create these additional indexes if they don't exist
-    try:
-        op.create_index('idx_triage_severity_level', 'triage_assessments', ['severity_level'], unique=False)
-    except Exception:
-        pass  # Index may already exist
+    triage_indexes = {idx['name'] for idx in inspector.get_indexes('triage_assessments')} if 'triage_assessments' in existing_tables else set()
+    if 'idx_triage_severity_level' not in triage_indexes:
+        try:
+            op.create_index('idx_triage_severity_level', 'triage_assessments', ['severity_level'], unique=False)
+        except Exception:
+            pass  # Index may already exist
     
-    try:
-        op.create_index('idx_triage_created_at', 'triage_assessments', ['created_at'], unique=False)
-    except Exception:
-        pass  # Index may already exist
+    if 'idx_triage_created_at' not in triage_indexes:
+        try:
+            op.create_index('idx_triage_created_at', 'triage_assessments', ['created_at'], unique=False)
+        except Exception:
+            pass  # Index may already exist
     
     # 11. Insert default system settings
     op.execute("""

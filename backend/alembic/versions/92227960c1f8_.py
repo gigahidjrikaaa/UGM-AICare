@@ -18,7 +18,14 @@ depends_on = None
 
 
 def upgrade():
-    op.create_table(
+    # Get inspector for idempotent checks
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing_tables = inspector.get_table_names()
+    
+    # Create users table if it doesn't exist
+    if 'users' not in existing_tables:
+        op.create_table(
         'users',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('google_sub', sa.String(), nullable=True),
@@ -49,11 +56,11 @@ def upgrade():
         sa.Column('allow_email_checkins', sa.Boolean(), server_default='true', nullable=False),
         sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
-    op.create_index(op.f('ix_users_google_sub'), 'users', ['google_sub'], unique=True)
-    op.create_index(op.f('ix_users_twitter_id'), 'users', ['twitter_id'], unique=True)
-    op.create_index(op.f('ix_users_wallet_address'), 'users', ['wallet_address'], unique=True)
-    op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
+        op.create_index(op.f('ix_users_email'), 'users', ['email'], unique=True)
+        op.create_index(op.f('ix_users_google_sub'), 'users', ['google_sub'], unique=True)
+        op.create_index(op.f('ix_users_twitter_id'), 'users', ['twitter_id'], unique=True)
+        op.create_index(op.f('ix_users_wallet_address'), 'users', ['wallet_address'], unique=True)
+        op.create_index(op.f('ix_users_id'), 'users', ['id'], unique=False)
 
 
 def downgrade():

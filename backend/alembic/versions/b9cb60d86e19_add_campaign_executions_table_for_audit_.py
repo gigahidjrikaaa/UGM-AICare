@@ -37,7 +37,14 @@ def downgrade() -> None:
 
 
 def schema_upgrade() -> None:
-    op.create_table(
+    # Get inspector for idempotent checks
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing_tables = inspector.get_table_names()
+    
+    # Create sca_campaign_executions table if it doesn't exist
+    if 'sca_campaign_executions' not in existing_tables:
+        op.create_table(
         'sca_campaign_executions',
         sa.Column('id', postgresql.UUID(as_uuid=True), primary_key=True, server_default=sa.text('gen_random_uuid()')),
         sa.Column('campaign_id', postgresql.UUID(as_uuid=True), nullable=False),
@@ -55,10 +62,10 @@ def schema_upgrade() -> None:
         sa.ForeignKeyConstraint(['campaign_id'], ['campaigns.id'], ondelete='CASCADE'),
         sa.ForeignKeyConstraint(['executed_by'], ['users.id'], ondelete='SET NULL'),
     )
-    
-    # Create indexes for efficient querying
-    op.create_index('ix_sca_campaign_executions_campaign_id', 'sca_campaign_executions', ['campaign_id'])
-    op.create_index('ix_sca_campaign_executions_executed_at', 'sca_campaign_executions', ['executed_at'])
+        
+        # Create indexes for efficient querying
+        op.create_index('ix_sca_campaign_executions_campaign_id', 'sca_campaign_executions', ['campaign_id'])
+        op.create_index('ix_sca_campaign_executions_executed_at', 'sca_campaign_executions', ['executed_at'])
 
 
 def schema_downgrade() -> None:

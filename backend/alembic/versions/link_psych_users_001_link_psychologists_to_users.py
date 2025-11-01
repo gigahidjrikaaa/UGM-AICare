@@ -17,38 +17,62 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Add user_id column to psychologists table
-    op.add_column('psychologists', sa.Column('user_id', sa.Integer(), nullable=True))
+    # Make migration idempotent - check column existence before adding
+    conn = op.get_bind()
+    inspector = sa.inspect(conn)
+    existing_columns = {col['name'] for col in inspector.get_columns('psychologists')}
+    
+    # Add columns only if they don't exist
+    if 'user_id' not in existing_columns:
+        op.add_column('psychologists', sa.Column('user_id', sa.Integer(), nullable=True))
     
     # Add extended profile fields
-    op.add_column('psychologists', sa.Column('bio', sa.Text(), nullable=True))
-    op.add_column('psychologists', sa.Column('education', sa.JSON(), nullable=True))
-    op.add_column('psychologists', sa.Column('certifications', sa.JSON(), nullable=True))
-    op.add_column('psychologists', sa.Column('years_of_experience', sa.Integer(), nullable=True))
-    op.add_column('psychologists', sa.Column('languages', sa.JSON(), nullable=True))
-    op.add_column('psychologists', sa.Column('consultation_fee', sa.Float(), nullable=True))
-    op.add_column('psychologists', sa.Column('availability_schedule', sa.JSON(), nullable=True))
-    op.add_column('psychologists', sa.Column('rating', sa.Float(), default=0.0, nullable=True))
-    op.add_column('psychologists', sa.Column('total_reviews', sa.Integer(), default=0, nullable=True))
-    op.add_column('psychologists', sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True))
-    op.add_column('psychologists', sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True))
+    if 'bio' not in existing_columns:
+        op.add_column('psychologists', sa.Column('bio', sa.Text(), nullable=True))
+    if 'education' not in existing_columns:
+        op.add_column('psychologists', sa.Column('education', sa.JSON(), nullable=True))
+    if 'certifications' not in existing_columns:
+        op.add_column('psychologists', sa.Column('certifications', sa.JSON(), nullable=True))
+    if 'years_of_experience' not in existing_columns:
+        op.add_column('psychologists', sa.Column('years_of_experience', sa.Integer(), nullable=True))
+    if 'languages' not in existing_columns:
+        op.add_column('psychologists', sa.Column('languages', sa.JSON(), nullable=True))
+    if 'consultation_fee' not in existing_columns:
+        op.add_column('psychologists', sa.Column('consultation_fee', sa.Float(), nullable=True))
+    if 'availability_schedule' not in existing_columns:
+        op.add_column('psychologists', sa.Column('availability_schedule', sa.JSON(), nullable=True))
+    if 'rating' not in existing_columns:
+        op.add_column('psychologists', sa.Column('rating', sa.Float(), default=0.0, nullable=True))
+    if 'total_reviews' not in existing_columns:
+        op.add_column('psychologists', sa.Column('total_reviews', sa.Integer(), default=0, nullable=True))
+    if 'created_at' not in existing_columns:
+        op.add_column('psychologists', sa.Column('created_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True))
+    if 'updated_at' not in existing_columns:
+        op.add_column('psychologists', sa.Column('updated_at', sa.DateTime(), server_default=sa.text('now()'), nullable=True))
     
-    # Create foreign key constraint
-    op.create_foreign_key(
-        'fk_psychologists_user_id', 
-        'psychologists', 
-        'users', 
-        ['user_id'], 
-        ['id'],
-        ondelete='CASCADE'
-    )
+    # Check if foreign key exists before creating
+    existing_fks = {fk['name'] for fk in inspector.get_foreign_keys('psychologists')}
+    if 'fk_psychologists_user_id' not in existing_fks:
+        op.create_foreign_key(
+            'fk_psychologists_user_id', 
+            'psychologists', 
+            'users', 
+            ['user_id'], 
+            ['id'],
+            ondelete='CASCADE'
+        )
     
-    # Create unique constraint on user_id (one user can have only one psychologist profile)
-    op.create_unique_constraint('uq_psychologists_user_id', 'psychologists', ['user_id'])
+    # Check if unique constraint exists before creating
+    existing_constraints = {c['name'] for c in inspector.get_unique_constraints('psychologists')}
+    if 'uq_psychologists_user_id' not in existing_constraints:
+        op.create_unique_constraint('uq_psychologists_user_id', 'psychologists', ['user_id'])
     
-    # Create index for faster lookups
-    op.create_index('ix_psychologists_user_id', 'psychologists', ['user_id'])
-    op.create_index('ix_psychologists_is_available', 'psychologists', ['is_available'])
+    # Check if indexes exist before creating
+    existing_indexes = {idx['name'] for idx in inspector.get_indexes('psychologists')}
+    if 'ix_psychologists_user_id' not in existing_indexes:
+        op.create_index('ix_psychologists_user_id', 'psychologists', ['user_id'])
+    if 'ix_psychologists_is_available' not in existing_indexes:
+        op.create_index('ix_psychologists_is_available', 'psychologists', ['is_available'])
 
 
 def downgrade() -> None:

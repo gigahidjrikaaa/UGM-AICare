@@ -6,7 +6,7 @@ import logging
 from typing import Any, Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -279,7 +279,7 @@ async def mark_multiple_seen(
         )
 
 
-@router.delete("/{alert_id}", status_code=status.HTTP_204_NO_CONTENT, response_class=Response)
+@router.delete("/{alert_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_alert(
     alert_id: UUID,
     db: AsyncSession = Depends(get_async_db),
@@ -299,7 +299,7 @@ async def delete_alert(
                 detail=f"Alert {alert_id} not found"
             )
         
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
+        # No return needed for 204 No Content - FastAPI will handle it
 
     except HTTPException:
         raise

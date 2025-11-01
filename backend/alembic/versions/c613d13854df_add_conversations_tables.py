@@ -17,8 +17,14 @@ depends_on = None
 
 
 def upgrade():
-    # Create conversations table
-    op.create_table('conversations',
+    # Get inspector for idempotent checks
+    bind = op.get_bind()
+    inspector = sa.inspect(bind)
+    existing_tables = inspector.get_table_names()
+    
+    # Create conversations table if it doesn't exist
+    if 'conversations' not in existing_tables:
+        op.create_table('conversations',
         sa.Column('id', sa.Integer(), nullable=False),
         sa.Column('user_id', sa.Integer(), nullable=False),
         sa.Column('session_id', sa.String(), nullable=False),
@@ -29,12 +35,13 @@ def upgrade():
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
         sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_conversations_id'), 'conversations', ['id'], unique=False)
-    op.create_index(op.f('ix_conversations_session_id'), 'conversations', ['session_id'], unique=False)
-    op.create_index(op.f('ix_conversations_conversation_id'), 'conversations', ['conversation_id'], unique=False)
+        op.create_index(op.f('ix_conversations_id'), 'conversations', ['id'], unique=False)
+        op.create_index(op.f('ix_conversations_session_id'), 'conversations', ['session_id'], unique=False)
+        op.create_index(op.f('ix_conversations_conversation_id'), 'conversations', ['conversation_id'], unique=False)
 
-    # Create user_summaries table
-    op.create_table('user_summaries',
+    # Create user_summaries table if it doesn't exist
+    if 'user_summaries' not in existing_tables:
+        op.create_table('user_summaries',
         sa.Column('id', sa.Integer(), nullable=False, autoincrement=True),
         sa.Column('user_id', sa.Integer(), nullable=False),
         sa.Column('summarized_session_id', sa.String(), nullable=True),
@@ -43,8 +50,8 @@ def upgrade():
         sa.ForeignKeyConstraint(['user_id'], ['users.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('id')
     )
-    op.create_index(op.f('ix_user_summaries_user_id'), 'user_summaries', ['user_id'], unique=False)
-    op.create_index(op.f('ix_user_summaries_summarized_session_id'), 'user_summaries', ['summarized_session_id'], unique=False)
+        op.create_index(op.f('ix_user_summaries_user_id'), 'user_summaries', ['user_id'], unique=False)
+        op.create_index(op.f('ix_user_summaries_summarized_session_id'), 'user_summaries', ['summarized_session_id'], unique=False)
 
 
 def downgrade():
