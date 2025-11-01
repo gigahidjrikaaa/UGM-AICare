@@ -98,8 +98,6 @@
 
 **Added Blockchain Libraries:**
 - ✅ `web3>=6.0.0` - Ethereum/SOMNIA interaction
-- ✅ `eth-account>=0.10.0` - Account management
-- ✅ `eth-utils>=2.0.0` - Utility functions
 
 ---
 

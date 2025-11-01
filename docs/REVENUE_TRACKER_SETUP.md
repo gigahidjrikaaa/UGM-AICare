@@ -86,11 +86,10 @@ ENABLE_REVENUE_SCHEDULER=true
 cd backend
 
 # Install Python packages
-pip install web3 eth-account apscheduler
+pip install web3 apscheduler
 
 # Or add to requirements.txt
 echo "web3>=6.0.0" >> requirements.txt
-echo "eth-account>=0.9.0" >> requirements.txt
 echo "apscheduler>=3.10.0" >> requirements.txt
 
 pip install -r requirements.txt

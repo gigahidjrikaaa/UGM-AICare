@@ -585,15 +585,12 @@ except Exception as e:
 # Keep these (compatible with new SDK)
   google-api-core>=2.19.0,<3.0.0
   protobuf>=3.20.3,<5.0.0
-  
-- langchain-google-genai>=2.0.0,<3.0.0  # May need update
-+ langchain-google-genai>=2.0.0,<3.0.0  # Check compatibility
 ```
 
 **Action Items:**
 
 - ✅ Update `google-generativeai` to `google-genai`
-- ⚠️ Verify LangChain compatibility with new SDK
+- ⚠️ Verify LangGraph orchestration still works with the new SDK
 - ✅ Test all dependencies resolve without conflicts
 
 ---
@@ -1180,15 +1177,14 @@ else:
 - Monitor API response times in production
 - Optimize if needed (caching, batching)
 
-### Risk 3: LangChain Compatibility Issues
+### Risk 3: LangGraph Integration Issues
 
 **Probability:** MEDIUM  
 **Impact:** MEDIUM  
 **Mitigation:**
 
-- Check `langchain-google-genai` compatibility with new SDK
 - Test LangGraph orchestration after migration
-- May need to update LangChain package
+- Ensure our LangGraph helpers remain aligned with SDK changes
 
 ### Risk 4: Unexpected API Differences
 

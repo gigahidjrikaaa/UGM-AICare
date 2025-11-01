@@ -84,7 +84,7 @@ npx hardhat run scripts/testCareToken.ts --network somniaTestnet
 cd ../backend
 
 # Install blockchain dependencies
-pip install web3>=6.0.0 eth-account>=0.10.0 eth-utils>=2.0.0
+pip install web3>=6.0.0
 
 # Update backend/.env with:
 # CARE_TOKEN_ADDRESS=<contract_address>
@@ -163,7 +163,7 @@ npm run dev
 - [ ] Backend wallet created and private key saved
 - [ ] MINTER_ROLE granted to backend wallet
 - [ ] Test script passes all 5 tests
-- [ ] Backend dependencies installed (web3, eth-account, eth-utils)
+- [ ] Backend dependencies installed (web3)
 - [ ] Backend API endpoints return correct data
 - [ ] Frontend displays token balance
 - [ ] Users can connect wallet

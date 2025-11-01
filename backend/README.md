@@ -70,7 +70,7 @@ backend/
 │   │   ├── orchestrator_graph_service.py  # Orchestrator service wrapper
 │   │   └── execution_tracker.py       # Real-time execution monitoring
 │   ├── core/
-│   │   ├── llm.py          # Gemini 2.5 API provider via LangChain
+│   │   ├── llm.py          # Gemini 2.5 API provider wired directly via LangGraph
 │   │   ├── memory.py       # Conversation memory and LangGraph orchestration
 │   │   └── policy.py       # Redaction + consent policy helpers (in progress)
 │   ├── database/           # Async SQLAlchemy session and migrations helpers
@@ -92,7 +92,7 @@ backend/
 
 ## Tech Stack & Integrations
 
-- **Runtime:** Python 3.11+ with FastAPI, asynchronous SQLAlchemy, and LangChain
+- **Runtime:** Python 3.11+ with FastAPI, asynchronous SQLAlchemy, and LangGraph
 - **Data Layer:** PostgreSQL, Redis (session state + feature flags), deterministic hashing for privacy
 - **LLM Providers:** Google Gemini (hosted) and optional Gemma 3 runtime wired through `core/llm.py`
 - **Authentication & Sessions:** JWT validation, NextAuth sync endpoints, Redis for sessions

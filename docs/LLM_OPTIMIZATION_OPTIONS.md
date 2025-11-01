@@ -194,9 +194,6 @@ class ONNXSemanticClassifier:
 - anthropic==0.5.0
 - 
 - google-generativeai
-- langchain
-- langchain-core
-- langchain-google-genai
 - langgraph
 - 
 - # Semantic Similarity for Crisis Detection
@@ -208,9 +205,6 @@ class ONNXSemanticClassifier:
 + anthropic==0.5.0
 + 
 + google-generativeai
-+ langchain
-+ langchain-core
-+ langchain-google-genai
 + langgraph
 + 
 + # ONNX Runtime for Crisis Detection (3-5x faster, 80% smaller than PyTorch)

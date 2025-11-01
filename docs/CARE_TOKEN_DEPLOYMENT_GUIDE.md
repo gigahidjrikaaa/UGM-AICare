@@ -180,7 +180,7 @@ CARE_TOKEN_NETWORK=testnet
 
 ```bash
 cd backend
-pip install web3 eth-account eth-utils
+pip install web3
 ```
 
 ### 4.3: Register CARE Token Routes

@@ -95,7 +95,7 @@ SOMNIA_RPC_URL=https://dream-rpc.somnia.network/
 
 ```bash
 cd backend
-pip install web3 eth-account
+pip install web3
 ```
 
 3. **Test connection:**

@@ -170,7 +170,7 @@ SOMNIA verification may require custom setup. Check the official docs:
 #### Install Dependencies
 
 ```bash
-pip install web3 eth-account python-dotenv
+pip install web3 python-dotenv
 ```
 
 #### Configuration

@@ -99,7 +99,7 @@ Analytics Queries → IA (Privacy-Preserving Aggregation) → END
 
 ## 3. Technical Architecture Snapshot
 
-### Backend Platform (FastAPI + LangChain + LangGraph)
+### Backend Platform (FastAPI + LangGraph)
 
 - **Target Structure:** `backend/app/agents/{sta,sca,sda,ia}/` packages with LangGraph StateGraph implementations
   - Each agent has: `*_graph.py` (StateGraph definition), `*_graph_service.py` (service wrapper), `service.py` (core logic)

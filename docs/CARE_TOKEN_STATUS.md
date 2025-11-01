@@ -196,7 +196,7 @@ npx hardhat run scripts/testCareToken.ts --network somniaTestnet
 cd ../backend
 
 # Install dependencies
-pip install web3>=6.0.0 eth-account>=0.10.0 eth-utils>=2.0.0
+pip install web3>=6.0.0
 
 # Update .env with backend wallet private key:
 MINTER_PRIVATE_KEY=<your_backend_wallet_private_key>
@@ -413,7 +413,7 @@ cd backend && uvicorn app.main:app --reload
 cd frontend && npm run dev
 
 # Install backend dependencies
-pip install web3 eth-account eth-utils
+pip install web3
 
 # Install frontend dependencies
 npm install wagmi viem @rainbow-me/rainbowkit

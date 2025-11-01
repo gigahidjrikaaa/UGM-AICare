@@ -141,7 +141,7 @@ The plan is structured in phases so it can be consumed by humans and orchestrati
   5. **Metadata & ACLs:** Implement taxonomy configuration with required fields; integrate RBAC to define per-resource ACLs; support sensitivity tags.
   6. **Index Lifecycle:** Adopt blue/green pattern with Pinecone namespaces; enable re-embed diffs by comparing hash of normalized text; track index version per deployment.
   7. **PII Toggle & Eval:** Add PII redaction module (e.g., Presidio) with preview; allow upload of evaluation CSVs (question, answer, expected chunk IDs) and display hit@k + latency chart.
-- **Integration Notes:** Introduce `sources`, `documents`, `artifacts`, `chunks`, `embeddings` tables; maintain ORM relationships. Utilize `langchain.text_splitter` or custom chunkers for flexible strategies.
+- **Integration Notes:** Introduce `sources`, `documents`, `artifacts`, `chunks`, `embeddings` tables; maintain ORM relationships. Utilize LangGraph-friendly or custom chunkers for flexible strategies.
 
 ### Phase 2 – Advanced Ingestion & Compliance (Weeks 7–12)
 
@@ -187,9 +187,9 @@ The plan is structured in phases so it can be consumed by humans and orchestrati
 
 | Capability | Suggested Tooling | Notes |
 |------------|-------------------|-------|
-| Connectors | Airbyte, LangChain connectors, custom OAuth apps | Store credentials in Vault/Key Vault; use webhooks for refresh. |
+| Connectors | Airbyte, custom connector workers, custom OAuth apps | Store credentials in Vault/Key Vault; use webhooks for refresh. |
 | Normalization | `unstructured`, Apache Tika, `pytesseract`, OpenAI Whisper | Abstract behind async tasks so formats can be added incrementally. |
-| Chunking | Custom strategy registry + `langchain` splitters | Persist anchor metadata (page, row, timestamp) in `chunks` table. |
+| Chunking | Custom strategy registry + LangGraph-compatible splitters | Persist anchor metadata (page, row, timestamp) in `chunks` table. |
 | PII/Compliance | Microsoft Presidio, AWS Comprehend, custom regex taxonomy | Surface redaction preview UI with diff highlighting. |
 | Scheduling | n8n (already in stack), Celery beat, or Temporal | Align with existing orchestration preference. |
 | Vector Index | Pinecone (existing), optional pgvector for metadata | Namespaces per index type; add metadata filters for ACLs and sensitivity. |

@@ -253,7 +253,7 @@ Organized with npm/yarn workspaces for streamlined dependency management across 
 - **Database Migrations:** Alembic for version-controlled schema changes
 - **Database:** PostgreSQL with asyncpg driver
 - **Caching/Session State:** Redis (via `redis-py` asyncio)
-- **AI/ML Framework:** LangChain with LangGraph for multi-agent orchestration
+- **AI/ML Framework:** LangGraph for multi-agent orchestration
 - **Crisis Detection ML:** ONNX Runtime with sentence-transformers model (paraphrase-multilingual-MiniLM-L12-v2)
 - **ML Inference:** 15-30ms latency with 96% smaller dependencies vs PyTorch
 - **LLM Provider:** Google Gemini 2.5 API (primary model for all agents)
