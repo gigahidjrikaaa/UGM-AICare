@@ -284,7 +284,7 @@ async def delete_alert(
     alert_id: UUID,
     db: AsyncSession = Depends(get_async_db),
     current_user: User = Depends(get_admin_user)
-) -> None:
+):
     """Delete an alert.
     
     **Admin only** - Requires admin role.
