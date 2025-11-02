@@ -265,6 +265,20 @@ else
   exit 1
 fi
 
+# 5.5. Initialize production admin and counselor accounts
+echo "[deploy.sh] Initializing production accounts (admin & counselor)..."
+# This ensures admin and counselor accounts exist with correct credentials
+# Even if the database was freshly created or credentials changed
+if docker compose -f infra/compose/docker-compose.prod.yml exec -T backend \
+  python scripts/init_production_accounts.py; then
+  echo "[deploy.sh] Production accounts initialized successfully."
+else
+  echo "[deploy.sh] WARNING: Production account initialization failed!"
+  echo "[deploy.sh] You may need to manually create admin/counselor accounts."
+  echo "[deploy.sh] Run: docker compose -f infra/compose/docker-compose.prod.yml exec backend python scripts/init_production_accounts.py"
+  # Don't exit - this is not critical enough to stop deployment
+fi
+
 # 6. Health check endpoints
 echo "[deploy.sh] Performing health checks..."
 # Best Practice Health Checks:
