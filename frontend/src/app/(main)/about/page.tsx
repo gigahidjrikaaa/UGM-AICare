@@ -8,7 +8,7 @@ import ParticleBackground from '@/components/ui/ParticleBackground';
 
 export default function AboutPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] py-10 px-4 sm:px-6">
+    <div className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] pt-24 pb-10 px-4 sm:px-6">
         <div className="absolute inset-0 z-0 opacity-40">
             <ParticleBackground count={70} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={1} />
         </div>

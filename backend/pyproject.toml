@@ -26,11 +26,11 @@ addopts = [
 # Markers for categorizing tests
 markers = [
     "unit: Unit tests for individual functions/methods",
-    "integration: Integration tests for API endpoints",
+    "integration: Integration tests with external services (Gemini API, Redis)",
     "e2e: End-to-end tests for complete workflows",
-    "slow: Tests that take longer to run",
+    "slow: Tests that take longer to run (>1 second)",
     "auth: Authentication and authorization tests",
-    "agents: Safety Agent Suite tests",
+    "agents: Safety Agent Suite tests (STA, SCA, SDA, IA)",
     "database: Database operation tests",
     "security: Security-related tests",
     "privacy: Privacy and consent tests",

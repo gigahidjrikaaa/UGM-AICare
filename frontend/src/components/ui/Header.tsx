@@ -51,8 +51,8 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
     <>
       <header className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-700 ease-out ${
         scrolled 
-          ? "bg-white/8 backdrop-blur-2xl border-white/15 shadow-xl shadow-black/5" 
-          : "bg-white/3 backdrop-blur-xl border-white/8"
+          ? "bg-white/10 backdrop-blur-2xl border-white/20 shadow-xl shadow-black/5" 
+          : "bg-white/5 backdrop-blur-xl border-white/10"
       } border-b border-solid`}>
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-2 flex items-center justify-between">
           <div className="flex items-center gap-3">

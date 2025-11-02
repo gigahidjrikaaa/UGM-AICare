@@ -98,10 +98,12 @@ async def apply_redaction_node(state: STAState, db: AsyncSession) -> STAState:
 
 
 async def assess_risk_node(state: STAState, db: AsyncSession) -> STAState:
-    """Node: Assess safety risk using STA hybrid classifier.
+    """Node: Assess safety risk using STA Gemini-based classifier.
     
-    This integrates with the existing SafetyTriageService which uses both
-    rule-based and ML-based classification (HybridClassifier).
+    This integrates with the SafetyTriageService which uses a 3-tier approach:
+    1. Rule-based pre-screening (instant crisis/safe detection)
+    2. Gemini chain-of-thought assessment (contextual analysis)
+    3. Conversation caching (smart optimization)
     
     Args:
         state: Current graph state

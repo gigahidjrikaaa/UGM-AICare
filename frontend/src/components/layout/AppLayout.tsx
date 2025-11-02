@@ -86,12 +86,8 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <Header onToggleSidebar={toggleSidebar}/>
         </NoSsr>
 
-        {/* Content area with top padding for header */}
-        <main className={cn(
-          "flex-grow relative overflow-auto",
-          // Add top padding for sticky header on standard pages, skip for full-screen pages
-          !isFullScreenPage && "pt-16"
-        )}>
+        {/* Content area - no padding, content flows naturally behind glassmorphic header */}
+        <main className="flex-grow relative overflow-auto">
             <div className="min-h-screen">
               {children}
             </div>

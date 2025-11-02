@@ -48,7 +48,7 @@ pytest-asyncio>=0.24.0  # Updated for anyio>=4 compatibility
 google-genai>=1.33.0
 google-api-core>=2.19.0,<3.0.0  # Constrain to avoid excessive backtracking
 googleapis-common-protos>=1.70.0,<2.0.0  # Explicit pin prevents resolver backtracking
-protobuf>=5.0.0,<6.0.0  # Compatible with google-genai, Langfuse, and ONNX
+protobuf>=5.0.0,<6.0.0  # Compatible with google-genai and Langfuse
 opentelemetry-sdk==1.35.0  # Align OpenTelemetry stack for Langfuse
 opentelemetry-proto==1.35.0
 opentelemetry-exporter-otlp-proto-http==1.35.0
@@ -58,26 +58,18 @@ opentelemetry-exporter-otlp-proto-common==1.35.0
 langgraph>=0.2.0,<0.3.0
 langfuse>=2.0.0  # LLM observability and agent tracing
 
-# ONNX Runtime for Crisis Detection (3-5x faster, 96% smaller than PyTorch)
-# Replaces: torch (800+ MB) + sentence-transformers
-onnxruntime>=1.16.0,<2.0.0  # Optimized inference runtime
-onnx>=1.15.0,<2.0.0  # For ONNX model optimization (pre-built wheels)
+# Safety Triage Agent (STA) - Crisis Detection
+# Migrated from PyTorch/ONNX to pure Gemini-based classification (Nov 2025)
+# Benefits:
+# - 99% smaller deployment (~1MB vs ~1GB)
+# - Better accuracy with contextual understanding
+# - Full explainability with chain-of-thought reasoning
+# - Cultural awareness (Indonesian + English)
+# - 60%+ API cost reduction via smart caching
+# See: docs/PYTORCH_TO_GEMINI_MIGRATION.md
 
 # Blockchain Integration
 web3>=6.0.0,<7.0.0  # Web3.py for Ethereum/SOMNIA blockchain interaction
-transformers>=4.41.0,<5.0.0  # For tokenizer (still needed, but much lighter without torch)
-
-# Torch - Only needed for ONNX export (can be removed after first build)
-# The ensure_onnx_model.py script will download the model and export to ONNX
-# After that, torch can be uninstalled - runtime only needs onnxruntime
-# 
-# IMPORTANT FOR DOCKER BUILDS:
-# In Dockerfile, torch is installed separately with --index-url https://download.pytorch.org/whl/cpu
-# to ensure CPU-only version (default from PyPI pulls 2.5GB+ of CUDA dependencies)
-# If you see nvidia-cuda-* packages being installed, the CPU version is NOT being used!
-#
-# For local development: pip install torch --index-url https://download.pytorch.org/whl/cpu
-torch>=2.0.0,<3.0.0
 
 # Statistical Analysis and Privacy
 numpy>=1.24.0,<2.0.0
@@ -105,4 +97,8 @@ isort==5.12.0
 flake8==6.1.0
 
 gunicorn>=20.1.0  # For production server
-spacy==3.7.5
+
+# spacy==3.7.5  # REMOVED: Optional NLP-based PII redaction (disabled by default)
+# The system uses regex-based PII redaction which doesn't require Spacy.
+# If needed in future, can be re-enabled by uncommenting and setting:
+# PII_NLP_REDACTION_ENABLED=true

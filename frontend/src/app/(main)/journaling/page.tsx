@@ -112,7 +112,7 @@ export default function JournalingPage() {
     };
 
     return (
-        <div className="bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white p-4 md:p-6 flex flex-col flex-1">
+        <div className="bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white pt-24 pb-6 px-4 md:px-6 flex flex-col flex-1">
             <h1 className="text-2xl font-bold mb-4 sm:mb-6"> {/* Adjusted margin */}
                 <span className="text-[#FFCA40]">Aika</span> Journal
             </h1>

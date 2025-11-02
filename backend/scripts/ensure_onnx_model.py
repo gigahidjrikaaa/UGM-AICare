@@ -1,6 +1,26 @@
 #!/usr/bin/env python3
 """
-Ensure ONNX model exists - auto-build if missing.
+[DEPRECATED] Ensure ONNX model exists - auto-build if missing.
+
+⚠️  THIS SCRIPT IS NO LONGER USED ⚠️
+
+As of November 2025, the Safety Triage Agent has been migrated from 
+PyTorch/ONNX to a pure Gemini-based approach with smart caching.
+
+This script is kept for reference only.
+
+Migration Details:
+- Old: PyTorch/ONNX ML classifiers (~1GB deployment size)
+- New: Gemini API with 3-tier optimization (~1MB deployment size)
+- See: docs/PYTORCH_TO_GEMINI_MIGRATION.md
+
+If you see errors related to ONNX models, please update your code to use
+the new GeminiSTAClassifier instead:
+    from app.agents.sta.gemini_classifier import GeminiSTAClassifier
+
+---
+
+ORIGINAL DOCUMENTATION (DEPRECATED):
 
 This script checks if the ONNX model exists, and if not, automatically
 downloads and exports it. Perfect for CI/CD and Docker builds.
@@ -17,6 +37,12 @@ Features:
 """
 import sys
 from pathlib import Path
+
+print("⚠️  WARNING: This script is DEPRECATED")
+print("   The STA now uses Gemini API instead of ONNX models.")
+print("   See: docs/PYTORCH_TO_GEMINI_MIGRATION.md")
+print("")
+sys.exit(1)
 
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent.parent))

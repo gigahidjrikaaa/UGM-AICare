@@ -200,12 +200,23 @@ case "${1:-}" in
         echo "🧹 Clean rebuild (no cache, parallel build)..."
         echo "   Warning: This will take longer but ensures a fresh build"
         echo ""
+        echo "🗑️  Cleaning Docker cache..."
+        # Remove dangling images
+        docker image prune -f
+        # Remove build cache
+        docker builder prune -f
+        echo "✅ Docker cache cleaned"
+        echo ""
+        echo "🔨 Building with no cache..."
         COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 docker-compose -f "$COMPOSE_FILE" build --parallel --no-cache backend frontend
         echo ""
         echo "🚀 Restarting services..."
         docker-compose -f "$COMPOSE_FILE" up -d backend frontend
         echo ""
         echo "✅ Clean rebuild complete!"
+        echo "   • Docker cache cleared"
+        echo "   • Images rebuilt from scratch"
+        echo "   • Services restarted"
         ;;
     
     test-build)

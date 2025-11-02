@@ -230,7 +230,7 @@ export default function DashboardPage() {
   if (profileLoading) {
     return (
       <main className="min-h-screen text-white">
-        <div className="mx-auto max-w-6xl px-4 py-20">
+        <div className="mx-auto max-w-6xl px-4 pt-24 pb-12">
           <div className="space-y-6">
             <div className="h-32 animate-pulse rounded-3xl bg-white/5" />
             <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -258,7 +258,7 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen text-white">
-      <div className="mx-auto max-w-6xl px-4 py-12 space-y-10">
+      <div className="mx-auto max-w-6xl px-4 pt-24 pb-12 space-y-10">
         <header className="rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="space-y-6">

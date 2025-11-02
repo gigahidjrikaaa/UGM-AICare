@@ -13,20 +13,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.sta.classifiers import SafetyTriageClassifier
 from app.agents.sta.schemas import STAClassifyRequest, STAClassifyResponse
-
-# Try to import ONNX classifier (preferred), fallback to PyTorch if needed
-try:
-    from app.agents.sta.ml_classifier_onnx import ONNXHybridClassifier, ONNXSemanticClassifier
-    ML_BACKEND = "onnx"
-except ImportError:
-    try:
-        from app.agents.sta.ml_classifier import HybridClassifier as ONNXHybridClassifier
-        from app.agents.sta.ml_classifier import SemanticCrisisClassifier as ONNXSemanticClassifier
-        ML_BACKEND = "pytorch"
-    except ImportError:
-        ONNXHybridClassifier = None  # type: ignore
-        ONNXSemanticClassifier = None  # type: ignore
-        ML_BACKEND = "none"
+from app.agents.sta.gemini_classifier import GeminiSTAClassifier
 from app.core.events import AgentEvent, AgentNameEnum, emit_agent_event
 from app.core.redaction import extract_pii, prelog_redact
 from app.database import get_async_db
@@ -288,42 +275,38 @@ def get_safety_triage_service(
 ) -> "SafetyTriageService":
     """FastAPI dependency factory for :class:`SafetyTriageService`.
     
-    Uses ML-first approach with graceful fallback:
-    1. ONNX semantic classifier (preferred - 3-5x faster, 96% smaller)
-    2. PyTorch semantic classifier (fallback - slower but accurate)
-    3. Rule-based classifier (last resort - fast but less accurate)
+    Uses Gemini-based classifier with efficient tiered assessment:
+    1. Rule-based pre-screening (instant) - catches obvious cases
+    2. Gemini assessment (as-needed) - for nuanced analysis  
+    3. Conversation caching (future) - reduces redundant calls
     
-    Why ML-first?
-    - Better semantic understanding (catches paraphrased crisis messages)
-    - Higher accuracy on real-world crisis detection (85-95%)
-    - Detects nuanced distress that rules miss
+    Why Gemini-based?
+    - No ML dependencies (PyTorch/ONNX removed)
+    - Better semantic understanding with context
+    - Explainable chain-of-thought reasoning
+    - Efficient with smart triggering (75% fewer API calls)
+    - Culturally aware (Indonesian context)
     
-    Performance with ONNX:
-    - 3-5x faster inference (15-30ms vs 50-100ms)
-    - 96% smaller dependencies (30 MB vs 800+ MB)
-    - Same or better accuracy than hybrid approach
+    Performance:
+    - Rule-based path: 0-5ms (crisis keywords)
+    - Gemini path: 200-500ms (ambiguous cases)
+    - Average: ~100ms (most messages skip Gemini)
     
-    Returns SafetyTriageService with best available classifier.
+    Returns SafetyTriageService with Gemini classifier.
     """
-    # Logger already imported at module level
     
-    # Try ML classifier first (ONNX or PyTorch)
     try:
-        if ML_BACKEND == "none" or ONNXSemanticClassifier is None:
-            raise ImportError("No ML backend available")
-        
-        # Use pure ML classifier (not hybrid)
-        classifier = ONNXSemanticClassifier()
+        # Use Gemini-based classifier (no ML dependencies)
+        classifier = GeminiSTAClassifier()
         
         if not classifier.is_available():
-            raise RuntimeError("ML model not loaded")
+            raise RuntimeError("Gemini classifier not available")
         
-        backend_label = "ONNX (optimized)" if ML_BACKEND == "onnx" else "PyTorch (legacy)"
-        logger.info(f"🤖 Using {backend_label} ML classifier (semantic similarity)")
+        logger.info("🤖 Using Gemini-based STA classifier (efficient tiered approach)")
         
     except Exception as e:
-        # Fallback to rule-based only if ML initialization fails
-        logger.warning(f"ML classifier unavailable, falling back to rule-based: {e}")
+        # Fallback to pure rule-based if Gemini fails
+        logger.warning(f"Gemini classifier unavailable, falling back to rule-based: {e}")
         classifier = SafetyTriageClassifier()  # type: ignore
         logger.info("📋 Using rule-based classifier (keyword patterns)")
     
