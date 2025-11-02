@@ -6,14 +6,15 @@ FROM python:3.11-slim-bookworm as builder
 
 WORKDIR /app
 
-# Install essential build tools (Rust needed for cryptography, bcrypt; cmake for onnx)
+# Install essential build tools
+# (Rust needed for cryptography/bcrypt if wheels unavailable; cmake for some dependencies)
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     gcc g++ python3-dev build-essential curl cmake && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Install Rust (required for cryptography package)
+# Install Rust (required for cryptography package if no wheel available)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | \
     sh -s -- -y --default-toolchain stable --profile minimal && \
     rm -rf /root/.cargo/registry
@@ -24,45 +25,18 @@ ENV PATH="/root/.cargo/bin:${PATH}"
 # Copy only the requirements file to leverage Docker cache
 COPY requirements.txt .
 
-# Install CPU-only PyTorch FIRST to avoid CUDA dependencies
-# This ensures all subsequent builds use the CPU version
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install --upgrade pip setuptools wheel && \
-    pip install --index-url https://download.pytorch.org/whl/cpu torch>=2.0.0
-
-# Create requirements without torch to prevent CUDA wheel creation
-# Remove torch and triton (torch dependency) from requirements
-RUN grep -v -E "^torch>=|^triton" requirements.txt > requirements-no-torch.txt
+# NOTE: Removed PyTorch installation - no longer needed after Gemini migration
+# The STA now uses Gemini API instead of PyTorch/ONNX models
 
 # Use BuildKit cache mount for pip to speed up repeated builds
-# Build wheels ONLY for non-torch dependencies
+# Build wheels for all dependencies (no more torch/ONNX exclusions needed)
 # --prefer-binary speeds up builds by using pre-built wheels when available
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip wheel --prefer-binary --wheel-dir /app/wheels -r requirements-no-torch.txt
+    pip wheel --prefer-binary --wheel-dir /app/wheels -r requirements.txt
 
-# ---- ONNX Model Build Stage ----
-FROM python:3.11-slim-bookworm as model-builder
-
-WORKDIR /app
-
-# Install only minimal dependencies needed for model export
-# Use BuildKit cache mount to speed up pip installs
-RUN --mount=type=cache,target=/root/.cache/pip \
-    python -m pip install --upgrade pip setuptools wheel && \
-    python -m pip install --index-url https://download.pytorch.org/whl/cpu \
-        torch>=2.0.0 && \
-    python -m pip install \
-        transformers>=4.41.0 \
-        onnxruntime>=1.16.0
-
-# Copy model export script
-COPY scripts/ensure_onnx_model.py scripts/
-
-# Build ONNX model with caching support
-# The HuggingFace cache will be preserved across builds with BuildKit
-RUN --mount=type=cache,target=/root/.cache/huggingface \
-    python scripts/ensure_onnx_model.py || echo "⚠️ ONNX model build failed, will retry at runtime"
-
+# NOTE: Removed deprecated ONNX Model Build Stage
+# The STA now uses Gemini API instead of PyTorch/ONNX models
+# See: docs/PYTORCH_TO_GEMINI_MIGRATION.md
 
 # ---- Final Stage (production) ----
 FROM python:3.11-slim-bookworm
@@ -82,18 +56,15 @@ RUN apt-get update &&     apt-get install -y --no-install-recommends libpq5 dos2
 # Copy pre-compiled wheels from the builder stage
 COPY --from=builder /app/wheels /wheels
 
-# Copy ONNX model from model-builder stage (if successful)
-COPY --from=model-builder /app/models/onnx /app/models/onnx
+# NOTE: Removed ONNX model copy - no longer needed after Gemini migration
+# The STA now uses Gemini API instead of PyTorch/ONNX models
 
-# Install CPU-only PyTorch FIRST in production (since it's not in wheels)
-# Then install remaining dependencies from wheels
+# Install all dependencies from pre-built wheels
+# No more PyTorch or Spacy installations needed
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip && \
-    pip install --index-url https://download.pytorch.org/whl/cpu torch>=2.0.0 && \
     pip install --no-index --find-links=/wheels /wheels/* && \
-    rm -rf /wheels && \
-    python -m spacy download xx_ent_wiki_sm || true && \
-    python -m spacy download en_core_web_sm || true
+    rm -rf /wheels
 
 # Copy the entire application code from the build context (./backend)
 COPY --chown=appuser:appgroup . .
