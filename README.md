@@ -564,10 +564,10 @@ The project includes Docker Compose configuration for local development and prod
 
 ```bash
 # Development mode
-docker-compose up
+docker compose up
 
 # Production mode
-docker-compose -f docker-compose.yml -f docker-compose.override.yml up -d
+docker compose -f docker-compose.yml -f docker-compose.override.yml up -d
 ```
 
 ### Production Monitoring Stack 📊
@@ -767,7 +767,7 @@ The CI/CD pipeline is divided into two main stages: Continuous Integration (CI) 
 To successfully deploy to your VM, ensure the following are installed and configured:
 
 - **Docker:** Latest version.
-- **Docker Compose V2:** Ensure `docker compose` command is available (not `docker-compose`).
+- **Docker Compose V2:** Ensure `docker compose` command is available (not `docker compose`).
 - **Firewall:** Configure firewall rules to allow incoming traffic on ports 8000 (backend) and 4000 (frontend), or any other ports you configure.
 - **Deploy User:** A dedicated SSH user with appropriate permissions to manage Docker and the project directory (`VM_PROJECT_PATH`).
 - **Project Path:** The `VM_PROJECT_PATH` on the VM should be the root directory where the repository is cloned.

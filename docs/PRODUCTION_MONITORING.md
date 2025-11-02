@@ -313,7 +313,7 @@ output {
 
 ```bash
 cd infra/docker
-docker-compose -f docker-compose.elk.yml up -d
+docker compose -f docker-compose.elk.yml up -d
 ```
 
 Access Kibana at: `http://localhost:5601`
@@ -1173,22 +1173,22 @@ counselor_response_satisfaction = Gauge(
 
 ```bash
 # Real-time logs from all containers
-docker-compose logs -f
+docker compose logs -f
 
 # Logs from specific service
-docker-compose logs -f backend
+docker compose logs -f backend
 
 # Last 100 lines
-docker-compose logs --tail=100 backend
+docker compose logs --tail=100 backend
 
 # Search logs for errors
-docker-compose logs backend | grep -i error
+docker compose logs backend | grep -i error
 
 # Follow logs with timestamp
-docker-compose logs -f -t backend
+docker compose logs -f -t backend
 
 # Export logs to file
-docker-compose logs --no-color backend > backend-logs.txt
+docker compose logs --no-color backend > backend-logs.txt
 ```
 
 ### **Query Prometheus Metrics**

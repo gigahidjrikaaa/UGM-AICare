@@ -15,7 +15,7 @@ This document lists all files that are `.gitignore`d but **required** on the pro
 
 **Contains:**
 ```bash
-# Database (Required for docker-compose)
+# Database (Required for docker compose)
 DATABASE_URL=postgresql+asyncpg://user:password@host:port/dbname
 POSTGRES_DB=your_database_name
 POSTGRES_USER=your_db_username
@@ -183,7 +183,7 @@ scp backend/alembic.ini deployuser@your_vm:/path/to/UGM-AICare/backend/
 
 ### 4. `docker-compose.override.yml` (Infra)
 **Location:** `UGM-AICare/infra/compose/docker-compose.override.yml`  
-**Purpose:** Local overrides for docker-compose (ports, volumes, etc.)  
+**Purpose:** Local overrides for docker compose (ports, volumes, etc.)  
 **Required if:** You need custom port mappings or configurations  
 
 **Example:**
@@ -456,7 +456,7 @@ echo "🚀 VM is ready for deployment!"
 - `GEMINI_API_KEY`
 - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
 
-These variables MUST be in the `.env` file for docker-compose to substitute them into the container.
+These variables MUST be in the `.env` file for docker compose to substitute them into the container.
 
 ### Error: "EMAIL_ENCRYPTION_KEY: Field required [type=missing]"
 **Cause:** Pydantic Settings validation error - EMAIL_ENCRYPTION_KEY is required  

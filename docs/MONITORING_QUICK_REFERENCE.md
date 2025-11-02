@@ -6,13 +6,13 @@
 
 ```bash
 # Real-time logs
-docker-compose logs -f backend
+docker compose logs -f backend
 
 # Search for errors
-docker-compose logs backend | grep ERROR
+docker compose logs backend | grep ERROR
 
 # Export logs
-docker-compose logs backend > logs-$(date +%Y%m%d).txt
+docker compose logs backend > logs-$(date +%Y%m%d).txt
 
 # Follow specific container
 docker logs -f ugm_aicare_backend_dev --tail 100
@@ -71,13 +71,13 @@ curl http://localhost:9200/_cluster/health
 
 ```bash
 # Check error logs
-docker-compose logs backend | grep ERROR | tail -50
+docker compose logs backend | grep ERROR | tail -50
 
 # Check database connection
 docker exec backend python -c "from app.database import get_async_db; print('DB OK')"
 
 # Restart service
-docker-compose restart backend
+docker compose restart backend
 ```
 
 ### Issue: Slow Response Time
@@ -104,10 +104,10 @@ SELECT count(*) FROM pg_stat_activity;
 docker stats --no-stream
 
 # Restart container
-docker-compose restart backend
+docker compose restart backend
 
 # Check logs for OOM
-docker-compose logs backend | grep -i "out of memory"
+docker compose logs backend | grep -i "out of memory"
 ```
 
 ---

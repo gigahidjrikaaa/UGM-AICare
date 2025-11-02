@@ -40,11 +40,11 @@ case "${1:-deploy}" in
 
         # 3. Build and restart Docker containers in detached mode
         echo "Building and restarting Docker containers..."
-        docker-compose up --build -d --remove-orphans
+        docker compose up --build -d --remove-orphans
 
         # 4. Display logs
         echo "Displaying logs for frontend and backend (Ctrl+C to stop)..."
-        timeout 30s docker-compose logs -f frontend backend || true
+        timeout 30s docker compose logs -f frontend backend || true
 
         echo "Production deployment/restart script finished."
         ;;
@@ -84,12 +84,12 @@ case "${1:-deploy}" in
         
         # 4. Build and restart with monitoring
         echo "Building and restarting Docker containers WITH MONITORING..."
-        docker-compose -f docker-compose.yml -f docker-compose.monitoring.yml up --build -d --remove-orphans 2>/dev/null || {
+        docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up --build -d --remove-orphans 2>/dev/null || {
             # Fallback: use infra/compose files if they exist
             if [ -f "infra/compose/docker-compose.prod.yml" ]; then
                 docker compose -f infra/compose/docker-compose.prod.yml -f infra/compose/docker-compose.prod-monitoring.yml --env-file .env up --build -d --remove-orphans
             else
-                echo "ERROR: Could not find production docker-compose files"
+                echo "ERROR: Could not find production docker compose files"
                 exit 1
             fi
         }
@@ -135,13 +135,13 @@ case "${1:-deploy}" in
         echo "  4. Update .env with:"
         echo "     LANGFUSE_PUBLIC_KEY=pk-lf-..."
         echo "     LANGFUSE_SECRET_KEY=sk-lf-..."
-        echo "  5. Restart backend: docker-compose restart backend"
+        echo "  5. Restart backend: docker compose restart backend"
         echo ""
         ;;
     
     restart)
         echo "Restarting production services..."
-        docker-compose restart
+        docker compose restart
         echo "✅ Services restarted"
         ;;
     
@@ -155,7 +155,7 @@ case "${1:-deploy}" in
             echo "❌ PostgreSQL database container is not running!"
             echo ""
             echo "Please start services first:"
-            echo "  docker-compose up -d db"
+            echo "  docker compose up -d db"
             exit 1
         fi
         
@@ -278,18 +278,18 @@ EOL
         echo "   LANGFUSE_SECRET_KEY=sk-lf-your-actual-key"
         echo ""
         echo "5. Restart backend:"
-        echo "   docker-compose restart backend"
+        echo "   docker compose restart backend"
         echo ""
         ;;
     
     logs)
         echo "Showing logs (Ctrl+C to stop)..."
-        docker-compose logs -f frontend backend
+        docker compose logs -f frontend backend
         ;;
     
     status)
         echo "📊 Production Services Status:"
-        docker-compose ps
+        docker compose ps
         ;;
     
     help|--help|-h)

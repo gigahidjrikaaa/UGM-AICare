@@ -9,7 +9,7 @@ This project includes a `docker-compose.override.yml` file that automatically en
 1. **Start services in development mode:**
 
    ```bash
-   docker-compose up
+   docker compose up
    ```
 
    The override file is automatically loaded and enables:
@@ -21,14 +21,14 @@ This project includes a `docker-compose.override.yml` file that automatically en
 
    ```bash
    # Only needed when package.json or requirements.txt changes
-   docker-compose up --build
+   docker compose up --build
    ```
 
 3. **View logs:**
 
    ```bash
-   docker-compose logs -f backend
-   docker-compose logs -f frontend
+   docker compose logs -f backend
+   docker compose logs -f frontend
    ```
 
 ### What's Different in Development Mode?
@@ -53,11 +53,11 @@ To run in production mode (as defined in `docker-compose.yml`):
 
 ```bash
 # Temporarily disable override
-docker-compose -f docker-compose.yml up
+docker compose -f docker-compose.yml up
 
 # Or rename the override file
 mv docker-compose.override.yml docker-compose.override.yml.disabled
-docker-compose up
+docker compose up
 ```
 
 ### Troubleshooting
@@ -65,7 +65,7 @@ docker-compose up
 **Changes not reflecting:**
 
 - Ensure you're editing files in the correct directory
-- Check if file watching is working: `docker-compose logs -f backend`
+- Check if file watching is working: `docker compose logs -f backend`
 - On Windows, file watching might be slower due to WSL/Docker Desktop
 
 **Performance issues:**
@@ -82,6 +82,6 @@ docker-compose up
 ### Tips
 
 - Keep `docker-compose.override.yml` in `.gitignore` if you have personal settings
-- Use `docker-compose down -v` to clean up volumes when switching modes
+- Use `docker compose down -v` to clean up volumes when switching modes
 - Backend changes reflect in 1-2 seconds
 - Frontend changes reflect almost instantly with Next.js Fast Refresh

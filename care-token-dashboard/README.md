@@ -88,7 +88,7 @@ care-token-dashboard/
 ```bash
 # Start PostgreSQL with Docker
 cd care-token-dashboard
-docker-compose up -d postgres
+docker compose up -d postgres
 
 # Or use existing PostgreSQL:
 # Create database: care_token_dashboard
@@ -273,7 +273,7 @@ pip freeze > requirements.txt
 
 ```bash
 cd care-token-dashboard
-docker-compose up -d
+docker compose up -d
 ```
 
 Services:

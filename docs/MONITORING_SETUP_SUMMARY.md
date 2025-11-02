@@ -439,7 +439,7 @@ netstat -tulpn | grep -E '5601|9090|3001|9200'
 docker system df
 ```
 
-**Solution**: Stop conflicting services or change ports in docker-compose files
+**Solution**: Stop conflicting services or change ports in docker compose files
 
 ---
 

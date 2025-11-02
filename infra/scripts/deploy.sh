@@ -91,7 +91,7 @@ echo "[deploy.sh] Bringing up services with docker-compose.prod.yml..."
 export GIT_SHA="$GIT_SHA"
 export GHCR_REPOSITORY_OWNER="$GHCR_REPOSITORY_OWNER_LOWER"
 
-# Load all variables from .env file so docker-compose can use them
+# Load all variables from .env file so docker compose can use them
 # Use a safer method that handles comments, empty lines, and malformed entries
 if [[ -f ".env" ]]; then
   echo "[deploy.sh] Loading environment variables from .env..."

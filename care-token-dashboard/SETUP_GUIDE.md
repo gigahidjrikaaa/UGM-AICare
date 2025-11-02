@@ -156,7 +156,7 @@ care-token-dashboard/
 
 ```bash
 cd care-token-dashboard
-docker-compose up -d postgres redis
+docker compose up -d postgres redis
 ```
 
 Verify:
@@ -472,7 +472,7 @@ tail -f logs/app.log
 
 ```bash
 cd care-token-dashboard
-docker-compose up -d
+docker compose up -d
 ```
 
 #### Option B: Manual Deployment

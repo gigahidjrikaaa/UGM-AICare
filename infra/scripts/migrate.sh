@@ -20,7 +20,7 @@ if [[ -n "$BACKEND_CONTAINER" ]]; then
   echo "[migrate.sh] Running migrations inside Docker container: $BACKEND_CONTAINER"
   
   # Run alembic upgrade inside the container
-  # Don't override DATABASE_URL - use the one already set in the container by docker-compose
+  # Don't override DATABASE_URL - use the one already set in the container by docker compose
   docker exec "$BACKEND_CONTAINER" \
     bash -c "cd /app && alembic upgrade head"
   

@@ -15,7 +15,7 @@ Before you begin, ensure your target VM meets the following requirements:
 - **Docker:** Install the latest version of Docker.
   - [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
   - [Install Docker Engine on CentOS](https://docs.docker.com/engine/install/centos/)
-- **Docker Compose V2:** Ensure `docker compose` command is available (not `docker-compose`). Docker Compose V2 is usually installed with Docker Desktop or can be installed separately.
+- **Docker Compose V2:** Ensure `docker compose` command is available (not `docker compose`). Docker Compose V2 is usually installed with Docker Desktop or can be installed separately.
   - [Install Docker Compose](https://docs.docker.com/compose/install/)
 - **Firewall Configuration:** Configure your VM's firewall to allow incoming traffic on the necessary ports:
   - **Port 8000:** For the Backend (FastAPI) service.

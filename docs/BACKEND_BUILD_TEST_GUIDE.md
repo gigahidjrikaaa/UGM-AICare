@@ -137,7 +137,7 @@ Web3.py version: 6.20.4
 ./dev.sh test-build
 
 # Check specific import
-docker-compose -f docker-compose.dev.yml run --rm --no-deps backend python -c "
+docker compose -f docker-compose.dev.yml run --rm --no-deps backend python -c "
 from app.blockchain.base_web3 import BaseWeb3Client
 print('Import successful!')
 "
@@ -196,7 +196,7 @@ The build is still valid for deployment.
 
 ### Test Specific Import
 ```bash
-docker-compose -f docker-compose.dev.yml run --rm --no-deps backend python -c "
+docker compose -f docker-compose.dev.yml run --rm --no-deps backend python -c "
 from web3.middleware import geth_poa_middleware
 print('Middleware:', geth_poa_middleware)
 print('Type:', type(geth_poa_middleware))
@@ -205,7 +205,7 @@ print('Type:', type(geth_poa_middleware))
 
 ### Check All Middleware
 ```bash
-docker-compose -f docker-compose.dev.yml run --rm --no-deps backend python -c "
+docker compose -f docker-compose.dev.yml run --rm --no-deps backend python -c "
 from web3 import Web3
 from web3.middleware import geth_poa_middleware
 
@@ -220,7 +220,7 @@ for i, mw in enumerate(w3.middleware_onion):
 
 ### Test With Live Connection
 ```bash
-docker-compose -f docker-compose.dev.yml run --rm backend python -c "
+docker compose -f docker-compose.dev.yml run --rm backend python -c "
 from web3 import Web3
 from web3.middleware import geth_poa_middleware
 
