@@ -159,6 +159,14 @@ services:
     depends_on:
       - backend
     restart: unless-stopped
+    healthcheck:
+      # Best Practice: Use dedicated health endpoint, not root path
+      # Checks every 30s, waits 60s for startup, allows 3 failures before marking unhealthy
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
     networks:
       - internal_network
       - monitoring  # Add monitoring network for metrics/logs collection

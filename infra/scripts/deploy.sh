@@ -267,10 +267,13 @@ fi
 
 # 6. Health check endpoints
 echo "[deploy.sh] Performing health checks..."
-# Example health checks (replace with actual application endpoints)
-# For backend:
-BACKEND_HEALTH_URL="http://localhost:8000/health" # Assuming /health endpoint exists
-FRONTEND_HEALTH_URL="http://localhost:4000" # Check root path - any response means it's alive
+# Best Practice Health Checks:
+# - Backend: Use dedicated /health endpoint (returns 200 + JSON status)
+# - Frontend: Use /api/health endpoint (stateless, fast, non-cached)
+# - Accept 2xx/3xx status codes (success or redirect)
+# - Use reasonable timeouts and retries for container startup time
+BACKEND_HEALTH_URL="http://localhost:8000/health"
+FRONTEND_HEALTH_URL="http://localhost:4000/api/health"
 
 HEALTH_CHECK_RETRIES=10
 HEALTH_CHECK_INTERVAL=10
