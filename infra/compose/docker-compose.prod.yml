@@ -135,6 +135,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      HOSTNAME: 0.0.0.0  # Bind to all interfaces to accept external connections
       # NextAuth.js Configuration (REQUIRED)
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET}
       NEXTAUTH_URL: ${NEXTAUTH_URL}

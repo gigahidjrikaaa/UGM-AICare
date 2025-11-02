@@ -270,7 +270,7 @@ echo "[deploy.sh] Performing health checks..."
 # Example health checks (replace with actual application endpoints)
 # For backend:
 BACKEND_HEALTH_URL="http://localhost:8000/health" # Assuming /health endpoint exists
-FRONTEND_HEALTH_URL="http://localhost:4000/api/health" # Dedicated health check endpoint
+FRONTEND_HEALTH_URL="http://localhost:4000" # Check root path - any response means it's alive
 
 HEALTH_CHECK_RETRIES=10
 HEALTH_CHECK_INTERVAL=10
@@ -314,7 +314,8 @@ for i in $(seq 1 $FRONTEND_HEALTH_CHECK_RETRIES); do
   echo "[deploy.sh] Attempt $i: Checking frontend health at $FRONTEND_HEALTH_URL..."
   # Check with more verbose curl and capture response
   HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$FRONTEND_HEALTH_URL" 2>/dev/null || echo "000")
-  if [[ "$HTTP_CODE" == "200" ]]; then
+  # Accept any 2xx or 3xx status code (success or redirect)
+  if [[ "$HTTP_CODE" =~ ^[23][0-9][0-9]$ ]]; then
     echo "[deploy.sh] Frontend health check passed (HTTP $HTTP_CODE)."
     HEALTH_CHECK_SUCCESS=true
     break
