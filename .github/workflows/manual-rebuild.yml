@@ -1,0 +1,318 @@
+name: Manual Rebuild & Redeploy
+
+# This workflow is for manual operations only
+# It allows you to force rebuild images and recreate containers with fresh environment variables
+# Use this when: env vars changed, need clean rebuild, or troubleshooting deployment issues
+
+on:
+  workflow_dispatch:
+    inputs:
+      rebuild_scope:
+        description: 'What to rebuild'
+        required: true
+        type: choice
+        options:
+          - 'all'
+          - 'backend-only'
+          - 'frontend-only'
+        default: 'all'
+      no_cache:
+        description: 'Build without Docker cache (force fresh build)'
+        required: true
+        type: boolean
+        default: true
+      force_recreate:
+        description: 'Force recreate containers (refresh environment variables)'
+        required: true
+        type: boolean
+        default: true
+      deploy_monitoring:
+        description: 'Deploy monitoring stack'
+        required: false
+        type: boolean
+        default: false
+      prune_system:
+        description: 'Clean up Docker system before rebuild'
+        required: false
+        type: boolean
+        default: true
+
+jobs:
+  manual-rebuild:
+    name: Manual Rebuild & Deploy
+    runs-on: ubuntu-latest
+    environment: production
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+      
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Set lowercase repository owner
+        id: lowercase
+        run: echo "owner=$(echo ${{ github.repository_owner }} | tr '[:upper:]' '[:lower:]')" >> $GITHUB_OUTPUT
+      
+      # ========================================
+      # Build Backend (if selected)
+      # ========================================
+      - name: Build and Push Backend Image
+        if: inputs.rebuild_scope == 'all' || inputs.rebuild_scope == 'backend-only'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./backend
+          file: ./infra/docker/backend.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-api:${{ github.sha }}
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-api:latest
+          cache-from: ${{ inputs.no_cache == false && format('type=registry,ref=ghcr.io/{0}/ugm-aicare-api:buildcache', steps.lowercase.outputs.owner) || '' }}
+          cache-to: type=registry,ref=ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-api:buildcache,mode=max
+          no-cache: ${{ inputs.no_cache }}
+      
+      # ========================================
+      # Build Frontend (if selected)
+      # ========================================
+      - name: Build and Push Frontend Image
+        if: inputs.rebuild_scope == 'all' || inputs.rebuild_scope == 'frontend-only'
+        uses: docker/build-push-action@v5
+        with:
+          context: ./frontend
+          file: ./infra/docker/frontend.Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-web:${{ github.sha }}
+            ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-web:latest
+          cache-from: ${{ inputs.no_cache == false && format('type=registry,ref=ghcr.io/{0}/ugm-aicare-web:buildcache', steps.lowercase.outputs.owner) || '' }}
+          cache-to: type=registry,ref=ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-web:buildcache,mode=max
+          no-cache: ${{ inputs.no_cache }}
+      
+      # ========================================
+      # Deploy to Production
+      # ========================================
+      - name: Deploy to Production
+        uses: appleboy/ssh-action@v1.0.3
+        env:
+          GIT_SHA: ${{ github.sha }}
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+          GHCR_REPOSITORY_OWNER: ${{ steps.lowercase.outputs.owner }}
+          ENV_FILE_PRODUCTION: ${{ secrets.ENV_FILE_PRODUCTION }}
+          DEPLOY_MONITORING: ${{ inputs.deploy_monitoring }}
+          FORCE_RECREATE: ${{ inputs.force_recreate }}
+          PRUNE_SYSTEM: ${{ inputs.prune_system }}
+          REBUILD_SCOPE: ${{ inputs.rebuild_scope }}
+        with:
+          host: ${{ secrets.VM_SSH_HOST }}
+          username: ${{ secrets.VM_SSH_USER }}
+          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
+          envs: GIT_SHA,GHCR_TOKEN,GHCR_USER,GHCR_REPOSITORY_OWNER,ENV_FILE_PRODUCTION,DEPLOY_MONITORING,FORCE_RECREATE,PRUNE_SYSTEM,REBUILD_SCOPE
+          script: |
+            set -e
+            
+            echo "=========================================="
+            echo "🔄 Manual Rebuild & Redeploy"
+            echo "=========================================="
+            echo "Git SHA: $GIT_SHA"
+            echo "Rebuild Scope: $REBUILD_SCOPE"
+            echo "Force Recreate: $FORCE_RECREATE"
+            echo "Prune System: $PRUNE_SYSTEM"
+            echo "Deploy Monitoring: $DEPLOY_MONITORING"
+            echo "=========================================="
+            
+            cd ${{ secrets.VM_PROJECT_PATH }}
+            
+            # ========================================
+            # 1. System Cleanup (if requested)
+            # ========================================
+            if [ "$PRUNE_SYSTEM" = "true" ]; then
+              echo ""
+              echo "🧹 Cleaning up Docker system..."
+              
+              docker compose -f infra/compose/docker-compose.prod.yml down || true
+              docker container prune -f || true
+              docker image prune -f || true
+              docker network prune -f || true
+              docker volume prune -f || true
+              docker builder prune -f --keep-storage=5GB || true
+              
+              echo "✅ Docker system cleaned"
+              echo ""
+              echo "Disk space:"
+              df -h / | awk 'NR==1 || /\/$/'
+            fi
+            
+            # ========================================
+            # 2. Update .env File
+            # ========================================
+            echo ""
+            echo "📝 Updating .env file..."
+            echo "$ENV_FILE_PRODUCTION" > .env
+            
+            # Verify critical variables
+            echo "Verifying environment variables..."
+            if ! grep -q "ADMIN_EMAIL=" .env; then
+              echo "❌ ERROR: ADMIN_EMAIL not found in .env!"
+              exit 1
+            fi
+            if ! grep -q "COUNSELOR_EMAIL=" .env; then
+              echo "❌ ERROR: COUNSELOR_EMAIL not found in .env!"
+              exit 1
+            fi
+            echo "✅ Critical environment variables verified"
+            
+            # ========================================
+            # 3. Docker Login
+            # ========================================
+            echo ""
+            echo "🔐 Logging into GHCR..."
+            echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+            echo "✅ Docker login successful"
+            
+            # ========================================
+            # 4. Pull Latest Images
+            # ========================================
+            echo ""
+            echo "📥 Pulling latest Docker images..."
+            
+            if [ "$REBUILD_SCOPE" = "all" ] || [ "$REBUILD_SCOPE" = "backend-only" ]; then
+              echo "Pulling backend image..."
+              docker pull "ghcr.io/${GHCR_REPOSITORY_OWNER}/ugm-aicare-api:${GIT_SHA}"
+              docker tag "ghcr.io/${GHCR_REPOSITORY_OWNER}/ugm-aicare-api:${GIT_SHA}" "ghcr.io/${GHCR_REPOSITORY_OWNER}/ugm-aicare-api:latest"
+            fi
+            
+            if [ "$REBUILD_SCOPE" = "all" ] || [ "$REBUILD_SCOPE" = "frontend-only" ]; then
+              echo "Pulling frontend image..."
+              docker pull "ghcr.io/${GHCR_REPOSITORY_OWNER}/ugm-aicare-web:${GIT_SHA}"
+              docker tag "ghcr.io/${GHCR_REPOSITORY_OWNER}/ugm-aicare-web:${GIT_SHA}" "ghcr.io/${GHCR_REPOSITORY_OWNER}/ugm-aicare-web:latest"
+            fi
+            
+            echo "✅ Images pulled successfully"
+            
+            # ========================================
+            # 5. Stop Existing Containers
+            # ========================================
+            echo ""
+            echo "⏹️  Stopping existing containers..."
+            docker compose -f infra/compose/docker-compose.prod.yml down
+            echo "✅ Containers stopped"
+            
+            # ========================================
+            # 6. Start Services
+            # ========================================
+            echo ""
+            echo "🚀 Starting services..."
+            
+            if [ "$FORCE_RECREATE" = "true" ]; then
+              echo "Using --force-recreate to refresh environment variables..."
+              
+              if [ "$DEPLOY_MONITORING" = "true" ]; then
+                docker compose -f infra/compose/docker-compose.prod.yml -f infra/compose/docker-compose.prod-monitoring.yml --env-file .env up -d --force-recreate --remove-orphans
+              else
+                docker compose -f infra/compose/docker-compose.prod.yml --env-file .env up -d --force-recreate --remove-orphans
+              fi
+            else
+              if [ "$DEPLOY_MONITORING" = "true" ]; then
+                docker compose -f infra/compose/docker-compose.prod.yml -f infra/compose/docker-compose.prod-monitoring.yml --env-file .env up -d --remove-orphans
+              else
+                docker compose -f infra/compose/docker-compose.prod.yml --env-file .env up -d --remove-orphans
+              fi
+            fi
+            
+            echo "✅ Services started"
+            
+            # ========================================
+            # 7. Wait for Services
+            # ========================================
+            echo ""
+            echo "⏳ Waiting for services to be healthy..."
+            sleep 15
+            
+            # Check backend health
+            echo "Checking backend health..."
+            for i in {1..10}; do
+              if docker compose -f infra/compose/docker-compose.prod.yml exec -T backend curl -f http://localhost:8000/health > /dev/null 2>&1; then
+                echo "✅ Backend is healthy"
+                break
+              fi
+              echo "Attempt $i/10: Backend not ready yet..."
+              sleep 5
+            done
+            
+            # ========================================
+            # 8. Run Database Migrations
+            # ========================================
+            echo ""
+            echo "🗄️  Running database migrations..."
+            docker compose -f infra/compose/docker-compose.prod.yml exec -T backend alembic upgrade head
+            echo "✅ Migrations completed"
+            
+            # ========================================
+            # 9. Initialize Production Accounts
+            # ========================================
+            echo ""
+            echo "👥 Initializing production accounts..."
+            docker compose -f infra/compose/docker-compose.prod.yml exec -T backend python scripts/init_production_accounts.py
+            echo "✅ Accounts initialized"
+            
+            # ========================================
+            # 10. Verify Deployment
+            # ========================================
+            echo ""
+            echo "🔍 Verifying deployment..."
+            
+            # Check running containers
+            echo "Running containers:"
+            docker compose -f infra/compose/docker-compose.prod.yml ps
+            
+            # Check backend logs
+            echo ""
+            echo "Recent backend logs:"
+            docker compose -f infra/compose/docker-compose.prod.yml logs --tail=50 backend | grep -E "ERROR|WARNING|admin|counselor" || echo "No critical messages in recent logs"
+            
+            # ========================================
+            # 11. Summary
+            # ========================================
+            echo ""
+            echo "=========================================="
+            echo "✅ Manual Rebuild & Redeploy Complete!"
+            echo "=========================================="
+            echo "Git SHA: $GIT_SHA"
+            echo "Rebuild Scope: $REBUILD_SCOPE"
+            echo "Timestamp: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
+            echo "=========================================="
+            echo ""
+            echo "🔗 Service URLs:"
+            echo "   - Backend API: https://api.aicare.sumbu.xyz"
+            echo "   - Frontend: https://aicare.sumbu.xyz"
+            echo "   - Health Check: https://api.aicare.sumbu.xyz/health"
+            echo ""
+            echo "📊 Next Steps:"
+            echo "   1. Test login with admin account"
+            echo "   2. Verify environment variables loaded"
+            echo "   3. Check application functionality"
+            echo "=========================================="
+      
+      # ========================================
+      # Notify Success
+      # ========================================
+      - name: Deployment Success
+        if: success()
+        run: |
+          echo "::notice title=Manual Rebuild Success::Manual rebuild and redeploy completed successfully for SHA ${{ github.sha }}"
+      
+      # ========================================
+      # Notify Failure
+      # ========================================
+      - name: Deployment Failure
+        if: failure()
+        run: |
+          echo "::error title=Manual Rebuild Failed::Manual rebuild and redeploy failed for SHA ${{ github.sha }}. Check logs for details."
