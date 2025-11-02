@@ -270,7 +270,7 @@ echo "[deploy.sh] Performing health checks..."
 # Example health checks (replace with actual application endpoints)
 # For backend:
 BACKEND_HEALTH_URL="http://localhost:8000/health" # Assuming /health endpoint exists
-FRONTEND_HEALTH_URL="http://localhost:4000" # Assuming frontend serves on root
+FRONTEND_HEALTH_URL="http://localhost:4000/api/health" # Dedicated health check endpoint
 
 HEALTH_CHECK_RETRIES=10
 HEALTH_CHECK_INTERVAL=10
@@ -290,24 +290,46 @@ done
 
 if [[ "$HEALTH_CHECK_SUCCESS" == "false" ]]; then
   echo "[deploy.sh] ERROR: Backend health check failed after multiple retries."
+  echo "[deploy.sh] Backend container logs:"
+  docker logs ugm_aicare_backend --tail 50
+  exit 1
+fi
+
+# Frontend takes longer to start (Next.js standalone mode)
+echo "[deploy.sh] Waiting for frontend to initialize (Next.js can take 30-60s to start)..."
+sleep 20
+
+# Check if frontend container is running
+FRONTEND_STATUS=$(docker inspect -f '{{.State.Status}}' ugm_aicare_frontend 2>/dev/null || echo "not_found")
+if [[ "$FRONTEND_STATUS" != "running" ]]; then
+  echo "[deploy.sh] ERROR: Frontend container is not running (status: $FRONTEND_STATUS)"
+  echo "[deploy.sh] Frontend container logs:"
+  docker logs ugm_aicare_frontend --tail 100
   exit 1
 fi
 
 HEALTH_CHECK_SUCCESS=false
-for i in $(seq 1 $HEALTH_CHECK_RETRIES); do
+FRONTEND_HEALTH_CHECK_RETRIES=15  # Increased from 10 to give more time
+for i in $(seq 1 $FRONTEND_HEALTH_CHECK_RETRIES); do
   echo "[deploy.sh] Attempt $i: Checking frontend health at $FRONTEND_HEALTH_URL..."
-  if curl -s -f "$FRONTEND_HEALTH_URL" > /dev/null; then
-    echo "[deploy.sh] Frontend health check passed."
+  # Check with more verbose curl and capture response
+  HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" "$FRONTEND_HEALTH_URL" 2>/dev/null || echo "000")
+  if [[ "$HTTP_CODE" == "200" ]]; then
+    echo "[deploy.sh] Frontend health check passed (HTTP $HTTP_CODE)."
     HEALTH_CHECK_SUCCESS=true
     break
   else
-    echo "[deploy.sh] Frontend health check failed. Retrying in $HEALTH_CHECK_INTERVAL seconds..."
+    echo "[deploy.sh] Frontend health check failed (HTTP $HTTP_CODE). Retrying in $HEALTH_CHECK_INTERVAL seconds..."
     sleep $HEALTH_CHECK_INTERVAL
   fi
 done
 
 if [[ "$HEALTH_CHECK_SUCCESS" == "false" ]]; then
   echo "[deploy.sh] ERROR: Frontend health check failed after multiple retries."
+  echo "[deploy.sh] Frontend container status:"
+  docker ps -a | grep ugm_aicare_frontend || echo "Container not found"
+  echo "[deploy.sh] Frontend container logs:"
+  docker logs ugm_aicare_frontend --tail 100
   exit 1
 fi
 
