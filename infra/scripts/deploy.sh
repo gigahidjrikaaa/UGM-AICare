@@ -217,7 +217,7 @@ echo "[deploy.sh] Waiting for database to be ready..."
 MAX_DB_WAIT=30
 DB_READY=false
 for i in $(seq 1 $MAX_DB_WAIT); do
-  if docker compose -f infra/compose/docker-compose.prod.yml exec -T db pg_isready -U "${POSTGRES_USER:-postgres}" > /dev/null 2>&1; then
+  if docker compose -f infra/compose/docker-compose.prod.yml --env-file "$ENV_FILE" exec -T db pg_isready -U "${POSTGRES_USER:-postgres}" > /dev/null 2>&1; then
     echo "[deploy.sh] Database is ready."
     DB_READY=true
     break
@@ -229,7 +229,7 @@ done
 if [[ "$DB_READY" == "false" ]]; then
   echo "[deploy.sh] ERROR: Database failed to become ready after ${MAX_DB_WAIT} attempts."
   echo "[deploy.sh] Showing database logs:"
-  docker compose -f infra/compose/docker-compose.prod.yml logs db --tail 50
+  docker compose -f infra/compose/docker-compose.prod.yml --env-file "$ENV_FILE" logs db --tail 50
   exit 1
 fi
 
@@ -238,7 +238,7 @@ echo "[deploy.sh] Waiting for backend container to be ready..."
 MAX_BACKEND_WAIT=30
 BACKEND_READY=false
 for i in $(seq 1 $MAX_BACKEND_WAIT); do
-  if docker compose -f infra/compose/docker-compose.prod.yml exec -T backend echo "ready" > /dev/null 2>&1; then
+  if docker compose -f infra/compose/docker-compose.prod.yml --env-file "$ENV_FILE" exec -T backend echo "ready" > /dev/null 2>&1; then
     echo "[deploy.sh] Backend container is ready."
     BACKEND_READY=true
     break
@@ -250,7 +250,7 @@ done
 if [[ "$BACKEND_READY" == "false" ]]; then
   echo "[deploy.sh] ERROR: Backend container failed to become ready."
   echo "[deploy.sh] Showing backend logs:"
-  docker compose -f infra/compose/docker-compose.prod.yml logs backend --tail 50
+  docker compose -f infra/compose/docker-compose.prod.yml --env-file "$ENV_FILE" logs backend --tail 50
   exit 1
 fi
 
@@ -283,13 +283,13 @@ fi
 echo "[deploy.sh] Initializing production accounts (admin & counselor)..."
 # This ensures admin and counselor accounts exist with correct credentials
 # Even if the database was freshly created or credentials changed
-if docker compose -f infra/compose/docker-compose.prod.yml exec -T backend \
+if docker compose -f infra/compose/docker-compose.prod.yml --env-file "$ENV_FILE" exec -T backend \
   python scripts/init_production_accounts.py; then
   echo "[deploy.sh] Production accounts initialized successfully."
 else
   echo "[deploy.sh] WARNING: Production account initialization failed!"
   echo "[deploy.sh] You may need to manually create admin/counselor accounts."
-  echo "[deploy.sh] Run: docker compose -f infra/compose/docker-compose.prod.yml exec backend python scripts/init_production_accounts.py"
+  echo "[deploy.sh] Run: docker compose -f infra/compose/docker-compose.prod.yml --env-file \"$ENV_FILE\" exec backend python scripts/init_production_accounts.py"
   # Don't exit - this is not critical enough to stop deployment
 fi
 
