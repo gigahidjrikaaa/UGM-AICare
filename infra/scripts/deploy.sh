@@ -130,6 +130,13 @@ fi
 
 echo "[deploy.sh] .env file size: $(wc -l < "$ENV_FILE") lines"
 
+# Copy .env to backend and frontend for safety
+echo "[deploy.sh] Copying .env to subdirectories..."
+cp "$ENV_FILE" "${PROJECT_ROOT}/backend/.env"
+cp "$ENV_FILE" "${PROJECT_ROOT}/frontend/.env"
+chmod 600 "${PROJECT_ROOT}/backend/.env" "${PROJECT_ROOT}/frontend/.env"
+echo "[deploy.sh] ✅ .env copied to backend/ and frontend/"
+
 # Start new containers (pass --env-file with absolute path)
 docker compose -f infra/compose/docker-compose.prod.yml --env-file "$ENV_FILE" up -d
 echo "[deploy.sh] Services started."

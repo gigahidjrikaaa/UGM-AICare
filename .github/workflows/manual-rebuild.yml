@@ -191,6 +191,14 @@ jobs:
             echo "Sample of loaded variables:"
             grep -E "^(ADMIN_EMAIL|COUNSELOR_EMAIL|DATABASE_URL|POSTGRES_|REDIS_HOST)=" .env | head -5 || true
             
+            # Copy .env to backend and frontend for safety
+            echo ""
+            echo "📋 Copying .env to subdirectories..."
+            cp .env backend/.env
+            cp .env frontend/.env
+            chmod 600 backend/.env frontend/.env
+            echo "✅ .env copied to backend/ and frontend/"
+            
             # ========================================
             # 2. System Cleanup (if requested)
             # ========================================

@@ -733,6 +733,13 @@ jobs:
             
             if [ -n "${{ secrets.ENV_FILE_PRODUCTION }}" ]; then
               echo "${{ secrets.ENV_FILE_PRODUCTION }}" > .env
+              
+              # Copy .env to backend and frontend for safety
+              echo "📋 Copying .env to subdirectories..."
+              cp .env backend/.env
+              cp .env frontend/.env
+              chmod 600 backend/.env frontend/.env
+              echo "✅ .env copied to backend/ and frontend/"
             fi
             
             # Deploy with or without monitoring based on workflow input or default to true for main branch
