@@ -32,9 +32,15 @@ from app.domains.finance.schemas import (
     RevenueApprovalResponse
 )
 
-from app.domains.finance.revenue_tracker import revenue_tracker
-from app.domains.finance.revenue_scheduler import scheduler, start_scheduler, stop_scheduler
-from app.domains.finance.routes import router as finance_router
+# Conditional imports: Skip runtime dependencies during migrations
+# Check if we're in Alembic migration context (alembic.context is available)
+import sys
+_is_migration = 'alembic' in sys.modules
+
+if not _is_migration:
+    from app.domains.finance.revenue_tracker import revenue_tracker
+    from app.domains.finance.revenue_scheduler import scheduler, start_scheduler, stop_scheduler
+    from app.domains.finance.routes import router as finance_router
 
 __all__ = [
     # Models
@@ -49,12 +55,17 @@ __all__ = [
     "RevenueBreakdownResponse",
     "RevenueApprovalCreate",
     "RevenueApprovalResponse",
-    # Services
-    "revenue_tracker",
-    # Scheduler
-    "scheduler",
-    "start_scheduler",
-    "stop_scheduler",
-    # Routes
-    "finance_router"
 ]
+
+# Add runtime services to __all__ only if not in migration
+if not _is_migration:
+    __all__.extend([
+        # Services
+        "revenue_tracker",
+        # Scheduler
+        "scheduler",
+        "start_scheduler",
+        "stop_scheduler",
+        # Routes
+        "finance_router"
+    ])

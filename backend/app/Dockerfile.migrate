@@ -27,6 +27,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     echo "pydantic>=2.9.0,<3.0.0" >> requirements-migrate-minimal.txt && \
     echo "pydantic-settings==2.0.3" >> requirements-migrate-minimal.txt && \
     echo "python-dotenv" >> requirements-migrate-minimal.txt && \
+    echo "web3>=7.0.0,<8.0.0" >> requirements-migrate-minimal.txt && \
     pip install --no-cache-dir -r requirements-migrate-minimal.txt
 
 # Copy application code

@@ -9,6 +9,7 @@
 **Aika** (愛佳 - Love, Excellence) is the unified AI consciousness of UGM-AICare—a meta-agent orchestrator coordinating four specialized agents to provide comprehensive mental health support for university students.
 
 **Key Capabilities:**
+
 - 🎯 **Unified AI Personality**: Consistent experience across chat, admin, and clinical support
 - �️ **Crisis Detection**: Real-time safety monitoring with Gemini-based semantic analysis
 - 💬 **CBT-Informed Coaching**: Evidence-based interventions via Support Coach Agent (SCA)
@@ -30,7 +31,8 @@
 ### 🛡️ Safety Agent Suite (LangGraph Orchestration)
 
 **Agent Workflow:**
-```
+
+```bash
 User Message → STA (Triage) → [Low/Moderate] → SCA (Coach) → Intervention Plans
                             → [High/Critical] → SDA (Escalate) → Clinical Staff
 Analytics → IA (Privacy-Preserving) → Differential Privacy Reports
@@ -50,6 +52,7 @@ Analytics → IA (Privacy-Preserving) → Differential Privacy Reports
 ### 🤖 Aika Meta-Agent
 
 **Intelligent Routing:**
+
 ```
 User Message → Aika (Classify Intent) → Route to Specialist
                                        ├─ STA: Safety assessment
@@ -62,20 +65,24 @@ User Message → Aika (Classify Intent) → Route to Specialist
 - **Smart Caching**: 60%+ reduction in redundant assessments via conversation state tracking
 - **Context Preservation**: Full history maintained across agent handoffs
 - **Crisis Monitoring**: Real-time safety checks on every message
+
 ### 🧠 Crisis Detection (Gemini-Based, No ML Dependencies)
 
 **3-Tier Assessment Strategy** (75% fewer API calls):
+
 1. **Rules (0-5ms)**: Instant detection of crisis keywords and safe greetings
 2. **Gemini (200-500ms)**: Semantic analysis for ambiguous messages with chain-of-thought reasoning
 3. **Cache**: Skip redundant assessments in stable conversations
 
 **Performance:**
+
 - Accuracy: 90%+ with deep semantic understanding
 - Average latency: ~100ms (75% instant rule-based, 25% Gemini API)
 - Languages: English + Indonesian (native support, no separate models)
 - Explainability: 8-step chain-of-thought reasoning for each assessment
 
 **Why Gemini vs ML Models:**
+
 - ✅ No PyTorch/ONNX dependencies (500MB+ saved, 5-10min faster builds)
 - ✅ Better semantic context understanding (tone, meaning, cultural nuance)
 - ✅ Zero model maintenance (no training, no ONNX exports)
@@ -140,6 +147,7 @@ User Message → Aika (Classify Intent) → Route to Specialist
 **Live Instance:** [https://aicare.sumbu.xyz](https://aicare.sumbu.xyz) (Personal VM)
 
 The platform is deployed using Docker Compose on a personal VM with automated CI/CD via GitHub Actions:
+
 - **Frontend**: Next.js app at `aicare.sumbu.xyz`
 - **Backend API**: FastAPI at `api.aicare.sumbu.xyz`  
 - **Reverse Proxy**: Nginx with SSL/TLS (Let's Encrypt)
@@ -152,6 +160,7 @@ The platform is deployed using Docker Compose on a personal VM with automated CI
 **Prerequisites:** Node.js 18+, Python 3.9+, PostgreSQL, Redis, Docker (optional)
 
 **Quick Start with Docker:**
+
 ```bash
 git clone https://github.com/gigahidjrikaaa/UGM-AICare.git
 cd UGM-AICare
@@ -160,11 +169,13 @@ cp .env.example .env  # Configure environment variables
 ```
 
 **Access:**
-- Frontend: http://localhost:4000
-- Backend API: http://localhost:8000 (Docs: /docs)
+
+- Frontend: <http://localhost:4000>
+- Backend API: <http://localhost:8000> (Docs: /docs)
 - Monitoring: `./dev.sh monitoring start` (Kibana: :8254, Grafana: :8256)
 
 **Manual Setup:**
+
 ```bash
 # Backend
 cd backend
@@ -187,12 +198,14 @@ npm install && npx hardhat node
 ## 🔑 Architecture Overview
 
 **Aika Meta-Agent Orchestration:**
+
 - **Intent Classification**: Routes messages to specialist agents (STA/SCA/SDA/IA)
 - **Conversation Caching**: 60%+ reduction in redundant assessments
 - **Crisis Detection**: Gemini-based 3-tier assessment (rules → semantic → cache)
 - **Intervention System**: CBT-informed coaching with trackable action plans
 
 **Key Technologies:**
+
 - **LangGraph**: Agent orchestration with conditional routing
 - **Google Gemini 2.5**: Semantic analysis and chain-of-thought reasoning
 - **SQLAlchemy 2**: Async ORM with event-centric design
@@ -204,38 +217,44 @@ npm install && npx hardhat node
 ## 📊 Monitoring & Observability
 
 **Production Stack:**
+
 - **ELK Stack**: Centralized logging (Elasticsearch, Logstash, Kibana, Filebeat)
 - **Prometheus + Grafana**: Metrics, alerts, dashboards (50+ custom metrics)
 - **Langfuse**: LLM tracing and observability
 
 **Quick Start:**
+
 ```bash
 ./dev.sh up-all                    # Start app + monitoring
 ./dev.sh monitoring start          # Start monitoring only
 ```
 
 **Access Points:**
-- Kibana (Logs): http://localhost:8254
-- Grafana (Metrics): http://localhost:8256 (admin/admin123)
-- Prometheus: http://localhost:8255
+
+- Kibana (Logs): <http://localhost:8254>
+- Grafana (Metrics): <http://localhost:8256> (admin/admin123)
+- Prometheus: <http://localhost:8255>
 
 → **[Complete Monitoring Guide](docs/PRODUCTION_MONITORING.md)** • **[Quick Reference](docs/MONITORING_QUICK_REFERENCE.md)**
 
 ## 🧪 Testing
 
 **Backend:**
+
 ```bash
 cd backend
 pytest tests/ -v
 ```
 
 **Frontend:**
+
 ```bash
 cd frontend
 npm test
 ```
 
 **Smart Contracts:**
+
 ```bash
 cd blockchain
 npx hardhat test
@@ -254,12 +273,14 @@ npx hardhat test
 ## 🆕 Recent Updates (November 2025)
 
 **✅ Migrated to Gemini-Based Crisis Detection**
+
 - Removed PyTorch/ONNX (500MB+ saved, 5-10min faster builds)
 - 3-tier assessment: Rules (0-5ms) → Gemini (200-500ms) → Cache
 - 90%+ accuracy with chain-of-thought reasoning and explainability
 - 75% fewer API calls via intelligent pre-screening
 
 **✅ Aika Meta-Agent Orchestration**
+
 - Unified AI personality coordinating STA/SCA/SDA/IA specialists
 - Intent classification with intelligent routing
 - 60%+ reduction in redundant assessments via conversation caching
