@@ -284,7 +284,7 @@ jobs:
             # Check backend health
             echo "Checking backend health..."
             for i in {1..10}; do
-              if docker compose -f infra/compose/docker-compose.prod.yml --env-file "$(pwd)/.env" exec -T backend curl -f http://localhost:8000/health > /dev/null 2>&1; then
+              if docker compose -f infra/compose/docker-compose.prod.yml --env-file "$(pwd)/.env" exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5).read()" > /dev/null 2>&1; then
                 echo "✅ Backend is healthy"
                 break
               fi

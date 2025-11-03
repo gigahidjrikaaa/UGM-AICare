@@ -38,8 +38,15 @@ WORKDIR /app
 ENV PYTHONDONTWRITEBYTECODE 1
 ENV PYTHONUNBUFFERED 1
 
-# Install runtime system dependencies, including dos2unix
-RUN apt-get update &&     apt-get install -y --no-install-recommends libpq5 dos2unix postgresql-client &&     apt-get clean &&     rm -rf /var/lib/apt/lists/*
+# Install runtime system dependencies, including dos2unix and curl (for health checks)
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+        libpq5 \
+        dos2unix \
+        postgresql-client \
+        curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
 
 # Copy pre-compiled wheels from the builder stage
 COPY --from=builder /app/wheels /wheels
