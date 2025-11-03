@@ -71,22 +71,44 @@ services:
       - "8000:8000"
     # env_file is passed via --env-file flag in deploy.sh
     environment:
+      # Database connection
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-      FRONTEND_URL: http://localhost:4000 # Reverted
-      BACKEND_URL: http://localhost:8000 # Reverted
-      ALLOWED_ORIGINS: "http://localhost:4000,http://127.0.0.1:4000" # Reverted
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_HOST: ${POSTGRES_HOST:-db}
+      POSTGRES_PORT: ${POSTGRES_PORT:-5432}
+      
+      # Admin & Counselor credentials
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+      COUNSELOR_EMAIL: ${COUNSELOR_EMAIL}
+      COUNSELOR_PASSWORD: ${COUNSELOR_PASSWORD}
+      COUNSELOR_NAME: ${COUNSELOR_NAME:-Main Counselor}
+      
+      # App URLs
+      FRONTEND_URL: ${FRONTEND_URL:-http://localhost:4000}
+      BACKEND_URL: ${BACKEND_URL:-http://localhost:8000}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:4000,http://127.0.0.1:4000}
+      
+      # Redis
       REDIS_HOST: redis
       REDIS_PORT: 6379
       REDIS_USERNAME: ""
       REDIS_PASSWORD: ""
       REDIS_URL: ""
+      
+      # Environment
       APP_ENV: production
       PYTHONPATH: /app
+      
+      # MinIO
       MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
       MINIO_BUCKET: ${MINIO_BUCKET:-content-resources}
       MINIO_SECURE: ${MINIO_SECURE:-false}
+      
       # Critical auth/API keys from .env (REQUIRED)
       JWT_SECRET_KEY: ${JWT_SECRET_KEY}
       EMAIL_ENCRYPTION_KEY: ${EMAIL_ENCRYPTION_KEY}
@@ -94,14 +116,30 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
+      
+      # Twitter API (Optional)
+      TWITTER_API_KEY: ${TWITTER_API_KEY:-}
+      TWITTER_API_SECRET: ${TWITTER_API_SECRET:-}
+      TWITTER_ACCESS_TOKEN: ${TWITTER_ACCESS_TOKEN:-}
+      TWITTER_ACCESS_TOKEN_SECRET: ${TWITTER_ACCESS_TOKEN_SECRET:-}
+      TWITTER_BEARER_TOKEN: ${TWITTER_BEARER_TOKEN:-}
+      
+      # Email SMTP (Optional)
+      EMAIL_USERNAME: ${EMAIL_USERNAME:-}
+      EMAIL_PASSWORD: ${EMAIL_PASSWORD:-}
+      EMAIL_SMTP_SERVER: ${EMAIL_SMTP_SERVER:-}
+      EMAIL_SMTP_PORT: ${EMAIL_SMTP_PORT:-}
+      
       # Optional API keys
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:-}
       AZURE_OPENAI_ENDPOINT: ${AZURE_OPENAI_ENDPOINT:-}
       AZURE_OPENAI_API_KEY: ${AZURE_OPENAI_API_KEY:-}
       AZURE_OPENAI_DEPLOYMENT: ${AZURE_OPENAI_DEPLOYMENT:-}
+      
       # EDU Chain / NFT Badge System (Optional)
       EDU_TESTNET_RPC_URL: ${EDU_TESTNET_RPC_URL:-}
       NFT_CONTRACT_ADDRESS: ${NFT_CONTRACT_ADDRESS:-}
+      
       # Blockchain (Optional - SOMNIA/EDU Chain)
       PLATFORM_REVENUE_ORACLE_ADDRESS: ${PLATFORM_REVENUE_ORACLE_ADDRESS:-}
       CARE_TOKEN_ADDRESS: ${CARE_TOKEN_ADDRESS:-}
