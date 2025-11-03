@@ -19,6 +19,17 @@ depends_on = None
 
 
 def upgrade():
+    # Helper function to check if an index exists
+    def index_exists(index_name):
+        bind = op.get_bind()
+        inspector = inspect(bind)
+        # Get all indexes for all tables
+        for table_name in inspector.get_table_names():
+            for idx in inspector.get_indexes(table_name):
+                if idx['name'] == index_name:
+                    return True
+        return False
+    
     # 0. Create triage_assessments table if it doesn't exist
     # This table is required for admin dashboard queries and must exist before creating indexes
     from sqlalchemy import inspect
@@ -45,11 +56,16 @@ def upgrade():
             sa.ForeignKeyConstraint(['conversation_id'], ['conversations.id'], ),
             sa.ForeignKeyConstraint(['user_id'], ['users.id'], ),
         )
-        op.create_index('ix_triage_assessments_id', 'triage_assessments', ['id'])
-        op.create_index('ix_triage_assessments_conversation_id', 'triage_assessments', ['conversation_id'])
-        op.create_index('ix_triage_assessments_user_id', 'triage_assessments', ['user_id'])
-        op.create_index('ix_triage_assessments_severity_level', 'triage_assessments', ['severity_level'])
-        op.create_index('ix_triage_assessments_created_at', 'triage_assessments', ['created_at'])
+        if not index_exists('ix_triage_assessments_id'):
+            op.create_index('ix_triage_assessments_id', 'triage_assessments', ['id'])
+        if not index_exists('ix_triage_assessments_conversation_id'):
+            op.create_index('ix_triage_assessments_conversation_id', 'triage_assessments', ['conversation_id'])
+        if not index_exists('ix_triage_assessments_user_id'):
+            op.create_index('ix_triage_assessments_user_id', 'triage_assessments', ['user_id'])
+        if not index_exists('ix_triage_assessments_severity_level'):
+            op.create_index('ix_triage_assessments_severity_level', 'triage_assessments', ['severity_level'])
+        if not index_exists('ix_triage_assessments_created_at'):
+            op.create_index('ix_triage_assessments_created_at', 'triage_assessments', ['created_at'])
     
     # 1. Create insights_reports table if it doesn't exist
     if 'insights_reports' not in existing_tables:
@@ -67,7 +83,11 @@ def upgrade():
         sa.Column('generated_at', sa.DateTime(timezone=True), nullable=False, index=True),
         sa.Column('generated_by', sa.String(100), nullable=False, default='ia_agent'),
     )
+    
+    # Create indexes only if they don't exist
+    if not index_exists('ix_insights_reports_report_type'):
         op.create_index('ix_insights_reports_report_type', 'insights_reports', ['report_type'])
+    if not index_exists('ix_insights_reports_generated_at'):
         op.create_index('ix_insights_reports_generated_at', 'insights_reports', ['generated_at'])
     
     # 2. Create campaigns table if it doesn't exist
@@ -87,7 +107,10 @@ def upgrade():
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now(), onupdate=sa.func.now()),
         sa.Column('last_executed_at', sa.DateTime(timezone=True), nullable=True),
     )
+    
+    if not index_exists('ix_campaigns_status'):
         op.create_index('ix_campaigns_status', 'campaigns', ['status'])
+    if not index_exists('ix_campaigns_created_at'):
         op.create_index('ix_campaigns_created_at', 'campaigns', ['created_at'])
     
     # 3. Create campaign_triggers table if it doesn't exist
@@ -103,6 +126,8 @@ def upgrade():
         sa.Column('last_match_at', sa.DateTime(timezone=True), nullable=True),
         sa.Column('match_count', sa.Integer(), default=0),
     )
+    
+    if not index_exists('ix_campaign_triggers_campaign_id'):
         op.create_index('ix_campaign_triggers_campaign_id', 'campaign_triggers', ['campaign_id'])
     
     # 4. Create campaign_metrics table if it doesn't exist
@@ -119,7 +144,10 @@ def upgrade():
         sa.Column('avg_sentiment_before', sa.Float(), nullable=True),
         sa.Column('avg_sentiment_after', sa.Float(), nullable=True),
     )
+    
+    if not index_exists('ix_campaign_metrics_campaign_id'):
         op.create_index('ix_campaign_metrics_campaign_id', 'campaign_metrics', ['campaign_id'])
+    if not index_exists('ix_campaign_metrics_execution_date'):
         op.create_index('ix_campaign_metrics_execution_date', 'campaign_metrics', ['execution_date'])
     
     # 5. Create system_settings table if it doesn't exist
@@ -133,6 +161,8 @@ def upgrade():
         sa.Column('updated_by', sa.Integer(), sa.ForeignKey('users.id', ondelete='SET NULL'), nullable=True),
         sa.Column('updated_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now(), onupdate=sa.func.now()),
     )
+    
+    if not index_exists('ix_system_settings_category'):
         op.create_index('ix_system_settings_category', 'system_settings', ['category'])
     
     # 6. Create agent_health_logs table if it doesn't exist
@@ -149,7 +179,10 @@ def upgrade():
         sa.Column('error_details', sa.Text(), nullable=True),
         sa.Column('created_at', sa.DateTime(timezone=True), nullable=False, server_default=sa.func.now(), index=True),
     )
+    
+    if not index_exists('ix_agent_health_logs_agent_name'):
         op.create_index('ix_agent_health_logs_agent_name', 'agent_health_logs', ['agent_name'])
+    if not index_exists('ix_agent_health_logs_created_at'):
         op.create_index('ix_agent_health_logs_created_at', 'agent_health_logs', ['created_at'])
     
     # 7. Create case_assignments table (audit trail) if it doesn't exist
@@ -164,42 +197,45 @@ def upgrade():
         sa.Column('reassignment_reason', sa.Text(), nullable=True),
         sa.Column('previous_assignee', sa.String(255), nullable=True),
     )
+    
+    if not index_exists('ix_case_assignments_case_id'):
         op.create_index('ix_case_assignments_case_id', 'case_assignments', ['case_id'])
+    if not index_exists('ix_case_assignments_assigned_at'):
         op.create_index('ix_case_assignments_assigned_at', 'case_assignments', ['assigned_at'])
     
     # 8. Add indexes to existing cases table for better query performance
-    existing_indexes = {idx['name'] for idx in inspector.get_indexes('cases')} if 'cases' in existing_tables else set()
-    if 'idx_cases_status' not in existing_indexes:
-        op.create_index('idx_cases_status', 'cases', ['status'])
-    if 'idx_cases_severity' not in existing_indexes:
-        op.create_index('idx_cases_severity', 'cases', ['severity'])
-    if 'idx_cases_created_at' not in existing_indexes:
-        op.create_index('idx_cases_created_at', 'cases', ['created_at'])
-    if 'idx_cases_assigned_to' not in existing_indexes:
-        op.create_index('idx_cases_assigned_to', 'cases', ['assigned_to'])
+    if 'cases' in existing_tables:
+        if not index_exists('idx_cases_status'):
+            op.create_index('idx_cases_status', 'cases', ['status'])
+        if not index_exists('idx_cases_severity'):
+            op.create_index('idx_cases_severity', 'cases', ['severity'])
+        if not index_exists('idx_cases_created_at'):
+            op.create_index('idx_cases_created_at', 'cases', ['created_at'])
+        if not index_exists('idx_cases_assigned_to'):
+            op.create_index('idx_cases_assigned_to', 'cases', ['assigned_to'])
     
     # 9. Add conversation_id FK to cases table (optional, for linking cases to conversations)
-    existing_columns = {col['name'] for col in inspector.get_columns('cases')} if 'cases' in existing_tables else set()
-    
-    if 'conversation_id' not in existing_columns:
-        op.add_column('cases', sa.Column('conversation_id', sa.Integer(), sa.ForeignKey('conversations.id', ondelete='SET NULL'), nullable=True))
-        op.create_index('idx_cases_conversation_id', 'cases', ['conversation_id'])
+    if 'cases' in existing_tables:
+        existing_columns = {col['name'] for col in inspector.get_columns('cases')}
+        
+        if 'conversation_id' not in existing_columns:
+            op.add_column('cases', sa.Column('conversation_id', sa.Integer(), sa.ForeignKey('conversations.id', ondelete='SET NULL'), nullable=True))
+            if not index_exists('idx_cases_conversation_id'):
+                op.create_index('idx_cases_conversation_id', 'cases', ['conversation_id'])
     
     # 10. Add additional indexes to triage_assessments for better dashboard query performance
-    # (Basic indexes were created with the table above)
-    # Only create these additional indexes if they don't exist
-    triage_indexes = {idx['name'] for idx in inspector.get_indexes('triage_assessments')} if 'triage_assessments' in existing_tables else set()
-    if 'idx_triage_severity_level' not in triage_indexes:
-        try:
-            op.create_index('idx_triage_severity_level', 'triage_assessments', ['severity_level'], unique=False)
-        except Exception:
-            pass  # Index may already exist
-    
-    if 'idx_triage_created_at' not in triage_indexes:
-        try:
-            op.create_index('idx_triage_created_at', 'triage_assessments', ['created_at'], unique=False)
-        except Exception:
-            pass  # Index may already exist
+    if 'triage_assessments' in existing_tables:
+        if not index_exists('idx_triage_severity_level'):
+            try:
+                op.create_index('idx_triage_severity_level', 'triage_assessments', ['severity_level'], unique=False)
+            except Exception:
+                pass  # Index may already exist
+        
+        if not index_exists('idx_triage_created_at'):
+            try:
+                op.create_index('idx_triage_created_at', 'triage_assessments', ['created_at'], unique=False)
+            except Exception:
+                pass  # Index may already exist
     
     # 11. Insert default system settings
     op.execute("""
@@ -216,24 +252,60 @@ def upgrade():
 
 
 def downgrade():
-    # Drop indexes first (with if_exists to handle optional indexes)
-    op.drop_index('idx_triage_created_at', 'triage_assessments', if_exists=True)
-    op.drop_index('idx_triage_severity_level', 'triage_assessments', if_exists=True)
-    op.drop_index('idx_cases_conversation_id', 'cases', if_exists=True)
-    op.drop_column('cases', 'conversation_id', if_exists=True)
-    op.drop_index('idx_cases_assigned_to', 'cases')
-    op.drop_index('idx_cases_created_at', 'cases')
-    op.drop_index('idx_cases_severity', 'cases')
-    op.drop_index('idx_cases_status', 'cases')
+    # Helper function to check if an index exists
+    def index_exists(index_name):
+        bind = op.get_bind()
+        from sqlalchemy import inspect
+        inspector = inspect(bind)
+        for table_name in inspector.get_table_names():
+            for idx in inspector.get_indexes(table_name):
+                if idx['name'] == index_name:
+                    return True
+        return False
+    
+    # Drop indexes first (check if they exist before dropping)
+    if index_exists('idx_triage_created_at'):
+        op.drop_index('idx_triage_created_at', 'triage_assessments')
+    if index_exists('idx_triage_severity_level'):
+        op.drop_index('idx_triage_severity_level', 'triage_assessments')
+    
+    # Check if cases table exists and has the column before trying to drop
+    from sqlalchemy import inspect
+    bind = op.get_bind()
+    inspector = inspect(bind)
+    if 'cases' in inspector.get_table_names():
+        existing_columns = {col['name'] for col in inspector.get_columns('cases')}
+        if 'conversation_id' in existing_columns:
+            if index_exists('idx_cases_conversation_id'):
+                op.drop_index('idx_cases_conversation_id', 'cases')
+            op.drop_column('cases', 'conversation_id')
+        
+        # Drop other case indexes if they exist
+        if index_exists('idx_cases_assigned_to'):
+            op.drop_index('idx_cases_assigned_to', 'cases')
+        if index_exists('idx_cases_created_at'):
+            op.drop_index('idx_cases_created_at', 'cases')
+        if index_exists('idx_cases_severity'):
+            op.drop_index('idx_cases_severity', 'cases')
+        if index_exists('idx_cases_status'):
+            op.drop_index('idx_cases_status', 'cases')
     
     # Drop tables in reverse order (respecting FK constraints)
-    op.drop_table('case_assignments')
-    op.drop_table('agent_health_logs')
-    op.drop_table('system_settings')
-    op.drop_table('campaign_metrics')
-    op.drop_table('campaign_triggers')
-    op.drop_table('campaigns')
-    op.drop_table('insights_reports')
+    existing_tables = inspector.get_table_names()
+    if 'case_assignments' in existing_tables:
+        op.drop_table('case_assignments')
+    if 'agent_health_logs' in existing_tables:
+        op.drop_table('agent_health_logs')
+    if 'system_settings' in existing_tables:
+        op.drop_table('system_settings')
+    if 'campaign_metrics' in existing_tables:
+        op.drop_table('campaign_metrics')
+    if 'campaign_triggers' in existing_tables:
+        op.drop_table('campaign_triggers')
+    if 'campaigns' in existing_tables:
+        op.drop_table('campaigns')
+    if 'insights_reports' in existing_tables:
+        op.drop_table('insights_reports')
     
     # Note: We do NOT drop triage_assessments here as it may have been created 
     # in a different migration or may be needed by other parts of the system

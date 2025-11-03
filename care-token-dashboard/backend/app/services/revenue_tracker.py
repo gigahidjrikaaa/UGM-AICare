@@ -23,7 +23,8 @@ from typing import Dict, Optional, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from web3 import Web3
-from web3.middleware import geth_poa_middleware  # type: ignore
+# web3.py v7+: geth_poa_middleware renamed to ExtraDataToPOAMiddleware
+from web3.middleware import ExtraDataToPOAMiddleware as geth_poa_middleware  # type: ignore
 from eth_account import Account
 from eth_typing import ChecksumAddress
 import logging

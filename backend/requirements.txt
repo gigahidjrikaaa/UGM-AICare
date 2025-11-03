@@ -69,7 +69,12 @@ langfuse>=2.0.0  # LLM observability and agent tracing
 # See: docs/PYTORCH_TO_GEMINI_MIGRATION.md
 
 # Blockchain Integration
-web3>=6.0.0,<7.0.0  # Web3.py for Ethereum/SOMNIA blockchain interaction
+# Updated to v7.x for improved middleware API and better PoA chain support
+# Key changes in v7.x:
+# - geth_poa_middleware renamed to ExtraDataToPOAMiddleware
+# - Class-based middleware (PythonicMiddleware vs pythonic_middleware)
+# - Improved async support and performance
+web3>=7.0.0,<8.0.0  # Web3.py for Ethereum/SOMNIA blockchain interaction
 
 # Statistical Analysis and Privacy
 numpy>=1.24.0,<2.0.0

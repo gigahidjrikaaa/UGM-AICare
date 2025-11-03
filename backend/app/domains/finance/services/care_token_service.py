@@ -10,7 +10,8 @@ on the SOMNIA blockchain, including:
 """
 
 from web3 import Web3
-from web3.middleware import geth_poa_middleware  # type: ignore
+# web3.py v7+: geth_poa_middleware renamed to ExtraDataToPOAMiddleware
+from web3.middleware import ExtraDataToPOAMiddleware as geth_poa_middleware  # type: ignore
 from eth_account import Account
 from decimal import Decimal
 from typing import Optional, Dict, Any

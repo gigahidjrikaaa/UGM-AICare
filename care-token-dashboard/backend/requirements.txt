@@ -8,7 +8,7 @@ pydantic-settings==2.0.0
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.6
-web3==6.5.0
+web3>=7.0.0,<8.0.0  # Updated for ExtraDataToPOAMiddleware API
 apscheduler==3.10.1
 python-dotenv==1.0.0
 redis==4.6.0
