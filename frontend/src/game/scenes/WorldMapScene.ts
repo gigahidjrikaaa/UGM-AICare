@@ -26,8 +26,8 @@ export class WorldMapScene extends Phaser.Scene {
     this.eventBridge = EventBridge.getInstance();
 
     // Background (TODO: Use UGM campus map when generated)
-    this.add.rectangle(640, 360, 1280, 720, 0x88cc88);
-    this.add.text(640, 50, 'UGM Campus - CareQuest World', {
+    this.add.rectangle(960, 540, 1920, 1080, 0x88cc88);
+    this.add.text(960, 75, 'UGM Campus - CareQuest World', {
       fontSize: '32px',
       color: '#ffffff',
       backgroundColor: '#000000',
@@ -35,7 +35,7 @@ export class WorldMapScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     // Player sprite (using placeholder)
-    this.player = this.physics.add.sprite(640, 360, 'player-placeholder');
+    this.player = this.physics.add.sprite(960, 540, 'player-placeholder');
     this.player.setCollideWorldBounds(true);
     this.player.setDepth(10); // Render on top
 
@@ -43,14 +43,14 @@ export class WorldMapScene extends Phaser.Scene {
     this.cursors = this.input.keyboard!.createCursorKeys();
 
     // Spawn NPCs
-    this.spawnNPC('aika', 500, 300, 'Hai! Aku Aika, virtual assistant UGM-AICare! 👋');
+    this.spawnNPC('aika', 750, 450, 'Hai! Aku Aika, virtual assistant UGM-AICare! 👋');
 
     // Spawn monster zones
-    this.spawnMonsterZone(800, 400, 'Anxiety Monster', 3);
-    this.spawnMonsterZone(300, 500, 'Stress Monster', 2);
+    this.spawnMonsterZone(1200, 600, 'Anxiety Monster', 3);
+    this.spawnMonsterZone(450, 750, 'Stress Monster', 2);
 
     // Instructions
-    this.add.text(640, 650, 'Arrow Keys: Move | Click NPC: Talk | Click Red Zone: Combat', {
+    this.add.text(960, 975, 'Arrow Keys: Move | Click NPC: Talk | Click Red Zone: Combat', {
       fontSize: '16px',
       color: '#ffffff',
       backgroundColor: '#000000',

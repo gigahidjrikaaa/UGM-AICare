@@ -81,17 +81,17 @@ export class CombatScene extends Phaser.Scene {
     console.log('[CombatScene] Creating combat UI...');
 
     // Background
-    this.add.rectangle(640, 360, 1280, 720, 0x1a1a2e);
+    this.add.rectangle(960, 540, 1920, 1080, 0x1a1a2e);
 
     // Title
-    this.add.text(640, 50, `Combat: ${this.monsterType}`, {
+    this.add.text(960, 75, `Combat: ${this.monsterType}`, {
       fontSize: '32px',
       color: '#ffffff',
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
     // Monster sprite (placeholder)
-    this.monster = this.add.sprite(640, 200, 'monster-placeholder');
+    this.monster = this.add.sprite(960, 300, 'monster-placeholder');
     this.monster.setScale(2);
 
     // Monster HP bar
@@ -99,31 +99,31 @@ export class CombatScene extends Phaser.Scene {
     this.updateMonsterHP();
 
     // Sentence display
-    this.sentenceText = this.add.text(640, 450, this.currentSentence, {
+    this.sentenceText = this.add.text(960, 675, this.currentSentence, {
       fontSize: '28px',
       color: '#ffffff',
       backgroundColor: '#333333',
       padding: { x: 20, y: 10 },
-      wordWrap: { width: 1100 },
+      wordWrap: { width: 1650 },
     }).setOrigin(0.5);
 
     // User input display
-    this.inputText = this.add.text(640, 550, '', {
+    this.inputText = this.add.text(960, 825, '', {
       fontSize: '28px',
       color: '#00ff00',
       backgroundColor: '#222222',
       padding: { x: 20, y: 10 },
-      wordWrap: { width: 1100 },
+      wordWrap: { width: 1650 },
     }).setOrigin(0.5);
 
     // Stats display (combo, WPM, accuracy)
-    this.statsText = this.add.text(640, 620, 'Combo: 0x | WPM: 0 | Accuracy: 0%', {
+    this.statsText = this.add.text(960, 930, 'Combo: 0x | WPM: 0 | Accuracy: 0%', {
       fontSize: '18px',
       color: '#ffff00',
     }).setOrigin(0.5);
 
     // Instructions
-    this.add.text(640, 680, 'Type the sentence above | Backspace to correct | Press ESC to flee', {
+    this.add.text(960, 1020, 'Type the sentence above | Backspace to correct | Press ESC to flee', {
       fontSize: '14px',
       color: '#aaaaaa',
     }).setOrigin(0.5);
@@ -223,9 +223,9 @@ export class CombatScene extends Phaser.Scene {
     
     this.monsterHPBar.clear();
     
-    // HP bar background
+    // HP bar background (scaled for FHD)
     this.monsterHPBar.fillStyle(0x333333);
-    this.monsterHPBar.fillRect(440, 260, 400, 25);
+    this.monsterHPBar.fillRect(660, 390, 600, 38);
     
     // HP bar fill (green → yellow → red)
     let color = 0x00ff00;
@@ -233,18 +233,18 @@ export class CombatScene extends Phaser.Scene {
     if (percentage < 0.25) color = 0xff0000;
     
     this.monsterHPBar.fillStyle(color);
-    this.monsterHPBar.fillRect(442, 262, 396 * percentage, 21);
+    this.monsterHPBar.fillRect(663, 393, 594 * percentage, 32);
     
     // Border
     this.monsterHPBar.lineStyle(2, 0xffffff);
-    this.monsterHPBar.strokeRect(440, 260, 400, 25);
+    this.monsterHPBar.strokeRect(660, 390, 600, 38);
 
     // HP text
     const hpText = `${Math.ceil(this.combatSystem['monsterHP'])} / ${this.combatSystem['monsterMaxHP']} HP`;
     this.monsterHPBar.fillStyle(0xffffff, 1);
     // Note: Can't use graphics.text, need to create separate text object
     if (!this.monsterHPBar.getData('hpText')) {
-      const text = this.add.text(640, 272, hpText, {
+      const text = this.add.text(960, 408, hpText, {
         fontSize: '14px',
         color: '#000000',
         fontStyle: 'bold',
@@ -259,7 +259,7 @@ export class CombatScene extends Phaser.Scene {
    * Show floating damage number
    */
   private showDamageNumber(damage: number, isCritical: boolean) {
-    const text = this.add.text(640, 200, `-${damage.toFixed(1)}`, {
+    const text = this.add.text(960, 300, `-${damage.toFixed(1)}`, {
       fontSize: isCritical ? '56px' : '40px',
       color: isCritical ? '#ffff00' : '#ff6600',
       fontStyle: 'bold',
@@ -268,7 +268,7 @@ export class CombatScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     if (isCritical) {
-      this.add.text(640, 250, 'CRITICAL!', {
+      this.add.text(960, 375, 'CRITICAL!', {
         fontSize: '28px',
         color: '#ffff00',
         fontStyle: 'bold',
@@ -277,7 +277,7 @@ export class CombatScene extends Phaser.Scene {
 
     this.tweens.add({
       targets: text,
-      y: 140,
+      y: 210,
       alpha: 0,
       duration: 1200,
       ease: 'Cubic.easeOut',
@@ -299,7 +299,7 @@ export class CombatScene extends Phaser.Scene {
     };
 
     // Show victory screen
-    const victoryText = this.add.text(640, 360, 'VICTORY!', {
+    const victoryText = this.add.text(960, 540, 'VICTORY!', {
       fontSize: '72px',
       color: '#ffff00',
       fontStyle: 'bold',
@@ -317,7 +317,7 @@ export class CombatScene extends Phaser.Scene {
     });
 
     // Show rewards
-    this.add.text(640, 450, `Rewards: +${rewards.joy_delta} JOY | +${rewards.care_delta} CARE | +${rewards.harmony_delta} Harmony`, {
+    this.add.text(960, 675, `Rewards: +${rewards.joy_delta} JOY | +${rewards.care_delta} CARE | +${rewards.harmony_delta} Harmony`, {
       fontSize: '24px',
       color: '#00ff00',
       backgroundColor: '#000000',

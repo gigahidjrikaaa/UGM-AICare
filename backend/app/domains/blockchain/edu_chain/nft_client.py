@@ -13,7 +13,8 @@ import os
 import json
 from typing import Optional
 from web3 import Web3  # type: ignore
-from web3.middleware import geth_poa_middleware  # type: ignore
+# web3.py v7+: geth_poa_middleware renamed to ExtraDataToPOAMiddleware
+from web3.middleware import ExtraDataToPOAMiddleware as geth_poa_middleware  # type: ignore
 from dotenv import load_dotenv
 import logging
 

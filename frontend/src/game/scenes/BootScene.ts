@@ -27,7 +27,7 @@ export class BootScene extends Phaser.Scene {
     progressBox.strokeRoundedRect(440, 320, 400, 50, 8);
 
     // Loading text - UGM Gold
-    const loadingText = this.add.text(640, 280, 'Loading CareQuest...', {
+    const loadingText = this.add.text(960, 420, 'Loading CareQuest...', {
       fontSize: '24px',
       fontStyle: 'bold',
       color: '#FFCA40', // UGM Gold
