@@ -3,6 +3,22 @@
 
 set -e
 
+# Detect docker-compose command (handle Windows Docker Desktop CLI plugin path)
+# Prioritize the CLI plugin path over the wrapper script
+if [ -f "/c/Program Files/Docker/Docker/resources/cli-plugins/docker-compose.exe" ]; then
+    DOCKER_COMPOSE_CMD="/c/Program Files/Docker/Docker/resources/cli-plugins/docker-compose.exe"
+elif command -v docker &> /dev/null && docker compose version &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker compose"
+elif command -v docker-compose &> /dev/null; then
+    DOCKER_COMPOSE_CMD="docker-compose"
+else
+    echo "❌ ERROR: docker-compose not found!"
+    echo "Please install Docker Compose: https://docs.docker.com/compose/install/"
+    exit 1
+fi
+
+echo "Using Docker Compose: $DOCKER_COMPOSE_CMD"
+
 COMPOSE_FILE="docker-compose.dev.yml"
 OVERRIDE_FILE="docker-compose.override.yml"
 BACKUP_FILE="docker-compose.override.yml.disabled"
@@ -77,7 +93,7 @@ case "${1:-}" in
         echo "   • Backend: Python files in /backend/app/"
         echo "   • Frontend: TypeScript/React files in /frontend/src/"
         echo ""
-        docker compose -f "$COMPOSE_FILE" up -d
+        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" up -d
         echo ""
         echo "✅ Services started!"
         echo "   Frontend: http://localhost:4000 (Next.js dev server)"
@@ -98,15 +114,15 @@ case "${1:-}" in
         echo "🚀 Starting FULL development environment (App + Monitoring)..."
         echo ""
         echo "📦 Starting application services..."
-        docker compose -f "$COMPOSE_FILE" up -d
+        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" up -d
         echo "✅ Application started"
         echo ""
         echo "📊 Starting ELK Stack (Logs)..."
-        docker compose -f "$ELK_COMPOSE" up -d
+        "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" up -d
         echo "✅ ELK Stack started"
         echo ""
         echo "📈 Starting Prometheus + Grafana (Metrics)..."
-        docker compose -f "$MONITORING_COMPOSE" up -d
+        "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" up -d
         echo "✅ Monitoring Stack started"
         echo ""
         echo "⏳ Waiting for services to be ready..."
@@ -135,7 +151,7 @@ case "${1:-}" in
     
     down)
         echo "🛑 Stopping application services..."
-        docker compose -f "$COMPOSE_FILE" down
+        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" down
         echo "✅ Application services stopped"
         echo ""
         echo "💡 Monitoring stack still running. To stop:"
@@ -147,11 +163,11 @@ case "${1:-}" in
         echo "🛑 Stopping ALL services (App + Monitoring)..."
         echo ""
         echo "Stopping application..."
-        docker compose -f "$COMPOSE_FILE" down
+        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" down
         echo ""
         echo "Stopping monitoring stack..."
-        docker compose -f "$MONITORING_COMPOSE" down
-        docker compose -f "$ELK_COMPOSE" down
+        "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" down
+        "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" down
         echo ""
         echo "✅ All services stopped"
         ;;
@@ -160,25 +176,25 @@ case "${1:-}" in
         echo "🔄 Restarting services..."
         if [ -n "${2:-}" ]; then
             echo "   Restarting $2..."
-            docker compose -f "$COMPOSE_FILE" restart "$2"
+            "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" restart "$2"
         else
             echo "   Restarting all services..."
-            docker compose -f "$COMPOSE_FILE" restart
+            "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" restart
         fi
         echo "✅ Services restarted"
         ;;
     
     logs)
         if [ -n "${2:-}" ]; then
-            docker compose -f "$COMPOSE_FILE" logs -f "$2"
+            "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" logs -f "$2"
         else
-            docker compose -f "$COMPOSE_FILE" logs -f
+            "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" logs -f
         fi
         ;;
     
     build)
         echo "🔨 Rebuilding containers..."
-        docker compose -f "$COMPOSE_FILE" up --build -d
+        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" up --build -d
         echo "✅ Rebuild complete"
         ;;
     
@@ -187,10 +203,10 @@ case "${1:-}" in
         echo "   This will rebuild with Docker cache for faster builds"
         echo ""
         # Use BuildKit for faster builds
-        COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 docker compose -f "$COMPOSE_FILE" build --parallel backend frontend
+        COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" build --parallel backend frontend
         echo ""
         echo "🚀 Restarting services..."
-        docker compose -f "$COMPOSE_FILE" up -d backend frontend
+        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" up -d backend frontend
         echo ""
         echo "✅ Fast rebuild complete!"
         echo "   Backend and frontend have been rebuilt and restarted"
@@ -208,10 +224,10 @@ case "${1:-}" in
         echo "✅ Docker cache cleaned"
         echo ""
         echo "🔨 Building with no cache..."
-        COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 docker compose -f "$COMPOSE_FILE" build --parallel --no-cache backend frontend
+        COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" build --parallel --no-cache backend frontend
         echo ""
         echo "🚀 Restarting services..."
-        docker compose -f "$COMPOSE_FILE" up -d backend frontend
+        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" up -d backend frontend
         echo ""
         echo "✅ Clean rebuild complete!"
         echo "   • Docker cache cleared"
@@ -231,7 +247,7 @@ case "${1:-}" in
             echo "💡 Tip: To rebuild from scratch, run: ./dev.sh rebuild-clean"
         else
             echo "⚠️  No existing image found. Building..."
-            COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 docker compose -f "$COMPOSE_FILE" build backend
+            COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" build backend
             
             if [ $? -ne 0 ]; then
                 echo ""
@@ -247,7 +263,7 @@ case "${1:-}" in
         
         echo ""
         echo "2️⃣ Testing Python imports..."
-        docker compose -f "$COMPOSE_FILE" run --rm --no-deps backend python -c "
+        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" run --rm --no-deps backend python -c "
 import sys
 print('Python version:', sys.version)
 print('')
@@ -326,7 +342,7 @@ print('🎉 All tests passed! Backend is ready for deployment.')
         
         echo ""
         echo "3️⃣ Checking Web3.py version..."
-        docker compose -f "$COMPOSE_FILE" run --rm --no-deps backend python -c "
+        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" run --rm --no-deps backend python -c "
 import web3
 print(f'Web3.py version: {web3.__version__}')
 "
@@ -363,10 +379,10 @@ print(f'Web3.py version: {web3.__version__}')
             mv "$OVERRIDE_FILE" "$BACKUP_FILE"
             echo "✅ Development override disabled"
             echo "   Starting in production mode..."
-            docker compose -f docker-compose.yml up -d
+            "$DOCKER_COMPOSE_CMD" -f docker-compose.yml up -d
         else
             echo "ℹ️  Already in production mode"
-            docker compose -f docker-compose.yml up -d
+            "$DOCKER_COMPOSE_CMD" -f docker-compose.yml up -d
         fi
         ;;
     
@@ -378,7 +394,7 @@ print(f'Web3.py version: {web3.__version__}')
         else
             echo "ℹ️  Already in development mode"
         fi
-        docker compose -f "$COMPOSE_FILE" up -d
+        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" up -d
         ;;
     
     clean)
@@ -386,7 +402,7 @@ print(f'Web3.py version: {web3.__version__}')
         read -p "This will remove application containers and volumes. Continue? (y/N) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            docker compose -f "$COMPOSE_FILE" down -v
+            "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" down -v
             echo "✅ Application cleanup complete"
             echo ""
             echo "💡 Monitoring stack not affected. To clean monitoring:"
@@ -403,11 +419,11 @@ print(f'Web3.py version: {web3.__version__}')
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             echo ""
             echo "Removing application..."
-            docker compose -f "$COMPOSE_FILE" down -v
+            "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" down -v
             echo ""
             echo "Removing monitoring stack..."
-            docker compose -f "$MONITORING_COMPOSE" down -v
-            docker compose -f "$ELK_COMPOSE" down -v
+            "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" down -v
+            "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" down -v
             echo ""
             echo "✅ Complete cleanup done"
         else
@@ -417,11 +433,11 @@ print(f'Web3.py version: {web3.__version__}')
     
     status)
         echo "📊 Application Services:"
-        docker compose -f "$COMPOSE_FILE" ps
+        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" ps
         echo ""
         echo "📊 Monitoring Services:"
-        docker compose -f "$MONITORING_COMPOSE" ps 2>/dev/null || echo "  (not running)"
-        docker compose -f "$ELK_COMPOSE" ps 2>/dev/null || echo "  (not running)"
+        "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" ps 2>/dev/null || echo "  (not running)"
+        "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" ps 2>/dev/null || echo "  (not running)"
         ;;
     
     monitoring)
@@ -430,10 +446,10 @@ print(f'Web3.py version: {web3.__version__}')
                 echo "📊 Starting monitoring stack..."
                 echo ""
                 echo "Starting ELK Stack..."
-                docker compose -f "$ELK_COMPOSE" up -d
+                "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" up -d
                 echo ""
                 echo "Starting Prometheus + Grafana..."
-                docker compose -f "$MONITORING_COMPOSE" up -d
+                "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" up -d
                 echo ""
                 echo "⏳ Waiting for services to be healthy..."
                 sleep 15
@@ -450,23 +466,23 @@ print(f'Web3.py version: {web3.__version__}')
             
             stop)
                 echo "🛑 Stopping monitoring stack..."
-                docker compose -f "$MONITORING_COMPOSE" down
-                docker compose -f "$ELK_COMPOSE" down
+                "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" down
+                "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" down
                 echo "✅ Monitoring stack stopped"
                 ;;
             
             restart)
                 echo "🔄 Restarting monitoring stack..."
-                docker compose -f "$MONITORING_COMPOSE" restart
-                docker compose -f "$ELK_COMPOSE" restart
+                "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" restart
+                "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" restart
                 echo "✅ Monitoring stack restarted"
                 ;;
             
             logs)
                 if [ -n "${3:-}" ]; then
                     # Try to find service in either compose file
-                    docker compose -f "$MONITORING_COMPOSE" logs -f "$3" 2>/dev/null || \
-                    docker compose -f "$ELK_COMPOSE" logs -f "$3"
+                    "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" logs -f "$3" 2>/dev/null || \
+                    "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" logs -f "$3"
                 else
                     echo "Available monitoring services:"
                     echo ""
@@ -494,10 +510,10 @@ print(f'Web3.py version: {web3.__version__}')
                 echo "📊 Monitoring Stack Status:"
                 echo ""
                 echo "ELK Stack:"
-                docker compose -f "$ELK_COMPOSE" ps
+                "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" ps
                 echo ""
                 echo "Prometheus + Grafana:"
-                docker compose -f "$MONITORING_COMPOSE" ps
+                "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" ps
                 ;;
             
             *)
@@ -583,7 +599,7 @@ EOL
         
         # Start Langfuse service
         echo "[5/5] Starting Langfuse service..."
-        docker compose -f docker-compose.monitoring.yml up -d langfuse-server
+        "$DOCKER_COMPOSE_CMD" -f docker-compose.monitoring.yml up -d langfuse-server
         echo "✓ Langfuse service started"
         echo ""
         
