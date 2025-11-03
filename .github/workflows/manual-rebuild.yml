@@ -131,13 +131,62 @@ jobs:
             cd ${{ secrets.VM_PROJECT_PATH }}
             
             # ========================================
-            # 1. System Cleanup (if requested)
+            # 1. Update .env File FIRST (before cleanup)
+            # ========================================
+            echo ""
+            echo "📝 Updating .env file..."
+            
+            # Write .env file (handle potential base64 encoding)
+            if echo "$ENV_FILE_PRODUCTION" | base64 -d > /dev/null 2>&1; then
+              echo "Using base64 encoded secret..."
+              echo "$ENV_FILE_PRODUCTION" | base64 -d > .env
+            else
+              echo "Using plain text secret..."
+              echo "$ENV_FILE_PRODUCTION" > .env
+            fi
+            
+            chmod 600 .env
+            
+            # Verify file was created
+            if [ ! -f .env ]; then
+              echo "❌ ERROR: Failed to create .env file"
+              exit 1
+            fi
+            
+            echo "✅ .env file created ($(wc -l < .env) lines)"
+            echo ""
+            echo "Verifying environment variables..."
+            
+            # Check for critical variables
+            CRITICAL_VARS="ADMIN_EMAIL COUNSELOR_EMAIL DATABASE_URL JWT_SECRET_KEY"
+            MISSING_VARS=""
+            
+            for var in $CRITICAL_VARS; do
+              if ! grep -q "^${var}=" .env; then
+                MISSING_VARS="$MISSING_VARS $var"
+              fi
+            done
+            
+            if [ -n "$MISSING_VARS" ]; then
+              echo "❌ ERROR: Missing critical environment variables:$MISSING_VARS"
+              echo "File size: $(stat -f%z .env 2>/dev/null || stat -c%s .env) bytes"
+              exit 1
+            fi
+            
+            echo "✅ All critical environment variables verified"
+            echo ""
+            echo "Sample of loaded variables:"
+            grep -E "^(ADMIN_EMAIL|COUNSELOR_EMAIL|DATABASE_URL|POSTGRES_|REDIS_HOST)=" .env | head -5 || true
+            
+            # ========================================
+            # 2. System Cleanup (if requested)
             # ========================================
             if [ "$PRUNE_SYSTEM" = "true" ]; then
               echo ""
               echo "🧹 Cleaning up Docker system..."
               
-              docker compose -f infra/compose/docker-compose.prod.yml down || true
+              # Now we can use --env-file since .env exists
+              docker compose -f infra/compose/docker-compose.prod.yml --env-file "$(pwd)/.env" down || true
               docker container prune -f || true
               docker image prune -f || true
               docker network prune -f || true
@@ -149,61 +198,6 @@ jobs:
               echo "Disk space:"
               df -h / | awk 'NR==1 || /\/$/'
             fi
-            
-            # ========================================
-            # 2. Update .env File
-            # ========================================
-            echo ""
-            echo "📝 Updating .env file..."
-            
-            # Write .env file (handle potential base64 encoding)
-            if echo "$ENV_FILE_PRODUCTION" | base64 -d > /dev/null 2>&1; then
-              echo "Detected base64 encoded secret, decoding..."
-              echo "$ENV_FILE_PRODUCTION" | base64 -d > .env
-            else
-              echo "Using plain text secret..."
-              echo "$ENV_FILE_PRODUCTION" > .env
-            fi
-            
-            # Verify file was created and has content
-            if [ ! -f .env ]; then
-              echo "❌ ERROR: .env file was not created!"
-              exit 1
-            fi
-            
-            FILE_SIZE=$(wc -l < .env)
-            echo "✅ .env file created ($FILE_SIZE lines)"
-            
-            # Verify critical variables
-            echo ""
-            echo "Verifying environment variables..."
-            MISSING_VARS=()
-            
-            if ! grep -q "^ADMIN_EMAIL=" .env; then
-              MISSING_VARS+=("ADMIN_EMAIL")
-            fi
-            if ! grep -q "^COUNSELOR_EMAIL=" .env; then
-              MISSING_VARS+=("COUNSELOR_EMAIL")
-            fi
-            if ! grep -q "^DATABASE_URL=" .env; then
-              MISSING_VARS+=("DATABASE_URL")
-            fi
-            if ! grep -q "^JWT_SECRET_KEY=" .env; then
-              MISSING_VARS+=("JWT_SECRET_KEY")
-            fi
-            
-            if [ ${#MISSING_VARS[@]} -gt 0 ]; then
-              echo "❌ ERROR: Missing critical variables: ${MISSING_VARS[*]}"
-              echo ""
-              echo "First 10 lines of .env file:"
-              head -10 .env
-              exit 1
-            fi
-            
-            echo "✅ All critical environment variables verified"
-            echo ""
-            echo "Sample of loaded variables:"
-            grep -E "^(ADMIN_EMAIL|COUNSELOR_EMAIL|DATABASE_URL|POSTGRES_|REDIS_HOST)=" .env | head -5 || true
             
             # ========================================
             # 3. Docker Login
