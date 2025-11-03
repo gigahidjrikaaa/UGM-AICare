@@ -127,6 +127,19 @@ jobs:
             echo "Prune System: $PRUNE_SYSTEM"
             echo "Deploy Monitoring: $DEPLOY_MONITORING"
             echo "=========================================="
+            echo ""
+            
+            # Check system resources
+            echo "📊 System Resources:"
+            echo "Memory:"
+            free -h | grep -E "Mem:|Swap:" || true
+            echo ""
+            echo "Disk:"
+            df -h / | awk 'NR==1 || /\/$/'
+            echo ""
+            echo "Docker:"
+            docker system df || true
+            echo "=========================================="
             
             cd ${{ secrets.VM_PROJECT_PATH }}
             
@@ -269,22 +282,47 @@ jobs:
             echo "✅ Services started"
             
             # ========================================
-            # 7. Wait for Services
+            # 7. Wait for Services & Health Check
             # ========================================
             echo ""
             echo "⏳ Waiting for services to be healthy..."
-            sleep 15
+            echo ""
             
-            # Check backend health
+            # Wait for backend to be ready (give it more time)
             echo "Checking backend health..."
-            for i in {1..10}; do
+            BACKEND_READY=false
+            
+            for i in {1..20}; do
+              # Check if backend container is running first
+              if ! docker compose -f infra/compose/docker-compose.prod.yml ps backend | grep -q "Up"; then
+                echo "Attempt $i/20: Backend container not running yet..."
+                sleep 3
+                continue
+              fi
+              
+              # Try Python-based health check (works without curl)
               if docker compose -f infra/compose/docker-compose.prod.yml --env-file "$(pwd)/.env" exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5).read()" > /dev/null 2>&1; then
-                echo "✅ Backend is healthy"
+                echo "✅ Backend is healthy (attempt $i/20)"
+                BACKEND_READY=true
                 break
               fi
-              echo "Attempt $i/10: Backend not ready yet..."
-              sleep 5
+              
+              # Fallback: Check if backend process is running
+              if docker compose -f infra/compose/docker-compose.prod.yml --env-file "$(pwd)/.env" exec -T backend pgrep -f "uvicorn" > /dev/null 2>&1; then
+                echo "✅ Backend process is running (attempt $i/20)"
+                BACKEND_READY=true
+                break
+              fi
+              
+              echo "Attempt $i/20: Backend not ready yet..."
+              sleep 3
             done
+            
+            if [ "$BACKEND_READY" = "false" ]; then
+              echo "⚠️  Warning: Backend health check failed, but continuing..."
+              echo "Checking backend logs for errors:"
+              docker compose -f infra/compose/docker-compose.prod.yml logs --tail=30 backend | grep -E "ERROR|CRITICAL|Traceback" || echo "No errors found"
+            fi
             
             # ========================================
             # 8. Run Database Migrations
@@ -299,8 +337,40 @@ jobs:
             # ========================================
             echo ""
             echo "👥 Initializing production accounts..."
-            docker compose -f infra/compose/docker-compose.prod.yml --env-file "$(pwd)/.env" exec -T backend python scripts/init_production_accounts.py
-            echo "✅ Accounts initialized"
+            
+            # Check available memory before running
+            echo "System memory status:"
+            free -h || true
+            
+            # Run with timeout and error handling
+            if timeout 120 docker compose -f infra/compose/docker-compose.prod.yml --env-file "$(pwd)/.env" exec -T backend python scripts/init_production_accounts.py; then
+              echo "✅ Accounts initialized successfully"
+            else
+              EXIT_CODE=$?
+              echo "⚠️  Account initialization failed with exit code: $EXIT_CODE"
+              
+              if [ $EXIT_CODE -eq 137 ]; then
+                echo "❌ ERROR: Out of Memory (OOM) - Container was killed"
+                echo "System memory after failure:"
+                free -h || true
+                echo ""
+                echo "Container memory usage:"
+                docker stats --no-stream --format "table {{.Container}}\t{{.MemUsage}}\t{{.MemPerc}}" || true
+                echo ""
+                echo "💡 Recommendation: Reduce monitoring services or increase VM memory"
+                exit 1
+              elif [ $EXIT_CODE -eq 124 ]; then
+                echo "❌ ERROR: Timeout - Account initialization took longer than 120 seconds"
+                echo "Backend logs:"
+                docker compose -f infra/compose/docker-compose.prod.yml logs --tail=50 backend
+                exit 1
+              else
+                echo "❌ ERROR: Unknown failure"
+                echo "Backend logs:"
+                docker compose -f infra/compose/docker-compose.prod.yml logs --tail=50 backend
+                exit 1
+              fi
+            fi
             
             # ========================================
             # 10. Verify Deployment

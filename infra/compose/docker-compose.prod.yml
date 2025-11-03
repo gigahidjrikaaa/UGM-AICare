@@ -69,6 +69,15 @@ services:
     image: ghcr.io/${GHCR_REPOSITORY_OWNER:-gigahidjrikaaa}/ugm-aicare-api:${GIT_SHA}
     ports: # Expose this service directly to the host
       - "8000:8000"
+    # Resource limits to prevent OOM in production
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+          cpus: '1.0'
+        reservations:
+          memory: 512M
+          cpus: '0.5'
     # env_file is passed via --env-file flag in deploy.sh
     environment:
       # Database connection
