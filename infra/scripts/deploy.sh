@@ -116,8 +116,22 @@ docker compose -f infra/compose/docker-compose.prod.yml down || true # Ignore er
 echo "[deploy.sh] Cleaning up stopped containers..."
 docker container prune -f || true
 
-# Start new containers (pass --env-file to use root .env)
-docker compose -f infra/compose/docker-compose.prod.yml --env-file .env up -d
+# Get absolute path to project root and .env
+PROJECT_ROOT=$(pwd)
+ENV_FILE="${PROJECT_ROOT}/.env"
+
+echo "[deploy.sh] Using .env file: $ENV_FILE"
+
+# Verify .env file exists and has content
+if [ ! -f "$ENV_FILE" ]; then
+  echo "[deploy.sh] ERROR: .env file not found at $ENV_FILE"
+  exit 1
+fi
+
+echo "[deploy.sh] .env file size: $(wc -l < "$ENV_FILE") lines"
+
+# Start new containers (pass --env-file with absolute path)
+docker compose -f infra/compose/docker-compose.prod.yml --env-file "$ENV_FILE" up -d
 echo "[deploy.sh] Services started."
 
 # Start monitoring stack if requested
@@ -126,18 +140,18 @@ if [[ "$DEPLOY_MONITORING" == "true" ]]; then
   
   # Check if langfuse_db exists, create if not
   echo "[deploy.sh] Checking if langfuse_db exists..."
-  DB_EXISTS=$(docker compose -f infra/compose/docker-compose.prod.yml exec -T db psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT 1 FROM pg_database WHERE datname='langfuse_db'" 2>/dev/null || echo "0")
+  DB_EXISTS=$(docker compose -f infra/compose/docker-compose.prod.yml --env-file "$ENV_FILE" exec -T db psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -tAc "SELECT 1 FROM pg_database WHERE datname='langfuse_db'" 2>/dev/null || echo "0")
   
   if [[ "$DB_EXISTS" != "1" ]]; then
     echo "[deploy.sh] Creating langfuse_db database..."
-    docker compose -f infra/compose/docker-compose.prod.yml exec -T db psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "CREATE DATABASE langfuse_db;" || true
+    docker compose -f infra/compose/docker-compose.prod.yml --env-file "$ENV_FILE" exec -T db psql -U "${POSTGRES_USER}" -d "${POSTGRES_DB}" -c "CREATE DATABASE langfuse_db;" || true
     echo "[deploy.sh] langfuse_db database created."
   else
     echo "[deploy.sh] langfuse_db database already exists."
   fi
   
   # Start monitoring services
-  docker compose -f infra/compose/docker-compose.prod.yml -f infra/compose/docker-compose.prod-monitoring.yml --env-file .env up -d
+  docker compose -f infra/compose/docker-compose.prod.yml -f infra/compose/docker-compose.prod-monitoring.yml --env-file "$ENV_FILE" up -d
   echo "[deploy.sh] Monitoring stack started."
   
   # Wait for monitoring services to be ready
