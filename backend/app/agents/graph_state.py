@@ -146,10 +146,21 @@ class SCAState(SafetyAgentState):
 class SDAState(SafetyAgentState):
     """SDA-specific state extension.
     
-    Used by the Service Desk Agent subgraph. Inherits all fields from
-    SafetyAgentState but can be extended with SDA-specific fields if needed.
+    Used by the Service Desk Agent subgraph. Extends SafetyAgentState with
+    auto-assignment tracking fields.
     """
-    pass
+    # Assignment tracking (from auto_assign_node)
+    assigned_to: NotRequired[Optional[str]]
+    """Counsellor ID (agent_users.id) assigned to this case."""
+    
+    assignment_id: NotRequired[Optional[str]]
+    """UUID of CaseAssignment record for audit trail."""
+    
+    assignment_reason: NotRequired[Optional[str]]
+    """Reason for assignment (e.g., 'auto_assigned_lowest_workload', 'no_counsellors_available')."""
+    
+    assigned_workload: NotRequired[Optional[int]]
+    """Number of active cases the assigned counsellor has (for load balancing metrics)."""
 
 
 class OrchestratorState(SafetyAgentState):

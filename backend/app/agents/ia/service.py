@@ -1,23 +1,16 @@
 from __future__ import annotations
 
-from __future__ import annotations
-
-from collections.abc import Awaitable, Callable
+from collections.abc import Awaitable, Callable, Sequence
 from datetime import datetime
 from typing import Any, Dict
 
 from fastapi import Depends
-from sqlalchemy import case, func, select
+from sqlalchemy import text, Row
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.ia.queries import ALLOWED_QUERIES
 from app.agents.ia.schemas import IAQueryRequest, IAQueryResponse
 from app.database import get_async_db
-from app.domains.mental_health.models import (
-    CampaignExecution as InterventionCampaignExecution,  # Alias for backward compatibility
-    Conversation,
-    TriageAssessment,
-)
 
 
 class InsightsAgentService:
@@ -27,161 +20,184 @@ class InsightsAgentService:
         self._session = session
 
     async def query(self, payload: IAQueryRequest) -> IAQueryResponse:
-        handler = self._resolve_handler(payload.question_id)
+        """
+        Execute allow-listed SQL query with date range parameters.
+        All queries enforce k-anonymity (minimum group size k=5).
+        """
+        question_id = payload.question_id
+        if question_id not in ALLOWED_QUERIES:
+            raise ValueError(f"Unsupported question_id: {question_id}")
+        
         start, end = payload.params.start, payload.params.end
         if start >= end:
             raise ValueError("Parameter 'from' must be before 'to'")
-        return await handler(start, end)
+        
+        # Execute raw SQL query with parameters
+        sql_query = ALLOWED_QUERIES[question_id]
+        result = await self._session.execute(
+            text(sql_query),
+            {"start_date": start, "end_date": end}
+        )
+        rows = result.fetchall()
+        
+        # Format results based on query type
+        handler = self._resolve_formatter(question_id)
+        return handler(rows, start, end)
 
-    def _resolve_handler(
+    def _resolve_formatter(
         self,
         question_id: str,
-    ) -> Callable[[datetime, datetime], Awaitable[IAQueryResponse]]:
-        handlers: Dict[str, Callable[[datetime, datetime], Awaitable[IAQueryResponse]]] = {
-            "crisis_trend": self._crisis_trend,
-            "dropoffs": self._dropoffs,
-            "resource_reuse": self._resource_reuse,
-            "fallback_reduction": self._fallback_reduction,
-            "cost_per_helpful": self._cost_per_helpful,
-            "coverage_windows": self._coverage_windows,
+    ) -> Callable[[Sequence[Row[Any]], datetime, datetime], IAQueryResponse]:
+        """Get formatter function for query results."""
+        formatters: Dict[str, Callable[[Sequence[Row[Any]], datetime, datetime], IAQueryResponse]] = {
+            "crisis_trend": self._format_crisis_trend,
+            "dropoffs": self._format_dropoffs,
+            "resource_reuse": self._format_resource_reuse,
+            "fallback_reduction": self._format_fallback_reduction,
+            "cost_per_helpful": self._format_cost_per_helpful,
+            "coverage_windows": self._format_coverage_windows,
         }
-        if question_id not in ALLOWED_QUERIES:
-            raise ValueError(f"Unsupported question_id: {question_id}")
-        return handlers[question_id]
+        return formatters[question_id]
 
-    async def _crisis_trend(self, start: datetime, end: datetime) -> IAQueryResponse:
-        stmt = (
-            select(func.date(TriageAssessment.created_at), func.count())
-            .where(TriageAssessment.created_at >= start)
-            .where(TriageAssessment.created_at <= end)
-            .where(TriageAssessment.severity_level.in_(("high", "critical")))
-            .group_by(func.date(TriageAssessment.created_at))
-            .order_by(func.date(TriageAssessment.created_at))
-        )
-        result = await self._session.execute(stmt)
-        rows = result.all()
+    def _format_crisis_trend(self, rows: Sequence[Row[Any]], start: datetime, end: datetime) -> IAQueryResponse:
+        """
+        Format crisis_trend query results.
+        Expected columns: date, crisis_count, severity, unique_users_affected
+        """
         def _coerce_iso(value: Any) -> str:
             if hasattr(value, "isoformat"):
                 return str(value.isoformat())
-            if isinstance(value, str):
-                return value
             return str(value)
 
-        series = [[_coerce_iso(day), count] for day, count in rows]
-        table = [{"date": _coerce_iso(day), "high_risk_assessments": count} for day, count in rows]
+        # Group by date for series
+        series_data: Dict[str, int] = {}
+        table = []
+        for row in rows:
+            date, crisis_count, severity, unique_users = row
+            date_str = _coerce_iso(date)
+            series_data[date_str] = series_data.get(date_str, 0) + crisis_count
+            table.append({
+                "date": date_str,
+                "crisis_count": crisis_count,
+                "severity": severity,
+                "unique_users_affected": unique_users
+            })
+
+        series = [[date, count] for date, count in sorted(series_data.items())]
         notes = [
-            "Counts include triage assessments marked high or critical.",
+            "Counts include cases marked high or critical severity.",
             f"Window: {start.isoformat()} → {end.isoformat()}.",
+            "K-anonymity enforced: minimum 5 cases per group.",
         ]
         return IAQueryResponse(
-            chart={"type": "line", "series": [{"name": "High risk", "data": series}]},
+            chart={"type": "line", "series": [{"name": "Crisis cases", "data": series}]},
             table=table,
             notes=notes,
         )
 
-    async def _dropoffs(self, start: datetime, end: datetime) -> IAQueryResponse:
-        session_counts_stmt = (
-            select(Conversation.session_id, Conversation.conversation_id, func.count())
-            .where(Conversation.timestamp >= start)
-            .where(Conversation.timestamp <= end)
-            .group_by(Conversation.session_id, Conversation.conversation_id)
-        )
-        result = await self._session.execute(session_counts_stmt)
-        counts = result.all()
-        if not counts:
+    def _format_dropoffs(self, rows: Sequence[Row[Any]], start: datetime, end: datetime) -> IAQueryResponse:
+        """
+        Format dropoffs query results.
+        Expected columns: date, total_sessions, early_dropoffs, dropoff_percentage, avg_messages_per_conversation
+        """
+        if not rows:
             empty_chart = {"type": "bar", "series": [{"name": "Sessions", "data": []}]}
             return IAQueryResponse(chart=empty_chart, table=[], notes=["No conversations during this window."])
 
-        total_sessions = len(counts)
-        short_sessions = sum(1 for *_ , count in counts if count <= 2)
-        completion_rate = round((total_sessions - short_sessions) / total_sessions * 100, 2)
+        table = []
+        total_sessions_sum = 0
+        total_dropoffs_sum = 0
+        for row in rows:
+            date, total_sessions, early_dropoffs, dropoff_percentage, avg_messages = row
+            table.append({
+                "date": str(date),
+                "total_sessions": total_sessions,
+                "early_dropoffs": early_dropoffs,
+                "dropoff_percentage": float(dropoff_percentage),
+                "avg_messages_per_conversation": float(avg_messages),
+            })
+            total_sessions_sum += total_sessions
+            total_dropoffs_sum += early_dropoffs
+
+        completion_rate = round(((total_sessions_sum - total_dropoffs_sum) / total_sessions_sum) * 100, 2) if total_sessions_sum else 0
 
         chart = {
             "type": "bar",
             "series": [
                 {
-                    "name": "Chat length",
+                    "name": "Session completion",
                     "data": [
-                        ["1 message", short_sessions],
-                        ["3+ messages", total_sessions - short_sessions],
+                        ["Early dropoffs (≤2 messages)", total_dropoffs_sum],
+                        ["Completed sessions (3+ messages)", total_sessions_sum - total_dropoffs_sum],
                     ],
                 }
             ],
         }
-        table = [
-            {
-                "metric": "total_sessions",
-                "value": total_sessions,
-            },
-            {
-                "metric": "single_message_dropoffs",
-                "value": short_sessions,
-            },
-            {
-                "metric": "completion_rate_percent",
-                "value": completion_rate,
-            },
-        ]
         notes = [
-            "Drop-offs defined as conversations with two or fewer exchanges.",
-            f"Completion rate {completion_rate}% across {total_sessions} sessions.",
+            "Drop-offs defined as conversations with two or fewer messages.",
+            f"Completion rate {completion_rate}% across {total_sessions_sum} sessions.",
+            "K-anonymity enforced: minimum 5 sessions per day.",
         ]
         return IAQueryResponse(chart=chart, table=table, notes=notes)
 
-    async def _resource_reuse(self, start: datetime, end: datetime) -> IAQueryResponse:
-        stmt = (
-            select(
-                InterventionCampaignExecution.campaign_id,
-                func.count(InterventionCampaignExecution.id),
-                func.count(func.distinct(InterventionCampaignExecution.user_id)),
-            )
-            .where(InterventionCampaignExecution.created_at >= start)
-            .where(InterventionCampaignExecution.created_at <= end)
-            .group_by(InterventionCampaignExecution.campaign_id)
-            .order_by(func.count(InterventionCampaignExecution.id).desc())
-            .limit(10)
-        )
-        result = await self._session.execute(stmt)
-        rows = result.all()
+    def _format_resource_reuse(self, rows: Sequence[Row[Any]], start: datetime, end: datetime) -> IAQueryResponse:
+        """
+        Format resource_reuse query results.
+        Expected columns: date, total_plans_created, unique_users, plans_revisited, revisit_rate, avg_completion_percentage
+        """
+        table = []
+        total_plans = 0
+        total_revisited = 0
+        for row in rows:
+            date, plans_created, unique_users, plans_revisited, revisit_rate, avg_completion = row
+            table.append({
+                "date": str(date),
+                "total_plans_created": plans_created,
+                "unique_users": unique_users,
+                "plans_revisited": plans_revisited,
+                "revisit_rate": float(revisit_rate),
+                "avg_completion_percentage": float(avg_completion) if avg_completion else 0.0,
+            })
+            total_plans += plans_created
+            total_revisited += plans_revisited
+
         chart = {
             "type": "bar",
             "series": [
                 {
-                    "name": "Executions",
-                    "data": [[str(campaign_id or "unknown"), executions] for campaign_id, executions, _ in rows],
+                    "name": "Intervention plans",
+                    "data": [[str(row[0]), row[1]] for row in rows[:10]],  # Top 10 days
                 }
             ],
         }
-        table = [
-            {
-                "campaign_id": str(campaign_id or "unknown"),
-                "executions": executions,
-                "unique_users": users,
-                "reuse_ratio": round(executions / users, 2) if users else None,
-            }
-            for campaign_id, executions, users in rows
+        notes = [
+            f"High revisit rate indicates users returning to intervention resources.",
+            f"Total: {total_plans} plans created, {total_revisited} revisited.",
+            "K-anonymity enforced: minimum 5 plans per day.",
         ]
-        notes = ["High reuse indicates campaign content being delivered repeatedly to the same cohort."]
         return IAQueryResponse(chart=chart, table=table, notes=notes)
 
-    async def _fallback_reduction(self, start: datetime, end: datetime) -> IAQueryResponse:
-        stmt = (
-            select(
-                func.count().label("total"),
-                func.sum(
-                    case(
-                        (TriageAssessment.recommended_action == "escalate_manual_review", 1),
-                        else_=0,
-                    )
-                ).label("escalations"),
-            )
-            .where(TriageAssessment.created_at >= start)
-            .where(TriageAssessment.created_at <= end)
-        )
-        total, escalations = (await self._session.execute(stmt)).one()
-        total = int(total or 0)
-        escalations = int(escalations or 0)
-        avoidance = round(((total - escalations) / total) * 100, 2) if total else 0.0
+    def _format_fallback_reduction(self, rows: Sequence[Row[Any]], start: datetime, end: datetime) -> IAQueryResponse:
+        """
+        Format fallback_reduction query results.
+        Expected columns: date, total_conversations, escalated_to_human, handled_by_ai, ai_resolution_rate
+        """
+        total_conversations = 0
+        total_escalations = 0
+        table = []
+        for row in rows:
+            date, total, escalated, handled_by_ai, ai_resolution_rate = row
+            table.append({
+                "date": str(date),
+                "total_conversations": total,
+                "escalated_to_human": escalated,
+                "handled_by_ai": handled_by_ai,
+                "ai_resolution_rate": float(ai_resolution_rate),
+            })
+            total_conversations += total
+            total_escalations += escalated
+
+        avoidance = round(((total_conversations - total_escalations) / total_conversations) * 100, 2) if total_conversations else 0.0
 
         chart = {
             "type": "pie",
@@ -189,80 +205,90 @@ class InsightsAgentService:
                 {
                     "name": "Routing",
                     "data": [
-                        ["Self-serve", total - escalations],
-                        ["Human fallback", escalations],
+                        ["AI-handled", total_conversations - total_escalations],
+                        ["Human escalation", total_escalations],
                     ],
                 }
             ],
         }
-        table = [
-            {"metric": "total_assessments", "value": total},
-            {"metric": "human_fallbacks", "value": escalations},
-            {"metric": "automated_resolution_percent", "value": avoidance},
-        ]
         notes = [
-            "Automated resolution percent reflects triage assessments that stayed within the Safety suite.",
+            f"Automated resolution {avoidance}% across {total_conversations} conversations.",
+            "AI-handled means no case escalation occurred.",
+            "K-anonymity enforced: minimum 5 conversations per day.",
         ]
         return IAQueryResponse(chart=chart, table=table, notes=notes)
 
-    async def _cost_per_helpful(self, start: datetime, end: datetime) -> IAQueryResponse:
-        stmt = (
-            select(
-                func.count().label("total"),
-                func.sum(
-                    case((InterventionCampaignExecution.engagement_score >= 0.7, 1), else_=0)
-                ).label("helpful"),
-            )
-            .where(InterventionCampaignExecution.created_at >= start)
-            .where(InterventionCampaignExecution.created_at <= end)
-        )
-        total, helpful = (await self._session.execute(stmt)).one()
-        total = int(total or 0)
-        helpful = int(helpful or 0)
-        assumed_cost = 5.0  # nominal IDR cost per execution placeholder
-        helpful = max(helpful, 1)
-        cost_per_helpful = round((total * assumed_cost) / helpful, 2)
+    def _format_cost_per_helpful(self, rows: Sequence[Row[Any]], start: datetime, end: datetime) -> IAQueryResponse:
+        """
+        Format cost_per_helpful query results.
+        Expected columns: date, total_assessments, avg_processing_time_ms, successful_interventions, success_rate_percentage
+        """
+        table = []
+        total_assessments = 0
+        total_successful = 0
+        total_processing_time = 0
+        for row in rows:
+            date, assessments, avg_processing_time, successful, success_rate = row
+            table.append({
+                "date": str(date),
+                "total_assessments": assessments,
+                "avg_processing_time_ms": float(avg_processing_time) if avg_processing_time else 0.0,
+                "successful_interventions": successful,
+                "success_rate_percentage": float(success_rate),
+            })
+            total_assessments += assessments
+            total_successful += successful
+            total_processing_time += avg_processing_time if avg_processing_time else 0
+
+        avg_processing_time = total_processing_time / len(rows) if rows else 0
+        assumed_cost = 5.0  # nominal IDR cost per assessment placeholder
+        cost_per_helpful = round((total_assessments * assumed_cost) / max(total_successful, 1), 2)
 
         chart = {
             "type": "gauge",
             "series": [{"name": "Cost/Helpful", "data": cost_per_helpful}],
         }
-        table = [
-            {"metric": "executions", "value": total},
-            {"metric": "helpful_responses", "value": helpful},
-            {"metric": "cost_per_helpful", "value": cost_per_helpful},
-        ]
         notes = [
             "Cost uses a placeholder 5-unit assumption until billing integration ships.",
-            "Helpful defined as engagement score ≥ 0.7.",
+            "Successful intervention = low/moderate assessment followed by plan within 1 hour.",
+            f"Avg processing time: {avg_processing_time:.2f}ms per assessment.",
+            "K-anonymity enforced: minimum 5 assessments per day.",
         ]
         return IAQueryResponse(chart=chart, table=table, notes=notes)
 
-    async def _coverage_windows(self, start: datetime, end: datetime) -> IAQueryResponse:
-        hour_field = func.extract("hour", Conversation.timestamp)
-        stmt = (
-            select(hour_field.label("hour"), func.count())
-            .where(Conversation.timestamp >= start)
-            .where(Conversation.timestamp <= end)
-            .group_by(hour_field)
-            .order_by(hour_field)
-        )
-        result = await self._session.execute(stmt)
-        rows = result.all()
+    def _format_coverage_windows(self, rows: Sequence[Row[Any]], start: datetime, end: datetime) -> IAQueryResponse:
+        """
+        Format coverage_windows query results.
+        Expected columns: hour_of_day, day_of_week, conversation_count, unique_users, avg_messages_per_conversation, high_risk_conversations
+        """
+        # Group by hour for heatmap
+        hour_data: Dict[int, int] = {}
+        table = []
+        for row in rows:
+            hour, day_of_week, conversation_count, unique_users, avg_messages, high_risk = row
+            hour_data[int(hour)] = hour_data.get(int(hour), 0) + conversation_count
+            table.append({
+                "hour_of_day": int(hour),
+                "day_of_week": int(day_of_week),  # 0=Sunday, 6=Saturday
+                "conversation_count": conversation_count,
+                "unique_users": unique_users,
+                "avg_messages_per_conversation": float(avg_messages),
+                "high_risk_conversations": high_risk,
+            })
+
         chart = {
             "type": "bar",
             "series": [
                 {
                     "name": "Conversations",
-                    "data": [[f"{int(hour):02d}:00", count] for hour, count in rows],
+                    "data": [[f"{hour:02d}:00", count] for hour, count in sorted(hour_data.items())],
                 }
             ],
         }
-        table = [
-            {"hour": int(hour), "conversations": count} for hour, count in rows
-        ]
         notes = [
             "Identifies peak hours for user conversations across the requested range.",
+            "Hour_of_day: 0-23 (24-hour format), day_of_week: 0=Sunday, 6=Saturday.",
+            "K-anonymity enforced: minimum 5 conversations per hour/day group.",
         ]
         return IAQueryResponse(chart=chart, table=table, notes=notes)
 

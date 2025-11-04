@@ -13,8 +13,16 @@ import os
 import json
 from typing import Optional
 from web3 import Web3  # type: ignore
-# web3.py v7+: geth_poa_middleware renamed to ExtraDataToPOAMiddleware
-from web3.middleware import ExtraDataToPOAMiddleware as geth_poa_middleware  # type: ignore
+# web3.py v7+: geth_poa_middleware renamed, use try/except for compatibility
+try:
+    from web3.middleware import ExtraDataToPOAMiddleware as geth_poa_middleware
+except ImportError:
+    try:
+        from web3.middleware import geth_poa_middleware  # type: ignore
+    except ImportError:
+        # Fallback for newer versions
+        geth_poa_middleware = None  # type: ignore
+
 from dotenv import load_dotenv
 import logging
 
@@ -87,7 +95,8 @@ async def init_blockchain():
             
             # EDU Chain is an L3 on Arbitrum Orbit - add POA middleware for testnet
             # This handles the extraData field in block headers correctly
-            w3.middleware_onion.inject(geth_poa_middleware, layer=0)
+            if geth_poa_middleware is not None:
+                w3.middleware_onion.inject(geth_poa_middleware, layer=0)
 
             if w3.is_connected():
                 logger.info(f"✅ Connected to EDU Chain RPC: {RPC_URL}")

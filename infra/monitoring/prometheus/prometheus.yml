@@ -5,14 +5,8 @@ global:
     cluster: 'ugm-aicare'
     environment: 'development'
 
-# Alert manager configuration
-alerting:
-  alertmanagers:
-    - static_configs:
-        - targets:
-            - alertmanager:9093
-
-# Load alert rules
+# Alert rules (evaluated by Prometheus, viewable in Prometheus UI)
+# Note: Alertmanager removed - alerts visible at http://localhost:8255/alerts
 rule_files:
   - 'alert_rules.yml'
 
@@ -21,7 +15,7 @@ scrape_configs:
   - job_name: 'ugm-aicare-backend'
     static_configs:
       - targets: ['backend:8000']
-    metrics_path: '/metrics'
+    metrics_path: '/metrics/'  # Note: trailing slash required by FastAPI mount
     scrape_interval: 10s
     scrape_timeout: 5s
 

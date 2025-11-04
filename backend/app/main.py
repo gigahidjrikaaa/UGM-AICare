@@ -46,6 +46,7 @@ from app.agents.sta.router import router as sta_router
 from app.agents.sca.router import router as sca_router
 from app.agents.sda.router import router as sda_router
 from app.agents.ia.router import router as ia_router
+from app.agents.aika.router import router as aika_router  # Aika Meta-Agent
 from contextlib import asynccontextmanager
 from app.core.scheduler import start_scheduler, shutdown_scheduler
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
@@ -207,6 +208,7 @@ app.include_router(sta_router)
 app.include_router(sca_router)
 app.include_router(sda_router)
 app.include_router(ia_router)
+app.include_router(aika_router)  # Aika Meta-Agent orchestrator
 app.include_router(intervention_plans.router)  # Intervention plan records
 app.include_router(appointments.router)
 app.include_router(surveys.router)

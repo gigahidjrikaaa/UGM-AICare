@@ -117,26 +117,6 @@ services:
       - aicare_dev
     restart: unless-stopped
 
-  alertmanager:
-    image: prom/alertmanager:v0.26.0
-    container_name: ugm_aicare_alertmanager
-    ports:
-      - "8261:9093"
-    volumes:
-      - ./infra/monitoring/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
-      - alertmanager-data:/alertmanager
-    command:
-      - '--config.file=/etc/alertmanager/alertmanager.yml'
-      - '--storage.path=/alertmanager'
-    networks:
-      - monitoring
-    healthcheck:
-      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost:9093/-/healthy"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-    restart: unless-stopped
-
   # Langfuse - LLM Observability & Agent Tracing
   langfuse-server:
     image: ghcr.io/langfuse/langfuse:latest
@@ -168,8 +148,6 @@ volumes:
   prometheus-data:
     driver: local
   grafana-data:
-    driver: local
-  alertmanager-data:
     driver: local
 
 networks:

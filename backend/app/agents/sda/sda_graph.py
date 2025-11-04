@@ -1,24 +1,18 @@
-"""LangGraph state machine for Service Desk Agent (SDA).
-
-This module implements the SDA workflow as a LangGraph StateGraph:
-    ingest_escalation → create_case → calculate_sla → auto_assign → 
-    notify_counsellor
-
-The graph handles high/critical severity cases that require manual intervention
-by licensed counsellors.
-"""
 from __future__ import annotations
 
 import logging
 from datetime import datetime, timedelta
 
 from langgraph.graph import StateGraph, END
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.graph_state import SDAState
 from app.agents.execution_tracker import execution_tracker
 from app.core.settings import get_settings
 from app.domains.mental_health.models import Case, CaseSeverityEnum, CaseStatusEnum
+from app.models.agent_user import AgentUser, AgentRoleEnum
+from app.models.system import CaseAssignment
 from app.services.event_bus import EventType, publish_event
 
 logger = logging.getLogger(__name__)
@@ -211,42 +205,127 @@ async def calculate_sla_node(state: SDAState, db: AsyncSession) -> SDAState:
 
 
 async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
-    """Node: Auto-assign case to available counsellor (future enhancement).
+    """Node: Auto-assign case to available counsellor with workload balancing.
     
-    Currently a placeholder for future auto-assignment logic.
-    Cases remain in 'new' status for manual assignment.
+    Assignment algorithm:
+    1. Query all counsellors (role='counselor')
+    2. Count active cases per counsellor (status in new/in_progress/waiting)
+    3. Assign to counsellor with lowest workload
+    4. Create CaseAssignment record for audit trail
+    5. Update Case.assigned_to and status to 'in_progress'
+    
+    If no counsellors available, case remains in 'new' status for manual assignment.
     
     Args:
-        state: Current graph state
+        state: Current graph state with case_id
         db: Database session
         
     Returns:
-        Updated state (no changes for now)
+        Updated state with assigned_to (if successful) and assignment_id
     """
     execution_id = state.get("execution_id")
     if execution_id:
         execution_tracker.start_node(execution_id, "sda::auto_assign", "sda")
     
     try:
-        # TODO: Implement auto-assignment logic
-        # - Query available counsellors
-        # - Check workload balancing
-        # - Assign based on specialty/availability
+        case_id = state.get("case_id")
+        if not case_id:
+            raise ValueError("No case_id found for assignment")
         
-        # For now, just log that auto-assignment is pending
-        logger.info(
-            f"SDA auto-assignment pending for case {state.get('case_id')} "
-            f"(feature not yet implemented)"
+        # Step 1: Query all counsellors
+        counsellors_stmt = select(AgentUser).where(
+            AgentUser.role == AgentRoleEnum.counselor
         )
+        counsellors_result = await db.execute(counsellors_stmt)
+        counsellors = counsellors_result.scalars().all()
         
+        if not counsellors:
+            logger.warning("No counsellors available for auto-assignment")
+            state["execution_path"].append("auto_assign")
+            state["assigned_to"] = None
+            state["assignment_reason"] = "no_counsellors_available"
+            
+            if execution_id:
+                execution_tracker.complete_node(
+                    execution_id, 
+                    "sda::auto_assign",
+                    metrics={
+                        "assigned": False,
+                        "reason": "no_counsellors_available"
+                    }
+                )
+            return state
+        
+        # Step 2: Count active cases per counsellor
+        # Active cases = status in (new, in_progress, waiting)
+        active_statuses = [
+            CaseStatusEnum.new,
+            CaseStatusEnum.in_progress,
+            CaseStatusEnum.waiting
+        ]
+        
+        counsellor_workload = {}
+        for counsellor in counsellors:
+            workload_stmt = select(func.count(Case.id)).where(
+                Case.assigned_to == counsellor.id,
+                Case.status.in_(active_statuses)
+            )
+            workload_result = await db.execute(workload_stmt)
+            workload_count = workload_result.scalar_one()
+            counsellor_workload[counsellor.id] = workload_count
+        
+        # Step 3: Select counsellor with lowest workload
+        # If tie, pick the first one (could be randomized or round-robin in future)
+        assigned_counsellor_id = min(
+            counsellor_workload.keys(),
+            key=lambda cid: counsellor_workload[cid]
+        )
+        assigned_workload = counsellor_workload[assigned_counsellor_id]
+        
+        # Step 4: Create CaseAssignment record
+        assignment = CaseAssignment(
+            case_id=case_id,
+            assigned_to=assigned_counsellor_id,
+            assigned_by=None,  # System auto-assignment (no user)
+            assigned_at=datetime.now(),
+            reassignment_reason=None,  # First assignment, not a reassignment
+            previous_assignee=None
+        )
+        db.add(assignment)
+        await db.flush()  # Get assignment.id
+        
+        # Step 5: Update Case with assignment
+        case = await db.get(Case, case_id)
+        if case:
+            case.assigned_to = assigned_counsellor_id  # type: ignore[assignment]
+            case.status = CaseStatusEnum.in_progress  # type: ignore[assignment]
+            case.updated_at = datetime.now()  # type: ignore[assignment]
+            db.add(case)
+            await db.flush()
+        
+        # Update state
+        state["assigned_to"] = assigned_counsellor_id
+        state["assignment_id"] = str(assignment.id)
+        state["assignment_reason"] = "auto_assigned_lowest_workload"
+        state["assigned_workload"] = assigned_workload
         state["execution_path"].append("auto_assign")
         
         if execution_id:
             execution_tracker.complete_node(
                 execution_id, 
                 "sda::auto_assign",
-                metrics={"assigned": False}
+                metrics={
+                    "assigned": True,
+                    "counsellor_id": assigned_counsellor_id,
+                    "workload": assigned_workload,
+                    "total_counsellors": len(counsellors)
+                }
             )
+        
+        logger.info(
+            f"SDA auto-assigned case {case_id} to counsellor {assigned_counsellor_id} "
+            f"(workload: {assigned_workload} active cases)"
+        )
         
     except Exception as e:
         error_msg = f"Auto-assignment failed: {str(e)}"

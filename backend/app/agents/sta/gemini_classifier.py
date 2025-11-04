@@ -13,6 +13,7 @@ Performance: 75% fewer Gemini calls vs naive per-message approach
 """
 from __future__ import annotations
 
+import hashlib
 import logging
 import re
 import json
@@ -28,8 +29,13 @@ from app.agents.sta.classifiers import (
     _BREAK_DOWN_PROBLEM_KEYWORDS,
 )
 from app.core.llm import generate_response
+from app.core.memory import get_redis_client
 
 logger = logging.getLogger(__name__)
+
+# Redis cache configuration
+CACHE_TTL_SECONDS = 3600  # 1 hour
+CACHE_KEY_PREFIX = "ugm-aicare:gemini:assessment"
 
 
 class GeminiSTAClassifier:
@@ -101,8 +107,8 @@ class GeminiSTAClassifier:
             context
         )
         
-        # Cache if low risk
-        if gemini_result.risk_level == 0:
+        # Cache if low-risk (levels 0-1: minimal and low)
+        if gemini_result.risk_level <= 1:
             await self._cache_assessment(payload, gemini_result, context)
         
         return gemini_result
@@ -330,8 +336,21 @@ Return as JSON:
                 temperature=0.3,
             )
             
+            # Strip markdown code blocks if present
+            # Gemini sometimes wraps JSON in ```json ... ```
+            cleaned_text = response_text.strip()
+            if cleaned_text.startswith("```json"):
+                cleaned_text = cleaned_text[7:]  # Remove ```json
+            elif cleaned_text.startswith("```"):
+                cleaned_text = cleaned_text[3:]  # Remove ```
+            
+            if cleaned_text.endswith("```"):
+                cleaned_text = cleaned_text[:-3]  # Remove trailing ```
+            
+            cleaned_text = cleaned_text.strip()
+            
             # Parse JSON response
-            result = json.loads(response_text)
+            result = json.loads(cleaned_text)
             
             classification = result["step8_classification"]
             support_needs = result.get("step7_support_needs", "none")
@@ -425,19 +444,46 @@ Return as JSON:
         - Cache low-risk assessments for up to 5 messages
         - Don't cache if risk level changes
         - Don't cache if emotional tone shifts
+        - Redis-based caching with 1-hour TTL
         
         Returns:
             Cached response or None
         """
-        # TODO: Implement Redis caching in production
-        # For now, return None (always assess)
+        try:
+            # Generate cache key from session_id + message content hash
+            session_id = payload.session_id
+            message_hash = hashlib.sha256(payload.text.encode()).hexdigest()[:16]
+            cache_key = f"{CACHE_KEY_PREFIX}:{session_id}:{message_hash}"
+            
+            # Try to get from Redis
+            redis_client = await get_redis_client()
+            cached_data = await redis_client.get(cache_key)
+            
+            if cached_data:
+                # Parse cached response
+                cached_dict = json.loads(cached_data)
+                cached_response = STAClassifyResponse(**cached_dict)
+                
+                logger.info(
+                    f"✅ Redis cache hit: {cache_key} "
+                    f"(risk_level={cached_response.risk_level}, cached={cached_dict.get('cached_at')})"
+                )
+                
+                return cached_response
+            
+            # No cache hit
+            logger.debug(f"❌ Redis cache miss: {cache_key}")
+            
+        except Exception as e:
+            logger.error(f"Redis cache get failed: {e}", exc_info=True)
+            # Continue without cache on error
         
-        # Check context for recent assessment
+        # Fallback: Check context for recent assessment (in-memory)
         conv_state = context.get("conversation_state", {})
         messages_since_assessment = conv_state.get("messages_since_last_assessment", 999)
         last_risk_level = conv_state.get("last_risk_level", "unknown")
         
-        # Use cache if:
+        # Use in-memory cache if:
         # - Recent assessment (< 5 messages ago)
         # - Was low risk
         # - Message is short (<30 words)
@@ -446,7 +492,7 @@ Return as JSON:
             len(payload.text.split()) < 30):
             
             logger.info(
-                f"Cache hit: {messages_since_assessment} messages since last low-risk assessment"
+                f"✅ In-memory cache hit: {messages_since_assessment} messages since last low-risk assessment"
             )
             
             return STAClassifyResponse(
@@ -456,8 +502,7 @@ Return as JSON:
                 handoff=False,
                 diagnostic_notes=f"Cached low-risk (recent assessment {messages_since_assessment} messages ago)",
                 needs_support_coach_plan=False,
-                support_plan_type="none",
-                metadata={"cached": True}
+                support_plan_type="none"
             )
         
         return None
@@ -468,8 +513,49 @@ Return as JSON:
         result: STAClassifyResponse,
         context: Mapping[str, Any],
     ):
-        """Cache low-risk assessment for future reuse."""
-        # TODO: Implement Redis caching in production
-        # For now, just log
-        logger.info(f"Would cache low-risk assessment (risk_level={result.risk_level})")
-        pass
+        """
+        Cache low-risk assessment for future reuse.
+        
+        Caching policy:
+        - Only cache low-risk assessments (risk_level 0-1)
+        - Store in Redis with 1-hour TTL
+        - Include timestamp for audit trail
+        
+        Args:
+            payload: Original classification request
+            result: Classification response to cache
+            context: Additional context (not cached)
+        """
+        try:
+            # Only cache low-risk assessments
+            if result.risk_level > 1:
+                logger.debug(f"Skipping cache for high-risk assessment (risk_level={result.risk_level})")
+                return
+            
+            # Generate cache key from session_id + message content hash
+            session_id = payload.session_id
+            message_hash = hashlib.sha256(payload.text.encode()).hexdigest()[:16]
+            cache_key = f"{CACHE_KEY_PREFIX}:{session_id}:{message_hash}"
+            
+            # Prepare data to cache
+            cache_data = result.model_dump()
+            cache_data["cached_at"] = datetime.now().isoformat()
+            cache_data["message_length"] = len(payload.text)
+            
+            # Store in Redis with TTL
+            redis_client = await get_redis_client()
+            await redis_client.setex(
+                cache_key,
+                CACHE_TTL_SECONDS,
+                json.dumps(cache_data)
+            )
+            
+            logger.info(
+                f"✅ Cached assessment: {cache_key} "
+                f"(risk_level={result.risk_level}, TTL={CACHE_TTL_SECONDS}s)"
+            )
+            
+        except Exception as e:
+            logger.error(f"Failed to cache assessment: {e}", exc_info=True)
+            # Don't raise - caching failure shouldn't break classification
+            pass

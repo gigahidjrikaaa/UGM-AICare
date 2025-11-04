@@ -26,8 +26,9 @@ schema_config:
         prefix: index_
         period: 24h
 
-ruler:
-  alertmanager_url: http://localhost:9093
+# Ruler disabled - Alertmanager removed from stack
+# ruler:
+#   alertmanager_url: http://localhost:9093
 
 # Retention (optional - keep logs for 30 days)
 limits_config:
