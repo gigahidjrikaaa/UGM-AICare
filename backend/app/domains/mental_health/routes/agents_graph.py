@@ -646,7 +646,13 @@ class IAGraphResponse(BaseModel):
     privacy_enforced: bool = Field(..., description="Whether privacy safeguards were applied")
     query_completed: bool = Field(..., description="Whether analytics query completed")
     
-    analytics_result: Dict[str, Any] | None = Field(None, description="Analytics query results")
+    # Use 'result' to match frontend expectations (renamed from 'analytics_result')
+    result: Dict[str, Any] | None = Field(None, description="Analytics query results with privacy metadata")
+    privacy_metadata: Dict[str, Any] = Field(
+        default_factory=lambda: {"k_value": 5, "epsilon_used": 0.0, "delta_used": 0.0},
+        description="Privacy safeguard metadata"
+    )
+    query_name: str = Field(default="", description="Name of the executed query")
     
     errors: List[str] = Field(default_factory=list, description="Errors encountered")
     execution_time_ms: float | None = Field(None, description="Total execution time in milliseconds")
@@ -720,7 +726,9 @@ async def execute_ia_graph(
             delta = result["completed_at"] - result["started_at"]
             execution_time_ms = delta.total_seconds() * 1000
         
-        # Build response
+        # Build response - map analytics_result to 'result' for frontend compatibility
+        analytics_result = result.get("analytics_result", {})
+        
         return IAGraphResponse(
             success=len(result.get("errors", [])) == 0,
             execution_id=result.get("execution_id", "unknown"),
@@ -729,7 +737,13 @@ async def execute_ia_graph(
             consent_validated=result.get("consent_validated", False),
             privacy_enforced=result.get("privacy_enforced", False),
             query_completed=result.get("query_completed", False),
-            analytics_result=result.get("analytics_result"),
+            result=analytics_result,  # Frontend expects 'result' key
+            privacy_metadata={
+                "k_value": 5,  # Our k-anonymity threshold
+                "epsilon_used": analytics_result.get("differential_privacy_budget_used", 0.0) if analytics_result else 0.0,
+                "delta_used": 0.0  # TODO: Implement delta tracking in Phase 3
+            },
+            query_name=request.question_id,
             errors=result.get("errors", []),
             execution_time_ms=execution_time_ms
         )

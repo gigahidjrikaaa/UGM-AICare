@@ -221,11 +221,19 @@ async def execute_analytics_node(state: IAState, db: AsyncSession) -> IAState:
         # Execute query (service handles k-anonymity and privacy)
         response: IAQueryResponse = await ia_service.query(request)
         
-        # Store results in state
+        # Check k-anonymity satisfaction
+        # Queries from Phase 1 have k-anonymity built-in via HAVING COUNT(*) >= 5
+        k_satisfied = len(response.table) > 0  # If table has data, k-anonymity was satisfied
+        total_records = len(response.table) if response.table else 0
+        
+        # Store results in state with privacy metadata
         state["analytics_result"] = {
+            "data": response.table,  # Frontend expects 'data' instead of 'table'
             "chart": response.chart,
-            "table": response.table,
-            "notes": response.notes
+            "notes": response.notes,
+            "k_anonymity_satisfied": k_satisfied,
+            "differential_privacy_budget_used": 0.0,  # TODO: Implement in Phase 3
+            "total_records_anonymized": total_records
         }
         state.setdefault("execution_path", []).append("ia:execute_analytics")
         state["query_completed"] = True

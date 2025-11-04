@@ -1,12 +1,13 @@
 /**
  * GraphHealthCards Component
  * 
- * Displays health status cards for all 5 LangGraph agents:
+ * Displays health status cards for all 6 LangGraph agents:
  * - STA (Safety Triage Agent)
  * - SCA (Support Coach Agent)
  * - SDA (Service Desk Agent)
  * - IA (Insights Agent)
- * - Orchestrator
+ * - AIKA (Meta-Agent)
+ * - Orchestrator (Legacy)
  * 
  * Each card shows:
  * - Status indicator (healthy/degraded/down)
@@ -46,6 +47,11 @@ const GRAPH_METADATA: Record<string, { name: string; description: string; icon: 
     description: 'Privacy-preserving analytics',
     icon: '📊'
   },
+  aika: {
+    name: 'AIKA Meta-Agent',
+    description: 'Multi-agent orchestration and intelligent routing',
+    icon: '🤖'
+  },
   orchestrator: {
     name: 'Orchestrator',
     description: 'Intent-based routing to appropriate agents',
@@ -56,8 +62,8 @@ const GRAPH_METADATA: Record<string, { name: string; description: string; icon: 
 export function GraphHealthCards({ graphs, loading }: GraphHealthCardsProps) {
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
-        {[...Array(5)].map((_, i) => (
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
+        {[...Array(6)].map((_, i) => (
           <div key={i} className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-4 animate-pulse">
             <div className="h-6 bg-white/20 rounded mb-2"></div>
             <div className="h-4 bg-white/20 rounded mb-4"></div>
@@ -69,7 +75,7 @@ export function GraphHealthCards({ graphs, loading }: GraphHealthCardsProps) {
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
       {graphs.map((graph) => {
         const metadata = GRAPH_METADATA[graph.graph_type];
         

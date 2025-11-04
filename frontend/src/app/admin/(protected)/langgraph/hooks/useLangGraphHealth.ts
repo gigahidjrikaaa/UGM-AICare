@@ -1,12 +1,13 @@
 /**
  * Custom hook for fetching LangGraph health status
  * 
- * Returns health metrics for all 5 graphs:
+ * Returns health metrics for all 6 graphs:
  * - STA (Safety Triage Agent)
  * - SCA (Support Coach Agent)
  * - SDA (Service Desk Agent)
  * - IA (Insights Agent)
- * - Orchestrator
+ * - AIKA (Meta-Agent - Orchestrator)
+ * - Orchestrator (Legacy routing)
  * 
  * Fetches data every 30 seconds
  */
@@ -17,7 +18,7 @@ import { useEffect, useState } from 'react';
 import * as langGraphApi from '@/services/langGraphApi';
 
 export interface GraphHealthStatus {
-  graph_type: 'sta' | 'sca' | 'sda' | 'ia' | 'orchestrator';
+  graph_type: 'sta' | 'sca' | 'sda' | 'ia' | 'aika' | 'orchestrator';
   status: 'healthy' | 'degraded' | 'down';
   total_executions: number;
   success_count: number;
@@ -46,10 +47,10 @@ export function useLangGraphHealth(autoRefreshSeconds: number = 30) {
       // Fetch analytics overview (last 24 hours)
       const overview = await langGraphApi.getAnalyticsOverview(1);
       
-      // For now, create placeholder health data for all 5 graphs
+      // For now, create placeholder health data for all 6 graphs
       // In a real implementation, we'd need per-graph analytics from backend
-      const graphTypes: Array<'sta' | 'sca' | 'sda' | 'ia' | 'orchestrator'> = 
-        ['sta', 'sca', 'sda', 'ia', 'orchestrator'];
+      const graphTypes: Array<'sta' | 'sca' | 'sda' | 'ia' | 'aika' | 'orchestrator'> = 
+        ['sta', 'sca', 'sda', 'ia', 'aika', 'orchestrator'];
       
       const graphs: GraphHealthStatus[] = graphTypes.map(graphType => {
         // Use overall metrics for each graph (placeholder until backend provides per-graph data)

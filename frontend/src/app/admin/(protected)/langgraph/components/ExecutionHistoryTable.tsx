@@ -52,26 +52,26 @@ export function ExecutionHistoryTable({ limit = 50 }: ExecutionHistoryTableProps
   // Fetch history on mount and when filters/pagination change
   useEffect(() => {
     const validStatus = statusFilter as 'completed' | 'failed' | 'running' | '';
-    const validGraph = graphFilter as 'sta' | 'sca' | 'sda' | 'ia' | 'orchestrator' | '';
+    const validGraph = graphFilter as 'sta' | 'sca' | 'sda' | 'ia' | 'aika' | 'orchestrator' | '';
     
     fetchHistory({
       limit,
       offset,
       status: validStatus || undefined,
-      graph_name: validGraph || undefined
+      graph_name: (validGraph || undefined) as 'sta' | 'sca' | 'sda' | 'ia' | 'aika' | 'orchestrator' | undefined
     });
   }, [offset, statusFilter, graphFilter, limit, fetchHistory]);
 
   const handleRefresh = () => {
     const validStatus = statusFilter as 'completed' | 'failed' | 'running' | '';
-    const validGraph = graphFilter as 'sta' | 'sca' | 'sda' | 'ia' | 'orchestrator' | '';
+    const validGraph = graphFilter as 'sta' | 'sca' | 'sda' | 'ia' | 'aika' | 'orchestrator' | '';
     
     setOffset(0);
     fetchHistory({ 
       limit, 
       offset: 0, 
       status: validStatus || undefined, 
-      graph_name: validGraph || undefined 
+      graph_name: (validGraph || undefined) as 'sta' | 'sca' | 'sda' | 'ia' | 'aika' | 'orchestrator' | undefined
     });
   };
 
@@ -139,6 +139,7 @@ export function ExecutionHistoryTable({ limit = 50 }: ExecutionHistoryTableProps
             <option value="sca" className="bg-[#001a47]">SCA</option>
             <option value="sda" className="bg-[#001a47]">SDA</option>
             <option value="ia" className="bg-[#001a47]">IA</option>
+            <option value="aika" className="bg-[#001a47]">AIKA</option>
             <option value="orchestrator" className="bg-[#001a47]">Orchestrator</option>
           </select>
         </div>

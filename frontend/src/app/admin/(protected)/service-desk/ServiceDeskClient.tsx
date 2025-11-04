@@ -128,10 +128,24 @@ export default function ServiceDeskClient() {
         className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
       >
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Service Desk Dashboard</h1>
-          <p className="text-white/60 text-sm">
+          <div className="flex items-center gap-3 mb-2">
+            <h1 className="text-3xl font-bold text-white">Service Desk Dashboard</h1>
+            <span className="px-3 py-1 bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-xs font-semibold rounded-full">
+              REAL-TIME TRIAGE
+            </span>
+          </div>
+          <p className="text-white/60 text-sm mb-2">
             Create and manage cases through the Service Desk Agent (SDA) with automatic SLA tracking
           </p>
+          <a 
+            href="/admin/cases" 
+            className="text-[#FFCA40] hover:text-[#FFCA40]/80 text-sm flex items-center gap-1 transition-colors"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+            </svg>
+            Need detailed case management? View all cases →
+          </a>
         </div>
 
         <div className="flex items-center gap-3">

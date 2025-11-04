@@ -16,6 +16,7 @@ from app.routes import (
 )
 from app.routes.admin import insights as admin_insights
 from app.routes.admin import counselors as admin_counselors
+from app.routes.admin import sca_admin
 
 # Mental health domain routes
 from app.domains.mental_health.routes import (
@@ -210,6 +211,7 @@ app.include_router(sda_router)
 app.include_router(ia_router)
 app.include_router(aika_router)  # Aika Meta-Agent orchestrator
 app.include_router(intervention_plans.router)  # Intervention plan records
+app.include_router(sca_admin.router)  # SCA admin management endpoints
 app.include_router(appointments.router)
 app.include_router(surveys.router)
 app.include_router(surveys.user_router)

@@ -151,10 +151,24 @@ export default function CasesPage() {
       <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
         <div className="flex items-center justify-between mb-4">
           <div>
-            <h1 className="text-2xl font-bold text-white mb-2">Case Management</h1>
-            <p className="text-white/70">
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-2xl font-bold text-white">Case Management</h1>
+              <span className="px-3 py-1 bg-blue-500/20 border border-blue-500/30 text-blue-300 text-xs font-semibold rounded-full">
+                ADMINISTRATIVE
+              </span>
+            </div>
+            <p className="text-white/70 mb-2">
               Monitor and manage mental health cases with real-time SLA tracking
             </p>
+            <a 
+              href="/admin/service-desk" 
+              className="text-[#FFCA40] hover:text-[#FFCA40]/80 text-sm flex items-center gap-1 transition-colors"
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+              Need quick triage? Go to Service Desk →
+            </a>
           </div>
           <div className="text-right">
             <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFCA40]/20 border border-[#FFCA40]/30 rounded-lg">

@@ -210,7 +210,7 @@ export interface ExecutionHistoryFilters {
   limit?: number;              // Default: 50, max: 500
   offset?: number;             // Default: 0
   status?: 'completed' | 'failed' | 'running';
-  graph_name?: 'sta' | 'orchestrator' | 'sda' | 'sca' | 'ia';
+  graph_name?: 'sta' | 'orchestrator' | 'sda' | 'sca' | 'ia' | 'aika';
 }
 
 /**

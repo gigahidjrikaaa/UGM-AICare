@@ -2,7 +2,7 @@
  * LangGraph Monitoring Dashboard
  * 
  * Purpose: Real-time monitoring and analytics for all LangGraph StateGraphs
- * - Graph health status (STA/SCA/SDA/IA/Orchestrator)
+ * - Graph health status (STA/SCA/SDA/IA/AIKA/Orchestrator)
  * - Execution history with filtering
  * - Performance analytics
  * - Active alerts
