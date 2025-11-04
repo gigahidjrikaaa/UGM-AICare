@@ -6,24 +6,23 @@ FROM python:3.11-slim-bookworm as builder
 
 WORKDIR /app
 
-# Install essential build tools
+# Install essential build tools (no Rust needed for binary wheels)
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends gcc python3-dev build-essential curl && \
-    curl https://sh.rustup.rs -sSf | sh -s -- -y --default-toolchain stable && \
+    apt-get install -y --no-install-recommends gcc python3-dev libpq-dev build-essential && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
-
-# Add Rust to PATH
-ENV PATH="/root/.cargo/bin:${PATH}"
 
 # Copy only the requirements file to leverage Docker cache
 COPY requirements.txt .
 
-# Install Python dependencies and compile them into wheels
+# Install Python dependencies using BINARY wheels where possible
+# --prefer-binary: Use pre-built wheels instead of compiling from source
+# This avoids needing Rust compiler for cryptography and other packages
 # Note: No longer installing PyTorch/ONNX (migrated to pure Gemini-based approach)
 # This saves ~1GB in deployment size and eliminates CUDA dependency issues
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip wheel --wheel-dir /app/wheels -r requirements.txt
+    pip install --upgrade pip && \
+    pip wheel --wheel-dir /app/wheels --prefer-binary -r requirements.txt
 
 
 # ---- Final Stage (production) ----
