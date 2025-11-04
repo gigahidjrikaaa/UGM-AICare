@@ -14,8 +14,10 @@ export const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
     },
   },
   scale: {
-    mode: Phaser.Scale.FIT, // Scale to fit container while maintaining aspect ratio
+    mode: Phaser.Scale.RESIZE, // Fill container and resize to match
     autoCenter: Phaser.Scale.CENTER_BOTH,
+    width: '100%',
+    height: '100%',
   },
   scene: [], // Scenes will be registered when creating game instance
   fps: {

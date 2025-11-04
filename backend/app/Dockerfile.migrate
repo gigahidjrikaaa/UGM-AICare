@@ -14,21 +14,14 @@ RUN apt-get update && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
-# Copy requirements and filter out heavy ML dependencies
+# Copy requirements and install all dependencies
+# Note: We install full requirements instead of minimal set because:
+# 1. Import chains from models → finance → blockchain → routes → fastapi
+# 2. Cherry-picking dependencies is error-prone and maintenance burden
+# 3. Migration container size is acceptable (~500MB vs ~200MB minimal)
 COPY requirements.txt .
-
-# Install ONLY packages needed for database migrations (minimal set)
-# This is much faster than installing all requirements (~7 packages vs ~100+)
 RUN --mount=type=cache,target=/root/.cache/pip \
-    echo "sqlalchemy[asyncio]==2.0.21" > requirements-migrate-minimal.txt && \
-    echo "alembic>=1.13.0,<2.0.0" >> requirements-migrate-minimal.txt && \
-    echo "asyncpg>=0.29.0" >> requirements-migrate-minimal.txt && \
-    echo "psycopg2-binary>=2.9.0" >> requirements-migrate-minimal.txt && \
-    echo "pydantic>=2.9.0,<3.0.0" >> requirements-migrate-minimal.txt && \
-    echo "pydantic-settings==2.0.3" >> requirements-migrate-minimal.txt && \
-    echo "python-dotenv" >> requirements-migrate-minimal.txt && \
-    echo "web3>=7.0.0,<8.0.0" >> requirements-migrate-minimal.txt && \
-    pip install --no-cache-dir -r requirements-migrate-minimal.txt
+    pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
 COPY --chown=nobody:nogroup . .

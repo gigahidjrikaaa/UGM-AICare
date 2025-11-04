@@ -27,7 +27,7 @@ Always import from domain modules directly:
 from .user import User
 from .agent_user import AgentUser, AgentRoleEnum
 
-# Revenue reporting - imported from finance domain
+# Revenue reporting - imported directly from models file to avoid loading blockchain dependencies
 from app.domains.finance.models import RevenueReport, RevenueApproval, ReportStatus
 
 # Social features
