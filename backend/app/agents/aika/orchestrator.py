@@ -65,7 +65,7 @@ class AikaOrchestrator:
         
         logger.info("SUCCESS: Aika Meta-Agent initialized with LangGraph services + conversation tracking")
     
-    def _build_graph(self) -> StateGraph:
+    def _build_graph(self):
         """
         Build LangGraph orchestration workflow.
         
@@ -138,11 +138,14 @@ class AikaOrchestrator:
         """Generate conversation state cache key"""
         return f"{user_id}:{conversation_id}"
     
-    def _get_conversation_state(self, conversation_id: str, user_id: str) -> ConversationState:
+    def _get_conversation_state(self, conversation_id: str, user_id: int) -> ConversationState:
         """Get or create conversation state for caching"""
-        key = self._get_conversation_key(conversation_id, user_id)
+        key = self._get_conversation_key(conversation_id, str(user_id))
         if key not in self._conversation_states:
-            self._conversation_states[key] = ConversationState()
+            self._conversation_states[key] = ConversationState(
+                conversation_id=conversation_id,
+                user_id=user_id
+            )
         return self._conversation_states[key]
 
     async def _classify_intent(self, state: AikaState) -> AikaState:
@@ -163,6 +166,10 @@ class AikaOrchestrator:
         
         try:
             # Load conversation state for caching optimization
+            # Ensure conversation_id exists
+            if not state.conversation_id:
+                state.conversation_id = f"conv_{state.user_id}_{int(time.time())}"
+            
             conv_state = self._get_conversation_state(state.conversation_id, state.user_id)
             conv_state.message_count += 1
             conv_state.messages_since_last_assessment += 1
@@ -175,17 +182,16 @@ class AikaOrchestrator:
                 state.intent_confidence = 0.85
                 
                 elapsed = time.time() - start_time
-                await self.activity_logger.log_activity(
-                    user_id=state.user_id,
-                    action="classify_intent",
-                    context={
+                self.activity_logger.log_info(
+                    agent="Aika",
+                    message=f"Intent classification cached: {state.intent}",
+                    details={
                         "intent": state.intent,
                         "confidence": state.intent_confidence,
                         "cached": True,
                         "cache_hit_rate": conv_state.cache_hit_rate,
-                    },
-                    status="success",
-                    duration_ms=int(elapsed * 1000),
+                        "duration_ms": int(elapsed * 1000),
+                    }
                 )
                 
                 logger.info(
@@ -244,24 +250,24 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
                 state.intent_confidence = 0.5
             
             # Update conversation state with new intent
-            conv_state.last_intent = state.intent
-            conv_state.intent_changes.append(state.intent)
+            if state.intent:
+                conv_state.last_intent = state.intent
+                conv_state.intent_changes.append(state.intent)
             
             state.agents_invoked.append("intent_classifier")
             
             elapsed = time.time() - start_time
-            await self.activity_logger.log_activity(
-                user_id=state.user_id,
-                action="classify_intent",
-                context={
+            self.activity_logger.log_info(
+                agent="Aika",
+                message=f"Intent classified: {state.intent}",
+                details={
                     "intent": state.intent,
                     "confidence": state.intent_confidence,
                     "cached": False,
                     "gemini_calls_total": conv_state.gemini_calls_made,
                     "efficiency_score": conv_state.efficiency_score,
-                },
-                status="success",
-                duration_ms=int(elapsed * 1000),
+                    "duration_ms": int(elapsed * 1000),
+                }
             )
             
             logger.info(
@@ -292,7 +298,7 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         
         # Admin routing
         elif role == "admin":
-            if "analytics" in intent or "query" in intent:
+            if intent and ("analytics" in intent or "query" in intent):
                 return "admin_analytics"
             else:
                 return "admin_actions"
@@ -319,39 +325,40 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
             self.activity_logger.log_agent_start("STA", "Analyzing message for safety concerns and risk factors")
             
             # Get conversation state for context
+            # Ensure conversation_id exists
+            if not state.conversation_id:
+                state.conversation_id = f"conv_{state.user_id}_{int(time.time())}"
+            
             conv_state = self._get_conversation_state(state.conversation_id, state.user_id)
             
-            # Call STA service with full graph execution + conversation context
+            # Call STA service with full graph execution
             sta_state = await self.sta_service.execute(
                 user_id=state.user_id,
-                session_id=state.session_id,
+                session_id=state.session_id or f"session_{state.user_id}_{int(time.time())}",
                 user_hash=str(state.user_id),  # Use user_id as hash for now
                 message=state.message,
-                conversation_id=state.conversation_id,
-                conversation_context={  # NEW: Pass conversation context for caching
-                    "message_count": conv_state.message_count,
-                    "messages_since_last_assessment": conv_state.messages_since_last_assessment,
-                    "last_risk_level": conv_state.last_risk_level,
-                    "risk_assessments": conv_state.risk_assessments,
-                },
+                conversation_id=None,  # STA expects int | None, we have str, so pass None
             )
             
             # Extract results from STA state
             risk_level = sta_state.get("risk_level", "low")
             risk_score = sta_state.get("risk_score", 0.0)
+            intent = sta_state.get("intent", "general")
             
             # Update conversation state with assessment results
             conv_state.update_after_assessment(
                 risk_level=risk_level,
                 risk_score=risk_score,
-                gemini_used=sta_state.get("gemini_used", True),
+                intent=intent,
+                skipped=False,
+                gemini_called=sta_state.get("gemini_used", True),
             )
             
             state.triage_result = {
                 "risk_level": risk_level,
                 "risk_score": risk_score,
                 "risk_factors": sta_state.get("risk_factors", []),
-                "intent": sta_state.get("intent", "general"),
+                "intent": intent,
                 "confidence": sta_state.get("confidence", 0.0),
                 "redacted_message": sta_state.get("redacted_message", state.message),
                 "execution_path": sta_state.get("execution_path", []),
@@ -364,7 +371,7 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
             
             # Log risk assessment
             self.activity_logger.log_risk_assessment(
-                risk_level=state.risk_level,
+                risk_level=state.risk_level or "low",
                 risk_score=sta_state.get("risk_score", 0.0),
                 risk_factors=state.risk_factors
             )
@@ -379,7 +386,7 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
             self.activity_logger.log_agent_error("STA", "Safety triage failed", e)
             logger.error(f"STA error: {e}", exc_info=True)
             state.errors.append(f"Safety triage failed: {str(e)}")
-            state.risk_level = "unknown"
+            state.risk_level = "low"  # Default to "low" instead of "unknown" (must be valid Literal)
         
         return state
     
@@ -406,15 +413,19 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
             triage_result = state.triage_result or {}
             triage_assessment_id = triage_result.get("assessment_id")
             
+            # Ensure valid risk_level (default to "low" if None)
+            risk_level = state.risk_level or "low"
+            intent = state.intent or "general"
+            
             # Call SCA service with full graph execution
             sca_state = await self.sca_service.execute(
                 user_id=state.user_id,
-                session_id=state.session_id,
+                session_id=state.session_id or f"session_{state.user_id}_{int(time.time())}",
                 user_hash=str(state.user_id),
                 message=state.message,
-                conversation_id=state.conversation_id,
-                severity=state.risk_level,
-                intent=state.intent,
+                conversation_id=None,  # SCA expects int | None, we have str, so pass None
+                severity=risk_level,
+                intent=intent,
                 triage_assessment_id=triage_assessment_id,
             )
             
@@ -430,18 +441,19 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
             # Build response with intervention plan if created
             if sca_state.get("intervention_plan_id"):
                 state.response = self._build_coaching_response_with_plan(
-                    sca_state.get("intervention_type"),
-                    sca_state.get("intervention_plan_id")
+                    sca_state.get("intervention_type") or "general_coping",
+                    sca_state.get("intervention_plan_id") or 0
                 )
                 state.intervention_plan = {"id": sca_state.get("intervention_plan_id")}
                 
                 # Log intervention creation
-                self.activity_logger.log_intervention_created(
-                    plan_id=sca_state.get("intervention_plan_id"),
-                    intervention_type=sca_state.get("intervention_type")
-                )
+                if sca_state.get("intervention_plan_id") and sca_state.get("intervention_type"):
+                    self.activity_logger.log_intervention_created(
+                        plan_id=sca_state.get("intervention_plan_id"),
+                        intervention_type=sca_state.get("intervention_type")
+                    )
             else:
-                state.response = self._build_generic_coaching_response(state.risk_level)
+                state.response = self._build_generic_coaching_response(state.risk_level or "low")
             
             state.agents_invoked.append("SCA")
             
@@ -483,12 +495,12 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
             # Call SDA service with full graph execution
             sda_state = await self.sda_service.execute(
                 user_id=state.user_id,
-                session_id=state.session_id,
+                session_id=state.session_id or f"session_{state.user_id}_{int(time.time())}",
                 user_hash=str(state.user_id),
                 message=state.message,
-                conversation_id=state.conversation_id,
-                severity=state.risk_level,
-                intent=state.intent,
+                conversation_id=None,  # SDA expects int | None
+                severity=state.risk_level or "high",
+                intent=state.intent or "crisis",
                 risk_score=risk_score,
                 triage_assessment_id=triage_assessment_id,
             )
@@ -514,11 +526,12 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
                 state.response = self._build_crisis_response(sda_state.get("case_id"))
                 
                 # Log case creation
-                self.activity_logger.log_case_created(
-                    case_id=sda_state.get("case_id"),
-                    severity=state.risk_level,
-                    sla_hours=sda_state.get("sla_hours", 0)
-                )
+                if sda_state.get("case_id"):
+                    self.activity_logger.log_case_created(
+                        case_id=sda_state.get("case_id"),
+                        severity=state.risk_level or "critical",
+                        sla_hours=sda_state.get("sla_hours", 0)
+                    )
             else:
                 state.response = self._build_crisis_fallback_response()
                 self.activity_logger.log_warning("SDA", "Case creation failed, using fallback response")
@@ -725,17 +738,17 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
                 logger.info("✨ Using response from specialized agent")
             else:
                 # Generate fallback response
-                state.response = self._generate_fallback_response(state)
+                state.response = self._build_fallback_response(state.user_role)
             
             # Add actions summary if any actions were taken
-            if state.actions_taken:
+            if state.actions_taken and state.response:
                 actions_summary = "\n\n🔧 **Actions taken:**\n" + "\n".join(
                     f"- {action}" for action in state.actions_taken
                 )
                 state.response += actions_summary
             
             # Add escalation notice if needed
-            if state.escalation_needed:
+            if state.escalation_needed and state.response:
                 state.response += "\n\n⚠️ **Case escalated to human counselor for immediate attention.**"
             
         except Exception as e:
@@ -753,8 +766,8 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         try:
             logger.info("📈 Running background analytics...")
             
-            # Call IA to log anonymized metrics (fire-and-forget)
-            await self.ia.log_interaction_metrics(
+            # Call IA service to log anonymized metrics (fire-and-forget)
+            await self.ia_service.log_interaction_metrics(
                 user_role=state.user_role,
                 intent=state.intent,
                 risk_level=state.risk_level,
@@ -931,12 +944,16 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         # Clear previous activity logs
         self.activity_logger.clear()
         
+        # Generate conversation ID if not provided (use session_id as conversation_id for now)
+        conversation_id = session_id or f"conv_{user_id}_{int(time.time())}"
+        
         # Initialize state
         initial_state = AikaState(
             user_id=user_id,
             user_role=user_role,
             message=message,
             session_id=session_id or f"session_{user_id}_{int(time.time())}",
+            conversation_id=conversation_id,
             conversation_history=conversation_history or [],
         )
         
@@ -998,7 +1015,7 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
                     "intent": initial_state.intent or "unknown",
                     "agents_invoked": initial_state.agents_invoked,
                     "processing_time_ms": total_time_ms,
-                    "risk_level": initial_state.risk_level or "unknown",
+                    "risk_level": initial_state.risk_level or "low",  # Use "low" instead of "unknown"
                     "escalation_needed": False,
                     "actions_taken": [],
                 },

@@ -145,6 +145,33 @@ class IAGraphService:
             initial_state["completed_at"] = datetime.now()
             
             raise
+    
+    async def log_interaction_metrics(
+        self,
+        user_role: str,
+        intent: str | None,
+        risk_level: str | None,
+        agents_invoked: list[str],
+        processing_time_ms: float | None
+    ) -> None:
+        """Log anonymized interaction metrics for research.
+        
+        This is a placeholder for future IA analytics logging.
+        Currently does nothing to avoid blocking the main flow.
+        
+        Args:
+            user_role: Role of user (user/admin/researcher)
+            intent: Classified intent of interaction
+            risk_level: Risk level from triage
+            agents_invoked: List of agents invoked
+            processing_time_ms: Total processing time
+        """
+        # TODO: Implement anonymized metrics collection with differential privacy
+        # For now, just log silently
+        logger.debug(
+            f"IA metrics logged: role={user_role}, intent={intent}, "
+            f"risk={risk_level}, agents={len(agents_invoked)}, time={processing_time_ms}ms"
+        )
 
 
 async def get_ia_graph_service(db: AsyncSession) -> IAGraphService:

@@ -23,6 +23,10 @@ class AikaState(BaseModel):
         description="User's role in the system"
     )
     session_id: Optional[str] = None
+    conversation_id: Optional[str] = Field(
+        default=None,
+        description="Unique conversation identifier for tracking context"
+    )
     
     # Input
     message: str = Field(description="User's input message")
@@ -99,7 +103,10 @@ class AikaState(BaseModel):
     created_at: datetime = Field(default_factory=datetime.utcnow)
     
     # Risk assessment (for students)
-    risk_level: Optional[Literal["low", "moderate", "high", "critical"]] = None
+    risk_level: Optional[Literal["low", "moderate", "high", "critical"]] = Field(
+        default="low",
+        description="Risk level assessment from Safety Triage Agent"
+    )
     risk_factors: List[str] = Field(default_factory=list)
     
     # Intervention plan (if created)

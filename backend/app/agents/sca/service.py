@@ -196,9 +196,7 @@ class SupportCoachService:
                 payload={
                     "session_id": payload.session_id,
                     "intent": intent_key,
-                    "user_hash": payload.options.get("user_hash")
-                    if isinstance(payload.options, dict)
-                    else None,
+                    "user_hash": payload.user_hash,  # Use direct field, not options
                     "resource_count": len(resources),
                     "plan_length": len(plan_steps),
                     "used_gemini": use_gemini_plan,

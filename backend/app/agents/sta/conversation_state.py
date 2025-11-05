@@ -28,6 +28,10 @@ class ConversationState:
     # Intent tracking (for caching intent classification)
     last_intent: str = "unknown"
     intent_stable_count: int = 0  # How many messages with same intent
+    intent_changes: list[str] = field(default_factory=list)  # History of intent changes
+    
+    # Risk assessments history
+    risk_assessments: list[dict] = field(default_factory=list)  # History of risk assessments
     
     # Emotional tracking
     recent_emotional_scores: list[float] = field(default_factory=list)

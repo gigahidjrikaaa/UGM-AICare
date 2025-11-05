@@ -80,7 +80,11 @@ class InterventionPlanRecord(Base):
     #   "next_check_in": {"timeframe": str, "method": str}
     # }
     
-    # Progress tracking
+    # Progress tracking (integer counts for quick queries)
+    total_steps: Mapped[int] = mapped_column(Integer, nullable=False)
+    completed_steps: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    
+    # Progress tracking (detailed JSON)
     completion_tracking: Mapped[dict] = mapped_column(JSON, nullable=False, default=dict)
     # Structure: {
     #   "completed_steps": [0, 2],  # indices of completed steps

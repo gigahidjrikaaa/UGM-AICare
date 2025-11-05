@@ -118,7 +118,7 @@ async def assess_risk_node(state: STAState, db: AsyncSession) -> STAState:
     
     try:
         # Get STA service with hybrid classifier
-        sta_service = await get_safety_triage_service(db)
+        sta_service = get_safety_triage_service(db)
         
         # Build classification request
         request = STAClassifyRequest(
@@ -231,10 +231,17 @@ def create_sta_graph(db: AsyncSession) -> StateGraph:
     """
     workflow = StateGraph(STAState)
     
-    # Add nodes (wrapping async functions with db dependency)
+    # Create async wrapper functions for db-dependent nodes
+    async def apply_redaction_wrapper(state: STAState) -> STAState:
+        return await apply_redaction_node(state, db)
+    
+    async def assess_risk_wrapper(state: STAState) -> STAState:
+        return await assess_risk_node(state, db)
+    
+    # Add nodes
     workflow.add_node("ingest_message", ingest_message_node)
-    workflow.add_node("apply_redaction", lambda state: apply_redaction_node(state, db))
-    workflow.add_node("assess_risk", lambda state: assess_risk_node(state, db))
+    workflow.add_node("apply_redaction", apply_redaction_wrapper)
+    workflow.add_node("assess_risk", assess_risk_wrapper)
     
     # Define linear flow through nodes
     workflow.set_entry_point("ingest_message")

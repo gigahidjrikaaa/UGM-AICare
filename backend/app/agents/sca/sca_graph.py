@@ -147,8 +147,8 @@ async def generate_plan_node(state: SCAState) -> SCAState:
             user_hash=state["user_hash"],
             session_id=state["session_id"],
             options={
-                "risk_level": state.get("risk_level"),
-                "severity": state.get("severity")
+                "risk_level": state.get("severity", "moderate"),  # Use severity from STA
+                "severity": state.get("severity", "moderate")
             }
         )
         
@@ -182,7 +182,7 @@ async def generate_plan_node(state: SCAState) -> SCAState:
                     "summary": card.summary,
                     "url": card.url
                 }
-                for card in response.resources
+                for card in response.resource_cards
             ]
         }
         
@@ -194,13 +194,13 @@ async def generate_plan_node(state: SCAState) -> SCAState:
                 "sca::generate_plan",
                 metrics={
                     "num_steps": len(response.plan_steps),
-                    "num_resources": len(response.resources)
+                    "num_resources": len(response.resource_cards)
                 }
             )
         
         logger.info(
             f"SCA generated plan: {len(response.plan_steps)} steps, "
-            f"{len(response.resources)} resources"
+            f"{len(response.resource_cards)} resources"
         )
         
     except Exception as e:
@@ -294,17 +294,29 @@ async def persist_plan_node(state: SCAState, db: AsyncSession) -> SCAState:
         plan_data = state.get("intervention_plan", {})
         
         # Ensure intervention_type is stored in plan_data
-        if "intervention_type" not in plan_data:
+        if plan_data and "intervention_type" not in plan_data:
             plan_data["intervention_type"] = intervention_type
         
+        # Calculate total_steps from plan_data
+        plan_steps = plan_data.get("plan_steps", []) if plan_data else []
+        total_steps = len(plan_steps)
+        
         # Create InterventionPlanRecord
+        # Note: conversation_id is expected to be int (FK to conversations table), not string
+        # Skip conversation_id if it's a string, 0, or invalid
+        conv_id = state.get("conversation_id")
+        if isinstance(conv_id, str) or conv_id == 0 or not conv_id:
+            conv_id = None  # Only use valid int FK references
+        
         plan = InterventionPlanRecord(
             user_id=state.get("user_id"),
             session_id=state.get("session_id"),
-            conversation_id=state.get("conversation_id"),
-            plan_title=f"{intervention_type.replace('_', ' ').title()} Intervention Plan",
+            conversation_id=conv_id,
+            plan_title=f"{intervention_type.replace('_', ' ').title() if intervention_type else 'General'} Intervention Plan",
             risk_level=state.get("risk_level", 0),
-            plan_data=plan_data,
+            plan_data=plan_data or {},
+            total_steps=total_steps,
+            completed_steps=0,
             completion_tracking={},
             status="active"
         )
@@ -350,12 +362,16 @@ def create_sca_graph(db: AsyncSession) -> StateGraph:
     """
     workflow = StateGraph(SCAState)
     
+    # Create async wrapper for persist_plan_node with db dependency
+    async def persist_plan_with_db(state: SCAState) -> SCAState:
+        return await persist_plan_node(state, db)
+    
     # Add nodes
     workflow.add_node("ingest_triage_signal", ingest_triage_signal_node)
     workflow.add_node("determine_intervention_type", determine_intervention_type_node)
     workflow.add_node("generate_plan", generate_plan_node)
     workflow.add_node("safety_review", safety_review_node)
-    workflow.add_node("persist_plan", lambda state: persist_plan_node(state, db))
+    workflow.add_node("persist_plan", persist_plan_with_db)
     
     # Define linear flow
     workflow.set_entry_point("ingest_triage_signal")
