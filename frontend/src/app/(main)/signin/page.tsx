@@ -15,6 +15,7 @@ import {
   FiLogIn, 
   FiShield 
 } from "@/icons";
+import ParticleBackground from "@/components/ui/ParticleBackground";
 
 export default function SignIn() {
   const router = useRouter();
@@ -130,9 +131,20 @@ export default function SignIn() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] flex">
+    <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] flex relative">
+      {/* Particle Background */}
+      <div className="absolute inset-0 z-0">
+        <ParticleBackground 
+          count={80}
+          colors={["#FFCA40", "#6A98F0", "#ffffff"]}
+          minSize={2}
+          maxSize={8}
+          speed={1}
+        />
+      </div>
+
       {/* Left Side - Tips and Mindful Messages */}
-      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden">
+      <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden z-10">
         {/* Background Pattern */}
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-20 left-20 w-32 h-32 rounded-full bg-[#FFCA40] blur-3xl"></div>
@@ -203,7 +215,7 @@ export default function SignIn() {
       </div>
 
       {/* Right Side - Login Form */}
-      <div className="w-full lg:w-1/2 flex items-center justify-center px-4 py-4 lg:px-6 lg:py-6">
+      <div className="w-full lg:w-1/2 flex items-center justify-center px-4 py-4 lg:px-6 lg:py-6 relative z-10">
         <motion.div 
           initial={{ opacity: 0, x: 20 }}
           animate={{ opacity: 1, x: 0 }}

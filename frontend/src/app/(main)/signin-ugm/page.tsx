@@ -8,6 +8,7 @@ import Image from "next/image";
 import { motion } from "framer-motion";
 import Link from "next/link";
 import ErrorMessage from "../../../components/ErrorMessage";
+import ParticleBackground from "@/components/ui/ParticleBackground";
 // import AccountLinker from "@/components/AccountLinker";
 
 export default function SignInUGM() {
@@ -23,9 +24,20 @@ export default function SignInUGM() {
   }, [status, router]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col relative">
+      {/* Particle Background */}
+      <div className="absolute inset-0 z-0">
+        <ParticleBackground 
+          count={80}
+          colors={["#FFCA40", "#6A98F0", "#ffffff"]}
+          minSize={2}
+          maxSize={8}
+          speed={1}
+        />
+      </div>
+
       {/* Content */}
-      <div className="flex-1 flex items-center justify-center p-6">
+      <div className="flex-1 flex items-center justify-center p-6 relative z-10">
         <motion.div 
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -76,7 +88,7 @@ export default function SignInUGM() {
       </div>
       
       {/* Footer */}
-      <footer className="py-4 px-6 text-center text-sm text-gray-400 border-t border-white/10">
+      <footer className="py-4 px-6 text-center text-sm text-gray-400 border-t border-white/10 relative z-10">
         <p>© 2025 UGM-AICare Team. All rights reserved.</p>
       </footer>
     </div>

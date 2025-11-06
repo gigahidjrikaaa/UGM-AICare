@@ -27,6 +27,15 @@ Always import from domain modules directly:
 from .user import User
 from .agent_user import AgentUser, AgentRoleEnum
 
+# User table normalization (Phase 1 - Nov 2025)
+from .user_profile import UserProfile
+from .user_clinical_record import UserClinicalRecord
+from .user_preferences import UserPreferences
+from .user_emergency_contact import UserEmergencyContact
+from .user_consent_ledger import UserConsentLedger
+from .user_audit_log import UserAuditLog
+from .user_session import UserSession
+
 # Revenue reporting - imported directly from models file to avoid loading blockchain dependencies
 from app.domains.finance.models import RevenueReport, RevenueApproval, ReportStatus
 

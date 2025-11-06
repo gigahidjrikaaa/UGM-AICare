@@ -332,10 +332,13 @@ async def register_user(
                     detail="Invalid date format for dateOfBirth. Please use YYYY-MM-DD.",
                 ) from exc
 
+        # Create core User record (auth only)
         new_user = User(
             name=encrypt_data(request.name),
             email=encrypted_email,
             password_hash=hashed_password,
+            role="user",
+            # Keep legacy fields for backward compatibility during migration
             first_name=encrypt_data(request.firstName) if request.firstName else None,
             last_name=encrypt_data(request.lastName) if request.lastName else None,
             phone=encrypt_data(request.phone) if request.phone else None,
@@ -346,13 +349,74 @@ async def register_user(
             major=encrypt_data(request.major) if request.major else None,
             year_of_study=request.yearOfStudy,
             allow_email_checkins=request.allowEmailCheckins,
-            role="user",
             check_in_code=uuid.uuid4().hex,
         )
 
         db.add(new_user)
+        await db.flush()  # Get user.id without committing
+
+        # Create UserProfile (normalized table)
+        from app.models import UserProfile
+        user_profile = UserProfile(
+            user_id=new_user.id,
+            first_name=encrypt_data(request.firstName) if request.firstName else None,
+            last_name=encrypt_data(request.lastName) if request.lastName else None,
+            phone=encrypt_data(request.phone) if request.phone else None,
+            date_of_birth=date_of_birth,
+            gender=encrypt_data(request.gender) if request.gender else None,
+            city=encrypt_data(request.city) if request.city else None,
+            country="Indonesia",  # Default for UGM
+            university=encrypt_data(request.university) if request.university else None,
+            major=encrypt_data(request.major) if request.major else None,
+            year_of_study=int(request.yearOfStudy) if request.yearOfStudy and request.yearOfStudy.isdigit() else None,
+        )
+        db.add(user_profile)
+
+        # Create UserPreferences (normalized table)
+        from app.models import UserPreferences
+        user_preferences = UserPreferences(
+            user_id=new_user.id,
+            preferred_language="id",  # Default Indonesian
+            preferred_timezone="Asia/Jakarta",  # Default Indonesian timezone
+            allow_email_checkins=request.allowEmailCheckins if request.allowEmailCheckins is not None else True,
+            theme="system",
+            aika_personality="empathetic",  # Default AI personality
+            aika_response_length="balanced",
+        )
+        db.add(user_preferences)
+
+        # Create initial consent ledger entries (GDPR/HIPAA compliance)
+        from app.models import UserConsentLedger
+        
+        # Data sharing consent (default: not granted, user can opt-in later)
+        data_sharing_consent = UserConsentLedger(
+            user_id=new_user.id,
+            consent_type="data_sharing",
+            granted=False,
+            consent_version="v1.0",
+            consent_language="id",
+            consent_method="registration",
+            timestamp=datetime.now(),
+        )
+        db.add(data_sharing_consent)
+
+        # Research consent (default: not granted, user can opt-in later)
+        research_consent = UserConsentLedger(
+            user_id=new_user.id,
+            consent_type="research",
+            granted=False,
+            consent_version="v1.0",
+            consent_language="id",
+            consent_method="registration",
+            timestamp=datetime.now(),
+        )
+        db.add(research_consent)
+
+        # Commit all changes
         await db.commit()
         await db.refresh(new_user)
+
+        logger.info("User registered successfully: user_id=%s", new_user.id)
 
         return {
             "message": "User registered successfully",
@@ -362,7 +426,7 @@ async def register_user(
         raise
     except Exception as exc:
         await db.rollback()
-        logger.error("User registration error: %s", exc)
+        logger.error("User registration error: %s", exc, exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
             detail="Internal server error during user registration",

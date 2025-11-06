@@ -10,11 +10,19 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload, selectinload
 
 from app.domains.blockchain import mint_nft_badge
 from app.database import get_async_db
 from app.dependencies import get_current_active_user
-from app.models import User, UserBadge  # Core models
+from app.models import (
+    User, 
+    UserBadge,
+    UserProfile,
+    UserPreferences,
+    UserEmergencyContact,
+    UserConsentLedger,
+)  # Core models
 from app.domains.mental_health.models import (
     Appointment,
     AppointmentType,
@@ -98,6 +106,21 @@ async def _ensure_check_in_code(user: User, db: AsyncSession) -> None:
     user.check_in_code = uuid.uuid4().hex
     db.add(user)
     await db.commit()
+
+
+async def _load_user_with_profile(user_id: int, db: AsyncSession) -> User:
+    """Load user with all normalized table relationships."""
+    stmt = (
+        select(User)
+        .options(
+            joinedload(User.profile),
+            joinedload(User.preferences),
+            selectinload(User.emergency_contacts),
+        )
+        .where(User.id == user_id)
+    )
+    result = await db.execute(stmt)
+    return result.unique().scalar_one()
     await db.refresh(user)
 
 
@@ -221,48 +244,114 @@ async def get_profile_overview(
 ) -> UserProfileOverviewResponse:
     await _ensure_check_in_code(current_user, db)
 
-    email = _safe_decrypt(current_user.email) or current_user.email
-    phone = _safe_decrypt(current_user.phone)
-    alternate_phone = _safe_decrypt(current_user.alternate_phone)
+    # Load user with normalized tables
+    user = await _load_user_with_profile(current_user.id, db)
 
-    emergency_contact = EmergencyContact(
-        name=_safe_decrypt(current_user.emergency_contact_name),
-        relationship=_safe_decrypt(current_user.emergency_contact_relationship),
-        phone=_safe_decrypt(current_user.emergency_contact_phone),
-        email=_safe_decrypt(current_user.emergency_contact_email),
+    # Email always from User table (core auth)
+    email = _safe_decrypt(user.email) or user.email
+    
+    # Phone numbers - read from UserProfile with fallback to legacy User columns
+    phone = (
+        _safe_decrypt(user.profile.phone) if user.profile and user.profile.phone
+        else _safe_decrypt(user.phone)
     )
-    if not any([emergency_contact.name, emergency_contact.relationship, emergency_contact.phone, emergency_contact.email]):
-        emergency_contact = None
+    alternate_phone = (
+        _safe_decrypt(user.profile.alternate_phone) if user.profile and user.profile.alternate_phone
+        else _safe_decrypt(user.alternate_phone)
+    )
 
-    full_name_parts = [
-        _safe_decrypt(current_user.first_name),
-        _safe_decrypt(current_user.last_name),
-    ]
-    full_name = " ".join([part for part in full_name_parts if part]) or _safe_decrypt(current_user.name)
-    preferred_name = _safe_decrypt(current_user.preferred_name)
+    # Emergency contact - read from UserEmergencyContact table with fallback to legacy User columns
+    emergency_contact = None
+    if user.emergency_contacts:
+        # Use first emergency contact from normalized table
+        primary_contact = user.emergency_contacts[0]
+        emergency_contact = EmergencyContact(
+            name=_safe_decrypt(primary_contact.full_name),
+            relationship=_safe_decrypt(primary_contact.relationship_to_user),
+            phone=_safe_decrypt(primary_contact.phone),
+            email=_safe_decrypt(primary_contact.email),
+        )
+    else:
+        # Fallback to legacy User columns
+        legacy_emergency_contact = EmergencyContact(
+            name=_safe_decrypt(user.emergency_contact_name),
+            relationship=_safe_decrypt(user.emergency_contact_relationship),
+            phone=_safe_decrypt(user.emergency_contact_phone),
+            email=_safe_decrypt(user.emergency_contact_email),
+        )
+        if any([legacy_emergency_contact.name, legacy_emergency_contact.relationship, 
+                legacy_emergency_contact.phone, legacy_emergency_contact.email]):
+            emergency_contact = legacy_emergency_contact
+
+    # Name fields - read from UserProfile with fallback to legacy User columns
+    first_name = (
+        _safe_decrypt(user.profile.first_name) if user.profile and user.profile.first_name
+        else _safe_decrypt(user.first_name)
+    )
+    last_name = (
+        _safe_decrypt(user.profile.last_name) if user.profile and user.profile.last_name
+        else _safe_decrypt(user.last_name)
+    )
+    full_name_parts = [first_name, last_name]
+    full_name = " ".join([part for part in full_name_parts if part]) or _safe_decrypt(user.name)
+    
+    preferred_name = (
+        _safe_decrypt(user.profile.preferred_name) if user.profile and user.profile.preferred_name
+        else _safe_decrypt(user.preferred_name)
+    )
+
+    # Profile header - read from UserProfile with fallback to legacy User columns
+    pronouns = (
+        _safe_decrypt(user.profile.pronouns) if user.profile and user.profile.pronouns
+        else _safe_decrypt(user.pronouns)
+    )
+    city = (
+        _safe_decrypt(user.profile.city) if user.profile and user.profile.city
+        else _safe_decrypt(user.city)
+    )
+    university = (
+        _safe_decrypt(user.profile.university) if user.profile and user.profile.university
+        else _safe_decrypt(user.university)
+    )
+    major = (
+        _safe_decrypt(user.profile.major) if user.profile and user.profile.major
+        else _safe_decrypt(user.major)
+    )
+    year_of_study = (
+        user.profile.year_of_study if user.profile and user.profile.year_of_study
+        else _safe_decrypt(user.year_of_study)
+    )
+    date_of_birth = (
+        user.profile.date_of_birth if user.profile
+        else user.date_of_birth
+    )
+    profile_photo_url = (
+        _safe_decrypt(user.profile.profile_photo_url) if user.profile and user.profile.profile_photo_url
+        else _safe_decrypt(user.profile_photo_url)
+    )
 
     header = ProfileHeaderSummary(
-        user_id=current_user.id,
+        user_id=user.id,
         full_name=full_name,
         preferred_name=preferred_name,
-        pronouns=_safe_decrypt(current_user.pronouns),
-        profile_photo_url=_safe_decrypt(current_user.profile_photo_url),
-        wallet_address=current_user.wallet_address,
-        google_sub=current_user.google_sub,
-        avatar_url=_safe_decrypt(current_user.profile_photo_url)
-        or _build_avatar_url(preferred_name or full_name, current_user.check_in_code or str(current_user.id)),
-        date_of_birth=cast(date, current_user.date_of_birth) if current_user.date_of_birth else None,
-        age=_calculate_age(cast(date, current_user.date_of_birth) if current_user.date_of_birth else None),
-        sentiment_score=current_user.sentiment_score,
-        current_streak=current_user.current_streak,
-        longest_streak=current_user.longest_streak,
-        last_activity_date=cast(date, current_user.last_activity_date) if current_user.last_activity_date else None,
-        city=_safe_decrypt(current_user.city),
-        university=_safe_decrypt(current_user.university),
-        major=_safe_decrypt(current_user.major),
-        year_of_study=_safe_decrypt(current_user.year_of_study),
-        created_at=current_user.created_at,
-        check_in_code=current_user.check_in_code or "",
+        pronouns=pronouns,
+        profile_photo_url=profile_photo_url,
+        wallet_address=user.wallet_address,
+        google_sub=user.google_sub,
+        avatar_url=profile_photo_url
+        or _build_avatar_url(preferred_name or full_name, user.check_in_code or str(user.id)),
+        date_of_birth=cast(date, date_of_birth) if date_of_birth else None,
+        age=_calculate_age(cast(date, date_of_birth) if date_of_birth else None),
+        sentiment_score=user.sentiment_score,
+        current_streak=user.current_streak,
+        longest_streak=user.longest_streak,
+        last_activity_date=cast(date, user.last_activity_date) if user.last_activity_date else None,
+        city=city,
+        university=university,
+        major=major,
+        year_of_study=year_of_study,
+        created_at=user.created_at,
+        check_in_code=user.check_in_code or "",
     )
 
     contact = ContactInfo(
@@ -273,37 +362,64 @@ async def get_profile_overview(
     )
 
     safety = SafetyAndClinicalBasics(
-        risk_level=_safe_decrypt(current_user.risk_level),
-        clinical_summary=_safe_decrypt(current_user.clinical_summary),
-        primary_concerns=_safe_decrypt(current_user.primary_concerns),
-        safety_plan_notes=_safe_decrypt(current_user.safety_plan_notes),
+        risk_level=_safe_decrypt(user.risk_level),
+        clinical_summary=_safe_decrypt(user.clinical_summary),
+        primary_concerns=_safe_decrypt(user.primary_concerns),
+        safety_plan_notes=_safe_decrypt(user.safety_plan_notes),
     )
 
     therapy = TherapyAssignment(
-        current_therapist_name=_safe_decrypt(current_user.current_therapist_name),
-        current_therapist_contact=_safe_decrypt(current_user.current_therapist_contact),
-        therapy_modality=_safe_decrypt(current_user.therapy_modality),
-        therapy_frequency=_safe_decrypt(current_user.therapy_frequency),
-        therapy_notes=_safe_decrypt(current_user.therapy_notes),
+        current_therapist_name=_safe_decrypt(user.current_therapist_name),
+        current_therapist_contact=_safe_decrypt(user.current_therapist_contact),
+        therapy_modality=_safe_decrypt(user.therapy_modality),
+        therapy_frequency=_safe_decrypt(user.therapy_frequency),
+        therapy_notes=_safe_decrypt(user.therapy_notes),
     )
 
+    # Consent settings - read from UserPreferences with fallback to legacy User columns
+    allow_email_checkins = (
+        user.preferences.allow_email_checkins if user.preferences and user.preferences.allow_email_checkins is not None
+        else user.allow_email_checkins
+    )
     consent = ConsentAndPrivacySettings(
-        allow_email_checkins=current_user.allow_email_checkins,
-        consent_data_sharing=current_user.consent_data_sharing,
-        consent_research=current_user.consent_research,
-        consent_emergency_contact=current_user.consent_emergency_contact,
-        consent_marketing=current_user.consent_marketing,
+        allow_email_checkins=allow_email_checkins,
+        consent_data_sharing=user.consent_data_sharing,
+        consent_research=user.consent_research,
+        consent_emergency_contact=user.consent_emergency_contact,
+        consent_marketing=user.consent_marketing,
     )
 
+    # Localization - read from UserPreferences with fallback to legacy User columns
+    preferred_language = (
+        _safe_decrypt(user.preferences.preferred_language) if user.preferences and user.preferences.preferred_language
+        else _safe_decrypt(user.preferred_language) or "id"
+    )
+    preferred_timezone = (
+        _safe_decrypt(user.preferences.preferred_timezone) if user.preferences and user.preferences.preferred_timezone
+        else _safe_decrypt(user.preferred_timezone) or "Asia/Jakarta"
+    )
+    accessibility_needs = (
+        _safe_decrypt(user.preferences.accessibility_needs) if user.preferences and user.preferences.accessibility_needs
+        else _safe_decrypt(user.accessibility_needs)
+    )
+    communication_preferences = (
+        _safe_decrypt(user.preferences.communication_preferences) if user.preferences and user.preferences.communication_preferences
+        else _safe_decrypt(user.communication_preferences)
+    )
+    interface_preferences = (
+        _safe_decrypt(user.preferences.interface_preferences) if user.preferences and user.preferences.interface_preferences
+        else _safe_decrypt(user.interface_preferences)
+    )
+    
     localization = LocalizationAndAccessibility(
-        preferred_language=_safe_decrypt(current_user.preferred_language),
-        preferred_timezone=_safe_decrypt(current_user.preferred_timezone),
-        accessibility_needs=_safe_decrypt(current_user.accessibility_needs),
-        communication_preferences=_safe_decrypt(current_user.communication_preferences),
-        interface_preferences=_safe_decrypt(current_user.interface_preferences),
+        preferred_language=preferred_language,
+        preferred_timezone=preferred_timezone,
+        accessibility_needs=accessibility_needs,
+        communication_preferences=communication_preferences,
+        interface_preferences=interface_preferences,
     )
 
-    timeline = await _build_timeline(current_user.id, db)
+    timeline = await _build_timeline(user.id, db)
 
     return UserProfileOverviewResponse(
         header=header,
@@ -313,7 +429,7 @@ async def get_profile_overview(
         timeline=timeline,
         consent=consent,
         localization=localization,
-        aicare_team_notes=_safe_decrypt(current_user.aicare_team_notes),
+        aicare_team_notes=_safe_decrypt(user.aicare_team_notes),
     )
 
 
@@ -349,77 +465,179 @@ async def update_profile_overview(
     if not data:
         return await get_profile_overview(db=db, current_user=current_user)
 
-    string_fields = [
-        "preferred_name",
-        "pronouns",
-        "profile_photo_url",
-        "phone",
-        "alternate_phone",
-        "emergency_contact_name",
-        "emergency_contact_relationship",
-        "emergency_contact_phone",
-        "emergency_contact_email",
-        "risk_level",
-        "clinical_summary",
-        "primary_concerns",
-        "safety_plan_notes",
-        "current_therapist_name",
-        "current_therapist_contact",
-        "therapy_modality",
-        "therapy_frequency",
-        "therapy_notes",
-        "preferred_language",
-        "preferred_timezone",
-        "accessibility_needs",
-        "communication_preferences",
-        "interface_preferences",
-        "city",
-        "university",
-        "major",
-        "year_of_study",
-    ]
-    boolean_fields = [
-        "consent_data_sharing",
-        "consent_research",
-        "consent_emergency_contact",
-        "consent_marketing",
-    ]
+    # Load user with normalized tables
+    user = await _load_user_with_profile(current_user.id, db)
+
+    # Define which fields belong to which tables
+    profile_fields = {
+        "preferred_name", "pronouns", "profile_photo_url", "phone", "alternate_phone",
+        "city", "university", "major", "year_of_study"
+    }
+    preference_fields = {
+        "preferred_language", "preferred_timezone", "accessibility_needs",
+        "communication_preferences", "interface_preferences"
+    }
+    emergency_contact_fields = {
+        "emergency_contact_name", "emergency_contact_relationship",
+        "emergency_contact_phone", "emergency_contact_email"
+    }
+    consent_fields = {
+        "consent_data_sharing", "consent_research",
+        "consent_emergency_contact", "consent_marketing"
+    }
+    # Legacy User table fields (for backward compatibility)
+    legacy_user_fields = {
+        "risk_level", "clinical_summary", "primary_concerns", "safety_plan_notes",
+        "current_therapist_name", "current_therapist_contact", "therapy_modality",
+        "therapy_frequency", "therapy_notes"
+    }
 
     updated = False
 
     try:
-        for field in string_fields:
+        # Update UserProfile fields
+        for field in profile_fields:
+            if field in data:
+                # Create profile if it doesn't exist
+                if not user.profile:
+                    user.profile = UserProfile(user_id=user.id, country="Indonesia")
+                    db.add(user.profile)
+                    updated = True
+                
+                normalized = _normalize_optional_string(data.get(field))
+                if normalized is None:
+                    setattr(user.profile, field, None)
+                    # Dual-write to legacy User column for backward compatibility
+                    if hasattr(user, field):
+                        setattr(user, field, None)
+                else:
+                    setattr(user.profile, field, _encrypt_optional(normalized))
+                    # Dual-write to legacy User column for backward compatibility
+                    if hasattr(user, field):
+                        setattr(user, field, _encrypt_optional(normalized))
+                updated = True
+
+        # Update UserPreferences fields
+        for field in preference_fields:
+            if field in data:
+                # Create preferences if they don't exist
+                if not user.preferences:
+                    user.preferences = UserPreferences(
+                        user_id=user.id,
+                        preferred_language="id",
+                        preferred_timezone="Asia/Jakarta",
+                        aika_personality="empathetic",
+                        aika_response_length="balanced"
+                    )
+                    db.add(user.preferences)
+                    updated = True
+                
+                normalized = _normalize_optional_string(data.get(field))
+                if normalized is None:
+                    setattr(user.preferences, field, None)
+                    # Dual-write to legacy User column for backward compatibility
+                    if hasattr(user, field):
+                        setattr(user, field, None)
+                else:
+                    setattr(user.preferences, field, _encrypt_optional(normalized))
+                    # Dual-write to legacy User column for backward compatibility
+                    if hasattr(user, field):
+                        setattr(user, field, _encrypt_optional(normalized))
+                updated = True
+
+        # Update emergency contact in UserEmergencyContact table
+        emergency_data = {k: data.get(k) for k in emergency_contact_fields if k in data}
+        if emergency_data:
+            # Map legacy field names to normalized field names
+            normalized_emergency = {}
+            if "emergency_contact_name" in emergency_data:
+                normalized_emergency["full_name"] = emergency_data["emergency_contact_name"]
+            if "emergency_contact_relationship" in emergency_data:
+                normalized_emergency["relationship_to_user"] = emergency_data["emergency_contact_relationship"]
+            if "emergency_contact_phone" in emergency_data:
+                normalized_emergency["phone"] = emergency_data["emergency_contact_phone"]
+            if "emergency_contact_email" in emergency_data:
+                normalized_emergency["email"] = emergency_data["emergency_contact_email"]
+
+            # Update or create first emergency contact
+            if user.emergency_contacts:
+                # Update existing first contact
+                primary_contact = user.emergency_contacts[0]
+                for field, value in normalized_emergency.items():
+                    normalized_value = _normalize_optional_string(value)
+                    if normalized_value is None:
+                        setattr(primary_contact, field, None)
+                    else:
+                        setattr(primary_contact, field, _encrypt_optional(normalized_value))
+            else:
+                # Create new emergency contact
+                new_contact = UserEmergencyContact(user_id=user.id)
+                for field, value in normalized_emergency.items():
+                    normalized_value = _normalize_optional_string(value)
+                    if normalized_value is not None:
+                        setattr(new_contact, field, _encrypt_optional(normalized_value))
+                db.add(new_contact)
+            
+            # Dual-write to legacy User columns for backward compatibility
+            for legacy_field, value in emergency_data.items():
+                normalized_value = _normalize_optional_string(value)
+                if normalized_value is None:
+                    setattr(user, legacy_field, None)
+                else:
+                    setattr(user, legacy_field, _encrypt_optional(normalized_value))
+            updated = True
+
+        # Update consent settings (append to UserConsentLedger for audit trail)
+        for field in consent_fields:
+            if field in data and data[field] is not None:
+                # Update User table (current consent status)
+                setattr(user, field, data[field])
+                
+                # Append to UserConsentLedger (append-only audit trail)
+                consent_type = field.replace("consent_", "")
+                consent_entry = UserConsentLedger(
+                    user_id=user.id,
+                    consent_type=consent_type,
+                    granted=data[field],
+                    consent_version="v1.0",
+                    consent_language=(
+                        user.preferences.preferred_language if user.preferences 
+                        else user.preferred_language or "id"
+                    ),
+                    consent_method="profile_update",
+                    timestamp=datetime.utcnow(),
+                )
+                db.add(consent_entry)
+                updated = True
+
+        # Update legacy User table fields (clinical/therapy data - not yet normalized)
+        for field in legacy_user_fields:
             if field in data:
                 normalized = _normalize_optional_string(data.get(field))
                 if normalized is None:
-                    setattr(current_user, field, None)
+                    setattr(user, field, None)
                 else:
-                    setattr(current_user, field, _encrypt_optional(normalized))
-                updated = True
-
-        for field in boolean_fields:
-            if field in data and data[field] is not None:
-                setattr(current_user, field, data[field])
+                    setattr(user, field, _encrypt_optional(normalized))
                 updated = True
 
         if updated:
-            current_user.updated_at = datetime.utcnow()
-            db.add(current_user)
+            user.updated_at = datetime.utcnow()
+            db.add(user)
             await db.commit()
-            await db.refresh(current_user)
+            await db.refresh(user)
             
             # Invalidate user cache after profile update
             from app.core.cache import invalidate_user_cache
-            await invalidate_user_cache(current_user.id)
-            logger.info(f"Invalidated cache for user {current_user.id} after profile update")
+            await invalidate_user_cache(user.id)
+            logger.info(f"Invalidated cache for user {user.id} after profile update")
     except HTTPException:
         raise
     except Exception as exc:  # pragma: no cover - defensive logging
         await db.rollback()
-        logger.error("Failed to update profile overview for user %s", current_user.id, exc_info=True)
+        logger.error("Failed to update profile overview for user %s", user.id, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update profile overview.") from exc
 
-    return await get_profile_overview(db=db, current_user=current_user)
+    return await get_profile_overview(db=db, current_user=user)
 
 
 @router.put("/settings/checkins", response_model=CheckinSettingsResponse)

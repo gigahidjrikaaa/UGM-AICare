@@ -94,6 +94,55 @@ class User(Base):
         uselist=False,
         cascade="all, delete-orphan"
     )
+    
+    # Normalized table relationships (Phase 1 - Nov 2025)
+    profile: Mapped[Optional["UserProfile"]] = relationship(
+        "UserProfile",
+        back_populates="user",
+        uselist=False,
+        lazy="joined",  # Eager load for common access
+        cascade="all, delete-orphan"
+    )
+    clinical_record: Mapped[Optional["UserClinicalRecord"]] = relationship(
+        "UserClinicalRecord",
+        back_populates="user",
+        foreign_keys="[UserClinicalRecord.user_id]",  # Specify primary FK (not updated_by, etc.)
+        uselist=False,
+        lazy="selectin",  # Load separately (less common, restricted access)
+        cascade="all, delete-orphan"
+    )
+    preferences: Mapped[Optional["UserPreferences"]] = relationship(
+        "UserPreferences",
+        back_populates="user",
+        uselist=False,
+        lazy="joined",  # Eager load for common access
+        cascade="all, delete-orphan"
+    )
+    emergency_contacts: Mapped[List["UserEmergencyContact"]] = relationship(
+        "UserEmergencyContact",
+        back_populates="user",
+        lazy="selectin",
+        cascade="all, delete-orphan"
+    )
+    consent_ledger: Mapped[List["UserConsentLedger"]] = relationship(
+        "UserConsentLedger",
+        back_populates="user",
+        lazy="selectin",
+        cascade="all, delete-orphan"
+    )
+    audit_log: Mapped[List["UserAuditLog"]] = relationship(
+        "UserAuditLog",
+        back_populates="user",
+        foreign_keys="[UserAuditLog.user_id]",  # Specify primary FK (not performed_by)
+        lazy="noload",  # Don't load by default (only for admin/compliance)
+        cascade="all, delete-orphan"
+    )
+    sessions: Mapped[List["UserSession"]] = relationship(
+        "UserSession",
+        back_populates="user",
+        lazy="noload",  # Don't load by default
+        cascade="all, delete-orphan"
+    )
 
     def __repr__(self):
         return f"<User(id={self.id}, email='{self.email}', role='{self.role}')>"

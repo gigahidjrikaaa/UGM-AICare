@@ -113,12 +113,12 @@ async def process_chat_message(
         if activity_callback:
             aika.set_activity_callback(activity_callback)
         
-        # Process through LangGraph workflow
+        # Process through NEW tool-calling workflow (Oct 2025 optimization)
         logger.info(
-            f"Processing message via AikaOrchestrator for user {current_user.id}"
+            f"Processing message via Tool-Calling Architecture for user {current_user.id}"
         )
         
-        result = await aika.process_message(
+        result = await aika.process_message_with_tools(
             user_id=current_user.id,
             user_role=user_role,
             message=request.message,
@@ -374,13 +374,13 @@ async def handle_aika_request(
         # Initialize Aika orchestrator
         aika = AikaOrchestrator(db=db)
         
-        # Process message through orchestration graph
+        # Process message through NEW tool-calling orchestration (Oct 2025)
         logger.info(
-            f"✨ Aika processing request from {request.role} user {current_user.id}: "
+            f"✨ Aika (tool-calling) processing request from {request.role} user {current_user.id}: "
             f"{request.message[:50]}..."
         )
         
-        result = await aika.process_message(
+        result = await aika.process_message_with_tools(
             user_id=request.user_id,
             user_role=request.role,
             message=request.message,

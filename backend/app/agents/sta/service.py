@@ -240,10 +240,15 @@ class SafetyTriageService:
 
     @staticmethod
     def _coerce_int(value: Any) -> Optional[int]:
+        """Convert value to int, returning None for invalid FK values (0, negative, non-int)."""
         if value is None:
             return None
         try:
-            return int(value)
+            result = int(value)
+            # Reject 0 and negative numbers (invalid FK references)
+            if result <= 0:
+                return None
+            return result
         except (TypeError, ValueError):
             return None
 

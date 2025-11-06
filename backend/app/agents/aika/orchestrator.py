@@ -13,6 +13,7 @@ All routing is handled by LangGraph with role-aware conditional edges.
 """
 
 import logging
+import os
 from typing import Dict, List, Literal, Optional, Callable
 from datetime import datetime
 import time
@@ -28,6 +29,7 @@ from .activity_logger import ActivityLogger
 from app.agents.sta.sta_graph_service import STAGraphService
 from app.agents.sta.conversation_state import ConversationState
 from app.agents.sca.sca_graph_service import SCAGraphService
+from app.core.memory import get_redis_client
 from app.agents.sda.sda_graph_service import SDAGraphService
 from app.agents.ia.ia_graph_service import IAGraphService
 from app.core.llm import generate_response
@@ -1020,3 +1022,898 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
                     "actions_taken": [],
                 },
             }
+
+    async def process_message_with_tools(
+        self,
+        user_id: int,
+        user_role: Literal["user", "counselor", "admin"],
+        message: str,
+        session_id: Optional[str] = None,
+        conversation_history: Optional[List[Dict[str, str]]] = None,
+    ) -> Dict:
+        """
+        NEW TOOL-CALLING ENTRY POINT (Oct 2025 Optimization).
+        
+        Uses Gemini function calling to intelligently decide when to activate agents.
+        Replaces always-run-agents pattern with conditional invocation.
+        
+        Architecture:
+        1. Call Gemini with tools (1-2s)
+        2. If Gemini requests tools → Execute LangGraph agents
+        3. If no tools → Direct conversational response
+        
+        Expected Performance:
+        - Casual chat: 1.2s (no agents)
+        - Plan request: 6.5s (SCA only)
+        - Crisis: 5.5s (STA + SDA)
+        - Average: 1.8s (83% improvement from 10.7s)
+        
+        Args:
+            user_id: User ID
+            user_role: User's role (user=student, counselor, admin)
+            message: User's message
+            session_id: Optional session ID for continuity
+            conversation_history: Optional conversation history
+        
+        Returns:
+            Dict with response and metadata (same format as process_message)
+        """
+        from google import genai
+        from google.genai import types
+        from .tool_definitions import get_gemini_tools
+        from .identity import AIKA_SYSTEM_PROMPTS
+        import uuid
+        
+        start_time = time.time()
+        
+        # Clear previous activity logs
+        self.activity_logger.clear()
+        
+        # Generate IDs
+        conversation_id = session_id or f"conv_{user_id}_{int(time.time())}"
+        session_id = session_id or f"session_{user_id}_{int(time.time())}"
+        
+        # Track which agents were invoked
+        agents_invoked = []
+        risk_level = "low"
+        escalation_needed = False
+        actions_taken = []
+        intervention_plan = None
+        errors = []
+        
+        try:
+            # Get Aika's personality based on role
+            system_instruction = AIKA_SYSTEM_PROMPTS.get(user_role, AIKA_SYSTEM_PROMPTS["student"])
+            
+            self.activity_logger.log_info(
+                "Aika", 
+                f"🧠 Tool-calling mode: Processing message from {user_role}",
+                {"user_id": user_id, "session_id": session_id}
+            )
+            
+            # Get conversation history from Redis if not provided
+            if not conversation_history:
+                conversation_history = await self._get_conversation_history(session_id)
+                if conversation_history:
+                    self.activity_logger.log_info(
+                        "Aika",
+                        f"📜 Loaded {len(conversation_history)} messages from Redis",
+                        {"session_id": session_id}
+                    )
+            
+            # Prepare conversation history for Gemini
+            history_contents = []
+            if conversation_history:
+                for msg in conversation_history:
+                    role = "user" if msg.get("role") == "user" else "model"
+                    history_contents.append(
+                        types.Content(
+                            role=role,
+                            parts=[types.Part(text=msg.get("content", ""))]
+                        )
+                    )
+            
+            # Add current message
+            history_contents.append(
+                types.Content(
+                    role="user",
+                    parts=[types.Part(text=message)]
+                )
+            )
+            
+            # Call Gemini with tools
+            client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_API_KEY"))
+            
+            self.activity_logger.log_info(
+                "Aika",
+                "📡 Calling Gemini with 5 agent tools",
+                {"message_length": len(message)}
+            )
+            
+            response = client.models.generate_content(
+                model="gemini-2.0-flash-exp",
+                contents=history_contents,
+                config=types.GenerateContentConfig(
+                    system_instruction=system_instruction,
+                    temperature=0.7,
+                    tools=get_gemini_tools()
+                )
+            )
+            
+            # Check if Gemini requested tool calls
+            if response.candidates and response.candidates[0].content.parts:
+                first_part = response.candidates[0].content.parts[0]
+                
+                if hasattr(first_part, 'function_call') and first_part.function_call:
+                    # Tool execution path
+                    self.activity_logger.log_info(
+                        "Aika",
+                        f"🔧 Gemini requested tool: {first_part.function_call.name}",
+                        {"args": dict(first_part.function_call.args)}
+                    )
+                    
+                    # Handle tool calls (can be multiple in sequence)
+                    final_response, tool_metadata = await self._handle_tool_calls(
+                        response=response,
+                        user_id=user_id,
+                        session_id=session_id,
+                        conversation_id=conversation_id,
+                        client=client,
+                        history_contents=history_contents,
+                        system_instruction=system_instruction
+                    )
+                    
+                    # Update metadata from tool execution
+                    agents_invoked = tool_metadata.get("agents_invoked", [])
+                    risk_level = tool_metadata.get("risk_level", "low")
+                    escalation_needed = tool_metadata.get("escalation_needed", False)
+                    actions_taken = tool_metadata.get("actions_taken", [])
+                    intervention_plan = tool_metadata.get("intervention_plan")
+                    errors = tool_metadata.get("errors", [])
+                    
+                else:
+                    # Direct conversational response (no tools needed)
+                    final_response = response.text
+                    self.activity_logger.log_info(
+                        "Aika",
+                        "💬 Direct response (no agents needed)",
+                        {"response_length": len(final_response)}
+                    )
+            else:
+                # Fallback: empty response
+                final_response = "Maaf, aku mengalami kesulitan memproses pesan kamu. Bisa coba lagi?"
+                errors.append("Empty response from Gemini")
+            
+            # Calculate total processing time
+            total_time_ms = (time.time() - start_time) * 1000
+            
+            logger.info(
+                f"✅ Aika (tool-calling) processed message in {total_time_ms:.2f}ms "
+                f"(agents: {', '.join(agents_invoked) if agents_invoked else 'none'})"
+            )
+            
+            # Save conversation to Redis for future context
+            await self._save_conversation_history(session_id, message, final_response)
+            
+            # Return response in same format as process_message
+            result = {
+                "success": True,
+                "response": final_response,
+                "metadata": {
+                    "session_id": session_id,
+                    "user_role": user_role,
+                    "intent": "tool_calling_mode",  # New architecture marker
+                    "agents_invoked": agents_invoked,
+                    "processing_time_ms": total_time_ms,
+                    "risk_level": risk_level,
+                    "escalation_needed": escalation_needed,
+                    "actions_taken": actions_taken,
+                },
+                "errors": errors if errors else None,
+                "activity_logs": self.get_activity_logs(),
+            }
+            
+            # Include intervention plan if created
+            if intervention_plan:
+                result["intervention_plan"] = intervention_plan
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"❌ Aika tool-calling error: {e}", exc_info=True)
+            
+            # Calculate processing time even for errors
+            total_time_ms = (time.time() - start_time) * 1000
+            
+            # Generate empathetic error response
+            error_response = (
+                "Maaf ya, aku lagi mengalami sedikit kendala teknis. "
+                "Kalau ini tentang krisis atau darurat, segera hubungi:\n\n"
+                "🚨 **Hotline Crisis Centre UGM**: 0274-544571\n"
+                "📞 **Telepon/SMS**: 0851-0111-0800\n\n"
+                "Aku akan siap membantu lagi sebentar lagi! 💙"
+            )
+            
+            return {
+                "success": False,
+                "error": str(e),
+                "response": error_response,
+                "metadata": {
+                    "session_id": session_id,
+                    "user_role": user_role,
+                    "intent": "tool_calling_mode",
+                    "agents_invoked": agents_invoked,
+                    "processing_time_ms": total_time_ms,
+                    "risk_level": "unknown",
+                    "escalation_needed": False,
+                    "actions_taken": [],
+                },
+            }
+    
+    async def _handle_tool_calls(
+        self,
+        response,
+        user_id: int,
+        session_id: str,
+        conversation_id: str,
+        client,
+        history_contents: List,
+        system_instruction: str,
+    ) -> tuple[str, Dict]:
+        """
+        Handle tool calls from Gemini (multi-turn execution).
+        
+        Process:
+        1. Extract tool calls from response
+        2. Execute each tool (run LangGraph agents)
+        3. Send tool results back to Gemini
+        4. Get final synthesized response
+        
+        Returns:
+            Tuple of (final_response_text, metadata_dict)
+        """
+        from google.genai import types
+        from .tool_definitions import get_gemini_tools
+        import uuid
+        
+        # Track metadata across tool executions
+        agents_invoked = []
+        risk_level = "low"
+        escalation_needed = False
+        actions_taken = []
+        intervention_plan = None
+        errors = []
+        
+        # Initialize final_text with fallback
+        final_text = "Maaf, aku kesulitan memberikan respons yang tepat."
+        
+        # Multi-turn tool execution loop
+        max_turns = 5  # Prevent infinite loops
+        current_response = response
+        
+        for turn in range(max_turns):
+            # Check if current response has tool calls
+            if not current_response.candidates or not current_response.candidates[0].content.parts:
+                break
+            
+            first_part = current_response.candidates[0].content.parts[0]
+            
+            if not hasattr(first_part, 'function_call') or not first_part.function_call:
+                # No more tool calls, get final text response
+                if hasattr(first_part, 'text'):
+                    final_text = first_part.text
+                else:
+                    final_text = "Maaf, aku kesulitan memberikan respons yang tepat."
+                break
+            
+            # Execute tool
+            function_call = first_part.function_call
+            tool_name = function_call.name
+            tool_args = dict(function_call.args)
+            
+            self.activity_logger.log_info(
+                "Aika",
+                f"🔧 Executing tool: {tool_name}",
+                {"args": tool_args, "turn": turn + 1}
+            )
+            
+            try:
+                # Execute tool and get result
+                tool_result = await self._execute_tool(
+                    tool_name=tool_name,
+                    args=tool_args,
+                    user_id=user_id,
+                    session_id=session_id,
+                    conversation_id=conversation_id,
+                    message=history_contents[-1].parts[0].text  # Original user message
+                )
+                
+                # Update metadata
+                if "agent" in tool_result:
+                    agents_invoked.append(tool_result["agent"])
+                if "risk_level" in tool_result:
+                    risk_level = tool_result["risk_level"]
+                if "escalation_needed" in tool_result:
+                    escalation_needed = tool_result["escalation_needed"]
+                if "actions_taken" in tool_result:
+                    actions_taken.extend(tool_result["actions_taken"])
+                if "intervention_plan" in tool_result:
+                    intervention_plan = tool_result["intervention_plan"]
+                if "error" in tool_result:
+                    errors.append(tool_result["error"])
+                
+                # Send tool result back to Gemini
+                history_contents.append(current_response.candidates[0].content)
+                history_contents.append(
+                    types.Content(
+                        role="user",
+                        parts=[
+                            types.Part(
+                                function_response=types.FunctionResponse(
+                                    name=tool_name,
+                                    response={"result": tool_result}
+                                )
+                            )
+                        ]
+                    )
+                )
+                
+                # Get next response from Gemini (may contain more tool calls or final answer)
+                current_response = client.models.generate_content(
+                    model="gemini-2.0-flash-exp",
+                    contents=history_contents,
+                    config=types.GenerateContentConfig(
+                        system_instruction=system_instruction,
+                        temperature=0.7,
+                        tools=get_gemini_tools()
+                    )
+                )
+                
+            except Exception as e:
+                logger.error(f"❌ Tool execution error ({tool_name}): {e}", exc_info=True)
+                errors.append(f"Tool {tool_name} failed: {str(e)}")
+                
+                # Send error back to Gemini
+                history_contents.append(current_response.candidates[0].content)
+                history_contents.append(
+                    types.Content(
+                        role="user",
+                        parts=[
+                            types.Part(
+                                function_response=types.FunctionResponse(
+                                    name=tool_name,
+                                    response={"error": str(e)}
+                                )
+                            )
+                        ]
+                    )
+                )
+                
+                # Try to get response from Gemini despite tool failure
+                try:
+                    current_response = client.models.generate_content(
+                        model="gemini-2.0-flash-exp",
+                        contents=history_contents,
+                        config=types.GenerateContentConfig(
+                            system_instruction=system_instruction,
+                            temperature=0.7,
+                            tools=get_gemini_tools()
+                        )
+                    )
+                except:
+                    # Complete failure, return error message
+                    final_text = (
+                        "Maaf ya, aku mengalami kesulitan teknis. "
+                        "Kalau ini urgent, hubungi Crisis Centre UGM: 0274-544571 💙"
+                    )
+                    break
+        else:
+            # Max turns reached
+            final_text = "Maaf, aku membutuhkan terlalu banyak langkah untuk menjawab. Bisa coba tanya dengan cara lain?"
+            errors.append("Max tool execution turns reached")
+        
+        # Compile metadata
+        metadata = {
+            "agents_invoked": agents_invoked,
+            "risk_level": risk_level,
+            "escalation_needed": escalation_needed,
+            "actions_taken": actions_taken,
+            "intervention_plan": intervention_plan,
+            "errors": errors,
+        }
+        
+        return final_text, metadata
+    
+    async def _execute_tool(
+        self,
+        tool_name: str,
+        args: Dict,
+        user_id: int,
+        session_id: str,
+        conversation_id: str,
+        message: str,
+    ) -> Dict:
+        """
+        Execute a specific tool by running corresponding LangGraph agent or DB query.
+        
+        Args:
+            tool_name: Name of tool to execute (from tool_definitions.py)
+            args: Tool arguments from Gemini
+            user_id: User ID
+            session_id: Session ID for continuity
+            conversation_id: Conversation ID for DB relations
+            message: Original user message
+        
+        Returns:
+            Dict with tool execution results and metadata
+        """
+        import uuid
+        
+        if tool_name == "run_safety_triage_agent":
+            # Execute STA LangGraph pipeline
+            reason = args.get("reason", "User message indicates potential risk")
+            urgency = args.get("urgency_override", "normal")
+            
+            self.activity_logger.log_info(
+                "STA",
+                f"🚨 Running safety triage: {reason}",
+                {"urgency": urgency}
+            )
+            
+            try:
+                # Run STA graph
+                sta_result = await self.sta_service.execute(
+                    user_id=user_id,
+                    session_id=session_id,
+                    user_hash=str(user_id),
+                    message=message,
+                    conversation_id=None,  # Tool mode doesn't persist to conversation yet
+                )
+                
+                severity = sta_result.get("severity", "unknown")
+                recommended_action = sta_result.get("recommended_action", "")
+                assessment_id = sta_result.get("assessment_id")
+                
+                self.activity_logger.log_info(
+                    "STA",
+                    f"✅ Triage complete: {severity}",
+                    {"assessment_id": assessment_id}
+                )
+                
+                return {
+                    "status": "completed",
+                    "agent": "STA",
+                    "severity": severity,
+                    "risk_level": severity,
+                    "recommended_action": recommended_action,
+                    "assessment_id": assessment_id,
+                    "escalation_needed": severity in ["high", "critical"],
+                    "actions_taken": [f"Risk assessment completed (severity: {severity})"],
+                }
+                
+            except Exception as e:
+                logger.error(f"❌ STA execution failed: {e}", exc_info=True)
+                return {
+                    "status": "failed",
+                    "agent": "STA",
+                    "error": str(e),
+                    "risk_level": "unknown",
+                }
+        
+        elif tool_name == "run_support_coach_agent":
+            # Execute SCA LangGraph pipeline
+            intervention_hint = args.get("intervention_hint", "general")
+            severity_context = args.get("severity_context", "low")
+            
+            self.activity_logger.log_info(
+                "SCA",
+                f"💙 Creating intervention plan: {intervention_hint}",
+                {"severity": severity_context}
+            )
+            
+            try:
+                # Run SCA graph
+                sca_result = await self.sca_service.execute(
+                    user_id=user_id,
+                    session_id=session_id,
+                    user_hash=str(user_id),
+                    message=message,
+                    conversation_id=None,  # Tool mode doesn't persist to conversation yet
+                    severity=severity_context,
+                    intent=intervention_hint,
+                )
+                
+                plan_id = sca_result.get("intervention_plan_id")
+                plan_data = sca_result.get("plan_data", {})
+                
+                self.activity_logger.log_info(
+                    "SCA",
+                    f"✅ Plan created: {plan_id}",
+                    {"total_steps": plan_data.get("total_steps", 0)}
+                )
+                
+                return {
+                    "status": "completed",
+                    "agent": "SCA",
+                    "plan_id": plan_id,
+                    "intervention_plan": plan_data,
+                    "total_steps": plan_data.get("total_steps", 0),
+                    "actions_taken": [f"Intervention plan created (ID: {plan_id})"],
+                }
+                
+            except Exception as e:
+                logger.error(f"❌ SCA execution failed: {e}", exc_info=True)
+                return {
+                    "status": "failed",
+                    "agent": "SCA",
+                    "error": str(e),
+                }
+        
+        elif tool_name == "run_service_desk_agent":
+            # Execute SDA workflow (case creation)
+            service_type = args.get("service_type", "counseling")
+            priority = args.get("priority", "normal")
+            
+            self.activity_logger.log_info(
+                "SDA",
+                f"📋 Creating service desk case: {service_type}",
+                {"priority": priority}
+            )
+            
+            try:
+                # Run SDA graph
+                sda_result = await self.sda_service.execute(
+                    user_id=user_id,
+                    session_id=session_id,
+                    user_hash=str(user_id),
+                    message=message,
+                    conversation_id=None,  # Tool mode doesn't persist to conversation yet
+                    severity="high" if priority == "high" else "critical",
+                    intent=service_type,
+                )
+                
+                case_id = sda_result.get("case_id")
+                status = sda_result.get("status", "open")
+                
+                self.activity_logger.log_info(
+                    "SDA",
+                    f"✅ Case created: {case_id}",
+                    {"status": status}
+                )
+                
+                return {
+                    "status": "completed",
+                    "agent": "SDA",
+                    "case_id": case_id,
+                    "case_status": status,
+                    "escalation_needed": True,
+                    "actions_taken": [f"Service desk case created (ID: {case_id})"],
+                }
+                
+            except Exception as e:
+                logger.error(f"❌ SDA execution failed: {e}", exc_info=True)
+                return {
+                    "status": "failed",
+                    "agent": "SDA",
+                    "error": str(e),
+                }
+        
+        elif tool_name == "get_user_intervention_plans":
+            # DB query for user's plans
+            active_only = args.get("active_only", False)
+            
+            self.activity_logger.log_info(
+                "Database",
+                f"📊 Fetching intervention plans (active_only={active_only})",
+                {"user_id": user_id}
+            )
+            
+            try:
+                from sqlalchemy import select
+                from app.domains.mental_health.models.interventions import InterventionPlanRecord
+                
+                query = select(InterventionPlanRecord).where(
+                    InterventionPlanRecord.user_id == user_id
+                )
+                
+                if active_only:
+                    query = query.where(InterventionPlanRecord.status == "active")
+                
+                query = query.order_by(InterventionPlanRecord.created_at.desc())
+                
+                result = await self.db.execute(query)
+                plans = result.scalars().all()
+                
+                plans_data = [
+                    {
+                        "id": plan.id,
+                        "title": plan.title,
+                        "status": plan.status,
+                        "total_steps": plan.total_steps,
+                        "completed_steps": plan.completed_steps,
+                        "created_at": plan.created_at.isoformat(),
+                    }
+                    for plan in plans
+                ]
+                
+                self.activity_logger.log_info(
+                    "Database",
+                    f"✅ Found {len(plans_data)} plans",
+                    {"active_only": active_only}
+                )
+                
+                return {
+                    "status": "completed",
+                    "plans": plans_data,
+                    "count": len(plans_data),
+                }
+                
+            except Exception as e:
+                logger.error(f"❌ Failed to fetch plans: {e}", exc_info=True)
+                return {
+                    "status": "failed",
+                    "error": str(e),
+                    "plans": [],
+                }
+        
+        elif tool_name == "get_mental_health_resources":
+            # Fetch resources (from DB or hardcoded)
+            category = args.get("category", "all")
+            topic = args.get("topic")
+            
+            self.activity_logger.log_info(
+                "Resources",
+                f"📚 Fetching mental health resources: {category}",
+                {"topic": topic}
+            )
+            
+            try:
+                # TODO: Replace with actual DB query when resources table exists
+                # For now, return hardcoded resources
+                resources = {
+                    "crisis": [
+                        {
+                            "title": "Crisis Centre UGM",
+                            "type": "hotline",
+                            "contact": "0274-544571 atau 0851-0111-0800",
+                            "available": "24/7",
+                        },
+                        {
+                            "title": "Grhatama Pustaka (GMC)",
+                            "type": "in_person",
+                            "location": "Gedung Grhatama Pustaka UGM, Lantai 2",
+                            "hours": "Senin-Jumat 08:00-15:00",
+                        },
+                    ],
+                    "coping": [
+                        {
+                            "title": "Teknik Pernapasan 4-7-8",
+                            "description": "Tarik napas 4 detik, tahan 7 detik, hembuskan 8 detik",
+                            "type": "breathing",
+                        },
+                        {
+                            "title": "Grounding 5-4-3-2-1",
+                            "description": "Sebutkan 5 hal yang kamu lihat, 4 yang kamu dengar, 3 yang kamu sentuh, 2 yang kamu cium, 1 yang kamu rasakan",
+                            "type": "grounding",
+                        },
+                    ],
+                    "educational": [
+                        {
+                            "title": "Mengenal Kecemasan",
+                            "url": "https://ugm.ac.id/kesehatan-mental",
+                            "type": "article",
+                        },
+                    ],
+                }
+                
+                if category == "all":
+                    result_resources = []
+                    for cat_resources in resources.values():
+                        result_resources.extend(cat_resources)
+                else:
+                    result_resources = resources.get(category, [])
+                
+                # Filter by topic if provided
+                if topic:
+                    result_resources = [
+                        r for r in result_resources
+                        if topic.lower() in r.get("title", "").lower()
+                        or topic.lower() in r.get("description", "").lower()
+                    ]
+                
+                self.activity_logger.log_info(
+                    "Resources",
+                    f"✅ Found {len(result_resources)} resources",
+                    {"category": category, "topic": topic}
+                )
+                
+                return {
+                    "status": "completed",
+                    "resources": result_resources,
+                    "count": len(result_resources),
+                }
+                
+            except Exception as e:
+                logger.error(f"❌ Failed to fetch resources: {e}", exc_info=True)
+                return {
+                    "status": "failed",
+                    "error": str(e),
+                }
+        
+        elif tool_name == "get_user_profile":
+            # Fetch user information from database
+            self.activity_logger.log_info(
+                "Database",
+                f"📊 Fetching profile for user {user_id}",
+                {"user_id": user_id}
+            )
+            
+            try:
+                from app.models import User
+                from sqlalchemy import select
+                
+                query = select(User).where(User.id == user_id)
+                result = await self.db.execute(query)
+                user = result.scalar_one_or_none()
+                
+                if user:
+                    self.activity_logger.log_info(
+                        "Database",
+                        f"✅ Profile retrieved: {user.full_name}",
+                        {"email": user.email}
+                    )
+                    
+                    return {
+                        "status": "completed",
+                        "user_id": user.id,
+                        "name": user.full_name or "Pengguna",
+                        "email": user.email,
+                        "role": user.role,
+                        "registered_date": user.created_at.isoformat() if user.created_at else None,
+                        "is_active": user.is_active,
+                    }
+                else:
+                    return {
+                        "status": "not_found",
+                        "error": "User profile not found",
+                    }
+            
+            except Exception as e:
+                logger.error(f"❌ Failed to fetch user profile: {e}", exc_info=True)
+                return {
+                    "status": "failed",
+                    "error": str(e),
+                }
+        
+        elif tool_name == "create_intervention_plan":
+            # Create CBT intervention plan directly
+            plan_title = args.get("plan_title", "Rencana Dukungan Mental")
+            concern_type = args.get("concern_type", "general")
+            severity = args.get("severity", "moderate")
+            
+            self.activity_logger.log_info(
+                "SCA",
+                f"💙 Creating intervention plan: {plan_title}",
+                {"concern": concern_type, "severity": severity}
+            )
+            
+            try:
+                # Call SCA service to generate structured plan
+                sca_result = await self.sca_service.execute(
+                    user_id=user_id,
+                    session_id=session_id,
+                    user_hash=str(user_id),
+                    message=f"User needs help with {concern_type}: {plan_title}",
+                    conversation_id=None,
+                    severity=severity,
+                    intent=concern_type,
+                )
+                
+                plan_id = sca_result.get("intervention_plan_id")
+                plan_data = sca_result.get("plan_data", {})
+                
+                self.activity_logger.log_info(
+                    "SCA",
+                    f"✅ Plan created: {plan_id}",
+                    {"total_steps": plan_data.get("total_steps", 0)}
+                )
+                
+                return {
+                    "status": "completed",
+                    "agent": "SCA",
+                    "plan_id": plan_id,
+                    "plan_title": plan_title,
+                    "intervention_plan": plan_data,
+                    "total_steps": plan_data.get("total_steps", 0),
+                    "actions_taken": [f"Created intervention plan: {plan_title} (ID: {plan_id})"],
+                }
+            
+            except Exception as e:
+                logger.error(f"❌ Failed to create intervention plan: {e}", exc_info=True)
+                return {
+                    "status": "failed",
+                    "agent": "SCA",
+                    "error": str(e),
+                    "resources": [],
+                }
+        
+        else:
+            # Unknown tool
+            logger.error(f"❌ Unknown tool requested: {tool_name}")
+            return {
+                "status": "failed",
+                "error": f"Unknown tool: {tool_name}",
+            }
+    
+    async def _get_conversation_history(self, session_id: str) -> List[Dict[str, str]]:
+        """
+        Get recent conversation history from Redis.
+        
+        Args:
+            session_id: Session identifier
+        
+        Returns:
+            List of conversation messages (role + content)
+        """
+        try:
+            import json
+            redis_client = await get_redis_client()
+            
+            cache_key = f"conv_history:{session_id}"
+            history_json = await redis_client.get(cache_key)
+            
+            if history_json:
+                history = json.loads(history_json)
+                logger.debug(f"📜 Retrieved {len(history)} messages from history cache")
+                return history
+            else:
+                logger.debug(f"📜 No cached history found for session {session_id}")
+                return []
+                
+        except Exception as e:
+            logger.warning(f"Failed to get conversation history: {e}")
+            return []
+    
+    async def _save_conversation_history(
+        self, 
+        session_id: str, 
+        user_msg: str, 
+        ai_msg: str
+    ) -> None:
+        """
+        Save conversation to Redis with 1-hour TTL.
+        
+        Maintains sliding window of last 10 messages to keep context manageable.
+        
+        Args:
+            session_id: Session identifier
+            user_msg: User's message
+            ai_msg: AI's response
+        """
+        try:
+            import json
+            redis_client = await get_redis_client()
+            
+            # Get existing history
+            history = await self._get_conversation_history(session_id)
+            
+            # Append new messages
+            history.append({"role": "user", "content": user_msg})
+            history.append({"role": "model", "content": ai_msg})
+            
+            # Keep only last 10 messages (5 turns)
+            history = history[-10:]
+            
+            # Save with 1-hour TTL
+            cache_key = f"conv_history:{session_id}"
+            await redis_client.setex(
+                cache_key,
+                3600,  # 1 hour
+                json.dumps(history)
+            )
+            
+            logger.debug(f"💾 Saved conversation to cache ({len(history)} messages)")
+            
+        except Exception as e:
+            logger.warning(f"Failed to save conversation history: {e}")
+            # Non-critical, continue without caching

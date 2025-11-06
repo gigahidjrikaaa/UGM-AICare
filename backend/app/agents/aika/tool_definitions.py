@@ -1,0 +1,301 @@
+"""
+Aika Tool Definitions for Gemini Function Calling
+
+This module defines the tools (functions) that Gemini can invoke
+to activate specialized LangGraph agents conditionally.
+"""
+
+# ==============================================================================
+# TOOL DEFINITIONS
+# ==============================================================================
+
+AIKA_AGENT_TOOLS = [
+    {
+        "name": "run_safety_triage_agent",
+        "description": """Execute the Safety Triage Agent (STA) LangGraph pipeline for comprehensive risk assessment.
+
+⚠️ ONLY call this tool when the user shows SERIOUS mental health concerns:
+- Self-harm or suicidal thoughts/ideation
+- Mentions of wanting to die or hurt themselves
+- Severe depression with hopelessness
+- Psychotic symptoms or severe anxiety
+- Crisis situation requiring immediate intervention
+- Harmful behavior patterns toward self or others
+
+❌ DO NOT call for:
+- Normal stress or exam anxiety
+- General sadness or disappointment
+- Academic pressure (unless extreme)
+- Relationship problems (unless indicating harm)
+- Casual expressions of frustration
+
+The STA agent performs:
+- PII redaction for privacy
+- Gemini-based risk classification
+- Severity level determination (low/moderate/high/critical)
+- Recommended action based on risk
+- Database persistence of assessment
+
+Keywords that might indicate need: "bunuh diri", "mati", "tidak ingin hidup", "suicide", 
+"mengakhiri hidup", "self-harm", "menyakiti diri"
+""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "urgency_override": {
+                    "type": "string",
+                    "enum": ["moderate", "high", "critical"],
+                    "description": "Override urgency level if immediate escalation is clearly needed based on message content"
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Brief explanation of why STA is being invoked (for audit trail and learning)"
+                }
+            },
+            "required": ["reason"]
+        }
+    },
+    {
+        "name": "run_support_coach_agent",
+        "description": """Execute the Support Coach Agent (SCA) LangGraph pipeline to generate a personalized CBT-informed intervention plan.
+
+✅ Call this tool when user EXPLICITLY requests structured support:
+- Asks for a plan or strategies: "buatin rencana", "kasih strategi", "gimana caranya"
+- Wants step-by-step guidance: "langkah-langkah apa yang harus aku lakukan"
+- Needs coping techniques: "cara mengatasi stress", "teknik relaksasi"
+- Requests intervention: "bantu aku menghadapi ini", "aku butuh bantuan"
+
+✅ Also call when user shows clear need for structured support:
+- Describes overwhelming stress or anxiety that needs actionable steps
+- Mentions struggling with specific situation (exams, relationships, family)
+- Expresses desire to improve but doesn't know how
+
+❌ DO NOT call for:
+- General questions about coping (just explain, don't generate full plan)
+- Casual chat or venting (listen and validate instead)
+- User just checking on existing plans (use get_user_intervention_plans instead)
+
+The SCA agent generates:
+- 4-6 actionable CBT-informed steps
+- 2-3 mental health resource cards
+- Personalized plan based on intervention type
+- Safety review before delivery
+- Database persistence for progress tracking
+
+Intervention types:
+- stress_management: Academic stress, work-life balance
+- anxiety_coping: Test anxiety, social anxiety, worry
+- depression_support: Low mood, lack of motivation
+- general_wellness: Self-care, resilience building
+""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "intervention_hint": {
+                    "type": "string",
+                    "enum": ["stress_management", "anxiety_coping", "depression_support", "general_wellness"],
+                    "description": "Suggested intervention type based on user's expressed need"
+                },
+                "severity_context": {
+                    "type": "string",
+                    "enum": ["low", "moderate"],
+                    "description": "Severity context from conversation (high severity should use STA first)"
+                }
+            },
+            "required": []
+        }
+    },
+    {
+        "name": "run_service_desk_agent",
+        "description": """Execute the Service Desk Agent (SDA) to create a case for human professional support.
+
+✅ Call this tool when user wants to connect with human professionals:
+- Explicitly asks for counselor/psychologist: "mau ketemu psikolog", "konseling", "mau curhat ke orang"
+- Requests referral to professional services: "perlu bantuan profesional"
+- Asks about GMC, HPU, or mental health services at UGM
+- Wants to escalate beyond AI support
+
+✅ Also call when situation requires professional intervention:
+- User has been assessed as high risk by STA
+- Problem is beyond AI's scope (trauma, severe mental illness)
+- User explicitly says AI support isn't enough
+
+The SDA agent:
+- Creates support case ticket with priority level
+- Notifies appropriate staff (counselors, emergency team)
+- Provides case number and estimated response time
+- Tracks case through resolution
+
+Service types:
+- counseling: General counseling sessions at GMC
+- psychiatry: Need for psychiatric evaluation/medication
+- crisis_intervention: Emergency situations requiring immediate human contact
+- general_inquiry: Questions about mental health services
+""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "service_type": {
+                    "type": "string",
+                    "enum": ["counseling", "psychiatry", "crisis_intervention", "general_inquiry"],
+                    "description": "Type of professional service user needs"
+                },
+                "priority": {
+                    "type": "string",
+                    "enum": ["normal", "high", "urgent"],
+                    "description": "Case priority (use 'urgent' for crisis, 'high' if STA indicated risk)"
+                }
+            },
+            "required": ["service_type"]
+        }
+    },
+    {
+        "name": "get_user_intervention_plans",
+        "description": """Retrieve user's existing intervention plans from database.
+
+Call when user asks about their plans or progress:
+- "rencana aku apa?", "plan aku gimana?"
+- "progress aku sudah sampai mana?"
+- "show my plans", "lihat rencana ku"
+- "aku sudah selesai langkah berapa?"
+
+Returns list of user's plans with completion status.
+""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "active_only": {
+                    "type": "boolean",
+                    "description": "If true, only return active (not completed/archived) plans. Default true."
+                }
+            }
+        }
+    },
+    {
+        "name": "get_mental_health_resources",
+        "description": """Retrieve mental health resources (articles, videos, contacts, techniques).
+
+Call when user asks for:
+- Coping strategies or techniques: "teknik relaksasi", "cara coping"
+- Educational content: "penjelasan tentang anxiety", "apa itu CBT"
+- Emergency contacts: "nomor darurat", "hotline bunuh diri"
+- UGM mental health services: "GMC", "HPU", "layanan konseling"
+
+Returns curated resources based on category.
+""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "category": {
+                    "type": "string",
+                    "enum": [
+                        "coping_strategies",
+                        "relaxation_techniques", 
+                        "emergency_contacts",
+                        "educational_content",
+                        "ugm_services"
+                    ],
+                    "description": "Category of resources to retrieve"
+                },
+                "topic": {
+                    "type": "string",
+                    "description": "Optional specific topic within category (e.g., 'breathing exercises', 'grounding techniques')"
+                }
+            },
+            "required": ["category"]
+        }
+    },
+    
+    # ==============================================================================
+    # ADDITIONAL USER-FACING TOOLS (from identity.py prompt)
+    # ==============================================================================
+    
+    {
+        "name": "get_user_profile",
+        "description": """Get user's profile information and account details.
+        
+        ✅ CALL WHEN:
+        - User asks "siapa aku?", "info tentang aku", "profil aku"
+        - User wants to know their account info
+        
+        ❌ DO NOT CALL:
+        - For general greetings (use direct response)
+        - For intervention plan queries (use get_user_intervention_plans)
+        
+        Returns: User's name, email, role, registration date, preferences""",
+        "parameters": {
+            "type": "object",
+            "properties": {},
+            "required": []
+        }
+    },
+    
+    {
+        "name": "create_intervention_plan",
+        "description": """Create a structured CBT intervention plan for the user.
+        
+        ✅ CALL WHEN USER EXPRESSES:
+        - Stress: "Aku stres dengan tugas kuliah"
+        - Anxiety: "Aku cemas menjelang ujian"
+        - Sadness: "Aku sedih dan tidak termotivasi"
+        - Overwhelm: "Aku kewalahan dengan tanggung jawab"
+        - Need for coping strategies
+        
+        ❌ DO NOT CALL:
+        - For casual greetings
+        - When user just wants to view existing plans (use get_user_intervention_plans)
+        - For crisis situations (use run_safety_triage_agent first)
+        
+        This tool creates a personalized plan with 4-6 actionable steps displayed as an interactive card.
+        CRITICAL: Always create plans proactively when user needs structured support!""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "plan_title": {
+                    "type": "string",
+                    "description": "Clear Indonesian title describing the goal (e.g., 'Strategi Mengelola Stres Akademik')"
+                },
+                "concern_type": {
+                    "type": "string",
+                    "description": "Type of concern: 'stress', 'anxiety', 'sadness', 'overwhelm', 'motivation', 'other'"
+                },
+                "severity": {
+                    "type": "string",
+                    "description": "Severity level: 'low', 'moderate', 'high' (use 'high' if user mentions severe distress)"
+                }
+            },
+            "required": ["plan_title", "concern_type"]
+        }
+    }
+]
+
+
+# ==============================================================================
+# HELPER: Convert to Gemini Format
+# ==============================================================================
+
+def get_gemini_tools():
+    """
+    Convert tool definitions to Gemini's function calling format.
+    
+    Returns:
+        List of Gemini Tool objects ready for API calls
+    """
+    from google.genai import types
+    
+    gemini_tools = []
+    
+    for tool in AIKA_AGENT_TOOLS:
+        gemini_tools.append(
+            types.Tool(
+                function_declarations=[
+                    types.FunctionDeclaration(
+                        name=tool["name"],
+                        description=tool["description"],
+                        parameters=tool["parameters"]
+                    )
+                ]
+            )
+        )
+    
+    return gemini_tools
