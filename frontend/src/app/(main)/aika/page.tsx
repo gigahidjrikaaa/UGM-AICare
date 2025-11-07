@@ -195,7 +195,7 @@ export default function AikaEnhancedPage() {
   return (
     <>
       {/* Content area */}
-      <div className="min-h-screen w-full text-white flex flex-col items-center justify-center p-2 md:p-4 lg:p-6 gap-4">
+      <div className="min-h-screen w-full text-white flex flex-col items-center justify-center p-2 md:p-4 lg:p-6 pt-24 gap-4">
         {/* Main Layout Container */}
         <div className="w-full max-w-7xl h-[calc(100vh-10rem)] flex gap-4">
           {/* Chat Panel */}

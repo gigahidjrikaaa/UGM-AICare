@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import { HiMenu, HiChevronDown } from "@/icons";
 import { useWellnessState } from "@/hooks/useQuests";
 // --- Import the new MobileNavMenu ---
@@ -21,6 +21,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
   const { data: wellness } = useWellnessState();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isAboutDropdownOpen, setIsAboutDropdownOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   
   // Track scroll position to add background blur on scroll
@@ -36,16 +37,21 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
   const toggleProfile = () => {
     setIsProfileOpen(!isProfileOpen);
     if (isMobileMenuOpen) setIsMobileMenuOpen(false);
+    if (isAboutDropdownOpen) setIsAboutDropdownOpen(false);
   };
-  
-  // const toggleMobileMenu = () => {
-  //   setIsMobileMenuOpen(!isMobileMenuOpen);
-  //   if (isProfileOpen) setIsProfileOpen(false);
-  // };
   
   const handleSignOut = () => {
     signOut({ callbackUrl: "/" });
   };
+
+  // About submenu items
+  const aboutMenuItems = [
+    { href: "/about", label: "About UGM-AICare" },
+    { href: "/about/aika", label: "Meet Aika" },
+    { href: "/about/features", label: "Features & Services" },
+    { href: "/about/privacy", label: "Privacy & Security" },
+    { href: "/about/research", label: "Research & Team" },
+  ];
 
   return (
     <>
@@ -107,11 +113,158 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
           
           {/* Desktop Navigation Links - Professional Style */}
           <nav className="hidden md:flex items-center gap-6">
+            {/* Home Link */}
+            <motion.div className="relative">
+              <Link 
+                href="/dashboard" 
+                className="relative text-white/70 hover:text-white transition-all duration-300 text-sm font-medium tracking-wide group py-2"
+              >
+                <span className="relative z-10">Home</span>
+                <motion.div
+                  className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#FFCA40] to-[#FFD700] rounded-full"
+                  initial={{ width: 0 }}
+                  whileHover={{ width: "100%" }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                />
+              </Link>
+            </motion.div>
+
+            {/* CareQuest Link with Logo */}
+            <motion.div className="relative">
+              <Link 
+                href="/carequest" 
+                className="relative text-white/70 hover:text-white transition-all duration-300 text-sm font-medium tracking-wide group py-2"
+              >
+                <motion.div
+                  className="relative z-10 flex items-center gap-2"
+                  whileHover={{ scale: 1.05 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 17 }}
+                >
+                  <motion.div
+                    className="relative"
+                    animate={{
+                      filter: [
+                        "drop-shadow(0 0 2px rgba(94,234,212,0.3))",
+                        "drop-shadow(0 0 8px rgba(94,234,212,0.6)) drop-shadow(0 0 12px rgba(94,234,212,0.4))",
+                        "drop-shadow(0 0 2px rgba(94,234,212,0.3))"
+                      ]
+                    }}
+                    transition={{
+                      duration: 2,
+                      repeat: Infinity,
+                      ease: "easeInOut"
+                    }}
+                    whileHover={{
+                      filter: "drop-shadow(0 0 12px rgba(94,234,212,0.8)) drop-shadow(0 0 20px rgba(94,234,212,0.5))",
+                      rotate: [0, -5, 5, -5, 0],
+                      transition: {
+                        rotate: {
+                          duration: 0.5,
+                          ease: "easeInOut"
+                        },
+                        filter: {
+                          duration: 0.3
+                        }
+                      }
+                    }}
+                  >
+                    <Image
+                      src="/carequest-logo.png"
+                      alt="CareQuest Logo"
+                      width={24}
+                      height={24}
+                      className="relative"
+                    />
+                    <motion.div
+                      className="absolute inset-0 rounded-full bg-[#5EEAD4]/20 blur-md opacity-0 group-hover:opacity-100"
+                      animate={{
+                        scale: [1, 1.3, 1],
+                        opacity: [0, 0.5, 0]
+                      }}
+                      transition={{
+                        duration: 2,
+                        repeat: Infinity,
+                        ease: "easeInOut"
+                      }}
+                    />
+                  </motion.div>
+                  <span>CareQuest</span>
+                </motion.div>
+                <motion.div
+                  className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#FFCA40] to-[#FFD700] rounded-full"
+                  initial={{ width: 0 }}
+                  whileHover={{ width: "100%" }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                />
+              </Link>
+            </motion.div>
+
+            {/* $CARE Token Link */}
+            <motion.div className="relative">
+              <Link 
+                href="/caretoken" 
+                className="relative text-[#FFCA40] hover:text-[#FFD700] transition-all duration-300 text-sm font-medium tracking-wide group py-2"
+              >
+                <span className="relative z-10">$CARE Token</span>
+                <motion.div
+                  className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#FFCA40] to-[#FFD700] rounded-full"
+                  initial={{ width: 0 }}
+                  whileHover={{ width: "100%" }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                />
+              </Link>
+            </motion.div>
+
+            {/* About Dropdown */}
+            <motion.div 
+              className="relative"
+              onMouseEnter={() => setIsAboutDropdownOpen(true)}
+              onMouseLeave={() => setIsAboutDropdownOpen(false)}
+            >
+              <button 
+                className="relative text-white/70 hover:text-white transition-all duration-300 text-sm font-medium tracking-wide group py-2 flex items-center gap-1"
+              >
+                <span className="relative z-10">About</span>
+                <motion.div
+                  animate={{ rotate: isAboutDropdownOpen ? 180 : 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <HiChevronDown size={14} />
+                </motion.div>
+                <motion.div
+                  className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#FFCA40] to-[#FFD700] rounded-full"
+                  initial={{ width: 0 }}
+                  animate={{ width: isAboutDropdownOpen ? "100%" : 0 }}
+                  transition={{ duration: 0.3, ease: "easeOut" }}
+                />
+              </button>
+
+              {/* Dropdown Menu */}
+              <AnimatePresence>
+                {isAboutDropdownOpen && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: 10 }}
+                    transition={{ duration: 0.2 }}
+                    className="absolute top-full left-0 mt-2 w-56 bg-white/10 backdrop-blur-xl rounded-xl border border-white/20 shadow-2xl overflow-hidden z-50"
+                  >
+                    {aboutMenuItems.map((item, idx) => (
+                      <Link
+                        key={idx}
+                        href={item.href}
+                        className="block px-4 py-3 text-sm text-white/80 hover:text-white hover:bg-white/10 transition-all duration-200 border-b border-white/5 last:border-0"
+                      >
+                        {item.label}
+                      </Link>
+                    ))}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+
+            {/* Other Links */}
             {[
-              { href: "/dashboard", label: "Home" },
-              { href: "/carequest", label: "CareQuest", useLogo: true },
-              { href: "/caretoken", label: "$CARE Token", highlight: true },
-              { href: "/about", label: "About" },
               { href: "/journaling", label: "Journaling" },
               { href: "/appointments", label: "Appointments" },
               { href: "/aika", label: "Talk to Aika" }
@@ -119,90 +272,19 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
               <motion.div key={i} className="relative">
                 <Link 
                   href={link.href} 
-                  className={`relative ${link.highlight ? 'text-[#FFCA40] hover:text-[#FFD700]' : 'text-white/70 hover:text-white'} transition-all duration-300 text-sm font-medium tracking-wide group py-2`}
+                  className="relative text-white/70 hover:text-white transition-all duration-300 text-sm font-medium tracking-wide group py-2"
                 >
-                  {link.useLogo ? (
-                    <motion.div
-                      className="relative z-10 flex items-center gap-2"
-                      whileHover={{ scale: 1.05 }}
-                      transition={{ type: "spring", stiffness: 400, damping: 17 }}
-                    >
-                      <motion.div
-                        className="relative"
-                        animate={{
-                          filter: [
-                            "drop-shadow(0 0 2px rgba(94,234,212,0.3))",
-                            "drop-shadow(0 0 8px rgba(94,234,212,0.6)) drop-shadow(0 0 12px rgba(94,234,212,0.4))",
-                            "drop-shadow(0 0 2px rgba(94,234,212,0.3))"
-                          ]
-                        }}
-                        transition={{
-                          duration: 2,
-                          repeat: Infinity,
-                          ease: "easeInOut"
-                        }}
-                        whileHover={{
-                          filter: "drop-shadow(0 0 12px rgba(94,234,212,0.8)) drop-shadow(0 0 20px rgba(94,234,212,0.5))",
-                          rotate: [0, -5, 5, -5, 0],
-                          transition: {
-                            rotate: {
-                              duration: 0.5,
-                              ease: "easeInOut"
-                            },
-                            filter: {
-                              duration: 0.3
-                            }
-                          }
-                        }}
-                      >
-                        <Image
-                          src="/carequest-logo.png"
-                          alt="CareQuest Logo"
-                          width={24}
-                          height={24}
-                          className="relative"
-                        />
-                        {/* Animated glow rings */}
-                        <motion.div
-                          className="absolute inset-0 rounded-full bg-[#5EEAD4]/20 blur-md opacity-0 group-hover:opacity-100"
-                          animate={{
-                            scale: [1, 1.3, 1],
-                            opacity: [0, 0.5, 0]
-                          }}
-                          transition={{
-                            duration: 2,
-                            repeat: Infinity,
-                            ease: "easeInOut"
-                          }}
-                        />
-                      </motion.div>
-                      <span>{link.label}</span>
-                    </motion.div>
-                  ) : (
-                    <span className="relative z-10">{link.label}</span>
-                  )}
-                  
-                  {/* Animated underline */}
+                  <span className="relative z-10">{link.label}</span>
                   <motion.div
                     className="absolute bottom-0 left-0 h-0.5 bg-gradient-to-r from-[#FFCA40] to-[#FFD700] rounded-full"
                     initial={{ width: 0 }}
                     whileHover={{ width: "100%" }}
                     transition={{ duration: 0.3, ease: "easeOut" }}
                   />
-                  
-                  {/* Subtle glow effect on hover */}
-                  <motion.div
-                    className="absolute inset-0 bg-white/5 rounded-lg opacity-0 group-hover:opacity-100 transition-opacity duration-300 -mx-2 -my-1"
-                    whileHover={{ 
-                      boxShadow: link.useLogo ? "0 0 30px rgba(94,234,212,0.15)" : "0 0 20px rgba(255,202,64,0.1)"
-                    }}
-                  />
                 </Link>
               </motion.div>
             ))}
           </nav>
-          
-          {/* Mobile Menu Button - Minimal Design */}
           <div className="md:hidden flex items-center">
             <motion.button
               onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}

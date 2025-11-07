@@ -65,7 +65,7 @@ export default function ForgotPassword() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col">
+      <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col pt-24">
         <div className="flex-1 flex items-center justify-center p-6">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -111,7 +111,7 @@ export default function ForgotPassword() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col pt-24">
       {/* Content */}
       <div className="flex-1 flex items-center justify-center p-6">
         <motion.div 

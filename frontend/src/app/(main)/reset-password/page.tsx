@@ -136,7 +136,7 @@ export default function ResetPassword() {
   // Loading state while validating token
   if (isValidatingToken) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col">
+      <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col pt-24">
         <div className="flex-1 flex items-center justify-center p-6">
           <motion.div 
             initial={{ opacity: 0 }}
@@ -155,7 +155,7 @@ export default function ResetPassword() {
   // Success state
   if (success) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col">
+      <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col pt-24">
         <div className="flex-1 flex items-center justify-center p-6">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -187,7 +187,7 @@ export default function ResetPassword() {
   // Error state (invalid token or other errors)
   if (!tokenValid) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col">
+      <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col pt-24">
         <div className="flex-1 flex items-center justify-center p-6">
           <motion.div 
             initial={{ opacity: 0, y: 20 }}
@@ -227,7 +227,7 @@ export default function ResetPassword() {
 
   // Main reset password form
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col">
+    <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col pt-24">
       {/* Header */}
       <div className="p-6">
         <Link href="/signin" className="inline-flex items-center text-white/70 hover:text-white transition-colors">

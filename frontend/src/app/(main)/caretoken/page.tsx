@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import { motion, useScroll, useTransform, useInView } from 'framer-motion';
 import Link from 'next/link';
+import ParticleBackground from '@/components/ui/ParticleBackground';
 import { 
   FiTrendingUp, 
   FiShield, 
@@ -26,42 +27,6 @@ import {
   FaCoins
 } from '@/icons';
 
-// ============ FLOATING ELEMENTS BACKGROUND ============
-const FloatingElements = () => {
-  return (
-    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-      {/* Floating coins */}
-      {[...Array(15)].map((_, i) => (
-        <motion.div
-          key={i}
-          className="absolute text-ugm-gold/10"
-          initial={{ 
-            x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1200), 
-            y: -50,
-            rotate: 0
-          }}
-          animate={{ 
-            y: (typeof window !== 'undefined' ? window.innerHeight : 800) + 50,
-            rotate: 360,
-            x: Math.random() * (typeof window !== 'undefined' ? window.innerWidth : 1200)
-          }}
-          transition={{ 
-            duration: 10 + Math.random() * 10,
-            repeat: Infinity,
-            delay: Math.random() * 5,
-            ease: "linear"
-          }}
-          style={{
-            left: `${Math.random() * 100}%`,
-          }}
-        >
-          <FaCoins size={20 + Math.random() * 30} />
-        </motion.div>
-      ))}
-    </div>
-  );
-};
-
 // ============ HERO SECTION ============
 const HeroSection = () => {
   const ref = useRef(null);
@@ -74,8 +39,37 @@ const HeroSection = () => {
   const opacity = useTransform(scrollYProgress, [0, 0.5], [1, 0]);
 
   return (
-    <section ref={ref} className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-ugm-blue via-ugm-blue-dark to-black">
-      <FloatingElements />
+    <section ref={ref} className="relative min-h-screen flex items-center justify-center overflow-hidden bg-gradient-to-br from-[#001D58] via-[#00308F] to-[#002A7A]">
+      {/* Particle Background - Consistent with design system */}
+      <div className="absolute inset-0 z-0">
+        <ParticleBackground 
+          count={60} 
+          colors={["#FFCA40", "#6A98F0", "#ffffff"]} 
+          minSize={2} 
+          maxSize={8} 
+          speed={0.8} 
+        />
+      </div>
+
+      {/* Animated Mesh Gradient Background */}
+      <div className="absolute inset-0 z-0 opacity-20">
+        <motion.div
+          className="absolute inset-0"
+          animate={{
+            background: [
+              'radial-gradient(circle at 20% 50%, rgba(255, 202, 64, 0.2) 0%, transparent 50%)',
+              'radial-gradient(circle at 80% 50%, rgba(106, 152, 240, 0.2) 0%, transparent 50%)',
+              'radial-gradient(circle at 50% 80%, rgba(255, 202, 64, 0.2) 0%, transparent 50%)',
+              'radial-gradient(circle at 20% 50%, rgba(255, 202, 64, 0.2) 0%, transparent 50%)',
+            ]
+          }}
+          transition={{
+            duration: 10,
+            repeat: Infinity,
+            ease: "easeInOut"
+          }}
+        />
+      </div>
       
       <motion.div 
         style={{ y, opacity }}
@@ -88,8 +82,8 @@ const HeroSection = () => {
           transition={{ duration: 0.8, type: "spring" }}
           className="mb-8 flex justify-center"
         >
-          <div className="w-32 h-32 bg-gradient-to-br from-ugm-gold to-yellow-600 rounded-full flex items-center justify-center shadow-2xl shadow-ugm-gold/50">
-            <FaCoins className="text-ugm-blue text-6xl" />
+          <div className="w-32 h-32 bg-gradient-to-br from-[#FFCA40] to-[#FFB700] rounded-full flex items-center justify-center shadow-2xl shadow-[#FFCA40]/50">
+            <FaCoins className="text-[#001D58] text-6xl" />
           </div>
         </motion.div>
 
@@ -98,7 +92,7 @@ const HeroSection = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.3 }}
-          className="text-5xl md:text-7xl font-bold text-ugm-gold mb-6"
+          className="text-5xl md:text-7xl font-bold text-[#FFCA40] mb-6"
         >
           $CARE Token
         </motion.h1>
@@ -136,8 +130,8 @@ const HeroSection = () => {
             { value: "SOMNIA", label: "Blockchain" },
             { value: "1M+ TPS", label: "Performance" }
           ].map((stat, i) => (
-            <div key={i} className="bg-white/10 backdrop-blur-sm rounded-xl p-4 border border-white/20">
-              <div className="text-3xl font-bold text-ugm-gold">{stat.value}</div>
+            <div key={i} className="bg-white/10 backdrop-blur-md rounded-xl p-4 border border-white/20">
+              <div className="text-3xl font-bold text-[#FFCA40]">{stat.value}</div>
               <div className="text-sm text-white/70">{stat.label}</div>
             </div>
           ))}
@@ -152,14 +146,14 @@ const HeroSection = () => {
         >
           <a
             href="#tokenomics"
-            className="px-8 py-4 bg-ugm-gold text-ugm-blue-dark rounded-full font-semibold hover:bg-yellow-500 transition-all hover:scale-105 flex items-center justify-center gap-2"
+            className="px-8 py-4 bg-[#FFCA40] text-[#001D58] rounded-full font-semibold hover:bg-yellow-500 transition-all hover:scale-105 flex items-center justify-center gap-2"
           >
             Explore Tokenomics
             <FiChevronRight />
           </a>
           <a
             href="#whitepaper"
-            className="px-8 py-4 bg-white/10 text-white rounded-full font-semibold hover:bg-white/20 transition-all backdrop-blur-sm border border-white/20 flex items-center justify-center gap-2"
+            className="px-8 py-4 bg-white/10 text-white rounded-full font-semibold hover:bg-white/20 transition-all backdrop-blur-md border border-white/20 flex items-center justify-center gap-2"
           >
             <FiFileText />
             Read Whitepaper
@@ -177,7 +171,7 @@ const HeroSection = () => {
             <motion.div
               animate={{ y: [0, 12, 0] }}
               transition={{ repeat: Infinity, duration: 1.5 }}
-              className="w-1.5 h-1.5 bg-ugm-gold rounded-full mt-2"
+              className="w-1.5 h-1.5 bg-[#FFCA40] rounded-full mt-2"
             />
           </div>
         </motion.div>
@@ -192,11 +186,22 @@ const ShariaComplianceSection = () => {
   const isInView = useInView(ref, { once: true, margin: "-100px" });
 
   return (
-    <section ref={ref} className="py-24 bg-gradient-to-b from-ugm-blue-dark via-ugm-blue to-ugm-blue-dark relative overflow-hidden">
+    <section ref={ref} className="py-24 bg-gradient-to-b from-[#002A7A] via-[#001D58] to-[#00308F] relative overflow-hidden">
+      {/* Particle Background for consistency */}
+      <div className="absolute inset-0 z-0 opacity-30">
+        <ParticleBackground 
+          count={40} 
+          colors={["#FFCA40", "#6A98F0", "#ffffff"]} 
+          minSize={2} 
+          maxSize={6} 
+          speed={0.5} 
+        />
+      </div>
+
       {/* Background decorations */}
       <div className="absolute inset-0">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-ugm-gold/5 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-ugm-gold/5 rounded-full blur-3xl"></div>
+        <div className="absolute top-20 left-10 w-72 h-72 bg-[#FFCA40]/5 rounded-full blur-3xl"></div>
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-[#FFCA40]/5 rounded-full blur-3xl"></div>
       </div>
 
       <div className="container mx-auto px-6 relative z-10">
@@ -207,12 +212,12 @@ const ShariaComplianceSection = () => {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-ugm-gold/10 rounded-full border border-ugm-gold/30 mb-4">
-            <FiShield className="text-ugm-gold" />
-            <span className="text-ugm-gold text-sm font-semibold">SHARIA-COMPLIANT</span>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFCA40]/10 rounded-full border border-[#FFCA40]/30 mb-4">
+            <FiShield className="text-[#FFCA40]" />
+            <span className="text-[#FFCA40] text-sm font-semibold">SHARIA-COMPLIANT</span>
           </div>
           <h2 className="text-4xl md:text-5xl font-bold mb-4">
-            <span className="bg-gradient-to-r from-ugm-gold via-yellow-400 to-ugm-gold bg-clip-text text-transparent">
+            <span className="bg-gradient-to-r from-[#FFCA40] via-[#FFD700] to-[#FFCA40] bg-clip-text text-transparent">
               Halal Staking & Ethical Finance
             </span>
           </h2>
@@ -240,7 +245,7 @@ const ShariaComplianceSection = () => {
               icon: <FiCheck className="text-5xl" />,
               title: "Riba-Free",
               description: "No interest - only profit-sharing from real revenue",
-              color: "from-ugm-gold to-yellow-500"
+              color: "from-[#FFCA40] to-yellow-500"
             },
             {
               icon: <FaHeart className="text-5xl" />,
@@ -254,9 +259,9 @@ const ShariaComplianceSection = () => {
               initial={{ opacity: 0, scale: 0.8 }}
               animate={isInView ? { opacity: 1, scale: 1 } : {}}
               transition={{ duration: 0.5, delay: 0.3 + index * 0.1 }}
-              className="bg-white/5 backdrop-blur-md rounded-2xl p-8 border border-ugm-gold/20 hover:border-ugm-gold/50 transition-all group hover:scale-105"
+              className="bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-[#FFCA40]/20 hover:border-[#FFCA40]/50 transition-all group hover:scale-105"
             >
-              <div className={`w-20 h-20 bg-gradient-to-br ${badge.color} rounded-full flex items-center justify-center mx-auto mb-4 text-white group-hover:rotate-6 transition-transform shadow-2xl shadow-ugm-gold/20`}>
+              <div className={`w-20 h-20 bg-gradient-to-br ${badge.color} rounded-full flex items-center justify-center mx-auto mb-4 text-white group-hover:rotate-6 transition-transform shadow-2xl shadow-[#FFCA40]/20`}>
                 {badge.icon}
               </div>
               <h3 className="text-2xl font-bold text-white text-center mb-3">{badge.title}</h3>
@@ -270,20 +275,20 @@ const ShariaComplianceSection = () => {
           initial={{ opacity: 0, y: 30 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.6 }}
-          className="bg-white/5 backdrop-blur-md rounded-3xl p-10 border border-ugm-gold/10 max-w-5xl mx-auto"
+          className="bg-white/5 backdrop-blur-md rounded-3xl p-10 border border-[#FFCA40]/10 max-w-5xl mx-auto"
         >
           <div className="flex items-center gap-3 mb-6">
-            <div className="w-10 h-10 bg-gradient-to-br from-ugm-gold to-yellow-500 rounded-lg flex items-center justify-center">
+            <div className="w-10 h-10 bg-gradient-to-br from-[#FFCA40] to-yellow-500 rounded-lg flex items-center justify-center">
               <FiZap className="text-white text-xl" />
             </div>
-            <h3 className="text-3xl font-bold text-ugm-gold">How Mudarabah Works</h3>
+            <h3 className="text-3xl font-bold text-[#FFCA40]">How Mudarabah Works</h3>
           </div>
           
           <div className="grid md:grid-cols-2 gap-6">
             <div className="space-y-4">
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-ugm-gold/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                  <span className="text-ugm-gold font-bold">1</span>
+                <div className="w-8 h-8 bg-[#FFCA40]/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                  <span className="text-[#FFCA40] font-bold">1</span>
                 </div>
                 <div>
                   <h4 className="text-white font-semibold mb-1">Stakers Provide Capital</h4>
@@ -292,8 +297,8 @@ const ShariaComplianceSection = () => {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-ugm-gold/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                  <span className="text-ugm-gold font-bold">2</span>
+                <div className="w-8 h-8 bg-[#FFCA40]/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                  <span className="text-[#FFCA40] font-bold">2</span>
                 </div>
                 <div>
                   <h4 className="text-white font-semibold mb-1">Platform Manages Operations</h4>
@@ -302,8 +307,8 @@ const ShariaComplianceSection = () => {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-ugm-gold/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                  <span className="text-ugm-gold font-bold">3</span>
+                <div className="w-8 h-8 bg-[#FFCA40]/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                  <span className="text-[#FFCA40] font-bold">3</span>
                 </div>
                 <div>
                   <h4 className="text-white font-semibold mb-1">Profits from Real Revenue</h4>
@@ -314,8 +319,8 @@ const ShariaComplianceSection = () => {
 
             <div className="space-y-4">
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-ugm-gold/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                  <span className="text-ugm-gold font-bold">4</span>
+                <div className="w-8 h-8 bg-[#FFCA40]/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                  <span className="text-[#FFCA40] font-bold">4</span>
                 </div>
                 <div>
                   <h4 className="text-white font-semibold mb-1">Profit-Sharing Distribution</h4>
@@ -324,8 +329,8 @@ const ShariaComplianceSection = () => {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-ugm-gold/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                  <span className="text-ugm-gold font-bold">5</span>
+                <div className="w-8 h-8 bg-[#FFCA40]/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                  <span className="text-[#FFCA40] font-bold">5</span>
                 </div>
                 <div>
                   <h4 className="text-white font-semibold mb-1">Fair Risk-Sharing</h4>
@@ -334,8 +339,8 @@ const ShariaComplianceSection = () => {
               </div>
 
               <div className="flex items-start gap-3">
-                <div className="w-8 h-8 bg-ugm-gold/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
-                  <span className="text-ugm-gold font-bold">6</span>
+                <div className="w-8 h-8 bg-[#FFCA40]/20 rounded-full flex items-center justify-center flex-shrink-0 mt-1">
+                  <span className="text-[#FFCA40] font-bold">6</span>
                 </div>
                 <div>
                   <h4 className="text-white font-semibold mb-1">Transparent On-Chain</h4>
@@ -346,8 +351,8 @@ const ShariaComplianceSection = () => {
           </div>
 
           {/* Key Differences */}
-          <div className="mt-8 pt-8 border-t border-ugm-gold/20">
-            <h4 className="text-xl font-bold text-ugm-gold mb-4 flex items-center gap-2">
+          <div className="mt-8 pt-8 border-t border-[#FFCA40]/20">
+            <h4 className="text-xl font-bold text-[#FFCA40] mb-4 flex items-center gap-2">
               <FiArrowRight />
               Key Differences from Traditional DeFi
             </h4>
@@ -425,7 +430,7 @@ const ShariaComplianceSection = () => {
         >
           <Link
             href="/docs/SHARIA_COMPLIANT_STAKING_DESIGN.md"
-            className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-ugm-gold to-yellow-500 text-ugm-blue-dark rounded-full font-bold hover:scale-105 transition-all shadow-2xl shadow-ugm-gold/50"
+            className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-[#FFCA40] to-yellow-500 text-[#001D58] rounded-full font-bold hover:scale-105 transition-all shadow-2xl shadow-[#FFCA40]/50"
           >
             <FiFileText />
             Read Full Sharia Compliance Design
@@ -453,7 +458,18 @@ const TokenomicsSection = () => {
   ];
 
   return (
-    <section id="tokenomics" ref={ref} className="py-24 bg-gradient-to-b from-black to-ugm-blue-dark relative overflow-hidden">
+    <section id="tokenomics" ref={ref} className="py-24 bg-gradient-to-b from-[#002A7A] via-[#001D58] to-[#00308F] relative overflow-hidden">
+      {/* Particle Background */}
+      <div className="absolute inset-0 z-0 opacity-20">
+        <ParticleBackground 
+          count={40} 
+          colors={["#FFCA40", "#6A98F0", "#ffffff"]} 
+          minSize={2} 
+          maxSize={6} 
+          speed={0.5} 
+        />
+      </div>
+      
       {/* Background decorations */}
       <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10"></div>
       
@@ -465,9 +481,9 @@ const TokenomicsSection = () => {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-ugm-gold/10 rounded-full border border-ugm-gold/30 mb-4">
-            <FiPieChart className="text-ugm-gold" />
-            <span className="text-ugm-gold text-sm font-semibold">TOKENOMICS</span>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFCA40]/10 rounded-full border border-[#FFCA40]/30 mb-4">
+            <FiPieChart className="text-[#FFCA40]" />
+            <span className="text-[#FFCA40] text-sm font-semibold">TOKENOMICS</span>
           </div>
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
             Distribution Model
@@ -486,7 +502,7 @@ const TokenomicsSection = () => {
         >
           <div className="max-w-4xl mx-auto">
             {/* Horizontal Bar Chart */}
-            <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10">
+            <div className="bg-white/5 backdrop-blur-md rounded-2xl p-8 border border-white/10">
               <div className="space-y-4">
                 {distribution.map((item, index) => (
                   <motion.div
@@ -501,7 +517,7 @@ const TokenomicsSection = () => {
                         <span className="text-white font-semibold">{item.name}</span>
                       </div>
                       <div className="text-right">
-                        <span className="text-ugm-gold font-bold text-lg">{item.percentage}%</span>
+                        <span className="text-[#FFCA40] font-bold text-lg">{item.percentage}%</span>
                         <span className="text-white/50 text-sm ml-2">({item.amount})</span>
                       </div>
                     </div>
@@ -553,7 +569,7 @@ const TokenomicsSection = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.6, delay: 0.8 + index * 0.1 }}
-              className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:border-ugm-gold/50 transition-all group"
+              className="bg-white/5 backdrop-blur-md rounded-xl p-6 border border-white/10 hover:border-[#FFCA40]/50 transition-all group"
             >
               <div className={`w-12 h-12 bg-gradient-to-br ${feature.color} rounded-lg flex items-center justify-center mb-4 text-white text-2xl group-hover:scale-110 transition-transform`}>
                 {feature.icon}
@@ -573,7 +589,7 @@ const TokenomicsSection = () => {
         >
           <Link
             href="/docs/CARE_TOKEN/TOKENOMICS_FINAL.md"
-            className="inline-flex items-center gap-2 px-6 py-3 bg-ugm-gold/10 text-ugm-gold rounded-full border border-ugm-gold/30 hover:bg-ugm-gold/20 transition-all"
+            className="inline-flex items-center gap-2 px-6 py-3 bg-[#FFCA40]/10 text-[#FFCA40] rounded-full border border-[#FFCA40]/30 hover:bg-[#FFCA40]/20 transition-all"
           >
             View Full Tokenomics
             <FiExternalLink />
@@ -655,8 +671,19 @@ const UseCasesSection = () => {
   const activeContent = content[activeTab];
 
   return (
-    <section id="usecases" ref={ref} className="py-24 bg-gradient-to-b from-ugm-blue-dark to-black relative">
-      <div className="container mx-auto px-6">
+    <section id="usecases" ref={ref} className="py-24 bg-gradient-to-b from-[#00308F] via-[#002A7A] to-[#001D58] relative overflow-hidden">
+      {/* Particle Background */}
+      <div className="absolute inset-0 z-0 opacity-20">
+        <ParticleBackground 
+          count={35} 
+          colors={["#FFCA40", "#6A98F0", "#ffffff"]} 
+          minSize={2} 
+          maxSize={6} 
+          speed={0.5} 
+        />
+      </div>
+      
+      <div className="container mx-auto px-6 relative z-10">
         {/* Section Header */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -664,9 +691,9 @@ const UseCasesSection = () => {
           transition={{ duration: 0.6 }}
           className="text-center mb-12"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-ugm-gold/10 rounded-full border border-ugm-gold/30 mb-4">
-            <FiZap className="text-ugm-gold" />
-            <span className="text-ugm-gold text-sm font-semibold">TOKEN UTILITY</span>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFCA40]/10 rounded-full border border-[#FFCA40]/30 mb-4">
+            <FiZap className="text-[#FFCA40]" />
+            <span className="text-[#FFCA40] text-sm font-semibold">TOKEN UTILITY</span>
           </div>
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
             How to Use $CARE
@@ -689,7 +716,7 @@ const UseCasesSection = () => {
               onClick={() => setActiveTab(tab.id)}
               className={`px-6 py-3 rounded-full font-semibold transition-all flex items-center gap-2 ${
                 activeTab === tab.id
-                  ? 'bg-ugm-gold text-ugm-blue-dark shadow-lg shadow-ugm-gold/30'
+                  ? 'bg-[#FFCA40] text-[#001D58] shadow-lg shadow-[#FFCA40]/30'
                   : 'bg-white/5 text-white hover:bg-white/10 border border-white/10'
               }`}
             >
@@ -719,13 +746,13 @@ const UseCasesSection = () => {
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ duration: 0.4, delay: index * 0.05 }}
-                className="bg-white/5 backdrop-blur-sm rounded-xl p-6 border border-white/10 hover:border-ugm-gold/50 transition-all group hover:scale-105"
+                className="bg-white/5 backdrop-blur-md rounded-xl p-6 border border-white/10 hover:border-[#FFCA40]/50 transition-all group hover:scale-105"
               >
                 <div className={`w-12 h-12 bg-gradient-to-br ${activeContent.gradient} rounded-lg flex items-center justify-center mb-4 text-white text-2xl group-hover:rotate-12 transition-transform`}>
                   {item.icon}
                 </div>
                 <h4 className="text-lg font-bold text-white mb-1">{item.title}</h4>
-                <div className="text-ugm-gold font-semibold mb-2">
+                <div className="text-[#FFCA40] font-semibold mb-2">
                   {'reward' in item ? item.reward : 'price' in item ? item.price : item.requirement}
                 </div>
                 <p className="text-white/60 text-sm">{item.description}</p>
@@ -771,7 +798,18 @@ const WhitepaperSection = () => {
   ];
 
   return (
-    <section id="whitepaper" ref={ref} className="py-24 bg-gradient-to-b from-black to-ugm-blue relative overflow-hidden">
+    <section id="whitepaper" ref={ref} className="py-24 bg-gradient-to-b from-[#001D58] via-[#002A7A] to-[#00308F] relative overflow-hidden">
+      {/* Particle Background */}
+      <div className="absolute inset-0 z-0 opacity-20">
+        <ParticleBackground 
+          count={40} 
+          colors={["#FFCA40", "#6A98F0", "#ffffff"]} 
+          minSize={2} 
+          maxSize={6} 
+          speed={0.5} 
+        />
+      </div>
+      
       {/* Background decoration */}
       <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-5"></div>
       
@@ -783,9 +821,9 @@ const WhitepaperSection = () => {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-ugm-gold/10 rounded-full border border-ugm-gold/30 mb-4">
-            <FiFileText className="text-ugm-gold" />
-            <span className="text-ugm-gold text-sm font-semibold">DOCUMENTATION</span>
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFCA40]/10 rounded-full border border-[#FFCA40]/30 mb-4">
+            <FiFileText className="text-[#FFCA40]" />
+            <span className="text-[#FFCA40] text-sm font-semibold">DOCUMENTATION</span>
           </div>
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-4">
             Whitepaper & Resources
@@ -808,19 +846,19 @@ const WhitepaperSection = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.6, delay: 0.3 + index * 0.1 }}
-              className="bg-white/5 backdrop-blur-sm rounded-2xl p-8 border border-white/10 hover:border-ugm-gold/50 transition-all group"
+              className="bg-white/5 backdrop-blur-md rounded-2xl p-8 border border-white/10 hover:border-[#FFCA40]/50 transition-all group"
             >
               <div className={`w-16 h-16 bg-gradient-to-br ${doc.color} rounded-xl flex items-center justify-center mb-6 text-white text-3xl group-hover:scale-110 transition-transform`}>
                 {doc.icon}
               </div>
               <h3 className="text-2xl font-bold text-white mb-2">{doc.title}</h3>
               <p className="text-white/60 mb-4">{doc.description}</p>
-              <div className="text-ugm-gold text-sm font-semibold mb-6">{doc.pages}</div>
+              <div className="text-[#FFCA40] text-sm font-semibold mb-6">{doc.pages}</div>
               <a
                 href={`https://github.com/gigahidjrikaaa/UGM-AICare/blob/main/docs/CARE_TOKEN/${doc.file}`}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 px-6 py-3 bg-ugm-gold text-ugm-blue-dark rounded-full font-semibold hover:bg-yellow-500 transition-all w-full justify-center"
+                className="inline-flex items-center gap-2 px-6 py-3 bg-[#FFCA40] text-[#001D58] rounded-full font-semibold hover:bg-yellow-500 transition-all w-full justify-center"
               >
                 <FiDownload />
                 View Document
@@ -834,7 +872,7 @@ const WhitepaperSection = () => {
           initial={{ opacity: 0, y: 20 }}
           animate={isInView ? { opacity: 1, y: 0 } : {}}
           transition={{ duration: 0.6, delay: 0.6 }}
-          className="bg-gradient-to-r from-ugm-gold/10 to-yellow-600/10 rounded-2xl p-8 border border-ugm-gold/30"
+          className="bg-gradient-to-r from-[#FFCA40]/10 to-yellow-600/10 rounded-2xl p-8 border border-[#FFCA40]/30"
         >
           <h3 className="text-2xl font-bold text-white mb-6 text-center">Key Highlights</h3>
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -845,7 +883,7 @@ const WhitepaperSection = () => {
               { label: "Team Vesting", value: "4 Years + Cliff", icon: <FiShield /> },
             ].map((item, index) => (
               <div key={index} className="text-center">
-                <div className="text-ugm-gold text-3xl mb-2 flex justify-center">{item.icon}</div>
+                <div className="text-[#FFCA40] text-3xl mb-2 flex justify-center">{item.icon}</div>
                 <div className="text-2xl font-bold text-white mb-1">{item.value}</div>
                 <div className="text-white/60 text-sm">{item.label}</div>
               </div>
@@ -938,7 +976,7 @@ const FAQSection = () => {
   ];
 
   return (
-    <section ref={ref} className="py-24 bg-gradient-to-b from-ugm-blue to-ugm-blue-dark">
+    <section ref={ref} className="py-24 bg-gradient-to-b from-[#00308F] to-[#001D58]">
       <div className="container mx-auto px-6 max-w-4xl">
         <motion.div
           initial={{ opacity: 0, y: 30 }}
@@ -961,7 +999,7 @@ const FAQSection = () => {
               initial={{ opacity: 0, y: 20 }}
               animate={isInView ? { opacity: 1, y: 0 } : {}}
               transition={{ duration: 0.4, delay: index * 0.05 }}
-              className="bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden"
+              className="bg-white/5 backdrop-blur-md rounded-xl border border-white/10 overflow-hidden"
             >
               <button
                 onClick={() => setOpenIndex(openIndex === index ? null : index)}
@@ -971,7 +1009,7 @@ const FAQSection = () => {
                 <motion.div
                   animate={{ rotate: openIndex === index ? 180 : 0 }}
                   transition={{ duration: 0.3 }}
-                  className="text-ugm-gold text-xl flex-shrink-0"
+                  className="text-[#FFCA40] text-xl flex-shrink-0"
                 >
                   <FiChevronRight className="rotate-90" />
                 </motion.div>
@@ -1003,8 +1041,17 @@ const CTASection = () => {
   const isInView = useInView(ref, { once: true });
 
   return (
-    <section ref={ref} className="py-24 bg-gradient-to-br from-ugm-blue-dark via-ugm-blue to-black relative overflow-hidden">
-      <FloatingElements />
+    <section ref={ref} className="py-24 bg-gradient-to-br from-[#001D58] via-[#00308F] to-[#002A7A] relative overflow-hidden">
+      {/* Particle Background */}
+      <div className="absolute inset-0 z-0 opacity-30">
+        <ParticleBackground 
+          count={40} 
+          colors={["#FFCA40", "#6A98F0", "#ffffff"]} 
+          minSize={2} 
+          maxSize={6} 
+          speed={0.6} 
+        />
+      </div>
       
       <motion.div
         initial={{ opacity: 0, y: 30 }}
@@ -1022,14 +1069,14 @@ const CTASection = () => {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               href="/signup"
-              className="px-8 py-4 bg-ugm-gold text-ugm-blue-dark rounded-full font-bold text-lg hover:bg-yellow-500 transition-all hover:scale-105 flex items-center justify-center gap-2 shadow-xl shadow-ugm-gold/30"
+              className="px-8 py-4 bg-[#FFCA40] text-[#001D58] rounded-full font-bold text-lg hover:bg-yellow-500 transition-all hover:scale-105 flex items-center justify-center gap-2 shadow-xl shadow-[#FFCA40]/30"
             >
               Get Started Now
               <FiArrowRight />
             </Link>
             <Link
               href="/dashboard"
-              className="px-8 py-4 bg-white/10 text-white rounded-full font-bold text-lg hover:bg-white/20 transition-all backdrop-blur-sm border border-white/20 flex items-center justify-center gap-2"
+              className="px-8 py-4 bg-white/10 text-white rounded-full font-bold text-lg hover:bg-white/20 transition-all backdrop-blur-md border border-white/20 flex items-center justify-center gap-2"
             >
               View Dashboard
             </Link>
@@ -1038,15 +1085,15 @@ const CTASection = () => {
           {/* Trust indicators */}
           <div className="mt-12 flex flex-wrap justify-center gap-8 text-white/60">
             <div className="flex items-center gap-2">
-              <FiShield className="text-ugm-gold" />
+              <FiShield className="text-[#FFCA40]" />
               <span>Audited Smart Contract</span>
             </div>
             <div className="flex items-center gap-2">
-              <FiUsers className="text-ugm-gold" />
+              <FiUsers className="text-[#FFCA40]" />
               <span>Community Governed</span>
             </div>
             <div className="flex items-center gap-2">
-              <FiLock className="text-ugm-gold" />
+              <FiLock className="text-[#FFCA40]" />
               <span>Secure & Transparent</span>
             </div>
           </div>
@@ -1059,7 +1106,7 @@ const CTASection = () => {
 // ============ MAIN PAGE COMPONENT ============
 export default function CareTokenPage() {
   return (
-    <main className="min-h-screen bg-black">
+    <main className="min-h-screen bg-gradient-to-b from-[#001D58] via-[#00308F] to-[#002A7A] pt-24">
       <HeroSection />
       <ShariaComplianceSection />
       <TokenomicsSection />

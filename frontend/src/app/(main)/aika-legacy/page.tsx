@@ -84,7 +84,7 @@ export default function AikaChatPage() {
   return (
     <>
       {/* Content area - background, particles, and padding all from AppLayout! */}
-      <div className="min-h-screen w-full text-white flex flex-col items-center justify-center p-2 md:p-4 lg:p-6">
+      <div className="min-h-screen w-full text-white flex flex-col items-center justify-center p-2 md:p-4 lg:p-6 pt-24">
         {/* Unified Chat Container (header simplified, controls moved to footer bar) */}
         <div className="w-full max-w-5xl h-[calc(100vh-10rem)] flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden">
           <HeaderBar 
