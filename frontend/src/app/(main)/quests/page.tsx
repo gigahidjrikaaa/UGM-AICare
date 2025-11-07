@@ -7,7 +7,7 @@ import { FiArrowLeft } from "@/icons";
 export default function QuestsPage() {
   return (
     <main className="min-h-screen text-white">
-      <div className="mx-auto max-w-5xl px-4 py-12 space-y-8">
+      <div className="mx-auto max-w-5xl px-4 pt-24 pb-12 space-y-8">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
             <p className="text-xs uppercase tracking-wide text-white/60">UGM-AICare Quest</p>

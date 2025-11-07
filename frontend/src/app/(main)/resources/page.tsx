@@ -220,7 +220,7 @@ export default function SupportHubPage() {
   return (
     <div className="relative min-h-screen bg-gradient-to-b from-slate-950 via-slate-900 to-slate-950 text-white">
       <ParticleBackground />
-      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-12 sm:py-16 space-y-16">
+      <main className="relative z-10 max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 pt-24 pb-12 sm:pb-16 space-y-16">
         <header className="space-y-6 text-center">
           <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/10 border border-white/15 text-xs sm:text-sm text-[#FFCA40] uppercase tracking-[0.3em]">
             <FiBookOpen /> Community Support Hub
