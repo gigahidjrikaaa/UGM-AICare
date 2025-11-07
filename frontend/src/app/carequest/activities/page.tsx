@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, Brain, BookOpen, Heart, Dumbbell, Filter } from 'lucide-react';
 import { QuestCard } from '@/components/carequest/QuestCard';
+import ParticleBackground from '@/components/ui/ParticleBackground';
 
 /**
  * Activities Page - RPG Redesign
@@ -34,11 +35,11 @@ interface Activity {
 }
 
 const categories = [
-  { id: 'all' as const, label: 'All Quests', icon: Sparkles, color: 'ugm-gold' },
-  { id: 'mindfulness' as const, label: 'Mindfulness', icon: Heart, color: 'aurora-pink' },
-  { id: 'cbt' as const, label: 'CBT', icon: Brain, color: 'aurora-purple' },
-  { id: 'journal' as const, label: 'Journaling', icon: BookOpen, color: 'aurora-blue' },
-  { id: 'exercise' as const, label: 'Exercises', icon: Dumbbell, color: 'aurora-cyan' },
+  { id: 'all' as const, label: 'All Quests', icon: Sparkles, color: '[#FFCA40]' },
+  { id: 'mindfulness' as const, label: 'Mindfulness', icon: Heart, color: '[#FF6B9D]' },
+  { id: 'cbt' as const, label: 'CBT', icon: Brain, color: '[#B8A4FF]' },
+  { id: 'journal' as const, label: 'Journaling', icon: BookOpen, color: '[#50E3C2]' },
+  { id: 'exercise' as const, label: 'Exercises', icon: Dumbbell, color: '[#50E3C2]' },
 ];
 
 export default function ActivitiesPage() {
@@ -147,28 +148,10 @@ export default function ActivitiesPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-ugm-blue via-ugm-blue-dark to-black">
-      {/* Animated background */}
+    <div className="min-h-screen bg-gradient-to-br from-[#001D58] via-[#00308F] to-[#002A7A] relative">
+      {/* Background Particles */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        {[...Array(20)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-1 h-1 bg-ugm-gold/20 rounded-full"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-            }}
-            animate={{
-              y: [0, -30, 0],
-              opacity: [0.2, 0.7, 0.2],
-            }}
-            transition={{
-              duration: 3 + Math.random() * 2,
-              repeat: Infinity,
-              delay: Math.random() * 2,
-            }}
-          />
-        ))}
+        <ParticleBackground count={50} colors={["#FFCA40", "#B8A4FF", "#50E3C2"]} minSize={2} maxSize={6} speed={0.8} />
       </div>
 
       <div className="container mx-auto px-6 py-12 max-w-7xl relative z-10">
@@ -179,13 +162,13 @@ export default function ActivitiesPage() {
           className="mb-8 text-center"
         >
           <div className="flex items-center justify-center gap-3 mb-4">
-            <Sparkles className="w-12 h-12 text-ugm-gold" />
-            <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-ugm-gold via-yellow-300 to-ugm-gold">
+            <Sparkles className="w-12 h-12 text-[#FFCA40]" />
+            <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFCA40] via-[#FFD700] to-[#FFCA40]">
               Quest Board
             </h1>
-            <Sparkles className="w-12 h-12 text-ugm-gold" />
+            <Sparkles className="w-12 h-12 text-[#FFCA40]" />
           </div>
-          <p className="text-xl text-gray-300">
+          <p className="text-xl text-white/70">
             Complete Therapeutic Quests to Earn XP and Improve Your Wellbeing
           </p>
         </motion.div>

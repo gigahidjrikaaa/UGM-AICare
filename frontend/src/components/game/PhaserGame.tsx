@@ -7,7 +7,6 @@ import { BootScene } from '@/game/scenes/BootScene';
 import { MenuScene } from '@/game/scenes/MenuScene';
 import { WorldMapScene } from '@/game/scenes/WorldMapScene';
 import { CombatScene } from '@/game/scenes/CombatScene';
-import { CareQuestHubScene } from '@/game/scenes/CareQuestHubScene';
 import { EventBridge } from '@/game/utils/EventBridge';
 import { useGameStore } from '@/store/gameStore';
 import toast from 'react-hot-toast';
@@ -35,13 +34,11 @@ export function PhaserGame() {
     console.log('[PhaserGame] Initializing Phaser 3 game...');
 
     // Create Phaser game instance
-    const config: Phaser.Types.Core.GameConfig = {
-      ...GAME_CONFIG,
-      parent: containerRef.current,
-      scene: [BootScene, MenuScene, WorldMapScene, CombatScene, CareQuestHubScene],
-    };
-
-    gameRef.current = new Phaser.Game(config);
+  const config: Phaser.Types.Core.GameConfig = {
+    ...GAME_CONFIG,
+    parent: containerRef.current,
+    scene: [BootScene, MenuScene, WorldMapScene, CombatScene],
+  };    gameRef.current = new Phaser.Game(config);
     setIsLoading(false);
 
     // Set up event listeners
@@ -95,49 +92,50 @@ export function PhaserGame() {
   }, [updateWellnessFromGame]);
 
   return (
-    <div className="relative w-full h-full flex items-center justify-center bg-gray-900">
+    <div className="relative w-full h-full flex items-center justify-center bg-black">
       {/* Loading overlay */}
       {isLoading && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-75 z-50">
+        <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-50">
           <div className="text-center">
-            <div className="text-4xl font-bold text-white mb-4">Loading CareQuest...</div>
-            <div className="w-64 h-2 bg-gray-700 rounded-full overflow-hidden">
-              <div className="h-full w-full bg-blue-500 animate-pulse"></div>
+            <div className="text-4xl font-bold text-[#FFCA40] mb-4 animate-pulse">Loading CareQuest...</div>
+            <div className="w-64 h-3 bg-white/10 rounded-full overflow-hidden border border-[#FFCA40]/30">
+              <div className="h-full w-full bg-gradient-to-r from-[#FFCA40] to-[#FFD700] animate-pulse"></div>
             </div>
+            <p className="text-white/60 text-sm mt-4">Preparing your mental health adventure...</p>
           </div>
         </div>
       )}
 
-      {/* Phaser canvas container - Contained with max dimensions */}
+      {/* Phaser canvas container - Scales to fill parent while maintaining aspect ratio */}
       <div
         ref={containerRef}
         id="phaser-game-container"
-        className="w-full h-full max-w-[1920px] max-h-[1080px] rounded-lg overflow-hidden shadow-2xl border-2 border-gray-700 aspect-video"
+        className="w-full h-full"
+        style={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+        }}
       />
 
-      {/* React UI overlays - Positioned inside game window */}
-      <div className="absolute top-6 left-6 bg-black bg-opacity-70 text-white p-4 rounded-lg shadow-lg z-10">
-        <div className="text-sm font-semibold mb-2">CareQuest Game Info</div>
-        <div className="text-xs space-y-1">
-          <p>
-            <span className="text-gray-400">Scene:</span>{' '}
-            <span className="text-blue-400">{currentScene}</span>
-          </p>
-          <p className="text-gray-400">
-            {currentScene === 'WorldMap' && 'Arrow Keys: Move | Click: Interact'}
-            {currentScene === 'Combat' && 'Type sentences | Backspace: Correct | ESC: Flee'}
-            {currentScene === 'Boot' && 'Loading assets...'}
-          </p>
+      {/* React UI overlays - Minimal and non-intrusive */}
+      <div className="absolute top-4 left-4 bg-black/60 backdrop-blur-md text-white p-3 rounded-xl shadow-2xl z-10 border border-[#FFCA40]/30">
+        <div className="text-xs font-bold mb-1 text-[#FFCA40]">Scene: {currentScene}</div>
+        <div className="text-[10px] text-white/70">
+          {currentScene === 'Menu' && '🎮 Select a scene to begin'}
+          {currentScene === 'WorldMap' && '🗺️ Explore the world'}
+          {currentScene === 'Combat' && '⚔️ Type to attack!'}
+          {currentScene === 'Boot' && '⏳ Loading assets...'}
         </div>
       </div>
 
       {/* Debug: Game status */}
       {process.env.NODE_ENV === 'development' && (
-        <div className="absolute bottom-6 right-6 bg-black bg-opacity-70 text-white p-3 rounded text-xs font-mono z-10">
-          <div>Phaser {Phaser.VERSION}</div>
-          <div>Scene: {currentScene}</div>
-          <div>Resolution: 1920x1080</div>
-          <div>FPS Target: 60</div>
+        <div className="absolute bottom-4 right-4 bg-black/60 backdrop-blur-md text-white p-3 rounded-xl text-xs font-mono z-10 border border-white/20">
+          <div className="text-[#50E3C2] font-bold mb-1">Debug Info</div>
+          <div className="text-white/70">Phaser {Phaser.VERSION}</div>
+          <div className="text-white/70">Scene: {currentScene}</div>
+          <div className="text-white/70">Target: 60 FPS</div>
         </div>
       )}
     </div>

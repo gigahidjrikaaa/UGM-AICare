@@ -8,17 +8,19 @@ import { StatBar } from '@/components/carequest/StatBar';
 import { QuestCard } from '@/components/carequest/QuestCard';
 import { ProgressRing } from '@/components/carequest/ProgressRing';
 import { Sword, Map, Users, ShoppingBag, Zap, Trophy, Star, Home, ArrowLeft, Sparkles, Shield } from 'lucide-react';
+import ParticleBackground from '@/components/ui/ParticleBackground';
 
 /**
- * CareQuest Landing Page - Redesigned with Flashy RPG Game Elements
+ * CareQuest Landing Page - Redesigned with UGM-AICare Design System
  * 
  * Features:
- * - Epic game-themed header with animations
+ * - UGM color palette consistency (#001D58, #FFCA40)
+ * - ParticleBackground for unified design
+ * - Glassmorphism with backdrop-blur-md
  * - RPG-style hero with animated stats
  * - Quest preview cards
  * - NFT Achievement showcase (EDU Chain / ERC-1155)
  * - Game-style navigation
- * - Back to main site button
  * 
  * NFT Badges are minted via UGMJournalBadges.sol contract on EDU Chain
  * Metadata: blockchain/metadata/*.json
@@ -32,459 +34,161 @@ export default function CareQuestPage() {
   const levelProgress = (harmony % 100);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-ugm-blue via-ugm-blue-dark to-black relative overflow-hidden">
-      {/* Epic Animated Background */}
-      <div className="fixed inset-0 pointer-events-none">
-        {/* Gradient orbs */}
-        <motion.div
-          className="absolute top-20 -left-40 w-96 h-96 bg-ugm-gold/20 rounded-full blur-3xl"
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.3, 0.5, 0.3],
-          }}
-          transition={{ duration: 8, repeat: Infinity }}
-        />
-        <motion.div
-          className="absolute bottom-20 -right-40 w-96 h-96 bg-aurora-purple/20 rounded-full blur-3xl"
-          animate={{
-            scale: [1.2, 1, 1.2],
-            opacity: [0.3, 0.5, 0.3],
-          }}
-          transition={{ duration: 8, repeat: Infinity, delay: 2 }}
-        />
-        
-        {/* Animated particles */}
-        <div className="absolute inset-0 overflow-hidden">
-          {[...Array(30)].map((_, i) => (
-            <motion.div
-              key={i}
-              className="absolute w-1 h-1 bg-ugm-gold rounded-full"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-              }}
-              animate={{
-                y: [0, -50, 0],
-                opacity: [0.2, 1, 0.2],
-                scale: [0.5, 1.5, 0.5],
-              }}
-              transition={{
-                duration: 4 + Math.random() * 3,
-                repeat: Infinity,
-                delay: Math.random() * 3,
-              }}
-            />
-          ))}
-        </div>
-
-        {/* Floating stars */}
-        {[...Array(15)].map((_, i) => (
-          <motion.div
-            key={`star-${i}`}
-            className="absolute"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-            }}
-            animate={{
-              rotate: 360,
-              scale: [1, 1.3, 1],
-              opacity: [0.4, 0.9, 0.4],
-            }}
-            transition={{
-              duration: 5 + Math.random() * 3,
-              repeat: Infinity,
-              delay: Math.random() * 2,
-            }}
-          >
-            <Sparkles className="w-4 h-4 text-ugm-gold/60" />
-          </motion.div>
-        ))}
+    <div className="min-h-screen bg-gradient-to-br from-[#001D58] via-[#00308F] to-[#002A7A] relative overflow-hidden">
+      {/* ParticleBackground for consistency with main site */}
+      <div className="fixed inset-0 pointer-events-none opacity-40">
+        <ParticleBackground count={50} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={0.8} />
       </div>
 
-      {/* Back to Main Site Button - Top Left */}
-      <motion.div
-        initial={{ opacity: 0, x: -50 }}
-        animate={{ opacity: 1, x: 0 }}
-        transition={{ delay: 0.2 }}
-        className="fixed top-6 left-6 z-50"
-      >
-        <Link href="/">
-          <motion.button
-            whileHover={{ scale: 1.05, x: -5 }}
-            whileTap={{ scale: 0.95 }}
-            className="group flex items-center gap-3 px-6 py-3 bg-gradient-to-r from-ugm-blue to-ugm-blue-dark backdrop-blur-xl border-2 border-ugm-gold/50 rounded-xl shadow-2xl shadow-ugm-gold/20 hover:shadow-ugm-gold/40 transition-all"
-          >
-            <motion.div
-              animate={{ x: [0, -4, 0] }}
-              transition={{ duration: 1.5, repeat: Infinity }}
-            >
-              <ArrowLeft className="w-5 h-5 text-ugm-gold" />
-            </motion.div>
-            <div className="text-left">
-              <div className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">Back to</div>
-              <div className="text-sm font-bold text-white flex items-center gap-1">
-                <Home className="w-4 h-4 text-ugm-gold" />
-                UGM-AICare
-              </div>
-            </div>
-          </motion.button>
-        </Link>
-      </motion.div>
-
-      {/* Epic Game Header */}
-      <section className="container mx-auto px-6 pt-24 pb-12 relative z-10">
-        <div className="text-center mb-12">
-          <motion.div
-            initial={{ opacity: 0, y: -50, scale: 0.9 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            transition={{ type: 'spring', stiffness: 80, damping: 15 }}
-          >
-            {/* Epic Title with Multiple Effects */}
-            <div className="relative inline-block mb-8">
-              {/* Glowing background */}
-              <motion.div
-                className="absolute -inset-8 bg-gradient-to-r from-ugm-gold/30 via-yellow-300/30 to-ugm-gold/30 rounded-full blur-3xl"
-                animate={{ 
-                  scale: [1, 1.2, 1],
-                  rotate: [0, 180, 360],
-                  opacity: [0.4, 0.7, 0.4] 
-                }}
-                transition={{ duration: 8, repeat: Infinity }}
-              />
-              
-              {/* Main title */}
-              <h1 className="relative text-8xl md:text-9xl font-black mb-4">
-                <span className="relative inline-block">
-                  <span className="absolute inset-0 text-transparent bg-clip-text bg-gradient-to-r from-yellow-200 via-ugm-gold to-yellow-200 blur-sm">
-                    CareQuest
-                  </span>
-                  <span className="relative text-transparent bg-clip-text bg-gradient-to-r from-ugm-gold via-yellow-300 to-ugm-gold">
-                    CareQuest
-                  </span>
-                </span>
-              </h1>
-
-              {/* Decorative swords */}
-              <div className="absolute -left-24 top-1/2 -translate-y-1/2 hidden lg:block">
-                <motion.div
-                  animate={{ rotate: [0, 10, 0], y: [0, -5, 0] }}
-                  transition={{ duration: 3, repeat: Infinity }}
-                >
-                  <Sword className="w-16 h-16 text-ugm-gold drop-shadow-2xl" />
-                </motion.div>
-              </div>
-              <div className="absolute -right-24 top-1/2 -translate-y-1/2 hidden lg:block">
-                <motion.div
-                  animate={{ rotate: [0, -10, 0], y: [0, -5, 0] }}
-                  transition={{ duration: 3, repeat: Infinity, delay: 1.5 }}
-                >
-                  <Shield className="w-16 h-16 text-aurora-purple drop-shadow-2xl" />
-                </motion.div>
-              </div>
-            </div>
-
-            {/* Subtitle with typewriter effect feel */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5, duration: 1 }}
-            >
-              <p className="text-3xl md:text-4xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-gray-200 via-white to-gray-200 mb-4">
-                Your Epic Mental Health Journey
-              </p>
-              <p className="text-xl text-gray-300 mb-6">
-                🏛️ Embark on therapeutic quests across UGM Campus 🏛️
-              </p>
-            </motion.div>
-
-            {/* Hero Character Image */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8, y: 30 }}
-              animate={{ opacity: 1, scale: 1, y: 0 }}
-              transition={{ delay: 0.7, type: 'spring', stiffness: 100 }}
-              className="relative mx-auto w-64 h-64 md:w-80 md:h-80 mb-8"
-            >
-              {/* Glowing orb background */}
-              <motion.div
-                className="absolute inset-0 bg-gradient-to-r from-ugm-gold/40 via-yellow-300/40 to-aurora-purple/40 rounded-full blur-3xl"
-                animate={{ 
-                  scale: [1, 1.3, 1],
-                  rotate: [0, 180, 360],
-                  opacity: [0.4, 0.7, 0.4] 
-                }}
-                transition={{ duration: 6, repeat: Infinity }}
-              />
-              
-              {/* Placeholder character illustration - Using logo as hero */}
-              <div className="relative w-full h-full rounded-full overflow-hidden border-4 border-ugm-gold shadow-2xl shadow-ugm-gold/50">
-                <motion.div
-                  animate={{ 
-                    y: [0, -10, 0],
-                  }}
-                  transition={{ duration: 3, repeat: Infinity, ease: 'easeInOut' }}
-                  className="w-full h-full flex items-center justify-center bg-gradient-to-br from-ugm-blue-dark/90 to-black/90"
-                >
-                  <Image
-                    src="/carequest-logo.png"
-                    alt="CareQuest Hero Character"
-                    width={200}
-                    height={200}
-                    className="object-contain drop-shadow-2xl"
-                    priority
-                  />
-                </motion.div>
-              </div>
-
-              {/* Floating sparkles around hero */}
-              {[...Array(8)].map((_, i) => (
-                <motion.div
-                  key={`hero-sparkle-${i}`}
-                  className="absolute"
-                  style={{
-                    left: `${50 + 45 * Math.cos((i / 8) * 2 * Math.PI)}%`,
-                    top: `${50 + 45 * Math.sin((i / 8) * 2 * Math.PI)}%`,
-                  }}
-                  animate={{
-                    scale: [1, 1.5, 1],
-                    opacity: [0.5, 1, 0.5],
-                    rotate: [0, 360],
-                  }}
-                  transition={{
-                    duration: 3,
-                    repeat: Infinity,
-                    delay: i * 0.3,
-                  }}
-                >
-                  <Star className="w-4 h-4 text-ugm-gold fill-ugm-gold" />
-                </motion.div>
-              ))}
-            </motion.div>
-
-            {/* Player Level Badge - More Flashy */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.8, type: 'spring', stiffness: 200 }}
-              className="inline-flex items-center gap-3 px-8 py-4 bg-gradient-to-r from-ugm-gold/20 via-yellow-400/20 to-ugm-gold/20 backdrop-blur-xl border-2 border-ugm-gold rounded-full shadow-2xl shadow-ugm-gold/30"
-            >
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-              >
-                <Zap className="w-6 h-6 text-ugm-gold fill-ugm-gold" />
-              </motion.div>
-              <span className="text-2xl font-black text-ugm-gold">
-                Level {playerLevel}
-              </span>
-              <span className="text-lg font-bold text-white">Adventurer</span>
-              <motion.div
-                animate={{ rotate: -360 }}
-                transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-              >
-                <Trophy className="w-6 h-6 text-ugm-gold fill-ugm-gold" />
-              </motion.div>
-            </motion.div>
-          </motion.div>
-
-          {/* Epic Call-to-Action Button */}
-          <motion.div
-            initial={{ opacity: 0, scale: 0.5 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: 1.2, type: 'spring', stiffness: 150 }}
-            className="mt-12"
-          >
-            <Link
-              href="/carequest/world"
-              className="group relative inline-block"
-            >
-              <motion.div
-                whileHover={{ scale: 1.1, y: -5 }}
-                whileTap={{ scale: 0.95 }}
-                className="relative"
-              >
-                {/* Pulsing glow effect */}
-                <motion.div
-                  className="absolute -inset-4 bg-gradient-to-r from-ugm-gold via-yellow-400 to-ugm-gold rounded-2xl blur-xl opacity-60"
-                  animate={{ 
-                    scale: [1, 1.1, 1],
-                    opacity: [0.6, 0.8, 0.6],
-                  }}
-                  transition={{ duration: 2, repeat: Infinity }}
-                />
-                
-                {/* Button */}
-                <div className="relative px-16 py-6 bg-gradient-to-r from-ugm-gold via-yellow-400 to-ugm-gold text-ugm-blue-dark text-3xl font-black rounded-2xl shadow-2xl overflow-hidden border-4 border-yellow-200">
-                  {/* Animated shine */}
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/40 to-transparent"
-                    animate={{ x: ['-200%', '200%'] }}
-                    transition={{ duration: 3, repeat: Infinity, repeatDelay: 0.5 }}
-                  />
-                  
-                  {/* Sparkles */}
-                  <motion.div
-                    className="absolute top-2 left-8"
-                    animate={{ 
-                      scale: [1, 1.5, 1],
-                      rotate: [0, 180, 360],
-                      opacity: [1, 0.5, 1],
-                    }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                  >
-                    <Star className="w-6 h-6 text-yellow-200 fill-yellow-200" />
-                  </motion.div>
-                  <motion.div
-                    className="absolute bottom-2 right-8"
-                    animate={{ 
-                      scale: [1, 1.5, 1],
-                      rotate: [360, 180, 0],
-                      opacity: [1, 0.5, 1],
-                    }}
-                    transition={{ duration: 2, repeat: Infinity, delay: 1 }}
-                  >
-                    <Star className="w-6 h-6 text-yellow-200 fill-yellow-200" />
-                  </motion.div>
-                  
-                  <span className="relative z-10 flex items-center gap-4">
-                    <motion.div
-                      animate={{ rotate: [0, 15, -15, 0] }}
-                      transition={{ duration: 1, repeat: Infinity, repeatDelay: 2 }}
-                    >
-                      <Sword className="w-8 h-8" />
-                    </motion.div>
-                    BEGIN YOUR QUEST
-                    <motion.div
-                      animate={{ scale: [1, 1.2, 1] }}
-                      transition={{ duration: 1, repeat: Infinity }}
-                    >
-                      <Zap className="w-8 h-8 fill-current" />
-                    </motion.div>
-                  </span>
-                </div>
-              </motion.div>
-            </Link>
-            
-            {/* Tutorial hint */}
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 1.5 }}
-              className="text-sm text-gray-400 mt-4"
-            >
-              ✨ Complete quests • Earn XP • Level up your mental wellness ✨
-            </motion.p>
-          </motion.div>
+      {/* Simplified Full-Width Hero */}
+      <section className="relative min-h-[80vh] flex items-center justify-center overflow-hidden py-12 pb-0">
+        {/* Transparent - let particles show through */}
+        <div className="absolute inset-0 z-0">
+          {/* Very subtle overlay to maintain readability */}
+          <div className="absolute inset-0 bg-gradient-to-br from-[#001D58]/20 via-[#00308F]/10 to-transparent" />
         </div>
 
-        {/* Enhanced Player Stats Dashboard */}
-        {(joy > 0 || care > 0 || harmony > 0) && (
-          <motion.div
-            initial={{ opacity: 0, y: 50 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 1.8, type: 'spring' }}
-            className="max-w-6xl mx-auto mb-16"
-          >
-            <div className="relative">
-              {/* Glow effect behind card */}
-              <motion.div
-                className="absolute -inset-1 bg-gradient-to-r from-ugm-gold/30 via-aurora-purple/30 to-aurora-cyan/30 rounded-3xl blur-2xl"
-                animate={{ 
-                  opacity: [0.5, 0.8, 0.5],
-                  scale: [1, 1.02, 1],
-                }}
-                transition={{ duration: 4, repeat: Infinity }}
-              />
-              
-              <div className="relative bg-gradient-to-br from-white/15 via-white/10 to-white/5 backdrop-blur-xl rounded-3xl border-2 border-white/30 p-10 shadow-2xl">
-                <div className="flex items-center justify-between mb-8 flex-wrap gap-6">
-                  <motion.div
-                    initial={{ x: -30, opacity: 0 }}
-                    animate={{ x: 0, opacity: 1 }}
-                    transition={{ delay: 2 }}
-                  >
-                    <h3 className="text-3xl font-black text-transparent bg-clip-text bg-gradient-to-r from-ugm-gold to-yellow-300 flex items-center gap-3">
-                      <motion.div
-                        animate={{ rotate: [0, 360] }}
-                        transition={{ duration: 3, repeat: Infinity, ease: 'linear' }}
-                      >
-                        <Trophy className="w-9 h-9 text-ugm-gold fill-ugm-gold drop-shadow-lg" />
-                      </motion.div>
-                      YOUR ADVENTURE STATS
-                    </h3>
-                    <p className="text-gray-300 mt-1 ml-12">Track your mental wellness journey</p>
-                  </motion.div>
-                  
-                  {/* Enhanced Level ring */}
-                  <motion.div
-                    initial={{ scale: 0, rotate: -180 }}
-                    animate={{ scale: 1, rotate: 0 }}
-                    transition={{ delay: 2.2, type: 'spring', stiffness: 200 }}
-                    className="relative"
-                  >
-                    <motion.div
-                      className="absolute -inset-3 bg-ugm-gold/30 rounded-full blur-xl"
-                      animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
-                      transition={{ duration: 2, repeat: Infinity }}
-                    />
-                    <ProgressRing
-                      progress={levelProgress}
-                      size={100}
-                      strokeWidth={8}
-                      color="gold"
-                      showPercentage={false}
-                    >
-                      <div className="text-center">
-                        <div className="text-3xl font-black text-ugm-gold drop-shadow-lg">{playerLevel}</div>
-                        <div className="text-xs text-gray-300 font-bold">LEVEL</div>
-                      </div>
-                    </ProgressRing>
-                  </motion.div>
-                </div>
-
-                {/* Enhanced stat bars with stagger animation */}
-                <div className="grid md:grid-cols-3 gap-6">
-                  {[
-                    { label: 'JOY', value: joy, max: 1000, icon: 'joy', color: 'pink', delay: 2.4 },
-                    { label: 'CARE', value: care, max: 10000, icon: 'care', color: 'cyan', delay: 2.6 },
-                    { label: 'Harmony', value: harmony % 100, max: 100, icon: 'harmony', color: 'purple', delay: 2.8 },
-                  ].map((stat) => (
-                    <motion.div
-                      key={stat.label}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      transition={{ delay: stat.delay }}
-                    >
-                      <StatBar
-                        label={stat.label}
-                        value={stat.value}
-                        maxValue={stat.max}
-                        icon={stat.icon as 'joy' | 'care' | 'harmony'}
-                        color={stat.color as 'pink' | 'cyan' | 'purple'}
-                        size="lg"
-                      />
-                    </motion.div>
-                  ))}
-                </div>
-
-                {/* Progress indicator */}
-                <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 3 }}
-                  className="mt-6 pt-6 border-t border-white/20 flex items-center justify-center gap-2 text-sm"
-                >
-                  <Sparkles className="w-4 h-4 text-ugm-gold" />
-                  <span className="text-gray-300">
-                    <span className="text-ugm-gold font-bold">{levelProgress}%</span> to Level {playerLevel + 1}
+        {/* Hero Content - Full Width Grid */}
+        <div className="container mx-auto px-6 lg:px-12 relative z-20">
+          <div className="grid lg:grid-cols-2 gap-8 lg:gap-16 items-center max-w-7xl mx-auto">
+            {/* Left Column - Text Content */}
+            <div className="text-left space-y-6">
+              {/* Title */}
+              <div className="relative">
+                <h1 className="text-6xl md:text-7xl lg:text-8xl font-black leading-none mb-3">
+                  <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#FFCA40] via-[#FFD700] to-[#FFCA40]">
+                    CareQuest
                   </span>
-                  <Sparkles className="w-4 h-4 text-ugm-gold" />
-                </motion.div>
+                </h1>
+
+                {/* Subtitle */}
+                <p className="text-xl md:text-2xl font-bold text-white mb-2">
+                  Your Epic Mental Health Journey
+                </p>
+                <p className="text-base md:text-lg text-gray-300">
+                  🏛️ Embark on therapeutic quests across UGM Campus
+                </p>
+              </div>
+
+              {/* Inline Level Badge - Simplified */}
+              <div className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#FFCA40]/20 to-[#FFD700]/20 backdrop-blur-md border border-[#FFCA40]/50 rounded-full">
+                <Zap className="w-5 h-5 text-[#FFCA40] fill-[#FFCA40]" />
+                <span className="text-lg font-black text-[#FFCA40]">
+                  Level {playerLevel}
+                </span>
+                <span className="text-sm font-bold text-white">Adventurer</span>
+                <Trophy className="w-5 h-5 text-[#FFCA40] fill-[#FFCA40]" />
+              </div>
+
+              {/* CTA Button - Simplified */}
+              <div>
+                <Link href="/carequest/game" className="group inline-block">
+                  <div className="relative px-10 py-4 bg-gradient-to-r from-[#FFCA40] via-[#FFD700] to-[#FFCA40] text-[#001D58] text-xl md:text-2xl font-black rounded-xl shadow-xl border-2 border-[#FFE680] hover:shadow-2xl hover:scale-105 transition-all duration-200">
+                    <span className="flex items-center gap-3">
+                      <Sword className="w-6 h-6" />
+                      BEGIN YOUR QUEST
+                      <Zap className="w-6 h-6 fill-current" />
+                    </span>
+                  </div>
+                </Link>
+                
+                {/* Tutorial hint */}
+                <p className="text-sm text-gray-400 mt-3">
+                  ✨ Complete quests • Earn XP • Level up your mental wellness
+                </p>
               </div>
             </div>
-          </motion.div>
-        )}
+
+            {/* Right Column - Hero Character - Simplified */}
+            <div className="relative flex items-center justify-center lg:justify-end">
+              <div className="relative w-72 h-72 md:w-96 md:h-96 lg:w-[450px] lg:h-[450px]">
+                {/* Subtle glow background - No animation */}
+                <div className="absolute inset-0 bg-gradient-to-r from-[#FFCA40]/30 via-[#FFD700]/30 to-[#B8A4FF]/30 rounded-full blur-3xl opacity-60" />
+                
+                {/* Character display */}
+                <div className="relative w-full h-full rounded-full overflow-hidden border-2 border-[#FFCA40]/70 shadow-2xl">
+                  <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-[#001D58]/90 to-black/90">
+                    <Image
+                      src="/carequest-logo.png"
+                      alt="CareQuest Hero"
+                      width={250}
+                      height={250}
+                      className="object-contain drop-shadow-2xl"
+                      priority
+                    />
+                  </div>
+                </div>
+
+                {/* Static decorative elements */}
+                <div className="absolute -left-12 top-1/4 hidden lg:block opacity-70">
+                  <Sword className="w-16 h-16 text-[#FFCA40] drop-shadow-xl" />
+                </div>
+                <div className="absolute -right-12 bottom-1/4 hidden lg:block opacity-70">
+                  <Shield className="w-16 h-16 text-[#B8A4FF] drop-shadow-xl" />
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Simple scroll indicator - No animation */}
+        <div className="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20 text-white/40 text-center">
+          <span className="text-xs font-semibold tracking-wider block mb-1">SCROLL DOWN</span>
+          <div className="w-5 h-8 border-2 border-white/30 rounded-full mx-auto flex items-start justify-center p-1">
+            <div className="w-1 h-2 bg-white/40 rounded-full" />
+          </div>
+        </div>
       </section>
+
+      {/* Simplified Stats Dashboard - Seamless Transition */}
+      {(joy > 0 || care > 0 || harmony > 0) && (
+        <section className="container mx-auto px-6 pb-12 relative z-10">
+          <div className="max-w-3xl mx-auto">
+            <div className="bg-white/10 backdrop-blur-md rounded-xl border border-white/20 p-5 shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFCA40] to-[#FFD700] flex items-center gap-2">
+                  <Trophy className="w-5 h-5 text-[#FFCA40] fill-[#FFCA40]" />
+                  Your Progress
+                </h3>
+                
+                {/* Compact level ring */}
+                <div className="relative">
+                  <ProgressRing
+                    progress={levelProgress}
+                    size={50}
+                    strokeWidth={5}
+                    color="gold"
+                    showPercentage={false}
+                  >
+                    <div className="text-center">
+                      <div className="text-base font-black text-[#FFCA40]">{playerLevel}</div>
+                    </div>
+                  </ProgressRing>
+                </div>
+              </div>
+
+              {/* Compact stat bars */}
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'JOY', value: joy, max: 1000, icon: 'joy', color: 'pink' },
+                  { label: 'CARE', value: care, max: 10000, icon: 'care', color: 'cyan' },
+                  { label: 'Harmony', value: harmony % 100, max: 100, icon: 'harmony', color: 'purple' },
+                ].map((stat) => (
+                  <StatBar
+                    key={stat.label}
+                    label={stat.label}
+                    value={stat.value}
+                    maxValue={stat.max}
+                    icon={stat.icon as 'joy' | 'care' | 'harmony'}
+                    color={stat.color as 'pink' | 'cyan' | 'purple'}
+                    size="sm"
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
 
       {/* Enhanced Quick Access Navigation - Epic Game Style */}
       <section className="container mx-auto px-6 mb-16 relative z-10">
@@ -527,7 +231,7 @@ export default function CareQuestPage() {
                 title: 'Quest Map',
                 description: 'Explore UGM campus and complete therapeutic quests',
                 icon: Map,
-                href: '/carequest/world',
+                href: '/carequest/game',
                 color: 'from-aurora-blue to-blue-600',
                 glow: 'shadow-aurora-blue/50',
               },
@@ -1007,7 +711,7 @@ export default function CareQuestPage() {
             Practice mental health skills, defeat anxiety monsters, and earn real rewards
           </p>
           
-          <Link href="/carequest/world">
+          <Link href="/carequest/game">
             <motion.div
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.95 }}

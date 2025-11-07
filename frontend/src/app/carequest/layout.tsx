@@ -3,20 +3,24 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { usePathname } from 'next/navigation';
-import { motion } from 'framer-motion';
+import { useSession, signOut } from 'next-auth/react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '@/store/gameStore';
-import { Home, Sword, Users, ShoppingBag, Activity, Sparkles } from 'lucide-react';
+import { useWellnessState } from '@/hooks/useQuests';
+import { Home, Sword, Users, ShoppingBag, Activity, Sparkles, Crown, Shield, Menu, X, ChevronDown } from 'lucide-react';
+import ParticleBackground from '@/components/ui/ParticleBackground';
+import ProfileDropdown from '@/components/ui/ProfileDropdown';
+import { useState, useEffect } from 'react';
 
 /**
- * CareQuest Layout - Redesigned with UGM Design System
+ * CareQuest Layout - Epic Game-Style Design
  * 
  * Features:
- * - UGM color palette (Blue #001D58, Gold #FFCA40)
- * - CareQuest logo integration
- * - Animated header with particle effects
- * - RPG-style resource display
- * - Glassmorphism effects
- * - Responsive mobile navigation
+ * - Game HUD-inspired navbar with floating elements
+ * - Animated resource counters with glow effects
+ * - RPG-style navigation with hover animations
+ * - Dynamic level progression display
+ * - Ornamental borders and fantasy aesthetics
  */
 export default function CareQuestLayout({
   children,
@@ -24,212 +28,320 @@ export default function CareQuestLayout({
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const { joy, care, harmony } = useGameStore();
+  const { data: session, status } = useSession();
+  const { data: wellness } = useWellnessState();
+  const { joy, care, harmony, setWellnessState } = useGameStore();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+
+  // Sync wellness state from backend to game store
+  useEffect(() => {
+    if (wellness) {
+      setWellnessState({
+        joy: wellness.joy_balance,
+        care: 0, // CARE tokens come from user profile, not wellness
+        harmony: wellness.harmony_score,
+      });
+    }
+  }, [wellness, setWellnessState]);
+
+  const handleSignOut = () => {
+    setIsProfileOpen(false);
+    signOut({ callbackUrl: '/' });
+  };
 
   const navItems = [
-    { href: '/carequest', label: 'Home', icon: Home, color: 'from-ugm-blue to-ugm-blue-dark' },
-    { href: '/carequest/world', label: 'Game', icon: Sword, color: 'from-ugm-gold to-yellow-500' },
-    { href: '/carequest/guild', label: 'Guild', icon: Users, color: 'from-aurora-purple to-purple-600' },
-    { href: '/carequest/market', label: 'Market', icon: ShoppingBag, color: 'from-green-500 to-emerald-600' },
-    { href: '/carequest/activities', label: 'Activities', icon: Activity, color: 'from-pink-500 to-rose-600' },
+    { href: '/carequest', label: 'Hub', icon: Home, color: '#001D58', glow: '#00308F' },
+    { href: '/carequest/game', label: 'Game', icon: Sword, color: '#FFCA40', glow: '#FFD700' },
+    { href: '/carequest/guild', label: 'Guild', icon: Users, color: '#B8A4FF', glow: '#9F7AEA' },
+    { href: '/carequest/market', label: 'Market', icon: ShoppingBag, color: '#50E3C2', glow: '#2DD4BF' },
+    { href: '/carequest/activities', label: 'Quests', icon: Activity, color: '#FF6B9D', glow: '#EC4899' },
   ];
 
   const isActive = (href: string) => pathname === href;
 
-  // Calculate player level
+  // Calculate player level and XP progress
   const playerLevel = Math.floor(harmony / 100) + 1;
+  const xpInCurrentLevel = harmony % 100;
+  const xpProgress = (xpInCurrentLevel / 100) * 100;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-ugm-blue via-ugm-blue-dark to-black relative">
+    <div className="min-h-screen bg-gradient-to-br from-[#001D58] via-[#00308F] to-[#002A7A] relative overflow-hidden">
       {/* Animated Background Effects */}
-      <div className="fixed inset-0 pointer-events-none overflow-hidden">
-        {/* Gradient orbs */}
-        <motion.div
-          className="absolute top-20 -left-40 w-96 h-96 bg-ugm-gold/10 rounded-full blur-3xl"
-          animate={{
-            scale: [1, 1.2, 1],
-            opacity: [0.2, 0.4, 0.2],
-          }}
-          transition={{ duration: 8, repeat: Infinity }}
-        />
-        <motion.div
-          className="absolute bottom-20 -right-40 w-96 h-96 bg-aurora-purple/10 rounded-full blur-3xl"
-          animate={{
-            scale: [1.2, 1, 1.2],
-            opacity: [0.2, 0.4, 0.2],
-          }}
-          transition={{ duration: 8, repeat: Infinity, delay: 2 }}
-        />
+      <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-30">
+        <ParticleBackground count={60} colors={["#FFCA40", "#B8A4FF", "#50E3C2"]} minSize={2} maxSize={8} speed={0.5} />
       </div>
 
-      {/* Header - Only show on non-world pages */}
-      {pathname !== '/carequest/world' && (
+      {/* Decorative Corner Ornaments */}
+      <div className="fixed top-0 left-0 w-32 h-32 border-t-4 border-l-4 border-[#FFCA40]/30 pointer-events-none z-40" />
+      <div className="fixed top-0 right-0 w-32 h-32 border-t-4 border-r-4 border-[#FFCA40]/30 pointer-events-none z-40" />
+      <div className="fixed bottom-0 left-0 w-32 h-32 border-b-4 border-l-4 border-[#FFCA40]/30 pointer-events-none z-40" />
+      <div className="fixed bottom-0 right-0 w-32 h-32 border-b-4 border-r-4 border-[#FFCA40]/30 pointer-events-none z-40" />
+
+      {/* Epic Game Navbar - Only show on non-game pages */}
+      {pathname !== '/carequest/game' && (
         <motion.header
           initial={{ y: -100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 100 }}
-          className="sticky top-0 z-50 backdrop-blur-xl bg-ugm-blue/80 border-b-2 border-ugm-gold/30 shadow-2xl"
+          transition={{ type: 'spring', stiffness: 100, damping: 15 }}
+          className="sticky top-0 z-50 backdrop-blur-xl bg-gradient-to-r from-[#001D58]/95 via-[#00308F]/95 to-[#001D58]/95 border-b-2 border-[#FFCA40]/50 shadow-2xl"
         >
-          <div className="container mx-auto px-4 md:px-6 py-4">
+          {/* Top decorative border */}
+          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-[#FFCA40] to-transparent" />
+          
+          <div className="container mx-auto px-4 md:px-6 py-3">
             <div className="flex items-center justify-between">
-              {/* Logo with Animation */}
-              <Link href="/carequest" className="flex items-center space-x-3 group">
-                <motion.div
-                  whileHover={{ rotate: 360, scale: 1.1 }}
-                  transition={{ duration: 0.6 }}
-                  className="relative w-12 h-12 rounded-xl overflow-hidden shadow-lg shadow-ugm-gold/50"
-                >
-                  <Image
-                    src="/carequest-logo.png"
-                    alt="CareQuest Logo"
-                    fill
-                    className="object-contain"
-                  />
-                </motion.div>
-                <div>
-                  <h1 className="text-2xl font-black text-transparent bg-clip-text bg-gradient-to-r from-ugm-gold via-yellow-300 to-ugm-gold group-hover:animate-pulse">
-                    CareQuest
-                  </h1>
-                  <p className="text-xs text-gray-400 group-hover:text-gray-300 transition-colors">
-                    Mental Health Adventure
-                  </p>
-                </div>
-              </Link>
+              {/* Left: Exit + Logo */}
+              <div className="flex items-center gap-2">
+                {/* Exit button - icon only with tooltip */}
+                <Link href="/">
+                  <button 
+                    className="group relative flex items-center justify-center w-9 h-9 bg-white/10 backdrop-blur-md rounded-md border border-white/20 hover:bg-white/15 hover:border-[#FFCA40]/50 transition-all"
+                    title="Exit to UGM-AICare"
+                  >
+                    <Home className="w-4 h-4 text-[#FFCA40]" />
+                    {/* Tooltip */}
+                    <span className="absolute left-full ml-2 px-2 py-1 bg-gray-900 text-white text-xs rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50">
+                      Exit to UGM-AICare
+                    </span>
+                  </button>
+                </Link>
 
-              {/* Desktop Navigation */}
-              <nav className="hidden lg:flex items-center space-x-2">
+                {/* Compact Logo */}
+                <Link href="/carequest" className="flex items-center gap-2 group relative">
+                  <div className="relative w-10 h-10 rounded-lg overflow-hidden shadow-lg bg-gradient-to-br from-[#FFCA40]/20 via-white/10 to-[#B8A4FF]/20 backdrop-blur-md border border-[#FFCA40]/50">
+                    <Image
+                      src="/carequest-logo.png"
+                      alt="CareQuest Logo"
+                      fill
+                      className="object-contain p-1.5"
+                    />
+                  </div>
+                  <div className="hidden md:block">
+                    <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFCA40] via-[#FFD700] to-[#FFCA40]">
+                      CareQuest
+                    </h1>
+                    <p className="text-[9px] text-[#FFCA40]/70 font-semibold tracking-wide leading-none">
+                      MENTAL HEALTH SAGA
+                    </p>
+                  </div>
+                </Link>
+              </div>
+
+              {/* Desktop Navigation - Simplified */}
+              <nav className="hidden lg:flex items-center gap-1.5">
                 {navItems.map((item) => {
                   const Icon = item.icon;
                   const active = isActive(item.href);
                   return (
                     <Link key={item.href} href={item.href}>
-                      <motion.div
-                        whileHover={{ scale: 1.05, y: -2 }}
-                        whileTap={{ scale: 0.95 }}
-                        className={`relative group px-4 py-2 rounded-xl transition-all ${
+                      <div
+                        className={`relative px-3 py-2 rounded-lg transition-all duration-200 border ${
                           active
-                            ? 'bg-gradient-to-r ' + item.color + ' shadow-lg'
-                            : 'hover:bg-white/10'
+                            ? 'bg-white/15 border-white/30'
+                            : 'bg-white/5 border-white/10 hover:bg-white/10 hover:border-white/20'
                         }`}
                       >
-                        <div className="flex items-center gap-2">
-                          <Icon className={`w-5 h-5 ${active ? 'text-white' : 'text-gray-300'}`} />
-                          <span className={`font-semibold ${active ? 'text-white' : 'text-gray-300'}`}>
+                        <div className="flex items-center gap-1.5">
+                          <Icon
+                            className="w-4 h-4"
+                            style={{ color: active ? item.color : '#ffffff99' }}
+                          />
+                          <span
+                            className="font-semibold text-xs"
+                            style={{ color: active ? '#ffffff' : '#ffffff99' }}
+                          >
                             {item.label}
                           </span>
                         </div>
-                        {active && (
-                          <motion.div
-                            layoutId="activeTab"
-                            className="absolute inset-0 bg-white/10 rounded-xl"
-                            transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                          />
-                        )}
-                      </motion.div>
+                      </div>
                     </Link>
                   );
                 })}
               </nav>
 
-              {/* Resource Display - RPG Style */}
-              <div className="hidden md:flex items-center gap-3">
-                {/* JOY */}
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  className="relative group"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-yellow-400/20 to-orange-400/20 rounded-xl blur-md group-hover:blur-lg transition-all" />
-                  <div className="relative flex items-center gap-2 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 backdrop-blur-sm px-4 py-2 rounded-xl border border-yellow-400/30">
-                    <Sparkles className="w-4 h-4 text-yellow-300" />
-                    <span className="font-bold text-yellow-100">{joy.toFixed(0)}</span>
-                    <span className="text-xs text-yellow-300/80">JOY</span>
+              {/* Ultra Compact Resource Display + Profile */}
+              <div className="flex items-center gap-1.5">
+                {/* All Stats in Single Compact Bar */}
+                <div className="hidden md:flex items-center gap-1.5 bg-white/10 backdrop-blur-md px-2.5 py-1 rounded-md border border-white/20 text-[11px]">
+                  {/* JOY with tooltip */}
+                  <div className="group relative flex items-center gap-1">
+                    <Sparkles className="w-3 h-3 text-[#FFCA40]" />
+                    <span className="font-black text-white">{joy.toFixed(0)}</span>
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-xl border border-[#FFCA40]/30">
+                      <div className="font-bold text-[#FFCA40] mb-1">JOY Points</div>
+                      <div className="text-[10px] text-gray-300">Earned from positive interactions</div>
+                      <div className="text-[10px] text-gray-300">and completing activities</div>
+                      {/* Arrow */}
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+                        <div className="border-4 border-transparent border-t-gray-900"></div>
+                      </div>
+                    </div>
                   </div>
-                </motion.div>
 
-                {/* CARE */}
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  className="relative group"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-green-400/20 to-emerald-400/20 rounded-xl blur-md group-hover:blur-lg transition-all" />
-                  <div className="relative flex items-center gap-2 bg-gradient-to-r from-green-500/20 to-emerald-500/20 backdrop-blur-sm px-4 py-2 rounded-xl border border-green-400/30">
-                    <span className="text-lg">💎</span>
-                    <span className="font-bold text-green-100">{care.toFixed(0)}</span>
-                    <span className="text-xs text-green-300/80">CARE</span>
+                  <div className="w-px h-3 bg-white/20" />
+
+                  {/* CARE with tooltip */}
+                  <div className="group relative flex items-center gap-1">
+                    <span className="text-xs">💎</span>
+                    <span className="font-black text-white">{care.toFixed(0)}</span>
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-xl border border-[#50E3C2]/30">
+                      <div className="font-bold text-[#50E3C2] mb-1">CARE Tokens</div>
+                      <div className="text-[10px] text-gray-300">Premium currency for special items</div>
+                      <div className="text-[10px] text-gray-300">and exclusive activities</div>
+                      {/* Arrow */}
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+                        <div className="border-4 border-transparent border-t-gray-900"></div>
+                      </div>
+                    </div>
                   </div>
-                </motion.div>
 
-                {/* Harmony Level */}
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  className="relative group"
-                >
-                  <div className="absolute inset-0 bg-gradient-to-r from-aurora-purple/20 to-purple-400/20 rounded-xl blur-md group-hover:blur-lg transition-all" />
-                  <div className="relative flex items-center gap-2 bg-gradient-to-r from-aurora-purple/20 to-purple-500/20 backdrop-blur-sm px-4 py-2 rounded-xl border border-purple-400/30">
-                    <span className="text-lg">⭐</span>
-                    <span className="font-bold text-purple-100">Lv.{playerLevel}</span>
-                    <span className="text-xs text-purple-300/80">Harmony</span>
+                  <div className="w-px h-3 bg-white/20" />
+
+                  {/* Level with tooltip */}
+                  <div className="group relative flex items-center gap-1">
+                    <Crown className="w-3 h-3 text-[#B8A4FF]" />
+                    <span className="font-black text-white">{playerLevel}</span>
+                    {/* Tooltip */}
+                    <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 px-3 py-2 bg-gray-900 text-white text-xs rounded-lg opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap pointer-events-none z-50 shadow-xl border border-[#B8A4FF]/30">
+                      <div className="font-bold text-[#B8A4FF] mb-1">Adventurer Level</div>
+                      <div className="text-[10px] text-gray-300">Current Harmony: {harmony.toFixed(0)}</div>
+                      <div className="text-[10px] text-gray-300">Next level: {((playerLevel) * 100).toFixed(0)} Harmony</div>
+                      {/* Arrow */}
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 -mt-px">
+                        <div className="border-4 border-transparent border-t-gray-900"></div>
+                      </div>
+                    </div>
                   </div>
-                </motion.div>
+                </div>
 
-                {/* Back to Main Site */}
-                <Link href="/">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.95 }}
-                    className="flex items-center gap-2 px-4 py-2 bg-ugm-blue-dark/50 backdrop-blur-sm rounded-xl border border-ugm-gold/30 hover:border-ugm-gold transition-all"
-                  >
-                    <Home className="w-4 h-4 text-ugm-gold" />
-                    <span className="text-sm font-semibold text-white">UGM-AICare</span>
-                  </motion.button>
-                </Link>
-              </div>
-            </div>
-
-            {/* Mobile Navigation */}
-            <nav className="lg:hidden flex items-center justify-around mt-4 pt-4 border-t border-white/10">
-              {navItems.map((item) => {
-                const Icon = item.icon;
-                const active = isActive(item.href);
-                return (
-                  <Link key={item.href} href={item.href}>
-                    <motion.div
-                      whileTap={{ scale: 0.9 }}
-                      className={`flex flex-col items-center gap-1 px-3 py-2 rounded-xl transition-all ${
-                        active ? 'bg-white/10' : ''
-                      }`}
+                {/* Profile Button */}
+                {status === 'authenticated' && session?.user && (
+                  <div className="relative">
+                    <motion.button
+                      onClick={() => setIsProfileOpen(!isProfileOpen)}
+                      whileHover={{ scale: 1.02, backgroundColor: "rgba(255,255,255,0.08)" }}
+                      whileTap={{ scale: 0.98 }}
+                      className="flex items-center gap-2 bg-white/5 hover:bg-white/8 backdrop-blur-xl rounded-2xl p-2 pr-3 transition-all duration-200 border border-white/8 hover:border-white/15"
+                      aria-haspopup="true"
+                      aria-expanded={isProfileOpen ? 'true' : 'false'}
                     >
-                      <Icon className={`w-5 h-5 ${active ? 'text-ugm-gold' : 'text-gray-400'}`} />
-                      <span className={`text-xs font-semibold ${active ? 'text-white' : 'text-gray-400'}`}>
-                        {item.label}
+                      <div className="relative h-7 w-7 rounded-xl overflow-hidden border border-white/15">
+                        <Image
+                          src={session.user.image || "/default-avatar.png"}
+                          alt={session.user.name || "User"} 
+                          fill 
+                          className="object-cover"
+                        />
+                      </div>
+                      <span className="ml-1 text-white/80 text-sm font-medium hidden sm:inline-block">
+                        {session.user.name?.split(' ')[0]}
                       </span>
-                    </motion.div>
-                  </Link>
-                );
-              })}
-            </nav>
+                      <motion.div
+                        animate={{ rotate: isProfileOpen ? 180 : 0 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                      >
+                        <ChevronDown className="ml-0.5 text-white/50" size={14} />
+                      </motion.div>
+                    </motion.button>
 
-            {/* Mobile Resources */}
-            <div className="md:hidden flex items-center justify-center gap-3 mt-4">
-              <div className="flex items-center gap-1 bg-yellow-500/20 px-3 py-1 rounded-lg border border-yellow-400/30">
-                <Sparkles className="w-3 h-3 text-yellow-300" />
-                <span className="text-xs font-bold text-yellow-100">{joy.toFixed(0)}</span>
+                    <ProfileDropdown
+                      isOpen={isProfileOpen}
+                      user={session.user}
+                      wellness={wellness}
+                      onClose={() => setIsProfileOpen(false)}
+                      onSignOut={handleSignOut}
+                    />
+                  </div>
+                )}
               </div>
-              <div className="flex items-center gap-1 bg-green-500/20 px-3 py-1 rounded-lg border border-green-400/30">
-                <span className="text-sm">💎</span>
-                <span className="text-xs font-bold text-green-100">{care.toFixed(0)}</span>
-              </div>
-              <div className="flex items-center gap-1 bg-purple-500/20 px-3 py-1 rounded-lg border border-purple-400/30">
-                <span className="text-sm">⭐</span>
-                <span className="text-xs font-bold text-purple-100">Lv.{playerLevel}</span>
-              </div>
+
+              {/* Mobile Menu Button */}
+              <motion.button
+                whileTap={{ scale: 0.9 }}
+                onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                className="lg:hidden p-2 rounded-xl bg-white/10 backdrop-blur-md border border-white/20"
+              >
+                {mobileMenuOpen ? (
+                  <X className="w-6 h-6 text-white" />
+                ) : (
+                  <Menu className="w-6 h-6 text-white" />
+                )}
+              </motion.button>
             </div>
+
+            {/* Mobile Navigation Menu */}
+            <AnimatePresence>
+              {mobileMenuOpen && (
+                <motion.nav
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.3 }}
+                  className="lg:hidden overflow-hidden"
+                >
+                  <div className="grid grid-cols-2 gap-2 mt-4 pb-4">
+                    {navItems.map((item) => {
+                      const Icon = item.icon;
+                      const active = isActive(item.href);
+                      return (
+                        <Link key={item.href} href={item.href} onClick={() => setMobileMenuOpen(false)}>
+                          <motion.div
+                            whileTap={{ scale: 0.95 }}
+                            className={`flex flex-col items-center gap-2 p-4 rounded-xl transition-all border-2 ${
+                              active
+                                ? 'bg-white/20 border-white/40'
+                                : 'bg-white/5 border-white/10'
+                            }`}
+                            style={{
+                              boxShadow: active ? `0 0 15px ${item.glow}40` : 'none',
+                            }}
+                          >
+                            <Icon
+                              className="w-6 h-6"
+                              style={{ color: active ? item.color : '#ffffff99' }}
+                            />
+                            <span
+                              className="text-sm font-bold"
+                              style={{ color: active ? '#ffffff' : '#ffffff99' }}
+                            >
+                              {item.label}
+                            </span>
+                          </motion.div>
+                        </Link>
+                      );
+                    })}
+                  </div>
+
+                  {/* Mobile Resources */}
+                  <div className="flex items-center justify-center gap-2 pb-4 border-t border-white/10 pt-4">
+                    <div className="flex items-center gap-1.5 bg-gradient-to-br from-[#FF6B9D]/20 to-[#FFCA40]/20 backdrop-blur-md px-3 py-2 rounded-lg border border-[#FFCA40]/50">
+                      <Sparkles className="w-4 h-4 text-[#FFCA40]" />
+                      <span className="text-sm font-bold text-white">{joy.toFixed(0)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-gradient-to-br from-[#50E3C2]/20 to-[#2DD4BF]/20 backdrop-blur-md px-3 py-2 rounded-lg border border-[#50E3C2]/50">
+                      <span className="text-base">💎</span>
+                      <span className="text-sm font-bold text-white">{care.toFixed(0)}</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 bg-gradient-to-br from-[#B8A4FF]/20 to-[#9F7AEA]/20 backdrop-blur-md px-3 py-2 rounded-lg border border-[#B8A4FF]/50">
+                      <Shield className="w-4 h-4 text-[#B8A4FF]" />
+                      <span className="text-sm font-bold text-white">Lv.{playerLevel}</span>
+                    </div>
+                  </div>
+                </motion.nav>
+              )}
+            </AnimatePresence>
           </div>
+
+          {/* Bottom decorative border */}
+          <div className="absolute bottom-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-[#FFCA40]/50 to-transparent" />
         </motion.header>
       )}
 
       {/* Main content */}
-      <main className={`relative z-10 ${pathname === '/carequest/world' ? '' : 'py-6'}`}>
+      <main className={`relative z-10 ${pathname === '/carequest/game' ? 'h-screen' : 'py-6'}`}>
         {children}
       </main>
     </div>

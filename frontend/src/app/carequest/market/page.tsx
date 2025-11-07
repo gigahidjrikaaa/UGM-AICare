@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { ShoppingBag, Wallet, Sparkles, Tag, Package, Gift } from 'lucide-react';
+import ParticleBackground from '@/components/ui/ParticleBackground';
 
 /**
  * Block Market Page - RPG Shop Redesign
@@ -35,25 +36,25 @@ const rarityConfig = {
     bg: 'bg-gray-500/20',
   },
   rare: {
-    gradient: 'from-aurora-blue to-blue-600',
-    glow: 'shadow-aurora-blue/50',
-    border: 'border-aurora-blue/70',
-    text: 'text-aurora-blue',
-    bg: 'bg-aurora-blue/20',
+    gradient: 'from-[#50E3C2] to-[#3BA99C]',
+    glow: 'shadow-[#50E3C2]/50',
+    border: 'border-[#50E3C2]/70',
+    text: 'text-[#50E3C2]',
+    bg: 'bg-[#50E3C2]/20',
   },
   epic: {
-    gradient: 'from-aurora-purple to-purple-600',
-    glow: 'shadow-aurora-purple/50',
-    border: 'border-aurora-purple/70',
-    text: 'text-aurora-purple',
-    bg: 'bg-aurora-purple/20',
+    gradient: 'from-[#B8A4FF] to-[#9B7FE5]',
+    glow: 'shadow-[#B8A4FF]/50',
+    border: 'border-[#B8A4FF]/70',
+    text: 'text-[#B8A4FF]',
+    bg: 'bg-[#B8A4FF]/20',
   },
   legendary: {
-    gradient: 'from-ugm-gold via-yellow-400 to-ugm-gold',
-    glow: 'shadow-ugm-gold/60',
-    border: 'border-ugm-gold',
-    text: 'text-ugm-gold',
-    bg: 'bg-ugm-gold/20',
+    gradient: 'from-[#FFCA40] via-[#FFD700] to-[#FFCA40]',
+    glow: 'shadow-[#FFCA40]/60',
+    border: 'border-[#FFCA40]',
+    text: 'text-[#FFCA40]',
+    bg: 'bg-[#FFCA40]/20',
   },
 };
 
@@ -145,28 +146,10 @@ export default function BlockMarketPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-ugm-blue via-ugm-blue-dark to-black">
-      {/* Animated background */}
+    <div className="min-h-screen bg-gradient-to-br from-[#001D58] via-[#00308F] to-[#002A7A] relative">
+      {/* Background Particles */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        {[...Array(15)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-1 h-1 bg-ugm-gold/20 rounded-full"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-            }}
-            animate={{
-              y: [0, -25, 0],
-              opacity: [0.2, 0.7, 0.2],
-            }}
-            transition={{
-              duration: 3 + Math.random() * 2,
-              repeat: Infinity,
-              delay: Math.random() * 2,
-            }}
-          />
-        ))}
+        <ParticleBackground count={50} colors={["#FFCA40", "#B8A4FF", "#50E3C2"]} minSize={2} maxSize={6} speed={0.8} />
       </div>
 
       <div className="container mx-auto px-6 py-12 max-w-7xl relative z-10">
@@ -177,13 +160,13 @@ export default function BlockMarketPage() {
           className="mb-8 text-center"
         >
           <div className="flex items-center justify-center gap-3 mb-4">
-            <ShoppingBag className="w-12 h-12 text-ugm-gold" />
-            <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-ugm-gold via-yellow-300 to-ugm-gold">
+            <ShoppingBag className="w-12 h-12 text-[#FFCA40]" />
+            <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFCA40] via-[#FFD700] to-[#FFCA40]">
               Block Market
             </h1>
-            <ShoppingBag className="w-12 h-12 text-ugm-gold" />
+            <ShoppingBag className="w-12 h-12 text-[#FFCA40]" />
           </div>
-          <p className="text-xl text-gray-300">
+          <p className="text-xl text-white/70">
             Trade Your $CARE Tokens for Real-World Rewards
           </p>
         </motion.div>

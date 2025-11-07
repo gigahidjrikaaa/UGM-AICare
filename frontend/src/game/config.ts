@@ -2,8 +2,8 @@ import * as Phaser from 'phaser';
 
 export const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO, // WebGL with canvas fallback
-  width: 1920, // Higher resolution (Full HD)
-  height: 1080, // Higher resolution (Full HD)
+  width: 1920, // Base width (design reference)
+  height: 1080, // Base height (design reference)
   parent: 'phaser-game-container',
   backgroundColor: '#2d3561',
   physics: {
@@ -14,10 +14,10 @@ export const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
     },
   },
   scale: {
-    mode: Phaser.Scale.RESIZE, // Fill container and resize to match
-    autoCenter: Phaser.Scale.CENTER_BOTH,
-    width: '100%',
-    height: '100%',
+    mode: Phaser.Scale.FIT, // Scale to fit while maintaining aspect ratio
+    autoCenter: Phaser.Scale.CENTER_BOTH, // Center game in container
+    width: 1920,
+    height: 1080,
   },
   scene: [], // Scenes will be registered when creating game instance
   fps: {
@@ -33,3 +33,4 @@ export const GAME_CONFIG: Phaser.Types.Core.GameConfig = {
     roundPixels: true, // Prevent pixel blur
   },
 };
+

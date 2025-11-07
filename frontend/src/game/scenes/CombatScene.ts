@@ -80,18 +80,23 @@ export class CombatScene extends Phaser.Scene {
   create() {
     console.log('[CombatScene] Creating combat UI...');
 
+    // Get dynamic dimensions
+    const { width, height } = this.cameras.main;
+    const centerX = width / 2;
+    const centerY = height / 2;
+
     // Background
-    this.add.rectangle(960, 540, 1920, 1080, 0x1a1a2e);
+    this.add.rectangle(centerX, centerY, width, height, 0x1a1a2e);
 
     // Title
-    this.add.text(960, 75, `Combat: ${this.monsterType}`, {
-      fontSize: '32px',
+    this.add.text(centerX, height * 0.07, `Combat: ${this.monsterType}`, {
+      fontSize: `${Math.min(width, height) * 0.03}px`,
       color: '#ffffff',
       fontStyle: 'bold',
     }).setOrigin(0.5);
 
     // Monster sprite (placeholder)
-    this.monster = this.add.sprite(960, 300, 'monster-placeholder');
+    this.monster = this.add.sprite(centerX, height * 0.28, 'monster-placeholder');
     this.monster.setScale(2);
 
     // Monster HP bar
@@ -99,32 +104,32 @@ export class CombatScene extends Phaser.Scene {
     this.updateMonsterHP();
 
     // Sentence display
-    this.sentenceText = this.add.text(960, 675, this.currentSentence, {
-      fontSize: '28px',
+    this.sentenceText = this.add.text(centerX, height * 0.625, this.currentSentence, {
+      fontSize: `${Math.min(width, height) * 0.026}px`,
       color: '#ffffff',
       backgroundColor: '#333333',
       padding: { x: 20, y: 10 },
-      wordWrap: { width: 1650 },
+      wordWrap: { width: width * 0.85 },
     }).setOrigin(0.5);
 
     // User input display
-    this.inputText = this.add.text(960, 825, '', {
-      fontSize: '28px',
+    this.inputText = this.add.text(centerX, height * 0.765, '', {
+      fontSize: `${Math.min(width, height) * 0.026}px`,
       color: '#00ff00',
       backgroundColor: '#222222',
       padding: { x: 20, y: 10 },
-      wordWrap: { width: 1650 },
+      wordWrap: { width: width * 0.85 },
     }).setOrigin(0.5);
 
     // Stats display (combo, WPM, accuracy)
-    this.statsText = this.add.text(960, 930, 'Combo: 0x | WPM: 0 | Accuracy: 0%', {
-      fontSize: '18px',
+    this.statsText = this.add.text(centerX, height * 0.86, 'Combo: 0x | WPM: 0 | Accuracy: 0%', {
+      fontSize: `${Math.min(width, height) * 0.017}px`,
       color: '#ffff00',
     }).setOrigin(0.5);
 
     // Instructions
-    this.add.text(960, 1020, 'Type the sentence above | Backspace to correct | Press ESC to flee', {
-      fontSize: '14px',
+    this.add.text(centerX, height * 0.945, 'Type the sentence above | Backspace to correct | Press ESC to flee', {
+      fontSize: `${Math.min(width, height) * 0.013}px`,
       color: '#aaaaaa',
     }).setOrigin(0.5);
 
@@ -256,11 +261,14 @@ export class CombatScene extends Phaser.Scene {
   }
 
   /**
-   * Show floating damage number
+   * Show floating damage number (responsive)
    */
   private showDamageNumber(damage: number, isCritical: boolean) {
-    const text = this.add.text(960, 300, `-${damage.toFixed(1)}`, {
-      fontSize: isCritical ? '56px' : '40px',
+    const { width, height } = this.cameras.main;
+    const centerX = width / 2;
+    
+    const text = this.add.text(centerX, height * 0.28, `-${damage.toFixed(1)}`, {
+      fontSize: isCritical ? `${Math.min(width, height) * 0.052}px` : `${Math.min(width, height) * 0.037}px`,
       color: isCritical ? '#ffff00' : '#ff6600',
       fontStyle: 'bold',
       stroke: '#000000',
@@ -268,8 +276,8 @@ export class CombatScene extends Phaser.Scene {
     }).setOrigin(0.5);
 
     if (isCritical) {
-      this.add.text(960, 375, 'CRITICAL!', {
-        fontSize: '28px',
+      this.add.text(centerX, height * 0.347, 'CRITICAL!', {
+        fontSize: `${Math.min(width, height) * 0.026}px`,
         color: '#ffff00',
         fontStyle: 'bold',
       }).setOrigin(0.5);

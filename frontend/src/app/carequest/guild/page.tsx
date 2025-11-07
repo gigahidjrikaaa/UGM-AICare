@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Users, MessageSquare, Settings, Crown, Shield, Swords } from 'lucide-react';
 import { ProgressRing } from '@/components/carequest/ProgressRing';
 import { RewardBadge } from '@/components/carequest/RewardBadge';
+import ParticleBackground from '@/components/ui/ParticleBackground';
 
 /**
  * Guild System Page - RPG Redesign
@@ -38,9 +39,9 @@ const mockMembers: GuildMember[] = [
 ];
 
 const roleConfig = {
-  leader: { icon: Crown, color: 'text-ugm-gold', bg: 'bg-ugm-gold/20', label: 'Guild Leader' },
-  officer: { icon: Swords, color: 'text-aurora-purple', bg: 'bg-aurora-purple/20', label: 'Officer' },
-  member: { icon: Shield, color: 'text-aurora-blue', bg: 'bg-aurora-blue/20', label: 'Member' },
+  leader: { icon: Crown, color: 'text-[#FFCA40]', bg: 'bg-[#FFCA40]/20', label: 'Guild Leader' },
+  officer: { icon: Swords, color: 'text-[#B8A4FF]', bg: 'bg-[#B8A4FF]/20', label: 'Officer' },
+  member: { icon: Shield, color: 'text-[#50E3C2]', bg: 'bg-[#50E3C2]/20', label: 'Member' },
 };
 
 export default function GuildPage() {
@@ -53,28 +54,10 @@ export default function GuildPage() {
   ];
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-ugm-blue via-ugm-blue-dark to-black">
-      {/* Animated background */}
+    <div className="min-h-screen bg-gradient-to-br from-[#001D58] via-[#00308F] to-[#002A7A] relative">
+      {/* Background Particles */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none">
-        {[...Array(15)].map((_, i) => (
-          <motion.div
-            key={i}
-            className="absolute w-1 h-1 bg-ugm-gold/20 rounded-full"
-            style={{
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
-            }}
-            animate={{
-              y: [0, -20, 0],
-              opacity: [0.2, 0.6, 0.2],
-            }}
-            transition={{
-              duration: 3 + Math.random() * 2,
-              repeat: Infinity,
-              delay: Math.random() * 2,
-            }}
-          />
-        ))}
+        <ParticleBackground count={50} colors={["#FFCA40", "#B8A4FF", "#50E3C2"]} minSize={2} maxSize={6} speed={0.8} />
       </div>
 
       <div className="container mx-auto px-6 py-12 max-w-7xl relative z-10">
@@ -85,13 +68,13 @@ export default function GuildPage() {
           className="mb-8 text-center"
         >
           <div className="flex items-center justify-center gap-3 mb-4">
-            <Users className="w-12 h-12 text-ugm-gold" />
-            <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-ugm-gold via-yellow-300 to-ugm-gold">
+            <Users className="w-12 h-12 text-[#FFCA40]" />
+            <h1 className="text-6xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFCA40] via-[#FFD700] to-[#FFCA40]">
               Guild Hall
             </h1>
-            <Users className="w-12 h-12 text-ugm-gold" />
+            <Users className="w-12 h-12 text-[#FFCA40]" />
           </div>
-          <p className="text-xl text-gray-300">
+          <p className="text-xl text-white/70">
             Unite with Fellow Warriors on Your Mental Health Journey
           </p>
         </motion.div>
@@ -101,16 +84,16 @@ export default function GuildPage() {
           initial={{ opacity: 0, scale: 0.95 }}
           animate={{ opacity: 1, scale: 1 }}
           transition={{ delay: 0.2 }}
-          className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md rounded-2xl border-2 border-white/20 p-6 mb-8 shadow-2xl"
+          className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 p-6 mb-8 shadow-2xl"
         >
           <div className="flex items-center justify-between flex-wrap gap-6">
             <div className="flex items-center gap-6">
-              <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-ugm-gold to-yellow-600 flex items-center justify-center text-4xl shadow-lg shadow-ugm-gold/30">
+              <div className="w-20 h-20 rounded-xl bg-gradient-to-br from-[#FFCA40] to-[#FFD700] flex items-center justify-center text-4xl shadow-lg shadow-[#FFCA40]/30">
                 🏰
               </div>
               <div>
                 <h2 className="text-3xl font-bold text-white mb-1">The Mindful Warriors</h2>
-                <p className="text-gray-300 text-sm">Est. October 2024 • {mockMembers.length} Members</p>
+                <p className="text-white/70 text-sm">Est. October 2024 • {mockMembers.length} Members</p>
               </div>
             </div>
             
@@ -149,8 +132,8 @@ export default function GuildPage() {
                 className={`
                   relative px-6 py-3 rounded-xl font-bold transition-all flex items-center gap-2
                   ${isActive 
-                    ? 'bg-gradient-to-r from-ugm-gold to-yellow-500 text-ugm-blue-dark shadow-lg shadow-ugm-gold/50' 
-                    : 'bg-white/10 backdrop-blur-sm text-white hover:bg-white/20 border border-white/20'
+                    ? 'bg-gradient-to-r from-[#FFCA40] to-[#FFD700] text-[#001D58] shadow-lg shadow-[#FFCA40]/50' 
+                    : 'bg-white/10 backdrop-blur-md text-white hover:bg-white/20 border border-white/20'
                   }
                 `}
               >
@@ -159,7 +142,7 @@ export default function GuildPage() {
                 {isActive && (
                   <motion.div
                     layoutId="activeTab"
-                    className="absolute inset-0 bg-gradient-to-r from-ugm-gold to-yellow-500 rounded-xl -z-10"
+                    className="absolute inset-0 bg-gradient-to-r from-[#FFCA40] to-[#FFD700] rounded-xl -z-10"
                   />
                 )}
               </motion.button>
@@ -178,11 +161,11 @@ export default function GuildPage() {
           >
             {/* Guild Roster Tab */}
             {activeTab === 'roster' && (
-              <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md rounded-2xl border-2 border-white/20 p-8 shadow-2xl">
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 p-8 shadow-2xl">
                 <div className="flex items-center gap-3 mb-6">
-                  <Users className="w-8 h-8 text-ugm-gold" />
+                  <Users className="w-8 h-8 text-[#FFCA40]" />
                   <h2 className="text-3xl font-bold text-white">Guild Members</h2>
-                  <span className="px-3 py-1 bg-ugm-gold/20 border border-ugm-gold/50 rounded-full text-ugm-gold text-sm font-semibold">
+                  <span className="px-3 py-1 bg-[#FFCA40]/20 border border-[#FFCA40]/50 rounded-full text-[#FFCA40] text-sm font-semibold">
                     {mockMembers.filter(m => m.isOnline).length} Online
                   </span>
                 </div>
@@ -199,7 +182,7 @@ export default function GuildPage() {
                         animate={{ opacity: 1, x: 0 }}
                         transition={{ delay: index * 0.1 }}
                         whileHover={{ scale: 1.02, y: -4 }}
-                        className="relative overflow-hidden rounded-xl border-2 border-white/20 bg-gradient-to-br from-ugm-blue/60 to-ugm-blue-dark/60 backdrop-blur-sm p-6 shadow-lg hover:shadow-xl transition-shadow"
+                        className="relative overflow-hidden rounded-xl border border-white/20 bg-white/10 backdrop-blur-md p-6 shadow-lg hover:shadow-xl transition-shadow"
                       >
                         {/* Shimmer effect */}
                         <motion.div
@@ -213,11 +196,11 @@ export default function GuildPage() {
                           <div className="flex items-center gap-4">
                             {/* Avatar with online indicator */}
                             <div className="relative">
-                              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-aurora-blue to-aurora-purple flex items-center justify-center text-3xl shadow-lg">
+                              <div className="w-16 h-16 rounded-xl bg-gradient-to-br from-[#50E3C2] to-[#B8A4FF] flex items-center justify-center text-3xl shadow-lg">
                                 {member.avatar}
                               </div>
                               {member.isOnline && (
-                                <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-ugm-blue-dark shadow-lg">
+                                <div className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full border-2 border-[#001D58] shadow-lg">
                                   <motion.div
                                     className="absolute inset-0 bg-green-500 rounded-full"
                                     animate={{ scale: [1, 1.5, 1], opacity: [0.7, 0, 0.7] }}
@@ -244,9 +227,9 @@ export default function GuildPage() {
                                   color="gold"
                                   showPercentage={false}
                                 >
-                                  <div className="text-xs font-bold text-ugm-gold">{member.level}</div>
+                                  <div className="text-xs font-bold text-[#FFCA40]">{member.level}</div>
                                 </ProgressRing>
-                                <span className="text-sm text-gray-300">Level {member.level} Warrior</span>
+                                <span className="text-sm text-white/70">Level {member.level} Warrior</span>
                               </div>
                             </div>
                           </div>
@@ -254,16 +237,16 @@ export default function GuildPage() {
                           {/* Stats */}
                           <div className="flex gap-4">
                             <div className="text-center">
-                              <div className="text-2xl font-bold text-aurora-pink">{member.joy}</div>
-                              <div className="text-xs text-gray-400">JOY</div>
+                              <div className="text-2xl font-bold text-[#FF6B9D]">{member.joy}</div>
+                              <div className="text-xs text-white/60">JOY</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-2xl font-bold text-aurora-cyan">{member.care}</div>
-                              <div className="text-xs text-gray-400">CARE</div>
+                              <div className="text-2xl font-bold text-[#50E3C2]">{member.care}</div>
+                              <div className="text-xs text-white/60">CARE</div>
                             </div>
                             <div className="text-center">
-                              <div className="text-2xl font-bold text-aurora-purple">{member.harmony}</div>
-                              <div className="text-xs text-gray-400">Harmony</div>
+                              <div className="text-2xl font-bold text-[#B8A4FF]">{member.harmony}</div>
+                              <div className="text-xs text-white/60">Harmony</div>
                             </div>
                           </div>
 
@@ -271,7 +254,7 @@ export default function GuildPage() {
                           <motion.button
                             whileHover={{ scale: 1.05 }}
                             whileTap={{ scale: 0.95 }}
-                            className="px-6 py-2 bg-gradient-to-r from-aurora-blue to-blue-600 text-white font-bold rounded-lg shadow-lg hover:shadow-aurora-blue/50 transition-shadow"
+                            className="px-6 py-2 bg-gradient-to-r from-[#50E3C2] to-[#3BA99C] text-white font-bold rounded-lg shadow-lg hover:shadow-[#50E3C2]/50 transition-shadow"
                           >
                             View Profile
                           </motion.button>
@@ -285,14 +268,14 @@ export default function GuildPage() {
 
             {/* Guild Chat Tab */}
             {activeTab === 'chat' && (
-              <div className="bg-gradient-to-br from-white/10 to-white/5 backdrop-blur-md rounded-2xl border-2 border-white/20 p-8 shadow-2xl">
+              <div className="bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 p-8 shadow-2xl">
                 <div className="flex items-center gap-3 mb-6">
-                  <MessageSquare className="w-8 h-8 text-ugm-gold" />
+                  <MessageSquare className="w-8 h-8 text-[#FFCA40]" />
                   <h2 className="text-3xl font-bold text-white">Guild Chat</h2>
                 </div>
                 
                 {/* Chat Area */}
-                <div className="bg-ugm-blue-dark/50 rounded-xl p-6 h-[500px] overflow-y-auto mb-4 border border-white/10">
+                <div className="bg-[#001D58]/50 rounded-xl p-6 h-[500px] overflow-y-auto mb-4 border border-white/10">
                   {/* Mock messages */}
                   <div className="space-y-4">
                     {[
