@@ -37,7 +37,7 @@ class CrisisScenario:
         true_label: CrisisLabel, 
         category: str, 
         language: str,
-        severity_if_crisis: str = None,
+        severity_if_crisis: str = None, # type: ignore
         notes: str = ""
     ):
         self.id = id

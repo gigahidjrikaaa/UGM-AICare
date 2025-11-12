@@ -26,7 +26,7 @@ from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.ia.queries import ALLOWED_QUERIES
-from app.agents.ia.schemas import IAQueryRequest, QueryParams
+from app.agents.ia.schemas import IAQueryRequest, IAQueryParams
 from app.agents.ia.service import InsightsAgentService
 
 
@@ -182,10 +182,10 @@ async def test_small_cohort_suppression(
     # Arrange
     request = IAQueryRequest(
         question_id="crisis_trend",
-        params=QueryParams(
-            start=datetime(2025, 11, 1, 0, 0, 0),
-            end=datetime(2025, 11, 2, 0, 0, 0)
-        )
+        params=IAQueryParams(**{
+            "from": datetime(2025, 11, 1, 0, 0, 0),
+            "to": datetime(2025, 11, 2, 0, 0, 0)
+        })
     )
     
     # Act
@@ -233,10 +233,10 @@ async def test_compliant_publication(
     # Arrange
     request = IAQueryRequest(
         question_id="crisis_trend",
-        params=QueryParams(
-            start=datetime(2025, 11, 5, 0, 0, 0),
-            end=datetime(2025, 11, 6, 0, 0, 0)
-        )
+        params=IAQueryParams(**{
+            "from": datetime(2025, 11, 5, 0, 0, 0),
+            "to": datetime(2025, 11, 6, 0, 0, 0)
+        })
     )
     
     # Act
@@ -375,10 +375,10 @@ async def test_boundary_condition_k_equals_5(
     # Arrange
     request = IAQueryRequest(
         question_id="crisis_trend",
-        params=QueryParams(
-            start=datetime(2025, 11, 12, 0, 0, 0),
-            end=datetime(2025, 11, 13, 0, 0, 0)
-        )
+        params=IAQueryParams(**{
+            "from": datetime(2025, 11, 12, 0, 0, 0),
+            "to": datetime(2025, 11, 13, 0, 0, 0)
+        })
     )
     
     # Act
@@ -415,10 +415,10 @@ async def test_multi_date_suppression_selectivity(
     # Arrange
     request = IAQueryRequest(
         question_id="crisis_trend",
-        params=QueryParams(
-            start=datetime(2025, 11, 10, 0, 0, 0),
-            end=datetime(2025, 11, 13, 0, 0, 0)  # Spans 3 days
-        )
+        params=IAQueryParams(**{
+            "from": datetime(2025, 11, 10, 0, 0, 0),
+            "to": datetime(2025, 11, 13, 0, 0, 0)  # Spans 3 days
+        })
     )
     
     # Act
