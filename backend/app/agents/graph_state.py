@@ -147,7 +147,7 @@ class SDAState(SafetyAgentState):
     """SDA-specific state extension.
     
     Used by the Service Desk Agent subgraph. Extends SafetyAgentState with
-    auto-assignment tracking fields.
+    auto-assignment tracking fields and appointment scheduling fields.
     """
     # Assignment tracking (from auto_assign_node)
     assigned_to: NotRequired[Optional[str]]
@@ -161,6 +161,30 @@ class SDAState(SafetyAgentState):
     
     assigned_workload: NotRequired[Optional[int]]
     """Number of active cases the assigned counsellor has (for load balancing metrics)."""
+    
+    # ============================================================================
+    # APPOINTMENT SCHEDULING FIELDS (NEW)
+    # ============================================================================
+    schedule_appointment: NotRequired[bool]
+    """Flag indicating if student wants to schedule appointment (default False)."""
+    
+    appointment_id: NotRequired[Optional[int]]
+    """Database ID of created Appointment record (if scheduled)."""
+    
+    appointment_datetime: NotRequired[Optional[str]]
+    """ISO timestamp of scheduled appointment."""
+    
+    appointment_confirmed: NotRequired[bool]
+    """Flag indicating if appointment was successfully booked."""
+    
+    psychologist_id: NotRequired[Optional[int]]
+    """ID of psychologist/counselor for appointment."""
+    
+    preferred_time: NotRequired[Optional[str]]
+    """Student's preferred time for appointment (natural language or structured)."""
+    
+    scheduling_context: NotRequired[Optional[Dict[str, Any]]]
+    """Additional scheduling context (preferences, constraints, etc.)."""
 
 
 class OrchestratorState(SafetyAgentState):
@@ -233,4 +257,154 @@ class IAState(TypedDict, total=False):
     
     completed_at: datetime
     """Timestamp when execution completed."""
+
+
+class AikaOrchestratorState(TypedDict, total=False):
+    """State for the unified Aika orchestrator graph.
+    
+    This state flows through the new LangGraph workflow where Aika is the
+    first decision node that determines if specialized agents are needed.
+    
+    Workflow:
+        START → aika_decision_node → [needs_agents?]
+                                       ↓           ↓
+                                  [YES: STA]   [NO: END]
+                                       ↓
+                                  [Conditional: SCA/SDA]
+                                       ↓
+                                     END
+    """
+    
+    # ============================================================================
+    # INPUT CONTEXT (Provided at workflow start)
+    # ============================================================================
+    user_id: int
+    """User ID from database."""
+    
+    user_role: Literal["user", "counselor", "admin"]
+    """User's role for role-aware routing."""
+    
+    session_id: str
+    """Session identifier for tracking user interactions."""
+    
+    user_hash: str
+    """Anonymized user identifier for privacy."""
+    
+    message: str
+    """Original user message content."""
+    
+    conversation_id: Optional[str]
+    """Conversation ID for tracking multi-turn conversations."""
+    
+    conversation_history: List[Dict[str, str]]
+    """Previous conversation turns for context."""
+    
+    # ============================================================================
+    # AIKA DECISION NODE OUTPUTS
+    # ============================================================================
+    intent: Optional[str]
+    """Detected user intent (e.g., 'emotional_support', 'crisis', 'analytics_query')."""
+    
+    intent_confidence: Optional[float]
+    """Confidence score for intent classification (0.0-1.0)."""
+    
+    needs_agents: bool
+    """Decision flag: True = invoke specialized agents, False = direct response."""
+    
+    aika_direct_response: Optional[str]
+    """Direct conversational response from Aika (when needs_agents=False)."""
+    
+    agent_reasoning: Optional[str]
+    """Explanation of why agents are/aren't needed."""
+    
+    # ============================================================================
+    # INHERITED FROM SafetyAgentState (for agent execution)
+    # ============================================================================
+    # STA outputs
+    risk_level: Optional[int]
+    """Risk level from 0-3 (0=low, 1=moderate, 2=high, 3=critical)."""
+    
+    risk_score: Optional[float]
+    """Normalized risk score from 0.0 to 1.0."""
+    
+    severity: Optional[Literal["low", "moderate", "high", "critical"]]
+    """Human-readable severity classification."""
+    
+    next_step: Optional[str]
+    """Routing decision: 'sca' (Support Coach), 'sda' (Service Desk), or 'end'."""
+    
+    redacted_message: Optional[str]
+    """Message with PII redacted for safe storage."""
+    
+    triage_assessment_id: Optional[int]
+    """Database ID of created TriageAssessment record."""
+    
+    # SCA outputs
+    intervention_plan: Optional[Dict[str, Any]]
+    """Generated intervention plan with steps and resources."""
+    
+    intervention_type: Optional[str]
+    """Type of intervention: 'calm_down', 'break_down_problem', 'general_coping'."""
+    
+    should_intervene: bool
+    """Flag indicating if SCA should create intervention (default False)."""
+    
+    intervention_plan_id: Optional[int]
+    """Database ID of created InterventionPlan record."""
+    
+    safety_approved: Optional[bool]
+    """Whether SCA plan passed safety review."""
+    
+    # SDA outputs
+    case_id: Optional[int]
+    """Database ID of created Case record (for high/critical escalations)."""
+    
+    case_created: bool
+    """Flag indicating if a new case was created (default False)."""
+    
+    sla_hours: Optional[int]
+    """SLA response time in hours based on severity."""
+    
+    sla_breach_at: Optional[datetime]
+    """Timestamp when SLA will be breached."""
+    
+    assigned_counsellor_id: Optional[int]
+    """ID of counselor auto-assigned to case."""
+    
+    notification_sent: Optional[bool]
+    """Whether notification was sent to assigned counselor."""
+    
+    # ============================================================================
+    # FINAL RESPONSE
+    # ============================================================================
+    final_response: Optional[str]
+    """Final synthesized response to user (either from Aika or agents)."""
+    
+    response_source: Optional[Literal["aika_direct", "agents"]]
+    """Source of final response: 'aika_direct' or 'agents'."""
+    
+    # ============================================================================
+    # METADATA & EXECUTION TRACKING
+    # ============================================================================
+    execution_id: Optional[str]
+    """Unique identifier for this graph execution."""
+    
+    execution_path: List[str]
+    """List of node names executed in order."""
+    
+    agents_invoked: List[str]
+    """List of agents that were invoked (e.g., ['STA', 'SCA'])."""
+    
+    errors: List[str]
+    """List of error messages encountered during execution."""
+    
+    started_at: Optional[datetime]
+    """Timestamp when execution started."""
+    
+    completed_at: Optional[datetime]
+    """Timestamp when execution completed."""
+    
+    processing_time_ms: Optional[float]
+    """Total processing time in milliseconds."""
+
 

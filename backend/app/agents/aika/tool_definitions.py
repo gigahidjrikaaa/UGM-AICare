@@ -266,6 +266,182 @@ Returns curated resources based on category.
             },
             "required": ["plan_title", "concern_type"]
         }
+    },
+    
+    # ==============================================================================
+    # APPOINTMENT SCHEDULING TOOLS
+    # ==============================================================================
+    
+    {
+        "name": "book_appointment",
+        "description": """Book a counseling appointment with a psychologist at UGM.
+        
+        ✅ CALL WHEN USER:
+        - Explicitly requests appointment: "mau booking", "jadwalin konseling", "book appointment"
+        - Wants to meet with psychologist: "mau ketemu psikolog", "pengen konseling"
+        - Specifies preferred time: "besok jam 2", "Selasa siang", "next week"
+        
+        ❌ DO NOT CALL:
+        - When just gathering preferences (ask first, then book)
+        - For general questions about counseling (just answer)
+        
+        IMPORTANT: Before calling this tool, you should have already:
+        1. Asked about preferred date/time
+        2. Optionally asked about preferred counselor
+        3. Optionally asked about appointment type (konseling umum, konsultasi akademik, etc.)
+        
+        This tool will create the appointment and return confirmation with appointment ID.
+        If successful, ALWAYS inform the user about:
+        - Appointment date and time
+        - Counselor name
+        - Location (GMC - Grhatama Pustaka)
+        - How to cancel/reschedule""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "psychologist_id": {
+                    "type": "integer",
+                    "description": "ID of the psychologist (get from get_available_counselors tool first). Optional if you want system to auto-assign."
+                },
+                "appointment_datetime": {
+                    "type": "string",
+                    "description": "Requested appointment date and time in ISO 8601 format (YYYY-MM-DDTHH:MM:SS). Example: '2025-11-19T13:00:00'"
+                },
+                "appointment_type_id": {
+                    "type": "integer",
+                    "description": "Type of appointment (1=General Counseling, 2=Academic Counseling, 3=Career Counseling, 4=Crisis Intervention). Default to 1 if not specified."
+                },
+                "notes": {
+                    "type": "string",
+                    "description": "Optional notes about the appointment or student's concern"
+                }
+            },
+            "required": ["appointment_datetime"]
+        }
+    },
+    
+    {
+        "name": "get_available_counselors",
+        "description": """Get list of available psychologists/counselors at UGM.
+        
+        ✅ CALL WHEN:
+        - User asks "siapa psikolog yang ada?", "counselor available?"
+        - User wants to choose specific counselor
+        - Need to show counselor options before booking
+        
+        Returns list of counselors with their specializations, languages, and experience.
+        Use this BEFORE book_appointment if user wants to choose counselor.""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "specialization": {
+                    "type": "string",
+                    "description": "Filter by specialization: 'anxiety', 'depression', 'trauma', 'academic_stress', 'relationships', 'general'"
+                },
+                "language": {
+                    "type": "string",
+                    "description": "Filter by language: 'id' (Indonesian), 'en' (English), 'jv' (Javanese)"
+                }
+            },
+            "required": []
+        }
+    },
+    
+    {
+        "name": "suggest_appointment_times",
+        "description": """Get AI-suggested optimal appointment times based on user preferences and counselor availability.
+        
+        ✅ CALL WHEN:
+        - User asks for available slots: "jam berapa aja yang available?", "kapan bisa?"
+        - User gives general preferences: "mau siang aja", "weekday afternoon"
+        - Need to suggest times before booking
+        
+        This tool uses AI to analyze:
+        - User's stated preferences (time of day, day of week)
+        - Counselor availability from their schedule
+        - Existing appointment conflicts
+        
+        Returns top 3 recommended time slots with reasoning.""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "psychologist_id": {
+                    "type": "integer",
+                    "description": "ID of specific psychologist. If not provided, suggests times for any available counselor."
+                },
+                "preferred_day_of_week": {
+                    "type": "array",
+                    "items": {"type": "string"},
+                    "description": "Preferred days: ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']"
+                },
+                "preferred_time_of_day": {
+                    "type": "string",
+                    "description": "Preferred time: 'morning' (08:00-12:00), 'afternoon' (12:00-17:00), 'evening' (17:00-20:00)"
+                },
+                "earliest_date": {
+                    "type": "string",
+                    "description": "Earliest acceptable date in YYYY-MM-DD format. Default to tomorrow."
+                },
+                "duration_minutes": {
+                    "type": "integer",
+                    "description": "Appointment duration in minutes. Default 60."
+                }
+            },
+            "required": []
+        }
+    },
+    
+    {
+        "name": "cancel_appointment",
+        "description": """Cancel an existing appointment.
+        
+        ✅ CALL WHEN:
+        - User asks to cancel: "cancel appointment", "batalin jadwal"
+        - User wants to remove booking
+        
+        Returns cancellation confirmation.""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "appointment_id": {
+                    "type": "integer",
+                    "description": "ID of the appointment to cancel"
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Optional reason for cancellation"
+                }
+            },
+            "required": ["appointment_id"]
+        }
+    },
+    
+    {
+        "name": "reschedule_appointment",
+        "description": """Reschedule an existing appointment to a new time.
+        
+        ✅ CALL WHEN:
+        - User asks to reschedule: "reschedule", "ganti jadwal", "pindahin appointment"
+        
+        Returns new appointment confirmation.""",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "appointment_id": {
+                    "type": "integer",
+                    "description": "ID of the appointment to reschedule"
+                },
+                "new_datetime": {
+                    "type": "string",
+                    "description": "New date and time in ISO 8601 format (YYYY-MM-DDTHH:MM:SS)"
+                },
+                "reason": {
+                    "type": "string",
+                    "description": "Optional reason for rescheduling"
+                }
+            },
+            "required": ["appointment_id", "new_datetime"]
+        }
     }
 ]
 

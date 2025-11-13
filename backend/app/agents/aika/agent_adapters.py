@@ -154,10 +154,10 @@ Provide empathetic, supportive response in Indonesian.
             while iteration < max_iterations:
                 iteration += 1
                 
-                # Call LLM with tools
+                # Call LLM with tools - Using Gemini 2.5 Flash Lite for Aika conversational
                 response_obj = await generate_gemini_response(
                     history=llm_history,
-                    model="gemini-2.0-flash-exp",
+                    model="gemini-2.5-flash-lite",  # Gemini 2.5 Flash Lite for Aika
                     temperature=0.7,
                     tools=gemini_tools,
                     return_full_response=True,  # Get full response for tool calling

@@ -126,9 +126,9 @@ Analyze the campaign name and description, then generate a complete campaign con
 
 Generate the campaign configuration now:"""
             
-            # Use new google-genai SDK with client
+            # Use new google-genai SDK with client - Gemini 2.5 Flash for campaign generation
             response = self.client.models.generate_content(
-                model='gemini-2.0-flash-exp',
+                model='gemini-2.5-flash',
                 contents=prompt,
             )
             response_text = response.text.strip()

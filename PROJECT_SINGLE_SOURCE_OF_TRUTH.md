@@ -4,11 +4,11 @@
 
 This document is the canonical reference for architecture, roadmap, and operational standards across the Safety Agent refactor. It supersedes the legacy three-agent summary and keeps pace with the documentation clean-up tracked in `docs/DEPRECATED.md`.
 
-**Document Version:** 4.0  
-**Last Updated:** October 22, 2025  
+**Document Version:** 5.0  
+**Last Updated:** November 13, 2025  
 **Repository:** UGM-AICare  
 **Maintainer:** Giga Hidjrika Aura Adkhy  
-**Major Update:** LangGraph StateGraph implementation complete for all Safety Agents
+**Major Update:** Unified Aika Orchestrator with Direct LangGraph Invocation (Agentic Architecture)
 
 ---
 
@@ -34,25 +34,35 @@ Deliver a Safety Agent Suite that combines high-sensitivity crisis detection wit
 
 ## 2. Safety Agent Suite Overview
 
-**LangGraph StateGraph Orchestration** (Implemented: October 2025)
+**NEW: Unified Aika Orchestrator with Direct LangGraph Invocation** (Implemented: November 2025)
 
-The Safety Agent Suite is now implemented as a **LangGraph-orchestrated multi-agent system** with deterministic state machines, typed state management, and conditional routing. All four agents operate through compiled StateGraph workflows with real-time execution tracking.
+The Safety Agent Suite is now orchestrated through a **unified Aika agent** that uses LangGraph's native patterns:
 
-**Orchestration Architecture:**
+### 🤖 Agentic Architecture Principles
+
+**CRITICAL: We follow AI Agent best practices, NOT traditional service layer patterns**
+
+✅ **Direct Graph Invocation**: The graph IS the agent—no service wrappers
+✅ **LangGraph Checkpointing**: Native conversation memory via `MemorySaver` / `AsyncSqliteSaver`
+✅ **Conditional Routing**: Deterministic agent invocation based on Aika's decision
+✅ **Aika as First Node**: Intelligence and personality at the entry point
+
+### 🎯 Architecture: Aika Decision Node First
 
 ```bash
-User Message → STA (Triage) → [Low/Moderate] → SCA (Coach) → END
-                             → [High/Critical] → SDA (Escalate) → END
-Analytics Queries → IA (Privacy-Preserving Aggregation) → END
+User Message → Aika Decision Node → [needs_agents?]
+                                      ↓               ↓
+                                 [YES: STA]      [NO: Direct Response]
+                                      ↓
+                                 [severity check]
+                                  ↓    ↓    ↓
+                                SDA  SCA  Synthesize → END
 ```
 
-**Core LangGraph Components:**
-
-- **StateGraph**: Workflow orchestration with typed state (`SafetyAgentState`, `IAState` TypedDict)
-- **Nodes**: Agent operations (e.g., `triage_node`, `generate_plan_node`, `create_case_node`)
-- **Edges**: Conditional routing based on risk level, intent classification, and consent validation
-- **Execution Tracking**: Real-time monitoring via `ExecutionStateTracker` with database persistence
-- **Error Recovery**: Graceful error handling at node level with state preservation
+**Key Innovation**: Aika intelligently decides if specialized agents are needed:
+- **Casual chat** ("hi", "how are you?") → Direct response (~1.2s, no agents)
+- **Emotional distress** → STA → SCA (intervention plan)
+- **Crisis signals** → STA → SDA (case creation + counselor assignment)
 
 ### 🛡️ Safety Triage Agent (STA)
 
@@ -82,18 +92,68 @@ Analytics Queries → IA (Privacy-Preserving Aggregation) → END
 - **LangGraph Implementation:** 4-node workflow (`ingest_query` → `validate_consent` → `apply_k_anonymity` → `execute_analytics`)
 - **Status:** ✅ **LangGraph Complete** (`backend/app/agents/ia/ia_graph.py`, smoke tests passing)
 
-**Master Orchestrator:** `backend/app/agents/orchestrator_graph.py` coordinates STA→SCA/SDA routing with conditional edges and subgraph invocation.
+### 🎭 Unified Aika Orchestrator (NEW)
+
+- **Scope:** Intelligent decision node that determines agent invocation
+- **Key Features:** 
+  - Aika personality (warm, empathetic Indonesian mental health assistant)
+  - Intent classification with confidence scoring
+  - Smart routing (agents only when needed)
+  - LangGraph native checkpointing for conversation memory
+  - Execution tracking and observability
+- **LangGraph Implementation:** 5-node workflow with conditional routing:
+  - `aika_decision_node`: Analyzes message, decides if agents needed
+  - `execute_sta`: Invokes STA subgraph if needed
+  - `execute_sca`: Invokes SCA subgraph for moderate severity
+  - `execute_sda`: Invokes SDA subgraph for high/critical severity
+  - `synthesize`: Combines agent outputs with Aika personality
+- **Status:** ✅ **LangGraph Complete** (`backend/app/agents/aika_orchestrator_graph.py`)
+
+**How to Use (Agentic Pattern):**
+
+```python
+from langgraph.checkpoint.memory import MemorySaver
+from app.agents.aika_orchestrator_graph import create_aika_agent_with_checkpointing
+
+# Create agent with conversation memory
+memory = MemorySaver()
+aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=memory)
+
+# Invoke directly (no wrapper needed)
+result = await aika_agent.ainvoke(
+    {
+        "user_id": user.id,
+        "user_role": "user",
+        "message": "I'm feeling stressed",
+        "conversation_history": history,
+    },
+    config={"configurable": {"thread_id": f"user_{user.id}"}}
+)
+
+# Access results
+print(result["final_response"])  # Synthesized response
+print(result["response_source"])  # "aika_direct" or "agents"
+print(result["agents_invoked"])  # ["STA", "SCA"] or []
+```
 
 **API Endpoints:**
 
-- `POST /api/v1/agents/graph/sta/execute` - Execute STA workflow only
-- `POST /api/v1/agents/graph/orchestrator/execute` - Full orchestration (STA→SCA/SDA)
-- `POST /api/v1/agents/graph/ia/execute` - Execute IA analytics workflow
+- `POST /api/v1/chat` - Main chat endpoint (uses unified Aika orchestrator)
+- `POST /api/v1/agents/graph/sta/execute` - Direct STA execution (testing)
+- `POST /api/v1/agents/graph/orchestrator/execute` - Legacy orchestrator (deprecated)
+- `POST /api/v1/agents/graph/ia/execute` - IA analytics workflow
 - `GET /api/v1/agents/graph/*/health` - Health checks with feature listings
 
-**Documentation:** See `docs/langgraph-phase5-complete.md` for complete implementation details, code samples, and architecture diagrams.
+**Documentation:** 
+- `AIKA_META_AGENT_ARCHITECTURE.md` - Complete Aika architecture explanation
+- `docs/langgraph-phase5-complete.md` - LangGraph implementation details
+- `docs/DEPRECATED.md` - Migration guidance from legacy systems
 
-**Transitional Guidance:** Legacy n8n agent references are deprecated. All new development must use LangGraph StateGraph patterns. Reference `docs/DEPRECATED.md` for migration guidance.
+**Transitional Guidance:** 
+- ❌ **NO service wrappers** - Use direct graph invocation
+- ✅ **Use LangGraph checkpointing** for conversation memory
+- ✅ **Invoke graphs directly** via `.ainvoke()` or `.astream()`
+- ❌ **Avoid wrapping graphs in classes** unless necessary for FastAPI integration
 
 ---
 

@@ -1,7 +1,7 @@
 // src/hooks/useChatMessages.ts
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid';
-import type { Message } from '@/types/chat';
+import type { Message, Appointment, InterventionPlan } from '@/types/chat';
 import { splitLongMessage, countWords, calculateReadTimeMs } from '@/lib/textUtils';
 
 const MAX_CHUNK_LENGTH = 350;
@@ -21,13 +21,16 @@ export function useChatMessages(initialMessages: Message[] = []) {
     responseContent: string,
     initialLoaderId: string,
     messageSessionId: string,
-    messageConversationId: string
+    messageConversationId: string,
+    appointment?: Appointment | null,
+    interventionPlan?: InterventionPlan | null,
+    agentActivity?: Message['agentActivity']
   ) => {
     setMessages((prev) => prev.filter((msg) => msg.id !== initialLoaderId));
 
     const chunks = splitLongMessage(responseContent, MAX_CHUNK_LENGTH);
     const baseTimestamp = new Date();
-    const assistantMessages: Message[] = chunks.map(chunkContent => ({
+    const assistantMessages: Message[] = chunks.map((chunkContent, index) => ({
       id: uuidv4(),
       role: 'assistant' as const,
       content: chunkContent,
@@ -37,6 +40,10 @@ export function useChatMessages(initialMessages: Message[] = []) {
       conversation_id: messageConversationId,
       created_at: baseTimestamp.toISOString(),
       updated_at: baseTimestamp.toISOString(),
+      // Add appointment, intervention_plan, and agentActivity only to the last message chunk
+      ...(index === chunks.length - 1 && appointment ? { appointment } : {}),
+      ...(index === chunks.length - 1 && interventionPlan ? { intervention_plan: interventionPlan } : {}),
+      ...(index === chunks.length - 1 && agentActivity ? { agentActivity } : {}),
     }));
 
     for (let i = 0; i < assistantMessages.length; i++) {

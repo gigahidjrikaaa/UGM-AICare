@@ -6,31 +6,77 @@ FastAPI service that powers the Safety Agent Suite behind UGM-AICare. The backen
 
 ## Safety Agent Suite
 
-**LangGraph-Orchestrated Agent Architecture** (Implemented: October 2025)
+**NEW: Unified Aika Orchestrator with Direct LangGraph Invocation** (November 2025)
 
-The backend implements a **LangGraph StateGraph** orchestration system coordinating four specialized agents through deterministic state transitions and conditional routing.
+The backend implements an **agentic architecture** following LangGraph best practices with Aika as the first decision node.
 
-| Agent | Scope | Highlights | Status (Oct 2025) |
-|-------|-------|------------|--------------------|
-| 🛡️ **Safety Triage Agent (STA)** | Real-time risk scoring inside the chat flow | Crisis detection (Level 0-3), PII redaction, risk assessment with conditional routing | ✅ **LangGraph Complete** |
-| 💬 **Support Coach Agent (SCA)** | CBT-informed coaching and micro-interventions | Intervention plan generation, resource cards, therapeutic exercises, module progression | ✅ **LangGraph Complete** |
-| 🗂️ **Service Desk Agent (SDA)** | Operational command center for clinical staff | Case creation, SLA calculation, auto-assignment, priority escalation | ✅ **LangGraph Complete** |
-| 🔍 **Insights Agent (IA)** | Privacy-preserving analytics over anonymized events | k-anonymity enforcement (k≥5), allow-listed queries, differential privacy budgets | ✅ **LangGraph Complete** |
+### 🤖 Agentic Architecture Principles
 
-**Orchestration Flow:**
+**CRITICAL**: We use **direct graph invocation**, NOT service layer patterns.
+
+✅ **Direct Invocation**: Graphs invoked via `.ainvoke()` or `.astream()`  
+✅ **LangGraph Checkpointing**: Built-in conversation memory  
+✅ **Aika as First Node**: Intelligence and personality at entry  
+✅ **Conditional Routing**: Agents invoked only when needed
+
+### 🎯 Orchestration Flow
+
 ```
-User Message → STA (Triage) → [Low/Moderate] → SCA (Coach) → END
-                             → [High/Critical] → SDA (Escalate) → END
-Analytics Queries → IA (Privacy-Preserving Aggregation) → END
+User Message → Aika Decision Node → [needs_agents?]
+                                     ↓               ↓
+                                [YES: STA]      [NO: Direct Response (~1.2s)]
+                                     ↓
+                                [severity check]
+                                 ↓    ↓    ↓
+                               SDA  SCA  Synthesize → END
+```
+
+**Key Innovation**: Aika decides if specialized agents are needed:
+- **Casual chat** ("hi", "how are you?") → Direct response (~1.2s)
+- **Emotional distress** → STA → SCA (intervention plan)
+- **Crisis signals** → STA → SDA (case creation)
+
+| Agent | Scope | Highlights | Status |
+|-------|-------|------------|--------|
+| 🤖 **Aika Meta-Agent** | Intelligent decision node | Intent classification, conditional routing, direct responses, conversation memory | ✅ **Complete** |
+| 🛡️ **Safety Triage Agent (STA)** | Real-time risk scoring | Crisis detection (Level 0-3), PII redaction, risk assessment | ✅ **Complete** |
+| 💬 **Support Coach Agent (SCA)** | CBT-informed coaching | Intervention plans, therapeutic exercises, progress tracking | ✅ **Complete** |
+| 🗂️ **Service Desk Agent (SDA)** | Clinical case management | Case creation, SLA tracking, auto-assignment | ✅ **Complete** |
+| 🔍 **Insights Agent (IA)** | Privacy-preserving analytics | k-anonymity (k≥5), differential privacy | ✅ **Complete** |
+
+**Usage Example (Agentic Pattern):**
+
+```python
+from langgraph.checkpoint.memory import MemorySaver
+from app.agents.aika_orchestrator_graph import create_aika_agent_with_checkpointing
+
+# Create agent with conversation memory
+memory = MemorySaver()
+aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=memory)
+
+# Invoke directly (no wrapper)
+result = await aika_agent.ainvoke(
+    {
+        "user_id": user.id,
+        "user_role": "user",
+        "message": "I'm feeling stressed",
+        "conversation_history": history,
+    },
+    config={"configurable": {"thread_id": f"user_{user.id}"}}
+)
+
+print(result["final_response"])  # Synthesized response
+print(result["response_source"])  # "aika_direct" or "agents"
 ```
 
 **LangGraph Components:**
-- **StateGraph**: Workflow orchestration with typed state (`SafetyAgentState`, `IAState`)
-- **Nodes**: Agent operations (e.g., `triage_node`, `generate_plan_node`, `create_case_node`)
-- **Edges**: Conditional routing based on risk level and intent classification
-- **Execution Tracking**: Real-time monitoring via `ExecutionStateTracker` with database persistence
+- **StateGraph**: Typed state (`AikaOrchestratorState`, `SafetyAgentState`, `IAState`)
+- **Nodes**: `aika_decision_node`, `triage_node`, `generate_plan_node`, etc.
+- **Edges**: Conditional routing on `needs_agents`, risk level, intent
+- **Checkpointing**: Native conversation memory (MemorySaver, AsyncSqliteSaver)
+- **Execution Tracking**: Real-time monitoring via `ExecutionStateTracker`
 
-Refer to `PROJECT_SINGLE_SOURCE_OF_TRUTH.md` and `docs/langgraph-phase5-complete.md` for detailed architecture.
+Refer to `AIKA_META_AGENT_ARCHITECTURE.md`, `PROJECT_SINGLE_SOURCE_OF_TRUTH.md`, and `docs/langgraph-phase5-complete.md`.
 
 ---
 

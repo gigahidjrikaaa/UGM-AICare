@@ -1,23 +1,31 @@
 """Tool definitions and handlers for Aika's function calling capabilities.
 
-REFACTORED: This module now uses shared tools from agents/shared/tools/
+REFACTORED: This module now uses the NEW decorator-based registry system.
 
-Changes:
-- Reduced from 1,824 lines to ~200 lines (89% reduction)
-- All tools now reusable by all agents (STA, SCA, SDA, IA, Aika)
-- Added external context tools for natural conversations
-- Better organization with 8 tool categories
+Changes (Latest):
+- Updated to use @register_tool decorator pattern
+- All tools registered via registry.py
+- Zero redundancy architecture
+- Auto-generated Gemini schemas
 
-Original 1,824-line version backed up as tools.py.backup
+Architecture:
+- agent_tools.py: STA, SCA, SDA, IA, general_query
+- scheduling_tools.py: Appointment booking tools
+- registry.py: Core decorator pattern and tool execution
 """
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 from sqlalchemy.ext.asyncio import AsyncSession
 
-# Import shared tool registry
-from app.agents.shared.tools import tool_registry
+# Import NEW registry functions (decorator pattern)
+from app.agents.shared.tools import (
+    generate_gemini_tools,
+    execute_tool,
+    get_all_tools,
+    get_tools_by_category
+)
 
 logger = logging.getLogger(__name__)
 
@@ -25,27 +33,24 @@ logger = logging.getLogger(__name__)
 def get_aika_tools() -> List[Dict[str, Any]]:
     """Return list of tools available to Aika.
     
+    This function is used by legacy code that expects a list of tool schemas.
+    For new code, use generate_gemini_tools() directly from the registry.
+    
     Returns:
         List[Dict]: Tool schemas for Gemini function calling
     """
     try:
-        # Define which tool categories Aika can use
-        aika_categories = [
-            "user_context",
-            "progress_tracking",
-            "conversation",
-            "safety",
-            "intervention",
-            "external_context",
-            "analytics"
-        ]
+        # Use NEW registry to get all tools
+        # The registry contains:
+        # - agent tools (STA, SCA, SDA, IA, general_query)
+        # - scheduling tools (book_appointment, get_available_counselors, etc.)
+        all_tools_dict = get_all_tools()  # Returns Dict[str, Dict]
+        all_tools = list(all_tools_dict.values())  # Convert to List[Dict]
         
-        # Get schemas from shared registry
-        schemas = tool_registry.get_schemas(categories=aika_categories)
+        logger.info(f"✅ Loaded {len(all_tools)} tools for Aika from registry")
         
-        logger.info(f"Loaded {len(schemas)} tools for Aika from {len(aika_categories)} categories")
-        
-        return schemas
+        # Return list of tool configurations
+        return all_tools
         
     except Exception as e:
         logger.error(f"Error loading Aika tools: {e}")
@@ -58,7 +63,10 @@ async def execute_tool_call(
     db: AsyncSession,
     user_id: str,
 ) -> Dict[str, Any]:
-    """Execute a tool call through the shared tool registry.
+    """Execute a tool call through the NEW unified registry.
+    
+    This function is used by legacy code. For new code, use execute_tool()
+    directly from the registry.
     
     Args:
         tool_name: Name of the tool to execute
@@ -70,23 +78,20 @@ async def execute_tool_call(
         Dict with tool execution result
     """
     try:
-        # Add user_id to args if not present
-        if "user_id" not in args:
-            args["user_id"] = user_id
+        logger.info(f"🔧 Executing tool '{tool_name}' for user {user_id}")
         
-        logger.info(f"Executing tool '{tool_name}' for user {user_id}")
-        
-        # Execute through shared registry
-        result = await tool_registry.execute(
-            name=tool_name,
+        # Execute through NEW registry (decorator pattern)
+        result = await execute_tool(
+            tool_name=tool_name,
+            args=args,
             db=db,
-            **args
+            user_id=int(user_id) if isinstance(user_id, str) else user_id
         )
         
-        if result.get("success"):
-            logger.info(f"Tool '{tool_name}' executed successfully")
+        if result.get("success") or result.get("status") == "completed":
+            logger.info(f"✅ Tool '{tool_name}' executed successfully")
         else:
-            logger.warning(f"Tool '{tool_name}' returned error: {result.get('error')}")
+            logger.warning(f"⚠️ Tool '{tool_name}' returned error: {result.get('error')}")
         
         return result
         

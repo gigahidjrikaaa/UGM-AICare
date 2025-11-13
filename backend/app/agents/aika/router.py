@@ -2,22 +2,23 @@
 Aika Meta-Agent API Router
 
 Provides unified endpoint for the Aika Meta-Agent orchestrator.
-This replaces direct agent calls with LangGraph-orchestrated workflows.
+Uses the NEW unified LangGraph orchestrator with Aika as first decision node.
 
 Endpoint: POST /api/v1/aika
 """
 
 import logging
-from typing import List, Literal, Optional
+from typing import Any, Dict, List, Literal, Optional
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, status
 from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
+from langgraph.checkpoint.memory import MemorySaver
 
 from app.database import get_async_db
 from app.core.auth import get_current_user
 from app.models.user import User
-from .orchestrator import AikaOrchestrator
+from app.agents.aika_orchestrator_graph import create_aika_agent_with_checkpointing
 
 logger = logging.getLogger(__name__)
 
@@ -69,6 +70,7 @@ class AikaResponse(BaseModel):
     success: bool
     response: str
     metadata: AikaMetadata
+    intervention_plan: Optional[Dict[str, Any]] = None
     error: Optional[str] = None
 
 
@@ -139,64 +141,93 @@ async def process_aika_message(
                 detail="You can only send messages as yourself",
             )
         
-        # Initialize Aika orchestrator
+        # Initialize Aika agent with checkpointing (NEW: Direct LangGraph invocation)
         logger.info(
-            f"Processing Aika request from user {request.user_id} "
-            f"(role={request.role}, message_length={len(request.message)})"
+            f"🤖 Processing Aika request via unified orchestrator: "
+            f"user={request.user_id}, role={request.role}, msg_len={len(request.message)}"
         )
         
-        orchestrator = AikaOrchestrator(db)
+        start_time = datetime.now()
+        
+        # Create Aika agent with in-memory checkpointing
+        memory = MemorySaver()
+        aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=memory)
         
         # Convert conversation history to dict format
         conversation_history = [
             {
                 "role": msg.role,
                 "content": msg.content,
-                "timestamp": msg.timestamp,
             }
             for msg in request.conversation_history
         ]
         
-        # Process through Aika orchestrator
-        result = await orchestrator.process_message(
-            user_id=request.user_id,
-            role=request.role,
-            message=request.message,
-            conversation_history=conversation_history,
+        # Generate session ID
+        session_id = f"sess_{request.user_id}_{int(datetime.now().timestamp())}"
+        
+        # Prepare initial state for LangGraph
+        initial_state = {
+            "user_id": request.user_id,
+            "user_role": request.role,
+            "message": request.message,
+            "conversation_history": conversation_history,
+            "session_id": session_id,
+        }
+        
+        # Invoke Aika agent directly (no wrapper - agentic pattern!)
+        result = await aika_agent.ainvoke(
+            initial_state,
+            config={
+                "configurable": {
+                    "thread_id": f"user_{request.user_id}_session_{session_id}"
+                }
+            }
         )
+        
+        # Calculate processing time
+        processing_time_ms = (datetime.now() - start_time).total_seconds() * 1000
+        
+        # Extract results from LangGraph state
+        final_response = result.get("final_response", "Maaf, terjadi kesalahan.")
+        response_source = result.get("response_source", "unknown")
+        agents_invoked = result.get("agents_invoked", [])
+        execution_path = result.get("execution_path", [])
         
         # Build metadata response
         metadata = AikaMetadata(
-            session_id=result.get("session_id", f"sess_{request.user_id}_{int(datetime.now().timestamp())}"),
+            session_id=session_id,
             user_role=request.role,
             intent=result.get("intent", "general_conversation"),
-            agents_invoked=result.get("agents_invoked", []),
-            actions_taken=result.get("actions_taken", []),
-            processing_time_ms=result.get("processing_time_ms", 0.0),
-            escalation_triggered=result.get("escalation_triggered", False),
-            case_id=result.get("case_id"),
+            agents_invoked=agents_invoked,
+            actions_taken=execution_path,
+            processing_time_ms=processing_time_ms,
+            escalation_triggered=result.get("case_created", False),
+            case_id=str(result.get("case_id")) if result.get("case_id") else None,
         )
         
-        # Add risk assessment if available
-        if "risk_assessment" in result:
-            risk = result["risk_assessment"]
+        # Add risk assessment if STA was invoked
+        if "STA" in agents_invoked and result.get("severity"):
             metadata.risk_assessment = AikaRiskAssessment(
-                risk_level=risk.get("risk_level", "low"),
-                risk_score=risk.get("risk_score", 0.0),
-                confidence=risk.get("confidence", 0.0),
-                risk_factors=risk.get("risk_factors", []),
+                risk_level=result.get("severity", "low"),
+                risk_score=result.get("risk_score", 0.0),
+                confidence=result.get("intent_confidence", 0.0),
+                risk_factors=result.get("risk_factors", []),
             )
         
         logger.info(
-            f"✅ Aika processed message for user {request.user_id}: "
-            f"{len(metadata.agents_invoked)} agents invoked, "
-            f"{metadata.processing_time_ms:.2f}ms"
+            f"✅ Aika unified orchestrator: user={request.user_id}, "
+            f"source={response_source}, agents={agents_invoked}, "
+            f"time={processing_time_ms:.2f}ms"
         )
+        
+        # Extract intervention plan if available (from SCA)
+        intervention_plan = result.get("intervention_plan")
         
         return AikaResponse(
             success=True,
-            response=result["response"],
+            response=final_response,
             metadata=metadata,
+            intervention_plan=intervention_plan,
         )
         
     except HTTPException:

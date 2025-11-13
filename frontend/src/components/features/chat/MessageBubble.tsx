@@ -11,12 +11,16 @@ import { LoadingDots } from '@/components/ui/LoadingDots';
 import { useEffect } from 'react';
 import { useLiveTalkStore } from '@/store/useLiveTalkStore';
 import { InterventionPlan } from './InterventionPlan';
+import { AppointmentCard } from './AppointmentCard';
+import { AgentActivityLog } from './AgentActivityLog';
 
 interface MessageBubbleProps {
   message: Message;
+  onCancelAppointment?: (appointmentId: number, reason: string) => Promise<void>;
+  onRescheduleAppointment?: (appointmentId: number, newDateTime: string) => Promise<void>;
 }
 
-export function MessageBubble({ message }: MessageBubbleProps) {
+export function MessageBubble({ message, onCancelAppointment, onRescheduleAppointment }: MessageBubbleProps) {
   const messageSoundsEnabled = useLiveTalkStore((state) => state.messageSoundsEnabled);
 
   useEffect(() => {
@@ -129,6 +133,24 @@ export function MessageBubble({ message }: MessageBubbleProps) {
         {!isUser && message.interventionPlan && !message.isLoading && (
           <div className="max-w-xs md:max-w-md lg:max-w-lg mt-2">
             <InterventionPlan plan={message.interventionPlan} />
+          </div>
+        )}
+        
+        {/* Appointment Card Display */}
+        {!isUser && message.appointment && !message.isLoading && (
+          <div className="max-w-xs md:max-w-md lg:max-w-lg mt-2">
+            <AppointmentCard 
+              appointment={message.appointment}
+              onCancel={onCancelAppointment}
+              onReschedule={onRescheduleAppointment}
+            />
+          </div>
+        )}
+        
+        {/* Agent Activity Log Display */}
+        {!isUser && message.agentActivity && !message.isLoading && (
+          <div className="max-w-xs md:max-w-md lg:max-w-lg mt-2">
+            <AgentActivityLog agentActivity={message.agentActivity} />
           </div>
         )}
         

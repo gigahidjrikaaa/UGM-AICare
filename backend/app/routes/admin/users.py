@@ -9,6 +9,7 @@ from typing import List, Optional
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import noload
 
 from app.database import get_async_db
 from app.dependencies import get_admin_user
@@ -85,6 +86,7 @@ async def get_users(
         .outerjoin(Conversation, User.id == Conversation.user_id)
         .outerjoin(UserBadge, User.id == UserBadge.user_id)
         .outerjoin(Appointment, User.id == Appointment.user_id)
+        .options(noload(User.profile), noload(User.preferences), noload(User.clinical_record))
         .group_by(User.id)
     )
 

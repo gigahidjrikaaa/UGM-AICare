@@ -21,8 +21,24 @@ logger = logging.getLogger(__name__)
 # --- Configuration ---
 GOOGLE_API_KEY = os.environ.get("GOOGLE_GENAI_API_KEY")
 
-DEFAULT_GEMINI_MODEL = "gemini-2.0-flash" 
-DEFAULT_GEMMA_LOCAL_MODEL = "gemma-3-12b-it-gguf"
+# Gemini 2.5 models for different use cases
+DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"  # Default for general use (GA - Stable)
+GEMINI_LITE_MODEL = "gemini-2.5-flash-lite-preview-09-2025"  # For high-volume conversational
+GEMINI_FLASH_MODEL = "gemini-2.5-flash"  # For STA and SCA agents
+GEMINI_PRO_MODEL = "gemini-2.5-pro"  # For Insights Agent (advanced reasoning)
+
+# Fallback chain for Gemini models (in order of preference)
+# Based on availability, quota limits, and performance
+GEMINI_FALLBACK_CHAIN = [
+    "gemini-2.5-flash",                          # 1. Primary: Latest stable (GA - Jun 2025)
+    "gemini-2.5-flash-preview-09-2025",          # 2. Preview: Latest preview version
+    "gemini-2.5-flash-lite-preview-09-2025",     # 3. Lite Preview: Lower cost, fast
+    "gemini-2.0-flash",                          # 4. Stable 2.0: Production-ready (Feb 2025)
+    "gemini-2.0-flash-lite",                     # 5. Lite 2.0: Cost-efficient (Feb 2025)
+    # Note: Gemma 3 is for local inference only, not available via Gemini API
+]
+
+DEFAULT_GEMMA_LOCAL_MODEL = "gemma-3-12b-it-gguf"  # Local inference via Ollama/vLLM
 
 # --- Client Singleton ---
 _gemini_client: Optional[genai.Client] = None
@@ -329,7 +345,94 @@ async def generate_gemini_response(
         return f"Error: Invalid configuration or request. {e}"
     except Exception as e:
         logger.error(f"Error calling Gemini API: {e}", exc_info=True)
-        return f"Error: An unexpected error occurred with Gemini API. {e}"
+        # Don't return error message here - let fallback handler decide
+        raise
+
+
+async def generate_gemini_response_with_fallback(
+    history: List[Dict[str, str]],
+    model: str = DEFAULT_GEMINI_MODEL,
+    max_tokens: int = 2048,
+    temperature: float = 0.7,
+    system_prompt: Optional[str] = None,
+    tools: Optional[List[Any]] = None,
+    return_full_response: bool = False,
+) -> str | Any:
+    """Generate Gemini response with automatic fallback to alternative models.
+    
+    This function tries the specified model first, then falls back through
+    GEMINI_FALLBACK_CHAIN if quota/rate limit errors occur.
+    
+    Fallback triggers:
+    - 429 RESOURCE_EXHAUSTED (quota exceeded)
+    - 503 UNAVAILABLE (model overloaded)
+    
+    Args:
+        Same as generate_gemini_response
+        
+    Returns:
+        Generated response or raises exception if all models fail
+    """
+    from google.genai.errors import ClientError, ServerError
+    
+    # Build model list: requested model + fallback chain (deduplicated)
+    models_to_try = [model] + [m for m in GEMINI_FALLBACK_CHAIN if m != model]
+    
+    last_error = None
+    for idx, current_model in enumerate(models_to_try):
+        try:
+            logger.info(f"🔄 Attempting Gemini request with model: {current_model} (attempt {idx + 1}/{len(models_to_try)})")
+            
+            response = await generate_gemini_response(
+                history=history,
+                model=current_model,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                system_prompt=system_prompt,
+                tools=tools,
+                return_full_response=return_full_response
+            )
+            
+            # Success!
+            if idx > 0:
+                logger.warning(f"✅ Fallback successful! Used model: {current_model} (original: {model})")
+            return response
+            
+        except (ClientError, ServerError) as e:
+            error_code = getattr(e, 'status_code', 0)
+            error_msg = str(e)
+            
+            # Check if this is a quota/rate limit error (429) or overload (503)
+            should_fallback = (
+                error_code == 429 or  # RESOURCE_EXHAUSTED
+                error_code == 503 or  # UNAVAILABLE
+                "RESOURCE_EXHAUSTED" in error_msg or
+                "overloaded" in error_msg.lower()
+            )
+            
+            if should_fallback and idx < len(models_to_try) - 1:
+                logger.warning(
+                    f"⚠️ Model {current_model} unavailable (code={error_code}). "
+                    f"Trying fallback model {models_to_try[idx + 1]}..."
+                )
+                last_error = e
+                continue  # Try next model
+            else:
+                # No more fallbacks or non-retriable error
+                logger.error(f"❌ Model {current_model} failed with non-retriable error: {error_msg}")
+                raise
+                
+        except Exception as e:
+            # Unexpected error - don't fallback
+            logger.error(f"❌ Unexpected error with model {current_model}: {e}")
+            raise
+    
+    # All models failed
+    logger.error(f"❌ All fallback models exhausted. Last error: {last_error}")
+    if last_error:
+        raise last_error
+    else:
+        raise Exception("All Gemini models failed with unknown error")
 
 
 
@@ -511,13 +614,12 @@ async def generate_response(
     system_prompt: Optional[str] = None # Pass system prompt through
 ) -> str:
     """
-    Generates a response using the specified LLM provider (async) without fallback.
+    Generates a response using the specified LLM provider with automatic fallback.
 
     Args:
         history: The conversation history (list of {'role': str, 'content': str}).
                  Must end with a 'user' message.
-        provider: The LLM provider ('gemma_local' or 'gemini').
-        model: The specific model name (optional, uses default for provider if None).
+        model: The LLM model ('gemma_local' or 'gemini_google').
         max_tokens: Maximum number of tokens to generate.
         temperature: Controls randomness (0.0-1.0+).
         system_prompt: An optional system prompt.
@@ -540,10 +642,15 @@ async def generate_response(
 
     elif model == "gemini_google":
         gemini_model = DEFAULT_GEMINI_MODEL
-        logger.info(f"Direct request: Using gemini (Model: {gemini_model})")
-        return await generate_gemini_response(
-            history=history, model=gemini_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
-        )
+        logger.info(f"Direct request: Using gemini with fallback chain (Primary: {gemini_model})")
+        try:
+            return await generate_gemini_response_with_fallback(
+                history=history, model=gemini_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
+            )
+        except Exception as e:
+            # If all fallbacks fail, return error message
+            logger.error(f"All Gemini models failed: {e}")
+            return f"Error: All Gemini models are currently unavailable. {str(e)[:200]}"
     
     else:
         # This case should ideally be prevented by Pydantic/FastAPI validation

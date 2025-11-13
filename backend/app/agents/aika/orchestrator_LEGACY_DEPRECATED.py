@@ -1,4 +1,38 @@
 """
+⚠️ DEPRECATED - LEGACY AIKA ORCHESTRATOR ⚠️
+
+This file is DEPRECATED and should NOT be used in new code.
+
+USE INSTEAD:
+  from app.agents.aika_orchestrator_graph import create_aika_agent_with_checkpointing
+
+REASON FOR DEPRECATION:
+  This legacy orchestrator uses service wrappers, which violates AI Agent best practices.
+  The new unified orchestrator (aika_orchestrator_graph.py) follows the agentic pattern:
+  - Direct LangGraph invocation (no wrappers)
+  - Native checkpointing for conversation memory
+  - Aika as first decision node
+  - Cleaner architecture
+
+MIGRATION GUIDE:
+  OLD:
+    aika = AikaOrchestrator(db)
+    result = await aika.process_message(...)
+  
+  NEW:
+    from langgraph.checkpoint.memory import MemorySaver
+    memory = MemorySaver()
+    aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=memory)
+    result = await aika_agent.ainvoke(initial_state, config={...})
+
+This file will be removed in a future version.
+Last used: November 2025
+Replaced by: aika_orchestrator_graph.py (November 2025)
+
+================================================================================
+ORIGINAL FILE HEADER (PRESERVED FOR REFERENCE):
+================================================================================
+
 Aika Meta-Agent Orchestrator
 
 This is the core orchestration logic that routes user requests to the appropriate
@@ -1060,7 +1094,7 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         """
         from google import genai
         from google.genai import types
-        from .tool_definitions import get_gemini_tools
+        from app.agents.shared.tools.registry import generate_gemini_tools
         from .identity import AIKA_SYSTEM_PROMPTS
         import uuid
         
@@ -1079,6 +1113,7 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         escalation_needed = False
         actions_taken = []
         intervention_plan = None
+        appointment = None  # NEW: Track appointment bookings
         errors = []
         
         try:
@@ -1124,28 +1159,42 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
             # Call Gemini with tools
             client = genai.Client(api_key=os.getenv("GOOGLE_GENAI_API_KEY"))
             
+            # Get tools and log them
+            gemini_tools = generate_gemini_tools()
+            tool_names = []
+            for tool in gemini_tools:
+                for func_decl in tool.function_declarations:
+                    tool_names.append(func_decl.name)
+            
+            logger.info(f"🔧 DEBUG: Gemini tools configured: {tool_names}")
+            logger.info(f"🔧 DEBUG: Total tools: {len(tool_names)}")
+            
             self.activity_logger.log_info(
                 "Aika",
-                "📡 Calling Gemini with 5 agent tools",
+                f"📡 Calling Gemini with {len(tool_names)} tools: {', '.join(tool_names)}",
                 {"message_length": len(message)}
             )
             
             response = client.models.generate_content(
-                model="gemini-2.0-flash-exp",
+                model="gemini-2.5-flash-lite",  # Gemini 2.5 Flash Lite for Aika conversational
                 contents=history_contents,
                 config=types.GenerateContentConfig(
                     system_instruction=system_instruction,
                     temperature=0.7,
-                    tools=get_gemini_tools()
+                    tools=gemini_tools
                 )
             )
             
             # Check if Gemini requested tool calls
+            logger.info(f"🔧 DEBUG: Response has candidates: {bool(response.candidates)}")
             if response.candidates and response.candidates[0].content.parts:
                 first_part = response.candidates[0].content.parts[0]
+                logger.info(f"🔧 DEBUG: First part type: {type(first_part)}")
+                logger.info(f"🔧 DEBUG: Has function_call: {hasattr(first_part, 'function_call')}")
                 
                 if hasattr(first_part, 'function_call') and first_part.function_call:
                     # Tool execution path
+                    logger.info(f"🔧 DEBUG: Gemini CALLED TOOL: {first_part.function_call.name}")
                     self.activity_logger.log_info(
                         "Aika",
                         f"🔧 Gemini requested tool: {first_part.function_call.name}",
@@ -1169,10 +1218,13 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
                     escalation_needed = tool_metadata.get("escalation_needed", False)
                     actions_taken = tool_metadata.get("actions_taken", [])
                     intervention_plan = tool_metadata.get("intervention_plan")
+                    appointment = tool_metadata.get("appointment")  # NEW: Extract appointment
                     errors = tool_metadata.get("errors", [])
                     
                 else:
                     # Direct conversational response (no tools needed)
+                    logger.info("🔧 DEBUG: Gemini gave DIRECT RESPONSE (no tool call)")
+                    logger.info(f"🔧 DEBUG: Response text length: {len(response.text) if hasattr(response, 'text') else 0}")
                     final_response = response.text
                     self.activity_logger.log_info(
                         "Aika",
@@ -1208,6 +1260,7 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
                     "risk_level": risk_level,
                     "escalation_needed": escalation_needed,
                     "actions_taken": actions_taken,
+                    "appointment": appointment,  # NEW: Include appointment in metadata
                 },
                 "errors": errors if errors else None,
                 "activity_logs": self.get_activity_logs(),
@@ -1216,6 +1269,10 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
             # Include intervention plan if created
             if intervention_plan:
                 result["intervention_plan"] = intervention_plan
+            
+            # Include appointment if created
+            if appointment:
+                result["appointment"] = appointment
             
             return result
             
@@ -1273,7 +1330,7 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
             Tuple of (final_response_text, metadata_dict)
         """
         from google.genai import types
-        from .tool_definitions import get_gemini_tools
+        from app.agents.shared.tools.registry import generate_gemini_tools
         import uuid
         
         # Track metadata across tool executions
@@ -1282,6 +1339,7 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         escalation_needed = False
         actions_taken = []
         intervention_plan = None
+        appointment = None  # NEW: Track appointment bookings
         errors = []
         
         # Initialize final_text with fallback
@@ -1339,6 +1397,8 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
                     actions_taken.extend(tool_result["actions_taken"])
                 if "intervention_plan" in tool_result:
                     intervention_plan = tool_result["intervention_plan"]
+                if "appointment" in tool_result:  # NEW: Track appointment data
+                    appointment = tool_result["appointment"]
                 if "error" in tool_result:
                     errors.append(tool_result["error"])
                 
@@ -1360,12 +1420,12 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
                 
                 # Get next response from Gemini (may contain more tool calls or final answer)
                 current_response = client.models.generate_content(
-                    model="gemini-2.0-flash-exp",
+                    model="gemini-2.5-flash-lite",  # Gemini 2.5 Flash Lite for Aika conversational
                     contents=history_contents,
                     config=types.GenerateContentConfig(
                         system_instruction=system_instruction,
                         temperature=0.7,
-                        tools=get_gemini_tools()
+                        tools=generate_gemini_tools()
                     )
                 )
                 
@@ -1392,12 +1452,12 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
                 # Try to get response from Gemini despite tool failure
                 try:
                     current_response = client.models.generate_content(
-                        model="gemini-2.0-flash-exp",
+                        model="gemini-2.5-flash-lite",  # Gemini 2.5 Flash Lite for Aika conversational
                         contents=history_contents,
                         config=types.GenerateContentConfig(
                             system_instruction=system_instruction,
                             temperature=0.7,
-                            tools=get_gemini_tools()
+                            tools=generate_gemini_tools()
                         )
                     )
                 except:
@@ -1419,6 +1479,7 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
             "escalation_needed": escalation_needed,
             "actions_taken": actions_taken,
             "intervention_plan": intervention_plan,
+            "appointment": appointment,  # NEW: Include appointment in metadata
             "errors": errors,
         }
         
@@ -1434,10 +1495,10 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         message: str,
     ) -> Dict:
         """
-        Execute a specific tool by running corresponding LangGraph agent or DB query.
+        Execute a specific tool using the unified tool registry.
         
         Args:
-            tool_name: Name of tool to execute (from tool_definitions.py)
+            tool_name: Name of tool to execute (registered in registry)
             args: Tool arguments from Gemini
             user_id: User ID
             session_id: Session ID for continuity
@@ -1447,402 +1508,46 @@ Return JSON: {{"intent": "...", "confidence": 0.0-1.0, "reasoning": "..."}}
         Returns:
             Dict with tool execution results and metadata
         """
-        import uuid
+        from app.agents.shared.tools.registry import execute_tool
         
-        if tool_name == "run_safety_triage_agent":
-            # Execute STA LangGraph pipeline
-            reason = args.get("reason", "User message indicates potential risk")
-            urgency = args.get("urgency_override", "normal")
-            
-            self.activity_logger.log_info(
-                "STA",
-                f"🚨 Running safety triage: {reason}",
-                {"urgency": urgency}
+        self.activity_logger.log_info(
+            "TOOL",
+            f"🔧 Executing tool: {tool_name}",
+            {"args": args, "user_id": user_id}
+        )
+        
+        try:
+            # Execute tool via unified registry
+            result = await execute_tool(
+                tool_name=tool_name,
+                args=args,
+                db=self.db,
+                user_id=user_id,
+                message=message,
+                session_id=session_id,
+                conversation_id=conversation_id,
+                # Pass agent services for agent tools
+                sta_service=self.sta_service,
+                sca_service=self.sca_service,
+                sda_service=self.sda_service,
+                ia_service=self.ia_service,
+                activity_logger=self.activity_logger
             )
             
-            try:
-                # Run STA graph
-                sta_result = await self.sta_service.execute(
-                    user_id=user_id,
-                    session_id=session_id,
-                    user_hash=str(user_id),
-                    message=message,
-                    conversation_id=None,  # Tool mode doesn't persist to conversation yet
-                )
-                
-                severity = sta_result.get("severity", "unknown")
-                recommended_action = sta_result.get("recommended_action", "")
-                assessment_id = sta_result.get("assessment_id")
-                
-                self.activity_logger.log_info(
-                    "STA",
-                    f"✅ Triage complete: {severity}",
-                    {"assessment_id": assessment_id}
-                )
-                
-                return {
-                    "status": "completed",
-                    "agent": "STA",
-                    "severity": severity,
-                    "risk_level": severity,
-                    "recommended_action": recommended_action,
-                    "assessment_id": assessment_id,
-                    "escalation_needed": severity in ["high", "critical"],
-                    "actions_taken": [f"Risk assessment completed (severity: {severity})"],
-                }
-                
-            except Exception as e:
-                logger.error(f"❌ STA execution failed: {e}", exc_info=True)
-                return {
-                    "status": "failed",
-                    "agent": "STA",
-                    "error": str(e),
-                    "risk_level": "unknown",
-                }
-        
-        elif tool_name == "run_support_coach_agent":
-            # Execute SCA LangGraph pipeline
-            intervention_hint = args.get("intervention_hint", "general")
-            severity_context = args.get("severity_context", "low")
-            
             self.activity_logger.log_info(
-                "SCA",
-                f"💙 Creating intervention plan: {intervention_hint}",
-                {"severity": severity_context}
+                "TOOL",
+                f"✅ Tool execution complete: {tool_name}",
+                {"status": result.get("status", "unknown")}
             )
             
-            try:
-                # Run SCA graph
-                sca_result = await self.sca_service.execute(
-                    user_id=user_id,
-                    session_id=session_id,
-                    user_hash=str(user_id),
-                    message=message,
-                    conversation_id=None,  # Tool mode doesn't persist to conversation yet
-                    severity=severity_context,
-                    intent=intervention_hint,
-                )
-                
-                plan_id = sca_result.get("intervention_plan_id")
-                plan_data = sca_result.get("plan_data", {})
-                
-                self.activity_logger.log_info(
-                    "SCA",
-                    f"✅ Plan created: {plan_id}",
-                    {"total_steps": plan_data.get("total_steps", 0)}
-                )
-                
-                return {
-                    "status": "completed",
-                    "agent": "SCA",
-                    "plan_id": plan_id,
-                    "intervention_plan": plan_data,
-                    "total_steps": plan_data.get("total_steps", 0),
-                    "actions_taken": [f"Intervention plan created (ID: {plan_id})"],
-                }
-                
-            except Exception as e:
-                logger.error(f"❌ SCA execution failed: {e}", exc_info=True)
-                return {
-                    "status": "failed",
-                    "agent": "SCA",
-                    "error": str(e),
-                }
-        
-        elif tool_name == "run_service_desk_agent":
-            # Execute SDA workflow (case creation)
-            service_type = args.get("service_type", "counseling")
-            priority = args.get("priority", "normal")
+            return result
             
-            self.activity_logger.log_info(
-                "SDA",
-                f"📋 Creating service desk case: {service_type}",
-                {"priority": priority}
-            )
-            
-            try:
-                # Run SDA graph
-                sda_result = await self.sda_service.execute(
-                    user_id=user_id,
-                    session_id=session_id,
-                    user_hash=str(user_id),
-                    message=message,
-                    conversation_id=None,  # Tool mode doesn't persist to conversation yet
-                    severity="high" if priority == "high" else "critical",
-                    intent=service_type,
-                )
-                
-                case_id = sda_result.get("case_id")
-                status = sda_result.get("status", "open")
-                
-                self.activity_logger.log_info(
-                    "SDA",
-                    f"✅ Case created: {case_id}",
-                    {"status": status}
-                )
-                
-                return {
-                    "status": "completed",
-                    "agent": "SDA",
-                    "case_id": case_id,
-                    "case_status": status,
-                    "escalation_needed": True,
-                    "actions_taken": [f"Service desk case created (ID: {case_id})"],
-                }
-                
-            except Exception as e:
-                logger.error(f"❌ SDA execution failed: {e}", exc_info=True)
-                return {
-                    "status": "failed",
-                    "agent": "SDA",
-                    "error": str(e),
-                }
-        
-        elif tool_name == "get_user_intervention_plans":
-            # DB query for user's plans
-            active_only = args.get("active_only", False)
-            
-            self.activity_logger.log_info(
-                "Database",
-                f"📊 Fetching intervention plans (active_only={active_only})",
-                {"user_id": user_id}
-            )
-            
-            try:
-                from sqlalchemy import select
-                from app.domains.mental_health.models.interventions import InterventionPlanRecord
-                
-                query = select(InterventionPlanRecord).where(
-                    InterventionPlanRecord.user_id == user_id
-                )
-                
-                if active_only:
-                    query = query.where(InterventionPlanRecord.status == "active")
-                
-                query = query.order_by(InterventionPlanRecord.created_at.desc())
-                
-                result = await self.db.execute(query)
-                plans = result.scalars().all()
-                
-                plans_data = [
-                    {
-                        "id": plan.id,
-                        "title": plan.title,
-                        "status": plan.status,
-                        "total_steps": plan.total_steps,
-                        "completed_steps": plan.completed_steps,
-                        "created_at": plan.created_at.isoformat(),
-                    }
-                    for plan in plans
-                ]
-                
-                self.activity_logger.log_info(
-                    "Database",
-                    f"✅ Found {len(plans_data)} plans",
-                    {"active_only": active_only}
-                )
-                
-                return {
-                    "status": "completed",
-                    "plans": plans_data,
-                    "count": len(plans_data),
-                }
-                
-            except Exception as e:
-                logger.error(f"❌ Failed to fetch plans: {e}", exc_info=True)
-                return {
-                    "status": "failed",
-                    "error": str(e),
-                    "plans": [],
-                }
-        
-        elif tool_name == "get_mental_health_resources":
-            # Fetch resources (from DB or hardcoded)
-            category = args.get("category", "all")
-            topic = args.get("topic")
-            
-            self.activity_logger.log_info(
-                "Resources",
-                f"📚 Fetching mental health resources: {category}",
-                {"topic": topic}
-            )
-            
-            try:
-                # TODO: Replace with actual DB query when resources table exists
-                # For now, return hardcoded resources
-                resources = {
-                    "crisis": [
-                        {
-                            "title": "Crisis Centre UGM",
-                            "type": "hotline",
-                            "contact": "0274-544571 atau 0851-0111-0800",
-                            "available": "24/7",
-                        },
-                        {
-                            "title": "Grhatama Pustaka (GMC)",
-                            "type": "in_person",
-                            "location": "Gedung Grhatama Pustaka UGM, Lantai 2",
-                            "hours": "Senin-Jumat 08:00-15:00",
-                        },
-                    ],
-                    "coping": [
-                        {
-                            "title": "Teknik Pernapasan 4-7-8",
-                            "description": "Tarik napas 4 detik, tahan 7 detik, hembuskan 8 detik",
-                            "type": "breathing",
-                        },
-                        {
-                            "title": "Grounding 5-4-3-2-1",
-                            "description": "Sebutkan 5 hal yang kamu lihat, 4 yang kamu dengar, 3 yang kamu sentuh, 2 yang kamu cium, 1 yang kamu rasakan",
-                            "type": "grounding",
-                        },
-                    ],
-                    "educational": [
-                        {
-                            "title": "Mengenal Kecemasan",
-                            "url": "https://ugm.ac.id/kesehatan-mental",
-                            "type": "article",
-                        },
-                    ],
-                }
-                
-                if category == "all":
-                    result_resources = []
-                    for cat_resources in resources.values():
-                        result_resources.extend(cat_resources)
-                else:
-                    result_resources = resources.get(category, [])
-                
-                # Filter by topic if provided
-                if topic:
-                    result_resources = [
-                        r for r in result_resources
-                        if topic.lower() in r.get("title", "").lower()
-                        or topic.lower() in r.get("description", "").lower()
-                    ]
-                
-                self.activity_logger.log_info(
-                    "Resources",
-                    f"✅ Found {len(result_resources)} resources",
-                    {"category": category, "topic": topic}
-                )
-                
-                return {
-                    "status": "completed",
-                    "resources": result_resources,
-                    "count": len(result_resources),
-                }
-                
-            except Exception as e:
-                logger.error(f"❌ Failed to fetch resources: {e}", exc_info=True)
-                return {
-                    "status": "failed",
-                    "error": str(e),
-                }
-        
-        elif tool_name == "get_user_profile":
-            # Fetch user information from database
-            self.activity_logger.log_info(
-                "Database",
-                f"📊 Fetching profile for user {user_id}",
-                {"user_id": user_id}
-            )
-            
-            try:
-                from app.models import User
-                from sqlalchemy import select
-                
-                query = select(User).where(User.id == user_id)
-                result = await self.db.execute(query)
-                user = result.scalar_one_or_none()
-                
-                if user:
-                    self.activity_logger.log_info(
-                        "Database",
-                        f"✅ Profile retrieved: {user.full_name}",
-                        {"email": user.email}
-                    )
-                    
-                    return {
-                        "status": "completed",
-                        "user_id": user.id,
-                        "name": user.full_name or "Pengguna",
-                        "email": user.email,
-                        "role": user.role,
-                        "registered_date": user.created_at.isoformat() if user.created_at else None,
-                        "is_active": user.is_active,
-                    }
-                else:
-                    return {
-                        "status": "not_found",
-                        "error": "User profile not found",
-                    }
-            
-            except Exception as e:
-                logger.error(f"❌ Failed to fetch user profile: {e}", exc_info=True)
-                return {
-                    "status": "failed",
-                    "error": str(e),
-                }
-        
-        elif tool_name == "create_intervention_plan":
-            # Create CBT intervention plan directly
-            plan_title = args.get("plan_title", "Rencana Dukungan Mental")
-            concern_type = args.get("concern_type", "general")
-            severity = args.get("severity", "moderate")
-            
-            self.activity_logger.log_info(
-                "SCA",
-                f"💙 Creating intervention plan: {plan_title}",
-                {"concern": concern_type, "severity": severity}
-            )
-            
-            try:
-                # Call SCA service to generate structured plan
-                sca_result = await self.sca_service.execute(
-                    user_id=user_id,
-                    session_id=session_id,
-                    user_hash=str(user_id),
-                    message=f"User needs help with {concern_type}: {plan_title}",
-                    conversation_id=None,
-                    severity=severity,
-                    intent=concern_type,
-                )
-                
-                plan_id = sca_result.get("intervention_plan_id")
-                plan_data = sca_result.get("plan_data", {})
-                
-                self.activity_logger.log_info(
-                    "SCA",
-                    f"✅ Plan created: {plan_id}",
-                    {"total_steps": plan_data.get("total_steps", 0)}
-                )
-                
-                return {
-                    "status": "completed",
-                    "agent": "SCA",
-                    "plan_id": plan_id,
-                    "plan_title": plan_title,
-                    "intervention_plan": plan_data,
-                    "total_steps": plan_data.get("total_steps", 0),
-                    "actions_taken": [f"Created intervention plan: {plan_title} (ID: {plan_id})"],
-                }
-            
-            except Exception as e:
-                logger.error(f"❌ Failed to create intervention plan: {e}", exc_info=True)
-                return {
-                    "status": "failed",
-                    "agent": "SCA",
-                    "error": str(e),
-                    "resources": [],
-                }
-        
-        else:
-            # Unknown tool
-            logger.error(f"❌ Unknown tool requested: {tool_name}")
+        except Exception as e:
+            logger.error(f"❌ Tool execution failed: {tool_name} - {e}", exc_info=True)
             return {
                 "status": "failed",
-                "error": f"Unknown tool: {tool_name}",
+                "error": str(e),
+                "tool_name": tool_name
             }
     
     async def _get_conversation_history(self, session_id: str) -> List[Dict[str, str]]:

@@ -3,7 +3,7 @@ import { useState, useCallback, Dispatch, SetStateAction, useRef } from 'react';
 import { useSession } from 'next-auth/react';
 import { toast } from 'react-hot-toast';
 import apiClient from '@/services/api';
-import type { ChatRequestPayload, ChatResponsePayload, ChatEventPayload, ApiMessage, Message } from '@/types/chat';
+import type { ChatRequestPayload, ChatResponsePayload, ChatEventPayload, ApiMessage, Message, Appointment, InterventionPlan } from '@/types/chat';
 import { v4 as uuidv4 } from 'uuid';
 
 export const DEFAULT_SYSTEM_PROMPT = `
@@ -53,7 +53,15 @@ interface ProcessApiCallParams {
 export function useChatApi(
   currentSessionId: string, 
   currentMode: string, 
-  addAssistantChunksSequentially: (responseContent: string, initialLoaderId: string, messageSessionId: string, messageConversationId: string) => Promise<void>, 
+  addAssistantChunksSequentially: (
+    responseContent: string, 
+    initialLoaderId: string, 
+    messageSessionId: string, 
+    messageConversationId: string,
+    appointment?: Appointment | null,
+    interventionPlan?: InterventionPlan | null,
+    agentActivity?: Message['agentActivity']
+  ) => Promise<void>, 
   setMessages: Dispatch<SetStateAction<Message[]>>
 ) {
   const { data: session } = useSession();
@@ -110,11 +118,33 @@ export function useChatApi(
     try {
   const data: ChatResponsePayload = await apiClient.post<ChatResponsePayload>('/chat', fullPayload, { signal: controller.signal }).then(res => res.data);
 
+      // Extract appointment if present in response
+      const appointment = data.appointment || null;
+      const interventionPlan = data.intervention_plan || null;
+      
+      // Extract agent activity metadata if present
+      const agentActivity = data.metadata ? {
+        execution_path: data.metadata.execution_path || [],
+        agents_invoked: data.metadata.agents_invoked || [],
+        intent: data.metadata.intent || 'unknown',
+        intent_confidence: data.metadata.intent_confidence || 0.0,
+        needs_agents: data.metadata.needs_agents || false,
+        agent_reasoning: data.metadata.agent_reasoning || '',
+        response_source: data.metadata.response_source || 'unknown',
+        processing_time_ms: data.metadata.processing_time_ms || 0,
+        ...(data.metadata.risk_level ? { risk_level: data.metadata.risk_level } : {}),
+        ...(data.metadata.risk_score !== undefined ? { risk_score: data.metadata.risk_score } : {}),
+      } : undefined;
+
+      // Add assistant message with appointment data
       await addAssistantChunksSequentially(
         data.response,
         initialLoaderId,
         currentSessionId,
-        conversationIdToUse
+        conversationIdToUse,
+        appointment,
+        interventionPlan,
+        agentActivity
       );
 
       if (data.module_completed_id && data.module_completed_id === currentMode.replace('module:', '')) {

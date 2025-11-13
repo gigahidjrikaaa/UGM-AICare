@@ -19,10 +19,12 @@ from fastapi import (
 )
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from langgraph.checkpoint.memory import MemorySaver
 
 from app import auth_utils
 from app.agents.aika.tools import get_aika_tools
-from app.agents.aika import AikaOrchestrator  # ✨ New: Meta-Agent Orchestrator
+# ✅ REMOVED: Legacy AikaOrchestrator - Now using unified orchestrator only
+from app.agents.aika_orchestrator_graph import create_aika_agent_with_checkpointing  # ✨ Direct LangGraph invocation
 from app.core import llm
 from app.core.rate_limiter import check_rate_limit_dependency, get_rate_limiter
 from app.database import get_async_db
@@ -106,24 +108,54 @@ async def process_chat_message(
                         "content": item.content,
                     })
         
-        # Initialize Aika orchestrator
-        aika = AikaOrchestrator(db=db)
+        # ============================================================================
+        # ✨ NEW ARCHITECTURE: Direct LangGraph Invocation (Nov 2025)
+        # ============================================================================
+        # Uses unified Aika orchestrator with LangGraph checkpointing
+        # Benefits:
+        # - Aika as first decision node (agents only when needed)
+        # - Built-in conversation memory via checkpointing
+        # - Deterministic routing with LangGraph
+        # - Better execution tracking and debugging
+        # ============================================================================
         
-        # Set activity callback for real-time streaming if provided (WebSocket)
-        if activity_callback:
-            aika.set_activity_callback(activity_callback)
-        
-        # Process through NEW tool-calling workflow (Oct 2025 optimization)
         logger.info(
-            f"Processing message via Tool-Calling Architecture for user {current_user.id}"
+            f"🤖 Invoking Aika Agent (LangGraph) for user {current_user.id}, role={user_role}"
         )
         
-        result = await aika.process_message_with_tools(
-            user_id=current_user.id,
-            user_role=user_role,
-            message=request.message,
-            session_id=session_id,
-            conversation_history=conversation_history,
+        # Create Aika agent with in-memory checkpointing
+        # For production, consider AsyncSqliteSaver for persistence
+        memory = MemorySaver()
+        aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=memory)
+        
+        # Prepare initial state for LangGraph
+        initial_state = {
+            "user_id": current_user.id,
+            "user_role": user_role,
+            "message": request.message,
+            "conversation_history": conversation_history,
+            "session_id": session_id,
+        }
+        
+        # Invoke Aika agent directly (no wrapper needed - the graph IS the agent)
+        result = await aika_agent.ainvoke(
+            initial_state,
+            config={
+                "configurable": {
+                    "thread_id": f"user_{current_user.id}_session_{session_id}"
+                }
+            }
+        )
+        
+        # Extract final response from LangGraph state
+        final_response = result.get("final_response", "Maaf, terjadi kesalahan.")
+        response_source = result.get("response_source", "unknown")
+        agents_invoked = result.get("agents_invoked", [])
+        
+        logger.info(
+            f"✅ Aika response: source={response_source}, "
+            f"agents={agents_invoked}, "
+            f"execution_path={result.get('execution_path', [])}"
         )
         
         # Convert Aika response to legacy format
@@ -131,7 +163,7 @@ async def process_chat_message(
         # For simplicity, we'll return history as dicts instead of schema objects
         updated_history = conversation_history + [
             {"role": "user", "content": request.message},
-            {"role": "assistant", "content": result["response"]},
+            {"role": "assistant", "content": final_response},
         ]
         
         # Convert to schema objects with required fields
@@ -148,12 +180,12 @@ async def process_chat_message(
             )
         
         return ChatProcessingResult(
-            response_text=result["response"],
+            response_text=final_response,
             provider_used="aika-langgraph",
-            model_used="gemini_google",  # ✅ Fixed: Valid model name
+            model_used="gemini-2.0-flash-exp",
             final_history=history_items,
             module_completed_id=None,
-            intervention_plan=result.get("metadata", {}).get("intervention_plan"),
+            intervention_plan=result.get("intervention_plan"),
         )
         
     except Exception as e:
@@ -254,7 +286,8 @@ async def _streaming_llm_responder(
 
     requested_model = request.model or "gemini_google"
     if requested_model == "gemini_google":
-        model_name = getattr(llm, "DEFAULT_GEMINI_MODEL", "gemini-2.0-flash")
+        # Use Gemini 2.5 Flash Lite for conversational (or use GEMINI_LITE_MODEL from llm.py)
+        model_name = getattr(llm, "GEMINI_LITE_MODEL", "gemini-2.5-flash-lite")
     else:
         model_name = requested_model
     full_text = ""
@@ -371,36 +404,86 @@ async def handle_aika_request(
                 detail="user_id in request must match authenticated user"
             )
         
-        # Initialize Aika orchestrator
-        aika = AikaOrchestrator(db=db)
-        
-        # Process message through NEW tool-calling orchestration (Oct 2025)
+        # ✅ NEW: Use unified Aika orchestrator with direct LangGraph invocation
         logger.info(
-            f"✨ Aika (tool-calling) processing request from {request.role} user {current_user.id}: "
-            f"{request.message[:50]}..."
+            f"🤖 Processing Aika request via unified orchestrator: "
+            f"user={request.user_id}, role={request.role}, msg_len={len(request.message)}"
         )
         
-        result = await aika.process_message_with_tools(
-            user_id=request.user_id,
-            user_role=request.role,
-            message=request.message,
-            session_id=request.session_id,
-            conversation_history=request.conversation_history,
+        start_time = datetime.now()
+        
+        # Create Aika agent with in-memory checkpointing
+        memory = MemorySaver()
+        aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=memory)
+        
+        # conversation_history is already a List[Dict[str, str]] from the request schema
+        # No conversion needed!
+        
+        # Generate user hash for privacy (STA requires this)
+        import hashlib
+        user_hash = hashlib.sha256(f"user_{request.user_id}".encode()).hexdigest()[:16]
+        
+        # Prepare initial state for LangGraph
+        initial_state = {
+            "user_id": request.user_id,
+            "user_role": request.role,
+            "user_hash": user_hash,  # Required by STA for privacy
+            "message": request.message,
+            "conversation_history": request.conversation_history,  # Already in correct format
+            "session_id": request.session_id or f"sess_{request.user_id}_{int(datetime.now().timestamp())}",
+            # Initialize tracking lists
+            "execution_path": [],
+            "agents_invoked": [],
+            "errors": [],
+        }
+        
+        # Invoke Aika agent directly (agentic pattern - no wrapper!)
+        result = await aika_agent.ainvoke(
+            initial_state,
+            config={
+                "configurable": {
+                    "thread_id": f"user_{request.user_id}_session_{request.session_id or 'default'}"
+                }
+            }
         )
         
-        # Safe logging with metadata check
-        if "metadata" in result:
-            logger.info(
-                f"✅ Aika completed: agents={result['metadata']['agents_invoked']}, "
-                f"time={result['metadata']['processing_time_ms']:.2f}ms"
-            )
-        else:
-            logger.warning(f"⚠️ Aika returned without metadata (error occurred)")
+        # Calculate processing time
+        processing_time_ms = (datetime.now() - start_time).total_seconds() * 1000
+        
+        # Extract results from LangGraph state
+        final_response = result.get("final_response", "Maaf, terjadi kesalahan.")
+        response_source = result.get("response_source", "unknown")
+        agents_invoked = result.get("agents_invoked", [])
+        
+        # Log completion
+        logger.info(
+            f"✅ Aika unified orchestrator: user={request.user_id}, "
+            f"source={response_source}, agents={agents_invoked}, time={processing_time_ms:.2f}ms"
+        )
+        
+        # Build response metadata
+        metadata = {
+            "session_id": result.get("session_id", request.session_id),
+            "agents_invoked": agents_invoked,
+            "response_source": response_source,
+            "processing_time_ms": processing_time_ms,
+            # Agent Activity Log data
+            "execution_path": result.get("execution_path", []),
+            "agent_reasoning": result.get("agent_reasoning", ""),
+            "intent": result.get("intent", "unknown"),
+            "intent_confidence": result.get("intent_confidence", 0.0),
+            "needs_agents": result.get("needs_agents", False),
+        }
+        
+        # Add risk assessment if available (from STA)
+        if result.get("sta_risk_assessment"):
+            metadata["risk_level"] = result["sta_risk_assessment"].get("risk_level", "unknown")
+            metadata["risk_score"] = result["sta_risk_assessment"].get("risk_score", 0.0)
         
         return AikaResponse(
-            success=result.get("success", False),
-            response=result.get("response", ""),
-            metadata=result.get("metadata", {}),
+            success=True,
+            response=final_response,
+            metadata=metadata,
         )
         
     except HTTPException:

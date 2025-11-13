@@ -332,7 +332,7 @@ Return as JSON:
         try:
             response_text = await generate_response(
                 history=[{"role": "user", "content": prompt}],
-                model="gemini_google",
+                model="gemini_google",  # Uses GEMINI_FLASH_MODEL (gemini-2.5-flash) for STA
                 temperature=0.3,
             )
             

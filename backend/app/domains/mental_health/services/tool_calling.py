@@ -71,7 +71,8 @@ async def generate_with_tools(
     """
     model_name = request.model or "gemini_google"
     if model_name == "gemini_google":
-        model_name = getattr(llm, "DEFAULT_GEMINI_MODEL", "gemini-2.0-flash")
+        # Use Gemini 2.5 Flash as default (or use GEMINI_FLASH_MODEL from llm.py)
+        model_name = getattr(llm, "GEMINI_FLASH_MODEL", "gemini-2.5-flash")
     
     conversation_history = list(history)
     iterations = 0

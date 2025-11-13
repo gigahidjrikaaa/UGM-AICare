@@ -19,6 +19,29 @@ export interface InterventionPlan {
   intervention_reason?: string;
 }
 
+export interface Appointment {
+  id: number;
+  student_id: number;
+  psychologist_id: number;
+  appointment_datetime: string; // ISO datetime string
+  appointment_type_id: number;
+  status: 'scheduled' | 'completed' | 'cancelled' | 'no_show';
+  notes?: string;
+  cancellation_reason?: string;
+  psychologist?: {
+    id: number;
+    full_name: string;
+    specialization?: string[];
+    languages?: string[];
+  };
+  appointment_type?: {
+    id: number;
+    name: string;
+    description?: string;
+  };
+  location?: string;
+}
+
 export interface Message {
   id: string;
   conversation_id: string;
@@ -36,7 +59,21 @@ export interface Message {
   metadata?: Record<string, unknown>; // To store things like module_id for event messages
   timestamp: Date;
   interventionPlan?: InterventionPlan; // SCA-generated support plan
+  appointment?: Appointment; // Scheduling confirmation
   isError?: boolean; // For error messages
+  agentActivity?: {
+    // Agent Activity Log for transparency
+    execution_path: string[]; // ["aika_decision", "sta_subgraph", "sca_subgraph", "synthesize_response"]
+    agents_invoked: string[]; // ["STA", "SCA"]
+    intent: string; // "emotional_support", "crisis_detection", etc.
+    intent_confidence: number; // 0.0 - 1.0
+    needs_agents: boolean;
+    agent_reasoning: string; // Why Aika made this decision
+    response_source: string; // "aika_direct", "agent_synthesis"
+    processing_time_ms: number;
+    risk_level?: string; // If STA was invoked
+    risk_score?: number; // If STA was invoked
+  };
   aikaMetadata?: {
     // Aika Meta-Agent metadata
     session_id: string;
@@ -104,4 +141,19 @@ export interface ChatResponsePayload {
     module_state?: { module: string; step: number }; // Example if backend sends state
     suggestions?: ChatModule[]; // Example if backend sends suggestions
     module_completed_id?: string;
+    intervention_plan?: InterventionPlan; // NEW: Intervention plan from SCA
+    appointment?: Appointment; // NEW: Appointment booking from scheduling tools
+    metadata?: {
+      // Agent Activity metadata from unified orchestrator
+      execution_path?: string[];
+      agents_invoked?: string[];
+      intent?: string;
+      intent_confidence?: number;
+      needs_agents?: boolean;
+      agent_reasoning?: string;
+      response_source?: string;
+      processing_time_ms?: number;
+      risk_level?: string;
+      risk_score?: number;
+    };
   }

@@ -52,6 +52,18 @@ export default function ChatInterface({
     cancelCurrent();
   }, [cancelCurrent]);
 
+  // NEW: Appointment cancel handler - sends conversational message to Aika
+  const handleCancelAppointment = useCallback(async (appointmentId: number, reason: string) => {
+    const cancelMessage = `Aku mau batalin appointment #${appointmentId}. Alasannya: ${reason}`;
+    await handleSendMessage(cancelMessage);
+  }, [handleSendMessage]);
+
+  // NEW: Appointment reschedule handler - sends conversational message to Aika
+  const handleRescheduleAppointment = useCallback(async (appointmentId: number, newDatetime: string) => {
+    const rescheduleMessage = `Aku mau reschedule appointment #${appointmentId} ke waktu ${newDatetime}`;
+    await handleSendMessage(rescheduleMessage);
+  }, [handleSendMessage]);
+
   useEffect(() => {
     if (typeof window === 'undefined') {
       return;
@@ -154,6 +166,8 @@ export default function ChatInterface({
         <ChatWindow
           messages={messages}
           chatContainerRef={chatContainerRef}
+          onCancelAppointment={handleCancelAppointment}
+          onRescheduleAppointment={handleRescheduleAppointment}
         />
 
         <div ref={liveRegionRef} aria-live="polite" aria-atomic="true" className="sr-only" />
