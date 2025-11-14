@@ -207,6 +207,7 @@ class IAState(TypedDict, total=False):
     - Allow-listed queries only
     - Consent validation
     - Differential privacy budget tracking
+    - LLM only receives k-anonymized aggregated data
     """
     
     # Query parameters
@@ -238,9 +239,28 @@ class IAState(TypedDict, total=False):
     query_completed: bool
     """Whether analytics query completed successfully."""
     
-    # Results
+    # Phase 1: Raw analytics results
     analytics_result: Dict[str, Any]
     """Analytics query results (chart, table, notes)."""
+    
+    # Phase 2: LLM-generated insights
+    interpretation: str
+    """Natural language interpretation of analytics results."""
+    
+    trends: List[Dict[str, Any]]
+    """Identified patterns and trends in the data."""
+    
+    summary: str
+    """Executive summary of key findings."""
+    
+    recommendations: List[Dict[str, Any]]
+    """Actionable recommendations for administrators."""
+    
+    interpretation_completed: bool
+    """Whether LLM interpretation completed successfully."""
+    
+    pdf_url: Optional[str]
+    """URL to downloadable PDF report (if generated)."""
     
     # Execution tracking
     execution_id: str

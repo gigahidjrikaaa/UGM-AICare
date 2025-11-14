@@ -635,7 +635,10 @@ class IAGraphRequest(BaseModel):
 
 
 class IAGraphResponse(BaseModel):
-    """Response from IA graph execution."""
+    """Response from IA graph execution.
+    
+    Includes both raw analytics data (Phase 1) and LLM-generated insights (Phase 2).
+    """
     
     success: bool = Field(..., description="Whether execution succeeded without errors")
     execution_id: str = Field(..., description="Unique execution tracking ID")
@@ -646,8 +649,19 @@ class IAGraphResponse(BaseModel):
     privacy_enforced: bool = Field(..., description="Whether privacy safeguards were applied")
     query_completed: bool = Field(..., description="Whether analytics query completed")
     
-    # Use 'result' to match frontend expectations (renamed from 'analytics_result')
+    # Phase 1: Raw analytics data
     result: Dict[str, Any] | None = Field(None, description="Analytics query results with privacy metadata")
+    
+    # Phase 2: LLM-generated insights (NEW)
+    interpretation: str | None = Field(None, description="Natural language interpretation of results")
+    trends: List[Dict[str, Any]] | None = Field(None, description="Identified patterns and trends")
+    summary: str | None = Field(None, description="Executive summary of key findings")
+    recommendations: List[Dict[str, Any]] | None = Field(None, description="Actionable recommendations for admins")
+    pdf_url: str | None = Field(None, description="URL to downloadable PDF report")
+    
+    privacy_metadata: Dict[str, Any] = Field(default_factory=dict, description="Privacy enforcement metadata")
+    errors: List[str] = Field(default_factory=list, description="Errors encountered during execution")
+    execution_time_ms: float | None = Field(None, description="Total execution time in milliseconds")
     privacy_metadata: Dict[str, Any] = Field(
         default_factory=lambda: {"k_value": 5, "epsilon_used": 0.0, "delta_used": 0.0},
         description="Privacy safeguard metadata"
@@ -738,12 +752,17 @@ async def execute_ia_graph(
             privacy_enforced=result.get("privacy_enforced", False),
             query_completed=result.get("query_completed", False),
             result=analytics_result,  # Frontend expects 'result' key
+            # Phase 2: LLM-generated insights
+            interpretation=result.get("interpretation"),
+            trends=result.get("trends"),
+            summary=result.get("summary"),
+            recommendations=result.get("recommendations"),
+            pdf_url=result.get("pdf_url"),
             privacy_metadata={
                 "k_value": 5,  # Our k-anonymity threshold
                 "epsilon_used": analytics_result.get("differential_privacy_budget_used", 0.0) if analytics_result else 0.0,
                 "delta_used": 0.0  # TODO: Implement delta tracking in Phase 3
             },
-            query_name=request.question_id,
             errors=result.get("errors", []),
             execution_time_ms=execution_time_ms
         )
