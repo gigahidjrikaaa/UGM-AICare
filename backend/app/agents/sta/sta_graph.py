@@ -120,27 +120,39 @@ async def assess_risk_node(state: STAState, db: AsyncSession) -> STAState:
         # Get STA service with hybrid classifier
         sta_service = get_safety_triage_service(db)
         
+        # Build meta dict, filtering out None values
+        meta = {}
+        if state.get("user_id") is not None:
+            meta["user_id"] = state["user_id"]
+        if state.get("conversation_id") is not None:
+            meta["conversation_id"] = state["conversation_id"]
+        if state.get("user_hash") is not None:
+            meta["user_hash"] = state["user_hash"]
+        
         # Build classification request
         request = STAClassifyRequest(
             text=state.get("redacted_message") or state["message"],
-            user_hash=state["user_hash"],
             session_id=state["session_id"],
-            meta={
-                "user_id": state.get("user_id"),
-                "conversation_id": state.get("conversation_id")
-            }
+            meta=meta if meta else None
         )
         
         # Classify using existing service (which handles DB persistence)
         response = await sta_service.classify(request)
         
+        # Map risk_level (0-3) to severity (low/medium/high/critical)
+        severity_map = {0: "low", 1: "medium", 2: "high", 3: "critical"}
+        severity = severity_map.get(response.risk_level, "low")
+        
+        # Normalize risk_level to risk_score (0.0-1.0)
+        risk_score = response.risk_level / 3.0 if response.risk_level > 0 else 0.0
+        
         # Update state with STA outputs
         state["risk_level"] = response.risk_level
-        state["risk_score"] = response.risk_score
-        state["severity"] = response.severity
+        state["risk_score"] = risk_score
+        state["severity"] = severity
         state["intent"] = response.intent
         state["next_step"] = response.next_step
-        state["triage_assessment_id"] = response.triage_assessment_id
+        # Note: triage_assessment_id is created by the service in the DB, but not returned
         
         state["execution_path"].append("assess_risk")
         
@@ -150,14 +162,14 @@ async def assess_risk_node(state: STAState, db: AsyncSession) -> STAState:
                 "sta:assess_risk",
                 metrics={
                     "risk_level": response.risk_level,
-                    "risk_score": response.risk_score,
-                    "severity": response.severity
+                    "risk_score": risk_score,
+                    "severity": severity
                 }
             )
         
         logger.info(
-            f"STA assessed risk: {response.severity} (level {response.risk_level}, "
-            f"score {response.risk_score:.2f})"
+            f"STA assessed risk: {severity} (level {response.risk_level}, "
+            f"score {risk_score:.2f})"
         )
         
     except Exception as e:

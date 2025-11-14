@@ -37,9 +37,12 @@ export default function ChatInterface({
     chatContainerRef,
     handleInputChange,
     handleSendMessage,
+    handleSendMessageStreaming,
     handleStartModule,
     setLiveTranscript,
     cancelCurrent,
+    isAikaStreaming,
+    aikaStatus,
   } = useChat({ model });
 
   const liveRegionRef = useRef<HTMLDivElement | null>(null);
@@ -55,14 +58,14 @@ export default function ChatInterface({
   // NEW: Appointment cancel handler - sends conversational message to Aika
   const handleCancelAppointment = useCallback(async (appointmentId: number, reason: string) => {
     const cancelMessage = `Aku mau batalin appointment #${appointmentId}. Alasannya: ${reason}`;
-    await handleSendMessage(cancelMessage);
-  }, [handleSendMessage]);
+    await handleSendMessageStreaming(cancelMessage);
+  }, [handleSendMessageStreaming]);
 
   // NEW: Appointment reschedule handler - sends conversational message to Aika
   const handleRescheduleAppointment = useCallback(async (appointmentId: number, newDatetime: string) => {
     const rescheduleMessage = `Aku mau reschedule appointment #${appointmentId} ke waktu ${newDatetime}`;
-    await handleSendMessage(rescheduleMessage);
-  }, [handleSendMessage]);
+    await handleSendMessageStreaming(rescheduleMessage);
+  }, [handleSendMessageStreaming]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -133,7 +136,7 @@ export default function ChatInterface({
   }, [transcriptSegments]);
 
   useLiveTalk({
-    onTranscriptReceived: handleSendMessage,
+    onTranscriptReceived: handleSendMessageStreaming,
     onPartialTranscript: setLiveTranscript,
     messages,
   });
@@ -224,7 +227,7 @@ export default function ChatInterface({
               toggleLiveTalk={toggleLiveTalk}
               inputValue={inputValue}
               onInputChange={handleInputChange}
-              onSendMessage={handleSendMessage}
+              onSendMessage={handleSendMessageStreaming}
               onStartModule={handleStartModule}
               isLoading={isLoading}
               currentMode={currentMode}

@@ -197,7 +197,11 @@ Return JSON with:
 """
         
         # Call Gemini for decision with fallback support
-        from app.core.llm import generate_gemini_response_with_fallback
+        from app.core.llm import generate_gemini_response_with_fallback, DEFAULT_GEMINI_MODEL
+        
+        # Use user's preferred model or default
+        preferred_model = state.get("preferred_model") or DEFAULT_GEMINI_MODEL
+        logger.info(f"🤖 Aika decision using model: {preferred_model}")
         
         # Convert to history format for fallback function
         decision_history = [
@@ -206,7 +210,7 @@ Return JSON with:
         
         response_text = await generate_gemini_response_with_fallback(
             history=decision_history,
-            model="gemini-2.0-flash-exp",
+            model=preferred_model,  # Use preferred model with fallback chain
             temperature=0.3,
             max_tokens=2048,
             system_prompt=system_instruction
@@ -224,6 +228,9 @@ Return JSON with:
             
             # If agents not needed, store direct response
             if not state["needs_agents"]:
+                # Get preferred model from state
+                preferred_model = state.get("preferred_model")
+                
                 # Generate conversational response with Aika personality
                 aika_response = await generate_response(
                     history=[{
@@ -236,7 +243,8 @@ Return JSON with:
                         {"role": "user", "content": state["message"]}
                     ],
                     model="gemini_google",
-                    temperature=0.7
+                    temperature=0.7,
+                    preferred_gemini_model=preferred_model  # Pass user's preferred model
                 )
                 
                 # Clean up any accidental tool call syntax (shouldn't happen but safety net)
@@ -518,6 +526,9 @@ Create a warm, empathetic response that:
 Keep response natural and conversational in Indonesian (for students) or professional (for admins/counselors).
 """
         
+        # Get preferred model from state
+        preferred_model = state.get("preferred_model")
+        
         # Generate synthesized response
         final_response = await generate_response(
             history=[{
@@ -528,7 +539,8 @@ Keep response natural and conversational in Indonesian (for students) or profess
                 "content": synthesis_prompt
             }],
             model="gemini_google",
-            temperature=0.7
+            temperature=0.7,
+            preferred_gemini_model=preferred_model  # Pass user's preferred model
         )
         
         state["final_response"] = final_response

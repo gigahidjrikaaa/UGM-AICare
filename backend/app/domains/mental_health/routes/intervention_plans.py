@@ -1,5 +1,6 @@
 """API routes for intervention plan records."""
 
+import logging
 from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -7,6 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_async_db
 from app.core.auth import get_current_user
 from app.models.user import User
+
+logger = logging.getLogger(__name__)
 from app.domains.mental_health.schemas.intervention_plans import (
     InterventionPlanRecordCreate,
     InterventionPlanRecordResponse,
@@ -43,6 +46,15 @@ async def get_user_intervention_plans(
     )
     
     total = await InterventionPlanService.get_active_plan_count(db, current_user.id)
+    
+    # DEBUG: Log what we're returning
+    logger.info(f"📋 Intervention Plans API - User: {current_user.id}, Active Only: {active_only}")
+    logger.info(f"📋 Returning {len(plans)} plans (total count: {total})")
+    if plans:
+        for plan in plans:
+            logger.info(f"  - Plan ID {plan.id}: user_id={plan.user_id}, is_active={plan.is_active}, status={plan.status}")
+    else:
+        logger.warning(f"⚠️ No plans found for user {current_user.id} (active_only={active_only})")
     
     return InterventionPlanListResponse(
         plans=plans,

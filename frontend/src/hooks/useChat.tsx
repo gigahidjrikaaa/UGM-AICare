@@ -6,6 +6,7 @@ import { useChatSession } from './useChatSession';
 import { useChatMessages } from './useChatMessages';
 import { useChatApi, DEFAULT_SYSTEM_PROMPT } from './useChatApi';
 import { useChatStream } from './useChatStream';
+import { useAikaStream } from './useAikaStream';
 import type { Message, ChatMode, AvailableModule, ApiMessage, ChatEventPayload, ChatRequestPayload, InterventionPlan } from '@/types/chat';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -40,6 +41,7 @@ const UPDATED_AVAILABLE_MODULES: AvailableModule[] = [
 export function useChat({ model }: { model: string }) {
   const [inputValue, setInputValue] = useState('');
   const [currentMode, setCurrentMode] = useState<ChatMode>('standard');
+  const [useStreaming, setUseStreaming] = useState(true); // Enable streaming by default
   const lastConversationIdRef = useRef<string | null>(null);
   const DRAFT_KEY = 'aika_chat_draft_v1';
 
@@ -63,7 +65,13 @@ export function useChat({ model }: { model: string }) {
     setMessages,
   );
   const { status: streamStatus, isStreaming, startStreaming, cancelStreaming } = useChatStream();
-  const isBusy = isLoading || isStreaming;
+  const {
+    isStreaming: isAikaStreaming,
+    currentStatus: aikaStatus,
+    streamMessage: streamAikaMessage,
+    cancelStream: cancelAikaStream,
+  } = useAikaStream();
+  const isBusy = isLoading || isStreaming || isAikaStreaming;
 
   useEffect(() => {
     if (messages.length === 0 && !isGreetingLoading && initialGreeting) {
@@ -285,6 +293,201 @@ export function useChat({ model }: { model: string }) {
     [isBusy, messages, currentSessionId, processApiCall, setMessages, model],
   );
 
+  // Streaming handler for progressive Aika responses
+  const handleSendMessageStreaming = useCallback(async (message?: string) => {
+    const messageText = (message ?? inputValue).trim();
+    if (!messageText || isAikaStreaming) return;
+
+    // Calculate active conversation ID
+    const activeConversationId =
+      messages.find((m) => m.conversation_id)?.conversation_id || lastConversationIdRef.current || uuidv4();
+    lastConversationIdRef.current = activeConversationId;
+
+    const newInputValue = message === undefined ? '' : inputValue;
+    setInputValue(newInputValue);
+    try {
+      if (newInputValue === '') {
+        localStorage.removeItem(DRAFT_KEY);
+      }
+    } catch {}
+
+    // Create user message
+    const userMessage: Message = {
+      id: uuidv4(),
+      role: 'user',
+      content: messageText,
+      timestamp: new Date(),
+      session_id: currentSessionId,
+      conversation_id: activeConversationId,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, userMessage]);
+
+    // Create assistant placeholder with loading state
+    const assistantMessageId = uuidv4();
+    const assistantMessage: Message = {
+      id: assistantMessageId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      session_id: currentSessionId,
+      conversation_id: activeConversationId,
+      isLoading: true,
+      toolIndicator: 'Memproses permintaan...',
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    };
+
+    setMessages((prev) => [...prev, assistantMessage]);
+
+    // Prepare conversation history
+    const updatedMessages = [...messages, userMessage];
+    const conversationHistory = updatedMessages
+      .filter((msg) => msg.role === 'user' || msg.role === 'assistant')
+      .slice(-10)
+      .map((msg) => ({
+        role: msg.role as 'user' | 'assistant',
+        content: msg.content,
+      }));
+
+    try {
+      // Stream the message with progressive updates
+      await streamAikaMessage(
+        messageText,
+        conversationHistory,
+        currentSessionId,
+        'user',
+        {
+          // Thinking indicator
+          onThinking: (message: string) => {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, toolIndicator: message }
+                  : msg
+              )
+            );
+          },
+
+          // Node status updates
+          onStatus: (node: string, message: string) => {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, toolIndicator: message }
+                  : msg
+              )
+            );
+          },
+
+          // Agent invocation notifications
+          onAgentInvoked: (agent: string, name: string, description?: string) => {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, toolIndicator: `${name} sedang bekerja...` }
+                  : msg
+              )
+            );
+          },
+
+          // Intervention plan received
+          onInterventionPlan: (plan: any) => {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, interventionPlan: plan }
+                  : msg
+              )
+            );
+          },
+
+          // Appointment received
+          onAppointment: (appointment: any) => {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, appointment }
+                  : msg
+              )
+            );
+          },
+
+          // Agent activity metadata
+          onAgentActivity: (activity: any) => {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? { ...msg, agentActivity: activity }
+                  : msg
+              )
+            );
+          },
+
+          // Final complete response
+          onComplete: (response: string, metadata: any) => {
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? {
+                      ...msg,
+                      content: response,
+                      isLoading: false,
+                      toolIndicator: undefined,
+                      agentActivity: metadata.agent_activity || msg.agentActivity,
+                    }
+                  : msg
+              )
+            );
+          },
+
+          // Error handling
+          onError: (error: string) => {
+            console.error('Streaming error:', error);
+            setMessages((prev) =>
+              prev.map((msg) =>
+                msg.id === assistantMessageId
+                  ? {
+                      ...msg,
+                      content: 'Maaf, terjadi kesalahan. Silakan coba lagi.',
+                      isLoading: false,
+                      isError: true,
+                      toolIndicator: undefined,
+                    }
+                  : msg
+              )
+            );
+          },
+        }
+      );
+    } catch (error) {
+      console.error('Streaming error:', error);
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === assistantMessageId
+            ? {
+                ...msg,
+                content: 'Maaf, terjadi kesalahan. Silakan coba lagi.',
+                isLoading: false,
+                isError: true,
+                toolIndicator: undefined,
+              }
+            : msg
+        )
+      );
+    }
+  }, [
+    inputValue,
+    isAikaStreaming,
+    messages,
+    lastConversationIdRef,
+    currentSessionId,
+    streamAikaMessage,
+    setMessages,
+  ]);
+
   const handleInputChange = useCallback((value: string) => {
     setInputValue(value);
     try {
@@ -321,9 +524,13 @@ export function useChat({ model }: { model: string }) {
     chatContainerRef,
     handleInputChange,
     handleSendMessage,
+    handleSendMessageStreaming,
     handleStartModule,
     setLiveTranscript,
     cancelCurrent: handleCancel,
     streamStatus,
+    isAikaStreaming,
+    aikaStatus,
+    cancelAikaStream,
   };
 }

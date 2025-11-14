@@ -583,22 +583,22 @@ async def _select_optimal_psychologist(
                 "has_schedule": bool(p.availability_schedule)
             })
         
-        prompt = f"""You are a mental health appointment coordinator. Select the BEST psychologist for this case.
+        prompt = f"""Kamu adalah koordinator appointment kesehatan mental. Pilih psikolog yang PALING COCOK untuk case ini.
 
-Case Context:
+Konteks Case:
 - Severity: {severity}
-- Student Preferences: {json.dumps(preferences)}
+- Preferensi Mahasiswa: {json.dumps(preferences)}
 
-Available Psychologists:
+Psikolog yang Available:
 {json.dumps(psych_profiles, indent=2)}
 
-Selection Criteria:
-1. For CRITICAL cases: Prioritize experience and high ratings
-2. Match specialization if student has specific concerns
-3. Consider language preferences
-4. Prefer psychologists with defined availability schedules
+Kriteria Pemilihan:
+1. Untuk case CRITICAL: Prioritas experience dan high ratings
+2. Match specialization kalau student punya concern spesifik
+3. Consider preferensi bahasa
+4. Prefer psikolog dengan jadwal availability yang defined
 
-Return ONLY the psychologist ID (integer) of your selection.
+Return HANYA psychologist ID (integer) dari pilihan kamu.
 """
         
         response = client.generate_content(
@@ -702,26 +702,26 @@ async def _find_optimal_appointment_time(
         
         urgency_text = ""
         if severity == "critical":
-            urgency_text = "\n⚠️ CRITICAL CASE: Select the EARLIEST available slot (within next 24-48 hours if possible)."
+            urgency_text = "\n⚠️ CASE CRITICAL: Pilih slot PALING AWAL yang available (dalam 24-48 jam ke depan kalau bisa)."
         elif severity == "high":
-            urgency_text = "\n⚠️ HIGH PRIORITY: Prefer slots within next 3-5 days."
+            urgency_text = "\n⚠️ HIGH PRIORITY: Prefer slots dalam 3-5 hari ke depan."
         
-        prompt = f"""You are scheduling an urgent mental health appointment.
+        prompt = f"""Kamu lagi schedule appointment kesehatan mental yang urgent.
 
 Case Severity: {severity}
 {urgency_text}
-Student Preferences: {preferred_time or 'None specified'}
-Additional Context: {json.dumps(scheduling_context)}
+Preferensi Mahasiswa: {preferred_time or 'Nggak ada yang specified'}
+Konteks Tambahan: {json.dumps(scheduling_context)}
 
-Available Slots:
+Slot yang Available:
 {slots_text}
 
-Select the SINGLE BEST time slot that balances:
-1. Urgency (critical cases need ASAP)
-2. Student preferences (if specified)
-3. Optimal timing (avoid very late evening unless necessary)
+Pilih SATU time slot yang PALING BAIK yang balance:
+1. Urgency (critical cases butuh ASAP)
+2. Preferensi student (kalau ada)
+3. Optimal timing (avoid very late evening kecuali memang perlu)
 
-Return ONLY the datetime string in ISO format (YYYY-MM-DDTHH:MM:SS) from the list above.
+Return HANYA datetime string dalam ISO format (YYYY-MM-DDTHH:MM:SS) dari list di atas.
 """
         
         response = client.generate_content(

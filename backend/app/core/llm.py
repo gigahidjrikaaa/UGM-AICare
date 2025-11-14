@@ -611,7 +611,8 @@ async def generate_response(
     model: Optional[str] = None,
     max_tokens: int = 2048,
     temperature: float = 0.7,
-    system_prompt: Optional[str] = None # Pass system prompt through
+    system_prompt: Optional[str] = None, # Pass system prompt through
+    preferred_gemini_model: Optional[str] = None  # Allow specifying exact Gemini model
 ) -> str:
     """
     Generates a response using the specified LLM provider with automatic fallback.
@@ -623,11 +624,13 @@ async def generate_response(
         max_tokens: Maximum number of tokens to generate.
         temperature: Controls randomness (0.0-1.0+).
         system_prompt: An optional system prompt.
+        preferred_gemini_model: Specific Gemini model to use (e.g., 'gemini-2.5-pro').
+                               Only used when model='gemini_google'.
 
     Returns:
         The generated text response string or an error message.
     """
-    logger.info(f"Generating response using model: {model}")
+    logger.info(f"Generating response using model: {model}, preferred Gemini: {preferred_gemini_model}")
 
     if not history or history[-1].get('role') != 'user':
         logger.error("Invalid history: Must not be empty and end with a 'user' message.")
@@ -641,7 +644,8 @@ async def generate_response(
         )
 
     elif model == "gemini_google":
-        gemini_model = DEFAULT_GEMINI_MODEL
+        # Use preferred model or default
+        gemini_model = preferred_gemini_model or DEFAULT_GEMINI_MODEL
         logger.info(f"Direct request: Using gemini with fallback chain (Primary: {gemini_model})")
         try:
             return await generate_gemini_response_with_fallback(

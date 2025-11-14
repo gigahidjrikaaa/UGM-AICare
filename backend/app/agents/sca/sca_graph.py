@@ -324,6 +324,9 @@ async def persist_plan_node(state: SCAState, db: AsyncSession) -> SCAState:
         db.add(plan)
         await db.flush()
         
+        # DEBUG: Log plan creation details
+        logger.info(f"📋 SCA persisted intervention plan: ID={plan.id}, user_id={plan.user_id}, is_active={plan.is_active}, status={plan.status}")
+        
         state["intervention_plan_id"] = plan.id
         state["execution_path"].append("persist_plan")
         

@@ -39,6 +39,7 @@ import {
 } from '@/components/features/aika/AikaComponents';
 import { ActivityLogPanel, ActivityIndicator } from '@/components/features/aika/ActivityLogPanel';
 import { useActivityLog } from '@/hooks/useActivityLog';
+import { ModelSelector } from '@/components/features/aika/ModelSelector';
 
 // Loading Component
 const LoadingIndicator = () => (
@@ -63,6 +64,9 @@ interface HeaderBarProps {
   activePlansCount: number;
   showMetadata: boolean;
   showActivityLog: boolean;
+  selectedModel: string;
+  onModelChange: (model: string) => void;
+  isLoading?: boolean;
 }
 
 function HeaderBar({
@@ -72,6 +76,9 @@ function HeaderBar({
   activePlansCount,
   showMetadata,
   showActivityLog,
+  selectedModel,
+  onModelChange,
+  isLoading = false,
 }: HeaderBarProps) {
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
@@ -85,6 +92,13 @@ function HeaderBar({
         </div>
       </div>
       <div className="flex items-center gap-2">
+        {/* Model Selector */}
+        <ModelSelector
+          selectedModel={selectedModel}
+          onModelChange={onModelChange}
+          disabled={isLoading}
+        />
+        
         {/* Plans button */}
         <button
           type="button"
@@ -143,6 +157,7 @@ export default function AikaEnhancedPage() {
   const [showMetadata, setShowMetadata] = useState(false);
   const [showActivityLog, setShowActivityLog] = useState(false);
   const [isPlansOpen, setIsPlansOpen] = useState(false);
+  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
   const chatContainerRef = useRef<HTMLDivElement>(null);
   
   // Fetch intervention plans
@@ -162,6 +177,7 @@ export default function AikaEnhancedPage() {
     sessionId: 'aika-session-' + new Date().getTime(),
     showAgentActivity: true,
     showRiskIndicators: true,
+    preferredModel: selectedModel,
   });
 
   // Activity logging
@@ -207,6 +223,9 @@ export default function AikaEnhancedPage() {
               activePlansCount={plansData?.total || 0}
               showMetadata={showMetadata}
               showActivityLog={showActivityLog}
+              selectedModel={selectedModel}
+              onModelChange={setSelectedModel}
+              isLoading={isLoading}
             />
             
             <div className="flex-1 overflow-hidden flex flex-col">

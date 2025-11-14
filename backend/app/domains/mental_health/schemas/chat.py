@@ -161,6 +161,10 @@ class AikaRequest(BaseModel):
         None,
         description="Optional session ID for continuity (auto-generated if not provided)"
     )
+    preferred_model: Optional[str] = Field(
+        None,
+        description="User's preferred Gemini model (e.g., 'gemini-2.5-flash', 'gemini-2.5-pro'). Falls back to default if not specified."
+    )
     
     model_config = {
         "protected_namespaces": ()

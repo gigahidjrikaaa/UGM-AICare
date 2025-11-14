@@ -15,9 +15,15 @@ interface UseAikaChatOptions {
   sessionId: string;
   showAgentActivity?: boolean;
   showRiskIndicators?: boolean;
+  preferredModel?: string;
 }
 
-export function useAikaChat({ sessionId, showAgentActivity = true, showRiskIndicators = true }: UseAikaChatOptions) {
+export function useAikaChat({ 
+  sessionId, 
+  showAgentActivity = true, 
+  showRiskIndicators = true,
+  preferredModel 
+}: UseAikaChatOptions) {
   const { data: session } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -124,7 +130,8 @@ export function useAikaChat({ sessionId, showAgentActivity = true, showRiskIndic
         const aikaResponse = await sendToAika(
           userMessageContent,
           historyForAika,
-          'user' // 'user' for students, can be 'counselor' or 'admin' based on user role
+          'user', // 'user' for students, can be 'counselor' or 'admin' based on user role
+          preferredModel
         );
 
         if (!aikaResponse) {
@@ -178,6 +185,7 @@ export function useAikaChat({ sessionId, showAgentActivity = true, showRiskIndic
       messages,
       sessionId,
       sendToAika,
+      preferredModel,
     ]
   );
 

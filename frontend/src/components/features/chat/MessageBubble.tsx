@@ -13,6 +13,7 @@ import { useLiveTalkStore } from '@/store/useLiveTalkStore';
 import { InterventionPlan } from './InterventionPlan';
 import { AppointmentCard } from './AppointmentCard';
 import { AgentActivityLog } from './AgentActivityLog';
+import { AikaThinkingCompact } from './AikaThinkingIndicator';
 
 interface MessageBubbleProps {
   message: Message;
@@ -80,14 +81,13 @@ export function MessageBubble({ message, onCancelAppointment, onRescheduleAppoin
     if (message.isLoading) {
       return (
         <div className="flex flex-col gap-2">
-          {message.toolIndicator && (
-            <div className="text-[10px] text-ugm-blue/70 italic px-1 py-0.5 bg-ugm-gold/10 rounded border border-ugm-gold/20 w-fit">
-              {message.toolIndicator}
+          {message.toolIndicator ? (
+            <AikaThinkingCompact message={message.toolIndicator} />
+          ) : (
+            <div className="flex items-center justify-start h-full px-3.5 py-2.5 text-ugm-blue-dark">
+              <LoadingDots text="Aika sedang mengetik..." />
             </div>
           )}
-          <div className="flex items-center justify-start h-full px-3.5 py-2.5 text-ugm-blue-dark">
-            <LoadingDots text="Aika sedang mengetik..." />
-          </div>
         </div>
       );
     }

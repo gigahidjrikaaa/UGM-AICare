@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime
-from typing import Any, Callable, Dict, List, Optional, cast
+from typing import Any, Callable, Dict, List, Optional, cast, AsyncGenerator
+import hashlib
 
 from fastapi import (
     APIRouter,
@@ -17,6 +18,7 @@ from fastapi import (
     WebSocketDisconnect,
     status,
 )
+from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from langgraph.checkpoint.memory import MemorySaver
@@ -38,6 +40,7 @@ from app.domains.mental_health.services.personal_context import (
     invalidate_user_personal_context,
 )
 from app.domains.mental_health.services.tool_calling import generate_with_tools
+from app.domains.mental_health.routes import aika_stream
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 
@@ -195,6 +198,9 @@ async def process_chat_message(
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["Chat"])
+
+# Include streaming endpoint
+router.include_router(aika_stream.router)
 
 MIN_TURNS_FOR_SUMMARY = 1  # Reduced from 2 to 1 for better memory capture
 MAX_HISTORY_CHARS_FOR_SUMMARY = 15000

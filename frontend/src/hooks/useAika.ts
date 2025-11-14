@@ -53,6 +53,7 @@ export interface AikaRequest {
   role: 'user' | 'admin' | 'counselor';
   message: string;
   conversation_history: AikaMessage[];
+  preferred_model?: string;
 }
 
 interface UseAikaOptions {
@@ -82,6 +83,7 @@ export function useAika(options: UseAikaOptions = {}) {
     message: string,
     conversationHistory: AikaMessage[] = [],
     role: 'user' | 'admin' | 'counselor' = 'user',
+    preferredModel?: string,
   ): Promise<AikaResponse | null> => {
     if (!session?.user?.id) {
       const errorMsg = 'User not authenticated';
@@ -101,6 +103,7 @@ export function useAika(options: UseAikaOptions = {}) {
         role,
         message,
         conversation_history: conversationHistory.slice(-10), // Last 10 messages
+        preferred_model: preferredModel,
       };
 
       const response = await fetch('/api/mental-health/aika', {

@@ -255,58 +255,58 @@ class GeminiSTAClassifier:
                 for msg in recent
             ])
         
-        prompt = f"""You are a mental health crisis triage specialist for Indonesian university students.
+        prompt = f"""Kamu adalah spesialis triage krisis kesehatan mental untuk mahasiswa Indonesia.
 
-Analyze this message for mental health risk using EXPLICIT STEP-BY-STEP REASONING.
+Analyze pesan ini untuk risiko kesehatan mental menggunakan EXPLICIT STEP-BY-STEP REASONING.
 
-**Current Message:**
+**Pesan Saat Ini:**
 "{message}"
 
-**Recent Conversation Context:**
-{history_str if history_str else "(No prior context)"}
+**Konteks Percakapan Sebelumnya:**
+{history_str if history_str else "(Nggak ada konteks sebelumnya)"}
 
-**SYSTEMATIC ANALYSIS:**
+**ANALISIS SISTEMATIS:**
 
-**STEP 1 - CRISIS KEYWORDS:**
-List any explicit crisis language (suicide, self-harm, death wishes, method mentions).
-Quote exact phrases from the message.
+**STEP 1 - KATA KUNCI KRISIS:**
+List kata-kata eksplisit yang indicate krisis (bunuh diri, self-harm, death wishes, mention metode).
+Quote exact phrases dari pesan.
 
-**STEP 2 - LINGUISTIC PATTERNS:**
-Check for: finality language, past-tense life review, goodbye statements, hopelessness.
-Explain what you found.
+**STEP 2 - POLA LINGUISTIK:**
+Check untuk: finality language, past-tense life review, goodbye statements, hopelessness.
+Explain apa yang kamu temukan.
 
-**STEP 3 - EMOTIONAL TONE:**
+**STEP 3 - TONE EMOSIONAL:**
 Rate negative valence (0-10). Look for: despair, defeat, emptiness, isolation.
-Provide evidence from message.
+Provide evidence dari pesan.
 
-**STEP 4 - URGENCY SIGNALS:**
-Check for: immediacy ("today", "now", "tonight"), concrete plans, time constraints.
-List what you found.
+**STEP 4 - SINYAL URGENSI:**
+Check untuk: immediacy ("hari ini", "sekarang", "malam ini"), rencana konkret, time constraints.
+List apa yang kamu temukan.
 
-**STEP 5 - PROTECTIVE FACTORS:**
-Look for: future plans, support mentions, help-seeking, ambivalence, humor.
-Note if present.
+**STEP 5 - FAKTOR PROTEKTIF:**
+Look for: rencana masa depan, mention support, help-seeking, ambivalence, humor.
+Note kalau ada.
 
-**STEP 6 - CONTEXTUAL FACTORS:**
-Consider: Indonesian mental health stigma, academic pressure (UGM context), cultural norms.
-How does culture affect interpretation?
+**STEP 6 - FAKTOR KONTEKSTUAL:**
+Consider: stigma kesehatan mental Indonesia, tekanan akademik (konteks UGM), norma budaya.
+Gimana budaya affect interpretasi?
 
-**STEP 7 - SUPPORT NEEDS:**
-Does the user need:
-- calm_down: anxiety/panic management techniques
-- break_down_problem: help with overwhelming complexity
-- general_coping: stress management strategies
-- none: no immediate plan needed
+**STEP 7 - KEBUTUHAN DUKUNGAN:**
+Apakah user butuh:
+- calm_down: teknik manajemen anxiety/panic
+- break_down_problem: bantuan dengan complexity yang overwhelming
+- general_coping: strategi stress management
+- none: nggak perlu plan immediate
 
-**STEP 8 - FINAL CLASSIFICATION:**
-Based on steps 1-7, classify:
+**STEP 8 - KLASIFIKASI FINAL:**
+Berdasarkan steps 1-7, classify:
 - risk_level: 0 (low), 1 (moderate), 2 (high), 3 (critical)
 - intent: crisis_support | acute_distress | academic_stress | relationship_strain | general_support
 - next_step: human (escalate) | sca (coaching) | resource (self-help)
-- confidence: 0.0-1.0 (how certain are you?)
+- confidence: 0.0-1.0 (seberapa yakin kamu?)
 
 Weight factors:
-- Crisis keywords/patterns: immediate level 3
+- Kata kunci/pola krisis: immediate level 3
 - Multiple distress signals: level 2
 - Single stressor + coping: level 1
 - Casual/safe: level 0
