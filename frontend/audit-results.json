@@ -1,0 +1,519 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "@rainbow-me/rainbowkit": {
+      "name": "@rainbow-me/rainbowkit",
+      "severity": "low",
+      "isDirect": true,
+      "via": [
+        "wagmi"
+      ],
+      "effects": [],
+      "range": "2.0.0-beta.0 - 2.0.0-beta.6 || >=2.1.0",
+      "nodes": [
+        "node_modules/@rainbow-me/rainbowkit"
+      ],
+      "fixAvailable": {
+        "name": "@rainbow-me/rainbowkit",
+        "version": "2.0.8",
+        "isSemVerMajor": true
+      }
+    },
+    "@reown/appkit": {
+      "name": "@reown/appkit",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@reown/appkit-controllers",
+        "@reown/appkit-pay",
+        "@reown/appkit-scaffold-ui",
+        "@reown/appkit-ui",
+        "@reown/appkit-utils",
+        "@reown/appkit-wallet",
+        "@walletconnect/types",
+        "@walletconnect/universal-provider"
+      ],
+      "effects": [
+        "@walletconnect/ethereum-provider"
+      ],
+      "range": "<=1.8.10-wallet-button-fix.0",
+      "nodes": [
+        "node_modules/@reown/appkit"
+      ],
+      "fixAvailable": {
+        "name": "wagmi",
+        "version": "1.4.13",
+        "isSemVerMajor": true
+      }
+    },
+    "@reown/appkit-controllers": {
+      "name": "@reown/appkit-controllers",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@reown/appkit-wallet",
+        "@walletconnect/universal-provider"
+      ],
+      "effects": [
+        "@reown/appkit",
+        "@reown/appkit-scaffold-ui",
+        "@reown/appkit-utils"
+      ],
+      "range": "<=1.8.10-wallet-button-fix.0",
+      "nodes": [
+        "node_modules/@reown/appkit-controllers"
+      ],
+      "fixAvailable": {
+        "name": "wagmi",
+        "version": "1.4.13",
+        "isSemVerMajor": true
+      }
+    },
+    "@reown/appkit-pay": {
+      "name": "@reown/appkit-pay",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@reown/appkit-controllers",
+        "@reown/appkit-ui",
+        "@reown/appkit-utils"
+      ],
+      "effects": [
+        "@reown/appkit"
+      ],
+      "range": "<=1.8.10-wallet-button-fix.0",
+      "nodes": [
+        "node_modules/@reown/appkit-pay"
+      ],
+      "fixAvailable": {
+        "name": "wagmi",
+        "version": "1.4.13",
+        "isSemVerMajor": true
+      }
+    },
+    "@reown/appkit-scaffold-ui": {
+      "name": "@reown/appkit-scaffold-ui",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@reown/appkit-controllers",
+        "@reown/appkit-ui",
+        "@reown/appkit-utils",
+        "@reown/appkit-wallet"
+      ],
+      "effects": [],
+      "range": "<=1.8.10-wallet-button-fix.0",
+      "nodes": [
+        "node_modules/@reown/appkit-scaffold-ui"
+      ],
+      "fixAvailable": true
+    },
+    "@reown/appkit-ui": {
+      "name": "@reown/appkit-ui",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@reown/appkit-controllers",
+        "@reown/appkit-wallet"
+      ],
+      "effects": [
+        "@reown/appkit",
+        "@reown/appkit-scaffold-ui"
+      ],
+      "range": "1.7.1-449657bc8f95adcfd295a2e883c4bcd439045044.0 - 1.8.10-wallet-button-fix.0",
+      "nodes": [
+        "node_modules/@reown/appkit-ui"
+      ],
+      "fixAvailable": {
+        "name": "wagmi",
+        "version": "1.4.13",
+        "isSemVerMajor": true
+      }
+    },
+    "@reown/appkit-utils": {
+      "name": "@reown/appkit-utils",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@reown/appkit-controllers",
+        "@reown/appkit-wallet",
+        "@walletconnect/logger",
+        "@walletconnect/universal-provider"
+      ],
+      "effects": [
+        "@reown/appkit",
+        "@reown/appkit-pay",
+        "@reown/appkit-scaffold-ui"
+      ],
+      "range": "<=1.8.10-wallet-button-fix.0",
+      "nodes": [
+        "node_modules/@reown/appkit-utils"
+      ],
+      "fixAvailable": {
+        "name": "wagmi",
+        "version": "1.4.13",
+        "isSemVerMajor": true
+      }
+    },
+    "@reown/appkit-wallet": {
+      "name": "@reown/appkit-wallet",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@walletconnect/logger"
+      ],
+      "effects": [
+        "@reown/appkit-scaffold-ui",
+        "@reown/appkit-ui"
+      ],
+      "range": "<=1.8.10-wallet-button-fix.0",
+      "nodes": [
+        "node_modules/@reown/appkit-wallet"
+      ],
+      "fixAvailable": {
+        "name": "wagmi",
+        "version": "1.4.13",
+        "isSemVerMajor": true
+      }
+    },
+    "@wagmi/connectors": {
+      "name": "@wagmi/connectors",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@walletconnect/ethereum-provider"
+      ],
+      "effects": [
+        "wagmi"
+      ],
+      "range": "<=0.0.0-wc-links-20240926225814 || 0.3.10-cjs - 3.1.11 || >=4.0.1",
+      "nodes": [
+        "node_modules/@wagmi/connectors"
+      ],
+      "fixAvailable": {
+        "name": "wagmi",
+        "version": "1.4.13",
+        "isSemVerMajor": true
+      }
+    },
+    "@walletconnect/core": {
+      "name": "@walletconnect/core",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@walletconnect/logger",
+        "@walletconnect/types",
+        "@walletconnect/utils"
+      ],
+      "effects": [],
+      "range": "2.0.0-2.0.0-beta.102 - 2.22.2",
+      "nodes": [
+        "node_modules/@reown/appkit-controllers/node_modules/@walletconnect/core",
+        "node_modules/@reown/appkit-utils/node_modules/@walletconnect/core",
+        "node_modules/@reown/appkit/node_modules/@walletconnect/core",
+        "node_modules/@walletconnect/core"
+      ],
+      "fixAvailable": true
+    },
+    "@walletconnect/ethereum-provider": {
+      "name": "@walletconnect/ethereum-provider",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@reown/appkit",
+        "@walletconnect/sign-client",
+        "@walletconnect/types",
+        "@walletconnect/universal-provider",
+        "@walletconnect/utils"
+      ],
+      "effects": [
+        "@wagmi/connectors"
+      ],
+      "range": "2.0.0-2.0.0-beta.102 - 2.22.4",
+      "nodes": [
+        "node_modules/@walletconnect/ethereum-provider"
+      ],
+      "fixAvailable": {
+        "name": "wagmi",
+        "version": "1.4.13",
+        "isSemVerMajor": true
+      }
+    },
+    "@walletconnect/logger": {
+      "name": "@walletconnect/logger",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "pino"
+      ],
+      "effects": [
+        "@reown/appkit-utils",
+        "@reown/appkit-wallet",
+        "@walletconnect/core",
+        "@walletconnect/sign-client",
+        "@walletconnect/types",
+        "@walletconnect/universal-provider"
+      ],
+      "range": "<=2.1.3",
+      "nodes": [
+        "node_modules/@walletconnect/logger"
+      ],
+      "fixAvailable": {
+        "name": "wagmi",
+        "version": "1.4.13",
+        "isSemVerMajor": true
+      }
+    },
+    "@walletconnect/sign-client": {
+      "name": "@walletconnect/sign-client",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@walletconnect/core",
+        "@walletconnect/logger",
+        "@walletconnect/types",
+        "@walletconnect/utils"
+      ],
+      "effects": [
+        "@walletconnect/ethereum-provider",
+        "@walletconnect/universal-provider"
+      ],
+      "range": "<=2.22.2",
+      "nodes": [
+        "node_modules/@reown/appkit-controllers/node_modules/@walletconnect/sign-client",
+        "node_modules/@reown/appkit-utils/node_modules/@walletconnect/sign-client",
+        "node_modules/@reown/appkit/node_modules/@walletconnect/sign-client",
+        "node_modules/@walletconnect/sign-client"
+      ],
+      "fixAvailable": {
+        "name": "wagmi",
+        "version": "1.4.13",
+        "isSemVerMajor": true
+      }
+    },
+    "@walletconnect/types": {
+      "name": "@walletconnect/types",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@walletconnect/logger"
+      ],
+      "effects": [
+        "@reown/appkit",
+        "@walletconnect/core",
+        "@walletconnect/ethereum-provider",
+        "@walletconnect/sign-client",
+        "@walletconnect/utils"
+      ],
+      "range": "2.1.2-eaa4818c - 2.22.2",
+      "nodes": [
+        "node_modules/@reown/appkit-controllers/node_modules/@walletconnect/types",
+        "node_modules/@reown/appkit-utils/node_modules/@walletconnect/types",
+        "node_modules/@reown/appkit/node_modules/@walletconnect/types",
+        "node_modules/@walletconnect/types"
+      ],
+      "fixAvailable": {
+        "name": "wagmi",
+        "version": "1.4.13",
+        "isSemVerMajor": true
+      }
+    },
+    "@walletconnect/universal-provider": {
+      "name": "@walletconnect/universal-provider",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@walletconnect/logger",
+        "@walletconnect/sign-client",
+        "@walletconnect/types",
+        "@walletconnect/utils"
+      ],
+      "effects": [
+        "@reown/appkit",
+        "@reown/appkit-controllers",
+        "@reown/appkit-utils",
+        "@walletconnect/ethereum-provider"
+      ],
+      "range": "<=2.22.2",
+      "nodes": [
+        "node_modules/@reown/appkit-controllers/node_modules/@walletconnect/universal-provider",
+        "node_modules/@reown/appkit-utils/node_modules/@walletconnect/universal-provider",
+        "node_modules/@reown/appkit/node_modules/@walletconnect/universal-provider",
+        "node_modules/@walletconnect/universal-provider"
+      ],
+      "fixAvailable": {
+        "name": "wagmi",
+        "version": "1.4.13",
+        "isSemVerMajor": true
+      }
+    },
+    "@walletconnect/utils": {
+      "name": "@walletconnect/utils",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "@walletconnect/types"
+      ],
+      "effects": [],
+      "range": "2.1.2-eaa4818c - 2.22.2",
+      "nodes": [
+        "node_modules/@reown/appkit-controllers/node_modules/@walletconnect/utils",
+        "node_modules/@reown/appkit-utils/node_modules/@walletconnect/utils",
+        "node_modules/@reown/appkit/node_modules/@walletconnect/utils",
+        "node_modules/@walletconnect/utils"
+      ],
+      "fixAvailable": true
+    },
+    "fast-redact": {
+      "name": "fast-redact",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1108265,
+          "name": "fast-redact",
+          "dependency": "fast-redact",
+          "title": "fast-redact vulnerable to prototype pollution",
+          "url": "https://github.com/advisories/GHSA-ffrw-9mx8-89p8",
+          "severity": "low",
+          "cwe": [
+            "CWE-1321"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": "<=3.5.0"
+        }
+      ],
+      "effects": [
+        "pino"
+      ],
+      "range": "*",
+      "nodes": [
+        "node_modules/fast-redact"
+      ],
+      "fixAvailable": {
+        "name": "wagmi",
+        "version": "1.4.13",
+        "isSemVerMajor": true
+      }
+    },
+    "js-yaml": {
+      "name": "js-yaml",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1109754,
+          "name": "js-yaml",
+          "dependency": "js-yaml",
+          "title": "js-yaml has prototype pollution in merge (<<)",
+          "url": "https://github.com/advisories/GHSA-mh29-5h37-fv8m",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-1321"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N"
+          },
+          "range": "<4.1.1"
+        }
+      ],
+      "effects": [],
+      "range": "<4.1.1",
+      "nodes": [
+        "node_modules/js-yaml"
+      ],
+      "fixAvailable": true
+    },
+    "next-auth": {
+      "name": "next-auth",
+      "severity": "moderate",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 1109305,
+          "name": "next-auth",
+          "dependency": "next-auth",
+          "title": "NextAuthjs Email misdelivery Vulnerability",
+          "url": "https://github.com/advisories/GHSA-5jpx-9hw9-2fx4",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-200"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": "<4.24.12"
+        }
+      ],
+      "effects": [],
+      "range": "<4.24.12",
+      "nodes": [
+        "node_modules/next-auth"
+      ],
+      "fixAvailable": true
+    },
+    "pino": {
+      "name": "pino",
+      "severity": "low",
+      "isDirect": false,
+      "via": [
+        "fast-redact"
+      ],
+      "effects": [
+        "@walletconnect/logger"
+      ],
+      "range": "5.0.0-rc.1 - 9.11.0",
+      "nodes": [
+        "node_modules/pino"
+      ],
+      "fixAvailable": {
+        "name": "wagmi",
+        "version": "1.4.13",
+        "isSemVerMajor": true
+      }
+    },
+    "wagmi": {
+      "name": "wagmi",
+      "severity": "low",
+      "isDirect": true,
+      "via": [
+        "@wagmi/connectors"
+      ],
+      "effects": [
+        "@rainbow-me/rainbowkit"
+      ],
+      "range": "<=0.0.0-wc-links-20240926225814 || >=2.0.1",
+      "nodes": [
+        "node_modules/wagmi"
+      ],
+      "fixAvailable": {
+        "name": "wagmi",
+        "version": "1.4.13",
+        "isSemVerMajor": true
+      }
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 19,
+      "moderate": 2,
+      "high": 0,
+      "critical": 0,
+      "total": 21
+    },
+    "dependencies": {
+      "prod": 721,
+      "dev": 337,
+      "optional": 79,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 1091
+    }
+  }
+}
