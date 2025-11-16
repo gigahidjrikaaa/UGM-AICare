@@ -395,6 +395,41 @@ class AikaOrchestratorState(TypedDict, total=False):
     """Whether notification was sent to assigned counselor."""
     
     # ============================================================================
+    # TWO-TIER RISK MONITORING FIELDS
+    # ============================================================================
+    
+    # Tier 1: Per-message immediate risk screening (from Aika's JSON)
+    immediate_risk_level: Optional[Literal["none", "low", "moderate", "high", "critical"]]
+    """Immediate risk detected by Aika in current message via JSON output."""
+    
+    crisis_keywords_detected: List[str]
+    """Crisis keywords found in current message (e.g., ['suicide', 'self-harm'])."""
+    
+    risk_reasoning: Optional[str]
+    """Brief explanation from Aika about why this risk level was assigned."""
+    
+    # Tier 2: Conversation-level analysis (from STA at conversation end)
+    conversation_ended: bool
+    """Flag indicating conversation has ended (inactive, new convo, or explicit goodbye)."""
+    
+    conversation_assessment: Optional[Dict[str, Any]]
+    """Full STA conversation-level assessment (runs on conversation end)."""
+    
+    sta_analysis_completed: bool
+    """Flag indicating STA conversation analysis has been performed."""
+    
+    # Crisis management escalation
+    needs_cma_escalation: bool
+    """Flag indicating CMA should be invoked for immediate crisis management."""
+    
+    # Conversation timing
+    last_message_timestamp: Optional[float]
+    """Unix timestamp of last message for inactivity detection."""
+    
+    previous_conversation_id: Optional[str]
+    """Previous conversation ID to detect new conversation starts."""
+    
+    # ============================================================================
     # FINAL RESPONSE
     # ============================================================================
     final_response: Optional[str]

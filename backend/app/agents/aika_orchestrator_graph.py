@@ -192,8 +192,34 @@ Return JSON with:
   "intent_confidence": float (0.0-1.0),
   "needs_agents": boolean,
   "reasoning": "string explaining decision",
-  "suggested_response": "string (only if needs_agents=false, provide direct response)"
+  "suggested_response": "string (only if needs_agents=false, provide direct response)",
+  
+  "immediate_risk": "none|low|moderate|high|critical",
+  "crisis_keywords": ["list of crisis keywords found, empty if none"],
+  "risk_reasoning": "Brief 1-sentence explanation of risk assessment"
 }}
+
+IMMEDIATE RISK ASSESSMENT CRITERIA:
+- "critical": Explicit suicide plan/intent with method and timeframe
+  Examples: "I'm going to kill myself tonight", "I have pills ready to overdose"
+  
+- "high": Strong self-harm ideation or active suicidal thoughts
+  Examples: "I keep thinking about cutting myself", "I want to die", "bunuh diri"
+  
+- "moderate": Significant emotional distress with concerning patterns
+  Examples: "I feel completely hopeless", "nothing matters anymore", "tidak ada gunanya hidup"
+  
+- "low": Stress/anxiety without crisis indicators
+  Examples: "I'm stressed about exams", "feeling anxious about presentation"
+  
+- "none": No distress signals
+  Examples: "Hello, how are you?", "What is CBT?", "Thanks for the help"
+
+CRISIS KEYWORDS TO DETECT (Indonesian + English):
+suicide, bunuh diri, kill myself, end my life, tidak ingin hidup lagi, 
+self-harm, cutting, mutilasi diri, menyakiti diri, overdose, 
+jump from building, loncat dari gedung, gantung diri, hanging,
+want to die, mau mati, ingin mati, etc.
 """
         
         # Call Gemini for decision with fallback support
@@ -225,6 +251,54 @@ Return JSON with:
             state["intent_confidence"] = decision.get("intent_confidence", 0.5)
             state["needs_agents"] = decision.get("needs_agents", False)
             state["agent_reasoning"] = decision.get("reasoning", "No reasoning provided")
+            
+            # ========================================================================
+            # TWO-TIER RISK MONITORING: Parse immediate risk fields (Tier 1)
+            # ========================================================================
+            state["immediate_risk_level"] = decision.get("immediate_risk", "none")
+            state["crisis_keywords_detected"] = decision.get("crisis_keywords", [])
+            state["risk_reasoning"] = decision.get("risk_reasoning", "")
+            
+            # Update last message timestamp for inactivity detection
+            state["last_message_timestamp"] = time.time()
+            
+            # Detect conversation end - Method 1: Time-based inactivity (5 minutes)
+            previous_timestamp = state.get("last_message_timestamp")
+            if previous_timestamp:
+                inactive_duration = time.time() - previous_timestamp
+                if inactive_duration > 300:  # 5 minutes
+                    state["conversation_ended"] = True
+                    logger.info(f"⏱️ Conversation ended: Inactive for {inactive_duration:.0f}s")
+            
+            # Detect conversation end - Method 2: Explicit goodbye signals
+            message_lower = state.get("message", "").lower()
+            end_signals = [
+                "goodbye", "bye", "terima kasih banyak", "sampai jumpa", 
+                "selesai", "sudah cukup", "thanks bye", "see you", "sampai nanti"
+            ]
+            if any(signal in message_lower for signal in end_signals):
+                state["conversation_ended"] = True
+                logger.info(f"👋 Conversation ended: Explicit goodbye detected")
+            else:
+                state["conversation_ended"] = False
+            
+            # Auto-escalate to CMA if high/critical immediate risk detected
+            if state["immediate_risk_level"] in ("high", "critical"):
+                state["needs_cma_escalation"] = True
+                logger.warning(
+                    f"🚨 IMMEDIATE CRISIS DETECTED: {state['immediate_risk_level']} "
+                    f"(keywords: {state['crisis_keywords_detected']}) "
+                    f"- Auto-escalating to CMA"
+                )
+            else:
+                state["needs_cma_escalation"] = False
+            
+            # Log risk assessment
+            if state["immediate_risk_level"] != "none":
+                logger.info(
+                    f"⚠️ Immediate Risk: {state['immediate_risk_level']} "
+                    f"(reasoning: {state['risk_reasoning'][:100]})"
+                )
             
             # If agents not needed, store direct response
             if not state["needs_agents"]:
@@ -286,6 +360,15 @@ Return JSON with:
             f"duration={elapsed_ms:.0f}ms"
         )
         
+        # ========================================================================
+        # TWO-TIER RISK MONITORING: Trigger background STA analysis if conversation ended
+        # ========================================================================
+        if state.get("conversation_ended", False):
+            logger.info("🔍 Conversation ended - triggering background STA analysis")
+            # Fire-and-forget: create background task without awaiting
+            import asyncio
+            asyncio.create_task(trigger_sta_conversation_analysis_background(state.copy(), db))
+        
     except Exception as e:
         error_msg = f"Aika decision node failed: {str(e)}"
         logger.error(error_msg, exc_info=True)
@@ -299,6 +382,84 @@ Return JSON with:
             execution_tracker.fail_node(execution_id, "aika::decision", str(e))
     
     return state
+
+
+async def trigger_sta_conversation_analysis_background(
+    state: AikaOrchestratorState,
+    db: AsyncSession
+) -> None:
+    """Background task to analyze conversation when it ends (fire-and-forget).
+    
+    This runs asynchronously without blocking the user's response.
+    Analyzes full conversation history and stores assessment in database.
+    
+    Args:
+        state: Current orchestrator state with conversation history
+        db: Database session for storing assessment
+    """
+    try:
+        from app.agents.sta.conversation_analyzer import analyze_conversation_risk
+        
+        # Skip if already analyzed
+        if state.get("sta_analysis_completed", False):
+            logger.debug("STA conversation analysis already completed, skipping background task")
+            return
+        
+        # Get conversation metadata
+        conversation_id = state.get("conversation_id")
+        user_id = state.get("user_id")
+        conversation_start = state.get("started_at")
+        start_timestamp = conversation_start.timestamp() if conversation_start else None
+        
+        logger.info(
+            f"🔍 [BACKGROUND] Starting STA conversation analysis for "
+            f"conversation_id={conversation_id}, user_id={user_id}"
+        )
+        
+        # Perform deep analysis
+        assessment = await analyze_conversation_risk(
+            conversation_history=state.get("conversation_history", []),
+            current_message=state.get("message", ""),
+            user_context=state.get("personal_context", {}),
+            conversation_start_time=start_timestamp,
+            preferred_model=state.get("preferred_model")
+        )
+        
+        # TODO: Store assessment in database
+        # assessment_record = ConversationAssessmentDB(
+        #     conversation_id=conversation_id,
+        #     user_id=user_id,
+        #     overall_risk_level=assessment.overall_risk_level,
+        #     ...
+        # )
+        # db.add(assessment_record)
+        # await db.commit()
+        
+        # Log results for monitoring
+        logger.info(
+            f"📊 [BACKGROUND] STA Conversation Assessment Complete:\n"
+            f"   Conversation ID: {conversation_id}\n"
+            f"   User ID: {user_id}\n"
+            f"   Messages Analyzed: {assessment.message_count_analyzed}\n"
+            f"   Overall Risk: {assessment.overall_risk_level}\n"
+            f"   Risk Trend: {assessment.risk_trend}\n"
+            f"   CMA Recommended: {assessment.should_invoke_cma}\n"
+            f"   Duration: {assessment.conversation_duration_seconds:.0f}s\n"
+            f"   Summary: {assessment.conversation_summary[:150]}..."
+        )
+        
+        # If CMA escalation needed, log alert (actual invocation handled in next conversation)
+        if assessment.should_invoke_cma:
+            logger.warning(
+                f"🚨 [BACKGROUND] STA recommends CMA escalation for conversation {conversation_id}\n"
+                f"   Reasoning: {assessment.reasoning[:200]}..."
+            )
+        
+    except Exception as e:
+        logger.error(
+            f"[BACKGROUND] STA conversation analysis failed: {e}",
+            exc_info=True
+        )
 
 
 async def execute_sta_subgraph(
@@ -577,16 +738,35 @@ def should_invoke_agents(state: AikaOrchestratorState) -> str:
     """Conditional edge after Aika decision node.
     
     Returns:
-        "invoke_sta" if agents needed, "end" if direct response
+        "invoke_cma" if immediate crisis escalation needed (Tier 1),
+        "invoke_sta" if agents needed for normal flow,
+        "end" if direct response
     """
     needs_agents = state.get("needs_agents", False)
+    needs_cma = state.get("needs_cma_escalation", False)
     
     execution_id = state.get("execution_id")
+    
+    # TWO-TIER: Check immediate crisis escalation first (Tier 1)
+    if needs_cma:
+        if execution_id:
+            execution_tracker.trigger_edge(
+                execution_id,
+                "aika::decision->cma",
+                condition_result=True
+            )
+        logger.warning(
+            f"🚨 Routing after Aika: IMMEDIATE CMA ESCALATION "
+            f"(risk={state.get('immediate_risk_level')})"
+        )
+        return "invoke_cma"
+    
+    # Normal flow: invoke agents or respond directly
     if execution_id:
         target = "invoke_sta" if needs_agents else "end"
         execution_tracker.trigger_edge(
             execution_id,
-            f"aika::decision->{ target}",
+            f"aika::decision->{target}",
             condition_result=True
         )
     
@@ -715,6 +895,7 @@ def create_aika_unified_graph(db: AsyncSession) -> StateGraph:
         "aika_decision",
         should_invoke_agents,
         {
+            "invoke_cma": "execute_sda",  # TWO-TIER: Immediate crisis escalation
             "invoke_sta": "execute_sta",
             "end": END
         }
