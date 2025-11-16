@@ -64,8 +64,11 @@ def ingest_query_node(state: IAState) -> IAState:
             raise ValueError("start_date and end_date are required")
         
         # Validate date range (prevent excessive historical queries)
-        start = state["start_date"]
-        end = state["end_date"]
+        start = state.get("start_date")
+        end = state.get("end_date")
+        
+        if not start or not end:
+            raise ValueError("start_date and end_date must be provided")
         
         if start >= end:
             raise ValueError("start_date must be before end_date")
@@ -81,7 +84,7 @@ def ingest_query_node(state: IAState) -> IAState:
         if execution_id:
             execution_tracker.complete_node(execution_id, "ia:ingest_query")
         
-        logger.info(f"IA ingested query: question_id={state['question_id']}, range={delta.days} days")
+        logger.info(f"IA ingested query: question_id={state.get('question_id')}, range={delta.days} days")
         
     except Exception as e:
         error_msg = f"Query ingestion failed: {str(e)}"
@@ -216,12 +219,16 @@ async def execute_analytics_node(state: IAState, db: AsyncSession) -> IAState:
         if not isinstance(start_date, datetime) or not isinstance(end_date, datetime):
             raise ValueError("start_date and end_date must be datetime objects")
         
+        # Create IAQueryParams using the correct field aliases ('from' and 'to')
+        from app.agents.ia.schemas import IAQueryParams
+        query_params = IAQueryParams.model_validate({
+            "from": start_date,
+            "to": end_date
+        })
+        
         request = IAQueryRequest(
             question_id=question_id,
-            params={
-                "start": start_date,
-                "end": end_date
-            }
+            params=query_params
         )
         
         # Execute query (service handles k-anonymity and privacy)
@@ -292,7 +299,7 @@ async def interpret_results_node(state: IAState) -> IAState:
             raise ValueError("Analytics results not available for interpretation")
         
         # Extract analytics results
-        analytics = state["analytics_result"]
+        analytics = state.get("analytics_result", {})
         data = analytics.get("data", [])
         chart = analytics.get("chart", {})
         notes = analytics.get("notes", [])
