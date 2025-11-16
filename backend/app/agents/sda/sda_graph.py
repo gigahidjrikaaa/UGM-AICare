@@ -7,6 +7,7 @@ import json
 from langgraph.graph import StateGraph, END
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from google.genai import types
 
 from app.agents.graph_state import SDAState
 from app.agents.execution_tracker import execution_tracker
@@ -41,9 +42,11 @@ async def ingest_escalation_node(state: SDAState) -> SDAState:
     # Validate this should be escalated
     severity = state.get("severity", "low")
     if severity not in ("high", "critical"):
-        state["errors"].append(
+        errors = state.get("errors", [])
+        errors.append(
             f"SDA should only handle high/critical cases, got severity={severity}"
         )
+        state["errors"] = errors
         if execution_id:
             execution_tracker.fail_node(
                 execution_id, 
@@ -52,7 +55,9 @@ async def ingest_escalation_node(state: SDAState) -> SDAState:
             )
         return state
     
-    state["execution_path"].append("ingest_escalation")
+    execution_path = state.get("execution_path", [])
+    execution_path.append("ingest_escalation")
+    state["execution_path"] = execution_path
     
     if execution_id:
         execution_tracker.complete_node(execution_id, "sda::ingest_escalation")
@@ -105,8 +110,8 @@ async def create_case_node(state: SDAState, db: AsyncSession) -> SDAState:
         case = Case(
             status=CaseStatusEnum.new,
             severity=case_severity,
-            user_hash=state["user_hash"],
-            session_id=state["session_id"],
+            user_hash=state.get("user_hash", ""),
+            session_id=state.get("session_id", ""),
             conversation_id=state.get("conversation_id"),
             summary_redacted=summary_redacted,
             triage_assessment_id=state.get("triage_assessment_id"),
@@ -116,11 +121,14 @@ async def create_case_node(state: SDAState, db: AsyncSession) -> SDAState:
         
         db.add(case)
         await db.flush()  # Get case.id
+        await db.refresh(case)  # Ensure id is loaded
         
-        state["case_id"] = case.id
+        state["case_id"] = str(case.id)  # Cast UUID to string for state
         state["case_severity"] = case_severity.value
         state["case_created"] = True
-        state["execution_path"].append("create_case")
+        execution_path = state.get("execution_path", [])
+        execution_path.append("create_case")
+        state["execution_path"] = execution_path
         
         if execution_id:
             execution_tracker.complete_node(
@@ -136,7 +144,9 @@ async def create_case_node(state: SDAState, db: AsyncSession) -> SDAState:
         
     except Exception as e:
         error_msg = f"Case creation failed: {str(e)}"
-        state["errors"].append(error_msg)
+        errors = state.get("errors", [])
+        errors.append(error_msg)
+        state["errors"] = errors
         logger.error(error_msg, exc_info=True)
         
         if execution_id:
@@ -177,15 +187,19 @@ async def calculate_sla_node(state: SDAState, db: AsyncSession) -> SDAState:
         sla_breach_at = datetime.now() + timedelta(minutes=sla_minutes)
         
         # Update case in DB
-        case = await db.get(Case, state["case_id"])
-        if case:
-            case.sla_breach_at = sla_breach_at  # type: ignore[assignment]
-            case.updated_at = datetime.now()  # type: ignore[assignment]
-            db.add(case)
-            await db.flush()
+        case_id = state.get("case_id")
+        if case_id:
+            case = await db.get(Case, case_id)
+            if case:
+                case.sla_breach_at = sla_breach_at  # type: ignore[assignment]
+                case.updated_at = datetime.now()  # type: ignore[assignment]
+                db.add(case)
+                await db.flush()
         
         state["sla_breach_at"] = sla_breach_at.isoformat()
-        state["execution_path"].append("calculate_sla")
+        execution_path = state.get("execution_path", [])
+        execution_path.append("calculate_sla")
+        state["execution_path"] = execution_path
         
         if execution_id:
             execution_tracker.complete_node(
@@ -198,7 +212,9 @@ async def calculate_sla_node(state: SDAState, db: AsyncSession) -> SDAState:
         
     except Exception as e:
         error_msg = f"SLA calculation failed: {str(e)}"
-        state["errors"].append(error_msg)
+        errors = state.get("errors", [])
+        errors.append(error_msg)
+        state["errors"] = errors
         logger.error(error_msg, exc_info=True)
         
         if execution_id:
@@ -244,7 +260,9 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
         
         if not counsellors:
             logger.warning("No counsellors available for auto-assignment")
-            state["execution_path"].append("auto_assign")
+            execution_path = state.get("execution_path", [])
+            execution_path.append("auto_assign")
+            state["execution_path"] = execution_path
             state["assigned_to"] = None
             state["assignment_reason"] = "no_counsellors_available"
             
@@ -311,7 +329,9 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
         state["assignment_id"] = str(assignment.id)
         state["assignment_reason"] = "auto_assigned_lowest_workload"
         state["assigned_workload"] = assigned_workload
-        state["execution_path"].append("auto_assign")
+        execution_path = state.get("execution_path", [])
+        execution_path.append("auto_assign")
+        state["execution_path"] = execution_path
         
         if execution_id:
             execution_tracker.complete_node(
@@ -332,7 +352,9 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
         
     except Exception as e:
         error_msg = f"Auto-assignment failed: {str(e)}"
-        state["errors"].append(error_msg)
+        errors = state.get("errors", [])
+        errors.append(error_msg)
+        state["errors"] = errors
         logger.error(error_msg, exc_info=True)
         
         if execution_id:
@@ -372,7 +394,7 @@ async def notify_counsellor_node(state: SDAState) -> SDAState:
             event_type=event_type,
             source_agent="sda",
             data={
-                "case_id": str(state["case_id"]),
+                "case_id": str(state.get("case_id")),
                 "severity": severity,
                 "user_hash": state.get("user_hash"),
                 "session_id": state.get("session_id"),
@@ -381,16 +403,20 @@ async def notify_counsellor_node(state: SDAState) -> SDAState:
             }
         )
         
-        state["execution_path"].append("notify_counsellor")
+        execution_path = state.get("execution_path", [])
+        execution_path.append("notify_counsellor")
+        state["execution_path"] = execution_path
         
         if execution_id:
             execution_tracker.complete_node(execution_id, "sda::notify_counsellor")
         
-        logger.info(f"SDA notified counsellors of case {state['case_id']}")
+        logger.info(f"SDA notified counsellors of case {state.get('case_id')}")
         
     except Exception as e:
         error_msg = f"Counsellor notification failed: {str(e)}"
-        state["errors"].append(error_msg)
+        errors = state.get("errors", [])
+        errors.append(error_msg)
+        state["errors"] = errors
         logger.error(error_msg, exc_info=True)
         
         if execution_id:
@@ -468,7 +494,7 @@ async def schedule_appointment_node(state: SDAState, db: AsyncSession) -> SDASta
             psychologist_id = await _select_optimal_psychologist(
                 db=db,
                 severity=severity,
-                preferences=scheduling_context
+                preferences=scheduling_context or {}
             )
         
         if not psychologist_id:
@@ -489,7 +515,7 @@ async def schedule_appointment_node(state: SDAState, db: AsyncSession) -> SDASta
             psychologist=psychologist,
             preferred_time=preferred_time,
             severity=severity,
-            scheduling_context=scheduling_context
+            scheduling_context=scheduling_context or {}
         )
         
         if not appointment_datetime:
@@ -517,7 +543,9 @@ async def schedule_appointment_node(state: SDAState, db: AsyncSession) -> SDASta
         state["appointment_datetime"] = appointment_datetime.isoformat()
         state["appointment_confirmed"] = True
         state["psychologist_id"] = psychologist_id
-        state["execution_path"].append("schedule_appointment")
+        execution_path = state.get("execution_path", [])
+        execution_path.append("schedule_appointment")
+        state["execution_path"] = execution_path
         
         if execution_id:
             execution_tracker.complete_node(execution_id, "sda::schedule_appointment")
@@ -529,7 +557,9 @@ async def schedule_appointment_node(state: SDAState, db: AsyncSession) -> SDASta
         
     except Exception as e:
         error_msg = f"Appointment scheduling failed: {str(e)}"
-        state["errors"].append(error_msg)
+        errors = state.get("errors", [])
+        errors.append(error_msg)
+        state["errors"] = errors
         state["appointment_confirmed"] = False
         logger.error(error_msg, exc_info=True)
         
@@ -601,12 +631,17 @@ Kriteria Pemilihan:
 Return HANYA psychologist ID (integer) dari pilihan kamu.
 """
         
-        response = client.generate_content(
-            prompt,
-            generation_config={
-                "temperature": 0.2,  # Lower temp for consistent selection
-            }
+        response = client.models.generate_content(
+            model=GEMINI_FLASH_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.2,  # Lower temp for consistent selection
+            )
         )
+        
+        if not response or not response.text:
+            logger.warning("No response from LLM for psychologist selection")
+            return psych_profiles[0]["id"]  # Default to first available
         
         # Extract ID from response
         selected_id = int(response.text.strip())
@@ -648,10 +683,11 @@ async def _find_optimal_appointment_time(
     Returns:
         Optimal datetime or None
     """
+    available_slots = []  # Initialize to avoid unbound variable
     try:
-        # Generate available slots
-        from app.agents.shared.tools.scheduling_tools import _generate_time_slots
-        
+        # Generate available slots (simplified - implement inline)
+        # Note: Original _generate_time_slots doesn't exist in scheduling_tools
+        # Using simplified slot generation for now
         schedule = psychologist.availability_schedule or {}
         start_date = datetime.now()
         end_date = start_date + timedelta(days=14)
@@ -660,12 +696,19 @@ async def _find_optimal_appointment_time(
         if severity == "critical":
             end_date = start_date + timedelta(days=3)
         
-        available_slots = _generate_time_slots(
-            schedule=schedule,
-            start_date=start_date,
-            end_date=end_date,
-            preferred_time=None  # Don't pre-filter, let LLM decide
-        )
+        # Generate simple slots (this should be replaced with proper scheduling logic)
+        available_slots = []
+        current = start_date
+        while current < end_date:
+            # Generate slots from 9 AM to 5 PM, every hour
+            for hour in range(9, 17):
+                slot_time = current.replace(hour=hour, minute=0, second=0, microsecond=0)
+                if slot_time > datetime.now():  # Only future slots
+                    available_slots.append({
+                        "datetime": slot_time.isoformat(),
+                        "display": slot_time.strftime("%A, %d %B %Y at %I:%M %p")
+                    })
+            current += timedelta(days=1)
         
         if not available_slots:
             logger.warning(f"No slots available for psychologist {psychologist.id}")
@@ -724,13 +767,18 @@ Pilih SATU time slot yang PALING BAIK yang balance:
 Return HANYA datetime string dalam ISO format (YYYY-MM-DDTHH:MM:SS) dari list di atas.
 """
         
-        response = client.generate_content(
-            prompt,
-            generation_config={
-                "temperature": 0.2,
-                "max_output_tokens": 50  # Just need datetime string
-            }
+        response = client.models.generate_content(
+            model=GEMINI_FLASH_MODEL,
+            contents=prompt,
+            config=types.GenerateContentConfig(
+                temperature=0.2,
+                max_output_tokens=50  # Just need datetime string
+            )
         )
+        
+        if not response or not response.text:
+            logger.warning("No response from LLM for time selection")
+            return datetime.fromisoformat(available_slots[0]["datetime"])
         
         selected_datetime_str = response.text.strip()
         
@@ -749,9 +797,13 @@ Return HANYA datetime string dalam ISO format (YYYY-MM-DDTHH:MM:SS) dari list di
         
     except Exception as e:
         logger.error(f"Error finding optimal time: {e}", exc_info=True)
-        # Last resort: return earliest slot
-        if available_slots:
-            return datetime.fromisoformat(available_slots[0]["datetime"])
+        # Last resort: return earliest slot if available
+        # Note: available_slots might not be defined if error occurred early
+        try:
+            if 'available_slots' in locals() and available_slots:
+                return datetime.fromisoformat(available_slots[0]["datetime"])
+        except Exception:
+            pass
         return None
 
 
@@ -790,4 +842,4 @@ def create_sda_graph(db: AsyncSession) -> StateGraph:
     workflow.add_edge("schedule_appt", "notify_counsellor")
     workflow.add_edge("notify_counsellor", END)
     
-    return workflow.compile()
+    return workflow.compile()  # type: ignore[return-value]

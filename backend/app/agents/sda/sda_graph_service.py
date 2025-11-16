@@ -52,7 +52,7 @@ class SDAGraphService:
             db: Database session for graph node operations
         """
         self.db = db
-        self.graph = create_sda_graph(db)
+        self.graph = create_sda_graph(db)  # CompiledStateGraph
     
     async def execute(
         self,
@@ -127,7 +127,7 @@ class SDAGraphService:
             "case_created": False,
             "started_at": datetime.now(),
             # STA outputs
-            "severity": severity,
+            "severity": severity,  # type: ignore[typeddict-item]
             "intent": intent,
             "risk_score": risk_score,
             "triage_assessment_id": triage_assessment_id
@@ -141,7 +141,8 @@ class SDAGraphService:
                 f"execution_id={execution_id}"
             )
             
-            final_state = await self.graph.ainvoke(initial_state)
+            # Note: self.graph is CompiledStateGraph at runtime, has ainvoke
+            final_state = await self.graph.ainvoke(initial_state)  # type: ignore[attr-defined]
             
             # Mark completion timestamp
             final_state["completed_at"] = datetime.now()
@@ -164,7 +165,9 @@ class SDAGraphService:
             execution_tracker.complete_execution(execution_id, success=False)
             
             # Return state with error
-            initial_state["errors"].append(f"Graph execution failed: {str(e)}")
+            errors = initial_state.get("errors", [])
+            errors.append(f"Graph execution failed: {str(e)}")
+            initial_state["errors"] = errors
             initial_state["completed_at"] = datetime.now()
             
             raise

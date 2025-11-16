@@ -91,8 +91,8 @@ class SafetyAgentState(TypedDict, total=False):
     # ============================================================================
     # SDA (Service Desk Agent) OUTPUTS
     # ============================================================================
-    case_id: Optional[int]
-    """Database ID of created Case record (for high/critical escalations)."""
+    case_id: Optional[str]
+    """Database ID (UUID string) of created Case record (for high/critical escalations)."""
     
     case_created: bool
     """Flag indicating if a new case was created (default False)."""
