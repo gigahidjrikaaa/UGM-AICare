@@ -65,7 +65,7 @@ export function SummaryCards({ cases }: SummaryCardsProps) {
     {
       title: 'Assigned Today',
       value: stats.assigned,
-      subtitle: 'Auto-assigned by SDA',
+      subtitle: 'Auto-assigned by CMA',
       icon: ClockIcon,
       color: 'purple',
       bgColor: 'bg-purple-500/10',

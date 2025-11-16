@@ -52,26 +52,26 @@ export function ExecutionHistoryTable({ limit = 50 }: ExecutionHistoryTableProps
   // Fetch history on mount and when filters/pagination change
   useEffect(() => {
     const validStatus = statusFilter as 'completed' | 'failed' | 'running' | '';
-    const validGraph = graphFilter as 'sta' | 'sca' | 'sda' | 'ia' | 'aika' | 'orchestrator' | '';
+    const validGraph = graphFilter as 'sta' | 'tca' | 'cma' | 'ia' | 'aika' | 'orchestrator' | '';
     
     fetchHistory({
       limit,
       offset,
       status: validStatus || undefined,
-      graph_name: (validGraph || undefined) as 'sta' | 'sca' | 'sda' | 'ia' | 'aika' | 'orchestrator' | undefined
+      graph_name: (validGraph || undefined) as 'sta' | 'tca' | 'cma' | 'ia' | 'aika' | 'orchestrator' | undefined
     });
   }, [offset, statusFilter, graphFilter, limit, fetchHistory]);
 
   const handleRefresh = () => {
     const validStatus = statusFilter as 'completed' | 'failed' | 'running' | '';
-    const validGraph = graphFilter as 'sta' | 'sca' | 'sda' | 'ia' | 'aika' | 'orchestrator' | '';
+    const validGraph = graphFilter as 'sta' | 'tca' | 'cma' | 'ia' | 'aika' | 'orchestrator' | '';
     
     setOffset(0);
     fetchHistory({ 
       limit, 
       offset: 0, 
       status: validStatus || undefined, 
-      graph_name: (validGraph || undefined) as 'sta' | 'sca' | 'sda' | 'ia' | 'aika' | 'orchestrator' | undefined
+      graph_name: (validGraph || undefined) as 'sta' | 'tca' | 'cma' | 'ia' | 'aika' | 'orchestrator' | undefined
     });
   };
 
@@ -136,8 +136,8 @@ export function ExecutionHistoryTable({ limit = 50 }: ExecutionHistoryTableProps
           >
             <option value="" className="bg-[#001a47]">All</option>
             <option value="sta" className="bg-[#001a47]">STA</option>
-            <option value="sca" className="bg-[#001a47]">SCA</option>
-            <option value="sda" className="bg-[#001a47]">SDA</option>
+            <option value="tca" className="bg-[#001a47]">TCA</option>
+            <option value="cma" className="bg-[#001a47]">CMA</option>
             <option value="ia" className="bg-[#001a47]">IA</option>
             <option value="aika" className="bg-[#001a47]">AIKA</option>
             <option value="orchestrator" className="bg-[#001a47]">Orchestrator</option>

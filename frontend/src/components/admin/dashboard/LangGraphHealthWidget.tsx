@@ -25,8 +25,8 @@ interface HealthData {
 
 const GRAPH_NAMES: Record<string, string> = {
   sta: 'STA',
-  sca: 'SCA',
-  sda: 'SDA',
+  tca: 'TCA',
+  cma: 'CMA',
   ia: 'IA',
   orchestrator: 'Orch',
 };
@@ -47,8 +47,8 @@ export default function LangGraphHealthWidget() {
         // Mock health data based on graph state - real analytics would come from metrics endpoint
         const mockGraphs: GraphHealth[] = [
           { graph_type: 'sta', status: 'healthy', success_rate: 98.5 },
-          { graph_type: 'sca', status: 'healthy', success_rate: 97.2 },
-          { graph_type: 'sda', status: 'healthy', success_rate: 99.1 },
+          { graph_type: 'tca', status: 'healthy', success_rate: 97.2 },
+          { graph_type: 'cma', status: 'healthy', success_rate: 99.1 },
           { graph_type: 'ia', status: 'healthy', success_rate: 96.8 },
           { graph_type: 'orchestrator', status: 'healthy', success_rate: 98.0 },
         ];

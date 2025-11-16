@@ -1,6 +1,6 @@
 /**
  * InterventionPlanModal Component
- * Displays SCA-generated intervention plans with steps, resources, and metadata
+ * Displays TCA-generated intervention plans with steps, resources, and metadata
  */
 
 'use client';

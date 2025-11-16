@@ -33,7 +33,7 @@ export interface AikaMetadata {
   session_id: string;
   user_role: 'user' | 'admin' | 'counselor';
   intent: string;
-  agents_invoked: string[];  // e.g., ["STA", "SCA"]
+  agents_invoked: string[];  // e.g., ["STA", "TCA"]
   actions_taken: string[];   // e.g., ["assess_risk", "provide_cbt_support"]
   processing_time_ms: number;
   risk_assessment?: AikaRiskAssessment;

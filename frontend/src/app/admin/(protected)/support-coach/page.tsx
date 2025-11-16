@@ -1,7 +1,7 @@
 /**
  * Therapeutic Coach Agent (TCA) Management Page
  * 
- * Purpose: Monitor and analyze SCA intervention plan effectiveness
+ * Purpose: Monitor and analyze TCA intervention plan effectiveness
  * Features:
  * - List all intervention plans across users (privacy-preserving)
  * - Analytics dashboard (completion rates, engagement metrics)

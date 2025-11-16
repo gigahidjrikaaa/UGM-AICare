@@ -177,14 +177,14 @@ export function CaseCreationForm({ onSubmit, loading }: CaseCreationFormProps) {
         </div>
       </div>
 
-      {/* SDA Workflow Info */}
+      {/* CMA Workflow Info */}
       <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4">
         <div className="flex items-start gap-2">
           <svg className="h-5 w-5 text-emerald-400 flex-shrink-0 mt-0.5" fill="currentColor" viewBox="0 0 20 20">
             <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
           </svg>
           <div className="text-sm text-white/70">
-            <p className="font-medium text-emerald-300 mb-1">SDA Graph Workflow</p>
+            <p className="font-medium text-emerald-300 mb-1">CMA Graph Workflow</p>
             <p>This form uses the Case Management Agent (CMA) graph workflow which will:</p>
             <ul className="list-disc list-inside mt-2 space-y-1 text-white/60">
               <li>Calculate SLA deadline based on severity</li>
@@ -211,7 +211,7 @@ export function CaseCreationForm({ onSubmit, loading }: CaseCreationFormProps) {
           ) : (
             <>
               <PaperAirplaneIcon className="w-5 h-5" />
-              Create Case via SDA
+              Create Case via CMA
             </>
           )}
         </button>

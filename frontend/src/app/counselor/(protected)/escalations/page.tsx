@@ -16,7 +16,7 @@ interface Escalation {
   user_id_hash: string;
   severity: 'low' | 'moderate' | 'high' | 'critical';
   trigger_type: 'crisis_keywords' | 'high_distress_score' | 'repeated_negative_thoughts' | 'manual_escalation';
-  agent_type: 'STA' | 'SCA' | 'SDA' | 'IA';
+  agent_type: 'STA' | 'TCA' | 'CMA' | 'IA';
   agent_notes: string;
   created_at: string;
   status: 'pending' | 'accepted' | 'reassigned' | 'resolved';
@@ -87,7 +87,7 @@ export default function CounselorEscalationsPage() {
           user_id_hash: 'user_def456',
           severity: 'high',
           trigger_type: 'high_distress_score',
-          agent_type: 'SCA',
+          agent_type: 'TCA',
           agent_notes: 'Distress score: 8.5/10. Multiple negative thought patterns detected.',
           created_at: new Date(Date.now() - 3600000).toISOString(),
           status: 'pending',

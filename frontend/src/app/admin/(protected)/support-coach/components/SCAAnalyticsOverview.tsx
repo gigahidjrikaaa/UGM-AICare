@@ -1,5 +1,5 @@
 /**
- * SCA Analytics Overview Component
+ * TCA Analytics Overview Component
  * Displays key metrics and charts for intervention plan effectiveness
  */
 

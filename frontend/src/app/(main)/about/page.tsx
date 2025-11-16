@@ -141,7 +141,7 @@ export default function AboutPage() {
 
           <div className="mt-8 p-6 bg-[#FFCA40]/10 border border-[#FFCA40]/30 rounded-xl">
             <p className="text-white/90 text-center">
-              <span className="font-bold text-[#FFCA40]">Orchestration Flow:</span> User Message → STA (Triage) → [Low/Moderate] → SCA (Coach) → END | [High/Critical] → SDA (Escalate) → END
+              <span className="font-bold text-[#FFCA40]">Orchestration Flow:</span> User Message → STA (Triage) → [Low/Moderate] → TCA (Coach) → END | [High/Critical] → CMA (Escalate) → END
             </p>
           </div>
         </motion.section>

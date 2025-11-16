@@ -1,9 +1,9 @@
 /**
- * Custom hooks for SCA admin data fetching
+ * Custom hooks for TCA admin data fetching
  */
 
 import { useState, useEffect } from 'react';
-import { apiClient } from '@/services/api';
+import apiClient from '@/services/api';
 
 // ============================================================================
 // TYPES
@@ -98,7 +98,7 @@ export interface CBTModuleUsage {
 // ============================================================================
 
 /**
- * Hook to fetch SCA analytics
+ * Hook to fetch TCA analytics
  */
 function useAnalytics(days: number = 30) {
   const [analytics, setAnalytics] = useState<SCAAnalytics | null>(null);

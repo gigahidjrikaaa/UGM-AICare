@@ -58,13 +58,13 @@ export interface Message {
   run_id?: string;
   metadata?: Record<string, unknown>; // To store things like module_id for event messages
   timestamp: Date;
-  interventionPlan?: InterventionPlan; // SCA-generated support plan
+  interventionPlan?: InterventionPlan; // TCA-generated support plan
   appointment?: Appointment; // Scheduling confirmation
   isError?: boolean; // For error messages
   agentActivity?: {
     // Agent Activity Log for transparency
-    execution_path: string[]; // ["aika_decision", "sta_subgraph", "sca_subgraph", "synthesize_response"]
-    agents_invoked: string[]; // ["STA", "SCA"]
+    execution_path: string[]; // ["aika_decision", "sta_subgraph", "tca_subgraph", "synthesize_response"]
+    agents_invoked: string[]; // ["STA", "TCA"]
     intent: string; // "emotional_support", "crisis_detection", etc.
     intent_confidence: number; // 0.0 - 1.0
     needs_agents: boolean;
@@ -141,7 +141,7 @@ export interface ChatResponsePayload {
     module_state?: { module: string; step: number }; // Example if backend sends state
     suggestions?: ChatModule[]; // Example if backend sends suggestions
     module_completed_id?: string;
-    intervention_plan?: InterventionPlan; // NEW: Intervention plan from SCA
+    intervention_plan?: InterventionPlan; // NEW: Intervention plan from TCA
     appointment?: Appointment; // NEW: Appointment booking from scheduling tools
     metadata?: {
       // Agent Activity metadata from unified orchestrator

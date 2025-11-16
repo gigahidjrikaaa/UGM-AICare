@@ -165,10 +165,10 @@ export default function ServiceDeskClient() {
             </span>
           </div>
 
-          {/* SDA Graph status */}
+          {/* CMA Graph status */}
           <div className="flex items-center gap-2 px-4 py-2 bg-blue-500/20 border border-blue-500/30 rounded-xl">
             <div className="h-2 w-2 bg-blue-500 rounded-full animate-pulse"></div>
-            <span className="text-sm font-medium text-blue-300">SDA Graph Active</span>
+            <span className="text-sm font-medium text-blue-300">CMA Graph Active</span>
           </div>
         </div>
       </motion.div>
@@ -194,10 +194,10 @@ export default function ServiceDeskClient() {
             <div>
               <h2 className="text-xl font-semibold text-white flex items-center gap-2">
                 <FolderOpenIcon className="w-6 h-6 text-[#FFCA40]" />
-                Create Case via SDA Graph
+                Create Case via CMA Graph
               </h2>
               <p className="text-sm text-white/60 mt-1">
-                Cases created through SDA include automatic SLA calculation and counselor assignment
+                Cases created through CMA include automatic SLA calculation and counselor assignment
               </p>
             </div>
           </div>
@@ -252,7 +252,7 @@ export default function ServiceDeskClient() {
             <div className="mt-2 text-sm text-white/60 space-y-1">
               <p>• <strong>Automatic SLA Calculation:</strong> Critical cases = 1 hour, High = 4 hours</p>
               <p>• <strong>Auto-Assignment:</strong> Cases are automatically assigned to available counselors</p>
-              <p>• <strong>Escalation Tracking:</strong> SDA monitors SLA breaches and triggers alerts</p>
+              <p>• <strong>Escalation Tracking:</strong> CMA monitors SLA breaches and triggers alerts</p>
             </div>
           </div>
         </div>

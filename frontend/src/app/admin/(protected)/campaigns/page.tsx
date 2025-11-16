@@ -137,7 +137,7 @@ export default function CampaignsPage() {
         className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
       >
         <div>
-          <h1 className="text-3xl font-bold text-white mb-2">SCA Outreach Management</h1>
+          <h1 className="text-3xl font-bold text-white mb-2">TCA Outreach Management</h1>
           <p className="text-white/60 text-sm">
             Manage proactive Therapeutic Coach Agent (TCA) campaigns and interventions
           </p>

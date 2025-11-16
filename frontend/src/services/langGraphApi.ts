@@ -23,7 +23,7 @@ export interface RiskAssessment {
   risk_score: number;          // 0.0-1.0 normalized score
   severity: 'low' | 'moderate' | 'high' | 'critical';
   intent: string;              // Detected user intent (e.g., "suicidal_ideation", "anxiety")
-  next_step: 'sca' | 'sda' | 'end';  // Routing decision
+  next_step: 'tca' | 'cma' | 'end';  // Routing decision
 }
 
 /**
@@ -51,9 +51,9 @@ export interface STAGraphResponse {
 }
 
 /**
- * SDA Graph Execution Request
+ * CMA Graph Execution Request
  */
-export interface SDAGraphRequest {
+export interface CMAGraphRequest {
   user_id: number;
   session_id: string;
   user_hash: string;
@@ -64,9 +64,9 @@ export interface SDAGraphRequest {
 }
 
 /**
- * SDA Graph Execution Response
+ * CMA Graph Execution Response
  */
-export interface SDAGraphResponse {
+export interface CMAGraphResponse {
   success: boolean;
   execution_id: string;
   execution_path: string[];
@@ -78,9 +78,9 @@ export interface SDAGraphResponse {
 }
 
 /**
- * SCA Graph Execution Request
+ * TCA Graph Execution Request
  */
-export interface SCAGraphRequest {
+export interface TCAGraphRequest {
   user_id: number;
   session_id: string;
   user_hash: string;
@@ -91,9 +91,9 @@ export interface SCAGraphRequest {
 }
 
 /**
- * SCA Graph Execution Response
+ * TCA Graph Execution Response
  */
-export interface SCAGraphResponse {
+export interface TCAGraphResponse {
   success: boolean;
   execution_id: string;
   execution_path: string[];
@@ -127,7 +127,7 @@ export interface OrchestratorGraphResponse {
   success: boolean;
   execution_id: string;
   execution_path: string[];
-  routed_to: string;           // Agent routed to: "sta", "sca", "sda", "ia"
+  routed_to: string;           // Agent routed to: "sta", "tca", "cma", "ia"
   agent_response?: Record<string, unknown>;  // Response from the routed agent
   errors: string[];
   execution_time_ms?: number;
@@ -210,7 +210,7 @@ export interface ExecutionHistoryFilters {
   limit?: number;              // Default: 50, max: 500
   offset?: number;             // Default: 0
   status?: 'completed' | 'failed' | 'running';
-  graph_name?: 'sta' | 'orchestrator' | 'sda' | 'sca' | 'ia' | 'aika';
+  graph_name?: 'sta' | 'orchestrator' | 'cma' | 'tca' | 'ia' | 'aika';
 }
 
 /**
@@ -365,8 +365,8 @@ export const executeSTA = async (request: STAGraphRequest): Promise<STAGraphResp
  * 
  * **UX Context:** Called from Service Desk dashboard when creating new cases
  */
-export const executeSDA = async (request: SDAGraphRequest): Promise<SDAGraphResponse> => {
-  const response = await apiClient.post<SDAGraphResponse>(
+export const executeCMA = async (request: CMAGraphRequest): Promise<CMAGraphResponse> => {
+  const response = await apiClient.post<CMAGraphResponse>(
     '/agents/graph/cma/execute',
     request
   );
@@ -386,8 +386,8 @@ export const executeSDA = async (request: SDAGraphRequest): Promise<SDAGraphResp
  * 
  * **UX Context:** Called from Cases page to generate intervention plans
  */
-export const executeSCA = async (request: SCAGraphRequest): Promise<SCAGraphResponse> => {
-  const response = await apiClient.post<SCAGraphResponse>(
+export const executeTCA = async (request: TCAGraphRequest): Promise<TCAGraphResponse> => {
+  const response = await apiClient.post<TCAGraphResponse>(
     '/agents/graph/tca/execute',
     request
   );
@@ -494,7 +494,7 @@ export const getAnalyticsOverview = async (
  * 
  * **Filters Available:**
  * - Status: completed, failed, running
- * - Graph name: sta, orchestrator, sda, sca, ia
+ * - Graph name: sta, orchestrator, cma, tca, ia
  * - Pagination: limit (max 500), offset
  * 
  * **UX Context:** Displayed in LangGraph Monitoring Dashboard execution history table
@@ -644,8 +644,8 @@ export const getMetricsTrends = async (): Promise<{
 export const langGraphApi = {
   // Execution endpoints
   executeSTA,
-  executeSDA,
-  executeSCA,
+  executeCMA,
+  executeTCA,
   executeOrchestrator,
   executeIA,
   

@@ -141,7 +141,7 @@ export default function AboutFeaturesPage() {
               </div>
               <div className="text-[#FFCA40] text-2xl">→</div>
               <div className="bg-white/10 px-4 py-2 rounded-lg">
-                <p className="text-white font-semibold">💬 SCA / 🗂️ SDA</p>
+                <p className="text-white font-semibold">💬 TCA / 🗂️ CMA</p>
               </div>
               <div className="text-[#FFCA40] text-2xl">→</div>
               <div className="bg-white/10 px-4 py-2 rounded-lg">

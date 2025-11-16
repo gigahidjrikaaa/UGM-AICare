@@ -10,7 +10,7 @@ import { getCaseDetail, getCaseConversation } from '@/services/adminCaseApi';
 import type { CaseDetailResponse, ConversationMessageSummary } from '@/types/admin/cases';
 import { formatDistanceToNow, format } from 'date-fns';
 import InterventionPlanModal from './InterventionPlanModal';
-import type { SCAGraphResponse } from '@/services/langGraphApi';
+import type { TCAGraphResponse } from '@/services/langGraphApi';
 
 interface CaseDetailModalProps {
   caseId: string;
@@ -33,7 +33,7 @@ export default function CaseDetailModal({
   const [error, setError] = useState<string | null>(null);
   const [showFullConversation, setShowFullConversation] = useState(false);
   const [activeTab, setActiveTab] = useState<'overview' | 'notes' | 'assignments' | 'triage' | 'conversation'>('overview');
-  const [interventionPlanResult, setInterventionPlanResult] = useState<SCAGraphResponse | null>(null);
+  const [interventionPlanResult, setInterventionPlanResult] = useState<TCAGraphResponse | null>(null);
   const [showInterventionPlan, setShowInterventionPlan] = useState(false);
 
   useEffect(() => {
@@ -210,9 +210,9 @@ export default function CaseDetailModal({
                       const { langGraphApi } = await import('@/services/langGraphApi');
                       const toast = (await import('react-hot-toast')).default;
                       
-                      // Prepare SCA request from case data
+                      // Prepare TCA request from case data
                       // Note: user_id not available in CaseDetailResponse, using placeholder
-                      const scaRequest = {
+                      const tcaRequest = {
                         user_id: parseInt(caseDetail.user_hash.substring(0, 8), 16) % 10000, // Derive numeric ID from hash
                         session_id: caseDetail.session_id || caseDetail.conversation_id || `case_${caseDetail.id}`,
                         user_hash: caseDetail.user_hash,
@@ -222,13 +222,13 @@ export default function CaseDetailModal({
                         risk_level: caseDetail.severity === 'critical' ? 3 : caseDetail.severity === 'high' ? 2 : caseDetail.severity === 'med' ? 1 : 0,
                       };
                       
-                      toast.loading('Generating intervention plan with SCA...', { id: 'sca-gen' });
-                      const result = await langGraphApi.executeSCA(scaRequest);
+                      toast.loading('Generating intervention plan with TCA...', { id: 'tca-gen' });
+                      const result = await langGraphApi.executeTCA(tcaRequest);
                       
                       if (result.success && result.intervention_plan) {
                         toast.success(
                           `✅ Intervention Plan Generated!`,
-                          { id: 'sca-gen', duration: 2000 }
+                          { id: 'tca-gen', duration: 2000 }
                         );
                         
                         // Store result and show modal
@@ -237,14 +237,14 @@ export default function CaseDetailModal({
                       } else {
                         toast.error(
                           result.errors?.join(', ') || 'Failed to generate intervention plan',
-                          { id: 'sca-gen' }
+                          { id: 'tca-gen' }
                         );
                       }
                     } catch (err) {
                       const toast = (await import('react-hot-toast')).default;
                       toast.error(
                         `Error: ${err instanceof Error ? err.message : 'Unknown error'}`,
-                        { id: 'sca-gen' }
+                        { id: 'tca-gen' }
                       );
                     }
                   }}
@@ -253,7 +253,7 @@ export default function CaseDetailModal({
                   <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                   </svg>
-                  Generate Intervention Plan (SCA)
+                  Generate Intervention Plan (TCA)
                 </button>
               </div>
 

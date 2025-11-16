@@ -529,7 +529,7 @@ export default function Home() {
                     {
                       icon: "💬",
                       name: "Therapeutic Coach Agent",
-                      acronym: "SCA",
+                      acronym: "TCA",
                       tagline: "Your Personal Coach",
                       color: "from-blue-500 to-purple-600",
                       borderColor: "border-blue-400/40",
@@ -546,7 +546,7 @@ export default function Home() {
                     {
                       icon: "🗂️",
                       name: "Case Management Agent",
-                      acronym: "SDA",
+                      acronym: "CMA",
                       tagline: "Behind-the-Scenes Hero",
                       color: "from-green-500 to-teal-600",
                       borderColor: "border-green-400/40",
@@ -750,14 +750,14 @@ export default function Home() {
                   },
                   { 
                     icon: "💬", 
-                    name: "SCA", 
+                    name: "TCA", 
                     color: "from-blue-500 to-purple-600",
                     action: "Creates intervention plans",
                     detail: "Personalized strategies"
                   },
                   { 
                     icon: "🗂️", 
-                    name: "SDA", 
+                    name: "CMA", 
                     color: "from-green-500 to-teal-600",
                     action: "Manages clinical follow-up",
                     detail: "Case coordination"
@@ -814,8 +814,8 @@ export default function Home() {
               <div className="lg:hidden space-y-6">
                 {[
                   { icon: "🚨", name: "STA", color: "from-red-500 to-pink-600", action: "Monitors every message" },
-                  { icon: "💬", name: "SCA", color: "from-blue-500 to-purple-600", action: "Creates intervention plans" },
-                  { icon: "🗂️", name: "SDA", color: "from-green-500 to-teal-600", action: "Manages clinical follow-up" },
+                  { icon: "💬", name: "TCA", color: "from-blue-500 to-purple-600", action: "Creates intervention plans" },
+                  { icon: "🗂️", name: "CMA", color: "from-green-500 to-teal-600", action: "Manages clinical follow-up" },
                   { icon: "🔍", name: "IA", color: "from-amber-500 to-orange-600", action: "Provides insights" },
                 ].map((agent, index) => (
                   <>

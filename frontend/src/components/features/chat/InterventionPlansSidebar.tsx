@@ -1,5 +1,5 @@
 /**
- * Sidebar component to display all SCA-generated intervention plans
+ * Sidebar component to display all TCA-generated intervention plans
  * Shows in /aika page as a toggleable side panel
  * Enhanced with UGM design system colors and improved UX
  */

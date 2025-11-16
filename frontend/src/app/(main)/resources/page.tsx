@@ -247,7 +247,7 @@ export default function SupportHubPage() {
           </div>
         </header>
 
-        {/* SCA Integration Banner */}
+        {/* TCA Integration Banner */}
         <section className="bg-gradient-to-r from-[#001D58] to-[#003580] border-2 border-[#FFCA40]/30 rounded-2xl p-6 sm:p-8 shadow-2xl shadow-[#FFCA40]/10">
           <div className="flex flex-col md:flex-row gap-6 items-center">
             <div className="flex-shrink-0">
