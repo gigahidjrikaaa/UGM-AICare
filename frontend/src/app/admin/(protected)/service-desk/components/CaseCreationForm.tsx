@@ -185,7 +185,7 @@ export function CaseCreationForm({ onSubmit, loading }: CaseCreationFormProps) {
           </svg>
           <div className="text-sm text-white/70">
             <p className="font-medium text-emerald-300 mb-1">SDA Graph Workflow</p>
-            <p>This form uses the Service Desk Agent (SDA) graph workflow which will:</p>
+            <p>This form uses the Case Management Agent (CMA) graph workflow which will:</p>
             <ul className="list-disc list-inside mt-2 space-y-1 text-white/60">
               <li>Calculate SLA deadline based on severity</li>
               <li>Automatically assign to available counselor</li>

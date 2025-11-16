@@ -206,7 +206,7 @@ export default function AboutAikaPage() {
               {
                 step: "3",
                 title: "Professional Escalation",
-                description: "If Aika detects high-risk situations, she immediately connects you with licensed counselors through our Service Desk Agent."
+                description: "If Aika detects high-risk situations, she immediately connects you with licensed counselors through our Case Management Agent."
               },
               {
                 step: "4",

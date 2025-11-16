@@ -340,7 +340,7 @@ export interface MetricsTrend {
  * 1. Ingest user message
  * 2. Apply redaction (remove PII)
  * 3. Assess risk level (0-3)
- * 4. Decide routing (SCA/SDA/end)
+ * 4. Decide routing (TCA/CMA/end)
  * 
  * **UX Context:** Called when counselor manually triggers triage or system auto-triages new messages
  */
@@ -353,7 +353,7 @@ export const executeSTA = async (request: STAGraphRequest): Promise<STAGraphResp
 };
 
 /**
- * Execute Service Desk Agent (SDA) workflow
+ * Execute Case Management Agent (CMA) workflow
  * 
  * **Use Case:** Create cases with automatic SLA calculation and counselor assignment
  * 
@@ -367,14 +367,14 @@ export const executeSTA = async (request: STAGraphRequest): Promise<STAGraphResp
  */
 export const executeSDA = async (request: SDAGraphRequest): Promise<SDAGraphResponse> => {
   const response = await apiClient.post<SDAGraphResponse>(
-    '/agents/graph/sda/execute',
+    '/agents/graph/cma/execute',
     request
   );
   return response.data;
 };
 
 /**
- * Execute Support Coach Agent (SCA) workflow
+ * Execute Therapeutic Coach Agent (TCA) workflow
  * 
  * **Use Case:** Generate personalized intervention plans for users
  * 
@@ -388,7 +388,7 @@ export const executeSDA = async (request: SDAGraphRequest): Promise<SDAGraphResp
  */
 export const executeSCA = async (request: SCAGraphRequest): Promise<SCAGraphResponse> => {
   const response = await apiClient.post<SCAGraphResponse>(
-    '/agents/graph/sca/execute',
+    '/agents/graph/tca/execute',
     request
   );
   return response.data;
@@ -401,7 +401,7 @@ export const executeSCA = async (request: SCAGraphRequest): Promise<SCAGraphResp
  * 
  * **Workflow:**
  * 1. Classify intent (if intent="auto")
- * 2. Route to appropriate agent (STA/SCA/SDA/IA)
+ * 2. Route to appropriate agent (STA/TCA/CMA/IA)
  * 3. Return agent response
  * 
  * **UX Context:** Used in agents command center for manual agent testing

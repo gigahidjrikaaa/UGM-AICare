@@ -1,6 +1,6 @@
-"""Service wrapper for SDA LangGraph execution.
+"""Service wrapper for TCA LangGraph execution.
 
-This module provides a high-level interface for executing the Service Desk Agent
+This module provides a high-level interface for executing the Therapeutic Coach Agent
 workflow via LangGraph, including execution tracking and error handling.
 """
 from __future__ import annotations
@@ -12,47 +12,46 @@ from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.graph_state import SDAState
-from app.agents.sda.sda_graph import create_sda_graph
+from app.agents.graph_state import SCAState
+from app.agents.tca.sca_graph import create_sca_graph
 from app.agents.execution_tracker import execution_tracker
 
 logger = logging.getLogger(__name__)
 
 
-class SDAGraphService:
-    """Execute SDA workflow via LangGraph.
+class TCAGraphService:
+    """Execute TCA workflow via LangGraph.
     
-    This service wraps the SDA StateGraph and provides execution tracking,
-    state initialization, and error handling for high-severity case escalations.
+    This service wraps the TCA StateGraph and provides execution tracking,
+    state initialization, and error handling.
     
     Example:
         ```python
         async with get_async_db() as db:
-            service = SDAGraphService(db)
+            service = TCAGraphService(db)
             result = await service.execute(
                 user_id=123,
                 session_id="abc-123",
                 user_hash="hash_456",
-                message="I want to end my life",
+                message="I'm feeling really stressed",
                 conversation_id=789,
-                severity="critical",
-                intent="crisis",
-                risk_score=0.95,
+                severity="moderate",
+                intent="anxiety",
                 triage_assessment_id=456
             )
-            print(f"Case ID: {result['case_id']}")
-            print(f"SLA breach at: {result['sla_breach_at']}")
+            print(f"Intervention type: {result['intervention_type']}")
+            print(f"Plan ID: {result['intervention_plan_id']}")
         ```
     """
     
     def __init__(self, db: AsyncSession):
-        """Initialize SDA graph service.
+        """Initialize TCA graph service.
         
         Args:
             db: Database session for graph node operations
         """
         self.db = db
-        self.graph = create_sda_graph(db)  # CompiledStateGraph
+        self.graph = create_sca_graph(db)
     
     async def execute(
         self,
@@ -61,60 +60,50 @@ class SDAGraphService:
         user_hash: str,
         message: str,
         conversation_id: int | None = None,
-        severity: str = "high",
-        intent: str = "crisis",
-        risk_score: float = 0.8,
+        severity: str = "moderate",
+        intent: str = "general",
         triage_assessment_id: int | None = None
-    ) -> SDAState:
-        """Execute SDA graph workflow for case creation.
+    ) -> SCAState:
+        """Execute TCA graph workflow.
         
         This method:
         1. Starts execution tracking
         2. Initializes graph state with STA triage outputs
-        3. Executes the compiled StateGraph to create a case
+        3. Executes the compiled StateGraph
         4. Completes execution tracking
-        5. Returns final state with case details
+        5. Returns final state with intervention plan
         
         Args:
             user_id: User database ID
             session_id: Session identifier
             user_hash: Anonymized user identifier
-            message: User message triggering escalation
+            message: User message for coaching
             conversation_id: Optional conversation ID
-            severity: Risk severity from STA (must be "high" or "critical")
-            intent: Detected intent from STA (e.g., "crisis", "self_harm")
-            risk_score: Numerical risk score from STA (0.0-1.0)
+            severity: Risk severity from STA (low/moderate/high/critical)
+            intent: Detected intent from STA (e.g., "anxiety", "overwhelmed")
             triage_assessment_id: Database ID of STA triage assessment
             
         Returns:
-            Final state after graph execution with case ID and SLA details
+            Final state after graph execution with intervention plan
             
         Raises:
             Exception: If graph execution fails
-            ValueError: If severity is not "high" or "critical"
         """
-        # Validate severity
-        if severity.lower() not in ("high", "critical"):
-            raise ValueError(
-                f"SDA only handles high/critical severity cases, got: {severity}"
-            )
-        
         # Start execution tracking
         execution_id = execution_tracker.start_execution(
-            graph_id="sda",
-            agent_name="Service Desk Agent",
+            graph_id="tca",
+            agent_name="Therapeutic Coach Agent",
             input_data={
                 "message": message,
                 "user_hash": user_hash,
                 "session_id": session_id,
                 "severity": severity,
-                "intent": intent,
-                "risk_score": risk_score
+                "intent": intent
             }
         )
         
         # Initialize state with STA outputs
-        initial_state: SDAState = {
+        initial_state: SCAState = {
             "user_id": user_id,
             "session_id": session_id,
             "user_hash": user_hash,
@@ -123,26 +112,24 @@ class SDAGraphService:
             "execution_id": execution_id,
             "errors": [],
             "execution_path": [],
-            "should_intervene": False,  # Not SCA intervention - case escalation
+            "should_intervene": True,  # TCA is invoked because intervention is needed
             "case_created": False,
             "started_at": datetime.now(),
             # STA outputs
-            "severity": severity,  # type: ignore[typeddict-item]
+            "severity": severity,
             "intent": intent,
-            "risk_score": risk_score,
             "triage_assessment_id": triage_assessment_id
         }
         
         try:
             # Execute graph
             logger.info(
-                f"Executing SDA graph for user_hash={user_hash}, "
-                f"severity={severity}, risk_score={risk_score}, "
+                f"Executing TCA graph for user_hash={user_hash}, "
+                f"severity={severity}, intent={intent}, "
                 f"execution_id={execution_id}"
             )
             
-            # Note: self.graph is CompiledStateGraph at runtime, has ainvoke
-            final_state = await self.graph.ainvoke(initial_state)  # type: ignore[attr-defined]
+            final_state = await self.graph.ainvoke(initial_state)
             
             # Mark completion timestamp
             final_state["completed_at"] = datetime.now()
@@ -152,34 +139,32 @@ class SDAGraphService:
             execution_tracker.complete_execution(execution_id, success=execution_success)
             
             logger.info(
-                f"SDA graph execution completed: "
-                f"case_created={final_state.get('case_created', False)}, "
-                f"case_id={final_state.get('case_id', 'none')}, "
+                f"TCA graph execution completed: "
+                f"intervention_type={final_state.get('intervention_type', 'unknown')}, "
+                f"plan_id={final_state.get('intervention_plan_id', 'none')}, "
                 f"errors={len(final_state.get('errors', []))}"
             )
             
             return final_state
             
         except Exception as e:
-            logger.error(f"SDA graph execution failed: {e}", exc_info=True)
+            logger.error(f"TCA graph execution failed: {e}", exc_info=True)
             execution_tracker.complete_execution(execution_id, success=False)
             
             # Return state with error
-            errors = initial_state.get("errors", [])
-            errors.append(f"Graph execution failed: {str(e)}")
-            initial_state["errors"] = errors
+            initial_state["errors"].append(f"Graph execution failed: {str(e)}")
             initial_state["completed_at"] = datetime.now()
             
             raise
 
 
-async def get_sda_graph_service(db: AsyncSession) -> SDAGraphService:
-    """FastAPI dependency factory for SDAGraphService.
+async def get_tca_graph_service(db: AsyncSession) -> TCAGraphService:
+    """FastAPI dependency factory for TCAGraphService.
     
     Args:
         db: Database session
         
     Returns:
-        Initialized SDAGraphService
+        Initialized TCAGraphService
     """
-    return SDAGraphService(db)
+    return TCAGraphService(db)

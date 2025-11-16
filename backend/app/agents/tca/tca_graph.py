@@ -1,10 +1,10 @@
-"""LangGraph state machine for Support Coach Agent (SCA).
+"""LangGraph state machine for Therapeutic Coach Agent (TCA).
 
-This module implements the SCA workflow as a LangGraph StateGraph:
+This module implements the TCA workflow as a LangGraph StateGraph:
     ingest_triage_signal → determine_intervention_type → generate_plan → 
     safety_review → persist_plan
 
-The graph integrates with SupportCoachService and uses Gemini AI for 
+The graph integrates with TherapeuticCoachService and uses Gemini AI for 
 personalized intervention plan generation.
 """
 from __future__ import annotations
@@ -16,8 +16,8 @@ from langgraph.graph import StateGraph, END
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.graph_state import SCAState
-from app.agents.sca.service import SupportCoachService
-from app.agents.sca.schemas import SCAInterveneRequest
+from app.agents.tca.service import TherapeuticCoachService
+from app.agents.tca.schemas import SCAInterveneRequest
 from app.agents.execution_tracker import execution_tracker
 from app.domains.mental_health.models import InterventionPlanRecord
 
@@ -28,7 +28,7 @@ async def ingest_triage_signal_node(state: SCAState) -> SCAState:
     """Node: Ingest triage signal from STA.
     
     Validates that STA has provided necessary risk assessment data
-    and initializes SCA execution tracking.
+    and initializes TCA execution tracking.
     
     Args:
         state: Current graph state with STA outputs
@@ -38,7 +38,7 @@ async def ingest_triage_signal_node(state: SCAState) -> SCAState:
     """
     execution_id = state.get("execution_id")
     if execution_id:
-        execution_tracker.start_node(execution_id, "sca::ingest_triage_signal", "sca")
+        execution_tracker.start_node(execution_id, "tca::ingest_triage_signal", "tca")
     
     # Validate STA outputs are present
     if not state.get("severity") or not state.get("intent"):
@@ -46,7 +46,7 @@ async def ingest_triage_signal_node(state: SCAState) -> SCAState:
         if execution_id:
             execution_tracker.fail_node(
                 execution_id, 
-                "sca::ingest_triage_signal", 
+                "tca::ingest_triage_signal", 
                 "Missing STA data"
             )
         return state
@@ -54,10 +54,10 @@ async def ingest_triage_signal_node(state: SCAState) -> SCAState:
     state["execution_path"].append("ingest_triage_signal")
     
     if execution_id:
-        execution_tracker.complete_node(execution_id, "sca::ingest_triage_signal")
+        execution_tracker.complete_node(execution_id, "tca::ingest_triage_signal")
     
     logger.info(
-        f"SCA ingested triage signal: severity={state.get('severity')}, "
+        f"TCA ingested triage signal: severity={state.get('severity')}, "
         f"intent={state.get('intent')}"
     )
     return state
@@ -79,7 +79,7 @@ async def determine_intervention_type_node(state: SCAState) -> SCAState:
     """
     execution_id = state.get("execution_id")
     if execution_id:
-        execution_tracker.start_node(execution_id, "sca::determine_intervention_type", "sca")
+        execution_tracker.start_node(execution_id, "tca::determine_intervention_type", "tca")
     
     try:
         intent = state.get("intent", "").lower()
@@ -100,11 +100,11 @@ async def determine_intervention_type_node(state: SCAState) -> SCAState:
         if execution_id:
             execution_tracker.complete_node(
                 execution_id, 
-                "sca::determine_intervention_type",
+                "tca::determine_intervention_type",
                 metrics={"intervention_type": intervention_type}
             )
         
-        logger.info(f"SCA determined intervention type: {intervention_type}")
+        logger.info(f"TCA determined intervention type: {intervention_type}")
         
     except Exception as e:
         error_msg = f"Failed to determine intervention type: {str(e)}"
@@ -114,7 +114,7 @@ async def determine_intervention_type_node(state: SCAState) -> SCAState:
         if execution_id:
             execution_tracker.fail_node(
                 execution_id, 
-                "sca::determine_intervention_type", 
+                "tca::determine_intervention_type", 
                 str(e)
             )
     
@@ -124,7 +124,7 @@ async def determine_intervention_type_node(state: SCAState) -> SCAState:
 async def generate_plan_node(state: SCAState) -> SCAState:
     """Node: Generate personalized intervention plan using Gemini AI.
     
-    Uses SupportCoachService with Gemini-powered plan generation to create
+    Uses TherapeuticCoachService with Gemini-powered plan generation to create
     hyper-personalized CBT-informed intervention plans.
     
     Args:
@@ -135,11 +135,11 @@ async def generate_plan_node(state: SCAState) -> SCAState:
     """
     execution_id = state.get("execution_id")
     if execution_id:
-        execution_tracker.start_node(execution_id, "sca::generate_plan", "sca")
+        execution_tracker.start_node(execution_id, "tca::generate_plan", "tca")
     
     try:
-        # Get SCA service
-        sca_service = SupportCoachService()
+        # Get TCA service
+        sca_service = TherapeuticCoachService()
         
         # Build intervention request
         request = SCAInterveneRequest(
@@ -191,7 +191,7 @@ async def generate_plan_node(state: SCAState) -> SCAState:
         if execution_id:
             execution_tracker.complete_node(
                 execution_id, 
-                "sca::generate_plan",
+                "tca::generate_plan",
                 metrics={
                     "num_steps": len(response.plan_steps),
                     "num_resources": len(response.resource_cards)
@@ -199,7 +199,7 @@ async def generate_plan_node(state: SCAState) -> SCAState:
             )
         
         logger.info(
-            f"SCA generated plan: {len(response.plan_steps)} steps, "
+            f"TCA generated plan: {len(response.plan_steps)} steps, "
             f"{len(response.resource_cards)} resources"
         )
         
@@ -209,7 +209,7 @@ async def generate_plan_node(state: SCAState) -> SCAState:
         logger.error(error_msg, exc_info=True)
         
         if execution_id:
-            execution_tracker.fail_node(execution_id, "sca::generate_plan", str(e))
+            execution_tracker.fail_node(execution_id, "tca::generate_plan", str(e))
     
     return state
 
@@ -228,30 +228,30 @@ async def safety_review_node(state: SCAState) -> SCAState:
     """
     execution_id = state.get("execution_id")
     if execution_id:
-        execution_tracker.start_node(execution_id, "sca::safety_review", "sca")
+        execution_tracker.start_node(execution_id, "tca::safety_review", "tca")
     
     try:
         severity = state.get("severity", "low")
         
-        # Safety check: High/critical severity should not use SCA
+        # Safety check: High/critical severity should not use TCA
         # (should be routed to SDA instead)
         if severity in ("high", "critical"):
             state["should_intervene"] = False
             state["errors"].append(
-                "Safety review: High/critical severity should route to SDA, not SCA"
+                "Safety review: High/critical severity should route to SDA, not TCA"
             )
-            logger.warning(f"SCA safety review blocked: severity={severity}")
+            logger.warning(f"TCA safety review blocked: severity={severity}")
         
         state["execution_path"].append("safety_review")
         
         if execution_id:
             execution_tracker.complete_node(
                 execution_id, 
-                "sca::safety_review",
+                "tca::safety_review",
                 metrics={"should_intervene": state.get("should_intervene", False)}
             )
         
-        logger.info(f"SCA safety review passed: should_intervene={state.get('should_intervene')}")
+        logger.info(f"TCA safety review passed: should_intervene={state.get('should_intervene')}")
         
     except Exception as e:
         error_msg = f"Safety review failed: {str(e)}"
@@ -259,7 +259,7 @@ async def safety_review_node(state: SCAState) -> SCAState:
         logger.error(error_msg, exc_info=True)
         
         if execution_id:
-            execution_tracker.fail_node(execution_id, "sca::safety_review", str(e))
+            execution_tracker.fail_node(execution_id, "tca::safety_review", str(e))
     
     return state
 
@@ -278,15 +278,15 @@ async def persist_plan_node(state: SCAState, db: AsyncSession) -> SCAState:
     """
     execution_id = state.get("execution_id")
     if execution_id:
-        execution_tracker.start_node(execution_id, "sca::persist_plan", "sca")
+        execution_tracker.start_node(execution_id, "tca::persist_plan", "tca")
     
     try:
         # Only persist if intervention should proceed
         if not state.get("should_intervene"):
-            logger.info("SCA skipping plan persistence (should_intervene=False)")
+            logger.info("TCA skipping plan persistence (should_intervene=False)")
             state["execution_path"].append("persist_plan")
             if execution_id:
-                execution_tracker.complete_node(execution_id, "sca::persist_plan")
+                execution_tracker.complete_node(execution_id, "tca::persist_plan")
             return state
         
         # Get intervention_type string and plan data
@@ -325,7 +325,7 @@ async def persist_plan_node(state: SCAState, db: AsyncSession) -> SCAState:
         await db.flush()
         
         # DEBUG: Log plan creation details
-        logger.info(f"📋 SCA persisted intervention plan: ID={plan.id}, user_id={plan.user_id}, is_active={plan.is_active}, status={plan.status}")
+        logger.info(f"📋 TCA persisted intervention plan: ID={plan.id}, user_id={plan.user_id}, is_active={plan.is_active}, status={plan.status}")
         
         state["intervention_plan_id"] = plan.id
         state["execution_path"].append("persist_plan")
@@ -333,11 +333,11 @@ async def persist_plan_node(state: SCAState, db: AsyncSession) -> SCAState:
         if execution_id:
             execution_tracker.complete_node(
                 execution_id, 
-                "sca::persist_plan",
+                "tca::persist_plan",
                 metrics={"plan_id": plan.id}
             )
         
-        logger.info(f"SCA persisted intervention plan: ID={plan.id}")
+        logger.info(f"TCA persisted intervention plan: ID={plan.id}")
         
     except Exception as e:
         error_msg = f"Plan persistence failed: {str(e)}"
@@ -345,13 +345,13 @@ async def persist_plan_node(state: SCAState, db: AsyncSession) -> SCAState:
         logger.error(error_msg, exc_info=True)
         
         if execution_id:
-            execution_tracker.fail_node(execution_id, "sca::persist_plan", str(e))
+            execution_tracker.fail_node(execution_id, "tca::persist_plan", str(e))
     
     return state
 
 
 def create_sca_graph(db: AsyncSession) -> StateGraph:
-    """Create the SCA LangGraph state machine.
+    """Create the TCA LangGraph state machine.
     
     Graph structure:
         START → ingest_triage_signal → determine_intervention_type → 

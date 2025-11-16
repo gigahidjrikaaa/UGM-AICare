@@ -5,8 +5,8 @@ routing user messages through the appropriate agent workflows based on risk asse
 
 Workflow:
     STA (assess risk) → 
-        - High/Critical → SDA (create case)
-        - Moderate + needs support → SCA (intervention plan) → (optionally SDA if escalated)
+        - High/Critical → CMA (create case)
+        - Moderate + needs support → TCA (intervention plan) → (optionally CMA if escalated)
         - Low → END (normal conversation)
 """
 from __future__ import annotations
@@ -19,8 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.graph_state import OrchestratorState
 from app.agents.sta.sta_graph import create_sta_graph
-from app.agents.sca.sca_graph import create_sca_graph
-from app.agents.sda.sda_graph import create_sda_graph
+from app.agents.tca.sca_graph import create_sca_graph
+from app.agents.cma.sda_graph import create_sda_graph
 from app.agents.execution_tracker import execution_tracker
 
 logger = logging.getLogger(__name__)
@@ -81,7 +81,7 @@ async def execute_sta_subgraph(state: OrchestratorState, db: AsyncSession) -> Or
 async def execute_sca_subgraph(state: OrchestratorState, db: AsyncSession) -> OrchestratorState:
     """Execute SCA as a subgraph.
     
-    Runs the Support Coach Agent workflow to generate personalized
+    Runs the Therapeutic Coach Agent workflow to generate personalized
     intervention plans for moderate-severity cases.
     
     Args:
@@ -96,7 +96,7 @@ async def execute_sca_subgraph(state: OrchestratorState, db: AsyncSession) -> Or
         execution_tracker.start_node(execution_id, "orchestrator::sca", "orchestrator")
     
     try:
-        # Create and execute SCA subgraph
+        # Create and execute TCA subgraph
         sca_graph = create_sca_graph(db)
         sca_result = await sca_graph.ainvoke(state)
         
@@ -114,13 +114,13 @@ async def execute_sca_subgraph(state: OrchestratorState, db: AsyncSession) -> Or
             )
         
         logger.info(
-            f"Orchestrator completed SCA: "
+            f"Orchestrator completed TCA: "
             f"should_intervene={sca_result.get('should_intervene')}, "
             f"plan_id={sca_result.get('intervention_plan_id')}"
         )
         
     except Exception as e:
-        error_msg = f"SCA subgraph failed: {str(e)}"
+        error_msg = f"TCA subgraph failed: {str(e)}"
         logger.error(error_msg, exc_info=True)
         state["errors"].append(error_msg)
         
@@ -131,7 +131,7 @@ async def execute_sca_subgraph(state: OrchestratorState, db: AsyncSession) -> Or
 
 
 async def execute_sda_subgraph(state: OrchestratorState, db: AsyncSession) -> OrchestratorState:
-    """Execute SDA as a subgraph.
+    """Execute CMA as a subgraph.
     
     Runs the Service Desk Agent workflow to create cases for high/critical
     severity situations requiring manual counsellor intervention.
@@ -141,18 +141,18 @@ async def execute_sda_subgraph(state: OrchestratorState, db: AsyncSession) -> Or
         db: Database session
         
     Returns:
-        State updated with SDA outputs (case_id, case_created, etc.)
+        State updated with CMA outputs (case_id, case_created, etc.)
     """
     execution_id = state.get("execution_id")
     if execution_id:
         execution_tracker.start_node(execution_id, "orchestrator::sda", "orchestrator")
     
     try:
-        # Create and execute SDA subgraph
+        # Create and execute CMA subgraph
         sda_graph = create_sda_graph(db)
         sda_result = await sda_graph.ainvoke(state)
         
-        # Merge SDA outputs into orchestrator state
+        # Merge CMA outputs into orchestrator state
         state.update(sda_result)
         
         if execution_id:
@@ -166,12 +166,12 @@ async def execute_sda_subgraph(state: OrchestratorState, db: AsyncSession) -> Or
             )
         
         logger.info(
-            f"Orchestrator completed SDA: case_id={sda_result.get('case_id')}, "
+            f"Orchestrator completed CMA: case_id={sda_result.get('case_id')}, "
             f"case_created={sda_result.get('case_created')}"
         )
         
     except Exception as e:
-        error_msg = f"SDA subgraph failed: {str(e)}"
+        error_msg = f"CMA subgraph failed: {str(e)}"
         logger.error(error_msg, exc_info=True)
         state["errors"].append(error_msg)
         
@@ -185,7 +185,7 @@ def should_route_to_sca(state: OrchestratorState) -> str:
     """Conditional edge: Should we invoke SCA?
     
     Routing logic:
-        - High/Critical severity → Skip SCA, go straight to SDA
+        - High/Critical severity → Skip TCA, go straight to CMA
         - Moderate + next_step='sca' → Invoke SCA
         - Otherwise → END (normal conversation)
     
@@ -212,12 +212,12 @@ def should_route_to_sca(state: OrchestratorState) -> str:
         f"Orchestrator routing after STA: severity={severity}, next_step={next_step}"
     )
     
-    # High/critical skip SCA and go straight to SDA
+    # High/critical skip SCA and go straight to CMA
     if severity in ("high", "critical"):
         return "route_sda"
     
     # Moderate with next_step=sca
-    if next_step == "sca":
+    if next_step == "tca":
         return "invoke_sca"
     
     return "end"
@@ -227,7 +227,7 @@ def should_route_to_sda_after_sca(state: OrchestratorState) -> str:
     """Conditional edge: Should we create a case after SCA?
     
     SCA typically handles moderate cases, but if there's escalation logic
-    in the future, this conditional allows routing to SDA after SCA.
+    in the future, this conditional allows routing to CMA after SCA.
     
     Args:
         state: Current orchestrator state
@@ -247,8 +247,8 @@ def should_route_to_sda_after_sca(state: OrchestratorState) -> str:
             condition_result=True
         )
     
-    # Future: Could check if SCA escalated to SDA
-    # For now, SCA cases don't route to SDA
+    # Future: Could check if TCA escalated to CMA
+    # For now, SCA cases don.t route to CMA
     logger.info(f"Orchestrator routing after SCA: severity={severity} -> END")
     
     return "end"
@@ -264,7 +264,7 @@ def create_orchestrator_graph(db: AsyncSession) -> StateGraph:
                 - Moderate + support → execute_sca → END
                 - Low → END
     
-    This orchestrator coordinates the three main agents (STA, SCA, SDA)
+    This orchestrator coordinates the three main agents (STA, TCA, CMA)
     and routes user messages through the appropriate workflows based on
     risk assessment.
     
@@ -295,7 +295,7 @@ def create_orchestrator_graph(db: AsyncSession) -> StateGraph:
         }
     )
     
-    # Conditional routing after SCA (currently always END)
+    # Conditional routing after TCA (currently always END)
     workflow.add_conditional_edges(
         "execute_sca",
         should_route_to_sda_after_sca,
@@ -305,7 +305,7 @@ def create_orchestrator_graph(db: AsyncSession) -> StateGraph:
         }
     )
     
-    # SDA is always terminal
+    # CMA is always terminal
     workflow.add_edge("execute_sda", END)
     
     return workflow.compile()

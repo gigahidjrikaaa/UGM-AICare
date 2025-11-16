@@ -71,7 +71,7 @@ export default function AboutFeaturesPage() {
               },
               {
                 emoji: "💬",
-                title: "Support Coach Agent (SCA)",
+                title: "Therapeutic Coach Agent (TCA)",
                 description: "CBT-informed therapeutic coaching",
                 features: [
                   "Evidence-based interventions",
@@ -82,7 +82,7 @@ export default function AboutFeaturesPage() {
               },
               {
                 emoji: "🗂️",
-                title: "Service Desk Agent (SDA)",
+                title: "Case Management Agent (CMA)",
                 description: "Professional case management",
                 features: [
                   "Licensed counselor coordination",

@@ -46,7 +46,7 @@ const navGroups = [
     items: [
       { name: 'Dashboard', icon: <FiBarChart2 size={18}/>, href: '/admin/dashboard' },
       { name: 'Cases', icon: <FiShield size={18}/>, href: '/admin/cases' },
-      { name: 'Service Desk', icon: <FiBriefcase size={18}/>, href: '/admin/service-desk' },
+      { name: 'Case Management', icon: <FiBriefcase size={18}/>, href: '/admin/service-desk' },
       { name: 'SCA Outreach', icon: <FiSend size={18}/>, href: '/admin/campaigns' },
       { name: 'Quest Templates', icon: <FiZap size={18}/>, href: '/admin/quests' },
       { name: 'Insights Analytics', icon: <FiTrendingUp size={18}/>, href: '/admin/insights' },

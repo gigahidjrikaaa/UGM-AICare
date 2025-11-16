@@ -25,7 +25,7 @@ class OrchestratorGraphService:
     
     This service wraps the master orchestrator StateGraph and provides
     complete end-to-end execution from user message intake through
-    appropriate agent workflows (STA → SCA/SDA).
+    appropriate agent workflows (STA → TCA/CMA).
     
     Example:
         ```python
@@ -67,7 +67,7 @@ class OrchestratorGraphService:
         This method:
         1. Starts execution tracking
         2. Initializes orchestrator state
-        3. Executes the compiled StateGraph (STA → SCA/SDA)
+        3. Executes the compiled StateGraph (STA → TCA/CMA)
         4. Completes execution tracking
         5. Returns final state with all agent outputs
         
@@ -80,7 +80,7 @@ class OrchestratorGraphService:
             
         Returns:
             Final state after complete workflow execution with outputs from
-            STA and any invoked downstream agents (SCA/SDA)
+            STA and any invoked downstream agents (TCA/CMA)
             
         Raises:
             Exception: If orchestrator execution fails

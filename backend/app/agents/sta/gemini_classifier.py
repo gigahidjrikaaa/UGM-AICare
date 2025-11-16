@@ -323,7 +323,7 @@ Return as JSON:
   "step8_classification": {{
     "risk_level": 2,
     "intent": "acute_distress",
-    "next_step": "sca",
+    "next_step": "tca",
     "confidence": 0.85,
     "reasoning": "brief explanation of decision"
   }}
@@ -411,7 +411,7 @@ Return as JSON:
             return STAClassifyResponse(
                 risk_level=1,
                 intent="general_support",
-                next_step="sca",
+                next_step="tca",
                 handoff=False,
                 diagnostic_notes=f"Gemini parse error (fallback to moderate): {str(e)}",
                 needs_support_coach_plan=False,
@@ -425,7 +425,7 @@ Return as JSON:
             return STAClassifyResponse(
                 risk_level=1,
                 intent="general_support",
-                next_step="sca",
+                next_step="tca",
                 handoff=False,
                 diagnostic_notes=f"Gemini error (fallback to moderate): {str(e)}",
                 needs_support_coach_plan=False,

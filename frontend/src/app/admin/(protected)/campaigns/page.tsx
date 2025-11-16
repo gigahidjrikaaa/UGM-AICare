@@ -139,7 +139,7 @@ export default function CampaignsPage() {
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">SCA Outreach Management</h1>
           <p className="text-white/60 text-sm">
-            Manage proactive Support Coach Agent (SCA) campaigns and interventions
+            Manage proactive Therapeutic Coach Agent (TCA) campaigns and interventions
           </p>
         </div>
 

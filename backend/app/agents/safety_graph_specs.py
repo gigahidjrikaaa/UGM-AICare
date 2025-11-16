@@ -116,7 +116,7 @@ STA_GRAPH_SPEC: GraphSpec = {
 }
 
 SCA_GRAPH_SPEC = {
-    "id": "sca",
+    "id": "tca",
     "name": "Safety Coaching Agent",
     "nodes": [
         {
@@ -183,7 +183,7 @@ SCA_GRAPH_SPEC = {
 }
 
 SDA_GRAPH_SPEC = {
-    "id": "sda",
+    "id": "cma",
     "name": "Safety Desk Agent",
     "nodes": [
         {
@@ -288,8 +288,8 @@ AGENT_GRAPH_SPECS: Dict[str, GraphSpec] = cast(
     Dict[str, GraphSpec],
     {
         "sta": STA_GRAPH_SPEC,
-        "sca": SCA_GRAPH_SPEC,
-        "sda": SDA_GRAPH_SPEC,
+        "tca": SCA_GRAPH_SPEC,
+        "cma": SDA_GRAPH_SPEC,
         "ia": IA_GRAPH_SPEC,
     },
 )

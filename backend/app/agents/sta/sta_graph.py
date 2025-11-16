@@ -218,7 +218,7 @@ def decide_routing(state: STAState) -> str:
         return "escalate_sda"
     
     # Moderate routes to SCA if needed
-    if next_step == "sca":
+    if next_step == "tca":
         return "route_sca"
     
     return "end"

@@ -8,7 +8,7 @@ Architecture:
                                    ↓               ↓
                               [YES: STA]      [NO: END]
                                    ↓
-                            [Conditional: SCA/SDA]
+                            [Conditional: TCA/CMA]
                                    ↓
                                  END
 
@@ -40,8 +40,8 @@ from app.core.llm import generate_response
 # Lazy imports to avoid circular dependencies
 if TYPE_CHECKING:
     from app.agents.sta.sta_graph import create_sta_graph
-    from app.agents.sca.sca_graph import create_sca_graph
-    from app.agents.sda.sda_graph import create_sda_graph
+    from app.agents.tca.tca_graph import create_tca_graph
+    from app.agents.cma.cma_graph import create_cma_graph
 
 logger = logging.getLogger(__name__)
 
@@ -96,7 +96,7 @@ async def aika_decision_node(
     
     Decision Logic:
     - Simple greetings/casual chat → Direct response (no agents)
-    - Emotional distress/crisis signals → Invoke agents (STA → SCA/SDA)
+    - Emotional distress/crisis signals → Invoke agents (STA → TCA/CMA)
     - Complex queries (admin analytics) → Invoke agents (IA)
     - Appointment requests → Direct response with tool calling
     
@@ -154,7 +154,7 @@ Message: {state["message"]}
 Decision Criteria:
 
 FOR STUDENTS (user):
-- NEEDS AGENTS (invoke STA → SCA/SDA):
+- NEEDS AGENTS (invoke STA → TCA/CMA):
   * Mentions stress, anxiety, depression, crisis
   * Expresses emotional distress or overwhelm
   * Contains self-harm or suicide signals
@@ -179,7 +179,7 @@ FOR ADMINS:
   * General platform questions
 
 FOR COUNSELORS:
-- NEEDS AGENTS (invoke SDA for case management):
+- NEEDS AGENTS (invoke CMA for case management):
   * Requests assigned cases or patient data
   * Clinical insights or treatment recommendations
   
@@ -357,9 +357,9 @@ async def execute_sca_subgraph(
     state: AikaOrchestratorState,
     db: AsyncSession
 ) -> AikaOrchestratorState:
-    """Execute Support Coach Agent subgraph.
+    """Execute Therapeutic Coach Agent subgraph.
     
-    Runs the SCA workflow to generate intervention plans.
+    Runs the TCA workflow to generate intervention plans.
     """
     execution_id = state.get("execution_id")
     if execution_id:
@@ -367,15 +367,15 @@ async def execute_sca_subgraph(
     
     try:
         # Lazy import to avoid circular dependency
-        from app.agents.sca.sca_graph import create_sca_graph
+        from app.agents.tca.tca_graph import create_tca_graph
         
-        # Create and execute SCA subgraph
-        sca_graph = create_sca_graph(db)
-        sca_result = await sca_graph.ainvoke(state)
+        # Create and execute TCA subgraph
+        tca_graph = create_tca_graph(db)
+        sca_result = await tca_graph.ainvoke(state)
         
-        # Merge SCA outputs into orchestrator state
+        # Merge TCA outputs into orchestrator state
         state.update(sca_result)
-        state.setdefault("agents_invoked", []).append("SCA")
+        state.setdefault("agents_invoked", []).append("TCA")
         state.setdefault("execution_path", []).append("sca_subgraph")
         
         if execution_id:
@@ -389,12 +389,12 @@ async def execute_sca_subgraph(
             )
         
         logger.info(
-            f"✅ SCA completed: should_intervene={sca_result.get('should_intervene')}, "
+            f"✅ TCA completed: should_intervene={sca_result.get('should_intervene')}, "
             f"plan_id={sca_result.get('intervention_plan_id')}"
         )
         
     except Exception as e:
-        error_msg = f"SCA subgraph failed: {str(e)}"
+        error_msg = f"TCA subgraph failed: {str(e)}"
         logger.error(error_msg, exc_info=True)
         state.setdefault("errors", []).append(error_msg)
         
@@ -408,9 +408,9 @@ async def execute_sda_subgraph(
     state: AikaOrchestratorState,
     db: AsyncSession
 ) -> AikaOrchestratorState:
-    """Execute Service Desk Agent subgraph.
+    """Execute Case Management Agent subgraph.
     
-    Runs the SDA workflow to create cases for escalation.
+    Runs the CMA workflow to create cases for escalation.
     """
     execution_id = state.get("execution_id")
     if execution_id:
@@ -418,15 +418,15 @@ async def execute_sda_subgraph(
     
     try:
         # Lazy import to avoid circular dependency
-        from app.agents.sda.sda_graph import create_sda_graph
+        from app.agents.cma.cma_graph import create_cma_graph
         
-        # Create and execute SDA subgraph
-        sda_graph = create_sda_graph(db)
-        sda_result = await sda_graph.ainvoke(state)
+        # Create and execute CMA subgraph
+        cma_graph = create_cma_graph(db)
+        sda_result = await cma_graph.ainvoke(state)
         
-        # Merge SDA outputs into orchestrator state
+        # Merge CMA outputs into orchestrator state
         state.update(sda_result)
-        state.setdefault("agents_invoked", []).append("SDA")
+        state.setdefault("agents_invoked", []).append("CMA")
         state.setdefault("execution_path", []).append("sda_subgraph")
         
         if execution_id:
@@ -440,12 +440,12 @@ async def execute_sda_subgraph(
             )
         
         logger.info(
-            f"✅ SDA completed: case_id={sda_result.get('case_id')}, "
+            f"✅ CMA completed: case_id={sda_result.get('case_id')}, "
             f"case_created={sda_result.get('case_created')}"
         )
         
     except Exception as e:
-        error_msg = f"SDA subgraph failed: {str(e)}"
+        error_msg = f"CMA subgraph failed: {str(e)}"
         logger.error(error_msg, exc_info=True)
         state.setdefault("errors", []).append(error_msg)
         
@@ -461,7 +461,7 @@ async def synthesize_final_response(
 ) -> AikaOrchestratorState:
     """Synthesize final response from agent outputs.
     
-    Takes results from STA/SCA/SDA and creates a cohesive response
+    Takes results from STA/TCA/CMA and creates a cohesive response
     with Aika's personality.
     """
     execution_id = state.get("execution_id")
@@ -499,17 +499,17 @@ Agent Results:
   * Risk Score: {state.get('risk_score', 0.0)}
 """
         
-        if "SCA" in agents_invoked:
+        if "TCA" in agents_invoked:
             synthesis_prompt += f"""
-- Support Coach (SCA):
+- Support Coach (TCA):
   * Intervention Created: {state.get('should_intervene', False)}
   * Intervention Type: {state.get('intervention_type', 'none')}
   * Plan ID: {state.get('intervention_plan_id', 'none')}
 """
         
-        if "SDA" in agents_invoked:
+        if "CMA" in agents_invoked:
             synthesis_prompt += f"""
-- Service Desk (SDA):
+- Service Desk (CMA):
   * Case Created: {state.get('case_created', False)}
   * Case ID: {state.get('case_id', 'none')}
   * Assigned Counselor: {state.get('assigned_counsellor_id', 'none')}
@@ -611,7 +611,7 @@ def should_route_to_sca(state: AikaOrchestratorState) -> str:
     
     execution_id = state.get("execution_id")
     
-    # High/critical → straight to SDA
+    # High/critical → straight to CMA
     if severity in ("high", "critical"):
         if execution_id:
             execution_tracker.trigger_edge(
@@ -619,18 +619,18 @@ def should_route_to_sca(state: AikaOrchestratorState) -> str:
                 "aika::sta->sda",
                 condition_result=True
             )
-        logger.info(f"🔀 STA routing: severity={severity} → SDA (crisis escalation)")
+        logger.info(f"🔀 STA routing: severity={severity} → CMA (crisis escalation)")
         return "route_sda"
     
-    # Moderate with SCA recommendation
-    if next_step == "sca":
+    # Moderate with TCA recommendation
+    if next_step == "tca":
         if execution_id:
             execution_tracker.trigger_edge(
                 execution_id,
                 "aika::sta->sca",
                 condition_result=True
             )
-        logger.info(f"🔀 STA routing: severity={severity}, next_step=sca → SCA (support)")
+        logger.info(f"🔀 STA routing: severity={severity}, next_step=sca → TCA (support)")
         return "invoke_sca"
     
     # Low or moderate without intervention need → synthesize directly
@@ -645,10 +645,10 @@ def should_route_to_sca(state: AikaOrchestratorState) -> str:
 
 
 def should_route_to_sda_after_sca(state: AikaOrchestratorState) -> str:
-    """Conditional edge after SCA.
+    """Conditional edge after TCA.
     
-    Currently always routes to synthesize (SCA doesn't escalate to SDA).
-    Future: Could check if SCA detected escalation need.
+    Currently always routes to synthesize (TCA doesn't escalate to CMA).
+    Future: Could check if TCA detected escalation need.
     """
     if state.get("execution_id"):
         execution_tracker.trigger_edge(
@@ -657,7 +657,7 @@ def should_route_to_sda_after_sca(state: AikaOrchestratorState) -> str:
             condition_result=True
         )
     
-    logger.info("🔀 SCA routing: → Synthesize")
+    logger.info("🔀 TCA routing: → Synthesize")
     return "synthesize"
 
 
@@ -677,7 +677,7 @@ def create_aika_unified_graph(db: AsyncSession) -> StateGraph:
                                    ↓       ↓        ↓
                               [High]  [Moderate]  [Low]
                                 ↓       ↓           ↓
-                              SDA     SCA      Synthesize
+                              CMA     TCA      Synthesize
                                 ↓       ↓           ↓
                             Synthesize Synthesize  END
                                 ↓       ↓
@@ -731,7 +731,7 @@ def create_aika_unified_graph(db: AsyncSession) -> StateGraph:
         }
     )
     
-    # Conditional routing after SCA
+    # Conditional routing after TCA
     workflow.add_conditional_edges(
         "execute_sca",
         should_route_to_sda_after_sca,

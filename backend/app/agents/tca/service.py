@@ -5,14 +5,14 @@ from datetime import datetime, timedelta
 from typing import Any, Optional, Dict
 import logging
 
-from app.agents.sca.resources import get_default_resources
-from app.agents.sca.schemas import (
+from app.agents.tca.resources import get_default_resources
+from app.agents.tca.schemas import (
     PlanStep,
     ResourceCard,
     SCAFollowUpRequest,
     SCAFollowUpResponse,
-    SCAInterveneRequest,
-    SCAInterveneResponse,
+    TCAInterveneRequest,
+    TCAInterveneResponse,
 )
 from app.core.events import AgentEvent, AgentNameEnum, emit_agent_event
 
@@ -51,16 +51,16 @@ _FALLBACK_PLAN = [
 ]
 
 
-class SupportCoachService:
+class TherapeuticCoachService:
     """
-    Support Coach Agent (SCA) - Generates structured therapeutic intervention plans.
+    Therapeutic Coach Agent (TCA) - Generates structured therapeutic intervention plans.
     
     Supports multiple evidence-based approaches:
     - Crisis Management: calm_down, break_down_problem, general_coping
     - CBT Interventions: cognitive_restructuring, behavioral_activation
     
     CBT Integration (replacing legacy CBT modules):
-    The SCA now incorporates Cognitive Behavioral Therapy principles through
+    The TCA now incorporates Cognitive Behavioral Therapy principles through
     AI-generated personalized plans. These plans follow established CBT frameworks
     while adapting to each user's specific situation.
     
@@ -90,16 +90,16 @@ class SupportCoachService:
 
     async def intervene(
         self, 
-        payload: SCAInterveneRequest,
+        payload: TCAInterveneRequest,
         use_gemini_plan: bool = False,
         plan_type: Optional[str] = None,
         user_message: Optional[str] = None,
         sta_context: Optional[Dict[str, Any]] = None
-    ) -> SCAInterveneResponse:
+    ) -> TCAInterveneResponse:
         """Generate intervention plan - uses Gemini AI if requested, otherwise static plans.
         
         Args:
-            payload: Standard SCA intervention request
+            payload: Standard TCA intervention request
             use_gemini_plan: If True, generate personalized plan with Gemini AI
             plan_type: Type of plan:
                 - "calm_down": Anxiety/panic management
@@ -111,7 +111,7 @@ class SupportCoachService:
             sta_context: Additional context from STA (risk_level, etc.)
         
         Returns:
-            SCAInterveneResponse with plan steps and resources
+            TCAInterveneResponse with plan steps and resources
         """
         intent_key = payload.intent.strip().lower()
         
@@ -120,7 +120,7 @@ class SupportCoachService:
             try:
                 logger.info(f"Generating Gemini-powered {plan_type} plan for intent: {intent_key}")
                 
-                from app.agents.sca.gemini_plan_generator import generate_personalized_plan
+                from app.agents.tca.gemini_plan_generator import generate_personalized_plan
                 
                 # Build context for Gemini
                 gemini_context = {}
@@ -183,7 +183,7 @@ class SupportCoachService:
             else None
         )
 
-        response = SCAInterveneResponse(
+        response = TCAInterveneResponse(
             plan_steps=plan_steps,
             resource_cards=resources,
             next_check_in=next_check_in,
@@ -191,7 +191,7 @@ class SupportCoachService:
 
         await self._emit_event(
             AgentEvent(
-                agent=AgentNameEnum.SCA,
+                agent=AgentNameEnum.TCA,
                 step="plan_generated",
                 payload={
                     "session_id": payload.session_id,
@@ -224,7 +224,7 @@ class SupportCoachService:
 
         await self._emit_event(
             AgentEvent(
-                agent=AgentNameEnum.SCA,
+                agent=AgentNameEnum.TCA,
                 step="followup_logged",
                 payload={
                     "session_id": payload.session_id,
@@ -240,7 +240,7 @@ class SupportCoachService:
         return response
 
     @staticmethod
-    def _resolve_followup_window(payload: SCAInterveneRequest, default_hours: int) -> int:
+    def _resolve_followup_window(payload: TCAInterveneRequest, default_hours: int) -> int:
         options = payload.options or {}
         window = options.get("check_in_hours")
         if isinstance(window, (int, float)) and window > 0:
@@ -257,9 +257,9 @@ class SupportCoachService:
         return list(get_default_resources("general_support"))
 
 
-def get_support_coach_service() -> "SupportCoachService":
-    """FastAPI dependency factory for :class:`SupportCoachService`."""
+def get_therapeutic_coach_service() -> "TherapeuticCoachService":
+    """FastAPI dependency factory for :class:`TherapeuticCoachService`."""
 
-    return SupportCoachService()
+    return TherapeuticCoachService()
 
 

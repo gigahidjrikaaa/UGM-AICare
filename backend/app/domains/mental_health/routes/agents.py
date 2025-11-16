@@ -30,7 +30,7 @@ async def ask_agent(_: dict[str, Any]) -> None:
     """Legacy LangGraph agents have been retired in favour of Safety Agent services."""
     raise HTTPException(
         status_code=503,
-        detail="Legacy LangGraph agents have been removed. Use Safety Agent endpoints (STA/SCA/SDA/IA).",
+        detail="Legacy LangGraph agents have been removed. Use Safety Agent endpoints (STA/TCA/CMA/IA).",
     )
 
 

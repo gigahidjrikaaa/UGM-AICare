@@ -1,7 +1,7 @@
 """Shared state schema for all LangGraph agent workflows.
 
 This module defines the TypedDict state that flows through the Safety Agent Suite
-graphs (STA, SCA, SDA, IA) and the master orchestrator.
+graphs (STA, TCA, CMA, IA) and the master orchestrator.
 """
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ from datetime import datetime
 
 
 class SafetyAgentState(TypedDict, total=False):
-    """Shared state across STA, SCA, SDA, and IA agents.
+    """Shared state across STA, TCA, CMA, and IA agents.
     
     This state flows through the LangGraph workflow, with each agent
     reading and writing relevant fields. All fields are optional to support
@@ -19,8 +19,8 @@ class SafetyAgentState(TypedDict, total=False):
     
     Workflow:
         STA → populates risk assessment fields
-        SCA → populates intervention plan fields (if needed)
-        SDA → populates case management fields (if escalated)
+        TCA → populates intervention plan fields (if needed)
+        CMA → populates case management fields (if escalated)
         IA → consumes anonymized data for analytics
     """
     
@@ -58,7 +58,7 @@ class SafetyAgentState(TypedDict, total=False):
     """Detected user intent (e.g., 'general_chat', 'crisis', 'academic_stress')."""
     
     next_step: str
-    """Routing decision: 'sca' (Support Coach), 'sda' (Service Desk), or 'end'."""
+    """Routing decision: 'tca' (Therapeutic Coach), 'cma' (Case Management), or 'end'."""
     
     redacted_message: Optional[str]
     """Message with PII redacted for safe storage and analytics."""
@@ -67,7 +67,7 @@ class SafetyAgentState(TypedDict, total=False):
     """Database ID of created TriageAssessment record."""
     
     # ============================================================================
-    # SCA (Support Coach Agent) OUTPUTS
+    # TCA (Therapeutic Coach Agent) OUTPUTS
     # ============================================================================
     intervention_plan: Optional[Dict[str, Any]]
     """Generated intervention plan with steps and resources.
@@ -89,7 +89,7 @@ class SafetyAgentState(TypedDict, total=False):
     """Database ID of created InterventionPlan record."""
     
     # ============================================================================
-    # SDA (Service Desk Agent) OUTPUTS
+    # CMA (Case Management Agent) OUTPUTS
     # ============================================================================
     case_id: Optional[str]
     """Database ID (UUID string) of created Case record (for high/critical escalations)."""
@@ -134,19 +134,19 @@ class STAState(SafetyAgentState):
     pass
 
 
-class SCAState(SafetyAgentState):
-    """SCA-specific state extension.
+class TCAState(SafetyAgentState):
+    """TCA-specific state extension.
     
-    Used by the Support Coach Agent subgraph. Inherits all fields from
-    SafetyAgentState but can be extended with SCA-specific fields if needed.
+    Used by the Therapeutic Coach Agent subgraph. Inherits all fields from
+    SafetyAgentState but can be extended with TCA-specific fields if needed.
     """
     pass
 
 
-class SDAState(SafetyAgentState):
-    """SDA-specific state extension.
+class CMAState(SafetyAgentState):
+    """CMA-specific state extension.
     
-    Used by the Service Desk Agent subgraph. Extends SafetyAgentState with
+    Used by the Case Management Agent subgraph. Extends SafetyAgentState with
     auto-assignment tracking fields and appointment scheduling fields.
     """
     # Assignment tracking (from auto_assign_node)
@@ -190,7 +190,7 @@ class SDAState(SafetyAgentState):
 class OrchestratorState(SafetyAgentState):
     """Orchestrator-specific state extension.
     
-    Used by the master orchestrator graph that coordinates STA→SCA→SDA flows.
+    Used by the master orchestrator graph that coordinates STA→TCA→CMA flows.
     Inherits all fields from SafetyAgentState.
     """
     pass
@@ -290,7 +290,7 @@ class AikaOrchestratorState(TypedDict, total=False):
                                        ↓           ↓
                                   [YES: STA]   [NO: END]
                                        ↓
-                                  [Conditional: SCA/SDA]
+                                  [Conditional: TCA/CMA]
                                        ↓
                                      END
     """
@@ -351,7 +351,7 @@ class AikaOrchestratorState(TypedDict, total=False):
     """Human-readable severity classification."""
     
     next_step: Optional[str]
-    """Routing decision: 'sca' (Support Coach), 'sda' (Service Desk), or 'end'."""
+    """Routing decision: 'tca' (Therapeutic Coach), 'cma' (Case Management), or 'end'."""
     
     redacted_message: Optional[str]
     """Message with PII redacted for safe storage."""
@@ -359,7 +359,7 @@ class AikaOrchestratorState(TypedDict, total=False):
     triage_assessment_id: Optional[int]
     """Database ID of created TriageAssessment record."""
     
-    # SCA outputs
+    # TCA outputs
     intervention_plan: Optional[Dict[str, Any]]
     """Generated intervention plan with steps and resources."""
     
@@ -367,15 +367,15 @@ class AikaOrchestratorState(TypedDict, total=False):
     """Type of intervention: 'calm_down', 'break_down_problem', 'general_coping'."""
     
     should_intervene: bool
-    """Flag indicating if SCA should create intervention (default False)."""
+    """Flag indicating if TCA should create intervention (default False)."""
     
     intervention_plan_id: Optional[int]
     """Database ID of created InterventionPlan record."""
     
     safety_approved: Optional[bool]
-    """Whether SCA plan passed safety review."""
+    """Whether TCA plan passed safety review."""
     
-    # SDA outputs
+    # CMA outputs
     case_id: Optional[int]
     """Database ID of created Case record (for high/critical escalations)."""
     
@@ -413,7 +413,7 @@ class AikaOrchestratorState(TypedDict, total=False):
     """List of node names executed in order."""
     
     agents_invoked: List[str]
-    """List of agents that were invoked (e.g., ['STA', 'SCA'])."""
+    """List of agents that were invoked (e.g., ['STA', 'TCA'])."""
     
     errors: List[str]
     """List of error messages encountered during execution."""

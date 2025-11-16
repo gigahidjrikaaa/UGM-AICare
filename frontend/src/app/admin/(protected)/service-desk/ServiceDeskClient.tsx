@@ -135,7 +135,7 @@ export default function ServiceDeskClient() {
             </span>
           </div>
           <p className="text-white/60 text-sm mb-2">
-            Create and manage cases through the Service Desk Agent (SDA) with automatic SLA tracking
+            Create and manage cases through the Case Management Agent (CMA) with automatic SLA tracking
           </p>
           <a 
             href="/admin/cases" 
@@ -248,7 +248,7 @@ export default function ServiceDeskClient() {
             </svg>
           </div>
           <div>
-            <h3 className="text-sm font-medium text-blue-300">About Service Desk Agent (SDA)</h3>
+            <h3 className="text-sm font-medium text-blue-300">About Case Management Agent (CMA)</h3>
             <div className="mt-2 text-sm text-white/60 space-y-1">
               <p>• <strong>Automatic SLA Calculation:</strong> Critical cases = 1 hour, High = 4 hours</p>
               <p>• <strong>Auto-Assignment:</strong> Cases are automatically assigned to available counselors</p>

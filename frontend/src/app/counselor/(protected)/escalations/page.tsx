@@ -48,8 +48,8 @@ const severityConfig = {
 
 const agentColors = {
   STA: 'bg-purple-500/20 text-purple-300',
-  SCA: 'bg-blue-500/20 text-blue-300',
-  SDA: 'bg-green-500/20 text-green-300',
+  TCA: 'bg-blue-500/20 text-blue-300',
+  CMA: 'bg-green-500/20 text-green-300',
   IA: 'bg-pink-500/20 text-pink-300',
 };
 

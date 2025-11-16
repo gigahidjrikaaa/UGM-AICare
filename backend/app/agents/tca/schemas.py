@@ -6,7 +6,7 @@ from typing import List, Optional, Dict, Union
 from pydantic import BaseModel, Field
 
 
-class SCAInterveneRequest(BaseModel):
+class TCAInterveneRequest(BaseModel):
     session_id: str = Field(..., min_length=1)
     intent: str = Field(..., min_length=1)
     user_hash: str = Field(..., min_length=1, description="Anonymized user identifier")
@@ -27,7 +27,7 @@ class ResourceCard(BaseModel):
     url: Optional[str] = None
 
 
-class SCAInterveneResponse(BaseModel):
+class TCAInterveneResponse(BaseModel):
     plan_steps: list[PlanStep]
     resource_cards: list[ResourceCard]
     next_check_in: Optional[datetime] = None

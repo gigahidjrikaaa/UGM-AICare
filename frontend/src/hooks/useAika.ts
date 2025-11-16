@@ -231,8 +231,8 @@ export function useAika(options: UseAikaOptions = {}) {
   const getAgentDisplayName = useCallback((agentCode: string): string => {
     const agentNames: Record<string, string> = {
       STA: 'Safety Triage',
-      SCA: 'Support Coach',
-      SDA: 'Service Desk',
+      TCA: 'Therapeutic Coach',
+      CMA: 'Case Management',
       IA: 'Insights',
     };
     return agentNames[agentCode] || agentCode;

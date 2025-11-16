@@ -36,7 +36,7 @@ class STAClassifyResponse(BaseModel):
             "example": {
                 "risk_level": 1,
                 "intent": "academic_stress",
-                "next_step": "sca",
+                "next_step": "tca",
                 "handoff": False,
                 "needs_support_coach_plan": True,
                 "support_plan_type": "break_down_problem"

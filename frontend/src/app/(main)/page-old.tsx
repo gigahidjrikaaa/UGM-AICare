@@ -528,7 +528,7 @@ export default function Home() {
                     },
                     {
                       icon: "💬",
-                      name: "Support Coach Agent",
+                      name: "Therapeutic Coach Agent",
                       acronym: "SCA",
                       tagline: "Your Personal Coach",
                       color: "from-blue-500 to-purple-600",
@@ -545,7 +545,7 @@ export default function Home() {
                     },
                     {
                       icon: "🗂️",
-                      name: "Service Desk Agent",
+                      name: "Case Management Agent",
                       acronym: "SDA",
                       tagline: "Behind-the-Scenes Hero",
                       color: "from-green-500 to-teal-600",
@@ -1524,7 +1524,7 @@ export default function Home() {
               },
               {
                 question: "What happens if I'm in crisis?",
-                answer: "Aika's Safety Triage Agent (STA) monitors every conversation for crisis signals. If detected, you'll immediately see crisis resources (UGM Crisis Line, SEJIWA 119, Emergency 112), receive grounding techniques, and the system will alert clinical staff for human follow-up. The Service Desk Agent (SDA) ensures no crisis goes unnoticed."
+                answer: "Aika's Safety Triage Agent (STA) monitors every conversation for crisis signals. If detected, you'll immediately see crisis resources (UGM Crisis Line, SEJIWA 119, Emergency 112), receive grounding techniques, and the system will alert clinical staff for human follow-up. The Case Management Agent (CMA) ensures no crisis goes unnoticed."
               },
               {
                 question: "Can anyone see my conversations?",
@@ -1540,7 +1540,7 @@ export default function Home() {
               },
               {
                 question: "How does Aika know what advice to give?",
-                answer: "Aika is powered by Google Gemini AI and trained on Indonesian mental health guidelines (JUKNIS P2 Gangguan Mental Emosional). The Support Coach Agent (SCA) uses evidence-based strategies from CBT and generates personalized intervention plans. All recommendations go through ethical guardrails and can be escalated to human counselors."
+                answer: "Aika is powered by Google Gemini AI and trained on Indonesian mental health guidelines (JUKNIS P2 Gangguan Mental Emosional). The Therapeutic Coach Agent (TCA) uses evidence-based strategies from CBT and generates personalized intervention plans. All recommendations go through ethical guardrails and can be escalated to human counselors."
               },
               {
                 question: "Is this only for UGM students?",

@@ -11,7 +11,7 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from app.core.llm import generate_gemini_response
-from app.agents.sca.schemas import PlanStep, ResourceCard
+from app.agents.tca.schemas import PlanStep, ResourceCard
 
 logger = logging.getLogger(__name__)
 
@@ -254,7 +254,7 @@ async def generate_personalized_plan(
         
         logger.debug(f"User prompt: {user_prompt[:200]}...")
         
-        # Call Gemini API - Using Gemini 2.5 Flash for SCA
+        # Call Gemini API - Using Gemini 2.5 Flash for TCA
         response_text = await generate_gemini_response(
             history=[{"role": "user", "content": user_prompt}],
             model="gemini-2.5-flash",  # Gemini 2.5 Flash for Support Coach Agent
@@ -303,7 +303,7 @@ async def generate_personalized_plan(
 
 def _get_default_resources(intent: str) -> List[Dict[str, Any]]:
     """Get default resource cards based on intent."""
-    from app.agents.sca.resources import get_default_resources
+    from app.agents.tca.resources import get_default_resources
     
     resource_objs = list(get_default_resources(intent))
     return [

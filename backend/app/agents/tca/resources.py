@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Iterable, List
 
-from app.agents.sca.schemas import ResourceCard
+from app.agents.tca.schemas import ResourceCard
 
 
 def get_default_resources(intent: str) -> Iterable[ResourceCard]:

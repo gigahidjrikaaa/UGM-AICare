@@ -205,11 +205,11 @@ async def run_support_coach_agent(
     **kwargs
 ) -> Dict[str, Any]:
     """Execute SCA graph to create intervention plan."""
-    from app.agents.sca.sca_graph_service import SCAGraphService
+    from app.agents.tca.tca_graph_service import TCAGraphService
     
     try:
         if sca_service is None:
-            sca_service = SCAGraphService(db=db)
+            sca_service = TCAGraphService(db=db)
         
         if activity_logger:
             activity_logger.log_info(
@@ -324,11 +324,11 @@ async def run_service_desk_agent(
     **kwargs
 ) -> Dict[str, Any]:
     """Execute SDA graph to create case and assign counselor."""
-    from app.agents.sda.sda_graph_service import SDAGraphService
+    from app.agents.cma.cma_graph_service import CMAGraphService
     
     try:
         if sda_service is None:
-            sda_service = SDAGraphService(db=db)
+            sda_service = CMAGraphService(db=db)
         
         if activity_logger:
             activity_logger.log_info(

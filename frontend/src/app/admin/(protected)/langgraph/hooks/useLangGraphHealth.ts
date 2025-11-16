@@ -3,8 +3,8 @@
  * 
  * Returns health metrics for all 6 graphs:
  * - STA (Safety Triage Agent)
- * - SCA (Support Coach Agent)
- * - SDA (Service Desk Agent)
+ * - SCA (Therapeutic Coach Agent)
+ * - SDA (Case Management Agent)
  * - IA (Insights Agent)
  * - AIKA (Meta-Agent - Orchestrator)
  * - Orchestrator (Legacy routing)

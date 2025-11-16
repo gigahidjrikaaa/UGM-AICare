@@ -81,14 +81,14 @@ async def test_activity_logger():
     logger.log_agent_complete("STA", "Risk assessment completed")
     
     # Start coaching agent
-    logger.log_agent_start("SCA", "Starting coaching intervention")
+    logger.log_agent_start("TCA", "Starting coaching intervention")
     await asyncio.sleep(0.1)
     
     # Create intervention
     logger.log_intervention_created(101, "stress-management")
     
     # Complete coaching
-    logger.log_agent_complete("SCA", "Coaching plan created")
+    logger.log_agent_complete("TCA", "Coaching plan created")
     
     # Get activity summary
     print()
@@ -97,13 +97,13 @@ async def test_activity_logger():
     print("=" * 80)
     activities = logger.get_activities()
     print(f"Total events: {len(activities)}")
-    print(f"Agents involved: STA, SCA")
+    print(f"Agents involved: STA, TCA")
     print()
     
     # Test error handling
     print("Testing error handling...")
     print()
-    logger.log_agent_error("SDA", "Database connection failed", Exception("Connection timeout"))
+    logger.log_agent_error("CMA", "Database connection failed", Exception("Connection timeout"))
     
     print("=" * 80)
     print("Test Complete!")

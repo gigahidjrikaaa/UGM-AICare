@@ -24,8 +24,8 @@ export function AgentActivityBadge({ agents, processingTime }: AgentActivityBadg
 
   const agentNames: Record<string, string> = {
     STA: 'Safety',
-    SCA: 'Support',
-    SDA: 'Service',
+    TCA: 'Support',
+    CMA: 'Service',
     IA: 'Insights',
   };
 

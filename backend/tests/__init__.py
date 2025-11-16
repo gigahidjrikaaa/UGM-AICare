@@ -9,7 +9,7 @@ Test Structure:
 - test_auth.py: Authentication and authorization tests
 - test_chat.py: Chat and message processing tests
 - test_journal.py: Journal entry tests
-- test_agents.py: Safety Agent Suite tests (STA/SCA/SDA/IA)
+- test_agents.py: Safety Agent Suite tests (STA/TCA/CMA/IA)
 - test_database.py: Database model and query tests
 - test_api_endpoints.py: API endpoint integration tests
 - conftest.py: Shared fixtures and test configuration

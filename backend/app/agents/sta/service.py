@@ -35,7 +35,7 @@ _SEVERITY_MAP: dict[int, Severity] = {
 
 _RECOMMENDATION_MAP: dict[str, Recommendation] = {
     "human": "escalate_manual_review",
-    "sca": "schedule_support_coach",
+    "tca": "schedule_support_coach",
     "resource": "deliver_self_help_pack",
 }
 

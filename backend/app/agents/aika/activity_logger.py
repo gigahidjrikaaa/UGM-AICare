@@ -35,7 +35,7 @@ class ActivityEvent:
     """Single activity event"""
     timestamp: str
     activity_type: ActivityType
-    agent: str  # STA, SCA, SDA, IA, or Aika
+    agent: str  # STA, TCA, CMA, IA, or Aika
     message: str
     details: Optional[Dict[str, Any]] = None
     duration_ms: Optional[float] = None
@@ -203,7 +203,7 @@ class ActivityLogger:
         event = ActivityEvent(
             timestamp=datetime.utcnow().isoformat(),
             activity_type=ActivityType.INTERVENTION_CREATED,
-            agent="SCA",
+            agent="TCA",
             message=f"Intervention plan created: {intervention_type}",
             details={
                 "plan_id": plan_id,
@@ -217,7 +217,7 @@ class ActivityLogger:
         event = ActivityEvent(
             timestamp=datetime.utcnow().isoformat(),
             activity_type=ActivityType.CASE_CREATED,
-            agent="SDA",
+            agent="CMA",
             message=f"Crisis case created: #{case_id} (SLA: {sla_hours}h)",
             details={
                 "case_id": case_id,

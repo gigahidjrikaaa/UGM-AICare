@@ -20,11 +20,11 @@ from typing import Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.sca.schemas import (
+from app.agents.tca.schemas import (
     SCAInterveneRequest,
     SCAInterveneResponse,
 )
-from app.agents.sca.service import SupportCoachService
+from app.agents.tca.service import TherapeuticCoachService
 from app.agents.sta.classifiers import SafetyTriageClassifier
 from app.agents.sta.schemas import (
     STAClassifyRequest,
@@ -87,7 +87,7 @@ class AgentIntegrationService:
             session=db,
         )
         # Initialize SCA service
-        self.sca_service = SupportCoachService()
+        self.sca_service = TherapeuticCoachService()
     
     async def analyze_and_intervene(
         self,
@@ -168,7 +168,7 @@ class AgentIntegrationService:
             return result
         
         # Moderate (1) or High (2) risk -> SCA intervention if recommended
-        if next_step != "sca":
+        if next_step != "tca":
             logger.debug(
                 "STA recommends '%s' instead of SCA for user %s",
                 next_step,

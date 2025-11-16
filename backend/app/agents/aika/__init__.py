@@ -5,7 +5,7 @@ Aika (愛佳) is the unified AI consciousness of UGM-AICare.
 She orchestrates all four Safety Agent Suite agents based on user role and intent.
 
 Architecture:
-- Meta-agent that coordinates STA, SCA, SDA, and IA
+- Meta-agent that coordinates STA, TCA, CMA, and IA
 - Role-based routing (student, counselor, admin)
 - LangGraph-powered orchestration with direct invocation (agentic pattern)
 - Unified personality across all interactions

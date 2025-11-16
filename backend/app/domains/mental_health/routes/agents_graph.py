@@ -15,8 +15,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
 from app.agents.sta.sta_graph_service import STAGraphService
-from app.agents.sca.sca_graph_service import SCAGraphService
-from app.agents.sda.sda_graph_service import SDAGraphService
+from app.agents.tca.tca_graph_service import TCAGraphService
+from app.agents.cma.cma_graph_service import CMAGraphService
 from app.agents.orchestrator_graph_service import OrchestratorGraphService
 from app.agents.ia.ia_graph_service import IAGraphService
 
@@ -46,7 +46,7 @@ class RiskAssessment(BaseModel):
     risk_score: float = Field(..., description="Normalized risk score 0.0-1.0")
     severity: str = Field(..., description="Severity: low/moderate/high/critical")
     intent: str = Field(..., description="Detected user intent")
-    next_step: str = Field(..., description="Routing decision: sca/sda/end")
+    next_step: str = Field(..., description="Routing decision: tca/cma/end")
 
 
 class STAGraphResponse(BaseModel):
@@ -202,7 +202,7 @@ class SCAGraphResponse(BaseModel):
     execution_time_ms: float | None = Field(None, description="Total execution time in milliseconds")
 
 
-@router.post("/sca/execute", response_model=SCAGraphResponse, status_code=status.HTTP_200_OK)
+@router.post("/tca/execute", response_model=SCAGraphResponse, status_code=status.HTTP_200_OK)
 async def execute_sca_graph(
     request: SCAGraphRequest,
     db: AsyncSession = Depends(get_async_db)
@@ -213,7 +213,7 @@ async def execute_sca_graph(
         ingest_triage_signal → determine_intervention_type → generate_plan → 
         safety_review → persist_plan
     
-    The graph uses the existing SupportCoachService for CBT-informed coaching
+    The graph uses the existing TherapeuticCoachService for CBT-informed coaching
     and integrates with ExecutionStateTracker for real-time monitoring.
     
     **Intervention Types:**
@@ -236,7 +236,7 @@ async def execute_sca_graph(
         
     Example:
         ```bash
-        curl -X POST http://localhost:8000/api/v1/agents/graph/sca/execute \\
+        curl -X POST http://localhost:8000/api/v1/agents/graph/tca/execute \\
           -H "Content-Type: application/json" \\
           -d '{
             "user_id": 1,
@@ -252,7 +252,7 @@ async def execute_sca_graph(
     """
     try:
         # Create service and execute graph
-        service = SCAGraphService(db)
+        service = TCAGraphService(db)
         result = await service.execute(
             user_id=request.user_id,
             session_id=request.session_id,
@@ -292,7 +292,7 @@ async def execute_sca_graph(
         )
 
 
-@router.get("/sca/health", status_code=status.HTTP_200_OK)
+@router.get("/tca/health", status_code=status.HTTP_200_OK)
 async def sca_graph_health() -> Dict[str, Any]:
     """Health check for SCA graph endpoint.
     
@@ -301,7 +301,7 @@ async def sca_graph_health() -> Dict[str, Any]:
     """
     return {
         "status": "healthy",
-        "graph": "sca",
+        "graph": "tca",
         "name": "Support Coach Agent",
         "version": "1.0.0",
         "langgraph_enabled": True,
@@ -344,7 +344,7 @@ class SDAGraphResponse(BaseModel):
     execution_time_ms: float | None = Field(None, description="Total execution time in milliseconds")
 
 
-@router.post("/sda/execute", response_model=SDAGraphResponse, status_code=status.HTTP_200_OK)
+@router.post("/cma/execute", response_model=SDAGraphResponse, status_code=status.HTTP_200_OK)
 async def execute_sda_graph(
     request: SDAGraphRequest,
     db: AsyncSession = Depends(get_async_db)
@@ -376,7 +376,7 @@ async def execute_sda_graph(
         
     Example:
         ```bash
-        curl -X POST http://localhost:8000/api/v1/agents/graph/sda/execute \\
+        curl -X POST http://localhost:8000/api/v1/agents/graph/cma/execute \\
           -H "Content-Type: application/json" \\
           -d '{
             "user_id": 1,
@@ -393,7 +393,7 @@ async def execute_sda_graph(
     """
     try:
         # Create service and execute graph
-        service = SDAGraphService(db)
+        service = CMAGraphService(db)
         result = await service.execute(
             user_id=request.user_id,
             session_id=request.session_id,
@@ -443,7 +443,7 @@ async def execute_sda_graph(
         )
 
 
-@router.get("/sda/health", status_code=status.HTTP_200_OK)
+@router.get("/cma/health", status_code=status.HTTP_200_OK)
 async def sda_graph_health() -> Dict[str, Any]:
     """Health check for SDA graph endpoint.
     
@@ -452,7 +452,7 @@ async def sda_graph_health() -> Dict[str, Any]:
     """
     return {
         "status": "healthy",
-        "graph": "sda",
+        "graph": "cma",
         "name": "Service Desk Agent",
         "version": "1.0.0",
         "langgraph_enabled": True,

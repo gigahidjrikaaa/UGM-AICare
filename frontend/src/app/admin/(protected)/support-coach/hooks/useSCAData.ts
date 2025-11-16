@@ -110,7 +110,7 @@ function useAnalytics(days: number = 30) {
       try {
         setLoading(true);
         setError(null);
-        const response = await apiClient.get<SCAAnalytics>(`/admin/sca/analytics?days=${days}`);
+        const response = await apiClient.get<SCAAnalytics>(`/admin/tca/analytics?days=${days}`);
         setAnalytics(response);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Failed to load analytics');
@@ -169,7 +169,7 @@ function useInterventionPlans(params: {
         if (search) queryParams.append('search', search);
 
         const response = await apiClient.get<InterventionPlansListResponse>(
-          `/admin/sca/interventions?${queryParams.toString()}`
+          `/admin/tca/interventions?${queryParams.toString()}`
         );
         setData(response);
       } catch (err) {
@@ -204,7 +204,7 @@ function usePlanDetail(planId: number | null) {
         setLoading(true);
         setError(null);
         const response = await apiClient.get<InterventionPlanDetail>(
-          `/admin/sca/interventions/${planId}`
+          `/admin/tca/interventions/${planId}`
         );
         setPlan(response);
       } catch (err) {
@@ -242,7 +242,7 @@ function useUserProgress(params: { limit?: number; min_plans?: number } = {}) {
         });
 
         const response = await apiClient.get<UserProgress[]>(
-          `/admin/sca/users/progress?${queryParams.toString()}`
+          `/admin/tca/users/progress?${queryParams.toString()}`
         );
         setUsers(response);
       } catch (err) {
@@ -272,7 +272,7 @@ function useCBTModuleUsage(days: number = 30) {
         setLoading(true);
         setError(null);
         const response = await apiClient.get<CBTModuleUsage[]>(
-          `/admin/sca/cbt-modules/usage?days=${days}`
+          `/admin/tca/cbt-modules/usage?days=${days}`
         );
         setModules(response);
       } catch (err) {

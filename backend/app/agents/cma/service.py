@@ -8,7 +8,7 @@ from fastapi import Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.sda.schemas import (
+from app.agents.cma.schemas import (
     SDAAssignRequest,
     SDAAssignResponse,
     SDACase,
@@ -22,7 +22,7 @@ from app.domains.mental_health.models import Case, CaseNote, CaseSeverityEnum, C
 from app.models.agent_user import AgentUser
 
 
-class SafetyDeskService:
+class CaseManagementService:
     """Queue management utilities for the Safety Desk Agent."""
 
     def __init__(self, session: AsyncSession) -> None:
@@ -131,9 +131,9 @@ class SafetyDeskService:
         )
 
 
-def get_safety_desk_service(
+def get_case_management_service(
     session: AsyncSession = Depends(get_async_db),
-) -> "SafetyDeskService":
-    """FastAPI dependency factory for :class:`SafetyDeskService`."""
+) -> "CaseManagementService":
+    """FastAPI dependency factory for :class:`CaseManagementService`."""
 
-    return SafetyDeskService(session=session)
+    return CaseManagementService(session=session)

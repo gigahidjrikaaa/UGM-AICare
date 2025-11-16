@@ -56,8 +56,8 @@ Keywords that might indicate need: "bunuh diri", "mati", "tidak ingin hidup", "s
         }
     },
     {
-        "name": "run_support_coach_agent",
-        "description": """Execute the Support Coach Agent (SCA) LangGraph pipeline to generate a personalized CBT-informed intervention plan.
+        "name": "run_therapeutic_coach_agent",
+        "description": """Execute the Therapeutic Coach Agent (TCA) LangGraph pipeline to generate a personalized CBT-informed intervention plan.
 
 ✅ Call this tool when user EXPLICITLY requests structured support:
 - Asks for a plan or strategies: "buatin rencana", "kasih strategi", "gimana caranya"
@@ -75,7 +75,7 @@ Keywords that might indicate need: "bunuh diri", "mati", "tidak ingin hidup", "s
 - Casual chat or venting (listen and validate instead)
 - User just checking on existing plans (use get_user_intervention_plans instead)
 
-The SCA agent generates:
+The TCA agent generates:
 - 4-6 actionable CBT-informed steps
 - 2-3 mental health resource cards
 - Personalized plan based on intervention type
@@ -106,8 +106,8 @@ Intervention types:
         }
     },
     {
-        "name": "run_service_desk_agent",
-        "description": """Execute the Service Desk Agent (SDA) to create a case for human professional support.
+        "name": "run_case_management_agent",
+        "description": """Execute the Case Management Agent (CMA) to create a case for human professional support.
 
 ✅ Call this tool when user wants to connect with human professionals:
 - Explicitly asks for counselor/psychologist: "mau ketemu psikolog", "konseling", "mau curhat ke orang"
@@ -120,7 +120,7 @@ Intervention types:
 - Problem is beyond AI's scope (trauma, severe mental illness)
 - User explicitly says AI support isn't enough
 
-The SDA agent:
+The CMA agent:
 - Creates support case ticket with priority level
 - Notifies appropriate staff (counselors, emergency team)
 - Provides case number and estimated response time

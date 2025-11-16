@@ -1,5 +1,5 @@
 """
-Test STA Support Coach Plan Flag Feature
+Test STA Therapeutic Coach Plan Flag Feature
 
 This script tests the new STA flags (needs_support_coach_plan, support_plan_type)
 and the Gemini-powered plan generation.
@@ -110,9 +110,9 @@ async def test_general_coping_detection():
         print(f"   ✨ Needs Support Plan: {response.needs_support_coach_plan}")
         print(f"   📋 Plan Type: {response.support_plan_type}")
         
-        # Assert (should be moderate risk with SCA next step)
+        # Assert (should be moderate risk with TCA next step)
         assert response.risk_level >= 1, "Should be moderate risk"
-        assert response.next_step == "sca", "Should recommend SCA"
+        assert response.next_step == "sca", "Should recommend TCA"
         assert response.needs_support_coach_plan == True, "Should flag need for support plan"
         assert response.support_plan_type == "general_coping", f"Should recommend general_coping plan, got {response.support_plan_type}"
         print(f"   ✅ PASS")
@@ -192,7 +192,7 @@ async def test_gemini_plan_generation():
         return
     
     try:
-        from app.agents.sca.gemini_plan_generator import generate_personalized_plan
+        from app.agents.tca.gemini_plan_generator import generate_personalized_plan
         
         # Test calm down plan
         print("\n   Testing calm_down plan generation...")
@@ -219,7 +219,7 @@ async def test_gemini_plan_generation():
 
 async def main():
     """Run all tests."""
-    print("🚀 Testing STA Support Coach Plan Flag Feature")
+    print("🚀 Testing STA Therapeutic Coach Plan Flag Feature")
     print("=" * 60)
     
     try:

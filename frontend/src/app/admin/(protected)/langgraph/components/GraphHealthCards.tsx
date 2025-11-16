@@ -3,8 +3,8 @@
  * 
  * Displays health status cards for all 6 LangGraph agents:
  * - STA (Safety Triage Agent)
- * - SCA (Support Coach Agent)
- * - SDA (Service Desk Agent)
+ * - SCA (Therapeutic Coach Agent)
+ * - SDA (Case Management Agent)
  * - IA (Insights Agent)
  * - AIKA (Meta-Agent)
  * - Orchestrator (Legacy)
@@ -33,12 +33,12 @@ const GRAPH_METADATA: Record<string, { name: string; description: string; icon: 
     icon: '🛡️'
   },
   sca: {
-    name: 'Support Coach Agent',
+    name: 'Therapeutic Coach Agent',
     description: 'CBT-informed coaching and intervention plans',
     icon: '🧠'
   },
   sda: {
-    name: 'Service Desk Agent',
+    name: 'Case Management Agent',
     description: 'Clinical case management and SLA tracking',
     icon: '📋'
   },

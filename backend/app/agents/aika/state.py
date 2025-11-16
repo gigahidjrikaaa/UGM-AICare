@@ -59,7 +59,7 @@ class AikaState(BaseModel):
     )
     coaching_result: Optional[Dict] = Field(
         default=None,
-        description="Support Coach Agent response"
+        description="Therapeutic Coach Agent response"
     )
     service_result: Optional[Dict] = Field(
         default=None,
@@ -112,7 +112,7 @@ class AikaState(BaseModel):
     # Intervention plan (if created)
     intervention_plan: Optional[Dict[str, Any]] = Field(
         default=None,
-        description="Intervention plan created by SCA if user needs structured guidance"
+        description="Intervention plan created by TCA if user needs structured guidance"
     )
     
     # Error handling

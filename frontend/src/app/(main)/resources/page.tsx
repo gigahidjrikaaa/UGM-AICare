@@ -268,7 +268,7 @@ export default function SupportHubPage() {
                 Our AI companion can assess your situation and provide immediate guidance tailored to your needs.
               </p>
               <p className="text-xs text-gray-300 italic">
-                ✨ Aika uses our Support Coach Agent (SCA) to generate personalized intervention plans with step-by-step actions and relevant resources.
+                ✨ Aika uses our Therapeutic Coach Agent (TCA) to generate personalized intervention plans with step-by-step actions and relevant resources.
               </p>
             </div>
             <div className="flex-shrink-0">
@@ -388,7 +388,7 @@ export default function SupportHubPage() {
                 </div>
                 <h3 className="text-xl font-semibold text-white">No intervention plans yet</h3>
                 <p className="text-sm text-gray-400 leading-relaxed">
-                  When you chat with Aika and our Support Coach Agent (SCA) identifies you need help, personalized intervention plans will appear here. 
+                  When you chat with Aika and our Therapeutic Coach Agent (TCA) identifies you need help, personalized intervention plans will appear here. 
                   These plans include step-by-step actions, resources, and follow-up guidance.
                 </p>
                 <Link

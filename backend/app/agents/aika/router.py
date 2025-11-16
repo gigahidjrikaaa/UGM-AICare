@@ -85,14 +85,14 @@ async def process_aika_message(
     
     This endpoint:
     1. Classifies user intent based on role and message
-    2. Routes to appropriate specialized agents (STA, SCA, SDA, IA)
+    2. Routes to appropriate specialized agents (STA, TCA, CMA, IA)
     3. Orchestrates multi-agent workflows via LangGraph
     4. Returns unified response with Aika's personality
     
     **Role-based flows:**
-    - **Students (user)**: STA → SCA → [SDA if crisis] → IA (background)
-    - **Admins**: Intent → IA (analytics) or SDA (actions)
-    - **Counselors**: SDA (cases) → IA (insights) → SCA (recommendations)
+    - **Students (user)**: STA → SCA → [CMA if crisis] → IA (background)
+    - **Admins**: Intent → IA (analytics) or CMA (actions)
+    - **Counselors**: CMA (cases) → IA (insights) → TCA (recommendations)
     
     **Example request:**
     ```json
@@ -116,7 +116,7 @@ async def process_aika_message(
         "session_id": "sess_123_1699099200",
         "user_role": "user",
         "intent": "seeking_support",
-        "agents_invoked": ["STA", "SCA"],
+        "agents_invoked": ["STA", "TCA"],
         "actions_taken": ["assess_risk", "provide_cbt_coaching"],
         "processing_time_ms": 1234.56,
         "risk_assessment": {
@@ -255,8 +255,8 @@ async def aika_health() -> dict:
         "orchestrator": "LangGraph",
         "agents": {
             "STA": "Safety Triage Agent",
-            "SCA": "Support Coach Agent",
-            "SDA": "Service Desk Agent",
+            "TCA": "Therapeutic Coach Agent",
+            "CMA": "Service Desk Agent",
             "IA": "Insights Agent",
         },
     }

@@ -111,12 +111,12 @@ export default function AboutPage() {
               },
               {
                 emoji: "💬",
-                name: "Support Coach Agent (SCA)",
+                name: "Therapeutic Coach Agent (TCA)",
                 description: "CBT-informed personalized coaching with therapeutic exercise guidance and intervention plans"
               },
               {
                 emoji: "🗂️",
-                name: "Service Desk Agent (SDA)",
+                name: "Case Management Agent (CMA)",
                 description: "Clinical case management with SLA tracking, auto-assignment, and follow-up workflows"
               },
               {

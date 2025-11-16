@@ -9,7 +9,7 @@ Changes (Latest):
 - Auto-generated Gemini schemas
 
 Architecture:
-- agent_tools.py: STA, SCA, SDA, IA, general_query
+- agent_tools.py: STA, TCA, CMA, IA, general_query
 - scheduling_tools.py: Appointment booking tools
 - registry.py: Core decorator pattern and tool execution
 """
@@ -42,7 +42,7 @@ def get_aika_tools() -> List[Dict[str, Any]]:
     try:
         # Use NEW registry to get all tools
         # The registry contains:
-        # - agent tools (STA, SCA, SDA, IA, general_query)
+        # - agent tools (STA, TCA, CMA, IA, general_query)
         # - scheduling tools (book_appointment, get_available_counselors, etc.)
         all_tools_dict = get_all_tools()  # Returns Dict[str, Dict]
         all_tools = list(all_tools_dict.values())  # Convert to List[Dict]

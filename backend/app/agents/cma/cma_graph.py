@@ -27,7 +27,7 @@ async def ingest_escalation_node(state: SDAState) -> SDAState:
     """Node: Ingest escalation signal from STA.
     
     Validates that this is a high/critical severity case requiring
-    SDA intervention.
+    CMA intervention.
     
     Args:
         state: Current graph state with STA outputs
@@ -37,20 +37,20 @@ async def ingest_escalation_node(state: SDAState) -> SDAState:
     """
     execution_id = state.get("execution_id")
     if execution_id:
-        execution_tracker.start_node(execution_id, "sda::ingest_escalation", "sda")
+        execution_tracker.start_node(execution_id, "cma::ingest_escalation", "cma")
     
     # Validate this should be escalated
     severity = state.get("severity", "low")
     if severity not in ("high", "critical"):
         errors = state.get("errors", [])
         errors.append(
-            f"SDA should only handle high/critical cases, got severity={severity}"
+            f"CMA should only handle high/critical cases, got severity={severity}"
         )
         state["errors"] = errors
         if execution_id:
             execution_tracker.fail_node(
                 execution_id, 
-                "sda::ingest_escalation", 
+                "cma::ingest_escalation", 
                 f"Invalid severity: {severity}"
             )
         return state
@@ -60,10 +60,10 @@ async def ingest_escalation_node(state: SDAState) -> SDAState:
     state["execution_path"] = execution_path
     
     if execution_id:
-        execution_tracker.complete_node(execution_id, "sda::ingest_escalation")
+        execution_tracker.complete_node(execution_id, "cma::ingest_escalation")
     
     logger.info(
-        f"SDA ingested escalation: severity={severity}, "
+        f"CMA ingested escalation: severity={severity}, "
         f"user_hash={state.get('user_hash')}"
     )
     return state
@@ -83,7 +83,7 @@ async def create_case_node(state: SDAState, db: AsyncSession) -> SDAState:
     """
     execution_id = state.get("execution_id")
     if execution_id:
-        execution_tracker.start_node(execution_id, "sda::create_case", "sda")
+        execution_tracker.start_node(execution_id, "cma::create_case", "cma")
     
     try:
         # Map severity to CaseSeverityEnum
@@ -133,14 +133,14 @@ async def create_case_node(state: SDAState, db: AsyncSession) -> SDAState:
         if execution_id:
             execution_tracker.complete_node(
                 execution_id, 
-                "sda::create_case",
+                "cma::create_case",
                 metrics={
                     "case_id": str(case.id),
                     "severity": case_severity.value
                 }
             )
         
-        logger.info(f"SDA created case: ID={case.id}, severity={case_severity.value}")
+        logger.info(f"CMA created case: ID={case.id}, severity={case_severity.value}")
         
     except Exception as e:
         error_msg = f"Case creation failed: {str(e)}"
@@ -150,7 +150,7 @@ async def create_case_node(state: SDAState, db: AsyncSession) -> SDAState:
         logger.error(error_msg, exc_info=True)
         
         if execution_id:
-            execution_tracker.fail_node(execution_id, "sda::create_case", str(e))
+            execution_tracker.fail_node(execution_id, "cma::create_case", str(e))
     
     return state
 
@@ -170,7 +170,7 @@ async def calculate_sla_node(state: SDAState, db: AsyncSession) -> SDAState:
     """
     execution_id = state.get("execution_id")
     if execution_id:
-        execution_tracker.start_node(execution_id, "sda::calculate_sla", "sda")
+        execution_tracker.start_node(execution_id, "cma::calculate_sla", "cma")
     
     try:
         if not state.get("case_id"):
@@ -204,11 +204,11 @@ async def calculate_sla_node(state: SDAState, db: AsyncSession) -> SDAState:
         if execution_id:
             execution_tracker.complete_node(
                 execution_id, 
-                "sda::calculate_sla",
+                "cma::calculate_sla",
                 metrics={"sla_minutes": sla_minutes}
             )
         
-        logger.info(f"SDA calculated SLA: breach at {sla_breach_at} ({sla_minutes} min)")
+        logger.info(f"CMA calculated SLA: breach at {sla_breach_at} ({sla_minutes} min)")
         
     except Exception as e:
         error_msg = f"SLA calculation failed: {str(e)}"
@@ -218,7 +218,7 @@ async def calculate_sla_node(state: SDAState, db: AsyncSession) -> SDAState:
         logger.error(error_msg, exc_info=True)
         
         if execution_id:
-            execution_tracker.fail_node(execution_id, "sda::calculate_sla", str(e))
+            execution_tracker.fail_node(execution_id, "cma::calculate_sla", str(e))
     
     return state
 
@@ -244,7 +244,7 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
     """
     execution_id = state.get("execution_id")
     if execution_id:
-        execution_tracker.start_node(execution_id, "sda::auto_assign", "sda")
+        execution_tracker.start_node(execution_id, "cma::auto_assign", "cma")
     
     try:
         case_id = state.get("case_id")
@@ -269,7 +269,7 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
             if execution_id:
                 execution_tracker.complete_node(
                     execution_id, 
-                    "sda::auto_assign",
+                    "cma::auto_assign",
                     metrics={
                         "assigned": False,
                         "reason": "no_counsellors_available"
@@ -336,7 +336,7 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
         if execution_id:
             execution_tracker.complete_node(
                 execution_id, 
-                "sda::auto_assign",
+                "cma::auto_assign",
                 metrics={
                     "assigned": True,
                     "counsellor_id": assigned_counsellor_id,
@@ -346,7 +346,7 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
             )
         
         logger.info(
-            f"SDA auto-assigned case {case_id} to counsellor {assigned_counsellor_id} "
+            f"CMA auto-assigned case {case_id} to counsellor {assigned_counsellor_id} "
             f"(workload: {assigned_workload} active cases)"
         )
         
@@ -358,7 +358,7 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
         logger.error(error_msg, exc_info=True)
         
         if execution_id:
-            execution_tracker.fail_node(execution_id, "sda::auto_assign", str(e))
+            execution_tracker.fail_node(execution_id, "cma::auto_assign", str(e))
     
     return state
 
@@ -376,7 +376,7 @@ async def notify_counsellor_node(state: SDAState) -> SDAState:
     """
     execution_id = state.get("execution_id")
     if execution_id:
-        execution_tracker.start_node(execution_id, "sda::notify_counsellor", "sda")
+        execution_tracker.start_node(execution_id, "cma::notify_counsellor", "cma")
     
     try:
         if not state.get("case_id"):
@@ -392,7 +392,7 @@ async def notify_counsellor_node(state: SDAState) -> SDAState:
         
         await publish_event(
             event_type=event_type,
-            source_agent="sda",
+            source_agent="cma",
             data={
                 "case_id": str(state.get("case_id")),
                 "severity": severity,
@@ -408,9 +408,9 @@ async def notify_counsellor_node(state: SDAState) -> SDAState:
         state["execution_path"] = execution_path
         
         if execution_id:
-            execution_tracker.complete_node(execution_id, "sda::notify_counsellor")
+            execution_tracker.complete_node(execution_id, "cma::notify_counsellor")
         
-        logger.info(f"SDA notified counsellors of case {state.get('case_id')}")
+        logger.info(f"CMA notified counsellors of case {state.get('case_id')}")
         
     except Exception as e:
         error_msg = f"Counsellor notification failed: {str(e)}"
@@ -420,7 +420,7 @@ async def notify_counsellor_node(state: SDAState) -> SDAState:
         logger.error(error_msg, exc_info=True)
         
         if execution_id:
-            execution_tracker.fail_node(execution_id, "sda::notify_counsellor", str(e))
+            execution_tracker.fail_node(execution_id, "cma::notify_counsellor", str(e))
     
     return state
 
@@ -449,14 +449,14 @@ async def schedule_appointment_node(state: SDAState, db: AsyncSession) -> SDASta
     """
     execution_id = state.get("execution_id")
     if execution_id:
-        execution_tracker.start_node(execution_id, "sda::schedule_appointment", "sda")
+        execution_tracker.start_node(execution_id, "cma::schedule_appointment", "cma")
     
     try:
         # Check if scheduling is requested
         if not state.get("schedule_appointment", False):
             logger.info("Scheduling not requested, skipping appointment node")
             if execution_id:
-                execution_tracker.complete_node(execution_id, "sda::schedule_appointment")
+                execution_tracker.complete_node(execution_id, "cma::schedule_appointment")
             return state
         
         user_id = state.get("user_id")
@@ -530,7 +530,7 @@ async def schedule_appointment_node(state: SDAState, db: AsyncSession) -> SDASta
             psychologist_id=psychologist_id,
             appointment_type_id=appointment_type_id,
             appointment_datetime=appointment_datetime,
-            notes=f"Auto-scheduled by SDA. Case severity: {severity}. Case ID: {state.get('case_id')}",
+            notes=f"Auto-scheduled by CMA. Case severity: {severity}. Case ID: {state.get('case_id')}",
             status="scheduled"
         )
         
@@ -548,10 +548,10 @@ async def schedule_appointment_node(state: SDAState, db: AsyncSession) -> SDASta
         state["execution_path"] = execution_path
         
         if execution_id:
-            execution_tracker.complete_node(execution_id, "sda::schedule_appointment")
+            execution_tracker.complete_node(execution_id, "cma::schedule_appointment")
         
         logger.info(
-            f"SDA scheduled appointment {new_appointment.id} for user {user_id} "
+            f"CMA scheduled appointment {new_appointment.id} for user {user_id} "
             f"with psychologist {psychologist.name} at {appointment_datetime}"
         )
         
@@ -564,7 +564,7 @@ async def schedule_appointment_node(state: SDAState, db: AsyncSession) -> SDASta
         logger.error(error_msg, exc_info=True)
         
         if execution_id:
-            execution_tracker.fail_node(execution_id, "sda::schedule_appointment", str(e))
+            execution_tracker.fail_node(execution_id, "cma::schedule_appointment", str(e))
     
     return state
 
@@ -808,7 +808,7 @@ Return HANYA datetime string dalam ISO format (YYYY-MM-DDTHH:MM:SS) dari list di
 
 
 def create_sda_graph(db: AsyncSession) -> StateGraph:
-    """Create the SDA LangGraph state machine.
+    """Create the CMA LangGraph state machine.
     
     Graph structure:
         START → ingest_escalation → create_case → calculate_sla → 

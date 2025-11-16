@@ -4,8 +4,8 @@ Safety Agent Suite Tests (LangGraph Aika Meta-Agent)
 
 Tests for the Aika Meta-Agent orchestrator which coordinates:
 - Safety Triage Agent (STA): Crisis detection and risk classification
-- Support Coach Agent (SCA): CBT-informed coaching and intervention plans
-- Service Desk Agent (SDA): Clinical case management
+- Therapeutic Coach Agent (TCA): CBT-informed coaching and intervention plans
+- Case Management Agent (CMA): Clinical case management
 - Insights Agent (IA): Privacy-preserving analytics
 
 All tests now use the /api/v1/aika endpoint which internally routes to appropriate agents.
@@ -95,11 +95,11 @@ class TestSafetyTriageAgent:
 
 
 class TestSupportCoachAgent:
-    """Test Support Coach Agent (SCA) functionality via Aika Meta-Agent."""
+    """Test Therapeutic Coach Agent (TCA) functionality via Aika Meta-Agent."""
     
     @pytest.mark.asyncio
     async def test_sca_intervention_plan_creation(self, client: AsyncClient, auth_headers: dict):
-        """Test SCA providing coaching via Aika."""
+        """Test TCA providing coaching via Aika."""
         coaching_request = {
             "google_sub": "test_user_123",
             "session_id": "test_session_coaching",
@@ -118,12 +118,12 @@ class TestSupportCoachAgent:
         data = response.json()
         assert data["success"] is True
         assert "response" in data
-        # SCA should be invoked for coaching
-        assert "SCA" in data["metadata"].get("agents_invoked", [])
+        # TCA should be invoked for coaching
+        assert "TCA" in data["metadata"].get("agents_invoked", [])
     
     @pytest.mark.asyncio
     async def test_sca_cbt_module_recommendation(self, client: AsyncClient, auth_headers: dict):
-        """Test SCA recommending CBT strategies via Aika."""
+        """Test TCA recommending CBT strategies via Aika."""
         cbt_request = {
             "google_sub": "test_user_123",
             "session_id": "test_session_cbt",
@@ -146,7 +146,7 @@ class TestSupportCoachAgent:
     
     @pytest.mark.asyncio
     async def test_sca_coaching_response(self, client: AsyncClient, auth_headers: dict):
-        """Test SCA providing coaching responses via Aika."""
+        """Test TCA providing coaching responses via Aika."""
         coaching_request = {
             "google_sub": "test_user_123",
             "session_id": "test_session_stress",
@@ -169,11 +169,11 @@ class TestSupportCoachAgent:
 
 
 class TestServiceDeskAgent:
-    """Test Service Desk Agent (SDA) functionality via Aika Meta-Agent."""
+    """Test Case Management Agent (CMA) functionality via Aika Meta-Agent."""
     
     @pytest.mark.asyncio
     async def test_sda_case_creation(self, client: AsyncClient, counselor_headers: dict):
-        """Test SDA creating clinical cases (counselor role)."""
+        """Test CMA creating clinical cases (counselor role)."""
         # Counselors can create cases through Aika
         case_request = {
             "google_sub": "counselor_123",
@@ -189,12 +189,12 @@ class TestServiceDeskAgent:
             json=case_request,
         )
         
-        # Should process successfully (counselor role routes to SDA)
+        # Should process successfully (counselor role routes to CMA)
         assert response.status_code in [200, 401]  # 401 if counselor_headers not properly set
     
     @pytest.mark.asyncio
     async def test_sda_case_assignment(self, client: AsyncClient, admin_headers: dict):
-        """Test SDA case management (admin role)."""
+        """Test CMA case management (admin role)."""
         # Admin can manage cases
         admin_request = {
             "google_sub": "admin_123",
@@ -214,7 +214,7 @@ class TestServiceDeskAgent:
     
     @pytest.mark.asyncio
     async def test_sda_sla_tracking(self, client: AsyncClient, counselor_headers: dict):
-        """Test SDA SLA tracking via counselor requests."""
+        """Test CMA SLA tracking via counselor requests."""
         sla_request = {
             "google_sub": "counselor_123",
             "session_id": "test_session_sla",
@@ -297,7 +297,7 @@ class TestAgentOrchestration:
     
     @pytest.mark.asyncio
     async def test_agent_workflow_sta_to_sca(self, client: AsyncClient, auth_headers: dict):
-        """Test workflow from STA assessment to SCA intervention."""
+        """Test workflow from STA assessment to TCA intervention."""
         # First, STA assesses message
         assessment = await client.post(
             "/api/v1/agents/sta/assess",
@@ -306,12 +306,12 @@ class TestAgentOrchestration:
         )
         assert assessment.status_code == 200
         
-        # Then, SCA creates intervention based on assessment
+        # Then, TCA creates intervention based on assessment
         # This would be triggered automatically by LangGraph in production
     
     @pytest.mark.asyncio
     async def test_agent_workflow_crisis_escalation(self, client: AsyncClient, auth_headers: dict):
-        """Test crisis workflow: STA → SDA escalation."""
+        """Test crisis workflow: STA → CMA escalation."""
         # STA detects crisis
         crisis_assessment = await client.post(
             "/api/v1/agents/sta/assess",
@@ -320,7 +320,7 @@ class TestAgentOrchestration:
         )
         assert crisis_assessment.status_code == 200
         
-        # SDA should receive escalation (automatic in production)
+        # CMA should receive escalation (automatic in production)
     
     @pytest.mark.asyncio
     async def test_agent_state_persistence(self, client: AsyncClient, auth_headers: dict):

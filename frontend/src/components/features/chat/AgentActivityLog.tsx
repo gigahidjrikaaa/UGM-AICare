@@ -20,8 +20,8 @@ interface AgentActivityLogProps {
 
 const AGENT_LABELS: Record<string, string> = {
   STA: '🧠 Suicide & Threat Assessment',
-  SCA: '🤝 Support & Care Agent',
-  SDA: '🚨 Scheduling & Documentation Agent',
+  TCA: '🤝 Support & Care Agent',
+  CMA: '🚨 Scheduling & Documentation Agent',
 };
 
 const INTENT_LABELS: Record<string, { label: string; icon: React.ReactNode; color: string }> = {

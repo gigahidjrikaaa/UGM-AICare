@@ -23,15 +23,15 @@ const AGENT_COLORS = {
     borderColor: 'border-red-500',
     textColor: 'text-red-400',
   },
-  SCA: {
-    name: 'Support Coach',
+  TCA: {
+    name: 'Therapeutic Coach',
     color: '#3b82f6', // Blue - for coaching/support
     bgColor: 'bg-blue-500/20',
     borderColor: 'border-blue-500',
     textColor: 'text-blue-400',
   },
-  SDA: {
-    name: 'Service Desk',
+  CMA: {
+    name: 'Case Management',
     color: '#f59e0b', // Orange - for case management
     bgColor: 'bg-orange-500/20',
     borderColor: 'border-orange-500',

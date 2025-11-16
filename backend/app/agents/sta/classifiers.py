@@ -251,7 +251,7 @@ class SafetyTriageClassifier:
         else:
             if any(keyword in text for keyword in _ACADEMIC_KEYWORDS):
                 intent = "academic_stress"
-                next_step = "sca"
+                next_step = "tca"
                 risk_score = max(risk_score, 1)
             if any(keyword in text for keyword in _RELATIONSHIP_KEYWORDS):
                 intent = "relationship_strain"
@@ -276,7 +276,7 @@ class SafetyTriageClassifier:
             diagnostic_notes.append("User overwhelmed by problem complexity - recommend breaking down approach")
         
         # If moderate/high risk and next_step is SCA, also recommend support plan
-        if risk_score >= 1 and next_step == "sca" and not needs_support_plan:
+        if risk_score >= 1 and next_step == "tca" and not needs_support_plan:
             needs_support_plan = True
             plan_type = "general_coping"
             diagnostic_notes.append("Moderate stress detected - recommend general coping support plan")

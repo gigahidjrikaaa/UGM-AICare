@@ -12,8 +12,8 @@ from app.database import Base
 
 class AgentNameEnum(str, enum.Enum):
     STA = "STA"
-    SCA = "SCA"
-    SDA = "SDA"
+    TCA = "TCA"
+    CMA = "CMA"
     IA = "IA"
 
 
