@@ -807,7 +807,7 @@ Return HANYA datetime string dalam ISO format (YYYY-MM-DDTHH:MM:SS) dari list di
         return None
 
 
-def create_sda_graph(db: AsyncSession) -> StateGraph:
+def create_cma_graph(db: AsyncSession) -> StateGraph:
     """Create the CMA LangGraph state machine.
     
     Graph structure:

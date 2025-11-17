@@ -33,6 +33,14 @@ class TCAInterveneResponse(BaseModel):
     next_check_in: Optional[datetime] = None
 
 
+# Backward compatibility aliases (SCA→TCA rename was incomplete)
+SCAInterveneRequest = TCAInterveneRequest
+"""Alias for TCAInterveneRequest. Support Coach Agent (SCA) was renamed to Therapeutic Coach Agent (TCA)."""
+
+SCAInterveneResponse = TCAInterveneResponse
+"""Alias for TCAInterveneResponse. Support Coach Agent (SCA) was renamed to Therapeutic Coach Agent (TCA)."""
+
+
 class SCAFollowUpRequest(BaseModel):
     session_id: str
     last_plan_id: str

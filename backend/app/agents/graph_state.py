@@ -143,6 +143,11 @@ class TCAState(SafetyAgentState):
     pass
 
 
+# Backward compatibility aliases (SCA→TCA and SDA→CMA rename was incomplete)
+SCAState = TCAState
+"""Alias for TCAState. Support Coach Agent (SCA) was renamed to Therapeutic Coach Agent (TCA)."""
+
+
 class CMAState(SafetyAgentState):
     """CMA-specific state extension.
     
@@ -185,6 +190,11 @@ class CMAState(SafetyAgentState):
     
     scheduling_context: NotRequired[Optional[Dict[str, Any]]]
     """Additional scheduling context (preferences, constraints, etc.)."""
+
+
+# Backward compatibility alias (SDA→CMA rename was incomplete)
+SDAState = CMAState
+"""Alias for CMAState. Service Desk Agent (SDA) was renamed to Case Management Agent (CMA)."""
 
 
 class OrchestratorState(SafetyAgentState):

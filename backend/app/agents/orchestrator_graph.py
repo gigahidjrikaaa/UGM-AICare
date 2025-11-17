@@ -19,8 +19,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.graph_state import OrchestratorState
 from app.agents.sta.sta_graph import create_sta_graph
-from app.agents.tca.sca_graph import create_sca_graph
-from app.agents.cma.sda_graph import create_sda_graph
+from app.agents.tca.tca_graph import create_tca_graph
+from app.agents.cma.cma_graph import create_cma_graph
 from app.agents.execution_tracker import execution_tracker
 
 logger = logging.getLogger(__name__)
@@ -97,7 +97,7 @@ async def execute_sca_subgraph(state: OrchestratorState, db: AsyncSession) -> Or
     
     try:
         # Create and execute TCA subgraph
-        sca_graph = create_sca_graph(db)
+        sca_graph = create_tca_graph(db)
         sca_result = await sca_graph.ainvoke(state)
         
         # Merge SCA outputs into orchestrator state
@@ -149,7 +149,7 @@ async def execute_sda_subgraph(state: OrchestratorState, db: AsyncSession) -> Or
     
     try:
         # Create and execute CMA subgraph
-        sda_graph = create_sda_graph(db)
+        sda_graph = create_cma_graph(db)
         sda_result = await sda_graph.ainvoke(state)
         
         # Merge CMA outputs into orchestrator state

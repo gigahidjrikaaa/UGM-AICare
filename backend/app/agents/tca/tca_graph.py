@@ -350,7 +350,7 @@ async def persist_plan_node(state: SCAState, db: AsyncSession) -> SCAState:
     return state
 
 
-def create_sca_graph(db: AsyncSession) -> StateGraph:
+def create_tca_graph(db: AsyncSession) -> StateGraph:
     """Create the TCA LangGraph state machine.
     
     Graph structure:
