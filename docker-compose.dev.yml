@@ -72,7 +72,12 @@ services:
       bash -c "
         /app/scripts/wait-for-it.sh db:5432 -t 60 -- echo 'Database is ready!' &&
         echo 'Running Alembic migrations...' &&
-        alembic upgrade head
+        if ! alembic upgrade head; then
+          echo 'Migration failed - attempting to fix alembic_version...' &&
+          psql postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB} -c 'DROP TABLE IF EXISTS alembic_version CASCADE;' &&
+          echo 'Retrying migrations...' &&
+          alembic upgrade head
+        fi
       "
     env_file:
       - .env
