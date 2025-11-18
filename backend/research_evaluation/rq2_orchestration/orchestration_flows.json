@@ -1,0 +1,62 @@
+[
+    {
+        "flow_id": "flow_001_id",
+        "description": "User expresses moderate stress in Indonesian, gets routed to TCA for a coping strategy, and confirms it's helpful.",
+        "conversation": [
+            {
+                "user": "Ujian bikin stres banget, rasanya nggak sanggup.",
+                "expected_intent": "request_emotional_support",
+                "expected_risk": "moderate",
+                "expected_next_agent": "TCA"
+            },
+            {
+                "user": "Oke, boleh dicoba tekniknya.",
+                "expected_intent": "accept_suggestion",
+                "expected_risk": "low",
+                "expected_next_agent": "Aika"
+            },
+            {
+                "user": "Makasih ya, Aika. Sedikit lebih tenang sekarang.",
+                "expected_intent": "express_gratitude",
+                "expected_risk": "none",
+                "expected_next_agent": "END"
+            }
+        ]
+    },
+    {
+        "flow_id": "flow_002_mix",
+        "description": "User reports a panic attack in mixed language, gets escalated to CMA for immediate human intervention.",
+        "conversation": [
+            {
+                "user": "Tolong, I'm having a panic attack, nggak bisa napas.",
+                "expected_intent": "request_crisis_support",
+                "expected_risk": "critical",
+                "expected_next_agent": "CMA"
+            },
+            {
+                "user": "Yes, I need help now.",
+                "expected_intent": "confirm_escalation",
+                "expected_risk": "critical",
+                "expected_tool_call": "create_crisis_case"
+            }
+        ]
+    },
+    {
+        "flow_id": "flow_003_en",
+        "description": "User asks to book an appointment in English, gets routed to CMA.",
+        "conversation": [
+            {
+                "user": "I want to book a counseling session, is that possible?",
+                "expected_intent": "schedule_appointment",
+                "expected_risk": "none",
+                "expected_next_agent": "CMA"
+            },
+            {
+                "user": "How about next week, Tuesday morning? Are there any available slots?",
+                "expected_intent": "provide_scheduling_details",
+                "expected_risk": "none",
+                "expected_tool_call": "find_available_slots"
+            }
+        ]
+    }
+]
