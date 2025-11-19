@@ -11,13 +11,21 @@ from fastapi.responses import Response, StreamingResponse
 from sqlalchemy import asc, case, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.agents.sta.conversation_analyzer import analyze_conversation_risk
 from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.domains.mental_health.models import Conversation
+from app.domains.mental_health.models.assessments import ConversationRiskAssessment
+from app.domains.mental_health.services.conversation_assessments import (
+    upsert_conversation_assessment,
+)
 from app.models import FlaggedSession, User  # Core models
 from app.schemas.admin import (
+    ConversationAssessmentTriggerRequest,
     ConversationDetailResponse,
     ConversationListItem,
+    ConversationRiskAssessmentListResponse,
+    ConversationRiskAssessmentResponse,
     ConversationStats,
     ConversationsResponse,
     SessionDetailResponse,
@@ -288,6 +296,50 @@ async def get_conversations_summary(
     )
 
 
+@router.get("/conversation-assessments", response_model=ConversationRiskAssessmentListResponse)
+async def list_conversation_assessments(
+    page: int = Query(1, ge=1),
+    limit: int = Query(25, ge=1, le=100),
+    session_id: Optional[str] = Query(None, description="Filter by session id"),
+    conversation_id: Optional[str] = Query(None, description="Filter by conversation id"),
+    user_id: Optional[int] = Query(None, description="Filter by user id"),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user),
+) -> ConversationRiskAssessmentListResponse:
+    """List stored STA conversation-level assessments with optional filters."""
+
+    filters = []
+    if conversation_id:
+        filters.append(ConversationRiskAssessment.conversation_id == conversation_id)
+    if session_id:
+        filters.append(ConversationRiskAssessment.session_id == session_id)
+    if user_id:
+        filters.append(ConversationRiskAssessment.user_id == user_id)
+
+    base_query = select(ConversationRiskAssessment)
+    count_query = select(func.count(ConversationRiskAssessment.id))
+    if filters:
+        base_query = base_query.where(*filters)
+        count_query = count_query.where(*filters)
+
+    total_count = (await db.execute(count_query)).scalar() or 0
+    offset = (page - 1) * limit
+
+    records = (
+        await db.execute(
+            base_query
+            .order_by(desc(ConversationRiskAssessment.analysis_timestamp))
+            .offset(offset)
+            .limit(limit)
+        )
+    ).scalars().all()
+
+    return ConversationRiskAssessmentListResponse(
+        assessments=records,
+        total_count=total_count,
+    )
+
+
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetailResponse)
 async def get_conversation_detail(
     conversation_id: int,
@@ -321,6 +373,119 @@ async def get_conversation_detail(
         timestamp=conversation.timestamp,
         sentiment_score=sentiment_score,
     )
+
+
+@router.get(
+    "/conversation-assessments/{conversation_id}",
+    response_model=ConversationRiskAssessmentResponse,
+)
+async def get_conversation_assessment(
+    conversation_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user),
+) -> ConversationRiskAssessmentResponse:
+    """Return the most recent STA conversation assessment for a conversation."""
+
+    record = (
+        await db.execute(
+            select(ConversationRiskAssessment)
+            .where(ConversationRiskAssessment.conversation_id == conversation_id)
+            .order_by(desc(ConversationRiskAssessment.analysis_timestamp))
+        )
+    ).scalars().first()
+
+    if not record:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
+
+    return record
+
+
+@router.post(
+    "/conversation-assessments/{conversation_id}/trigger",
+    response_model=ConversationRiskAssessmentResponse,
+    status_code=status.HTTP_202_ACCEPTED,
+)
+async def trigger_conversation_assessment(
+    conversation_id: str,
+    payload: ConversationAssessmentTriggerRequest,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user),
+) -> ConversationRiskAssessmentResponse:
+    """Run STA analysis manually for a conversation and persist the result."""
+
+    if not payload.force_refresh:
+        existing = (
+            await db.execute(
+                select(ConversationRiskAssessment)
+                .where(ConversationRiskAssessment.conversation_id == conversation_id)
+                .order_by(desc(ConversationRiskAssessment.analysis_timestamp))
+            )
+        ).scalars().first()
+        if existing:
+            logger.info(
+                "Admin %s requested STA assessment for %s; returning cached record %s",
+                admin_user.id,
+                conversation_id,
+                existing.id,
+            )
+            return existing
+
+    conversations = (
+        await db.execute(
+            select(Conversation)
+            .where(Conversation.conversation_id == conversation_id)
+            .order_by(asc(Conversation.timestamp))
+        )
+    ).scalars().all()
+
+    if not conversations:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Conversation history not found")
+
+    history: List[Dict[str, str]] = []
+    for conv in conversations:
+        history.append({"role": "user", "content": conv.message})
+        history.append({"role": "assistant", "content": conv.response})
+
+    last_user_idx = next((idx for idx in range(len(history) - 1, -1, -1) if history[idx]["role"] == "user"), None)
+    if last_user_idx is None:
+        raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Conversation has no user messages")
+
+    current_message = history[last_user_idx]["content"]
+    context_history = history[:last_user_idx]
+    if not context_history:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Conversation does not have enough turns prior to the closing message to run STA assessment",
+        )
+
+    sanitized_history = [{"role": entry["role"], "content": entry["content"]} for entry in context_history]
+    conversation_start = conversations[0].timestamp.timestamp() if conversations[0].timestamp else None
+
+    assessment = await analyze_conversation_risk(
+        conversation_history=sanitized_history,
+        current_message=current_message,
+        user_context={},
+        conversation_start_time=conversation_start,
+        preferred_model=payload.preferred_model,
+    )
+
+    record = await upsert_conversation_assessment(
+        db,
+        conversation_id=conversation_id,
+        session_id=conversations[0].session_id,
+        user_id=conversations[0].user_id,
+        assessment=assessment,
+        force_refresh=True,
+    )
+
+    logger.info(
+        "Admin %s stored STA conversation assessment %s for conversation %s",
+        admin_user.id,
+        record.id,
+        conversation_id,
+    )
+
+    return record
 
 
 @router.get("/conversation-session/{session_id}", response_model=SessionDetailResponse)

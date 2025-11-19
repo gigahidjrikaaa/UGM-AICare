@@ -114,7 +114,6 @@ async def create_case_node(state: SDAState, db: AsyncSession) -> SDAState:
             session_id=state.get("session_id", ""),
             conversation_id=state.get("conversation_id"),
             summary_redacted=summary_redacted,
-            triage_assessment_id=state.get("triage_assessment_id"),
             created_at=datetime.now(),
             updated_at=datetime.now()
         )
@@ -825,12 +824,25 @@ def create_cma_graph(db: AsyncSession) -> StateGraph:
     """
     workflow = StateGraph(SDAState)
     
+    # Define async wrappers to properly await the nodes
+    async def create_case_wrapper(state: SDAState) -> SDAState:
+        return await create_case_node(state, db)
+
+    async def calculate_sla_wrapper(state: SDAState) -> SDAState:
+        return await calculate_sla_node(state, db)
+
+    async def auto_assign_wrapper(state: SDAState) -> SDAState:
+        return await auto_assign_node(state, db)
+
+    async def schedule_appt_wrapper(state: SDAState) -> SDAState:
+        return await schedule_appointment_node(state, db)
+
     # Add nodes
     workflow.add_node("ingest_escalation", ingest_escalation_node)
-    workflow.add_node("create_case", lambda state: create_case_node(state, db))
-    workflow.add_node("calculate_sla", lambda state: calculate_sla_node(state, db))
-    workflow.add_node("auto_assign", lambda state: auto_assign_node(state, db))
-    workflow.add_node("schedule_appt", lambda state: schedule_appointment_node(state, db))  # Renamed to avoid conflict with state key
+    workflow.add_node("create_case", create_case_wrapper)
+    workflow.add_node("calculate_sla", calculate_sla_wrapper)
+    workflow.add_node("auto_assign", auto_assign_wrapper)
+    workflow.add_node("schedule_appt", schedule_appt_wrapper)  # Renamed to avoid conflict with state key
     workflow.add_node("notify_counsellor", notify_counsellor_node)
     
     # Define flow with conditional scheduling

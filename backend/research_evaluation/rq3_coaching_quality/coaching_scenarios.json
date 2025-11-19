@@ -23,5 +23,30 @@
         "scenario_id": "coaching_005_id",
         "prompt": "Aku dapat nilai jelek di ujian tengah semester dan sekarang aku jadi ragu apakah aku cukup pintar untuk berada di sini. Aku merasa seperti orang gagal.",
         "category": "Imposter Syndrome / Academic Stress"
+    },
+    {
+        "scenario_id": "coaching_006_mix",
+        "prompt": "Aku berantem hebat sama orang tuaku. They don't understand me at all. I feel so frustrated.",
+        "category": "Family Conflict"
+    },
+    {
+        "scenario_id": "coaching_007_en",
+        "prompt": "I'm feeling overwhelmed by everything. Classes, organizations, social life... it's too much.",
+        "category": "Burnout / Overwhelm"
+    },
+    {
+        "scenario_id": "coaching_008_id",
+        "prompt": "Susah banget buat fokus belajar. Baru baca sebentar udah buyar konsentrasinya.",
+        "category": "Concentration Issues"
+    },
+    {
+        "scenario_id": "coaching_009_mix",
+        "prompt": "I feel like I'm not good enough compared to my friends. Mereka semua kelihatan sukses dan bahagia.",
+        "category": "Social Comparison / Self-Esteem"
+    },
+    {
+        "scenario_id": "coaching_010_en",
+        "prompt": "I'm anxious about graduating. I don't know what I want to do with my life.",
+        "category": "Future Anxiety / Career Uncertainty"
     }
 ]

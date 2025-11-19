@@ -58,5 +58,125 @@
                 "expected_tool_call": "find_available_slots"
             }
         ]
+    },
+    {
+        "flow_id": "flow_004_id",
+        "description": "User asks for general information about services, handled by Aika directly.",
+        "conversation": [
+            {
+                "user": "Layanan apa aja yang ada di UGM-AICare?",
+                "expected_intent": "ask_service_info",
+                "expected_risk": "none",
+                "expected_next_agent": "Aika"
+            },
+            {
+                "user": "Oke makasih infonya.",
+                "expected_intent": "express_gratitude",
+                "expected_risk": "none",
+                "expected_next_agent": "END"
+            }
+        ]
+    },
+    {
+        "flow_id": "flow_005_mix",
+        "description": "User expresses loneliness, routed to TCA for support.",
+        "conversation": [
+            {
+                "user": "I feel so lonely lately. Kayak nggak punya temen.",
+                "expected_intent": "request_emotional_support",
+                "expected_risk": "low",
+                "expected_next_agent": "TCA"
+            },
+            {
+                "user": "Susah sih buat mulai ngobrol sama orang baru.",
+                "expected_intent": "express_hesitation",
+                "expected_risk": "low",
+                "expected_next_agent": "TCA"
+            }
+        ]
+    },
+    {
+        "flow_id": "flow_006_en",
+        "description": "User asks for analytics/insights, routed to IA.",
+        "conversation": [
+            {
+                "user": "What are the most common student issues this month?",
+                "expected_intent": "request_analytics",
+                "expected_risk": "none",
+                "expected_next_agent": "IA"
+            },
+            {
+                "user": "That's interesting. Thanks.",
+                "expected_intent": "express_gratitude",
+                "expected_risk": "none",
+                "expected_next_agent": "END"
+            }
+        ]
+    },
+    {
+        "flow_id": "flow_007_id",
+        "description": "User reports self-harm thoughts, immediate escalation to CMA.",
+        "conversation": [
+            {
+                "user": "Aku kepikiran buat lukain diri sendiri lagi.",
+                "expected_intent": "report_self_harm",
+                "expected_risk": "high",
+                "expected_next_agent": "CMA"
+            },
+            {
+                "user": "Aku takut.",
+                "expected_intent": "express_fear",
+                "expected_risk": "high",
+                "expected_tool_call": "create_crisis_case"
+            }
+        ]
+    },
+    {
+        "flow_id": "flow_008_mix",
+        "description": "User asks about privacy policy, handled by Aika.",
+        "conversation": [
+            {
+                "user": "Is my data safe here? Dataku bakal disebar nggak?",
+                "expected_intent": "ask_privacy_policy",
+                "expected_risk": "none",
+                "expected_next_agent": "Aika"
+            }
+        ]
+    },
+    {
+        "flow_id": "flow_009_en",
+        "description": "User wants to cancel an appointment, routed to CMA.",
+        "conversation": [
+            {
+                "user": "I need to cancel my appointment for tomorrow.",
+                "expected_intent": "cancel_appointment",
+                "expected_risk": "none",
+                "expected_next_agent": "CMA"
+            },
+            {
+                "user": "Yes, please cancel it.",
+                "expected_intent": "confirm_cancellation",
+                "expected_risk": "none",
+                "expected_tool_call": "cancel_appointment"
+            }
+        ]
+    },
+    {
+        "flow_id": "flow_010_id",
+        "description": "User feels unmotivated, routed to TCA for behavioral activation.",
+        "conversation": [
+            {
+                "user": "Males banget ngapa-ngapain seharian.",
+                "expected_intent": "request_emotional_support",
+                "expected_risk": "low",
+                "expected_next_agent": "TCA"
+            },
+            {
+                "user": "Boleh deh dicoba satu kegiatan kecil dulu.",
+                "expected_intent": "accept_suggestion",
+                "expected_risk": "low",
+                "expected_next_agent": "Aika"
+            }
+        ]
     }
 ]

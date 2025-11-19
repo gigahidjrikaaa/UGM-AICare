@@ -6,7 +6,7 @@ from pydantic import BaseModel, Field
 
 
 RiskLevel = Literal[0, 1, 2, 3]
-NextStep = Literal['sca', 'human', 'resource']
+NextStep = Literal['tca', 'human', 'resource']
 SupportPlanType = Literal['calm_down', 'break_down_problem', 'general_coping', 'none']
 
 

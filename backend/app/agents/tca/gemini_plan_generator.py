@@ -293,12 +293,116 @@ async def generate_personalized_plan(
         
     except json.JSONDecodeError as e:
         logger.error(f"Failed to parse Gemini JSON response: {e}\nResponse: {response_text}")
+        
+        # Attempt to repair truncated JSON (Cost-effective failsafe)
+        repaired_plan = _repair_truncated_json(response_text, intent)
+        if repaired_plan:
+            return repaired_plan
+            
         # Fallback to static plan
         return _get_fallback_plan(plan_type, intent)
     except Exception as e:
         logger.error(f"Error generating personalized plan with Gemini: {e}", exc_info=True)
         # Fallback to static plan
         return _get_fallback_plan(plan_type, intent)
+
+
+def _repair_truncated_json(response_text: str, intent: str) -> Optional[Dict[str, Any]]:
+    """
+    Attempts to salvage valid data from a truncated JSON response.
+    Common case: 'plan_steps' is complete but 'resource_cards' is cut off.
+    """
+    try:
+        import re
+        # Find the start of plan_steps array
+        match = re.search(r'"plan_steps"\s*:\s*\[', response_text)
+        if not match:
+            return None
+            
+        start_pos = match.end() - 1 # Point to the '['
+        
+        # Stack-based parser to find the matching closing bracket
+        stack = []
+        end_pos = -1
+        
+        # Iterate through the string to find the balancing ']'
+        # We need to be careful about brackets inside strings, but for a simple failsafe 
+        # on this specific schema, a simple counter often suffices if we assume no '[' in the content text.
+        # However, to be safe, let's just try to parse incrementally if we can't find a clean break.
+        
+        # Better approach for this specific schema:
+        # The plan_steps array is a list of objects. We can try to find the last closing '},' or '}' 
+        # before the truncation happens.
+        
+        current_pos = start_pos
+        balance = 0
+        in_string = False
+        escape = False
+        
+        for i in range(start_pos, len(response_text)):
+            char = response_text[i]
+            
+            if escape:
+                escape = False
+                continue
+                
+            if char == '\\':
+                escape = True
+                continue
+                
+            if char == '"':
+                in_string = not in_string
+                continue
+                
+            if not in_string:
+                if char == '[':
+                    balance += 1
+                elif char == ']':
+                    balance -= 1
+                    if balance == 0:
+                        end_pos = i + 1
+                        break
+        
+        if end_pos != -1:
+            # We found a complete list!
+            plan_steps_str = response_text[start_pos:end_pos]
+            try:
+                plan_steps = json.loads(plan_steps_str)
+                if isinstance(plan_steps, list) and len(plan_steps) > 0:
+                    logger.info(f"✅ Successfully salvaged {len(plan_steps)} plan steps from truncated response")
+                    return {
+                        "plan_steps": plan_steps,
+                        "resource_cards": _get_default_resources(intent)
+                    }
+            except json.JSONDecodeError:
+                pass
+        
+        # If we couldn't find the closing ']', maybe we can salvage the items we have so far?
+        # This is more complex, but let's try a simple heuristic:
+        # Find the last occurrence of "}," inside the array and close it with "]"
+        
+        # Limit search to a reasonable window to avoid scanning huge garbage
+        search_window = response_text[start_pos:]
+        last_object_end = search_window.rfind('}')
+        
+        if last_object_end != -1:
+            # Construct a candidate list string: [ ... } ]
+            candidate_str = search_window[:last_object_end+1] + "]"
+            try:
+                plan_steps = json.loads(candidate_str)
+                if isinstance(plan_steps, list) and len(plan_steps) > 0:
+                    logger.info(f"✅ Successfully salvaged {len(plan_steps)} plan steps (partial list) from truncated response")
+                    return {
+                        "plan_steps": plan_steps,
+                        "resource_cards": _get_default_resources(intent)
+                    }
+            except json.JSONDecodeError:
+                pass
+
+        return None
+    except Exception as e:
+        logger.warning(f"Failed to repair truncated JSON: {e}")
+        return None
 
 
 def _get_default_resources(intent: str) -> List[Dict[str, Any]]:

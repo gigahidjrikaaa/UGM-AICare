@@ -302,7 +302,7 @@ Apakah user butuh:
 Berdasarkan steps 1-7, classify:
 - risk_level: 0 (low), 1 (moderate), 2 (high), 3 (critical)
 - intent: crisis_support | acute_distress | academic_stress | relationship_strain | general_support
-- next_step: human (escalate) | sca (coaching) | resource (self-help)
+- next_step: human (escalate) | tca (coaching) | resource (self-help)
 - confidence: 0.0-1.0 (seberapa yakin kamu?)
 
 Weight factors:
@@ -329,108 +329,104 @@ Return as JSON:
   }}
 }}"""
 
-        try:
-            response_text = await generate_response(
-                history=[{"role": "user", "content": prompt}],
-                model="gemini_google",  # Uses GEMINI_FLASH_MODEL (gemini-2.5-flash) for STA
-                temperature=0.3,
-            )
-            
-            # Strip markdown code blocks if present
-            # Gemini sometimes wraps JSON in ```json ... ```
-            cleaned_text = response_text.strip()
-            if cleaned_text.startswith("```json"):
-                cleaned_text = cleaned_text[7:]  # Remove ```json
-            elif cleaned_text.startswith("```"):
-                cleaned_text = cleaned_text[3:]  # Remove ```
-            
-            if cleaned_text.endswith("```"):
-                cleaned_text = cleaned_text[:-3]  # Remove trailing ```
-            
-            cleaned_text = cleaned_text.strip()
-            
-            # Parse JSON response
-            result = json.loads(cleaned_text)
-            
-            classification = result["step8_classification"]
-            support_needs = result.get("step7_support_needs", "none")
-            
-            # Build diagnostic notes from chain-of-thought
-            diagnostic_parts = []
-            
-            if result.get("step1_crisis_keywords"):
-                keywords = ", ".join(result["step1_crisis_keywords"][:3])
-                diagnostic_parts.append(f"Keywords: {keywords}")
-            
-            if result.get("step2_linguistic_patterns"):
-                diagnostic_parts.append(f"Patterns: {result['step2_linguistic_patterns'][:100]}")
-            
-            tone = result.get("step3_emotional_tone", {})
-            if tone:
-                diagnostic_parts.append(
-                    f"Emotion: {tone.get('score', 0)}/10 - {tone.get('evidence', '')[:80]}"
+        # Retry loop for JSON parsing errors
+        max_retries = 3
+        for attempt in range(max_retries):
+            try:
+                response_text = await generate_response(
+                    history=[{"role": "user", "content": prompt}],
+                    model="gemini_google",  # Uses GEMINI_FLASH_MODEL (gemini-2.5-flash) for STA
+                    temperature=0.3,
+                    max_tokens=8192,
+                    json_mode=True,
                 )
-            
-            if result.get("step4_urgency_signals"):
-                urgency = "; ".join(result["step4_urgency_signals"][:2])
-                diagnostic_parts.append(f"Urgency: {urgency}")
-            
-            diagnostic_parts.append(f"Reasoning: {classification['reasoning']}")
-            
-            diagnostic_notes = " | ".join(diagnostic_parts)
-            
-            # Determine if support plan needed
-            needs_support_plan = support_needs != "none"
-            plan_type = support_needs if needs_support_plan else "none"
-            
-            # Determine next step and handoff
-            risk_level = classification["risk_level"]
-            next_step = classification["next_step"]
-            handoff = risk_level >= 2  # high/critical
-            
-            return STAClassifyResponse(
-                risk_level=risk_level,
-                intent=classification["intent"],
-                next_step=next_step,
-                handoff=handoff,
-                diagnostic_notes=diagnostic_notes,
-                needs_support_coach_plan=needs_support_plan,
-                support_plan_type=plan_type,
-                metadata={
-                    "gemini_confidence": classification.get("confidence", 0.0),
-                    "gemini_reasoning": classification.get("reasoning", ""),
-                    "chain_of_thought": result,  # Full analysis for audit
-                }
-            )
-            
-        except json.JSONDecodeError as e:
-            logger.error(f"Failed to parse Gemini JSON response: {e}")
-            logger.error(f"Raw response: {response_text[:500]}")
-            
-            # Fallback to moderate risk if parsing fails
-            return STAClassifyResponse(
-                risk_level=1,
-                intent="general_support",
-                next_step="tca",
-                handoff=False,
-                diagnostic_notes=f"Gemini parse error (fallback to moderate): {str(e)}",
-                needs_support_coach_plan=False,
-                support_plan_type="none",
-            )
-        
-        except Exception as e:
-            logger.error(f"Gemini assessment failed: {e}", exc_info=True)
-            
-            # Fallback to moderate risk
-            return STAClassifyResponse(
-                risk_level=1,
-                intent="general_support",
-                next_step="tca",
-                handoff=False,
-                diagnostic_notes=f"Gemini error (fallback to moderate): {str(e)}",
-                needs_support_coach_plan=False,
-                support_plan_type="none",
-            )
+                
+                # Strip markdown code blocks if present
+                # Gemini sometimes wraps JSON in ```json ... ```
+                cleaned_text = response_text.strip()
+                if cleaned_text.startswith("```json"):
+                    cleaned_text = cleaned_text[7:]  # Remove ```json
+                elif cleaned_text.startswith("```"):
+                    cleaned_text = cleaned_text[3:]  # Remove ```
+                
+                if cleaned_text.endswith("```"):
+                    cleaned_text = cleaned_text[:-3]  # Remove trailing ```
+                
+                cleaned_text = cleaned_text.strip()
+                
+                # Parse JSON response
+                result = json.loads(cleaned_text)
+                
+                classification = result["step8_classification"]
+                support_needs = result.get("step7_support_needs", "none")
+                
+                # Build diagnostic notes from chain-of-thought
+                diagnostic_parts = []
+                
+                if result.get("step1_crisis_keywords"):
+                    keywords = ", ".join(result["step1_crisis_keywords"][:3])
+                    diagnostic_parts.append(f"Keywords: {keywords}")
+                
+                if result.get("step2_linguistic_patterns"):
+                    diagnostic_parts.append(f"Patterns: {result['step2_linguistic_patterns'][:100]}")
+                
+                tone = result.get("step3_emotional_tone", {})
+                if tone:
+                    diagnostic_parts.append(
+                        f"Emotion: {tone.get('score', 0)}/10 - {tone.get('evidence', '')[:80]}"
+                    )
+                
+                if result.get("step4_urgency_signals"):
+                    urgency = ", ".join(result["step4_urgency_signals"][:3])
+                    diagnostic_parts.append(f"Urgency: {urgency}")
+                
+                if classification.get("reasoning"):
+                    diagnostic_parts.append(f"Reasoning: {classification['reasoning']}")
+                
+                diagnostic_notes = " | ".join(diagnostic_parts)
+                
+                # Map support needs to boolean and type
+                needs_support_coach_plan = support_needs != "none"
+                support_plan_type = support_needs if needs_support_coach_plan else "none"
+                
+                return STAClassifyResponse(
+                    risk_level=classification["risk_level"],
+                    intent=classification["intent"],
+                    next_step=classification["next_step"],
+                    handoff=classification["next_step"] == "human",
+                    diagnostic_notes=diagnostic_notes,
+                    needs_support_coach_plan=needs_support_coach_plan,
+                    support_plan_type=support_plan_type,
+                    confidence=classification.get("confidence", 0.8)
+                )
+                
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse Gemini JSON response (attempt {attempt+1}/{max_retries}): {e}")
+                logger.error(f"Raw response: {response_text}")
+                if attempt == max_retries - 1:
+                    # Fallback to rule-based safe default if all retries fail
+                    logger.error("All Gemini retries failed. Falling back to safe default.")
+                    return STAClassifyResponse(
+                        risk_level=2, # High risk default for safety
+                        intent="crisis_support",
+                        next_step="human",
+                        handoff=True,
+                        diagnostic_notes="Gemini classification failed (JSON error). Defaulting to high risk.",
+                        needs_support_coach_plan=False
+                    )
+            except Exception as e:
+                logger.error(f"Gemini assessment failed (attempt {attempt+1}/{max_retries}): {e}")
+                if attempt == max_retries - 1:
+                    logger.error("All Gemini retries failed. Falling back to safe default.")
+                    return STAClassifyResponse(
+                        risk_level=1,
+                        intent="general_support",
+                        next_step="tca",
+                        handoff=False,
+                        diagnostic_notes=f"Gemini error (fallback to moderate): {str(e)}",
+                        needs_support_coach_plan=False,
+                        support_plan_type="none",
+                    )
     
     async def _get_cached_assessment(
         self,

@@ -28,6 +28,7 @@ from datetime import datetime
 from typing import Dict, Any, List, TYPE_CHECKING
 
 from langgraph.graph import StateGraph, END
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from google import genai
 from google.genai import types
@@ -244,8 +245,25 @@ want to die, mau mati, ingin mati, etc.
         
         # Parse decision (response_text is already a string from fallback function)
         import json
+        import re
+        
+        # Clean up markdown code blocks if present
+        cleaned_text = response_text.strip()
+        if "```" in cleaned_text:
+            # Remove ```json ... ``` or just ``` ... ```
+            cleaned_text = re.sub(r'^```(?:json)?\s*', '', cleaned_text, flags=re.MULTILINE)
+            cleaned_text = re.sub(r'\s*```$', '', cleaned_text, flags=re.MULTILINE)
+            cleaned_text = cleaned_text.strip()
+            
         try:
-            decision = json.loads(response_text)
+            decision = json.loads(cleaned_text)
+            
+            # Validate required fields
+            required_fields = ["intent", "needs_agents"]
+            if not all(field in decision for field in required_fields):
+                logger.warning(f"Gemini decision missing fields: {decision}")
+                # Fallback logic will handle this
+                raise ValueError("Missing required fields")
             
             state["intent"] = decision.get("intent", "unknown")
             state["intent_confidence"] = decision.get("intent_confidence", 0.5)
@@ -259,17 +277,21 @@ want to die, mau mati, ingin mati, etc.
             state["crisis_keywords_detected"] = decision.get("crisis_keywords", [])
             state["risk_reasoning"] = decision.get("risk_reasoning", "")
             
-            # Update last message timestamp for inactivity detection
-            state["last_message_timestamp"] = time.time()
-            
             # Detect conversation end - Method 1: Time-based inactivity (5 minutes)
+            now_ts = time.time()
             previous_timestamp = state.get("last_message_timestamp")
+            conversation_ended = False
             if previous_timestamp:
-                inactive_duration = time.time() - previous_timestamp
+                inactive_duration = now_ts - previous_timestamp
                 if inactive_duration > 300:  # 5 minutes
-                    state["conversation_ended"] = True
-                    logger.info(f"⏱️ Conversation ended: Inactive for {inactive_duration:.0f}s")
-            
+                    conversation_ended = True
+                    logger.info(
+                        f"⏱️ Conversation ended: Inactive for {inactive_duration:.0f}s"
+                    )
+
+            # Update timestamp after computing inactivity delta
+            state["last_message_timestamp"] = now_ts
+
             # Detect conversation end - Method 2: Explicit goodbye signals
             message_lower = state.get("message", "").lower()
             end_signals = [
@@ -277,10 +299,10 @@ want to die, mau mati, ingin mati, etc.
                 "selesai", "sudah cukup", "thanks bye", "see you", "sampai nanti"
             ]
             if any(signal in message_lower for signal in end_signals):
-                state["conversation_ended"] = True
+                conversation_ended = True
                 logger.info(f"👋 Conversation ended: Explicit goodbye detected")
-            else:
-                state["conversation_ended"] = False
+
+            state["conversation_ended"] = conversation_ended
             
             # Auto-escalate to CMA if high/critical immediate risk detected
             if state["immediate_risk_level"] in ("high", "critical"):
@@ -399,6 +421,10 @@ async def trigger_sta_conversation_analysis_background(
     """
     try:
         from app.agents.sta.conversation_analyzer import analyze_conversation_risk
+        from app.domains.mental_health.models.assessments import ConversationRiskAssessment
+        from app.domains.mental_health.services.conversation_assessments import (
+            upsert_conversation_assessment,
+        )
         
         # Skip if already analyzed
         if state.get("sta_analysis_completed", False):
@@ -411,6 +437,23 @@ async def trigger_sta_conversation_analysis_background(
         conversation_start = state.get("started_at")
         start_timestamp = conversation_start.timestamp() if conversation_start else None
         
+        force_refresh = state.get("force_sta_reanalysis", False)
+
+        if conversation_id and not force_refresh:
+            existing_query = await db.execute(
+                select(ConversationRiskAssessment).where(
+                    ConversationRiskAssessment.conversation_id == conversation_id
+                )
+            )
+            existing_record = existing_query.scalars().first()
+            if existing_record:
+                logger.info(
+                    "🛈 STA conversation assessment already exists for %s (record id=%s). Skipping.",
+                    conversation_id,
+                    existing_record.id,
+                )
+                return
+
         logger.info(
             f"🔍 [BACKGROUND] Starting STA conversation analysis for "
             f"conversation_id={conversation_id}, user_id={user_id}"
@@ -425,15 +468,19 @@ async def trigger_sta_conversation_analysis_background(
             preferred_model=state.get("preferred_model")
         )
         
-        # TODO: Store assessment in database
-        # assessment_record = ConversationAssessmentDB(
-        #     conversation_id=conversation_id,
-        #     user_id=user_id,
-        #     overall_risk_level=assessment.overall_risk_level,
-        #     ...
-        # )
-        # db.add(assessment_record)
-        # await db.commit()
+        assessment_record = None
+        if conversation_id:
+            assessment_record = await upsert_conversation_assessment(
+                db,
+                conversation_id=conversation_id,
+                session_id=state.get("session_id"),
+                user_id=user_id,
+                assessment=assessment,
+                force_refresh=force_refresh,
+            )
+        else:
+            # Ensure pending transactions are flushed even when no persistence occurs
+            await db.flush()
         
         # Log results for monitoring
         logger.info(
@@ -447,6 +494,16 @@ async def trigger_sta_conversation_analysis_background(
             f"   Duration: {assessment.conversation_duration_seconds:.0f}s\n"
             f"   Summary: {assessment.conversation_summary[:150]}..."
         )
+
+        if assessment_record:
+            logger.info(
+                "💾 Conversation assessment stored with id=%s (session_id=%s)",
+                assessment_record.id,
+                assessment_record.session_id,
+            )
+        
+        state["sta_analysis_completed"] = True
+        state["conversation_assessment"] = assessment.model_dump()
         
         # If CMA escalation needed, log alert (actual invocation handled in next conversation)
         if assessment.should_invoke_cma:

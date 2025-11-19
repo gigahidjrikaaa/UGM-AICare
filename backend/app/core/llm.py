@@ -218,6 +218,7 @@ async def generate_gemini_response(
     system_prompt: Optional[str] = None,
     tools: Optional[List[Any]] = None,
     return_full_response: bool = False,
+    json_mode: bool = False,
 ) -> str | Any:
     """Generates a response using the Google Gemini API with new google-genai SDK.
     
@@ -237,13 +238,14 @@ async def generate_gemini_response(
         system_prompt: Optional system instruction
         tools: Optional list of Tool objects for function calling
         return_full_response: If True, returns full response object for tool calling
+        json_mode: If True, forces the model to output valid JSON
         
     Returns:
         Generated response text, or full response object if return_full_response=True
     """
     try:
         client = get_gemini_client()
-        logger.info(f"Sending request to Gemini API (Model: {model}, Tools: {bool(tools)})")
+        logger.info(f"Sending request to Gemini API (Model: {model}, Tools: {bool(tools)}, JSON: {json_mode})")
         if system_prompt:
             logger.info(f"🤖 System prompt applied: {system_prompt[:100]}...")
 
@@ -259,6 +261,9 @@ async def generate_gemini_response(
             temperature=temperature,
             max_output_tokens=max_tokens,
         )
+        
+        if json_mode:
+            config.response_mime_type = "application/json"
         
         # Add system prompt if provided
         if system_prompt:
@@ -357,6 +362,7 @@ async def generate_gemini_response_with_fallback(
     system_prompt: Optional[str] = None,
     tools: Optional[List[Any]] = None,
     return_full_response: bool = False,
+    json_mode: bool = False,
 ) -> str | Any:
     """Generate Gemini response with automatic fallback to alternative models.
     
@@ -390,7 +396,8 @@ async def generate_gemini_response_with_fallback(
                 temperature=temperature,
                 system_prompt=system_prompt,
                 tools=tools,
-                return_full_response=return_full_response
+                return_full_response=return_full_response,
+                json_mode=json_mode
             )
             
             # Success!
@@ -612,7 +619,8 @@ async def generate_response(
     max_tokens: int = 2048,
     temperature: float = 0.7,
     system_prompt: Optional[str] = None, # Pass system prompt through
-    preferred_gemini_model: Optional[str] = None  # Allow specifying exact Gemini model
+    preferred_gemini_model: Optional[str] = None,  # Allow specifying exact Gemini model
+    json_mode: bool = False,
 ) -> str:
     """
     Generates a response using the specified LLM provider with automatic fallback.
@@ -626,6 +634,7 @@ async def generate_response(
         system_prompt: An optional system prompt.
         preferred_gemini_model: Specific Gemini model to use (e.g., 'gemini-2.5-pro').
                                Only used when model='gemini_google'.
+        json_mode: If True, forces the model to output valid JSON (Gemini only).
 
     Returns:
         The generated text response string or an error message.
@@ -649,7 +658,7 @@ async def generate_response(
         logger.info(f"Direct request: Using gemini with fallback chain (Primary: {gemini_model})")
         try:
             return await generate_gemini_response_with_fallback(
-                history=history, model=gemini_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
+                history=history, model=gemini_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt, json_mode=json_mode
             )
         except Exception as e:
             # If all fallbacks fail, return error message

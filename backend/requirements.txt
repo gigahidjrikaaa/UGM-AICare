@@ -22,7 +22,7 @@ minio==7.2.9
 beautifulsoup4==4.12.3
 
 # Database and ORM
-sqlalchemy[asyncio]==2.0.21
+sqlalchemy[asyncio]>=2.0.36
 alembic>=1.13.0,<2.0.0
 redis==5.0.1
 asyncpg>=0.29.0  # Fast PostgreSQL Database Client Library for Python/asyncio
@@ -77,7 +77,7 @@ langfuse>=2.0.0  # LLM observability and agent tracing
 web3>=7.0.0,<8.0.0  # Web3.py for Ethereum/SOMNIA blockchain interaction
 
 # Statistical Analysis and Privacy
-numpy>=1.24.0,<2.0.0
+numpy>=1.24.0
 
 # Social Media Integration
 tweepy==4.14.0  # For Twitter/X API integration

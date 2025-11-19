@@ -98,3 +98,37 @@ class SessionListItem(BaseModel):
 class SessionListResponse(BaseModel):
     sessions: List[SessionListItem]
     total_count: int
+
+
+class ConversationRiskAssessmentResponse(BaseModel):
+    id: int
+    conversation_id: Optional[str] = None
+    session_id: Optional[str] = None
+    user_id: Optional[int] = None
+    overall_risk_level: str
+    risk_trend: str
+    conversation_summary: str
+    user_context: Optional[Dict[str, Any]] = None
+    protective_factors: Optional[List[str]] = None
+    concerns: Optional[List[str]] = None
+    recommended_actions: Optional[List[str]] = None
+    should_invoke_cma: bool
+    reasoning: str
+    message_count: int
+    conversation_duration_seconds: Optional[float] = None
+    analysis_timestamp: datetime
+    raw_assessment: Optional[Dict[str, Any]] = None
+    created_at: datetime
+    updated_at: datetime
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class ConversationRiskAssessmentListResponse(BaseModel):
+    assessments: List[ConversationRiskAssessmentResponse]
+    total_count: int
+
+
+class ConversationAssessmentTriggerRequest(BaseModel):
+    force_refresh: bool = False
+    preferred_model: Optional[str] = None
