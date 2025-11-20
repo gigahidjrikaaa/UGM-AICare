@@ -213,6 +213,19 @@ async def process_aika_message(
                 confidence=result.get("intent_confidence", 0.0),
                 risk_factors=result.get("risk_factors", []),
             )
+        # Fallback: Check for immediate risk from Aika decision (Tier 1 escalation)
+        elif result.get("immediate_risk_level") and result.get("immediate_risk_level") not in ("none", None):
+            # Map immediate risk to risk assessment structure
+            risk_level = result.get("immediate_risk_level")
+            # Estimate score based on level if not provided
+            risk_score_map = {"low": 0.3, "moderate": 0.6, "high": 0.8, "critical": 0.95}
+            
+            metadata.risk_assessment = AikaRiskAssessment(
+                risk_level=risk_level,
+                risk_score=risk_score_map.get(risk_level, 0.5),
+                confidence=result.get("intent_confidence", 0.8),
+                risk_factors=result.get("crisis_keywords_detected", []),
+            )
         
         logger.info(
             f"✅ Aika unified orchestrator: user={request.user_id}, "
