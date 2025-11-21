@@ -8,15 +8,16 @@ import {
   FaComments, 
   FaHeartbeat, 
   FaArrowRight,
+  FaStar
+} from 'react-icons/fa';
+import {
   FiHeart,
   FiShield,
   FiUsers,
-  FaStar,
   FiCheckCircle,
   FiZap,
   FiClock
-} from '@/icons';
-import ParticleBackground from '@/components/ui/ParticleBackground';
+} from 'react-icons/fi';
 
 // ============ ANIMATION COMPONENTS ============
 
@@ -47,448 +48,232 @@ const RevealOnScroll = ({ children, direction = "up" }: { children: React.ReactN
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
-  const { scrollYProgress } = useScroll();
-  const heroOpacity = useTransform(scrollYProgress, [0, 0.2], [1, 0]);
   
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    if (mounted) {
-      window.scrollTo({ top: 10, behavior: 'smooth' });
-    }
-  }, [mounted]);
-  
   if (!mounted) return null;
 
   return (
-    <main className="min-h-screen overflow-x-hidden w-full pt-24">
+    <main className="min-h-screen w-full bg-[#00112e] text-white selection:bg-[#FFCA40] selection:text-[#001D58] font-sans">
+      
       {/* ============================ */}
       {/* HERO SECTION */}
       {/* ============================ */}
-      <section className="relative min-h-screen flex items-center overflow-hidden bg-gradient-to-br from-[#001D58] via-[#00308F] to-[#002A7A]">
-        {/* Particle Background */}
+      <section className="relative h-screen w-full flex items-center justify-center overflow-hidden">
+        {/* Background Image with Overlay */}
         <div className="absolute inset-0 z-0">
-          <ParticleBackground 
-            count={50} 
-            colors={["#FFCA40", "#6A98F0", "#ffffff"]} 
-            minSize={1} 
-            maxSize={6} 
-            speed={0.4} 
+          <Image
+            src="https://images.unsplash.com/photo-1519452635265-7b1fbfd1e4e0?q=80&w=1920&auto=format&fit=crop"
+            alt="Calm Library"
+            fill
+            className="object-cover opacity-40"
+            priority
           />
+          <div className="absolute inset-0 bg-gradient-to-b from-[#001D58]/80 via-[#00112e]/60 to-[#00112e]" />
         </div>
-        
-        {/* Animated Mesh Gradient */}
-        <div className="absolute inset-0 z-0 opacity-30">
+
+        {/* Content */}
+        <div className="relative z-10 max-w-5xl mx-auto px-6 text-center">
           <motion.div
-            className="absolute inset-0"
-            animate={{
-              background: [
-                'radial-gradient(circle at 20% 50%, rgba(255, 202, 64, 0.15) 0%, transparent 50%)',
-                'radial-gradient(circle at 80% 50%, rgba(106, 152, 240, 0.15) 0%, transparent 50%)',
-                'radial-gradient(circle at 50% 80%, rgba(255, 202, 64, 0.15) 0%, transparent 50%)',
-                'radial-gradient(circle at 20% 50%, rgba(255, 202, 64, 0.15) 0%, transparent 50%)',
-              ]
-            }}
-            transition={{
-              duration: 10,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-          />
-        </div>
-        
-        {/* Hero Content */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-20 w-full py-20">
-          <motion.div 
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 1 }}
-            style={{ opacity: heroOpacity }}
-            className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 1, ease: "easeOut" }}
           >
-            {/* Left Column - Content */}
-            <div className="text-center lg:text-left space-y-6">
-              {/* Badge */}
-              <motion.div 
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ duration: 0.6, delay: 0.1 }}
-                className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#FFCA40]/20 to-[#FFB700]/20 backdrop-blur-xl rounded-full border border-[#FFCA40]/30 shadow-lg"
-              >
-                <FaStar className="text-[#FFCA40]" />
-                <span className="text-white font-medium text-sm">
-                  Trusted by <span className="text-[#FFCA40] font-bold">UGM Students</span>
-                </span>
-              </motion.div>
-
-              {/* Main Heading */}
-              <motion.h1
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.2 }}
-                className="text-4xl md:text-6xl font-bold text-white leading-tight"
-              >
-                Your Mental Health 
-                <span className="bg-gradient-to-r from-[#FFCA40] via-[#FFD700] to-[#FFCA40] bg-clip-text text-transparent"> Companion</span>
-              </motion.h1>
-
-              {/* Subtitle */}
-              <motion.p
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.4 }}
-                className="text-lg md:text-xl text-white/80 max-w-xl"
-              >
-                AI-powered support designed for Indonesian university students. Chat with Aika 24/7 for empathetic guidance, track your wellbeing, and access professional resources.
-              </motion.p>
-
-              {/* CTA Buttons */}
-              <motion.div
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-                className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start"
-              >
-                <Link href="/signup">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="px-8 py-4 bg-gradient-to-r from-[#FFCA40] to-[#FFB700] text-[#001D58] rounded-full font-bold text-lg shadow-2xl shadow-[#FFCA40]/50 hover:shadow-[#FFCA40]/70 transition-all"
-                  >
-                    Start Free Today
-                  </motion.button>
-                </Link>
-                <Link href="/about">
-                  <motion.button
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.98 }}
-                    className="px-8 py-4 bg-white/10 backdrop-blur-md text-white rounded-full font-semibold text-lg border border-white/20 hover:bg-white/20 transition-all flex items-center gap-2 justify-center"
-                  >
-                    Learn More
-                    <FaArrowRight className="text-sm" />
-                  </motion.button>
-                </Link>
-              </motion.div>
-
-              {/* Trust Indicators */}
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                transition={{ delay: 0.8 }}
-                className="flex items-center gap-6 justify-center lg:justify-start text-sm text-white/60"
-              >
-                <div className="flex items-center gap-2">
-                  <FiShield className="text-[#FFCA40]" />
-                  <span>Privacy-First</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <FiCheckCircle className="text-[#FFCA40]" />
-                  <span>UGM Certified</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <FiClock className="text-[#FFCA40]" />
-                  <span>24/7 Available</span>
-                </div>
-              </motion.div>
-            </div>
-
-            {/* Right Column - Aika Character */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.8 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: 0.5, duration: 0.8 }}
-              className="relative h-[400px] lg:h-[500px]"
-            >
-              <div className="relative w-full h-full flex items-center justify-center">
-                <motion.div
-                  animate={{ 
-                    y: [0, -20, 0],
-                    rotate: [0, 2, 0, -2, 0]
-                  }}
-                  transition={{ 
-                    repeat: Infinity,
-                    duration: 6,
-                    ease: "easeInOut"
-                  }}
-                  className="relative w-[300px] h-[300px] lg:w-[400px] lg:h-[400px]"
-                >
-                  <Image 
-                    src="/aika-human.jpeg"
-                    alt="Aika - Your AI Companion" 
-                    fill
-                    className="object-contain drop-shadow-2xl rounded-full"
-                    priority
-                  />
-                  {/* Glow Effect */}
-                  <div className="absolute inset-0 bg-gradient-to-br from-[#FFCA40]/20 to-[#6A98F0]/20 rounded-full blur-3xl -z-10"></div>
-                </motion.div>
-              </div>
-            </motion.div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* ============================ */}
-      {/* KEY FEATURES - SIMPLIFIED */}
-      {/* ============================ */}
-      <section className="relative py-20 bg-gradient-to-b from-[#002A7A] to-[#001D58] overflow-hidden">
-        {/* Subtle particle background */}
-        <div className="absolute inset-0 z-0 opacity-20">
-          <ParticleBackground 
-            count={30} 
-            colors={["#FFCA40", "#6A98F0", "#ffffff"]} 
-            minSize={1} 
-            maxSize={4} 
-            speed={0.3} 
-          />
-        </div>
-
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-          <RevealOnScroll>
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">
-                Everything You Need for <span className="text-[#FFCA40]">Mental Wellbeing</span>
-              </h2>
-              <p className="text-white/70 text-lg max-w-2xl mx-auto">
-                Comprehensive support designed for the unique challenges of student life
-              </p>
-            </div>
-          </RevealOnScroll>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                icon: <FaComments className="text-4xl" />,
-                title: "AI Chat Support",
-                description: "Talk to Aika anytime for empathetic, judgment-free conversations in Bahasa Indonesia.",
-                color: "from-blue-500 to-cyan-500"
-              },
-              {
-                icon: <FaHeartbeat className="text-4xl" />,
-                title: "Mood Tracking",
-                description: "Track your emotions, identify patterns, and build healthier mental habits over time.",
-                color: "from-pink-500 to-red-500"
-              },
-              {
-                icon: <FiUsers className="text-4xl" />,
-                title: "Professional Resources",
-                description: "Connect with licensed counselors and access curated mental health resources.",
-                color: "from-purple-500 to-indigo-500"
-              }
-            ].map((feature, idx) => (
-              <RevealOnScroll key={idx} direction="up">
-                <motion.div
-                  whileHover={{ y: -10, scale: 1.02 }}
-                  className="bg-white/10 backdrop-blur-md rounded-2xl p-8 border border-white/20 hover:border-[#FFCA40]/50 transition-all"
-                >
-                  <div className={`w-16 h-16 bg-gradient-to-br ${feature.color} rounded-xl flex items-center justify-center mb-6 text-white`}>
-                    {feature.icon}
-                  </div>
-                  <h3 className="text-2xl font-bold text-white mb-3">{feature.title}</h3>
-                  <p className="text-white/70 leading-relaxed">{feature.description}</p>
-                </motion.div>
-              </RevealOnScroll>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ============================ */}
-      {/* HOW IT WORKS - SIMPLIFIED */}
-      {/* ============================ */}
-      <section className="relative py-20 bg-gradient-to-b from-[#001D58] to-[#00308F]">
-        <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          <RevealOnScroll>
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">
-                Get Started in <span className="text-[#FFCA40]">3 Simple Steps</span>
-              </h2>
-            </div>
-          </RevealOnScroll>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                step: "1",
-                title: "Create Account",
-                description: "Sign up with your UGM email in under 60 seconds"
-              },
-              {
-                step: "2",
-                title: "Chat with Aika",
-                description: "Start talking about what's on your mind, anytime"
-              },
-              {
-                step: "3",
-                title: "Track Progress",
-                description: "Monitor your wellbeing journey and access resources"
-              }
-            ].map((item, idx) => (
-              <RevealOnScroll key={idx} direction="up">
-                <div className="relative text-center">
-                  <div className="w-20 h-20 bg-gradient-to-br from-[#FFCA40] to-[#FFB700] rounded-full flex items-center justify-center mx-auto mb-6 text-[#001D58] text-3xl font-bold shadow-2xl shadow-[#FFCA40]/50">
-                    {item.step}
-                  </div>
-                  <h3 className="text-xl font-bold text-white mb-3">{item.title}</h3>
-                  <p className="text-white/70">{item.description}</p>
-                  {idx < 2 && (
-                    <div className="hidden md:block absolute top-10 -right-4 w-8 h-0.5 bg-gradient-to-r from-[#FFCA40] to-transparent"></div>
-                  )}
-                </div>
-              </RevealOnScroll>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ============================ */}
-      {/* QUICK STATS */}
-      {/* ============================ */}
-      <section className="relative py-16 bg-gradient-to-b from-[#00308F] to-[#002A7A]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {[
-              { value: "5,000+", label: "Active Users" },
-              { value: "24/7", label: "Available" },
-              { value: "95%", label: "Satisfaction" },
-              { value: "50K+", label: "Conversations" }
-            ].map((stat, idx) => (
-              <RevealOnScroll key={idx}>
-                <div className="text-center">
-                  <div className="text-4xl md:text-5xl font-bold text-[#FFCA40] mb-2">{stat.value}</div>
-                  <div className="text-white/70">{stat.label}</div>
-                </div>
-              </RevealOnScroll>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ============================ */}
-      {/* WHY CHOOSE US */}
-      {/* ============================ */}
-      <section className="relative py-20 bg-gradient-to-b from-[#002A7A] to-[#001D58]">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-          <RevealOnScroll>
-            <div className="text-center mb-16">
-              <h2 className="text-3xl md:text-5xl font-bold text-white mb-4">
-                Why <span className="text-[#FFCA40]">UGM-AICare</span>?
-              </h2>
-              <p className="text-white/70 text-lg max-w-2xl mx-auto">
-                Built specifically for Indonesian students, with privacy and cultural understanding at its core
-              </p>
-            </div>
-          </RevealOnScroll>
-
-          <div className="grid md:grid-cols-3 gap-8">
-            {[
-              {
-                icon: <FiShield />,
-                title: "Privacy-First",
-                description: "Your conversations are encrypted and never shared. Full transparency in data handling."
-              },
-              {
-                icon: <FaStar />,
-                title: "Culturally Aware",
-                description: "Aika understands Indonesian context, values, and the unique pressures of student life."
-              },
-              {
-                icon: <FiZap />,
-                title: "Evidence-Based",
-                description: "Built on CBT principles and validated through university research partnerships."
-              }
-            ].map((item, idx) => (
-              <RevealOnScroll key={idx}>
-                <div className="bg-white/5 backdrop-blur-md rounded-xl p-6 border border-white/10 text-center">
-                  <div className="w-12 h-12 bg-[#FFCA40]/20 rounded-full flex items-center justify-center mx-auto mb-4 text-[#FFCA40] text-2xl">
-                    {item.icon}
-                  </div>
-                  <h3 className="text-xl font-bold text-white mb-3">{item.title}</h3>
-                  <p className="text-white/70 text-sm">{item.description}</p>
-                </div>
-              </RevealOnScroll>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* ============================ */}
-      {/* FINAL CTA */}
-      {/* ============================ */}
-      <section className="relative py-24 bg-gradient-to-br from-[#001D58] via-[#00308F] to-[#002A7A] overflow-hidden">
-        <div className="absolute inset-0 z-0">
-          <ParticleBackground 
-            count={40} 
-            colors={["#FFCA40", "#6A98F0", "#ffffff"]} 
-            minSize={1} 
-            maxSize={5} 
-            speed={0.4} 
-          />
-        </div>
-
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 text-center relative z-10">
-          <RevealOnScroll>
-            <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
-              Ready to Start Your <span className="text-[#FFCA40]">Wellbeing Journey</span>?
-            </h2>
-            <p className="text-xl text-white/80 mb-10 max-w-2xl mx-auto">
-              Join thousands of UGM students who trust AICare for their mental health support
+            <p className="text-[#FFCA40] font-medium tracking-[0.2em] uppercase text-sm mb-6 font-sans">
+              Universitas Gadjah Mada
             </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+            <h1 className="text-5xl md:text-7xl lg:text-8xl font-serif font-medium leading-tight mb-8 tracking-tight">
+              Your AI Companion for <br />
+              <span className="italic text-white/80">Mental Wellness.</span>
+            </h1>
+            <p className="text-lg md:text-xl text-white/70 max-w-2xl mx-auto font-light leading-relaxed mb-12 font-sans">
+              Bridging the gap between students and mental health support. UGM-AICare offers proactive intervention, resource management, and a safe space for you to be heard.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
               <Link href="/signup">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="px-12 py-5 bg-gradient-to-r from-[#FFCA40] to-[#FFB700] text-[#001D58] rounded-full font-bold text-xl shadow-2xl shadow-[#FFCA40]/50 hover:shadow-[#FFCA40]/70 transition-all"
-                >
-                  Get Started Free
-                </motion.button>
+                <button className="px-8 py-4 bg-[#FFCA40] text-[#001D58] rounded-full font-medium text-lg hover:bg-white transition-colors duration-300 font-sans">
+                  Start Your Journey
+                </button>
               </Link>
               <Link href="/about">
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="px-12 py-5 bg-white/10 backdrop-blur-md text-white rounded-full font-semibold text-xl border border-white/20 hover:bg-white/20 transition-all"
-                >
+                <button className="px-8 py-4 bg-transparent border border-white/30 text-white rounded-full font-medium text-lg hover:bg-white/10 transition-colors duration-300 font-sans backdrop-blur-sm">
                   Learn More
-                </motion.button>
+                </button>
               </Link>
             </div>
-            <p className="text-white/50 text-sm mt-8">
-              Free forever. No credit card required. Start in under 60 seconds.
+          </motion.div>
+        </div>
+
+        {/* Scroll Indicator */}
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ delay: 1.5, duration: 1 }}
+          className="absolute bottom-12 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 text-white/50"
+        >
+          <span className="text-xs uppercase tracking-widest font-sans">Scroll</span>
+          <div className="w-[1px] h-12 bg-gradient-to-b from-white/50 to-transparent" />
+        </motion.div>
+      </section>
+
+      {/* ============================ */}
+      {/* SECTION 2: ABOUT UGM-AICARE */}
+      {/* ============================ */}
+      <section className="relative py-32 px-6 bg-[#00112e]">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+          <RevealOnScroll direction="up">
+            <div className="space-y-8">
+              <h2 className="text-4xl md:text-5xl font-serif leading-tight">
+                Transforming Support <br />
+                <span className="text-[#FFCA40]">Proactive & Personal</span>
+              </h2>
+              <p className="text-white/70 text-lg font-light leading-relaxed font-sans">
+                UGM-AICare is more than just a platform; it's a paradigm shift from reactive to proactive mental health support. We utilize advanced AI agents to identify needs early, manage resources efficiently, and provide timely interventions. Our goal is to ensure every student feels supported, understood, and empowered to seek help when needed.
+              </p>
+              <div className="pt-4">
+                <Link href="/about" className="inline-flex items-center gap-2 text-[#FFCA40] border-b border-[#FFCA40]/30 pb-1 hover:border-[#FFCA40] transition-colors font-sans">
+                  <span className="uppercase tracking-widest text-sm">Our Mission</span>
+                  <FaArrowRight className="text-xs" />
+                </Link>
+              </div>
+            </div>
+          </RevealOnScroll>
+
+          <RevealOnScroll direction="left">
+            <div className="relative aspect-[4/5] w-full overflow-hidden rounded-sm">
+              <Image
+                src="https://images.unsplash.com/photo-1523240795612-9a054b0db644?q=80&w=1920&auto=format&fit=crop"
+                alt="Students talking"
+                fill
+                className="object-cover hover:scale-105 transition-transform duration-700"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#001D58]/80 to-transparent opacity-60" />
+            </div>
+          </RevealOnScroll>
+        </div>
+      </section>
+
+      {/* ============================ */}
+      {/* SECTION 3: MEET AIKA */}
+      {/* ============================ */}
+      <section className="relative py-32 px-6 bg-[#000d24]">
+        <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
+          <RevealOnScroll direction="right">
+            <div className="relative aspect-square w-full overflow-hidden rounded-sm order-2 lg:order-1">
+              <Image
+                src="https://images.unsplash.com/photo-1499750310159-52f0f83ad497?q=80&w=1920&auto=format&fit=crop"
+                alt="Calm Sea"
+                fill
+                className="object-cover hover:scale-105 transition-transform duration-700"
+              />
+              <div className="absolute inset-0 bg-[#FFCA40]/10 mix-blend-overlay" />
+            </div>
+          </RevealOnScroll>
+
+          <RevealOnScroll direction="up">
+            <div className="space-y-8 order-1 lg:order-2">
+              <span className="text-[#FFCA40] text-xs font-bold tracking-widest uppercase border border-[#FFCA40]/30 px-3 py-1 rounded-full font-sans">
+                Meet Aika
+              </span>
+              <h2 className="text-4xl md:text-5xl font-serif leading-tight">
+                An empathetic listener, always here for you.
+              </h2>
+              <p className="text-white/70 text-lg font-light leading-relaxed font-sans">
+                Aika is an intelligent AI agent designed to provide immediate, non-judgmental support. Whether you need to vent, seek advice, or just have a quiet companion, Aika is available 24/7. She helps bridge the gap until you can connect with human counselors if needed.
+              </p>
+              
+              <div className="grid grid-cols-2 gap-8 pt-4 font-sans">
+                <div>
+                  <h3 className="text-xl font-serif mb-2 text-white">24/7 Availability</h3>
+                  <p className="text-sm text-white/50">Support whenever you need it.</p>
+                </div>
+                <div>
+                  <h3 className="text-xl font-serif mb-2 text-white">Confidential</h3>
+                  <p className="text-sm text-white/50">Your conversations are private.</p>
+                </div>
+              </div>
+
+              <div className="pt-6">
+                <Link href="/aika">
+                  <button className="px-8 py-3 bg-white/5 border border-white/10 hover:bg-white/10 text-white rounded-full transition-all duration-300 font-sans">
+                    Talk to Aika
+                  </button>
+                </Link>
+              </div>
+            </div>
+          </RevealOnScroll>
+        </div>
+      </section>
+
+      {/* ============================ */}
+      {/* SECTION 4: QUOTE / MOOD */}
+      {/* ============================ */}
+      <section className="relative py-40 px-6 overflow-hidden">
+        {/* Gradient Background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-[#001D58] via-[#5e3a00] to-[#000000] opacity-80" />
+        
+        <div className="relative z-10 max-w-4xl mx-auto text-center space-y-10">
+          <RevealOnScroll direction="up">
+            <div className="flex justify-center mb-8">
+              <div className="w-px h-16 bg-[#FFCA40]/50" />
+            </div>
+            <h2 className="text-3xl md:text-5xl lg:text-6xl font-serif leading-tight text-white/90">
+              "Grace flows quietly through patience. When you stop striving to fix everything, you begin to see how love already surrounds and carries you forward."
+            </h2>
+            <p className="mt-8 text-[#FFCA40] uppercase tracking-widest text-sm">
+              Daily Calm • Wednesday, 21
             </p>
           </RevealOnScroll>
         </div>
       </section>
 
       {/* ============================ */}
-      {/* FLOATING ACTION BUTTON - CRISIS HELP */}
+      {/* SECTION 5: RESOURCES GRID */}
       {/* ============================ */}
-      <motion.div
-        className="fixed bottom-8 right-8 z-50"
-        initial={{ scale: 0, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        transition={{ delay: 2, type: "spring", stiffness: 260, damping: 20 }}
-      >
-        <motion.a
-          href="https://wa.me/6281228773800"
-          target="_blank"
-          rel="noopener noreferrer"
-          className="flex items-center gap-3 px-6 py-4 bg-gradient-to-r from-red-500 to-pink-600 text-white rounded-full font-bold shadow-2xl group"
-          whileHover={{ scale: 1.1, boxShadow: "0 25px 50px rgba(239, 68, 68, 0.5)" }}
-          whileTap={{ scale: 0.95 }}
-        >
-          <motion.div
-            animate={{ scale: [1, 1.2, 1] }}
-            transition={{ repeat: Infinity, duration: 2 }}
-          >
-            <FiHeart className="text-2xl" />
-          </motion.div>
-          <span className="hidden md:block">Need Help Now?</span>
-        </motion.a>
-      </motion.div>
+      <section className="relative py-32 px-6 bg-[#00112e]">
+        <div className="max-w-7xl mx-auto">
+          <div className="flex justify-between items-end mb-16">
+            <h2 className="text-4xl font-serif">Your Journey</h2>
+            <Link href="/resources" className="text-sm uppercase tracking-widest text-white/50 hover:text-white transition-colors">
+              (view all)
+            </Link>
+          </div>
+
+          <div className="grid md:grid-cols-3 gap-8">
+            {[
+              { title: "Meditation", subtitle: "02 — 05", img: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=800&auto=format&fit=crop" },
+              { title: "Journaling", subtitle: "Daily Reflection", img: "https://images.unsplash.com/photo-1517842645767-c639042777db?q=80&w=800&auto=format&fit=crop" },
+              { title: "Counseling", subtitle: "Professional Help", img: "https://images.unsplash.com/photo-1573497019940-1c28c88b4f3e?q=80&w=800&auto=format&fit=crop" },
+            ].map((item, i) => (
+              <RevealOnScroll key={i} direction="up">
+                <div className="group cursor-pointer">
+                  <div className="relative aspect-[3/4] overflow-hidden mb-6">
+                    <Image
+                      src={item.img}
+                      alt={item.title}
+                      fill
+                      className="object-cover transition-transform duration-700 group-hover:scale-110"
+                    />
+                    <div className="absolute inset-0 bg-black/20 group-hover:bg-black/0 transition-colors duration-500" />
+                  </div>
+                  <div className="flex justify-between items-start border-t border-white/10 pt-4">
+                    <div>
+                      <h3 className="text-xl font-serif mb-1">{item.title}</h3>
+                      <p className="text-xs uppercase tracking-widest text-white/50">{item.subtitle}</p>
+                    </div>
+                    <span className="opacity-0 group-hover:opacity-100 transition-opacity duration-300 text-[#FFCA40]">
+                      <FaArrowRight />
+                    </span>
+                  </div>
+                </div>
+              </RevealOnScroll>
+            ))}
+          </div>
+        </div>
+      </section>
 
     </main>
   );

@@ -12,6 +12,9 @@ export const en = {
   'nav.surveys': 'Survey Management',
   'nav.analytics': 'Analytics',
   'nav.help_support': 'Help & Support',
+  'nav.about': 'About',
+  'nav.features': 'Features',
+  'nav.resources': 'Resources',
 
   'header.search_placeholder': 'Search...',
   'header.notifications': 'Notifications',
@@ -19,6 +22,40 @@ export const en = {
   'header.settings': 'Settings',
   'header.sign_out': 'Sign Out',
   'header.admin_panel': 'Admin Panel',
+  'header.subtitle': 'Mental Health Companion',
+
+  'hero.university': 'Universitas Gadjah Mada',
+  'hero.title_prefix': 'Your AI Companion for',
+  'hero.title_suffix': 'Mental Wellness.',
+  'hero.description': 'Bridging the gap between students and mental health support. UGM-AICare offers proactive intervention, resource management, and a safe space for you to be heard.',
+  'hero.cta_start': 'Start Your Journey',
+  'hero.cta_learn_more': 'Learn More',
+
+  'about.title_prefix': 'Transforming Support',
+  'about.title_suffix': 'Proactive & Personal',
+  'about.description': "UGM-AICare is more than just a platform; it's a paradigm shift from reactive to proactive mental health support. We utilize advanced AI agents to identify needs early, manage resources efficiently, and provide timely interventions. Our goal is to ensure every student feels supported, understood, and empowered to seek help when needed.",
+  'about.mission_link': 'Our Mission',
+
+  'aika.badge': 'Meet Aika',
+  'aika.title': 'An empathetic listener, always here for you.',
+  'aika.description': 'Aika is an intelligent AI agent designed to provide immediate, non-judgmental support. Whether you need to vent, seek advice, or just have a quiet companion, Aika is available 24/7. She helps bridge the gap until you can connect with human counselors if needed.',
+  'aika.feature1_title': '24/7 Availability',
+  'aika.feature1_desc': 'Support whenever you need it.',
+  'aika.feature2_title': 'Confidential',
+  'aika.feature2_desc': 'Your conversations are private.',
+  'aika.cta': 'Talk to Aika',
+
+  'quote.text': '"Grace flows quietly through patience. When you stop striving to fix everything, you begin to see how love already surrounds and carries you forward."',
+  'quote.author': 'Daily Calm • Wednesday, 21',
+
+  'resources.title': 'Your Journey',
+  'resources.view_all': '(view all)',
+  'resources.meditation': 'Meditation',
+  'resources.journaling': 'Journaling',
+  'resources.counseling': 'Counseling',
+  'resources.meditation_sub': '02 — 05',
+  'resources.journaling_sub': 'Daily Reflection',
+  'resources.counseling_sub': 'Professional Help',
 
   'dashboard.title': 'Admin Dashboard',
 };

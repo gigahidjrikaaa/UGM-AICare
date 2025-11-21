@@ -9,98 +9,70 @@
 ## Dataset Composition
 
 ### Overview
+
 - **Total Scenarios**: 50
 - **Crisis Messages**: 25 (50%)
 - **Non-Crisis Messages**: 25 (50%)
+- **File**: `conversation_scenarios.json`
 - **Language Distribution**:
-  - English: 37 messages (74%)
-  - Indonesian (Bahasa): 13 messages (26%)
+  - English: ~60%
+  - Indonesian (Bahasa): ~20%
+  - Mixed: ~20%
 
 ### Crisis Categories (n=25)
 
-#### 1. Explicit Suicidal Ideation (n=15)
-- Active suicidal statements ("I want to die")
-- Method research or planning
-- Goodbye messages
-- Location-specific crisis (e.g., "on the bridge")
-- **Severity**: Critical
-- **Examples**: C001-C008, C014-C018, C021-C025
+#### 1. Suicidal Ideation (n=10)
 
-#### 2. Self-Harm Intent (n=7)
-- Cutting, burning, or other self-injury
-- Escalation intent ("want to cut deeper")
-- Compulsive urges with loss of control
-- **Severity**: High
-- **Examples**: C009-C013, C019-C020
+- **Explicit**: Active planning, means acquisition, goodbye messages.
+  - IDs: `crisis_conv_001`, `004`, `006`, `012`, `018`, `021`, `023`
+- **Passive**: Death wishes without active planning.
+  - IDs: `crisis_conv_016`, `019`, `025`
 
-#### 3. Passive Suicidal Ideation (n=3)
-- Death wishes without active planning
-- "I wish I wouldn't wake up"
-- Should still flag for intervention
-- **Severity**: Moderate
-- **Examples**: C021-C025
+#### 2. Self-Harm Intent (n=5)
+
+- Cutting, burning, or other self-injury urges/actions.
+- IDs: `crisis_conv_002`, `009`, `017`, `020`, `024`
+
+#### 3. Other Crisis Situations (n=10)
+
+- **Overdose**: `crisis_conv_005`, `014`, `022`
+- **Severe Panic/Psychosis**: `crisis_conv_003`, `008`, `013`
+- **Violence/Trauma**: `crisis_conv_007`, `010`, `015`
+- **Medical/Eating Disorder**: `crisis_conv_011`
 
 ### Non-Crisis Categories (n=25)
 
-#### 1. Academic Stress (n=11)
-- Exam anxiety
-- Thesis overwhelm
-- Time management struggles
-- GPA concerns
-- **Examples**: NC001-NC008, NC018-NC019
+#### 1. Academic & Career Stress (n=9)
 
-#### 2. Emotional Distress (Non-Crisis) (n=7)
-- General sadness
-- Loneliness
-- Future anxiety
-- Family concerns
-- **Examples**: NC009-NC013, NC021-NC022
+- Exam anxiety, thesis overwhelm, career uncertainty, procrastination.
+- IDs: `non_crisis_conv_001`, `005`, `009`, `013`, `014`, `015`, `018`, `021`, `025`
 
-#### 3. Relationship Issues (n=4)
-- Breakups
-- Friendship conflicts
-- Social connection struggles
-- **Examples**: NC014-NC017, NC020
+#### 2. Social & Relationship Issues (n=8)
 
-#### 4. General Inquiries & Positive Updates (n=3)
-- Productivity tips requests
-- Progress reports
-- Proactive mental health questions
-- **Examples**: NC023-NC025
+- Breakups, loneliness, family conflict, roommate drama, cultural adjustment.
+- IDs: `non_crisis_conv_002`, `003`, `006`, `008`, `012`, `017`, `019`, `023`
+
+#### 3. Personal & Health Concerns (n=8)
+
+- Sleep issues, body image, burnout, financial stress, grief, health anxiety.
+- IDs: `non_crisis_conv_004`, `007`, `010`, `011`, `016`, `020`, `022`, `024`
 
 ## Files
 
-### 1. `crisis_scenarios.py`
-Python script containing all 50 scenarios with metadata.
+### 1. `conversation_scenarios.json`
 
-**Usage**:
-```bash
-cd research_evaluation/rq1_crisis_detection
-python crisis_scenarios.py
-```
+Complete dataset in JSON format containing all 50 scenarios.
 
-**Output**:
-- `rq1_crisis_scenarios.json` - Full dataset with metadata
-- `rq1_crisis_scenarios.csv` - Tabular format for analysis
-
-### 2. `rq1_crisis_scenarios.json`
-Complete dataset in JSON format with:
-- Metadata (version, date, counts, description)
-- All 50 scenarios with:
-  - `id`: Unique identifier (C001-C025 for crisis, NC001-NC025 for non-crisis)
-  - `text`: Student message text
-  - `true_label`: Ground truth ("crisis" or "non-crisis")
-  - `category`: Specific crisis/non-crisis type
-  - `language`: "english" or "indonesian"
-  - `severity_if_crisis`: Crisis severity level (critical/high/moderate)
-  - `notes`: Researcher annotations
-
-### 3. `rq1_crisis_scenarios.csv`
-CSV format for easy import into analysis tools (Excel, pandas, etc.)
+- **Structure**:
+  - `id`: Unique identifier (e.g., `crisis_conv_001`)
+  - `is_crisis`: Boolean flag (true/false)
+  - `category`: Specific type of issue
+  - `turns`: Array of conversation turns (User/Assistant)
 
 ## Evaluation Protocol
 
 ### Step 1: Prepare STA Service
+
 ```bash
 # Ensure STA is running
 cd ../../
@@ -109,13 +81,16 @@ python -m pytest tests/agents/test_gemini_sta.py -v  # Verify STA works
 ```
 
 ### Step 2: Run Evaluation Script
+
 ```bash
 # Execute evaluation (creates evaluation script in Step 4)
 python rq1_evaluate_sta.py
 ```
 
 ### Step 3: Analyze Results
+
 The evaluation script will:
+
 1. Load all 50 scenarios
 2. Send each message to STA classifier
 3. Record predictions (crisis/non-crisis) and risk levels
@@ -126,6 +101,7 @@ The evaluation script will:
    - **False Negatives (FN)**: Crisis incorrectly classified as non-crisis
 
 ### Step 4: Calculate Metrics
+
 - **Sensitivity (Recall)**: TP / (TP + FN) - Ability to detect true crises
 - **Specificity**: TN / (TN + FP) - Ability to identify non-crises
 - **Accuracy**: (TP + TN) / Total - Overall correctness
@@ -134,13 +110,15 @@ The evaluation script will:
 ## Expected Results Template
 
 ### Confusion Matrix Example
-```
+
+```text
                     Predicted Crisis    Predicted Non-Crisis
 Actual Crisis             22 (TP)              3 (FN)
 Actual Non-Crisis          2 (FP)             23 (TN)
 ```
 
 ### Metrics Example
+
 - **Sensitivity**: 22/25 = 88% (detected 22 out of 25 true crises)
 - **Specificity**: 23/25 = 92% (correctly identified 23 out of 25 non-crises)
 - **Accuracy**: 45/50 = 90% (45 correct predictions out of 50 total)
@@ -208,6 +186,7 @@ between normal student stress and genuine crisis situations.
 ## Quality Assurance
 
 ### Scenario Design Principles
+
 1. **Realism**: Based on actual student mental health presentations
 2. **Diversity**: Covers cultural, linguistic, and severity variations
 3. **Balance**: Equal crisis/non-crisis distribution prevents model bias
@@ -215,6 +194,7 @@ between normal student stress and genuine crisis situations.
 5. **Ethical**: All scenarios are synthetic (no real student data)
 
 ### Validation Checklist
+
 - [ ] All 25 crisis scenarios contain clear crisis indicators
 - [ ] All 25 non-crisis scenarios lack crisis markers
 - [ ] Indonesian translations preserve semantic meaning

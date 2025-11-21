@@ -12,6 +12,9 @@ export const id = {
   'nav.surveys': 'Manajemen Survei',
   'nav.analytics': 'Analitik',
   'nav.help_support': 'Bantuan & Dukungan',
+  'nav.about': 'Tentang',
+  'nav.features': 'Fitur',
+  'nav.resources': 'Sumber Daya',
 
   'header.search_placeholder': 'Cari...',
   'header.notifications': 'Notifikasi',
@@ -19,6 +22,40 @@ export const id = {
   'header.settings': 'Pengaturan',
   'header.sign_out': 'Keluar',
   'header.admin_panel': 'Panel Admin',
+  'header.subtitle': 'Pendamping Kesehatan Mental',
+
+  'hero.university': 'Universitas Gadjah Mada',
+  'hero.title_prefix': 'Pendamping AI Anda untuk',
+  'hero.title_suffix': 'Kesehatan Mental.',
+  'hero.description': 'Menjembatani kesenjangan antara mahasiswa dan dukungan kesehatan mental. UGM-AICare menawarkan intervensi proaktif, manajemen sumber daya, dan ruang aman untuk didengar.',
+  'hero.cta_start': 'Mulai Perjalanan Anda',
+  'hero.cta_learn_more': 'Pelajari Lebih Lanjut',
+
+  'about.title_prefix': 'Mengubah Dukungan',
+  'about.title_suffix': 'Proaktif & Personal',
+  'about.description': 'UGM-AICare lebih dari sekadar platform; ini adalah perubahan paradigma dari dukungan kesehatan mental reaktif menjadi proaktif. Kami menggunakan agen AI canggih untuk mengidentifikasi kebutuhan sejak dini, mengelola sumber daya secara efisien, dan memberikan intervensi tepat waktu. Tujuan kami adalah memastikan setiap mahasiswa merasa didukung, dipahami, dan diberdayakan untuk mencari bantuan saat dibutuhkan.',
+  'about.mission_link': 'Misi Kami',
+
+  'aika.badge': 'Kenalan dengan Aika',
+  'aika.title': 'Pendengar yang empatik, selalu ada untuk Anda.',
+  'aika.description': 'Aika adalah agen AI cerdas yang dirancang untuk memberikan dukungan segera tanpa menghakimi. Apakah Anda perlu curhat, mencari saran, atau hanya butuh teman yang tenang, Aika tersedia 24/7. Dia membantu menjembatani kesenjangan sampai Anda dapat terhubung dengan konselor manusia jika diperlukan.',
+  'aika.feature1_title': 'Ketersediaan 24/7',
+  'aika.feature1_desc': 'Dukungan kapan pun Anda membutuhkannya.',
+  'aika.feature2_title': 'Rahasia',
+  'aika.feature2_desc': 'Percakapan Anda bersifat pribadi.',
+  'aika.cta': 'Bicara dengan Aika',
+
+  'quote.text': '"Rahmat mengalir dengan tenang melalui kesabaran. Ketika Anda berhenti berusaha memperbaiki segalanya, Anda mulai melihat bagaimana cinta sudah mengelilingi dan membawa Anda maju."',
+  'quote.author': 'Daily Calm • Rabu, 21',
+
+  'resources.title': 'Perjalanan Anda',
+  'resources.view_all': '(lihat semua)',
+  'resources.meditation': 'Meditasi',
+  'resources.journaling': 'Jurnal',
+  'resources.counseling': 'Konseling',
+  'resources.meditation_sub': '02 — 05',
+  'resources.journaling_sub': 'Refleksi Harian',
+  'resources.counseling_sub': 'Bantuan Profesional',
 
   'dashboard.title': 'Dasbor Admin',
 };

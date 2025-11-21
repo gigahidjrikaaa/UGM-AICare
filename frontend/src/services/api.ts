@@ -14,7 +14,7 @@ import type {
 } from '@/types/api'; // Import types
 import toast from 'react-hot-toast';
 import type { UserProfileOverviewResponse, UserProfileOverviewUpdate } from '@/types/profile';
-import { getSession, signOut } from 'next-auth/react';
+import { signOut } from 'next-auth/react';
 
 // Define the base URL for your backend API
 // Use NEXT_PUBLIC_API_URL for client-side requests (browser)
@@ -32,15 +32,20 @@ const apiClient = axios.create({
 let hasTriggeredSignOut = false;
 const AUTH_ROUTE_PREFIXES = ["/signin", "/signup", "/auth"];
 
+// Token management for performance optimization
+let accessToken: string | undefined = undefined;
+
+export const setAccessToken = (token: string | undefined) => {
+  accessToken = token;
+};
+
 // Add request interceptor to attach JWT token to every request
 // This will be called before every request to the backend
 apiClient.interceptors.request.use(
   async (config) => {
-    const session = await getSession();
-    const token = session?.accessToken;
-
-    if (token && config.headers) {
-      config.headers.Authorization = `Bearer ${token}`;
+    // Use the cached token instead of calling getSession() which triggers a network request
+    if (accessToken && config.headers) {
+      config.headers.Authorization = `Bearer ${accessToken}`;
     }
 
     return config;

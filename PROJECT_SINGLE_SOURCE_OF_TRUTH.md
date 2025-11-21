@@ -36,7 +36,7 @@ Deliver a Safety Agent Suite that combines high-sensitivity crisis detection wit
 
 **NEW: Unified Aika Orchestrator with Direct LangGraph Invocation** (Implemented: November 2025)
 
-The Safety Agent Suite is now orchestrated through a **unified Aika agent** that uses LangGraph's native patterns:
+The Safety Agent Suite is now orchestrated through a **unified Aika Meta-Agent** that uses LangGraph's native patterns. The architecture is designed as two integrated loops: a **Real-Time Interaction Loop** for immediate student support and a **Strategic Oversight Loop** for institutional analytics.
 
 ### 🤖 Agentic Architecture Principles
 
@@ -50,51 +50,60 @@ The Safety Agent Suite is now orchestrated through a **unified Aika agent** that
 ### 🎯 Architecture: Aika Decision Node First
 
 ```bash
-User Message → Aika Decision Node → [needs_agents?]
+User Message → Aika Meta-Agent → [needs_agents?]
                                       ↓               ↓
                                  [YES: STA]      [NO: Direct Response]
                                       ↓
                                  [severity check]
                                   ↓    ↓    ↓
-                                SDA  SCA  Synthesize → END
+                                CMA  TCA  Synthesize → END
 ```
 
-**Key Innovation**: Aika intelligently decides if specialized agents are needed:
+**Key Innovation**: Aika acts as the sole user-facing conversationalist. It intelligently decides if specialized agents are needed:
 - **Casual chat** ("hi", "how are you?") → Direct response (~1.2s, no agents)
-- **Emotional distress** → STA → SCA (intervention plan)
-- **Crisis signals** → STA → SDA (case creation + counselor assignment)
+- **Emotional distress** → STA → TCA (intervention plan)
+- **Crisis signals** → STA → CMA (case creation + counselor assignment)
 
 ### 🛡️ Safety Triage Agent (STA)
 
-- **Scope:** Real-time message classification, risk scoring (Level 0-3), and escalation routing inside the user chat experience
-- **Key Features:** PII redaction before assessment, crisis banner orchestration, consent-aware disclosures, feature-flagged crisis protocols, automated professional referral, audit logging
+- **Role:** Background conversation-level assessor.
+- **Scope:** Real-time message classification, risk scoring (Level 0-3), and escalation routing inside the user chat experience. Produces Tier 2 risk labels and compliance artifacts.
+- **Key Features:** PII redaction before assessment, crisis banner orchestration, consent-aware disclosures, feature-flagged crisis protocols, automated professional referral, audit logging.
 - **LangGraph Implementation:** 4-node workflow (`apply_redaction` → `classify_intent` → `assess_risk` → `route_to_agent`)
 - **Status:** ✅ **LangGraph Complete** (`backend/app/agents/sta/sta_graph.py`, smoke tests passing)
 
-### 💬 Support Coach Agent (SCA)
+### 💬 Therapeutic Coach Agent (TCA)
 
-- **Scope:** CBT-informed personalized coaching, brief micro-interventions, and evidence-based therapeutic guidance
-- **Key Features:** Empathetic dialogue, structured self-help modules (anxiety management, stress reduction), therapeutic exercise guidance, intervention plan generation, progress tracking
+*Implemented as `SCA` (Support Coach Agent) in codebase.*
+
+- **Role:** Background agent for CBT-based intervention.
+- **Scope:** Generates CBT-informed personalized coaching, brief micro-interventions, and evidence-based therapeutic guidance. Does not engage in direct conversation.
+- **Key Features:** Empathetic dialogue, structured self-help modules (anxiety management, stress reduction), therapeutic exercise guidance, intervention plan generation, progress tracking.
 - **LangGraph Implementation:** 4-node workflow (`validate_intervention_need` → `classify_intervention_type` → `generate_plan` → `persist_plan`)
 - **Status:** ✅ **LangGraph Complete** (`backend/app/agents/sca/sca_graph.py`)
 
-### 🗂️ Service Desk Agent (SDA)
+### 🗂️ Case Management Agent (CMA)
 
-- **Scope:** Operational command center for clinical staff (case management, SLA tracking, follow-up workflows)
-- **Key Features:** Case creation, escalation workflows, SLA calculation with breach prediction, clinical staff auto-assignment, interoperability hooks for campus systems
+*Implemented as `SDA` (Service Desk Agent) in codebase.*
+
+- **Role:** Procedural backbone for administrative tasks.
+- **Scope:** Operational command center for clinical staff (case management, SLA tracking, follow-up workflows).
+- **Key Features:** Case creation, escalation workflows, SLA calculation with breach prediction, clinical staff auto-assignment, interoperability hooks for campus systems.
 - **LangGraph Implementation:** 4-node workflow (`validate_escalation` → `create_case` → `calculate_sla` → `auto_assign`)
 - **Status:** ✅ **LangGraph Complete** (`backend/app/agents/sda/sda_graph.py`)
 
 ### 🔍 Insights Agent (IA)
 
-- **Scope:** Privacy-preserving analytics over anonymized events/messages with differential privacy guarantees
-- **Key Features:** k-anonymity enforcement (k≥5), allow-listed queries (6 pre-approved analytics questions), differential privacy budget tracking (ε-δ), consent-aware dimensions, aggregate trend analysis, clinical approval checkpoints
+- **Role:** Strategic analyst for population-level insights.
+- **Scope:** Privacy-preserving analytics over anonymized events/messages with differential privacy guarantees.
+- **Key Features:** k-anonymity enforcement (k≥5), allow-listed queries (6 pre-approved analytics questions), differential privacy budget tracking (ε-δ), consent-aware dimensions, aggregate trend analysis, clinical approval checkpoints.
 - **LangGraph Implementation:** 4-node workflow (`ingest_query` → `validate_consent` → `apply_k_anonymity` → `execute_analytics`)
 - **Status:** ✅ **LangGraph Complete** (`backend/app/agents/ia/ia_graph.py`, smoke tests passing)
 
-### 🎭 Unified Aika Orchestrator (NEW)
+### 🎭 Aika Meta-Agent (Unified Orchestrator)
 
-- **Scope:** Intelligent decision node that determines agent invocation
+- **Role:** Sole user-facing interface and orchestrator.
+- **Scope:** Intelligent decision node that determines agent invocation. Manages all user interactions, performs initial risk assessment, and routes tasks to specialist agents.
 - **Key Features:** 
   - Aika personality (warm, empathetic Indonesian mental health assistant)
   - Intent classification with confidence scoring
@@ -104,8 +113,8 @@ User Message → Aika Decision Node → [needs_agents?]
 - **LangGraph Implementation:** 5-node workflow with conditional routing:
   - `aika_decision_node`: Analyzes message, decides if agents needed
   - `execute_sta`: Invokes STA subgraph if needed
-  - `execute_sca`: Invokes SCA subgraph for moderate severity
-  - `execute_sda`: Invokes SDA subgraph for high/critical severity
+  - `execute_sca`: Invokes TCA (SCA) subgraph for moderate severity
+  - `execute_sda`: Invokes CMA (SDA) subgraph for high/critical severity
   - `synthesize`: Combines agent outputs with Aika personality
 - **Status:** ✅ **LangGraph Complete** (`backend/app/agents/aika_orchestrator_graph.py`)
 
@@ -206,7 +215,10 @@ print(result["agents_invoked"])  # ["STA", "SCA"] or []
   - Differential privacy (ε-δ budgets) and k-anonymity enforced at the Insights layer
   - Consent withdrawal honored by redaction policies and agent routing
   - No raw conversational content leaves secured storage; STA operates on redacted payloads
-- **Success Criteria:** Crisis detection sensitivity/specificity (RQ1), orchestration reliability (RQ2), coaching quality per CBT rubric (RQ3), insights stability under privacy thresholds (RQ4)
+- **Success Criteria:**
+  - **RQ1 (Proactive Safety):** Sensitivity, Specificity, False Negative Rate (Target: FNR ≤ 10%).
+  - **RQ2 (Functional Correctness):** Tool Call Success Rate, Retry Recovery Rate, State Transition Accuracy (Target: Success Rate ≥ 95%).
+  - **RQ3 (Output Quality & Privacy):** Mean Rubric Score (Target ≥ 3.5/5) and K-Anonymity Compliance (100%).
 
 ---
 
@@ -265,10 +277,9 @@ print(result["agents_invoked"])  # ["STA", "SCA"] or []
    - Crisis escalation SOP automation with real-time alerts
 
 5. **Research Validation**
-   - RQ2 evaluation: LangGraph orchestration reliability metrics
-   - IA privacy safeguard validation (k-anonymity, differential privacy budgets)
-   - Clinical efficacy study for SCA intervention plans
-   - Privacy compliance dashboards and runbooks
+   - **RQ1 (Proactive Safety):** Crisis detection evaluation on synthetic corpus (n=50).
+   - **RQ2 (Functional Correctness):** Orchestration reliability testing on conversation flows (n=10).
+   - **RQ3 (Output Quality & Privacy):** Rubric-based coaching quality assessment (n=10) and privacy code review.
 
 Target rollout sequence: **Database → Backend Agents → Frontend Surfaces → Operational Playbooks**.
 

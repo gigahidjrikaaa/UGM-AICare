@@ -20,11 +20,16 @@ export function useTodayQuests() {
   });
 }
 
+import { useSession } from "next-auth/react";
+
 export function useWellnessState() {
+  const { status } = useSession();
   return useQuery<WellnessState>({
     queryKey: WELLNESS_QUERY_KEY,
     queryFn: fetchWellnessState,
     staleTime: 1000 * 60 * 5,
+    retry: false,
+    enabled: status === "authenticated", // Only fetch if authenticated
   });
 }
 

@@ -68,8 +68,6 @@ const nextConfig = {
   experimental: {
     // Optimize package imports for better tree shaking
     optimizePackageImports: ['framer-motion', 'react-icons', 'date-fns', 'lucide-react', 'recharts'],
-    // Reduce memory usage
-    workerThreads: false,
     // Enable faster refresh
     webVitalsAttribution: ['CLS', 'LCP'],
   },
@@ -88,6 +86,10 @@ const nextConfig = {
     domains: [],
     // Add any remote hostnames if needed
     remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'images.unsplash.com',
+      },
       {
         hostname: 'lh3.googleusercontent.com',
       },
