@@ -1,0 +1,81 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "js-yaml": {
+      "name": "js-yaml",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1109802,
+          "name": "js-yaml",
+          "dependency": "js-yaml",
+          "title": "js-yaml has prototype pollution in merge (<<)",
+          "url": "https://github.com/advisories/GHSA-mh29-5h37-fv8m",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-1321"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:N"
+          },
+          "range": ">=4.0.0 <4.1.1"
+        }
+      ],
+      "effects": [],
+      "range": "4.0.0 - 4.1.0",
+      "nodes": [
+        "node_modules/js-yaml"
+      ],
+      "fixAvailable": true
+    },
+    "next-auth": {
+      "name": "next-auth",
+      "severity": "moderate",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 1109305,
+          "name": "next-auth",
+          "dependency": "next-auth",
+          "title": "NextAuthjs Email misdelivery Vulnerability",
+          "url": "https://github.com/advisories/GHSA-5jpx-9hw9-2fx4",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-200"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": "<4.24.12"
+        }
+      ],
+      "effects": [],
+      "range": "<4.24.12",
+      "nodes": [
+        "node_modules/next-auth"
+      ],
+      "fixAvailable": true
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 2,
+      "high": 0,
+      "critical": 0,
+      "total": 2
+    },
+    "dependencies": {
+      "prod": 721,
+      "dev": 337,
+      "optional": 79,
+      "peer": 0,
+      "peerOptional": 0,
+      "total": 1091
+    }
+  }
+}

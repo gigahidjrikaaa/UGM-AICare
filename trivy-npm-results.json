@@ -1,0 +1,13 @@
+{
+  "SchemaVersion": 2,
+  "CreatedAt": "2025-11-22T03:03:49.561106138Z",
+  "ArtifactName": "frontend",
+  "ArtifactType": "filesystem",
+  "Results": [
+    {
+      "Target": "package-lock.json",
+      "Class": "lang-pkgs",
+      "Type": "npm"
+    }
+  ]
+}
