@@ -742,6 +742,9 @@ Create a warm, empathetic response that:
 4. Maintains Aika's personality (caring, supportive)
 
 Keep response natural and conversational in Indonesian (for students) or professional (for admins/counselors).
+
+IMPORTANT: If an intervention plan was created (TCA), you MUST explicitly mention it in your response.
+Say something like: "Aku sudah buatkan rencana khusus buat kamu. Cek di sidebar ya!" or "I've prepared a plan for you, please check the sidebar."
 """
         
         # Get preferred model from state

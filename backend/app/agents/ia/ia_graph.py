@@ -377,20 +377,22 @@ async def export_pdf_node(state: IAState) -> IAState:
         execution_tracker.start_node(execution_id, "ia:export_pdf", "ia")
     
     try:
-        # For MVP: Skip PDF generation, return placeholder
-        # TODO: Implement PDF generation using reportlab or weasyprint
-        # pdf_path = await generate_pdf_report(state)
-        # pdf_url = f"/api/v1/insights/reports/{pdf_path}"
+        # Import generator dynamically to avoid circular imports
+        from app.agents.ia.pdf_generator import generate_pdf_report
         
-        pdf_url = None  # None means "PDF not generated yet"
+        # Generate PDF
+        pdf_url = generate_pdf_report(state)
+        
         state["pdf_url"] = pdf_url
-        
         state.setdefault("execution_path", []).append("ia:export_pdf")
         
         if execution_id:
             execution_tracker.complete_node(execution_id, "ia:export_pdf")
         
-        logger.info("IA PDF export skipped (not yet implemented)")
+        if pdf_url:
+            logger.info(f"IA PDF export successful: {pdf_url}")
+        else:
+            logger.warning("IA PDF export returned None")
         
     except Exception as e:
         error_msg = f"PDF export failed: {str(e)}"

@@ -4,7 +4,7 @@ import { useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { FolderOpenIcon, ClockIcon } from '@heroicons/react/24/outline';
 import toast from 'react-hot-toast';
-import { SDAGraphRequest, SDAGraphResponse } from '@/services/langGraphApi';
+import { CMAGraphRequest, CMAGraphResponse } from '@/services/langGraphApi';
 import { CaseCreationForm } from './components/CaseCreationForm';
 import { SummaryCards } from './components/SummaryCards';
 import { PriorityQueue } from './components/PriorityQueue';
@@ -32,7 +32,7 @@ export default function ServiceDeskClient() {
       case 'case_created':
       case 'case_updated': {
         const caseData = event.data as CaseRecord;
-        
+
         // Show toast for new high/critical severity cases
         if (event.type === 'case_created' && (caseData.severity === 'critical' || caseData.severity === 'high')) {
           toast.success(`🚨 New ${caseData.severity.toUpperCase()} case created: ${caseData.case_id}`, {
@@ -44,7 +44,7 @@ export default function ServiceDeskClient() {
         // Update or add case to recent cases list
         setRecentCases(prev => {
           const existingIndex = prev.findIndex(c => c.case_id === caseData.case_id);
-          
+
           if (existingIndex >= 0) {
             // Update existing case
             const updated = [...prev];
@@ -88,19 +88,19 @@ export default function ServiceDeskClient() {
     debug: process.env.NODE_ENV === 'development',
   });
 
-  const handleCreateCase = useCallback<(request: SDAGraphRequest) => Promise<void>>(async (request) => {
+  const handleCreateCase = useCallback<(request: CMAGraphRequest) => Promise<void>>(async (request) => {
     setLoading(true);
     try {
       // Import dynamically to avoid SSR issues
       const { langGraphApi } = await import('@/services/langGraphApi');
-      const result: SDAGraphResponse = await langGraphApi.executeSDA(request);
+      const result: CMAGraphResponse = await langGraphApi.executeCMA(request);
 
       if (!result.success) {
         throw new Error(result.errors.join(', ') || 'Failed to create case');
       }
 
       toast.success(`✅ Case created successfully! ID: ${result.case_id}`);
-      
+
       // Add to recent cases
       setRecentCases(prev => [{
         case_id: result.case_id,
@@ -137,8 +137,8 @@ export default function ServiceDeskClient() {
           <p className="text-white/60 text-sm mb-2">
             Create and manage cases through the Case Management Agent (CMA) with automatic SLA tracking
           </p>
-          <a 
-            href="/admin/cases" 
+          <a
+            href="/admin/cases"
             className="text-[#FFCA40] hover:text-[#FFCA40]/80 text-sm flex items-center gap-1 transition-colors"
           >
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -150,17 +150,14 @@ export default function ServiceDeskClient() {
 
         <div className="flex items-center gap-3">
           {/* Real-time connection status */}
-          <div className={`flex items-center gap-2 px-4 py-2 border rounded-xl ${
-            isConnected 
-              ? 'bg-emerald-500/20 border-emerald-500/30' 
+          <div className={`flex items-center gap-2 px-4 py-2 border rounded-xl ${isConnected
+              ? 'bg-emerald-500/20 border-emerald-500/30'
               : 'bg-orange-500/20 border-orange-500/30'
-          }`}>
-            <div className={`h-2 w-2 rounded-full ${
-              isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-orange-500'
-            }`}></div>
-            <span className={`text-sm font-medium ${
-              isConnected ? 'text-emerald-300' : 'text-orange-300'
             }`}>
+            <div className={`h-2 w-2 rounded-full ${isConnected ? 'bg-emerald-500 animate-pulse' : 'bg-orange-500'
+              }`}></div>
+            <span className={`text-sm font-medium ${isConnected ? 'text-emerald-300' : 'text-orange-300'
+              }`}>
               {isConnected ? 'Live Updates Active' : 'Reconnecting...'}
             </span>
           </div>

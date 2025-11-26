@@ -78,6 +78,7 @@ web3>=7.0.0,<8.0.0  # Web3.py for Ethereum/SOMNIA blockchain interaction
 
 # Statistical Analysis and Privacy
 numpy>=1.24.0
+reportlab>=4.0.0
 
 # Social Media Integration
 tweepy==4.14.0  # For Twitter/X API integration
