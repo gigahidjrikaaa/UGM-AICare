@@ -40,6 +40,21 @@ const ALLOW_LISTED_QUERIES = [
     label: '6. Counselor Workload Balance',
     description: 'Case load distribution across counselors',
   },
+  {
+    value: 'topic_analysis',
+    label: '7. Topic & Intent Analysis',
+    description: 'Dominant topics and concerns from risk assessments',
+  },
+  {
+    value: 'sentiment_trends',
+    label: '8. Sentiment Landscape',
+    description: 'Risk score trends and severity distribution over time',
+  },
+  {
+    value: 'intervention_latency',
+    label: '9. Intervention Latency',
+    description: 'Average time-to-intervention analysis',
+  },
 ];
 
 interface IAQuerySelectorProps {

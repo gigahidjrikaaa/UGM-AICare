@@ -203,5 +203,62 @@ ALLOWED_QUERIES: Final[dict[QuestionId, str]] = {
         HAVING COUNT(DISTINCT c.id) >= 5  -- k-anonymity
         ORDER BY day_of_week, hour_of_day
     """,
+
+    # Topic Analysis: Extract dominant topics from risk assessments
+    "topic_analysis": """
+        SELECT 
+            topic,
+            COUNT(*) as frequency,
+            COUNT(DISTINCT user_id) as unique_users
+        FROM (
+            SELECT 
+                json_array_elements_text(concerns) as topic,
+                user_id
+            FROM conversation_risk_assessments
+            WHERE 
+                created_at >= :start_date 
+                AND created_at < :end_date
+                AND concerns IS NOT NULL
+        ) as subquery
+        GROUP BY topic
+        HAVING COUNT(*) >= 5 -- k-anonymity
+        ORDER BY frequency DESC
+        LIMIT 20
+    """,
+
+    # Sentiment Trends: Proxy sentiment using risk scores and severity levels
+    "sentiment_trends": """
+        SELECT 
+            DATE(created_at) as date,
+            AVG(risk_score) as avg_risk_score,
+            COUNT(CASE WHEN severity_level = 'low' THEN 1 END) as low_risk_count,
+            COUNT(CASE WHEN severity_level = 'med' THEN 1 END) as med_risk_count,
+            COUNT(CASE WHEN severity_level = 'high' THEN 1 END) as high_risk_count,
+            COUNT(CASE WHEN severity_level = 'critical' THEN 1 END) as critical_risk_count,
+            COUNT(*) as total_assessments
+        FROM triage_assessments
+        WHERE 
+            created_at >= :start_date 
+            AND created_at < :end_date
+        GROUP BY DATE(created_at)
+        HAVING COUNT(*) >= 5 -- k-anonymity
+        ORDER BY date DESC
+    """,
+
+    # Intervention Latency: Time between message and assessment
+    "intervention_latency": """
+        SELECT 
+            DATE(ta.created_at) as date,
+            AVG(EXTRACT(EPOCH FROM (ta.created_at - c.timestamp))) as avg_latency_seconds,
+            COUNT(*) as sample_size
+        FROM triage_assessments ta
+        JOIN conversations c ON ta.conversation_id = c.id
+        WHERE 
+            ta.created_at >= :start_date 
+            AND ta.created_at < :end_date
+        GROUP BY DATE(ta.created_at)
+        HAVING COUNT(*) >= 5 -- k-anonymity
+        ORDER BY date DESC
+    """,
 }
 

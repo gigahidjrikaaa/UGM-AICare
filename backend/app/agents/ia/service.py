@@ -56,6 +56,10 @@ class InsightsAgentService:
             "fallback_reduction": self._format_fallback_reduction,
             "cost_per_helpful": self._format_cost_per_helpful,
             "coverage_windows": self._format_coverage_windows,
+            "coverage_windows": self._format_coverage_windows,
+            "topic_analysis": self._format_topic_analysis,
+            "sentiment_trends": self._format_sentiment_trends,
+            "intervention_latency": self._format_intervention_latency,
         }
         return formatters[question_id]
 
@@ -289,6 +293,123 @@ class InsightsAgentService:
             "Identifies peak hours for user conversations across the requested range.",
             "Hour_of_day: 0-23 (24-hour format), day_of_week: 0=Sunday, 6=Saturday.",
             "K-anonymity enforced: minimum 5 conversations per hour/day group.",
+        ]
+        return IAQueryResponse(chart=chart, table=table, notes=notes)
+
+    def _format_topic_analysis(self, rows: Sequence[Row[Any]], start: datetime, end: datetime) -> IAQueryResponse:
+        """
+        Format topic_analysis query results.
+        Expected columns: topic, frequency, unique_users
+        """
+        table = []
+        for row in rows:
+            topic, frequency, unique_users = row
+            table.append({
+                "topic": topic,
+                "frequency": frequency,
+                "unique_users": unique_users
+            })
+
+        # Sort by frequency desc
+        sorted_rows = sorted(rows, key=lambda x: x[1], reverse=True)
+        top_10 = sorted_rows[:10]
+
+        chart = {
+            "type": "bar",
+            "series": [
+                {
+                    "name": "Topic Frequency",
+                    "data": [[row[0], row[1]] for row in top_10]
+                }
+            ]
+        }
+        
+        notes = [
+            "Topics extracted from 'concerns' field in risk assessments.",
+            f"Showing top {len(top_10)} topics.",
+            "K-anonymity enforced: minimum 5 occurrences per topic."
+        ]
+        return IAQueryResponse(chart=chart, table=table, notes=notes)
+
+    def _format_sentiment_trends(self, rows: Sequence[Row[Any]], start: datetime, end: datetime) -> IAQueryResponse:
+        """
+        Format sentiment_trends query results.
+        Expected columns: date, avg_risk_score, low_risk_count, med_risk_count, high_risk_count, critical_risk_count, total_assessments
+        """
+        table = []
+        series_avg_risk = []
+        series_high_critical = []
+        
+        for row in rows:
+            date, avg_risk, low, med, high, critical, total = row
+            date_str = str(date)
+            
+            table.append({
+                "date": date_str,
+                "avg_risk_score": float(avg_risk) if avg_risk else 0.0,
+                "low_risk": low,
+                "med_risk": med,
+                "high_risk": high,
+                "critical_risk": critical,
+                "total": total
+            })
+            
+            series_avg_risk.append([date_str, float(avg_risk) if avg_risk else 0.0])
+            series_high_critical.append([date_str, high + critical])
+
+        # Sort by date
+        series_avg_risk.sort(key=lambda x: x[0])
+        series_high_critical.sort(key=lambda x: x[0])
+
+        chart = {
+            "type": "line",
+            "series": [
+                {"name": "Avg Risk Score (0-1)", "data": series_avg_risk},
+                {"name": "High/Critical Cases", "data": series_high_critical}
+            ]
+        }
+        
+        notes = [
+            "Risk Score acts as a proxy for negative sentiment (Higher = More Negative).",
+            "High/Critical cases indicate severe distress.",
+            "K-anonymity enforced: minimum 5 assessments per day."
+        ]
+        return IAQueryResponse(chart=chart, table=table, notes=notes)
+
+    def _format_intervention_latency(self, rows: Sequence[Row[Any]], start: datetime, end: datetime) -> IAQueryResponse:
+        """
+        Format intervention_latency query results.
+        Expected columns: date, avg_latency_seconds, sample_size
+        """
+        table = []
+        series_latency = []
+        
+        for row in rows:
+            date, latency, sample_size = row
+            date_str = str(date)
+            latency_val = float(latency) if latency else 0.0
+            
+            table.append({
+                "date": date_str,
+                "avg_latency_seconds": latency_val,
+                "sample_size": sample_size
+            })
+            
+            series_latency.append([date_str, latency_val])
+
+        series_latency.sort(key=lambda x: x[0])
+
+        chart = {
+            "type": "line",
+            "series": [
+                {"name": "Avg Latency (s)", "data": series_latency}
+            ]
+        }
+        
+        notes = [
+            "Latency = Time between user message and agent risk assessment.",
+            "Lower is better.",
+            "K-anonymity enforced: minimum 5 assessments per day."
         ]
         return IAQueryResponse(chart=chart, table=table, notes=notes)
 

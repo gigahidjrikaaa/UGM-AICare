@@ -95,7 +95,6 @@ function getChartForQueryType(queryName: string, data: Record<string, unknown>[]
 export function IAQueryResults({ result, loading }: IAQueryResultsProps) {
   if (loading) {
     return (
-    return (
       <div className="bg-[#00153a]/40 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-xl">
         <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
           <div>
@@ -146,7 +145,7 @@ export function IAQueryResults({ result, loading }: IAQueryResultsProps) {
     );
   }
 
-  const { query_name, result: queryResult, privacy_metadata, execution_path, execution_time_ms } = result;
+  const { query_name, result: queryResult, privacy_metadata, execution_path, execution_time_ms, summary, recommendations } = result;
 
   // Format query name for display
   const queryNameDisplay = query_name
@@ -201,6 +200,50 @@ export function IAQueryResults({ result, loading }: IAQueryResultsProps) {
             </div>
           </div>
         </div>
+
+        {/* LLM Insights Display */}
+        {summary && (
+          <div className="mb-6 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            {/* Executive Summary */}
+            <div className="bg-gradient-to-br from-blue-500/10 to-purple-500/10 border border-white/10 rounded-xl p-6">
+              <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                <span className="text-xl">📊</span> Executive Summary
+              </h3>
+              <p className="text-white/80 text-sm leading-relaxed whitespace-pre-wrap">
+                {summary}
+              </p>
+            </div>
+
+            {/* Actionable Recommendations */}
+            <div className="bg-gradient-to-br from-emerald-500/10 to-teal-500/10 border border-white/10 rounded-xl p-6">
+              <h3 className="text-lg font-bold text-white mb-3 flex items-center gap-2">
+                <span className="text-xl">🚀</span> Actionable Recommendations
+              </h3>
+              <div className="space-y-3">
+                {recommendations && recommendations.length > 0 ? (
+                  recommendations.map((rec: any, idx: number) => (
+                    <div key={idx} className="bg-black/20 rounded-lg p-3 border border-white/5">
+                      <div className="flex justify-between items-start mb-1">
+                        <span className="font-semibold text-emerald-300 text-sm">{rec.recommendation}</span>
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full uppercase tracking-wider ${rec.priority?.toLowerCase() === 'high' ? 'bg-red-500/20 text-red-400' :
+                          rec.priority?.toLowerCase() === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                            'bg-blue-500/20 text-blue-400'
+                          }`}>
+                          {rec.priority || 'Medium'}
+                        </span>
+                      </div>
+                      {rec.action && (
+                        <p className="text-xs text-white/50 mt-1">👉 {rec.action}</p>
+                      )}
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-white/40 text-sm italic">No specific recommendations generated.</p>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Results Data */}
         <div className="mb-5">

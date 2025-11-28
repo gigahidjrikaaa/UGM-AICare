@@ -161,6 +161,12 @@ export interface IAGraphResponse {
     differential_privacy_budget_used: number;  // ε used
     total_records_anonymized: number;
   };
+  summary?: string;            // Executive summary from LLM
+  recommendations?: Array<{    // Actionable recommendations
+    recommendation: string;
+    priority: string;
+    action: string;
+  }>;
   privacy_metadata: {
     k_value: number;           // Actual k value (≥5 required)
     epsilon_used: number;      // Differential privacy ε
@@ -503,12 +509,12 @@ export const getExecutionHistory = async (
   filters: ExecutionHistoryFilters = {}
 ): Promise<ExecutionHistoryResponse> => {
   const params = new URLSearchParams();
-  
+
   if (filters.limit) params.append('limit', String(filters.limit));
   if (filters.offset) params.append('offset', String(filters.offset));
   if (filters.status) params.append('status', filters.status);
   if (filters.graph_name) params.append('graph_name', filters.graph_name);
-  
+
   const response = await apiClient.get<ExecutionHistoryResponse>(
     `/admin/langgraph/executions/history?${params.toString()}`
   );
@@ -648,10 +654,10 @@ export const langGraphApi = {
   executeTCA,
   executeOrchestrator,
   executeIA,
-  
+
   // Health monitoring
   getGraphHealth,
-  
+
   // Analytics endpoints
   getAnalyticsOverview,
   getExecutionHistory,

@@ -95,18 +95,23 @@ Catatan Privasi:
 
 Berikan analisis dalam format berikut:
 
-1. INTERPRETASI UTAMA (2-3 paragraf)
+1. RINGKASAN EKSEKUTIF (1 paragraf - Natural Language)
+   - Format naratif yang ringkas untuk administrator sibuk.
+   - Contoh: "Sepanjang periode ini, sentimen mahasiswa menurun 12% yang didorong oleh lonjakan 'Stres Akademik'. Kasus risiko tinggi stabil, namun kebutuhan coaching meningkat."
+
+2. INTERPRETASI UTAMA (2-3 paragraf)
    - Apa insight paling penting dari data ini?
    - Apa yang menonjol atau mengkhawatirkan?
 
-2. TREN YANG TERIDENTIFIKASI (3-5 tren)
+3. TREN YANG TERIDENTIFIKASI (3-5 tren)
    - Format: "Tren: [deskripsi] | Signifikansi: [high/medium/low] | Implikasi: [penjelasan]"
 
-3. RINGKASAN EKSEKUTIF (1 paragraf)
-   - Kesimpulan utama untuk stakeholder
-
-4. REKOMENDASI (3-5 rekomendasi)
+4. REKOMENDASI (3-5 rekomendasi - Actionable)
    - Format: "Rekomendasi: [judul] | Prioritas: [high/medium/low] | Aksi: [langkah konkret]"
+   - Contoh Aksi: "Adakan workshop manajemen waktu", "Kirim broadcast tips tidur", "Tambah konselor di Selasa malam".
+
+5. METADATA PRIVASI
+   - Wajib sertakan kalimat ini: "Data aggregated from {len(data)} records. K-anonymity (k ≥ 5) enforced to protect user privacy."
 
 Pastikan setiap analisis didukung oleh angka spesifik dari data.
 """
