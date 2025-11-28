@@ -2,14 +2,14 @@ version: '3.8'
 
 services:
   prometheus:
-    image: prom/prometheus:v2.48.0
+    build:
+      context: ./infra/monitoring/prometheus
+      dockerfile: Dockerfile
     container_name: ugm_aicare_prometheus
     user: root
     ports:
       - "8255:9090"
     volumes:
-      - ./infra/monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
-      - ./infra/monitoring/prometheus/alert_rules.yml:/etc/prometheus/alert_rules.yml:ro
       - prometheus-data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
