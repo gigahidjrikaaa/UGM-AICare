@@ -194,8 +194,9 @@ Return JSON with:
 }}
 
 IMMEDIATE RISK ASSESSMENT CRITERIA:
-- "critical": Explicit suicide plan/intent with method and timeframe
+- "critical": Explicit suicide plan/intent with method and timeframe OR active crisis in progress.
   Examples: "I'm going to kill myself tonight", "I have pills ready to overdose"
+  * IMPORTANT: If conversation history shows recent suicide threat, MAINTAIN "critical" or "high" risk until explicitly de-escalated.
   
 - "high": Strong self-harm ideation or active suicidal thoughts
   Examples: "I keep thinking about cutting myself", "I want to die", "bunuh diri"

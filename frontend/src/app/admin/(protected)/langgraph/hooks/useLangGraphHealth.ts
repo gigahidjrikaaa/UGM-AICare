@@ -18,7 +18,7 @@ import { useEffect, useState } from 'react';
 import * as langGraphApi from '@/services/langGraphApi';
 
 export interface GraphHealthStatus {
-  graph_type: 'sta' | 'tca' | 'cma' | 'ia' | 'aika' | 'orchestrator';
+  graph_type: 'sta' | 'tca' | 'cma' | 'ia' | 'aika';
   status: 'healthy' | 'degraded' | 'down';
   total_executions: number;
   success_count: number;
@@ -43,19 +43,19 @@ export function useLangGraphHealth(autoRefreshSeconds: number = 30) {
   const fetchHealth = async () => {
     try {
       setError(null);
-      
+
       // Fetch analytics overview (last 24 hours)
       const overview = await langGraphApi.getAnalyticsOverview(1);
-      
+
       // For now, create placeholder health data for all 6 graphs
       // In a real implementation, we'd need per-graph analytics from backend
-      const graphTypes: Array<'sta' | 'tca' | 'cma' | 'ia' | 'aika' | 'orchestrator'> = 
-        ['sta', 'tca', 'cma', 'ia', 'aika', 'orchestrator'];
-      
+      const graphTypes: Array<'sta' | 'tca' | 'cma' | 'ia' | 'aika'> =
+        ['sta', 'tca', 'cma', 'ia', 'aika'];
+
       const graphs: GraphHealthStatus[] = graphTypes.map(graphType => {
         // Use overall metrics for each graph (placeholder until backend provides per-graph data)
         const successRate = overview.data.success_rate_percent;
-        
+
         let status: 'healthy' | 'degraded' | 'down';
         if (successRate >= 95) status = 'healthy';
         else if (successRate >= 70) status = 'degraded';

@@ -16,7 +16,11 @@ from app.routes import (
 )
 from app.routes.admin import insights as admin_insights
 from app.routes.admin import counselors as admin_counselors
-from app.routes.admin import sca_admin
+from app.routes.admin import analytics as admin_analytics
+
+# ... (other imports)
+
+
 
 # Mental health domain routes
 from app.domains.mental_health.routes import (
@@ -199,6 +203,7 @@ app.include_router(admin_counselors.router, prefix="/api/v1")  # Admin counselor
 app.include_router(counselor.router, prefix="/api/v1")  # Counselor self-management
 app.include_router(admin.router)  # Admin endpoints (includes /admin/counselors and other admin routes)
 app.include_router(admin_insights.router)  # Admin insights endpoints
+app.include_router(admin_analytics.router)  # Admin analytics endpoints
 app.include_router(agents.router)
 app.include_router(agents_command.router)
 app.include_router(agents_graph.router)  # LangGraph agent execution endpoints
@@ -213,7 +218,7 @@ app.include_router(ia_router)
 # app.include_router(aika_router)  # Aika Meta-Agent orchestrator
 app.include_router(aika_stream.router, prefix="/api/v1")  # Aika Streaming Endpoint
 app.include_router(intervention_plans.router)  # Intervention plan records
-app.include_router(sca_admin.router)  # SCA admin management endpoints
+# app.include_router(sca_admin.router)  # REMOVED (Legacy)
 app.include_router(appointments.router)
 app.include_router(surveys.router)
 app.include_router(surveys.user_router)

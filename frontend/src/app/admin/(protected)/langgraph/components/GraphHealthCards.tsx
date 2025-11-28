@@ -51,11 +51,6 @@ const GRAPH_METADATA: Record<string, { name: string; description: string; icon: 
     name: 'AIKA Meta-Agent',
     description: 'Multi-agent orchestration and intelligent routing',
     icon: '🤖'
-  },
-  orchestrator: {
-    name: 'Orchestrator',
-    description: 'Intent-based routing to appropriate agents',
-    icon: '🎯'
   }
 };
 
@@ -139,7 +134,7 @@ export function GraphHealthCards({ graphs, loading }: GraphHealthCardsProps) {
                 <div className="w-full bg-white/10 rounded-full h-1.5 relative overflow-hidden">
                   <div
                     className={`absolute top-0 left-0 h-full rounded-full transition-all duration-500 ${graph.status === 'healthy' ? 'bg-emerald-500' :
-                        graph.status === 'degraded' ? 'bg-[#FFCA40]' : 'bg-red-500'
+                      graph.status === 'degraded' ? 'bg-[#FFCA40]' : 'bg-red-500'
                       }`}
                     style={{ width: `${graph.success_rate}%` }}
                   ></div>

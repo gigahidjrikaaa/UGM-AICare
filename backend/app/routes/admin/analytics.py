@@ -1,88 +1,32 @@
-"""Admin API routes for Support Coach Agent (SCA) management.
+"""Admin analytics API endpoints.
 
-Provides admin-only endpoints for:
-- Viewing all intervention plans across users
-- Analytics on plan effectiveness
-- User progress monitoring
-- CBT module usage tracking
+Provides metrics and analytics for:
+- Intervention Plans (TCA)
+- CBT Module Usage
+- User Progress & Engagement
 """
 
 from typing import List, Optional
 from datetime import datetime, timedelta
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, desc, case
-from sqlalchemy.orm import selectinload
 
 from app.database import get_async_db
-from app.core.auth import get_current_user, require_role
+from app.core.auth import require_role
 from app.models.user import User
 from app.domains.mental_health.models.interventions import InterventionPlanRecord
 from pydantic import BaseModel, Field
 
-router = APIRouter(prefix="/api/v1/admin/sca", tags=["admin-sca"])
+router = APIRouter(prefix="/api/v1/admin/analytics", tags=["admin-analytics"])
 
 
 # ============================================================================
 # RESPONSE SCHEMAS
 # ============================================================================
 
-class InterventionPlanSummary(BaseModel):
-    """Summary of an intervention plan for admin list view."""
-    id: int
-    user_hash: str = Field(description="Anonymized user identifier")
-    plan_title: str
-    risk_level: Optional[int]
-    status: str
-    is_active: bool
-    total_steps: int
-    completed_steps: int
-    completion_percentage: float
-    created_at: datetime
-    last_viewed_at: Optional[datetime]
-    
-    # Engagement metrics
-    days_since_created: int
-    days_since_last_viewed: Optional[int]
-    
-    class Config:
-        from_attributes = True
-
-
-class InterventionPlanDetail(BaseModel):
-    """Detailed intervention plan for admin inspection."""
-    id: int
-    user_hash: str
-    session_id: Optional[str]
-    plan_title: str
-    risk_level: Optional[int]
-    plan_data: dict
-    completion_tracking: dict
-    total_steps: int
-    completed_steps: int
-    status: str
-    is_active: bool
-    created_at: datetime
-    updated_at: datetime
-    last_viewed_at: Optional[datetime]
-    archived_at: Optional[datetime]
-    
-    class Config:
-        from_attributes = True
-
-
-class InterventionPlansListResponse(BaseModel):
-    """Paginated list of intervention plans."""
-    plans: List[InterventionPlanSummary]
-    total: int
-    page: int
-    page_size: int
-    has_next: bool
-    has_prev: bool
-
-
 class SCAAnalytics(BaseModel):
-    """Analytics for SCA effectiveness."""
+    """Analytics for SCA/TCA effectiveness."""
     # Overview
     total_plans: int
     active_plans: int
@@ -172,150 +116,14 @@ def calculate_engagement_score(
 # ENDPOINTS
 # ============================================================================
 
-@router.get("/interventions", response_model=InterventionPlansListResponse)
-async def list_all_intervention_plans(
-    page: int = Query(1, ge=1),
-    page_size: int = Query(20, ge=1, le=100),
-    status: Optional[str] = Query(None, description="Filter by status: active, completed, archived"),
-    risk_level: Optional[int] = Query(None, ge=0, le=3, description="Filter by risk level"),
-    sort_by: str = Query("created_at", description="Sort by: created_at, completion_percentage, last_viewed_at"),
-    sort_order: str = Query("desc", description="Sort order: asc or desc"),
-    search: Optional[str] = Query(None, description="Search in plan titles"),
-    current_user: User = Depends(require_role(["admin"])),
-    db: AsyncSession = Depends(get_async_db)
-):
-    """
-    Get all intervention plans across all users (admin only).
-    
-    Features:
-    - Pagination
-    - Filtering by status and risk level
-    - Sorting by multiple fields
-    - Search by plan title
-    - Privacy-preserving user hash
-    """
-    # Build query
-    query = select(InterventionPlanRecord)
-    
-    # Apply filters
-    filters = []
-    if status:
-        filters.append(InterventionPlanRecord.status == status)
-    if risk_level is not None:
-        filters.append(InterventionPlanRecord.risk_level == risk_level)
-    if search:
-        filters.append(InterventionPlanRecord.plan_title.ilike(f"%{search}%"))
-    
-    if filters:
-        query = query.where(and_(*filters))
-    
-    # Apply sorting
-    sort_column = getattr(InterventionPlanRecord, sort_by, InterventionPlanRecord.created_at)
-    if sort_order == "desc":
-        query = query.order_by(desc(sort_column))
-    else:
-        query = query.order_by(sort_column)
-    
-    # Get total count
-    count_query = select(func.count()).select_from(InterventionPlanRecord)
-    if filters:
-        count_query = count_query.where(and_(*filters))
-    total_result = await db.execute(count_query)
-    total = total_result.scalar() or 0
-    
-    # Apply pagination
-    query = query.limit(page_size).offset((page - 1) * page_size)
-    
-    # Execute query
-    result = await db.execute(query)
-    plans = result.scalars().all()
-    
-    # Convert to response format
-    now = datetime.now()
-    plans_summary = []
-    for plan in plans:
-        days_since_created = (now - plan.created_at).days
-        days_since_last_viewed = (now - plan.last_viewed_at).days if plan.last_viewed_at else None
-        
-        # Calculate completion percentage from tracking
-        tracking = plan.completion_tracking or {}
-        completed_step_indices = tracking.get("completed_steps", [])
-        completion_pct = (len(completed_step_indices) / plan.total_steps * 100) if plan.total_steps > 0 else 0.0
-        
-        plans_summary.append(InterventionPlanSummary(
-            id=plan.id,
-            user_hash=anonymize_user_id(plan.user_id),
-            plan_title=plan.plan_title,
-            risk_level=plan.risk_level,
-            status=plan.status,
-            is_active=plan.is_active,
-            total_steps=plan.total_steps,
-            completed_steps=plan.completed_steps,
-            completion_percentage=completion_pct,
-            created_at=plan.created_at,
-            last_viewed_at=plan.last_viewed_at,
-            days_since_created=days_since_created,
-            days_since_last_viewed=days_since_last_viewed
-        ))
-    
-    return InterventionPlansListResponse(
-        plans=plans_summary,
-        total=total,
-        page=page,
-        page_size=page_size,
-        has_next=(page * page_size) < total,
-        has_prev=page > 1
-    )
-
-
-@router.get("/interventions/{plan_id}", response_model=InterventionPlanDetail)
-async def get_intervention_plan_detail(
-    plan_id: int,
-    current_user: User = Depends(require_role(["admin"])),
-    db: AsyncSession = Depends(get_async_db)
-):
-    """
-    Get detailed information about a specific intervention plan (admin only).
-    
-    Returns full plan data including steps, resources, and tracking.
-    """
-    query = select(InterventionPlanRecord).where(InterventionPlanRecord.id == plan_id)
-    result = await db.execute(query)
-    plan = result.scalar_one_or_none()
-    
-    if not plan:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Intervention plan {plan_id} not found"
-        )
-    
-    return InterventionPlanDetail(
-        id=plan.id,
-        user_hash=anonymize_user_id(plan.user_id),
-        session_id=plan.session_id,
-        plan_title=plan.plan_title,
-        risk_level=plan.risk_level,
-        plan_data=plan.plan_data,
-        completion_tracking=plan.completion_tracking,
-        total_steps=plan.total_steps,
-        completed_steps=plan.completed_steps,
-        status=plan.status,
-        is_active=plan.is_active,
-        created_at=plan.created_at,
-        updated_at=plan.updated_at,
-        last_viewed_at=plan.last_viewed_at,
-        archived_at=plan.archived_at
-    )
-
-
-@router.get("/analytics", response_model=SCAAnalytics)
-async def get_sca_analytics(
+@router.get("/interventions", response_model=SCAAnalytics)
+async def get_intervention_analytics(
     days: int = Query(30, ge=1, le=365, description="Timeframe in days"),
     current_user: User = Depends(require_role(["admin"])),
     db: AsyncSession = Depends(get_async_db)
 ):
     """
-    Get analytics on SCA intervention plan effectiveness (admin only).
+    Get analytics on intervention plan effectiveness (admin only).
     
     Provides metrics on:
     - Total plans created
@@ -472,7 +280,6 @@ async def get_cbt_module_usage(
     for plan in plans:
         plan_data = plan.plan_data or {}
         plan_steps = plan_data.get("plan_steps", [])
-        resource_cards = plan_data.get("resource_cards", [])
         
         # Extract module names from steps and resources
         for step in plan_steps:

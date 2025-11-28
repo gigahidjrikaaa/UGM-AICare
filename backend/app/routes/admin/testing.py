@@ -27,16 +27,7 @@ from app.domains.mental_health.schemas.chat import ChatRequest, ChatResponse
 # from app.domains.mental_health.services.chat_processing import process_chat_message
 from app.domains.mental_health.services.personal_context import build_user_personal_context
 
-# Chat processing is not yet implemented - use stub that raises NotImplementedError
-try:
-    from app.domains.mental_health.services.chat_processing import process_chat_message
-except ImportError:
-    # Fallback to stub function
-    async def process_chat_message(*args, **kwargs):
-        raise NotImplementedError(
-            "chat_processing module not yet implemented. "
-            "This endpoint requires the chat_processing service to be developed."
-        )
+from app.domains.mental_health.routes.chat import process_chat_message
 
 logger = logging.getLogger(__name__)
 

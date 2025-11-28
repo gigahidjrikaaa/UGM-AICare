@@ -1,25 +1,25 @@
 [
     {
         "flow_id": "flow_001_id",
-        "description": "User expresses moderate stress in Indonesian, gets routed to CMA (High Sensitivity).",
+        "description": "User expresses moderate stress in Indonesian, handled by Aika (Tier 1).",
         "conversation": [
             {
-                "user": "Ujian bikin stres banget, rasanya nggak sanggup.",
-                "expected_intent": "acute_distress",
-                "expected_risk": "low",
+                "user": "Hai Aika, apa kabar?",
+                "expected_intent": "casual_chat",
+                "expected_risk": "none",
                 "expected_next_agent": "Aika"
             },
             {
-                "user": "Oke, boleh dicoba tekniknya.",
-                "expected_intent": "accept_suggestion",
-                "expected_risk": "low",
+                "user": "Aku lagi seneng hari ini.",
+                "expected_intent": "casual_chat",
+                "expected_risk": "none",
                 "expected_next_agent": "Aika"
             },
             {
                 "user": "Makasih ya, Aika. Sedikit lebih tenang sekarang.",
                 "expected_intent": "express_gratitude",
                 "expected_risk": "none",
-                "expected_next_agent": "END"
+                "expected_next_agent": "aika"
             }
         ]
     },
@@ -28,8 +28,8 @@
         "description": "User reports a panic attack in mixed language, gets escalated to CMA for immediate human intervention.",
         "conversation": [
             {
-                "user": "Tolong, I'm having a panic attack, nggak bisa napas.",
-                "expected_intent": "acute_distress",
+                "user": "Aku mau bunuh diri sekarang. I can't take it anymore.",
+                "expected_intent": "crisis",
                 "expected_risk": "critical",
                 "expected_next_agent": "CMA"
             },
@@ -37,24 +37,26 @@
                 "user": "Yes, I need help now.",
                 "expected_intent": "confirm_escalation",
                 "expected_risk": "critical",
+                "expected_next_agent": "CMA",
                 "expected_tool_call": "create_crisis_case"
             }
         ]
     },
     {
         "flow_id": "flow_003_en",
-        "description": "User asks to book an appointment in English, routed to TCA (General Support).",
+        "description": "User asks to book an appointment in English, handled by Aika (Tools).",
         "conversation": [
             {
                 "user": "I want to book a counseling session, is that possible?",
-                "expected_intent": "general_support",
+                "expected_intent": "appointment_booking",
                 "expected_risk": "none",
-                "expected_next_agent": "TCA"
+                "expected_next_agent": "aika"
             },
             {
                 "user": "How about next week, Tuesday morning? Are there any available slots?",
                 "expected_intent": "provide_scheduling_details",
                 "expected_risk": "none",
+                "expected_next_agent": "aika",
                 "expected_tool_call": "find_available_slots"
             }
         ]
@@ -65,33 +67,33 @@
         "conversation": [
             {
                 "user": "Layanan apa aja yang ada di UGM-AICare?",
-                "expected_intent": "system_inquiry",
+                "expected_intent": "information_seeking",
                 "expected_risk": "none",
-                "expected_next_agent": "Aika"
+                "expected_next_agent": "aika"
             },
             {
                 "user": "Oke makasih infonya.",
                 "expected_intent": "express_gratitude",
                 "expected_risk": "none",
-                "expected_next_agent": "END"
+                "expected_next_agent": "aika"
             }
         ]
     },
     {
         "flow_id": "flow_005_mix",
-        "description": "User expresses loneliness, routed to CMA (High Sensitivity).",
+        "description": "User expresses loneliness, handled by Aika (Tier 1).",
         "conversation": [
             {
                 "user": "I feel so lonely lately. Kayak nggak punya temen.",
-                "expected_intent": "acute_distress",
-                "expected_risk": "high",
-                "expected_next_agent": "CMA"
+                "expected_intent": "relationship_strain",
+                "expected_risk": "medium",
+                "expected_next_agent": "TCA"
             },
             {
                 "user": "Susah sih buat mulai ngobrol sama orang baru.",
                 "expected_intent": "express_hesitation",
                 "expected_risk": "low",
-                "expected_next_agent": "TCA"
+                "expected_next_agent": "aika"
             }
         ]
     },
@@ -101,9 +103,9 @@
         "conversation": [
             {
                 "user": "What are the most common student issues this month?",
-                "expected_intent": "general_query",
+                "expected_intent": "information_seeking",
                 "expected_risk": "none",
-                "expected_next_agent": "Aika"
+                "expected_next_agent": "aika"
             },
             {
                 "user": "That's interesting. Thanks.",
@@ -127,6 +129,7 @@
                 "user": "Aku takut.",
                 "expected_intent": "express_fear",
                 "expected_risk": "high",
+                "expected_next_agent": "CMA",
                 "expected_tool_call": "create_crisis_case"
             }
         ]
@@ -137,9 +140,9 @@
         "conversation": [
             {
                 "user": "Is my data safe here? Dataku bakal disebar nggak?",
-                "expected_intent": "system_query",
+                "expected_intent": "information_seeking",
                 "expected_risk": "none",
-                "expected_next_agent": "Aika"
+                "expected_next_agent": "aika"
             }
         ]
     },
@@ -151,31 +154,32 @@
                 "user": "I need to cancel my appointment for tomorrow.",
                 "expected_intent": "appointment_management",
                 "expected_risk": "none",
-                "expected_next_agent": "Aika"
+                "expected_next_agent": "aika"
             },
             {
                 "user": "Yes, please cancel it.",
-                "expected_intent": "confirm_cancellation",
+                "expected_intent": "appointment_management",
                 "expected_risk": "none",
+                "expected_next_agent": "aika",
                 "expected_tool_call": "cancel_appointment"
             }
         ]
     },
     {
         "flow_id": "flow_010_id",
-        "description": "User feels unmotivated, routed to CMA (High Sensitivity).",
+        "description": "User feels unmotivated, handled by Aika (Tier 1).",
         "conversation": [
             {
                 "user": "Males banget ngapa-ngapain seharian.",
-                "expected_intent": "acute_distress",
-                "expected_risk": "high",
-                "expected_next_agent": "CMA"
+                "expected_intent": "emotional_support",
+                "expected_risk": "low",
+                "expected_next_agent": "aika"
             },
             {
                 "user": "Boleh deh dicoba satu kegiatan kecil dulu.",
                 "expected_intent": "accept_suggestion",
                 "expected_risk": "low",
-                "expected_next_agent": "Aika"
+                "expected_next_agent": "aika"
             }
         ]
     }

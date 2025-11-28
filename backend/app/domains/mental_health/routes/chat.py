@@ -497,9 +497,25 @@ async def handle_aika_request(
                 }
                 
                 # Add risk info
+                # Debug: Add keys to metadata
+                metadata["debug_keys"] = list(final_state.keys())
+                metadata["debug_immediate_risk"] = final_state.get("immediate_risk_level")
+                metadata["debug_severity"] = final_state.get("severity")
+
                 if final_state.get("sta_risk_assessment"):
                     metadata["risk_level"] = final_state["sta_risk_assessment"].get("risk_level", "unknown")
                     metadata["risk_score"] = final_state["sta_risk_assessment"].get("risk_score", 0.0)
+                elif final_state.get("severity"):
+                    metadata["risk_level"] = final_state.get("severity")
+                    metadata["risk_score"] = final_state.get("risk_score", 0.0)
+                else:
+                    # Fallback to immediate risk from Aika (Tier 1) if STA hasn't run yet
+                    metadata["risk_level"] = final_state.get("immediate_risk_level", "unknown")
+                    metadata["risk_score"] = 0.0 # No score from Tier 1
+                
+                # Hack: If CMA invoked, force risk to high/critical if unknown (inference from routing)
+                if "CMA" in agents_invoked and metadata["risk_level"] == "unknown":
+                     metadata["risk_level"] = "high"
                 
                 # Send final response
                 yield f"event: final_response\ndata: {json.dumps({'response': final_response})}\n\n"

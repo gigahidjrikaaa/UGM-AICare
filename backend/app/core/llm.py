@@ -2,6 +2,7 @@
 
 import os
 import httpx
+import asyncio
 from typing import Any, AsyncIterator, cast
 
 # NEW SDK imports
@@ -301,10 +302,15 @@ async def generate_gemini_response(
         ]
 
         # Generate content with new SDK
-        response = client.models.generate_content(
-            model=model,
-            contents=contents,
-            config=config
+        # Run blocking call in executor to avoid blocking the event loop
+        loop = asyncio.get_running_loop()
+        response = await loop.run_in_executor(
+            None,
+            lambda: client.models.generate_content(
+                model=model,
+                contents=contents,
+                config=config
+            )
         )
 
         # Return full response if requested (for tool calling)
