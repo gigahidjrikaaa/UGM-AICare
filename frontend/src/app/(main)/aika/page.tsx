@@ -81,70 +81,75 @@ function HeaderBar({
   isLoading = false,
 }: HeaderBarProps) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
-      <div className="flex items-center gap-3">
-        <AikaAvatar />
+    <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/5 backdrop-blur-sm">
+      <div className="flex items-center gap-4">
+        <div className="relative">
+          <AikaAvatar />
+          <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-[#001D58]" />
+        </div>
         <div>
-          <h1 className="text-base sm:text-lg font-semibold tracking-wide text-white">
-            Aika Chat (Enhanced)
+          <h1 className="text-lg font-bold tracking-wide text-white flex items-center gap-2">
+            Aika Chat
+            <AikaPoweredBadge />
           </h1>
-          <AikaPoweredBadge />
+          <p className="text-xs text-white/60 font-medium">
+            AI Mental Health Assistant
+          </p>
         </div>
       </div>
-      <div className="flex items-center gap-2">
-        {/* Model Selector */}
-        <ModelSelector
-          selectedModel={selectedModel}
-          onModelChange={onModelChange}
-          disabled={isLoading}
-        />
-        
-        {/* Plans button */}
-        <button
-          type="button"
-          onClick={onOpenPlans}
-          className="relative h-7 w-7 inline-flex items-center justify-center rounded-md border border-white/15 bg-white/10 hover:bg-white/20 text-white/80 hover:text-white text-xs focus:outline-none focus:ring-2 focus:ring-ugm-gold/40 transition"
-          aria-label="View intervention plans"
-          title="View intervention plans"
-        >
-          <ListChecks className="h-4 w-4" />
-          {activePlansCount > 0 && (
-            <span className="absolute -top-1 -right-1 h-4 w-4 bg-red-500 rounded-full text-[10px] flex items-center justify-center">
-              {activePlansCount}
-            </span>
-          )}
-        </button>
-        
-        {/* Activity log toggle button */}
-        <button
-          type="button"
-          onClick={onToggleActivityLog}
-          className={`h-7 w-7 inline-flex items-center justify-center rounded-md border border-white/15 ${
-            showActivityLog ? 'bg-ugm-gold/30 ring-2 ring-ugm-gold/40' : 'bg-white/10'
-          } hover:bg-white/20 text-white/80 hover:text-white text-xs focus:outline-none focus:ring-2 focus:ring-ugm-gold/40 transition`}
-          aria-label="Toggle activity log"
-          title="Show/hide agent activity log"
-        >
-          <Activity className="h-4 w-4" />
-        </button>
-        
-        {/* Metadata toggle button */}
-        <button
-          type="button"
-          onClick={onOpenMetadata}
-          className={`h-7 w-7 inline-flex items-center justify-center rounded-md border border-white/15 ${
-            showMetadata ? 'bg-purple-500/30' : 'bg-white/10'
-          } hover:bg-white/20 text-white/80 hover:text-white text-xs focus:outline-none focus:ring-2 focus:ring-ugm-gold/40 transition`}
-          aria-label="Toggle metadata display"
-          title="Show/hide technical details"
-        >
-          <Info className="h-4 w-4" />
-        </button>
-        
-        {/* LangGraph badge */}
-        <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full bg-[#FFCA40]/15 text-[#FFCA40] border border-[#FFCA40]/30">
-          LangGraph
-        </span>
+
+      <div className="flex items-center gap-3">
+        {/* Model Selector - Cleaner look */}
+        <div className="hidden sm:block">
+          <ModelSelector
+            selectedModel={selectedModel}
+            onModelChange={onModelChange}
+            disabled={isLoading}
+          />
+        </div>
+
+        <div className="h-6 w-px bg-white/10 mx-1" />
+
+        {/* Tools Group */}
+        <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1 border border-white/10">
+          {/* Plans button */}
+          <button
+            type="button"
+            onClick={onOpenPlans}
+            className="relative h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+            aria-label="View intervention plans"
+            title="Intervention Plans"
+          >
+            <ListChecks className="h-4 w-4" />
+            {activePlansCount > 0 && (
+              <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full ring-2 ring-[#001D58]" />
+            )}
+          </button>
+
+          {/* Activity log toggle button */}
+          <button
+            type="button"
+            onClick={onToggleActivityLog}
+            className={`h-8 w-8 inline-flex items-center justify-center rounded-md transition-colors ${showActivityLog ? 'bg-white/10 text-[#FFCA40]' : 'hover:bg-white/10 text-white/70 hover:text-white'
+              }`}
+            aria-label="Toggle activity log"
+            title="Agent Activity"
+          >
+            <Activity className="h-4 w-4" />
+          </button>
+
+          {/* Metadata toggle button */}
+          <button
+            type="button"
+            onClick={onOpenMetadata}
+            className={`h-8 w-8 inline-flex items-center justify-center rounded-md transition-colors ${showMetadata ? 'bg-white/10 text-purple-400' : 'hover:bg-white/10 text-white/70 hover:text-white'
+              }`}
+            aria-label="Toggle metadata display"
+            title="Technical Details"
+          >
+            <Info className="h-4 w-4" />
+          </button>
+        </div>
       </div>
     </div>
   );
@@ -159,7 +164,7 @@ export default function AikaEnhancedPage() {
   const [isPlansOpen, setIsPlansOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  
+
   // Fetch intervention plans
   const { data: plansData, refetch: refetchPlans } = useInterventionPlans(true);
 
@@ -185,10 +190,43 @@ export default function AikaEnhancedPage() {
     activities,
     latestActivity,
     isReceiving,
+    addActivity,
   } = useActivityLog({
     enabled: true,
     maxLogs: 100,
   });
+
+  // Effect to ingest activity logs from metadata
+  useEffect(() => {
+    if (lastMetadata?.activity_logs && Array.isArray(lastMetadata.activity_logs)) {
+      // Sort by start time to ensure chronological order
+      const sortedLogs = [...lastMetadata.activity_logs].sort((a: any, b: any) =>
+        new Date(a.started_at).getTime() - new Date(b.started_at).getTime()
+      );
+
+      sortedLogs.forEach((log: any) => {
+        // Infer agent from node name
+        let agent = 'Aika';
+        if (log.name.includes('sta')) agent = 'STA';
+        else if (log.name.includes('tca')) agent = 'TCA';
+        else if (log.name.includes('cma')) agent = 'CMA';
+        else if (log.name.includes('ia')) agent = 'IA';
+
+        // Determine activity type
+        let type: any = 'node_complete';
+        if (log.status === 'failed') type = 'agent_error';
+
+        addActivity({
+          timestamp: log.completed_at || log.started_at || new Date().toISOString(),
+          activity_type: type,
+          agent: agent,
+          message: `Executed node: ${log.name}`,
+          duration_ms: log.duration_ms,
+          details: log
+        });
+      });
+    }
+  }, [lastMetadata, addActivity]);
 
   useEffect(() => {
     setMounted(true);
@@ -211,13 +249,13 @@ export default function AikaEnhancedPage() {
   return (
     <>
       {/* Content area */}
-      <div className="min-h-screen w-full text-white flex flex-col items-center justify-center p-2 md:p-4 lg:p-6 pt-24 gap-4">
+      <div className="min-h-screen w-full text-white flex flex-col items-center justify-center p-2 md:p-4 lg:p-6 pt-40 gap-4">
         {/* Main Layout Container */}
         <div className="w-full max-w-7xl h-[calc(100vh-10rem)] flex gap-4">
           {/* Chat Panel */}
           <div className={`${showActivityLog ? 'w-2/3' : 'w-full'} flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden transition-all duration-300`}>
-            <HeaderBar 
-              onOpenMetadata={() => setShowMetadata(!showMetadata)} 
+            <HeaderBar
+              onOpenMetadata={() => setShowMetadata(!showMetadata)}
               onToggleActivityLog={() => setShowActivityLog(!showActivityLog)}
               onOpenPlans={() => setIsPlansOpen(true)}
               activePlansCount={plansData?.total || 0}
@@ -227,7 +265,7 @@ export default function AikaEnhancedPage() {
               onModelChange={setSelectedModel}
               isLoading={isLoading}
             />
-            
+
             <div className="flex-1 overflow-hidden flex flex-col">
               {/* Agent Activity Indicator */}
               {isReceiving && activeAgents.length > 0 && (
@@ -238,7 +276,7 @@ export default function AikaEnhancedPage() {
                   />
                 </div>
               )}
-              
+
               {/* Agent Activity & Risk Display */}
               {lastMetadata && (
                 <div className="px-4 pt-3 space-y-2">
@@ -251,67 +289,62 @@ export default function AikaEnhancedPage() {
                   {lastMetadata.risk_assessment && lastMetadata.risk_assessment.risk_level !== 'low' && (
                     <RiskLevelIndicator
                       assessment={lastMetadata.risk_assessment}
-                    showFactors={lastMetadata.risk_assessment.risk_level === 'high' || lastMetadata.risk_assessment.risk_level === 'critical'}
-                  />
-                )}
-                {lastMetadata.escalation_triggered && lastMetadata.case_id && (
-                  <EscalationNotification caseId={lastMetadata.case_id} />
-                )}
-                {showMetadata && <MetadataDisplay metadata={lastMetadata} />}
-              </div>
-            )}
-            
-            {/* Chat Window - using original component */}
-            <ChatWindow 
-              messages={messages}
-              chatContainerRef={chatContainerRef}
-            />
-            
-            {/* Loading indicator with agent activity */}
-            {isLoading && (
-              <div className="px-4 pb-4">
-                <AikaLoadingBubble activeAgents={activeAgents} />
-              </div>
-            )}
-            
-            {/* Chat Input - using original component */}
-            <div className="p-4">
-              <ChatInput
-                inputValue={inputValue}
-                onInputChange={handleInputChange}
-                onSendMessage={handleSendMessage}
-                onStartModule={() => {}} // Disabled for now
+                      showFactors={lastMetadata.risk_assessment.risk_level === 'high' || lastMetadata.risk_assessment.risk_level === 'critical'}
+                    />
+                  )}
+                  {lastMetadata.escalation_triggered && lastMetadata.case_id && (
+                    <EscalationNotification caseId={lastMetadata.case_id} />
+                  )}
+                  {showMetadata && <MetadataDisplay metadata={lastMetadata} />}
+                </div>
+              )}
+
+              {/* Chat Window - using original component */}
+              <ChatWindow
+                messages={messages}
+                chatContainerRef={chatContainerRef}
                 isLoading={isLoading}
-                currentMode="standard"
-                availableModules={[]}
-                isLiveTalkActive={false}
-                toggleLiveTalk={() => {}} // Disabled for now
-                interruptOnEnter={false}
+                activeAgents={activeAgents}
               />
+
+              {/* Chat Input - using original component */}
+              <div className="p-4">
+                <ChatInput
+                  inputValue={inputValue}
+                  onInputChange={handleInputChange}
+                  onSendMessage={handleSendMessage}
+                  onStartModule={() => { }} // Disabled for now
+                  isLoading={isLoading}
+                  currentMode="standard"
+                  availableModules={[]}
+                  isLiveTalkActive={false}
+                  toggleLiveTalk={() => { }} // Disabled for now
+                  interruptOnEnter={false}
+                />
+              </div>
             </div>
           </div>
+
+          {/* Activity Log Panel */}
+          {showActivityLog && (
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: 20 }}
+              className="w-1/3 flex flex-col"
+            >
+              <ActivityLogPanel
+                activities={activities}
+                isOpen={showActivityLog}
+                onClose={() => setShowActivityLog(false)}
+                maxHeight="calc(100vh - 10rem)"
+              />
+            </motion.div>
+          )}
         </div>
 
-        {/* Activity Log Panel */}
-        {showActivityLog && (
-          <motion.div
-            initial={{ opacity: 0, x: 20 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: 20 }}
-            className="w-1/3 flex flex-col"
-          >
-            <ActivityLogPanel
-              activities={activities}
-              isOpen={showActivityLog}
-              onClose={() => setShowActivityLog(false)}
-              maxHeight="calc(100vh - 10rem)"
-            />
-          </motion.div>
-        )}
-      </div>
-        
         {/* Intervention Plans Sidebar */}
-        <InterventionPlansSidebar 
+        <InterventionPlansSidebar
           isOpen={isPlansOpen}
           onClose={() => setIsPlansOpen(false)}
         />

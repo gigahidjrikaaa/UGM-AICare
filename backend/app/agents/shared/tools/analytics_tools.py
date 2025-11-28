@@ -24,28 +24,41 @@ from app.domains.mental_health.models import (
     QuestInstance,
     Appointment
 )
-from app.agents.shared.tools import tool_registry
+from app.agents.shared.tools.registry import register_tool
 
 import logging
 
 logger = logging.getLogger(__name__)
 
 
+@register_tool(
+    name="get_platform_stats",
+    description="Get overall platform statistics (anonymized aggregates). Returns active users, conversations, journals, etc.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "days": {
+                "type": "integer",
+                "description": "Number of days to analyze (default 30)",
+                "default": 30
+            }
+        },
+        "required": []
+    },
+    category="analytics",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_platform_stats(
     db: AsyncSession,
-    days: int = 30
+    days: int = 30,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get overall platform statistics.
     
     Returns anonymized aggregate metrics for the platform.
     ANONYMIZED DATA - no PII.
-    
-    Args:
-        days: Number of days to analyze (default 30)
-        
-    Returns:
-        Dict with platform statistics or error
     """
     try:
         start_date = datetime.utcnow() - timedelta(days=days)
@@ -90,23 +103,39 @@ async def get_platform_stats(
         }
 
 
+@register_tool(
+    name="get_user_engagement_metrics",
+    description="Get engagement metrics for a specific user. Returns activity levels and patterns. SENSITIVE DATA.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "string",
+                "description": "User ID"
+            },
+            "days": {
+                "type": "integer",
+                "description": "Number of days to analyze (default 30)",
+                "default": 30
+            }
+        },
+        "required": ["user_id"]
+    },
+    category="analytics",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_user_engagement_metrics(
     db: AsyncSession,
     user_id: str,
-    days: int = 30
+    days: int = 30,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get engagement metrics for a user.
     
     Returns user's activity levels and engagement patterns.
     SENSITIVE DATA - individual user metrics.
-    
-    Args:
-        user_id: User ID
-        days: Number of days to analyze (default 30)
-        
-    Returns:
-        Dict with engagement metrics or error
     """
     try:
         start_date = datetime.utcnow() - timedelta(days=days)
@@ -187,65 +216,3 @@ async def get_user_engagement_metrics(
             "error": str(e),
             "user_id": user_id
         }
-
-
-# ============================================================================
-# GEMINI FUNCTION CALLING SCHEMAS
-# ============================================================================
-
-get_platform_stats_schema = {
-    "name": "get_platform_stats",
-    "description": "Get overall platform statistics (anonymized aggregates). Returns active users, conversations, journals, etc.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "days": {
-                "type": "integer",
-                "description": "Number of days to analyze (default 30)",
-                "default": 30
-            }
-        },
-        "required": []
-    }
-}
-
-get_user_engagement_metrics_schema = {
-    "name": "get_user_engagement_metrics",
-    "description": "Get engagement metrics for a specific user. Returns activity levels and patterns. SENSITIVE DATA.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "string",
-                "description": "User ID"
-            },
-            "days": {
-                "type": "integer",
-                "description": "Number of days to analyze (default 30)",
-                "default": 30
-            }
-        },
-        "required": ["user_id"]
-    }
-}
-
-
-# ============================================================================
-# REGISTER TOOLS WITH CENTRAL REGISTRY
-# ============================================================================
-
-tool_registry.register(
-    name="get_platform_stats",
-    func=get_platform_stats,
-    schema=get_platform_stats_schema,
-    category="analytics"
-)
-
-tool_registry.register(
-    name="get_user_engagement_metrics",
-    func=get_user_engagement_metrics,
-    schema=get_user_engagement_metrics_schema,
-    category="analytics"
-)
-
-logger.info("🔧 Registered 2 analytics tools in 'analytics' category")

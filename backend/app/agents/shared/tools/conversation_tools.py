@@ -20,7 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User  # Core model
 from app.domains.mental_health.models import Conversation, Message
-from app.agents.shared.tools import tool_registry
+from app.agents.shared.tools.registry import register_tool
 
 import logging
 
@@ -33,23 +33,39 @@ MAX_SEARCH_RESULTS = 20
 MESSAGE_PREVIEW_LENGTH = 200
 
 
+@register_tool(
+    name="get_conversation_history",
+    description="Get recent messages from a conversation in chronological order. Returns sender info and message content. SENSITIVE DATA.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "conversation_id": {
+                "type": "string",
+                "description": "Conversation ID to retrieve messages from"
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of messages to return (default 50, max 50)",
+                "default": 50
+            }
+        },
+        "required": ["conversation_id"]
+    },
+    category="conversation",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_conversation_history(
     db: AsyncSession,
     conversation_id: str,
-    limit: int = MAX_MESSAGES
+    limit: int = MAX_MESSAGES,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get recent messages from a conversation.
     
     Returns messages in chronological order with sender info.
     SENSITIVE DATA - contains user messages.
-    
-    Args:
-        conversation_id: Conversation ID
-        limit: Maximum number of messages (default 50, max 50)
-        
-    Returns:
-        Dict with messages list or error
     """
     try:
         if limit > MAX_MESSAGES:
@@ -103,9 +119,27 @@ async def get_conversation_history(
         }
 
 
+@register_tool(
+    name="get_conversation_summary",
+    description="Get AI-generated summary of a conversation. Returns overview of conversation topics and key points. SENSITIVE DATA.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "conversation_id": {
+                "type": "string",
+                "description": "Conversation ID to get summary for"
+            }
+        },
+        "required": ["conversation_id"]
+    },
+    category="conversation",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_conversation_summary(
     db: AsyncSession,
-    conversation_id: str
+    conversation_id: str,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get AI-generated summary of a conversation.
@@ -113,12 +147,6 @@ async def get_conversation_summary(
     Returns summary stored in conversation metadata, or generates one
     from recent messages if not available.
     SENSITIVE DATA - conversation content.
-    
-    Args:
-        conversation_id: Conversation ID
-        
-    Returns:
-        Dict with summary or error
     """
     try:
         # Get conversation
@@ -166,25 +194,44 @@ async def get_conversation_summary(
         }
 
 
+@register_tool(
+    name="search_conversations",
+    description="Search across user's conversation history by keywords. Returns matching conversations with previews. SENSITIVE DATA.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "string",
+                "description": "User ID to search conversations for"
+            },
+            "query": {
+                "type": "string",
+                "description": "Search query string to look for in messages"
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of results to return (default 20, max 20)",
+                "default": 20
+            }
+        },
+        "required": ["user_id", "query"]
+    },
+    category="conversation",
+    requires_db=True,
+    requires_user_id=False
+)
 async def search_conversations(
     db: AsyncSession,
     user_id: str,
     query: str,
-    limit: int = MAX_SEARCH_RESULTS
+    limit: int = MAX_SEARCH_RESULTS,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Search across user's conversation history.
     
     Searches message content for keywords and returns matching conversations.
     SENSITIVE DATA - searches user messages.
-    
-    Args:
-        user_id: User ID
-        query: Search query string
-        limit: Maximum number of results (default 20, max 20)
-        
-    Returns:
-        Dict with search results or error
     """
     try:
         if limit > MAX_SEARCH_RESULTS:
@@ -266,23 +313,39 @@ async def search_conversations(
         }
 
 
+@register_tool(
+    name="get_conversation_stats",
+    description="Get conversation statistics for user (total conversations, message count, averages). Used for engagement tracking.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "string",
+                "description": "User ID to get conversation stats for"
+            },
+            "days": {
+                "type": "integer",
+                "description": "Number of days to analyze (default 30)",
+                "default": 30
+            }
+        },
+        "required": ["user_id"]
+    },
+    category="conversation",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_conversation_stats(
     db: AsyncSession,
     user_id: str,
-    days: int = 30
+    days: int = 30,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get conversation statistics for user.
     
     Returns metrics like total conversations, message count, avg length, etc.
     Used for engagement tracking.
-    
-    Args:
-        user_id: User ID
-        days: Number of days to analyze (default 30)
-        
-    Returns:
-        Dict with statistics or error
     """
     try:
         # Calculate date range
@@ -359,122 +422,3 @@ async def get_conversation_stats(
             "error": str(e),
             "user_id": user_id
         }
-
-
-# ============================================================================
-# GEMINI FUNCTION CALLING SCHEMAS
-# ============================================================================
-
-get_conversation_history_schema = {
-    "name": "get_conversation_history",
-    "description": "Get recent messages from a conversation in chronological order. Returns sender info and message content. SENSITIVE DATA.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "conversation_id": {
-                "type": "string",
-                "description": "Conversation ID to retrieve messages from"
-            },
-            "limit": {
-                "type": "integer",
-                "description": "Maximum number of messages to return (default 50, max 50)",
-                "default": 50
-            }
-        },
-        "required": ["conversation_id"]
-    }
-}
-
-get_conversation_summary_schema = {
-    "name": "get_conversation_summary",
-    "description": "Get AI-generated summary of a conversation. Returns overview of conversation topics and key points. SENSITIVE DATA.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "conversation_id": {
-                "type": "string",
-                "description": "Conversation ID to get summary for"
-            }
-        },
-        "required": ["conversation_id"]
-    }
-}
-
-search_conversations_schema = {
-    "name": "search_conversations",
-    "description": "Search across user's conversation history by keywords. Returns matching conversations with previews. SENSITIVE DATA.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "string",
-                "description": "User ID to search conversations for"
-            },
-            "query": {
-                "type": "string",
-                "description": "Search query string to look for in messages"
-            },
-            "limit": {
-                "type": "integer",
-                "description": "Maximum number of results to return (default 20, max 20)",
-                "default": 20
-            }
-        },
-        "required": ["user_id", "query"]
-    }
-}
-
-get_conversation_stats_schema = {
-    "name": "get_conversation_stats",
-    "description": "Get conversation statistics for user (total conversations, message count, averages). Used for engagement tracking.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "string",
-                "description": "User ID to get conversation stats for"
-            },
-            "days": {
-                "type": "integer",
-                "description": "Number of days to analyze (default 30)",
-                "default": 30
-            }
-        },
-        "required": ["user_id"]
-    }
-}
-
-
-# ============================================================================
-# REGISTER TOOLS WITH CENTRAL REGISTRY
-# ============================================================================
-
-tool_registry.register(
-    name="get_conversation_history",
-    func=get_conversation_history,
-    schema=get_conversation_history_schema,
-    category="conversation"
-)
-
-tool_registry.register(
-    name="get_conversation_summary",
-    func=get_conversation_summary,
-    schema=get_conversation_summary_schema,
-    category="conversation"
-)
-
-tool_registry.register(
-    name="search_conversations",
-    func=search_conversations,
-    schema=search_conversations_schema,
-    category="conversation"
-)
-
-tool_registry.register(
-    name="get_conversation_stats",
-    func=get_conversation_stats,
-    schema=get_conversation_stats_schema,
-    category="conversation"
-)
-
-logger.info("🔧 Registered 4 conversation tools in 'conversation' category")

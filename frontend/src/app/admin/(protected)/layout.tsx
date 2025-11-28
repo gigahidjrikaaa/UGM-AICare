@@ -1,13 +1,16 @@
 "use client";
 
 import { ReactNode } from 'react';
+import { usePathname } from 'next/navigation';
 import AdminHeader from '@/components/ui/admin/AdminHeader';
 import AdminSidebar from '@/components/ui/admin/AdminSidebar';
 import AdminFooter from '@/components/ui/admin/AdminFooter';
+import AikaChatWidget from '@/components/admin/chat/AikaChatWidget';
 import { useAdminSessionGuard } from '@/hooks/useAdminSessionGuard';
 import { useAdminSessionExpiry } from '@/hooks/useSessionExpiry';
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
+  const pathname = usePathname();
   // Monitor for backend token expiry and auto sign-out
   useAdminSessionExpiry();
 
@@ -44,16 +47,22 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     );
   }
 
+  // Pages that handle their own padding/layout
+  const isFullWidthPage = pathname?.includes('/langgraph') ||
+    pathname?.includes('/insights') ||
+    pathname?.includes('/dashboard');
+
   // Render layout if authenticated as admin
   return (
     <div className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] text-white flex">
       <AdminSidebar />
-      <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden relative">
         <AdminHeader />
-        <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto bg-[#001030]/30">
+        <main className={`flex-1 overflow-y-auto bg-[#001030]/30 ${isFullWidthPage ? '' : 'p-4 md:p-6 lg:p-8'}`}>
           {children}
         </main>
         <AdminFooter />
+        <AikaChatWidget />
       </div>
     </div>
   );

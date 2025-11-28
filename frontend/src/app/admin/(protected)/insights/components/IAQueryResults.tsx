@@ -77,7 +77,7 @@ function getChartForQueryType(queryName: string, data: Record<string, unknown>[]
     // Default to Bar Chart
     const dataKey = Object.keys(data[0] || {}).find(key => typeof data[0]?.[key] === 'number') || 'value';
     const nameKey = Object.keys(data[0] || {}).find(key => typeof data[0]?.[key] === 'string') || 'name';
-    
+
     return (
       <BarChart data={data}>
         <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.1)" />
@@ -95,19 +95,23 @@ function getChartForQueryType(queryName: string, data: Record<string, unknown>[]
 export function IAQueryResults({ result, loading }: IAQueryResultsProps) {
   if (loading) {
     return (
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden">
-        <div className="p-5 border-b border-white/10 flex justify-between items-center">
+    return (
+      <div className="bg-[#00153a]/40 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-xl">
+        <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
           <div>
-            <h2 className="text-lg font-semibold text-white">Query Results</h2>
-            <p className="text-xs text-white/60 mt-1">Privacy-preserving analytics output</p>
+            <h2 className="text-xl font-bold text-white tracking-tight">Query Results</h2>
+            <p className="text-xs text-white/50 mt-1 font-mono uppercase tracking-wider">Privacy-preserving analytics output</p>
           </div>
         </div>
-        
-        <div className="p-5">
-          <div className="text-center py-12">
-            <div className="inline-block animate-spin rounded-full h-10 w-10 border-b-2 border-[#FFCA40]"></div>
-            <p className="mt-4 text-sm text-white/80">Executing query with privacy safeguards...</p>
-            <p className="text-xs text-white/50 mt-1">Validating consent → Applying k-anonymity → Executing analytics</p>
+
+        <div className="p-8">
+          <div className="text-center py-16">
+            <div className="relative inline-block">
+              <div className="absolute inset-0 bg-[#FFCA40] blur-xl opacity-20 rounded-full animate-pulse"></div>
+              <div className="relative inline-block animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-[#FFCA40]"></div>
+            </div>
+            <p className="mt-6 text-base text-white/90 font-medium">Executing query with privacy safeguards...</p>
+            <p className="text-xs text-white/40 mt-2 font-mono">Validating consent → Applying k-anonymity → Executing analytics</p>
           </div>
         </div>
       </div>
@@ -116,24 +120,26 @@ export function IAQueryResults({ result, loading }: IAQueryResultsProps) {
 
   if (!result) {
     return (
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl overflow-hidden">
-        <div className="p-5 border-b border-white/10 flex justify-between items-center">
+      <div className="bg-[#00153a]/40 backdrop-blur-md border border-white/10 rounded-2xl overflow-hidden shadow-xl h-full flex flex-col">
+        <div className="p-6 border-b border-white/5 flex justify-between items-center bg-white/5">
           <div>
-            <h2 className="text-lg font-semibold text-white">Query Results</h2>
-            <p className="text-xs text-white/60 mt-1">Privacy-preserving analytics output</p>
+            <h2 className="text-xl font-bold text-white tracking-tight">Query Results</h2>
+            <p className="text-xs text-white/50 mt-1 font-mono uppercase tracking-wider">Privacy-preserving analytics output</p>
           </div>
-          <button className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-sm font-medium text-white/50 cursor-not-allowed">
+          <button className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-xs font-medium text-white/30 cursor-not-allowed uppercase tracking-wider">
             Export CSV
           </button>
         </div>
-        
-        <div className="p-5">
-          <div className="text-center py-12 text-white/60">
-            <svg className="mx-auto h-10 w-10 text-white/30" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-            </svg>
-            <p className="mt-4 text-sm">No query results yet</p>
-            <p className="text-xs text-white/40 mt-1">Select and execute a query above to see results</p>
+
+        <div className="p-8 flex-1 flex items-center justify-center">
+          <div className="text-center py-12 text-white/40">
+            <div className="bg-white/5 rounded-full p-6 inline-block mb-4">
+              <svg className="h-12 w-12 text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+            </div>
+            <p className="text-base font-medium text-white/60">No query results yet</p>
+            <p className="text-xs text-white/30 mt-2 max-w-xs mx-auto">Select a query from the panel above and click "Execute" to generate privacy-safe insights.</p>
           </div>
         </div>
       </div>
@@ -176,7 +182,7 @@ export function IAQueryResults({ result, loading }: IAQueryResultsProps) {
           Export CSV
         </button>
       </div>
-      
+
       <div className="p-5">
         {/* Success Message */}
         <div className="mb-5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4">

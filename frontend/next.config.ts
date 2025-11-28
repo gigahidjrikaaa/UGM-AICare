@@ -3,26 +3,26 @@ const nextConfig = {
   /* config options here */
   reactStrictMode: true,
   output: 'standalone',
-  
+
   // Development optimizations
   devIndicators: {
     buildActivity: true,
     buildActivityPosition: 'bottom-right',
   },
-  
+
   // Turbopack configuration (Next.js 16 default bundler)
   turbopack: {
     // Turbopack handles resolve.fallback automatically for browser builds
     // Web3 externals are handled via serverExternalPackages below
   },
-  
+
   // Legacy webpack config for backward compatibility (if needed with --webpack flag)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   webpack: (config: any) => {
     // Ignore missing optional dependencies that are not needed in browser
     if (!config.resolve) config.resolve = {};
     if (!config.resolve.fallback) config.resolve.fallback = {};
-    
+
     config.resolve.fallback = {
       ...config.resolve.fallback,
       fs: false,
@@ -63,7 +63,7 @@ const nextConfig = {
 
     return config;
   },
-  
+
   // Bundle optimization
   experimental: {
     // Optimize package imports for better tree shaking
@@ -71,7 +71,7 @@ const nextConfig = {
     // Enable faster refresh
     webVitalsAttribution: ['CLS', 'LCP'],
   },
-  
+
   // External packages configuration for server (both webpack and Turbopack)
   serverExternalPackages: [
     'pino-pretty',
@@ -80,7 +80,7 @@ const nextConfig = {
     'bufferutil',
     'encoding',
   ],
-  
+
   images: {
     // Optimize all images, including remote ones
     domains: [],
@@ -120,24 +120,37 @@ const nextConfig = {
     // Increase image format options
     formats: ['image/webp']
   },
-  
+
   // Help prevent hydration issues
   compiler: {
     // Remove console.logs in production
     removeConsole: process.env.NODE_ENV === 'production',
   },
-  
+
   // Production-only optimizations (skip in dev)
   ...(process.env.NODE_ENV === 'production' && {
     compress: true,
     poweredByHeader: false,
   }),
-  
+
   // Development-only optimizations
   ...(process.env.NODE_ENV === 'development' && {
     // Disable static optimization during dev for faster builds
     staticPageGenerationTimeout: 1000,
   }),
+
+  // Proxy API requests to backend
+  async rewrites() {
+    // INTERNAL_API_URL is set in docker-compose for container-to-container communication
+    const backendUrl = process.env.INTERNAL_API_URL || process.env.BACKEND_URL || 'http://backend:8000';
+    console.log(`[Next.js] Rewriting /api requests to ${backendUrl}`);
+    return [
+      {
+        source: '/api/v1/:path*',
+        destination: `${backendUrl}/api/v1/:path*`,
+      },
+    ];
+  },
 };
 
 module.exports = nextConfig;

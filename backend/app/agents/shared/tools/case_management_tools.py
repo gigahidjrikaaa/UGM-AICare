@@ -21,7 +21,7 @@ from app.domains.mental_health.models import (
     CaseStatusEnum,
     CaseSeverityEnum
 )
-from app.agents.shared.tools import tool_registry
+from app.agents.shared.tools.registry import register_tool
 
 import logging
 
@@ -30,21 +30,33 @@ logger = logging.getLogger(__name__)
 MAX_CASES = 20
 
 
+@register_tool(
+    name="get_case_details",
+    description="Get details of a specific clinical case including severity, status, and timeline. HIGHLY SENSITIVE.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "case_id": {
+                "type": "string",
+                "description": "Case ID"
+            }
+        },
+        "required": ["case_id"]
+    },
+    category="case_management",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_case_details(
     db: AsyncSession,
-    case_id: str
+    case_id: str,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get details of a specific case.
     
     Returns case information, status, severity, and timeline.
     HIGHLY SENSITIVE - clinical case data.
-    
-    Args:
-        case_id: Case ID
-        
-    Returns:
-        Dict with case details or error
     """
     try:
         # Get case
@@ -87,25 +99,45 @@ async def get_case_details(
         }
 
 
+@register_tool(
+    name="get_user_cases",
+    description="Get all cases for a user with optional status filter. Returns case history. HIGHLY SENSITIVE.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "string",
+                "description": "User ID"
+            },
+            "status": {
+                "type": "string",
+                "description": "Optional status filter (OPEN, IN_PROGRESS, RESOLVED, CLOSED)",
+                "enum": ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"]
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of cases to return (default 20, max 20)",
+                "default": 20
+            }
+        },
+        "required": ["user_id"]
+    },
+    category="case_management",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_user_cases(
     db: AsyncSession,
     user_id: str,
     status: Optional[str] = None,
-    limit: int = MAX_CASES
+    limit: int = MAX_CASES,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get all cases for a user.
     
     Returns list of cases with optional status filter.
     HIGHLY SENSITIVE - clinical case history.
-    
-    Args:
-        user_id: User ID
-        status: Filter by status (OPEN, IN_PROGRESS, RESOLVED, CLOSED)
-        limit: Maximum number of cases (default 20, max 20)
-        
-    Returns:
-        Dict with cases list or error
     """
     try:
         if limit > MAX_CASES:
@@ -153,69 +185,3 @@ async def get_user_cases(
             "error": str(e),
             "user_id": user_id
         }
-
-
-# ============================================================================
-# GEMINI FUNCTION CALLING SCHEMAS
-# ============================================================================
-
-get_case_details_schema = {
-    "name": "get_case_details",
-    "description": "Get details of a specific clinical case including severity, status, and timeline. HIGHLY SENSITIVE.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "case_id": {
-                "type": "string",
-                "description": "Case ID"
-            }
-        },
-        "required": ["case_id"]
-    }
-}
-
-get_user_cases_schema = {
-    "name": "get_user_cases",
-    "description": "Get all cases for a user with optional status filter. Returns case history. HIGHLY SENSITIVE.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "string",
-                "description": "User ID"
-            },
-            "status": {
-                "type": "string",
-                "description": "Optional status filter (OPEN, IN_PROGRESS, RESOLVED, CLOSED)",
-                "enum": ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"]
-            },
-            "limit": {
-                "type": "integer",
-                "description": "Maximum number of cases to return (default 20, max 20)",
-                "default": 20
-            }
-        },
-        "required": ["user_id"]
-    }
-}
-
-
-# ============================================================================
-# REGISTER TOOLS WITH CENTRAL REGISTRY
-# ============================================================================
-
-tool_registry.register(
-    name="get_case_details",
-    func=get_case_details,
-    schema=get_case_details_schema,
-    category="case_management"
-)
-
-tool_registry.register(
-    name="get_user_cases",
-    func=get_user_cases,
-    schema=get_user_cases_schema,
-    category="case_management"
-)
-
-logger.info("🔧 Registered 2 case management tools in 'case_management' category")

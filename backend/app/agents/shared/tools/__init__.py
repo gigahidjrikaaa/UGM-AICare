@@ -52,6 +52,54 @@ try:
 except ImportError as e:
     logger.error(f"❌ Could not load scheduling_tools: {e}")
 
+try:
+    from . import user_tools  # noqa: F401
+    logger.info("✅ Loaded user_tools (get_user_profile, etc.)")
+except ImportError as e:
+    logger.error(f"❌ Could not load user_tools: {e}")
+
+try:
+    from . import analytics_tools  # noqa: F401
+    logger.info("✅ Loaded analytics_tools")
+except ImportError as e:
+    logger.error(f"❌ Could not load analytics_tools: {e}")
+
+try:
+    from . import case_management_tools  # noqa: F401
+    logger.info("✅ Loaded case_management_tools")
+except ImportError as e:
+    logger.error(f"❌ Could not load case_management_tools: {e}")
+
+try:
+    from . import conversation_tools  # noqa: F401
+    logger.info("✅ Loaded conversation_tools")
+except ImportError as e:
+    logger.error(f"❌ Could not load conversation_tools: {e}")
+
+try:
+    from . import external_tools  # noqa: F401
+    logger.info("✅ Loaded external_tools")
+except ImportError as e:
+    logger.error(f"❌ Could not load external_tools: {e}")
+
+try:
+    from . import intervention_tools  # noqa: F401
+    logger.info("✅ Loaded intervention_tools")
+except ImportError as e:
+    logger.error(f"❌ Could not load intervention_tools: {e}")
+
+try:
+    from . import progress_tools  # noqa: F401
+    logger.info("✅ Loaded progress_tools")
+except ImportError as e:
+    logger.error(f"❌ Could not load progress_tools: {e}")
+
+try:
+    from . import safety_tools  # noqa: F401
+    logger.info("✅ Loaded safety_tools")
+except ImportError as e:
+    logger.error(f"❌ Could not load safety_tools: {e}")
+
 # Log registry stats after all imports
 try:
     all_tools = get_all_tools()  # Returns Dict[str, Dict]
@@ -65,6 +113,14 @@ __all__ = [
     # Tool modules
     "agent_tools",
     "scheduling_tools",
+    "user_tools",
+    "analytics_tools",
+    "case_management_tools",
+    "conversation_tools",
+    "external_tools",
+    "intervention_tools",
+    "progress_tools",
+    "safety_tools",
     
     # Registry functions (NEW)
     "register_tool",

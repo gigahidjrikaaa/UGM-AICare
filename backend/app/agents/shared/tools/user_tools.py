@@ -5,6 +5,7 @@ and consent status. Essential for all agents to understand who they're supportin
 
 Tools:
 - get_user_profile: Basic demographics and profile info
+- update_user_profile: Update user profile information
 - get_user_mental_health_summary: Mental health context (risk, diagnoses)
 - get_user_preferences: Communication preferences
 - get_user_consent_status: Check consent for specific operations
@@ -15,34 +16,47 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from sqlalchemy import select
+from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User  # Core models
 from app.domains.mental_health.models import Consent, ConsentScopeEnum, UserSummary
 
-from . import tool_registry
+from .registry import register_tool
 
 logger = logging.getLogger(__name__)
 
 
+@register_tool(
+    name="get_user_profile",
+    description="""Get user's profile information including demographics, faculty, year of study.
+Use when you need to understand who the user is for personalized support.
+Does NOT include sensitive mental health data.""",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "integer",
+                "description": "The user's ID (optional, defaults to current user if not provided)"
+            }
+        },
+        "required": []
+    },
+    category="user",
+    requires_db=True,
+    requires_user_id=True
+)
 async def get_user_profile(
     db: AsyncSession,
-    user_id: int
+    user_id: int,
+    **kwargs
 ) -> Dict[str, Any]:
-    """Get user profile information.
-    
-    Returns demographics, faculty, year of study, and basic info.
-    Does NOT include sensitive mental health data.
-    
-    Args:
-        db: Database session
-        user_id: User ID
-    
-    Returns:
-        Dict with user profile data or error
-    """
+    """Get user profile information."""
     try:
+        # If user_id is passed as string in kwargs (from tool call), convert it
+        if isinstance(user_id, str) and user_id.isdigit():
+            user_id = int(user_id)
+            
         result = await db.execute(
             select(User).where(User.id == user_id)
         )
@@ -54,13 +68,19 @@ async def get_user_profile(
                 "user_id": user_id
             }
         
+        # Calculate age from date_of_birth
+        age = None
+        if user.date_of_birth:
+            today = datetime.now().date()
+            age = today.year - user.date_of_birth.year - ((today.month, today.day) < (user.date_of_birth.month, user.date_of_birth.day))
+
         return {
             "user_id": user.id,
             "email": user.email,
-            "full_name": user.full_name,
-            "age": user.age,
+            "full_name": user.name or f"{user.first_name or ''} {user.last_name or ''}".strip(),
+            "age": age,
             "gender": user.gender,
-            "faculty": user.faculty,
+            "faculty": user.major,  # Mapping major to faculty as it's the closest field
             "year_of_study": user.year_of_study,
             "created_at": user.created_at.isoformat() if user.created_at else None,
             "is_active": user.is_active,
@@ -73,22 +93,121 @@ async def get_user_profile(
         }
 
 
+@register_tool(
+    name="update_user_profile",
+    description="""Update user's profile information.
+Use this when the user explicitly asks to change their details (e.g., "panggil aku Budi", "aku sekarang semester 5").
+Only update fields that are explicitly provided.""",
+    parameters={
+        "type": "object",
+        "properties": {
+            "full_name": {
+                "type": "string",
+                "description": "New full name or nickname"
+            },
+            "age": {
+                "type": "integer",
+                "description": "User's age"
+            },
+            "gender": {
+                "type": "string",
+                "enum": ["male", "female", "other"],
+                "description": "User's gender"
+            },
+            "faculty": {
+                "type": "string",
+                "description": "User's faculty/department"
+            },
+            "year_of_study": {
+                "type": "integer",
+                "description": "Current year of study (1-7)"
+            }
+        },
+        "required": []
+    },
+    category="user",
+    requires_db=True,
+    requires_user_id=True
+)
+async def update_user_profile(
+    db: AsyncSession,
+    user_id: int,
+    full_name: Optional[str] = None,
+    age: Optional[int] = None,
+    gender: Optional[str] = None,
+    faculty: Optional[str] = None,
+    year_of_study: Optional[int] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Update user profile information."""
+    try:
+        # Build update dictionary
+        updates = {}
+        if full_name:
+            updates["name"] = full_name
+        # Age cannot be updated directly as it's calculated from DOB
+        # if age:
+        #     updates["age"] = age
+        if gender:
+            updates["gender"] = gender
+        if faculty:
+            updates["major"] = faculty
+        if year_of_study:
+            updates["year_of_study"] = str(year_of_study)  # Ensure string as per model
+            
+        if not updates:
+            return {
+                "status": "skipped",
+                "message": "No changes provided"
+            }
+            
+        # Execute update
+        await db.execute(
+            update(User)
+            .where(User.id == user_id)
+            .values(**updates)
+        )
+        await db.commit()
+        
+        return {
+            "status": "success",
+            "message": "Profile updated successfully",
+            "updated_fields": list(updates.keys())
+        }
+        
+    except Exception as e:
+        logger.error(f"Error updating user profile for user {user_id}: {e}")
+        return {
+            "status": "error",
+            "error": str(e)
+        }
+
+
+@register_tool(
+    name="get_user_mental_health_summary",
+    description="""Get user's mental health summary including key concerns and current state.
+SENSITIVE DATA - only use when necessary for safety assessment or intervention planning.
+Check consent before using.""",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "integer",
+                "description": "The user's ID (optional)"
+            }
+        },
+        "required": []
+    },
+    category="user",
+    requires_db=True,
+    requires_user_id=True
+)
 async def get_user_mental_health_summary(
     db: AsyncSession,
-    user_id: int
+    user_id: int,
+    **kwargs
 ) -> Dict[str, Any]:
-    """Get user's mental health summary.
-    
-    Includes risk level, diagnoses, current mental state.
-    SENSITIVE DATA - check consent before using.
-    
-    Args:
-        db: Database session
-        user_id: User ID
-    
-    Returns:
-        Dict with mental health summary or error
-    """
+    """Get user's mental health summary."""
     try:
         result = await db.execute(
             select(UserSummary)
@@ -121,21 +240,30 @@ async def get_user_mental_health_summary(
         }
 
 
+@register_tool(
+    name="get_user_preferences",
+    description="""Get user's communication preferences including language, timezone,
+and notification settings. Use for personalizing communication style.""",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "integer",
+                "description": "The user's ID (optional)"
+            }
+        },
+        "required": []
+    },
+    category="user",
+    requires_db=True,
+    requires_user_id=True
+)
 async def get_user_preferences(
     db: AsyncSession,
-    user_id: int
+    user_id: int,
+    **kwargs
 ) -> Dict[str, Any]:
-    """Get user's communication preferences.
-    
-    Returns preferred language, communication style, notification settings.
-    
-    Args:
-        db: Database session
-        user_id: User ID
-    
-    Returns:
-        Dict with user preferences
-    """
+    """Get user's communication preferences."""
     try:
         result = await db.execute(
             select(User).where(User.id == user_id)
@@ -149,7 +277,6 @@ async def get_user_preferences(
             }
         
         # Return basic preferences
-        # TODO: Expand when UserPreferences model is implemented
         return {
             "user_id": user.id,
             "language": "id",  # Default to Indonesian
@@ -165,24 +292,37 @@ async def get_user_preferences(
         }
 
 
+@register_tool(
+    name="get_user_consent_status",
+    description="""Check if user has granted consent for a specific operation.
+IMPORTANT: Always check before analytics, data sharing, or intervention tracking.
+Valid scopes: analytics, data_sharing, intervention_tracking.""",
+    parameters={
+        "type": "object",
+        "properties": {
+            "scope": {
+                "type": "string",
+                "description": "Consent scope to check",
+                "enum": ["analytics", "data_sharing", "intervention_tracking"]
+            },
+            "user_id": {
+                "type": "integer",
+                "description": "The user's ID (optional)"
+            }
+        },
+        "required": ["scope"]
+    },
+    category="user",
+    requires_db=True,
+    requires_user_id=True
+)
 async def get_user_consent_status(
     db: AsyncSession,
     user_id: int,
-    scope: str
+    scope: str,
+    **kwargs
 ) -> Dict[str, Any]:
-    """Check user's consent status for a specific operation.
-    
-    IMPORTANT: Always check consent before sensitive operations
-    (analytics, data sharing, intervention tracking).
-    
-    Args:
-        db: Database session
-        user_id: User ID
-        scope: Consent scope (e.g., "analytics", "data_sharing", "intervention_tracking")
-    
-    Returns:
-        Dict with consent status
-    """
+    """Check user's consent status for a specific operation."""
     try:
         # Convert string to enum
         try:
@@ -228,119 +368,3 @@ async def get_user_consent_status(
             "user_id": user_id,
             "scope": scope
         }
-
-
-# Tool schemas for Gemini function calling
-
-GET_USER_PROFILE_SCHEMA = {
-    "name": "get_user_profile",
-    "description": (
-        "Get user's profile information including demographics, faculty, year of study. "
-        "Use when you need to understand who the user is for personalized support. "
-        "Does NOT include sensitive mental health data."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "integer",
-                "description": "The user's ID"
-            }
-        },
-        "required": ["user_id"]
-    }
-}
-
-GET_USER_MENTAL_HEALTH_SUMMARY_SCHEMA = {
-    "name": "get_user_mental_health_summary",
-    "description": (
-        "Get user's mental health summary including key concerns and current state. "
-        "SENSITIVE DATA - only use when necessary for safety assessment or intervention planning. "
-        "Check consent before using."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "integer",
-                "description": "The user's ID"
-            }
-        },
-        "required": ["user_id"]
-    }
-}
-
-GET_USER_PREFERENCES_SCHEMA = {
-    "name": "get_user_preferences",
-    "description": (
-        "Get user's communication preferences including language, timezone, "
-        "and notification settings. Use for personalizing communication style."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "integer",
-                "description": "The user's ID"
-            }
-        },
-        "required": ["user_id"]
-    }
-}
-
-GET_USER_CONSENT_STATUS_SCHEMA = {
-    "name": "get_user_consent_status",
-    "description": (
-        "Check if user has granted consent for a specific operation. "
-        "IMPORTANT: Always check before analytics, data sharing, or intervention tracking. "
-        "Valid scopes: analytics, data_sharing, intervention_tracking."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "integer",
-                "description": "The user's ID"
-            },
-            "scope": {
-                "type": "string",
-                "description": "Consent scope to check (analytics, data_sharing, intervention_tracking)",
-                "enum": ["analytics", "data_sharing", "intervention_tracking"]
-            }
-        },
-        "required": ["user_id", "scope"]
-    }
-}
-
-
-# Register tools with the global registry
-tool_registry.register(
-    "get_user_profile",
-    get_user_profile,
-    GET_USER_PROFILE_SCHEMA,
-    "user_context"
-)
-
-tool_registry.register(
-    "get_user_mental_health_summary",
-    get_user_mental_health_summary,
-    GET_USER_MENTAL_HEALTH_SUMMARY_SCHEMA,
-    "user_context"
-)
-
-tool_registry.register(
-    "get_user_preferences",
-    get_user_preferences,
-    GET_USER_PREFERENCES_SCHEMA,
-    "user_context"
-)
-
-tool_registry.register(
-    "get_user_consent_status",
-    get_user_consent_status,
-    GET_USER_CONSENT_STATUS_SCHEMA,
-    "user_context"
-)
-
-
-logger.info("✅ User context tools registered (4 tools)")

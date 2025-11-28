@@ -128,6 +128,8 @@ async def generate_with_tools(
                     # No tool calls detected, return final response
                     try:
                         response_text = response_obj.text  # type: ignore
+                        if response_text is None:
+                            response_text = "I've processed your request."
                     except (ValueError, AttributeError):
                         # Fallback if can't extract text
                         response_text = "I've processed your request."
@@ -182,7 +184,26 @@ async def generate_with_tools(
                 if function_response_parts:
                     contents.append(types.Content(role='user', parts=function_response_parts))
                 
+                # Update conversation history for the next iteration
+                # This is CRITICAL: We must append the tool interactions to the history
+                # so that the next generate_content call sees them.
+                
+                # 1. Add model's tool call request
+                # We can't easily reconstruct the exact protobuf, so we use a representation
+                tool_names = [r['tool_name'] for r in tool_results]
+                conversation_history.append({
+                    "role": "assistant",
+                    "content": "", # Content is empty for tool calls in some models, or we can add a description
+                    "tool_calls": tool_results # Store for debugging/tracking
+                })
+                
+                # 2. Add tool results (simulated as user message for history tracking, 
+                # but for the API call we use the structured contents above)
+                # Note: The 'contents' variable is what actually gets sent to Gemini.
+                # The 'conversation_history' is just for our internal state tracking.
+                
                 # Make another API call with the updated contents to get final response
+                logger.info(f"Sending tool results back to LLM (iteration {iterations})")
                 client = llm.get_gemini_client()
                 final_response_obj = await client.aio.models.generate_content(
                     model=model_name,
@@ -199,23 +220,39 @@ async def generate_with_tools(
                 # For safety, limit to max_iterations
                 response_obj = final_response_obj
                 
-                # Update conversation history with tool usage indicator
-                tool_names = [r['tool_name'] for r in tool_results]
-                conversation_history.append({
-                    "role": "assistant",
-                    "content": f"[Used tools: {', '.join(tool_names)}]"
-                })
+                # Check if the new response has tool calls
+                new_tool_results = await _check_and_execute_tool_calls(
+                    response=response_obj,
+                    db=db,
+                    user_id=user_id,
+                )
                 
-                # Continue loop to check if final_response_obj has more tool calls
-                continue
+                if new_tool_results:
+                    logger.info(f"🔄 Nested tool calls detected: {len(new_tool_results)}")
+                    # Loop will continue and handle these new calls
+                    continue
+                else:
+                    # No more tool calls, we have the final response
+                    try:
+                        response_text = response_obj.text
+                        if response_text is None:
+                            response_text = "I've processed your request."
+                    except (ValueError, AttributeError):
+                        response_text = "I've processed your request."
+                        
+                    # If we used tools, add indicator
+                    if tool_calls_executed:
+                        tool_names = [tc["tool_name"] for tc in tool_calls_executed]
+                        tool_indicator = f"_🔧 Menggunakan: {', '.join(tool_names)}_\n\n"
+                        response_text = tool_indicator + response_text
+                        
+                    return response_text, tool_calls_executed
                 
         except Exception as e:
             logger.error(f"Error in tool calling iteration {iterations}: {e}", exc_info=True)
             if iterations == 1:
-                # First iteration failed, propagate error
                 raise
             else:
-                # Later iteration failed, return what we have so far
                 error_msg = f"Tool calling encountered an error: {str(e)}"
                 return error_msg, tool_calls_executed
     

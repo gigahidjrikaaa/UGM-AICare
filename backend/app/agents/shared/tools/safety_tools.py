@@ -27,7 +27,7 @@ from app.domains.mental_health.models import (
     CaseSeverityEnum,
     ContentResource,
 )
-from app.agents.shared.tools import tool_registry
+from app.agents.shared.tools.registry import register_tool
 
 import logging
 
@@ -39,23 +39,39 @@ MAX_CASES = 5
 MAX_RESOURCES = 10
 
 
+@register_tool(
+    name="get_risk_assessment_history",
+    description="Get user's risk assessment history from Safety Triage Agent. Returns recent risk classifications and concerns. SENSITIVE DATA.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "string",
+                "description": "User ID to get risk history for"
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of assessments to return (default 10, max 10)",
+                "default": 10
+            }
+        },
+        "required": ["user_id"]
+    },
+    category="safety",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_risk_assessment_history(
     db: AsyncSession,
     user_id: str,
-    limit: int = MAX_ASSESSMENTS
+    limit: int = MAX_ASSESSMENTS,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get user's risk assessment history from Safety Triage Agent.
     
     Returns recent risk classifications, concerns detected, and timestamps.
     SENSITIVE DATA - requires consent check.
-    
-    Args:
-        user_id: User ID
-        limit: Max number of assessments (default 10)
-        
-    Returns:
-        Dict with assessments list or error
     """
     try:
         if limit > MAX_ASSESSMENTS:
@@ -102,23 +118,39 @@ async def get_risk_assessment_history(
         }
 
 
+@register_tool(
+    name="get_active_safety_cases",
+    description="Get user's active crisis cases managed by Service Desk Agent. Returns open cases requiring follow-up. HIGHLY SENSITIVE.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "string",
+                "description": "User ID to get active cases for"
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of cases to return (default 5, max 5)",
+                "default": 5
+            }
+        },
+        "required": ["user_id"]
+    },
+    category="safety",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_active_safety_cases(
     db: AsyncSession,
     user_id: str,
-    limit: int = MAX_CASES
+    limit: int = MAX_CASES,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get user's active crisis cases managed by Service Desk Agent.
     
     Returns open cases requiring follow-up or intervention.
     HIGHLY SENSITIVE - safety-critical data.
-    
-    Args:
-        user_id: User ID
-        limit: Max number of cases (default 5)
-        
-    Returns:
-        Dict with cases list or error
     """
     try:
         if limit > MAX_CASES:
@@ -177,23 +209,40 @@ async def get_active_safety_cases(
         }
 
 
+@register_tool(
+    name="get_crisis_resources",
+    description="Get emergency mental health resources like hotlines and clinics. Returns PUBLIC safety resources for immediate help.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "location": {
+                "type": "string",
+                "description": "Geographic location for resources (default 'Indonesia')",
+                "default": "Indonesia"
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of resources to return (default 10, max 10)",
+                "default": 10
+            }
+        },
+        "required": []
+    },
+    category="safety",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_crisis_resources(
     db: AsyncSession,
     location: str = "Indonesia",
-    limit: int = MAX_RESOURCES
+    limit: int = MAX_RESOURCES,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get emergency mental health resources (hotlines, clinics).
     
     Returns crisis hotlines and professional resources for immediate help.
     This is PUBLIC DATA for safety.
-    
-    Args:
-        location: Geographic location (default "Indonesia")
-        limit: Max number of resources (default 10)
-        
-    Returns:
-        Dict with resources list or error
     """
     try:
         if limit > MAX_RESOURCES:
@@ -245,21 +294,33 @@ async def get_crisis_resources(
         }
 
 
+@register_tool(
+    name="check_risk_level",
+    description="Get user's current risk level from most recent assessment. Returns latest risk classification. SENSITIVE DATA.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "string",
+                "description": "User ID to check risk level for"
+            }
+        },
+        "required": ["user_id"]
+    },
+    category="safety",
+    requires_db=True,
+    requires_user_id=False
+)
 async def check_risk_level(
     db: AsyncSession,
-    user_id: str
+    user_id: str,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get user's current risk level from most recent assessment.
     
     Returns latest risk classification and whether intervention is needed.
     SENSITIVE DATA - safety monitoring.
-    
-    Args:
-        user_id: User ID
-        
-    Returns:
-        Dict with current risk level or error
     """
     try:
         # Get most recent assessment
@@ -311,21 +372,34 @@ async def check_risk_level(
         }
 
 
+@register_tool(
+    name="get_escalation_protocol",
+    description="Get recommended actions for a given risk level. Returns escalation steps and timelines. PROTOCOL DATA.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "risk_level": {
+                "type": "string",
+                "description": "Risk level to get protocol for (LOW, MODERATE, HIGH, CRITICAL)",
+                "enum": ["LOW", "MODERATE", "HIGH", "CRITICAL"]
+            }
+        },
+        "required": ["risk_level"]
+    },
+    category="safety",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_escalation_protocol(
     db: AsyncSession,
-    risk_level: str
+    risk_level: str,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get recommended actions for a given risk level.
     
     Returns escalation steps, timelines, and who should be involved.
     This is PROTOCOL DATA for safety decision-making.
-    
-    Args:
-        risk_level: Risk level (LOW, MODERATE, HIGH, CRITICAL)
-        
-    Returns:
-        Dict with protocol steps or error
     """
     try:
         # Define escalation protocols (could be from database in future)
@@ -413,142 +487,3 @@ async def get_escalation_protocol(
             "error": str(e),
             "risk_level": risk_level
         }
-
-
-# ============================================================================
-# GEMINI FUNCTION CALLING SCHEMAS
-# ============================================================================
-
-get_risk_assessment_history_schema = {
-    "name": "get_risk_assessment_history",
-    "description": "Get user's risk assessment history from Safety Triage Agent. Returns recent risk classifications and concerns. SENSITIVE DATA.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "string",
-                "description": "User ID to get risk history for"
-            },
-            "limit": {
-                "type": "integer",
-                "description": "Maximum number of assessments to return (default 10, max 10)",
-                "default": 10
-            }
-        },
-        "required": ["user_id"]
-    }
-}
-
-get_active_safety_cases_schema = {
-    "name": "get_active_safety_cases",
-    "description": "Get user's active crisis cases managed by Service Desk Agent. Returns open cases requiring follow-up. HIGHLY SENSITIVE.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "string",
-                "description": "User ID to get active cases for"
-            },
-            "limit": {
-                "type": "integer",
-                "description": "Maximum number of cases to return (default 5, max 5)",
-                "default": 5
-            }
-        },
-        "required": ["user_id"]
-    }
-}
-
-get_crisis_resources_schema = {
-    "name": "get_crisis_resources",
-    "description": "Get emergency mental health resources like hotlines and clinics. Returns PUBLIC safety resources for immediate help.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "location": {
-                "type": "string",
-                "description": "Geographic location for resources (default 'Indonesia')",
-                "default": "Indonesia"
-            },
-            "limit": {
-                "type": "integer",
-                "description": "Maximum number of resources to return (default 10, max 10)",
-                "default": 10
-            }
-        },
-        "required": []
-    }
-}
-
-check_risk_level_schema = {
-    "name": "check_risk_level",
-    "description": "Get user's current risk level from most recent assessment. Returns latest risk classification. SENSITIVE DATA.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "string",
-                "description": "User ID to check risk level for"
-            }
-        },
-        "required": ["user_id"]
-    }
-}
-
-get_escalation_protocol_schema = {
-    "name": "get_escalation_protocol",
-    "description": "Get recommended actions for a given risk level. Returns escalation steps and timelines. PROTOCOL DATA.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "risk_level": {
-                "type": "string",
-                "description": "Risk level to get protocol for (LOW, MODERATE, HIGH, CRITICAL)",
-                "enum": ["LOW", "MODERATE", "HIGH", "CRITICAL"]
-            }
-        },
-        "required": ["risk_level"]
-    }
-}
-
-
-# ============================================================================
-# REGISTER TOOLS WITH CENTRAL REGISTRY
-# ============================================================================
-
-tool_registry.register(
-    name="get_risk_assessment_history",
-    func=get_risk_assessment_history,
-    schema=get_risk_assessment_history_schema,
-    category="safety"
-)
-
-tool_registry.register(
-    name="get_active_safety_cases",
-    func=get_active_safety_cases,
-    schema=get_active_safety_cases_schema,
-    category="safety"
-)
-
-tool_registry.register(
-    name="get_crisis_resources",
-    func=get_crisis_resources,
-    schema=get_crisis_resources_schema,
-    category="safety"
-)
-
-tool_registry.register(
-    name="check_risk_level",
-    func=check_risk_level,
-    schema=check_risk_level_schema,
-    category="safety"
-)
-
-tool_registry.register(
-    name="get_escalation_protocol",
-    func=get_escalation_protocol,
-    schema=get_escalation_protocol_schema,
-    category="safety"
-)
-
-logger.info("🔧 Registered 5 safety tools in 'safety' category")

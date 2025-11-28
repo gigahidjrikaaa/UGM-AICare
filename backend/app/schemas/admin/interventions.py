@@ -170,7 +170,29 @@ class InterventionSettingsUpdate(BaseModel):
     daily_send_limit: Optional[int] = None
     channels_enabled: Optional[List[str]] = None
     escalation_email: Optional[str] = None
-    office_hours_start: Optional[str] = None
     office_hours_end: Optional[str] = None
     manual_notes: Optional[str] = None
+
+
+class InterventionPlanResponse(BaseModel):
+    id: int
+    user_id: int
+    user_name: Optional[str] = None
+    user_email: Optional[str] = None
+    plan_title: str
+    risk_level: Optional[int]
+    status: str
+    total_steps: int
+    completed_steps: int
+    created_at: datetime
+    updated_at: datetime
+    plan_data: Dict[str, Any]
+    completion_tracking: Dict[str, Any]
+
+    model_config = ConfigDict(from_attributes=True)
+
+
+class InterventionPlanListResponse(BaseModel):
+    items: List[InterventionPlanResponse]
+    total: int
 

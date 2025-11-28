@@ -1,10 +1,11 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
-import { 
-  FiPlay, FiTrash2, FiEye, FiAlertTriangle, FiAlertCircle, 
-  FiCheckCircle, FiInfo, FiUsers, FiMessageSquare, FiPlus, FiX 
+import {
+  FiPlay, FiTrash2, FiEye, FiAlertTriangle, FiAlertCircle,
+  FiCheckCircle, FiInfo, FiUsers, FiMessageSquare, FiPlus, FiX,
+  FiDatabase, FiActivity, FiClipboard, FiServer, FiCpu
 } from "react-icons/fi";
 
 // --- Types ---
@@ -29,6 +30,30 @@ interface GeneratedCase {
   scenario: string;
   severity: string;
   caseId: string;
+}
+
+interface BatchTestResult {
+  id: string;
+  input: string;
+  expected: string;
+  actual: string;
+  risk_level?: string;
+  passed: boolean;
+  error?: string;
+}
+
+interface RQ2Result {
+  flow_id: string;
+  status: string;
+  passed: boolean;
+  details?: string;
+}
+
+interface RQ3Response {
+  id: string;
+  prompt: string;
+  response: string;
+  category: string;
 }
 
 // --- Pre-defined Risk Scenarios ---
@@ -106,118 +131,41 @@ const riskLevelIcons = {
 };
 
 export default function TestingPage() {
-  // State for scenario generation
-  const [loading, setLoading] = useState<string | null>(null);
-  const [generatedCases, setGeneratedCases] = useState<GeneratedCase[]>([]);
+  // --- State ---
+  const [activeTab, setActiveTab] = useState<"data" | "simulation" | "verification">("data");
 
-  // State for user management
+  // Data Management State
   const [testUsers, setTestUsers] = useState<TestUser[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [showUserForm, setShowUserForm] = useState(false);
   const [newUserName, setNewUserName] = useState("");
   const [newUserEmail, setNewUserEmail] = useState("");
+  const [newUserRole, setNewUserRole] = useState("user");
 
-  // State for custom conversation
+  // Simulation State
+  const [loading, setLoading] = useState<string | null>(null);
+  const [generatedCases, setGeneratedCases] = useState<GeneratedCase[]>([]);
   const [showConversationForm, setShowConversationForm] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [customMessages, setCustomMessages] = useState<string[]>([""]);
-  const [selectedRiskLevel, setSelectedRiskLevel] = useState<string>("low");
-  const [useRealChat, setUseRealChat] = useState(true); // New state for real chat toggle
+  const [useRealChat, setUseRealChat] = useState(true);
+  const [simulationLogs, setSimulationLogs] = useState<string[]>([]);
 
-  // --- Functions ---
-  const generateConversation = async (scenario: ConversationScenario) => {
-    setLoading(scenario.id);
-    
-    // First, ensure we have a test user
-    if (testUsers.length === 0) {
-      toast.error("Please create a test user first");
-      setLoading(null);
-      return;
-    }
-    
-    const testUser = testUsers[0]; // Use first test user
-    
-    try {
-      if (useRealChat) {
-        // New: Simulate real chat with AI responses
-        const response = await fetch("http://localhost:8000/api/v1/admin/testing/chat-simulation", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            user_id: testUser.id,
-            user_messages: [scenario.userMessage],
-            enable_sta: true,
-            enable_sca: true,
-          }),
-        });
+  // Verification State
+  const [batchResults, setBatchResults] = useState<BatchTestResult[]>([]);
+  const [batchSummary, setBatchSummary] = useState<{ total: number, passed: number, failed: number, metrics?: any } | null>(null);
+  const [rq2Results, setRq2Results] = useState<RQ2Result[]>([]);
+  const [rq3Responses, setRq3Responses] = useState<RQ3Response[]>([]);
+  const [verificationTab, setVerificationTab] = useState<"rq1" | "rq2" | "rq3">("rq1");
 
-        if (!response.ok) throw new Error("Failed to simulate real chat");
-        const data = await response.json();
+  // --- Effects ---
+  useEffect(() => {
+    loadTestUsers();
+  }, []);
 
-        toast.success(
-          `${scenario.name} - AI Responded! ${data.case_created ? "Case created ✓" : ""}`
-        );
+  // --- API Functions ---
 
-        if (data.case_created) {
-          setGeneratedCases((prev) => [
-            ...prev,
-            {
-              scenario: scenario.name,
-              severity: data.risk_assessment?.severity || "unknown",
-              caseId: data.session_id,
-            },
-          ]);
-        }
-      } else {
-        // Old: Direct classification without chat
-        const response = await fetch("http://localhost:8000/api/agents/sta/classify", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            conversation_id: `test-${Date.now()}`,
-            user_id: testUser.id,
-            conversation_text: scenario.userMessage,
-          }),
-        });
-
-        if (!response.ok) throw new Error("Failed to classify conversation");
-        const data = await response.json();
-
-        toast.success(`Generated ${scenario.name} - Severity: ${data.severity}`);
-
-        if (data.case_id) {
-          setGeneratedCases((prev) => [
-            ...prev,
-            {
-              scenario: scenario.name,
-              severity: data.severity,
-              caseId: data.case_id,
-            },
-          ]);
-        }
-      }
-    } catch (error) {
-      console.error("Error:", error);
-      toast.error("Failed to generate conversation");
-    } finally {
-      setLoading(null);
-    }
-  };
-
-  const generateAllScenarios = async () => {
-    for (const scenario of scenarios) {
-      await generateConversation(scenario);
-      await new Promise((resolve) => setTimeout(resolve, 2000));
-    }
-  };
-
-  const clearGeneratedCases = () => {
-    setGeneratedCases([]);
-    toast.success("Cleared generated cases list");
-  };
-
-  // User management functions
+  // 1. Data Management
   const loadTestUsers = async () => {
     setLoadingUsers(true);
     try {
@@ -227,7 +175,6 @@ export default function TestingPage() {
       if (!response.ok) throw new Error("Failed to load users");
       const data = await response.json();
       setTestUsers(data.users);
-      toast.success(`Loaded ${data.total} test users`);
     } catch (error) {
       console.error("Error:", error);
       toast.error("Failed to load test users");
@@ -251,6 +198,7 @@ export default function TestingPage() {
         body: JSON.stringify({
           name: newUserName,
           email: newUserEmail || undefined,
+          role: newUserRole,
           university: "Universitas Gadjah Mada",
         }),
       });
@@ -261,7 +209,7 @@ export default function TestingPage() {
       }
 
       const data = await response.json();
-      toast.success(`Created user: ${data.email}`);
+      toast.success(`Created ${newUserRole}: ${data.email}`);
       setNewUserName("");
       setNewUserEmail("");
       setShowUserForm(false);
@@ -275,80 +223,31 @@ export default function TestingPage() {
     }
   };
 
-  const simulateCustomConversation = async () => {
-    if (!selectedUserId) {
-      toast.error("Please select a user");
-      return;
-    }
+  const seedDatabase = async () => {
+    if (!confirm("This will create 5 students, 2 counselors, and 1 admin. Continue?")) return;
 
-    const validMessages = customMessages.filter((m) => m.trim());
-    if (validMessages.length === 0) {
-      toast.error("Please add at least one message");
-      return;
-    }
-
-    setLoading("custom-conversation");
+    setLoadingUsers(true);
     try {
-      if (useRealChat) {
-        // New: Simulate real chat with AI responses
-        const response = await fetch("http://localhost:8000/api/v1/admin/testing/chat-simulation", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            user_id: selectedUserId,
-            user_messages: validMessages,
-            enable_sta: true,
-            enable_sca: true,
-          }),
-        });
+      const response = await fetch("http://localhost:8000/api/v1/admin/testing/seed", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          users_count: 5,
+          counselors_count: 2,
+          admins_count: 1
+        }),
+      });
 
-        if (!response.ok) throw new Error("Failed to simulate real chat");
-        const data = await response.json();
-
-        toast.success(
-          `Real chat simulated! ${data.conversation_turns} turns with AI responses. ${data.case_created ? "Case created ✓" : ""}`
-        );
-
-        if (data.case_created) {
-          toast.success("Case automatically created from risk assessment", { icon: "🚨" });
-        }
-
-        setCustomMessages([""]);
-        setShowConversationForm(false);
-      } else {
-        // Old: Direct conversation creation without chat
-        const response = await fetch("http://localhost:8000/api/v1/admin/testing/conversations", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          credentials: "include",
-          body: JSON.stringify({
-            user_id: selectedUserId,
-            messages: validMessages,
-            risk_level: selectedRiskLevel,
-            auto_classify: true,
-          }),
-        });
-
-        if (!response.ok) throw new Error("Failed to simulate conversation");
-        const data = await response.json();
-
-        toast.success(
-          `Conversation created! ${data.messages_created} messages, Classification: ${data.classification?.severity || "N/A"}`
-        );
-
-        if (data.case_created) {
-          toast.success("Case automatically created (high/critical risk)", { icon: "🚨" });
-        }
-
-        setCustomMessages([""]);
-        setShowConversationForm(false);
-      }
+      if (!response.ok) throw new Error("Failed to seed database");
+      const data = await response.json();
+      toast.success(`Seeded: ${data.users_created} users, ${data.counselors_created} counselors, ${data.admins_created} admins`);
+      await loadTestUsers();
     } catch (error) {
       console.error("Error:", error);
-      toast.error("Failed to simulate conversation");
+      toast.error("Failed to seed database");
     } finally {
-      setLoading(null);
+      setLoadingUsers(false);
     }
   };
 
@@ -384,437 +283,788 @@ export default function TestingPage() {
     }
   };
 
+  // 2. Simulation
+  const simulateCustomConversation = async () => {
+    if (!selectedUserId) {
+      toast.error("Please select a user");
+      return;
+    }
+
+    const validMessages = customMessages.filter((m) => m.trim());
+    if (validMessages.length === 0) {
+      toast.error("Please add at least one message");
+      return;
+    }
+
+    setLoading("custom-conversation");
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/admin/testing/chat-simulation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          user_id: selectedUserId,
+          user_messages: validMessages,
+          enable_sta: true,
+          enable_sca: true,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to simulate real chat");
+      const data = await response.json();
+
+      toast.success(
+        `Simulation complete! ${data.conversation_turns} turns. ${data.case_created ? "Case created ✓" : ""}`
+      );
+
+      if (data.agent_routing_log) {
+        setSimulationLogs(data.agent_routing_log);
+      }
+
+      setCustomMessages([""]);
+      setShowConversationForm(false);
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Failed to simulate conversation");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const generateConversation = async (scenario: ConversationScenario) => {
+    setLoading(scenario.id);
+
+    if (testUsers.length === 0) {
+      toast.error("Please create a test user first");
+      setLoading(null);
+      return;
+    }
+
+    const testUser = testUsers[0]; // Use first test user
+
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/admin/testing/chat-simulation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({
+          user_id: testUser.id,
+          user_messages: [scenario.userMessage],
+          enable_sta: true,
+          enable_sca: true,
+        }),
+      });
+
+      if (!response.ok) throw new Error("Failed to simulate real chat");
+      const data = await response.json();
+
+      toast.success(
+        `${scenario.name} - AI Responded! ${data.case_created ? "Case created ✓" : ""}`
+      );
+
+      if (data.case_created) {
+        setGeneratedCases((prev) => [
+          ...prev,
+          {
+            scenario: scenario.name,
+            severity: data.risk_assessment?.severity || "unknown",
+            caseId: data.session_id,
+          },
+        ]);
+      }
+
+      if (data.agent_routing_log) {
+        setSimulationLogs(data.agent_routing_log);
+      }
+
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Failed to generate conversation");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  // 3. Verification
+  // 3. Verification
+  const runBatchTest = async (fullEval: boolean = false) => {
+    setLoading("batch");
+    try {
+      let body: any = {};
+
+      if (fullEval) {
+        body = { rq1_eval_file: "rq1" };
+      } else {
+        const batchScenarios = scenarios.map(s => ({
+          id: s.id,
+          input: s.userMessage,
+          expected_risk: s.riskLevel
+        }));
+        body = { scenarios: batchScenarios };
+      }
+
+      const response = await fetch("http://localhost:8000/api/v1/admin/testing/batch-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify(body),
+      });
+
+      if (!response.ok) throw new Error("Failed to run batch test");
+      const data = await response.json();
+
+      setBatchResults(data.results);
+      setBatchSummary({
+        total: data.total_tests,
+        passed: data.passed,
+        failed: data.failed,
+        metrics: data.metrics
+      });
+
+      toast.success(`Batch Test: ${data.passed}/${data.total_tests} Passed`);
+
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Failed to run batch test");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const runRQ2Validation = async () => {
+    setLoading("rq2");
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/admin/testing/rq2/validation", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+
+      if (!response.ok) throw new Error("Failed to run RQ2 validation");
+      const data = await response.json();
+      setRq2Results(data.results);
+      toast.success("RQ2 Validation Complete");
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Failed to run RQ2 validation");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const runRQ3Generation = async () => {
+    setLoading("rq3");
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/admin/testing/rq3/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+
+      if (!response.ok) throw new Error("Failed to generate RQ3 responses");
+      const data = await response.json();
+      setRq3Responses(data.responses);
+      toast.success("RQ3 Responses Generated");
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Failed to generate responses");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  // --- Render Helpers ---
+  const renderTabButton = (id: "data" | "simulation" | "verification", label: string, icon: React.ReactNode) => (
+    <button
+      onClick={() => setActiveTab(id)}
+      className={`flex items-center gap-2 px-6 py-3 font-semibold transition-all border-b-2 ${activeTab === id
+        ? "border-[#FFCA40] text-[#FFCA40] bg-white/5"
+        : "border-transparent text-white/60 hover:text-white hover:bg-white/5"
+        }`}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold text-white mb-2">Testing Dashboard</h1>
+            <h1 className="text-2xl font-bold text-white mb-2">Developer Playground</h1>
             <p className="text-white/70">
-              Comprehensive testing suite for user creation, conversation simulation, and case generation
+              System verification suite for Thesis Research Questions (RQ1-RQ4)
             </p>
           </div>
-        </div>
-
-        <div className="mt-4 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-          <div className="flex items-start gap-3">
-            <FiInfo className="text-blue-400 mt-0.5 flex-shrink-0" size={18} />
-            <div>
-              <h3 className="font-semibold text-blue-300 mb-2">Features:</h3>
-              <ul className="text-sm text-white/80 space-y-1.5">
-                <li>• Create test users with realistic profiles</li>
-                <li>• Generate pre-defined risk scenarios (low → critical)</li>
-                <li>• Simulate custom multi-turn conversations</li>
-                <li>• Auto-classify with STA agent and create cases</li>
-                <li>• All data directly integrates with real database</li>
-              </ul>
+          <div className="flex gap-2">
+            <div className="px-3 py-1 bg-blue-500/20 text-blue-300 rounded text-xs border border-blue-500/30">
+              Backend Connected
             </div>
-          </div>
-        </div>
-
-        {/* Real Chat Mode Toggle */}
-        <div className="mt-4 p-4 bg-green-500/10 border border-green-500/30 rounded-lg">
-          <div className="flex items-center justify-between">
-            <div>
-              <h3 className="font-semibold text-green-300 mb-1">Real Chat Simulation Mode</h3>
-              <p className="text-sm text-white/70">
-                {useRealChat 
-                  ? "✓ Messages are sent through /aika endpoint with real AI responses and STA risk detection"
-                  : "Direct database insertion without AI responses"}
-              </p>
-            </div>
-            <button
-              onClick={() => setUseRealChat(!useRealChat)}
-              className={`relative inline-flex h-8 w-14 items-center rounded-full transition-colors ${
-                useRealChat ? "bg-green-500" : "bg-gray-500"
-              }`}
-              aria-label="Toggle real chat simulation mode"
-            >
-              <span
-                className={`inline-block h-6 w-6 transform rounded-full bg-white transition-transform ${
-                  useRealChat ? "translate-x-7" : "translate-x-1"
-                }`}
-              />
-            </button>
           </div>
         </div>
       </div>
 
-      {/* User Management Section */}
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <FiUsers className="text-[#FFCA40]" size={24} />
-            <h2 className="text-xl font-bold text-white">Test User Management</h2>
-          </div>
-          <div className="flex gap-3">
-            <button
-              onClick={loadTestUsers}
-              disabled={loadingUsers}
-              className="px-4 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-all"
-              aria-label="Load test users from database"
-            >
-              {loadingUsers ? "Loading..." : "Load Users"}
-            </button>
-            <button
-              onClick={() => setShowUserForm(!showUserForm)}
-              className="px-4 py-2 bg-[#FFCA40] text-[#001D58] font-semibold rounded-lg hover:bg-[#FFD966] transition-all"
-              aria-label="Create new test user"
-            >
-              <FiPlus className="inline mr-2" />
-              New User
-            </button>
-          </div>
-        </div>
+      {/* Tabs */}
+      <div className="flex border-b border-white/10 mb-6">
+        {renderTabButton("data", "Data Management", <FiDatabase />)}
+        {renderTabButton("simulation", "Simulation Lab", <FiActivity />)}
+        {renderTabButton("verification", "RQ Verification", <FiClipboard />)}
+      </div>
 
-        {showUserForm && (
-          <div className="mb-4 p-4 bg-white/5 rounded-lg border border-white/10">
-            <div className="grid grid-cols-2 gap-4 mb-4">
-              <div>
-                <label htmlFor="user-name" className="block text-sm font-medium text-white/80 mb-2">
-                  Name *
-                </label>
-                <input
-                  id="user-name"
-                  type="text"
-                  value={newUserName}
-                  onChange={(e) => setNewUserName(e.target.value)}
-                  placeholder="e.g., Budi Santoso"
-                  className="w-full px-4 py-2 bg-black/30 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#FFCA40]"
-                />
-              </div>
-              <div>
-                <label htmlFor="user-email" className="block text-sm font-medium text-white/80 mb-2">
-                  Email (optional - auto-generated if empty)
-                </label>
-                <input
-                  id="user-email"
-                  type="email"
-                  value={newUserEmail}
-                  onChange={(e) => setNewUserEmail(e.target.value)}
-                  placeholder="e.g., budi.test@ugm.ac.id"
-                  className="w-full px-4 py-2 bg-black/30 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#FFCA40]"
-                />
-              </div>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={createTestUser}
-                disabled={loadingUsers}
-                className="px-4 py-2 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 disabled:opacity-50 transition-all"
-                aria-label="Create test user"
-              >
-                Create User
-              </button>
-              <button
-                onClick={() => {
-                  setShowUserForm(false);
-                  setNewUserName("");
-                  setNewUserEmail("");
-                }}
-                className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all"
-                aria-label="Cancel user creation"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        )}
-
-        {testUsers.length > 0 && (
-          <div className="space-y-2">
-            <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-white/60">Total: {testUsers.length} test users</p>
-              <button
-                onClick={deleteAllTestData}
-                className="px-3 py-1.5 bg-red-500/20 text-red-300 text-sm font-medium rounded hover:bg-red-500/30 transition-all border border-red-500/30"
-                aria-label="Delete all test users and their data"
-              >
-                <FiTrash2 className="inline mr-1" size={14} />
-                Delete All
-              </button>
-            </div>
-            {testUsers.map((user) => (
-              <div
-                key={user.id}
-                className="flex items-center justify-between p-3 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors"
-              >
-                <div>
-                  <span className="font-semibold text-white">{user.name}</span>
-                  <span className="ml-3 text-sm text-white/60">{user.email}</span>
-                  <span className="ml-3 text-xs text-white/40">ID: {user.id}</span>
-                </div>
+      {/* Tab Content: Data Management */}
+      {activeTab === "data" && (
+        <div className="space-y-6">
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <FiUsers className="text-[#FFCA40]" />
+                Test Data Management
+              </h2>
+              <div className="flex gap-3">
                 <button
-                  onClick={() => {
-                    setSelectedUserId(user.id);
-                    setShowConversationForm(true);
-                    toast.success(`Selected user: ${user.name}`);
-                  }}
-                  className="px-3 py-1.5 bg-blue-500/20 text-blue-300 text-sm rounded hover:bg-blue-500/30 transition-all border border-blue-500/30"
-                  aria-label={`Simulate conversation for ${user.name}`}
+                  onClick={seedDatabase}
+                  disabled={loadingUsers}
+                  className="px-4 py-2 bg-purple-500 text-white font-semibold rounded-lg hover:bg-purple-600 disabled:opacity-50 transition-all"
                 >
-                  <FiMessageSquare className="inline mr-1" size={14} />
-                  Simulate Conversation
+                  <FiDatabase className="inline mr-2" />
+                  Seed Database
+                </button>
+                <button
+                  onClick={() => setShowUserForm(!showUserForm)}
+                  className="px-4 py-2 bg-[#FFCA40] text-[#001D58] font-semibold rounded-lg hover:bg-[#FFD966] transition-all"
+                >
+                  <FiPlus className="inline mr-2" />
+                  New User
+                </button>
+                <button
+                  onClick={deleteAllTestData}
+                  className="px-4 py-2 bg-red-500/20 text-red-300 font-semibold rounded-lg hover:bg-red-500/30 border border-red-500/30 transition-all"
+                >
+                  <FiTrash2 className="inline mr-2" />
+                  Reset All
                 </button>
               </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Custom Conversation Section */}
-      {showConversationForm && (
-        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <FiMessageSquare className="text-[#FFCA40]" size={24} />
-              <h2 className="text-xl font-bold text-white">Simulate Custom Conversation</h2>
-            </div>
-            <button
-              onClick={() => setShowConversationForm(false)}
-              className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-              aria-label="Close conversation form"
-            >
-              <FiX className="text-white" size={20} />
-            </button>
-          </div>
-
-          <div className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">Selected User</label>
-              <div className="px-4 py-2 bg-black/30 border border-white/20 rounded-lg text-[#FFCA40]">
-                {testUsers.find((u) => u.id === selectedUserId)?.name || "None"} (ID: {selectedUserId})
-              </div>
             </div>
 
-            <div>
-              <label htmlFor="risk-level" className="block text-sm font-medium text-white/80 mb-2">
-                Expected Risk Level
-              </label>
-              <select
-                id="risk-level"
-                value={selectedRiskLevel}
-                onChange={(e) => setSelectedRiskLevel(e.target.value)}
-                className="w-full px-4 py-2 bg-black/30 border border-white/20 rounded-lg text-white focus:outline-none focus:border-[#FFCA40]"
-                aria-label="Select expected risk level for conversation"
-              >
-                <option value="low">Low</option>
-                <option value="med">Medium</option>
-                <option value="high">High</option>
-                <option value="critical">Critical</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-white/80 mb-2">
-                User Messages (multi-turn conversation)
-              </label>
-              {customMessages.map((msg, idx) => (
-                <div key={idx} className="flex gap-2 mb-2">
-                  <input
-                    type="text"
-                    value={msg}
-                    onChange={(e) => {
-                      const updated = [...customMessages];
-                      updated[idx] = e.target.value;
-                      setCustomMessages(updated);
-                    }}
-                    placeholder={`Message ${idx + 1}`}
-                    aria-label={`User message ${idx + 1}`}
-                    className="flex-1 px-4 py-2 bg-black/30 border border-white/20 rounded-lg text-white placeholder-white/40 focus:outline-none focus:border-[#FFCA40]"
-                  />
-                  {customMessages.length > 1 && (
-                    <button
-                      onClick={() => setCustomMessages(customMessages.filter((_, i) => i !== idx))}
-                      className="px-3 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30 transition-all"
-                      aria-label={`Remove message ${idx + 1}`}
-                    >
-                      <FiX size={18} />
-                    </button>
-                  )}
-                </div>
-              ))}
-              <button
-                onClick={() => setCustomMessages([...customMessages, ""])}
-                className="mt-2 px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all text-sm"
-                aria-label="Add another message to conversation"
-              >
-                <FiPlus className="inline mr-1" />
-                Add Message
-              </button>
-            </div>
-
-            <button
-              onClick={simulateCustomConversation}
-              disabled={loading === "custom-conversation"}
-              className="w-full px-6 py-3 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 disabled:opacity-50 transition-all shadow-lg"
-              aria-label="Simulate conversation with current messages"
-            >
-              {loading === "custom-conversation" ? (
-                <>
-                  <span className="inline-block animate-spin mr-2">⏳</span>
-                  Simulating...
-                </>
-              ) : (
-                <>
-                  <FiPlay className="inline mr-2" />
-                  Simulate Conversation
-                </>
-              )}
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Pre-defined Scenarios Section */}
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xl font-bold text-white">Pre-defined Risk Scenarios</h2>
-          <div className="flex gap-3">
-            <button
-              onClick={generateAllScenarios}
-              disabled={loading !== null}
-              className="px-6 py-3 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg shadow-blue-500/20 hover:shadow-blue-500/40"
-              aria-label="Generate all pre-defined scenarios"
-            >
-              <FiPlay className="inline mr-2" />
-              Generate All
-            </button>
-            <button
-              onClick={clearGeneratedCases}
-              className="px-6 py-3 bg-white/10 text-white font-semibold rounded-lg hover:bg-white/20 transition-all border border-white/10"
-              aria-label="Clear generated cases list"
-            >
-              <FiTrash2 className="inline mr-2" />
-              Clear List
-            </button>
-            <a
-              href="/admin/cases"
-              className="px-6 py-3 bg-[#FFCA40] text-[#001D58] font-semibold rounded-lg hover:bg-[#FFD966] transition-all shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/40"
-              aria-label="View cases in case management page"
-            >
-              <FiEye className="inline mr-2" />
-              View Cases →
-            </a>
-          </div>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {scenarios.map((scenario) => (
-            <div
-              key={scenario.id}
-              className={`border-2 rounded-lg p-5 bg-white/5 backdrop-blur-sm ${riskLevelColors[scenario.riskLevel]} transition-all hover:scale-[1.02]`}
-            >
-              <div className="flex items-start justify-between mb-3">
-                <div className="flex items-start gap-3">
-                  <div className="mt-1">{riskLevelIcons[scenario.riskLevel]}</div>
+            {showUserForm && (
+              <div className="mb-6 p-4 bg-white/5 rounded-lg border border-white/10 animate-in fade-in slide-in-from-top-2">
+                <div className="grid grid-cols-3 gap-4 mb-4">
                   <div>
-                    <h3 className="text-lg font-bold mb-1">{scenario.name}</h3>
-                    <span className="inline-block px-3 py-1 text-xs font-semibold bg-white/20 backdrop-blur-sm rounded-full border border-white/20">
-                      {scenario.riskLevel.toUpperCase()}
-                    </span>
+                    <label className="block text-sm font-medium text-white/80 mb-2">Name</label>
+                    <input
+                      type="text"
+                      value={newUserName}
+                      onChange={(e) => setNewUserName(e.target.value)}
+                      placeholder="e.g., Budi Santoso"
+                      className="w-full px-4 py-2 bg-black/30 border border-white/20 rounded-lg text-white focus:border-[#FFCA40]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-white/80 mb-2">Email (Optional)</label>
+                    <input
+                      type="email"
+                      value={newUserEmail}
+                      onChange={(e) => setNewUserEmail(e.target.value)}
+                      placeholder="Auto-generated if empty"
+                      className="w-full px-4 py-2 bg-black/30 border border-white/20 rounded-lg text-white focus:border-[#FFCA40]"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-white/80 mb-2">Role</label>
+                    <select
+                      value={newUserRole}
+                      onChange={(e) => setNewUserRole(e.target.value)}
+                      className="w-full px-4 py-2 bg-black/30 border border-white/20 rounded-lg text-white focus:border-[#FFCA40]"
+                    >
+                      <option value="user">Student (User)</option>
+                      <option value="counselor">Counselor</option>
+                      <option value="admin">Admin</option>
+                    </select>
                   </div>
                 </div>
+                <div className="flex justify-end gap-3">
+                  <button
+                    onClick={() => setShowUserForm(false)}
+                    className="px-4 py-2 text-white/60 hover:text-white"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={createTestUser}
+                    disabled={loadingUsers}
+                    className="px-6 py-2 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600"
+                  >
+                    Create User
+                  </button>
+                </div>
               </div>
+            )}
 
-              <p className="text-sm mb-4 opacity-90">{scenario.description}</p>
-
-              <div className="mb-4 p-3 bg-black/20 backdrop-blur-sm rounded-lg border border-white/10">
-                <p className="text-xs font-semibold text-white/60 mb-2">User Message:</p>
-                <p className="text-sm text-white/90 italic leading-relaxed">&quot;{scenario.userMessage}&quot;</p>
-              </div>
-
-              <button
-                onClick={() => generateConversation(scenario)}
-                disabled={loading !== null}
-                className={`w-full px-4 py-2.5 font-semibold rounded-lg transition-all ${
-                  loading === scenario.id
-                    ? "bg-white/20 cursor-wait"
-                    : "bg-white/10 hover:bg-white/20 border border-white/20"
-                }`}
-                aria-label={`Generate ${scenario.name} scenario`}
-              >
-                {loading === scenario.id ? (
-                  <>
-                    <span className="inline-block animate-spin mr-2">⏳</span>
-                    Generating...
-                  </>
-                ) : (
-                  <>
-                    <FiPlay className="inline mr-2" />
-                    Generate
-                  </>
-                )}
-              </button>
+            <div className="overflow-hidden rounded-lg border border-white/10">
+              <table className="w-full text-left text-sm text-white/70">
+                <thead className="bg-white/5 text-white font-semibold">
+                  <tr>
+                    <th className="p-3">ID</th>
+                    <th className="p-3">Name</th>
+                    <th className="p-3">Email</th>
+                    <th className="p-3">Role</th>
+                    <th className="p-3">Created</th>
+                    <th className="p-3 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-white/10">
+                  {testUsers.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="p-8 text-center text-white/40">
+                        No test users found. Click "Seed Database" to get started.
+                      </td>
+                    </tr>
+                  ) : (
+                    testUsers.map((user) => (
+                      <tr key={user.id} className="hover:bg-white/5 transition-colors">
+                        <td className="p-3 font-mono text-xs">{user.id}</td>
+                        <td className="p-3 font-medium text-white">{user.name}</td>
+                        <td className="p-3">{user.email}</td>
+                        <td className="p-3">
+                          <span className={`px-2 py-1 rounded text-xs font-semibold ${user.role === 'admin' ? 'bg-red-500/20 text-red-300' :
+                            user.role === 'counselor' ? 'bg-purple-500/20 text-purple-300' :
+                              'bg-blue-500/20 text-blue-300'
+                            }`}>
+                            {user.role.toUpperCase()}
+                          </span>
+                        </td>
+                        <td className="p-3 text-xs">{new Date(user.created_at).toLocaleDateString()}</td>
+                        <td className="p-3 text-right">
+                          <button
+                            onClick={() => {
+                              setSelectedUserId(user.id);
+                              setActiveTab("simulation");
+                              setShowConversationForm(true);
+                              toast.success(`Selected ${user.name} for simulation`);
+                            }}
+                            className="text-[#FFCA40] hover:text-[#FFD966] mr-3"
+                          >
+                            Simulate
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* Generated Cases Log */}
-      {generatedCases.length > 0 && (
-        <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-white">Generated Cases ({generatedCases.length})</h2>
-          </div>
-          <div className="space-y-2">
-            {generatedCases.map((item, index) => (
-              <div
-                key={index}
-                className="flex items-center justify-between p-4 bg-white/5 rounded-lg border border-white/10 hover:bg-white/10 transition-colors"
-              >
-                <div>
-                  <span className="font-semibold text-white">{item.scenario}</span>
-                  <span className="ml-3 text-sm text-white/60">
-                    Severity: <span className="text-[#FFCA40]">{item.severity}</span>
-                  </span>
-                </div>
-                <div className="text-sm">
-                  <span className="text-white/60">Case ID: </span>
-                  <code className="bg-black/30 px-3 py-1.5 rounded font-mono text-xs text-[#FFCA40] border border-white/10">
-                    {item.caseId}
-                  </code>
-                </div>
-              </div>
-            ))}
           </div>
         </div>
       )}
 
-      {/* Technical Details */}
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
-        <h3 className="font-bold text-white mb-3 flex items-center gap-2">
-          <FiInfo size={18} />
-          API Endpoints
-        </h3>
-        <div className="text-sm text-white/70 space-y-2">
-          <div className="flex items-start gap-2">
-            <span className="text-white/50 font-medium min-w-[180px]">Create User:</span>
-            <code className="bg-black/30 px-2 py-1 rounded text-xs text-[#FFCA40] flex-1">
-              POST /api/v1/admin/testing/users
-            </code>
+      {/* Tab Content: Simulation Lab */}
+      {activeTab === "simulation" && (
+        <div className="space-y-6">
+          {/* Custom Simulation */}
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <FiMessageSquare className="text-[#FFCA40]" />
+                Interactive Chat Simulator
+              </h2>
+              <button
+                onClick={() => setShowConversationForm(!showConversationForm)}
+                className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-all"
+              >
+                {showConversationForm ? "Hide Form" : "Open Simulator"}
+              </button>
+            </div>
+
+            {showConversationForm && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                <div className="p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg mb-4">
+                  <p className="text-sm text-blue-200">
+                    <FiInfo className="inline mr-2" />
+                    Simulates a real conversation flow. Messages are sent to the AI, processed by agents (STA/CMA), and responses are returned.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-white/80 mb-2">Select User</label>
+                  <select
+                    value={selectedUserId || ""}
+                    onChange={(e) => setSelectedUserId(Number(e.target.value))}
+                    className="w-full px-4 py-2 bg-black/30 border border-white/20 rounded-lg text-white focus:border-[#FFCA40]"
+                  >
+                    <option value="">-- Select a User --</option>
+                    {testUsers.map((u) => (
+                      <option key={u.id} value={u.id}>
+                        {u.name} ({u.role})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-white/80 mb-2">User Messages</label>
+                  {customMessages.map((msg, idx) => (
+                    <div key={idx} className="flex gap-2 mb-2">
+                      <input
+                        type="text"
+                        value={msg}
+                        onChange={(e) => {
+                          const updated = [...customMessages];
+                          updated[idx] = e.target.value;
+                          setCustomMessages(updated);
+                        }}
+                        placeholder={`Message ${idx + 1}`}
+                        className="flex-1 px-4 py-2 bg-black/30 border border-white/20 rounded-lg text-white focus:border-[#FFCA40]"
+                      />
+                      {customMessages.length > 1 && (
+                        <button
+                          onClick={() => setCustomMessages(customMessages.filter((_, i) => i !== idx))}
+                          className="px-3 py-2 bg-red-500/20 text-red-300 rounded-lg hover:bg-red-500/30"
+                        >
+                          <FiX />
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                  <button
+                    onClick={() => setCustomMessages([...customMessages, ""])}
+                    className="text-sm text-[#FFCA40] hover:underline mt-1"
+                  >
+                    + Add another message
+                  </button>
+                </div>
+
+                <button
+                  onClick={simulateCustomConversation}
+                  disabled={loading === "custom-conversation"}
+                  className="w-full px-6 py-3 bg-green-500 text-white font-semibold rounded-lg hover:bg-green-600 disabled:opacity-50 transition-all shadow-lg"
+                >
+                  {loading === "custom-conversation" ? "Simulating..." : "Run Simulation"}
+                </button>
+              </div>
+            )}
+
+            {/* Simulation Logs */}
+            {simulationLogs.length > 0 && (
+              <div className="mt-6 p-4 bg-black/30 rounded-lg border border-white/10 font-mono text-sm">
+                <h3 className="text-white/60 mb-2 uppercase text-xs font-bold tracking-wider">Agent Routing Log</h3>
+                <div className="space-y-1">
+                  {simulationLogs.map((log, i) => (
+                    <div key={i} className="text-green-400">
+                      <span className="text-white/40 mr-2">[{new Date().toLocaleTimeString()}]</span>
+                      {log}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
-          <div className="flex items-start gap-2">
-            <span className="text-white/50 font-medium min-w-[180px]">Simulate Conversation:</span>
-            <code className="bg-black/30 px-2 py-1 rounded text-xs text-[#FFCA40] flex-1">
-              POST /api/v1/admin/testing/conversations
-            </code>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="text-white/50 font-medium min-w-[180px]">List Test Users:</span>
-            <code className="bg-black/30 px-2 py-1 rounded text-xs text-[#FFCA40] flex-1">
-              GET /api/v1/admin/testing/users
-            </code>
-          </div>
-          <div className="flex items-start gap-2">
-            <span className="text-white/50 font-medium min-w-[180px]">Cleanup:</span>
-            <code className="bg-black/30 px-2 py-1 rounded text-xs text-[#FFCA40] flex-1">
-              DELETE /api/v1/admin/testing/cleanup
-            </code>
+
+          {/* Pre-defined Scenarios */}
+          <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
+            <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+              <FiPlay className="text-[#FFCA40]" />
+              Scenario Runner
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {scenarios.map((scenario) => (
+                <div
+                  key={scenario.id}
+                  className={`border rounded-lg p-4 bg-white/5 ${riskLevelColors[scenario.riskLevel]} hover:bg-white/10 transition-all`}
+                >
+                  <div className="flex justify-between items-start mb-2">
+                    <div className="flex items-center gap-2">
+                      {riskLevelIcons[scenario.riskLevel]}
+                      <h3 className="font-bold">{scenario.name}</h3>
+                    </div>
+                    <span className="text-xs uppercase font-bold opacity-70 border border-current px-2 py-0.5 rounded">
+                      {scenario.riskLevel}
+                    </span>
+                  </div>
+                  <p className="text-sm opacity-80 mb-3">{scenario.description}</p>
+                  <div className="bg-black/20 p-2 rounded text-xs italic mb-3">
+                    "{scenario.userMessage}"
+                  </div>
+                  <button
+                    onClick={() => generateConversation(scenario)}
+                    disabled={loading !== null}
+                    className="w-full py-2 bg-white/10 hover:bg-white/20 rounded font-semibold text-sm transition-all"
+                  >
+                    {loading === scenario.id ? "Running..." : "Run Scenario"}
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
-      </div>
+      )}
+
+      {/* Tab Content: RQ Verification */}
+      {activeTab === "verification" && (
+        <div className="space-y-6">
+          {/* Sub-tabs for RQs */}
+          <div className="flex gap-4 border-b border-white/10 pb-4">
+            <button
+              onClick={() => setVerificationTab("rq1")}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${verificationTab === "rq1" ? "bg-[#FFCA40] text-[#001D58]" : "bg-white/5 text-white/60 hover:bg-white/10"}`}
+            >
+              RQ1: Crisis Detection
+            </button>
+            <button
+              onClick={() => setVerificationTab("rq2")}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${verificationTab === "rq2" ? "bg-[#FFCA40] text-[#001D58]" : "bg-white/5 text-white/60 hover:bg-white/10"}`}
+            >
+              RQ2: Orchestration
+            </button>
+            <button
+              onClick={() => setVerificationTab("rq3")}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${verificationTab === "rq3" ? "bg-[#FFCA40] text-[#001D58]" : "bg-white/5 text-white/60 hover:bg-white/10"}`}
+            >
+              RQ3: Coaching Quality
+            </button>
+          </div>
+
+          {/* RQ1 Content */}
+          {verificationTab === "rq1" && (
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <FiClipboard className="text-[#FFCA40]" />
+                    RQ1: Safety Classification Verification
+                  </h2>
+                  <p className="text-white/60 text-sm mt-1">
+                    Verify that the STA agent correctly classifies crisis vs non-crisis scenarios.
+                  </p>
+                </div>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => runBatchTest(false)}
+                    disabled={loading === "batch"}
+                    className="px-4 py-2 bg-white/10 text-white font-semibold rounded-lg hover:bg-white/20 disabled:opacity-50 transition-all"
+                  >
+                    Run Sample Batch (8)
+                  </button>
+                  <button
+                    onClick={() => runBatchTest(true)}
+                    disabled={loading === "batch"}
+                    className="px-6 py-2 bg-blue-500 text-white font-semibold rounded-lg hover:bg-blue-600 disabled:opacity-50 transition-all shadow-lg"
+                  >
+                    {loading === "batch" ? "Running Full Eval..." : "Run Full Evaluation (50)"}
+                  </button>
+                </div>
+              </div>
+
+              {batchSummary && (
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                  <div className="p-4 bg-white/5 rounded-lg border border-white/10 text-center">
+                    <div className="text-2xl font-bold text-white">{batchSummary.total}</div>
+                    <div className="text-xs text-white/60 uppercase">Total Tests</div>
+                  </div>
+                  <div className="p-4 bg-green-500/10 rounded-lg border border-green-500/30 text-center">
+                    <div className="text-2xl font-bold text-green-400">{batchSummary.passed}</div>
+                    <div className="text-xs text-green-300/60 uppercase">Passed</div>
+                  </div>
+                  <div className="p-4 bg-red-500/10 rounded-lg border border-red-500/30 text-center">
+                    <div className="text-2xl font-bold text-red-400">{batchSummary.failed}</div>
+                    <div className="text-xs text-red-300/60 uppercase">Failed</div>
+                  </div>
+                  <div className="p-4 bg-blue-500/10 rounded-lg border border-blue-500/30 text-center">
+                    <div className="text-2xl font-bold text-blue-400">
+                      {batchSummary.metrics ? `${(batchSummary.metrics.accuracy * 100).toFixed(0)}%` : "-"}
+                    </div>
+                    <div className="text-xs text-blue-300/60 uppercase">Accuracy</div>
+                  </div>
+                </div>
+              )}
+
+              {batchSummary?.metrics && (
+                <div className="grid grid-cols-4 gap-4 mb-6">
+                  <div className="p-3 bg-white/5 rounded border border-white/10">
+                    <div className="text-xs text-white/50">Sensitivity (Recall)</div>
+                    <div className="text-lg font-mono text-white">{batchSummary.metrics.sensitivity}</div>
+                  </div>
+                  <div className="p-3 bg-white/5 rounded border border-white/10">
+                    <div className="text-xs text-white/50">Specificity</div>
+                    <div className="text-lg font-mono text-white">{batchSummary.metrics.specificity}</div>
+                  </div>
+                  <div className="p-3 bg-white/5 rounded border border-white/10">
+                    <div className="text-xs text-white/50">Precision</div>
+                    <div className="text-lg font-mono text-white">{batchSummary.metrics.precision}</div>
+                  </div>
+                  <div className="p-3 bg-white/5 rounded border border-white/10">
+                    <div className="text-xs text-white/50">Confusion Matrix</div>
+                    <div className="text-xs font-mono text-white/70">
+                      TP:{batchSummary.metrics.confusion_matrix.tp} | TN:{batchSummary.metrics.confusion_matrix.tn}<br />
+                      FP:{batchSummary.metrics.confusion_matrix.fp} | FN:{batchSummary.metrics.confusion_matrix.fn}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {batchResults.length > 0 && (
+                <div className="overflow-hidden rounded-lg border border-white/10">
+                  <table className="w-full text-left text-sm text-white/70">
+                    <thead className="bg-white/5 text-white font-semibold">
+                      <tr>
+                        <th className="p-3">ID</th>
+                        <th className="p-3">Input</th>
+                        <th className="p-3">Expected</th>
+                        <th className="p-3">Actual</th>
+                        <th className="p-3">Result</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-white/10">
+                      {batchResults.map((result, idx) => (
+                        <tr key={idx} className="hover:bg-white/5 transition-colors">
+                          <td className="p-3 font-mono text-xs">{result.id}</td>
+                          <td className="p-3 truncate max-w-[300px]" title={result.input}>{result.input}</td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded text-xs ${result.expected === 'Crisis' ? 'bg-red-500/20 text-red-300' : 'bg-green-500/20 text-green-300'
+                              }`}>
+                              {result.expected}
+                            </span>
+                          </td>
+                          <td className="p-3">
+                            <span className={`px-2 py-0.5 rounded text-xs ${result.actual === 'Crisis' ? 'bg-red-500/20 text-red-300' : 'bg-green-500/20 text-green-300'
+                              }`}>
+                              {result.actual}
+                            </span>
+                            <div className="text-[10px] opacity-50 mt-1">Level: {result.risk_level}</div>
+                          </td>
+                          <td className="p-3">
+                            {result.passed ? (
+                              <span className="text-green-400 flex items-center gap-1">
+                                <FiCheckCircle size={14} /> PASS
+                              </span>
+                            ) : (
+                              <span className="text-red-400 flex items-center gap-1">
+                                <FiX size={14} /> FAIL
+                              </span>
+                            )}
+                            {result.error && <div className="text-xs text-red-400 mt-1">{result.error}</div>}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* RQ2 Content */}
+          {verificationTab === "rq2" && (
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <FiCpu className="text-[#FFCA40]" />
+                    RQ2: Orchestration Verification
+                  </h2>
+                  <p className="text-white/60 text-sm mt-1">
+                    Verify that the multi-agent framework correctly routes users to the appropriate agent.
+                  </p>
+                </div>
+                <button
+                  onClick={runRQ2Validation}
+                  disabled={loading === "rq2"}
+                  className="px-6 py-3 bg-purple-500 text-white font-semibold rounded-lg hover:bg-purple-600 disabled:opacity-50 transition-all shadow-lg"
+                >
+                  {loading === "rq2" ? "Validating Flows..." : "Run Flow Validation"}
+                </button>
+              </div>
+
+              {rq2Results.length > 0 ? (
+                <div className="space-y-4">
+                  {rq2Results.map((res, idx) => (
+                    <div key={idx} className="p-4 bg-white/5 rounded-lg border border-white/10">
+                      <div className="flex justify-between items-center mb-2">
+                        <div className="font-bold text-white">{res.flow_id}</div>
+                        <div className={`px-2 py-1 rounded text-xs font-bold ${res.passed ? 'bg-green-500/20 text-green-300' : 'bg-yellow-500/20 text-yellow-300'}`}>
+                          {res.status}
+                        </div>
+                      </div>
+                      <div className="text-sm text-white/60">{res.details}</div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-white/40 border border-dashed border-white/10 rounded-lg">
+                  Click "Run Flow Validation" to verify orchestration flows.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* RQ3 Content */}
+          {verificationTab === "rq3" && (
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <FiMessageSquare className="text-[#FFCA40]" />
+                    RQ3: Coaching Quality Verification
+                  </h2>
+                  <p className="text-white/60 text-sm mt-1">
+                    Generate and evaluate coaching responses for empathy and clinical appropriateness.
+                  </p>
+                </div>
+                <button
+                  onClick={runRQ3Generation}
+                  disabled={loading === "rq3"}
+                  className="px-6 py-3 bg-pink-500 text-white font-semibold rounded-lg hover:bg-pink-600 disabled:opacity-50 transition-all shadow-lg"
+                >
+                  {loading === "rq3" ? "Generating Responses..." : "Generate Responses"}
+                </button>
+              </div>
+
+              {rq3Responses.length > 0 ? (
+                <div className="grid grid-cols-1 gap-6">
+                  {rq3Responses.map((res, idx) => (
+                    <div key={idx} className="p-6 bg-white/5 rounded-lg border border-white/10">
+                      <div className="flex justify-between mb-4">
+                        <span className="text-xs font-mono text-white/40">{res.id}</span>
+                        <span className="px-2 py-1 bg-white/10 rounded text-xs text-white/70">{res.category}</span>
+                      </div>
+                      <div className="mb-4">
+                        <div className="text-xs text-white/40 uppercase mb-1">User Prompt</div>
+                        <div className="text-white/90 italic">"{res.prompt}"</div>
+                      </div>
+                      <div className="mb-4">
+                        <div className="text-xs text-white/40 uppercase mb-1">AI Response</div>
+                        <div className="p-4 bg-black/20 rounded text-white/80 text-sm whitespace-pre-wrap">{res.response}</div>
+                      </div>
+
+                      {/* Manual Grading UI Placeholder */}
+                      <div className="border-t border-white/10 pt-4 mt-4">
+                        <div className="text-xs text-white/40 uppercase mb-2">Manual Grading</div>
+                        <div className="flex gap-4">
+                          {["Empathy", "CBT Techniques", "Safety"].map(criteria => (
+                            <div key={criteria} className="flex items-center gap-2">
+                              <span className="text-xs text-white/60">{criteria}:</span>
+                              <div className="flex gap-1">
+                                {[1, 2, 3, 4, 5].map(star => (
+                                  <button key={star} className="w-4 h-4 rounded-full bg-white/10 hover:bg-[#FFCA40] transition-colors"></button>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-center py-12 text-white/40 border border-dashed border-white/10 rounded-lg">
+                  Click "Generate Responses" to start the evaluation.
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

@@ -2,10 +2,10 @@
  * LangGraph Monitoring Dashboard
  * 
  * Purpose: Real-time monitoring and analytics for all LangGraph StateGraphs
- * - Graph health status (STA/TCA/CMA/IA/AIKA/Orchestrator)
- * - Execution history with filtering
- * - Performance analytics
- * - Active alerts
+ * - Interactive Agentic Architecture Graph
+ * - Detailed Agent Metrics
+ * - Execution History
+ * - System Alerts
  * 
  * User Role: Admin only
  */
@@ -13,151 +13,153 @@
 'use client';
 
 import { useState } from 'react';
-import { GraphHealthCards } from './components/GraphHealthCards';
+import { AgenticArchitectureGraph } from './components/AgenticArchitectureGraph';
+import { AgentDetailsPanel } from './components/AgentDetailsPanel';
 import { AnalyticsOverview } from './components/AnalyticsOverview';
 import { ExecutionHistoryTable } from './components/ExecutionHistoryTable';
 import { AlertsPanel } from './components/AlertsPanel';
+import { ArchitectureGuide } from './components/ArchitectureGuide';
 import { useLangGraphHealth } from './hooks/useLangGraphHealth';
 
 export default function LangGraphMonitoringPage() {
   const [analyticsDays, setAnalyticsDays] = useState(7);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const { loading, data, error, refetch } = useLangGraphHealth(30); // Auto-refresh every 30 seconds
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#00153a] via-[#001a47] to-[#00153a] p-8">
-      <div className="max-w-[1600px] mx-auto space-y-8">
+    <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] p-6 font-sans text-slate-200 selection:bg-[#FFCA40]/30 selection:text-[#FFCA40]">
+      {/* Background Ambient Effects */}
+      <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none z-0">
+        <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-blue-600/10 rounded-full blur-[120px] animate-pulse-slow"></div>
+        <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-purple-600/10 rounded-full blur-[120px] animate-pulse-slow delay-1000"></div>
+        <div className="absolute top-[20%] right-[20%] w-[30%] h-[30%] bg-emerald-500/5 rounded-full blur-[100px] animate-pulse-slow delay-2000"></div>
+      </div>
+
+      <div className="max-w-[1800px] mx-auto space-y-8 relative z-10">
         {/* Page Header */}
-        <div className="flex justify-between items-start">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 pb-6 border-b border-white/5">
           <div>
-            <h1 className="text-4xl font-bold text-white mb-2">LangGraph Monitoring</h1>
-            <p className="text-white/60">
-              Real-time execution monitoring and analytics for all Safety Agent Suite graphs
+            <h1 className="text-3xl font-bold text-white mb-2 tracking-tight">LangGraph Monitoring</h1>
+            <p className="text-white/60 text-sm">
+              Interactive visualization and analytics for the Safety Agent Suite
             </p>
           </div>
-          
+
           {/* Overall Status Badge */}
           {data && (
-            <div className={`flex items-center gap-2 backdrop-blur-sm rounded-lg px-4 py-2 border ${
-              data.overall_status === 'healthy' ? 'bg-emerald-500/20 border-emerald-500/30' :
-              data.overall_status === 'degraded' ? 'bg-yellow-500/20 border-yellow-500/30' :
-              'bg-red-500/20 border-red-500/30'
-            }`}>
-              <div className={`h-3 w-3 rounded-full animate-pulse ${
-                data.overall_status === 'healthy' ? 'bg-emerald-400' :
-                data.overall_status === 'degraded' ? 'bg-yellow-400' : 'bg-red-400'
-              }`}></div>
-              <span className={`text-sm font-semibold uppercase ${
-                data.overall_status === 'healthy' ? 'text-emerald-300' :
-                data.overall_status === 'degraded' ? 'text-yellow-300' : 'text-red-300'
+            <div className={`flex items-center gap-3 backdrop-blur-sm border rounded-lg px-4 py-2.5 transition-all duration-500 ${data.overall_status === 'healthy' ? 'bg-emerald-500/10 border-emerald-500/20' :
+                data.overall_status === 'degraded' ? 'bg-yellow-500/10 border-yellow-500/20' :
+                  'bg-red-500/10 border-red-500/20'
               }`}>
-                {data.overall_status}
-              </span>
+              <div className="relative flex h-3 w-3">
+                <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${data.overall_status === 'healthy' ? 'bg-emerald-400' :
+                    data.overall_status === 'degraded' ? 'bg-yellow-400' : 'bg-red-400'
+                  }`}></span>
+                <span className={`relative inline-flex rounded-full h-3 w-3 ${data.overall_status === 'healthy' ? 'bg-emerald-500' :
+                    data.overall_status === 'degraded' ? 'bg-yellow-500' : 'bg-red-500'
+                  }`}></span>
+              </div>
+              <div className="flex flex-col">
+                <span className={`text-xs font-medium uppercase tracking-wider ${data.overall_status === 'healthy' ? 'text-emerald-400' :
+                    data.overall_status === 'degraded' ? 'text-yellow-400' : 'text-red-400'
+                  }`}>
+                  {data.overall_status} System
+                </span>
+              </div>
             </div>
           )}
         </div>
 
         {/* Error State */}
         {error && (
-          <div className="bg-red-500/10 backdrop-blur-sm border border-red-500/30 rounded-xl p-4">
-            <div className="flex items-center gap-2">
-              <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+          <div className="bg-red-500/10 backdrop-blur-md border border-red-500/20 rounded-2xl p-6 flex items-center gap-4 shadow-lg shadow-red-500/5">
+            <div className="bg-red-500/20 p-3 rounded-xl">
+              <svg className="h-6 w-6 text-red-400" fill="currentColor" viewBox="0 0 20 20">
                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
               </svg>
-              <span className="text-red-300 text-sm font-medium">Failed to load health data: {error}</span>
-              <button
-                onClick={refetch}
-                className="ml-auto px-3 py-1 bg-red-500/20 text-red-300 border border-red-500/30 rounded text-sm hover:bg-red-500/30 transition-colors"
-              >
-                Retry
-              </button>
             </div>
+            <div>
+              <h3 className="text-red-300 font-bold">Connection Error</h3>
+              <p className="text-red-300/70 text-sm">Failed to load health data: {error}</p>
+            </div>
+            <button
+              onClick={refetch}
+              className="ml-auto px-6 py-2 bg-red-500/20 text-red-300 border border-red-500/30 rounded-xl text-sm font-bold hover:bg-red-500/30 transition-all hover:scale-105 active:scale-95"
+            >
+              Retry Connection
+            </button>
           </div>
         )}
 
-        {/* Graph Health Cards */}
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-semibold text-white">Graph Health Status</h2>
-            {data && (
-              <span className="text-xs text-white/40">
-                Last updated: {new Date(data.last_updated).toLocaleTimeString()}
-              </span>
-            )}
-          </div>
-          <GraphHealthCards graphs={data?.graphs || []} loading={loading} />
-        </div>
-
-        {/* Analytics Overview with Time Period Selector */}
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-2xl font-semibold text-white">Analytics Overview</h2>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setAnalyticsDays(7)}
-                className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
-                  analyticsDays === 7
-                    ? 'bg-[#FFCA40] text-[#00153a]'
-                    : 'bg-white/5 text-white/60 hover:bg-white/10'
-                }`}
-              >
-                7 days
-              </button>
-              <button
-                onClick={() => setAnalyticsDays(30)}
-                className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
-                  analyticsDays === 30
-                    ? 'bg-[#FFCA40] text-[#00153a]'
-                    : 'bg-white/5 text-white/60 hover:bg-white/10'
-                }`}
-              >
-                30 days
-              </button>
-              <button
-                onClick={() => setAnalyticsDays(90)}
-                className={`px-3 py-1 text-sm font-medium rounded-lg transition-colors ${
-                  analyticsDays === 90
-                    ? 'bg-[#FFCA40] text-[#00153a]'
-                    : 'bg-white/5 text-white/60 hover:bg-white/10'
-                }`}
-              >
-                90 days
-              </button>
-            </div>
-          </div>
-          <AnalyticsOverview days={analyticsDays} />
-        </div>
-
-        {/* Alerts Panel */}
-        <div>
-          <AlertsPanel />
-        </div>
-
-        {/* Execution History Table */}
-        <div>
-          <ExecutionHistoryTable limit={50} />
-        </div>
-
-        {/* Info Footer */}
-        <div className="bg-blue-500/10 backdrop-blur-sm border border-blue-500/30 rounded-xl p-4">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-blue-400" fill="currentColor" viewBox="0 0 20 20">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
-              </svg>
-            </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-300">About This Dashboard</h3>
-              <div className="mt-2 text-sm text-blue-200/80">
-                <p>
-                  This dashboard monitors all LangGraph StateGraphs in the Safety Agent Suite.
-                  Health data auto-refreshes every 30 seconds. Click on execution history rows
-                  to view detailed traces. Resolve alerts when issues are addressed.
-                </p>
+        {/* Main Content Grid */}
+        <div className="grid grid-cols-12 gap-8">
+          {/* Left Column: Graph & Analytics (8 cols) */}
+          <div className="col-span-12 lg:col-span-8 space-y-10">
+            {/* Agentic Architecture Graph */}
+            <div className="space-y-6">
+              <div className="flex justify-between items-end px-2">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                  <span className="text-3xl">🕸️</span> Agentic Architecture
+                </h2>
+                <span className="text-sm font-medium text-white/40 bg-white/5 px-3 py-1 rounded-full border border-white/5">
+                  Click nodes to view detailed metrics
+                </span>
               </div>
+              <AgenticArchitectureGraph
+                onNodeClick={setSelectedAgentId}
+                healthData={data}
+              />
+            </div>
+
+            {/* Architecture Guide */}
+            <ArchitectureGuide />
+
+            {/* Analytics Overview */}
+            <div className="space-y-6">
+              <div className="flex justify-between items-center px-2">
+                <h2 className="text-2xl font-bold text-white flex items-center gap-3">
+                  <span className="text-3xl">📈</span> Performance Analytics
+                </h2>
+                <div className="flex bg-white/5 p-1.5 rounded-xl border border-white/5">
+                  {[7, 30, 90].map((days) => (
+                    <button
+                      key={days}
+                      onClick={() => setAnalyticsDays(days)}
+                      className={`px-4 py-1.5 text-xs font-bold rounded-lg transition-all ${analyticsDays === days
+                        ? 'bg-[#FFCA40] text-[#00153a] shadow-lg scale-105'
+                        : 'text-white/40 hover:text-white'
+                        }`}
+                    >
+                      {days}d
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <AnalyticsOverview days={analyticsDays} />
+            </div>
+          </div>
+
+          {/* Right Column: Alerts & History (4 cols) */}
+          <div className="col-span-12 lg:col-span-4 space-y-8 flex flex-col">
+            {/* Alerts Panel */}
+            <div className="flex-1 min-h-[400px]">
+              <AlertsPanel />
+            </div>
+
+            {/* Execution History (Compact) */}
+            <div className="flex-1">
+              <ExecutionHistoryTable limit={10} />
             </div>
           </div>
         </div>
       </div>
+
+      {/* Slide-over Details Panel */}
+      <AgentDetailsPanel
+        agentId={selectedAgentId}
+        onClose={() => setSelectedAgentId(null)}
+        healthData={data}
+      />
     </div>
   );
 }

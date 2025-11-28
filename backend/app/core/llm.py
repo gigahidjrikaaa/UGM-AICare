@@ -271,9 +271,14 @@ async def generate_gemini_response(
         
         # Add tools if provided
         if tools:
-            converted_tools = _convert_tool_schemas_for_new_sdk(tools)
-            config.tools = converted_tools
-            logger.debug(f"Enabled {len(tools)} tool(s) for this request")
+            # Check if tools are already in new SDK format (types.Tool)
+            if tools and isinstance(tools[0], types.Tool):
+                config.tools = tools
+                logger.debug(f"Using {len(tools)} pre-converted tool(s) for this request")
+            else:
+                converted_tools = _convert_tool_schemas_for_new_sdk(tools)
+                config.tools = converted_tools
+                logger.debug(f"Enabled {len(tools)} tool(s) for this request")
         
         # Add safety settings
         config.safety_settings = [
@@ -492,9 +497,14 @@ async def stream_gemini_response(
         
         # Add tools if provided
         if tools:
-            converted_tools = _convert_tool_schemas_for_new_sdk(tools)
-            config.tools = converted_tools
-            logger.debug(f"Enabled {len(tools)} tool(s) for streaming request")
+            # Check if tools are already in new SDK format (types.Tool)
+            if tools and isinstance(tools[0], types.Tool):
+                config.tools = tools
+                logger.debug(f"Using {len(tools)} pre-converted tool(s) for streaming request")
+            else:
+                converted_tools = _convert_tool_schemas_for_new_sdk(tools)
+                config.tools = converted_tools
+                logger.debug(f"Enabled {len(tools)} tool(s) for streaming request")
 
         # Add safety settings
         config.safety_settings = [

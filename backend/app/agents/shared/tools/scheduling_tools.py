@@ -105,8 +105,8 @@ async def get_available_counselors(
                 "rating": p.rating,
                 "total_reviews": p.total_reviews,
                 "consultation_fee": p.consultation_fee,
-                "contact_email": p.contact_email,
-                "contact_phone": p.contact_phone,
+                # "contact_email": p.contact_email, # Not in model
+                # "contact_phone": p.contact_phone, # Not in model
                 "has_availability": bool(p.availability_schedule)
             })
         
@@ -320,13 +320,13 @@ async def book_appointment(
         
         # Create appointment
         appointment = Appointment(
-            student_id=user_id,
+            user_id=user_id, # Fixed: student_id -> user_id
             psychologist_id=psychologist_id,
             appointment_datetime=appt_dt,
             appointment_type_id=appointment_type_id,
             status="scheduled",
             notes=notes,
-            location="Ruang Konseling Gedung UC Lt. 3, Universitas Gadjah Mada"
+            # location="Ruang Konseling Gedung UC Lt. 3, Universitas Gadjah Mada" # Removed: Not in model
         )
         
         db.add(appointment)
@@ -343,18 +343,18 @@ async def book_appointment(
             "success": True,
             "appointment": {
                 "id": appointment.id,
-                "student_id": appointment.student_id,
+                "student_id": appointment.user_id,
                 "psychologist_id": appointment.psychologist_id,
                 "appointment_datetime": appointment.appointment_datetime.isoformat(),
                 "status": appointment.status,
                 "notes": appointment.notes,
-                "location": appointment.location,
+                # "location": appointment.location, # Removed
                 "psychologist": {
                     "id": psychologist.id,
                     "name": psychologist.name,
                     "specialization": psychologist.specialization,
-                    "contact_email": psychologist.contact_email,
-                    "contact_phone": psychologist.contact_phone
+                    # "contact_email": psychologist.contact_email, # Removed
+                    # "contact_phone": psychologist.contact_phone # Removed
                 },
                 "appointment_type": {
                     "id": appt_type.id if appt_type else None,
@@ -422,7 +422,7 @@ async def cancel_appointment(
             .where(
                 and_(
                     Appointment.id == appointment_id,
-                    Appointment.student_id == user_id
+                    Appointment.user_id == user_id # Fixed: student_id -> user_id
                 )
             )
         )
@@ -512,7 +512,7 @@ async def reschedule_appointment(
             .where(
                 and_(
                     Appointment.id == appointment_id,
-                    Appointment.student_id == user_id
+                    Appointment.user_id == user_id # Fixed: student_id -> user_id
                 )
             )
         )
@@ -558,4 +558,95 @@ async def reschedule_appointment(
             "success": False,
             "error": str(e),
             "message": "Failed to reschedule appointment"
+        }
+
+
+# ============================================================================
+# TOOL: Get User Appointments
+# ============================================================================
+
+@register_tool(
+    name="get_user_appointments",
+    description="""Get list of user's appointments (upcoming and past).
+
+✅ CALL WHEN:
+- User asks "jadwal saya kapan?", "cek appointment saya"
+- User wants to see their history
+- Before cancelling/rescheduling to get appointment IDs
+
+Returns list of appointments with details.""",
+    parameters={
+        "type": "object",
+        "properties": {
+            "status": {
+                "type": "string",
+                "enum": ["scheduled", "completed", "cancelled", "all"],
+                "description": "Filter by status (default: 'scheduled')"
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Max number of appointments to return (default: 5)"
+            }
+        },
+        "required": []
+    },
+    category="scheduling",
+    requires_db=True,
+    requires_user_id=True
+)
+async def get_user_appointments(
+    db: AsyncSession,
+    user_id: int,
+    status: str = "scheduled",
+    limit: int = 5,
+    **kwargs
+) -> Dict[str, Any]:
+    """Get user appointments."""
+    try:
+        query = select(Appointment).where(Appointment.user_id == user_id) # Fixed: student_id -> user_id
+        
+        if status != "all":
+            query = query.where(Appointment.status == status)
+            
+        # Order by datetime (upcoming first for scheduled, past first for others)
+        if status == "scheduled":
+            query = query.order_by(Appointment.appointment_datetime.asc())
+        else:
+            query = query.order_by(Appointment.appointment_datetime.desc())
+            
+        query = query.limit(limit)
+        
+        result = await db.execute(query)
+        appointments = result.scalars().all()
+        
+        # Get psychologist details for each appointment
+        appt_list = []
+        for appt in appointments:
+            psych_result = await db.execute(
+                select(Psychologist).where(Psychologist.id == appt.psychologist_id)
+            )
+            psych = psych_result.scalar_one_or_none()
+            
+            appt_list.append({
+                "id": appt.id,
+                "datetime": appt.appointment_datetime.isoformat(),
+                "status": appt.status,
+                "psychologist_name": psych.name if psych else "Unknown",
+                # "location": appt.location, # Removed
+                "notes": appt.notes
+            })
+            
+        return {
+            "success": True,
+            "appointments": appt_list,
+            "count": len(appt_list),
+            "message": f"Found {len(appt_list)} {status} appointment(s)"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error getting user appointments: {e}", exc_info=True)
+        return {
+            "success": False,
+            "error": str(e),
+            "appointments": []
         }

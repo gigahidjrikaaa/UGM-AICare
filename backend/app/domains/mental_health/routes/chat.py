@@ -33,14 +33,14 @@ from app.database import get_async_db
 from app.dependencies import get_current_active_user
 from app.models import User  # Core model
 from app.domains.mental_health.models import Conversation, UserSummary
-from app.domains.mental_health.schemas.chat import ChatRequest, ChatResponse, ConversationHistoryItem, AikaRequest, AikaResponse
+from app.domains.mental_health.schemas.chat import ConversationHistoryItem, AikaRequest, AikaResponse
 # Note: Integrating with LangGraph AikaOrchestrator for chat processing
 from app.domains.mental_health.services.personal_context import (
     build_user_personal_context,
     invalidate_user_personal_context,
 )
 from app.domains.mental_health.services.tool_calling import generate_with_tools
-from app.domains.mental_health.routes import aika_stream
+
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
 
@@ -102,7 +102,12 @@ async def process_chat_message(
         # Convert history to Aika format
         conversation_history = []
         if request.history:
-            for item in request.history:
+            for i, item in enumerate(request.history):
+                # Skip the last message if it matches the current request message
+                # This prevents double-input since frontend might send optimistic history
+                if i == len(request.history) - 1 and item.content == request.message:
+                    continue
+                    
                 if isinstance(item, dict):
                     conversation_history.append(item)
                 else:
@@ -199,8 +204,7 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1", tags=["Chat"])
 
-# Include streaming endpoint
-router.include_router(aika_stream.router)
+# Streaming endpoint is now included in main.py directly
 
 MIN_TURNS_FOR_SUMMARY = 1  # Reduced from 2 to 1 for better memory capture
 MAX_HISTORY_CHARS_FOR_SUMMARY = 15000
@@ -362,534 +366,167 @@ async def _streaming_tool_aware_llm_responder(
 
 # ===================== NEW: AIKA META-AGENT ENDPOINT =====================
 
-@router.post("/aika", response_model=AikaResponse, dependencies=[Depends(check_rate_limit_dependency)])
+# ===================== NEW: AIKA META-AGENT ENDPOINT (STREAMING) =====================
+
+@router.post("/aika", response_class=StreamingResponse, dependencies=[Depends(check_rate_limit_dependency)])
 async def handle_aika_request(
     request: AikaRequest = Body(...),
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_db),
-) -> AikaResponse:
+) -> StreamingResponse:
     """
-    🌟 Aika Meta-Agent Endpoint
+    🌟 Aika Meta-Agent Endpoint (Streaming)
     
-    This endpoint routes requests through Aika's orchestration graph,
-    which intelligently coordinates STA, SCA, SDA, and IA based on user role.
+    Routes requests through Aika's orchestration graph with real-time SSE updates.
     
-    **User Roles:**
-    - `student`: Safety triage → Coaching → Escalation if needed
-    - `admin`: Analytics and administrative actions
-    - `counselor`: Case management and clinical insights
-    
-    **Response Format:**
-    ```json
-    {
-        "success": true,
-        "response": "Aika's response",
-        "metadata": {
-            "session_id": "...",
-            "agents_invoked": ["STA", "SCA"],
-            "risk_level": "low",
-            "processing_time_ms": 1234.56
-        }
-    }
-    ```
-    
-    Args:
-        request: AikaRequest with message and conversation history
-        current_user: Authenticated user (auto-injected from token)
-        db: Database session
-        
-    Returns:
-        AikaResponse with Aika's response and metadata
+    **SSE Events:**
+    - `agent_start`: When an agent starts working
+    - `agent_update`: Progress updates from agents
+    - `agent_complete`: When an agent finishes
+    - `final_response`: The final text response
+    - `metadata`: Final execution metadata
+    - `error`: If something goes wrong
     """
     
-    try:
-        # Validate user_id matches authenticated user
-        if request.user_id != current_user.id:
-            raise HTTPException(
-                status_code=403,
-                detail="user_id in request must match authenticated user"
-            )
-        
-        # ✅ NEW: Use unified Aika orchestrator with direct LangGraph invocation
-        logger.info(
-            f"🤖 Processing Aika request via unified orchestrator: "
-            f"user={request.user_id}, role={request.role}, msg_len={len(request.message)}"
+    # Validate user_id matches authenticated user
+    if request.user_id != current_user.id:
+        raise HTTPException(
+            status_code=403,
+            detail="user_id in request must match authenticated user"
         )
-        
-        start_time = datetime.now()
-        
-        # Create Aika agent with in-memory checkpointing
-        memory = MemorySaver()
-        aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=memory)
-        
-        # conversation_history is already a List[Dict[str, str]] from the request schema
-        # No conversion needed!
-        
-        # Generate user hash for privacy (STA requires this)
-        import hashlib
-        user_hash = hashlib.sha256(f"user_{request.user_id}".encode()).hexdigest()[:16]
-        
-        # Prepare initial state for LangGraph
-        initial_state = {
-            "user_id": request.user_id,
-            "user_role": request.role,
-            "user_hash": user_hash,  # Required by STA for privacy
-            "message": request.message,
-            "conversation_history": request.conversation_history,  # Already in correct format
-            "session_id": request.session_id or f"sess_{request.user_id}_{int(datetime.now().timestamp())}",
-            # Initialize tracking lists
-            "execution_path": [],
-            "agents_invoked": [],
-            "errors": [],
-        }
-        
-        # Invoke Aika agent directly (agentic pattern - no wrapper!)
-        result = await aika_agent.ainvoke(
-            initial_state,
-            config={
+    
+    logger.info(
+        f"🤖 Processing Aika request via unified orchestrator (STREAMING): "
+        f"user={request.user_id}, role={request.role}, msg_len={len(request.message)}"
+    )
+    
+    async def event_generator() -> AsyncGenerator[str, None]:
+        try:
+            start_time = datetime.now()
+            
+            # Create Aika agent with in-memory checkpointing
+            memory = MemorySaver()
+            aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=memory)
+            
+            # Generate user hash for privacy
+            import hashlib
+            user_hash = hashlib.sha256(f"user_{request.user_id}".encode()).hexdigest()[:16]
+            
+            # Prepare initial state
+            initial_state = {
+                "user_id": request.user_id,
+                "user_role": request.role,
+                "user_hash": user_hash,
+                "message": request.message,
+                "conversation_history": request.conversation_history,
+                "session_id": request.session_id or f"sess_{request.user_id}_{int(datetime.now().timestamp())}",
+                "execution_path": [],
+                "agents_invoked": [],
+                "errors": [],
+            }
+            
+            config = {
                 "configurable": {
                     "thread_id": f"user_{request.user_id}_session_{request.session_id or 'default'}"
                 }
             }
-        )
-        
-        # Calculate processing time
-        processing_time_ms = (datetime.now() - start_time).total_seconds() * 1000
-        
-        # Extract results from LangGraph state
-        final_response = result.get("final_response", "Maaf, terjadi kesalahan.")
-        response_source = result.get("response_source", "unknown")
-        agents_invoked = result.get("agents_invoked", [])
-        
-        # Log completion
-        logger.info(
-            f"✅ Aika unified orchestrator: user={request.user_id}, "
-            f"source={response_source}, agents={agents_invoked}, time={processing_time_ms:.2f}ms"
-        )
-        
-        # Build response metadata
-        metadata = {
-            "session_id": result.get("session_id", request.session_id),
-            "agents_invoked": agents_invoked,
-            "response_source": response_source,
-            "processing_time_ms": processing_time_ms,
-            # Agent Activity Log data
-            "execution_path": result.get("execution_path", []),
-            "agent_reasoning": result.get("agent_reasoning", ""),
-            "intent": result.get("intent", "unknown"),
-            "intent_confidence": result.get("intent_confidence", 0.0),
-            "needs_agents": result.get("needs_agents", False),
-        }
-        
-        # Add risk assessment if available (from STA)
-        if result.get("sta_risk_assessment"):
-            metadata["risk_level"] = result["sta_risk_assessment"].get("risk_level", "unknown")
-            metadata["risk_score"] = result["sta_risk_assessment"].get("risk_score", 0.0)
-        
-        return AikaResponse(
-            success=True,
-            response=final_response,
-            metadata=metadata,
-        )
-        
-    except HTTPException:
-        raise
-    except ValueError as exc:
-        logger.warning(f"Value error in /aika endpoint: {exc}", exc_info=True)
-        return AikaResponse(
-            success=False,
-            response="",
-            metadata={},
-            error=str(exc),
-        )
-    except Exception as exc:
-        logger.error(
-            f"Unhandled exception in /aika endpoint for user {current_user.id}: {exc}",
-            exc_info=True,
-        )
-        return AikaResponse(
-            success=False,
-            response="",
-            metadata={},
-            error="Internal server error",
-        )
+            
+            # Stream events from LangGraph
+            final_state = None
+            
+            async for event in aika_agent.astream_events(
+                initial_state,
+                config=config,
+                version="v2"
+            ):
+                kind = event["event"]
+                
+                # Handle different event types
+                if kind == "on_chain_start":
+                    if event["name"] == "LangGraph":
+                        continue
+                        
+                elif kind == "on_chain_end":
+                    if event["name"] == "LangGraph":
+                        # Capture final state
+                        final_state = event["data"].get("output")
+                        
+                elif kind == "on_chat_model_stream":
+                    # Stream tokens if needed (optional, adds verbosity)
+                    pass
+                    
+                elif kind == "on_tool_start":
+                    # Notify tool usage
+                    yield f"event: agent_update\ndata: {json.dumps({'status': 'tool_start', 'tool': event['name']})}\n\n"
+                    
+                elif kind == "on_tool_end":
+                    yield f"event: agent_update\ndata: {json.dumps({'status': 'tool_end', 'tool': event['name']})}\n\n"
+
+                # Custom node events (mapped from graph node names)
+                if kind == "on_chain_start" and event["name"] in ["aika_decision_node", "execute_sta_subgraph", "execute_sca_subgraph", "execute_sda_subgraph", "synthesize_final_response"]:
+                    node_name = event["name"]
+                    agent_name = {
+                        "aika_decision_node": "Aika",
+                        "execute_sta_subgraph": "STA",
+                        "execute_sca_subgraph": "TCA",
+                        "execute_sda_subgraph": "CMA",
+                        "synthesize_final_response": "Aika"
+                    }.get(node_name, "System")
+                    
+                    yield f"event: agent_start\ndata: {json.dumps({'agent': agent_name, 'node': node_name})}\n\n"
+
+            # Process final result
+            if final_state:
+                final_response = final_state.get("final_response") or final_state.get("response") or "Maaf, terjadi kesalahan."
+                response_source = final_state.get("response_source", "unknown")
+                agents_invoked = final_state.get("agents_invoked", [])
+                
+                processing_time_ms = (datetime.now() - start_time).total_seconds() * 1000
+                
+                # Build metadata
+                metadata = {
+                    "session_id": final_state.get("session_id", request.session_id),
+                    "agents_invoked": agents_invoked,
+                    "response_source": response_source,
+                    "processing_time_ms": processing_time_ms,
+                    "execution_path": final_state.get("execution_path", []),
+                    "agent_reasoning": final_state.get("agent_reasoning", ""),
+                    "intent": final_state.get("intent", "unknown"),
+                    "intent_confidence": final_state.get("intent_confidence", 0.0),
+                    "needs_agents": final_state.get("needs_agents", False),
+                }
+                
+                # Add risk info
+                if final_state.get("sta_risk_assessment"):
+                    metadata["risk_level"] = final_state["sta_risk_assessment"].get("risk_level", "unknown")
+                    metadata["risk_score"] = final_state["sta_risk_assessment"].get("risk_score", 0.0)
+                
+                # Send final response
+                yield f"event: final_response\ndata: {json.dumps({'response': final_response})}\n\n"
+                
+                # Send metadata
+                yield f"event: metadata\ndata: {json.dumps(metadata)}\n\n"
+                
+                # Commit DB changes
+                await db.commit()
+                
+            else:
+                yield f"event: error\ndata: {json.dumps({'message': 'No final state received'})}\n\n"
+                
+        except Exception as e:
+            logger.error(f"Streaming error: {e}", exc_info=True)
+            yield f"event: error\ndata: {json.dumps({'message': str(e)})}\n\n"
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream")
 
 
 # ===================== EXISTING LEGACY CHAT ENDPOINT =====================
 
-@router.post("/chat", response_model=ChatResponse, dependencies=[Depends(check_rate_limit_dependency)])
-async def handle_chat_request(
-    request: ChatRequest = Body(...),
-    current_user: User = Depends(get_current_active_user),
-    db: AsyncSession = Depends(get_async_db),
-    enable_tools: bool = Query(default=True, description="Enable tool calling for memory access"),
-) -> ChatResponse:
-    """Handle traditional REST chat requests.
-    
-    Args:
-        request: Chat request with message, history, and configuration
-        current_user: Authenticated user
-        db: Database session
-        enable_tools: Whether to enable tool calling (default: True)
-        
-    Returns:
-        ChatResponse with assistant's reply and updated history
-    """
+# ===================== LEGACY ENDPOINTS REMOVED =====================
+# The /chat and /chat/ws endpoints have been removed in favor of the unified
+# Aika Meta-Agent endpoint (/api/v1/aika) which supports streaming.
+# ====================================================================
 
-    session_id = request.session_id
-    conversation_id = request.conversation_id
-
-    try:
-        personal_context = await build_user_personal_context(db, current_user)
-        active_system_prompt = _compose_system_prompt(request.system_prompt, personal_context)
-        
-        # DEBUG: Log system prompt to verify it's being received
-        logger.info(f"🎭 System prompt received from frontend: {request.system_prompt[:100] if request.system_prompt else 'None'}...")
-        logger.info(f"👤 Personal context: {personal_context[:100] if personal_context else 'None'}...")
-        logger.info(f"✅ Active system prompt (composed): {active_system_prompt[:100] if active_system_prompt else 'None'}...")
-
-        # Choose LLM responder based on tool enablement
-        if enable_tools:
-            # Create a closure that includes db and user_id for tool execution
-            async def tool_responder(hist, sysprompt, req, callback):
-                return await _tool_aware_llm_responder(
-                    history=hist,
-                    system_prompt=sysprompt,
-                    request=req,
-                    db=db,
-                    user_id=current_user.id,
-                    stream_callback=callback,
-                )
-            llm_responder = tool_responder
-            logger.info(f"Tool calling enabled for user {current_user.id}, session {session_id}")
-        else:
-            llm_responder = _default_llm_responder
-            logger.debug(f"Tool calling disabled for user {current_user.id}, session {session_id}")
-
-        if request.event:
-            result = await process_chat_event(
-                request=request,
-                current_user=current_user,
-                db=db,
-                session_id=session_id,
-                conversation_id=conversation_id,
-                active_system_prompt=active_system_prompt,
-            )
-        elif request.message:
-            result = await process_chat_message(
-                request=request,
-                current_user=current_user,
-                db=db,
-                session_id=session_id,
-                conversation_id=conversation_id,
-                active_system_prompt=active_system_prompt,
-                schedule_summary=None,
-                summarize_now=summarize_and_save,
-                llm_responder=llm_responder,
-            )
-        else:
-            raise HTTPException(status_code=400, detail="Invalid request: Missing message or event payload")
-
-        return ChatResponse(
-            response=result.response_text,
-            provider_used=result.provider_used,
-            model_used=result.model_used,
-            history=result.final_history,
-            module_completed_id=result.module_completed_id,
-            intervention_plan=result.intervention_plan,
-        )
-
-    except ValueError as exc:
-        logger.warning("Value error in /chat endpoint: %s", exc, exc_info=True)
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
-    except HTTPException:
-        raise
-    except Exception as exc:  # pragma: no cover - defensive logging
-        user_id_for_log = current_user.id if current_user else "unknown_user"
-        logger.error(
-            "Unhandled exception in /chat endpoint for user %s, session %s: %s",
-            user_id_for_log,
-            session_id,
-            exc,
-            exc_info=True,
-        )
-        raise HTTPException(status_code=500, detail="An internal server error occurred.") from exc
-
-
-@router.websocket("/chat/ws")
-async def chat_ws(
-    websocket: WebSocket,
-    token: str,
-    db: AsyncSession = Depends(get_async_db),
-) -> None:
-    """Stream chat responses to the frontend via WebSocket."""
-    try:
-        payload = auth_utils.decrypt_and_validate_token(token)
-    except HTTPException:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
-
-    user_id_str = payload.sub
-    if user_id_str is None:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
-
-    try:
-        user_id = int(user_id_str)
-    except ValueError:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
-
-    user = await db.get(User, user_id)
-    if not user:
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION)
-        return
-
-    await websocket.accept()
-
-    async def emit_token(chunk: str, *, session_id: str, conversation_id: str) -> None:
-        await websocket.send_json(
-            {
-                "type": "token",
-                "token": chunk,
-                "sessionId": session_id,
-                "conversationId": conversation_id,
-            }
-        )
-
-    try:
-        while True:
-            message = await websocket.receive_text()
-            try:
-                raw_payload = json.loads(message)
-            except json.JSONDecodeError as exc:
-                await websocket.send_json({"type": "error", "detail": f"Invalid JSON: {exc}"})
-                continue
-
-            try:
-                chat_request = ChatRequest.model_validate(raw_payload)
-            except Exception as exc:  # pragma: no cover - defensive logging
-                await websocket.send_json({"type": "error", "detail": f"Invalid payload: {exc}"})
-                continue
-
-            session_id = chat_request.session_id
-            conversation_id = chat_request.conversation_id
-
-            # Rate limiting check for WebSocket
-            rate_limiter = get_rate_limiter()
-            # ✅ FIX: Use role attribute instead of is_admin
-            role = "admin" if (hasattr(user, 'role') and user.role == "admin") else "student"
-            is_allowed, remaining, reset_timestamp = await rate_limiter.check_rate_limit(
-                user_id=user.id,
-                endpoint="chat",
-                role=role
-            )
-            
-            if not is_allowed:
-                # Send rate limit error to client
-                retry_after = max(1, reset_timestamp - int(datetime.now().timestamp()))
-                await websocket.send_json({
-                    "type": "error",
-                    "detail": {
-                        "error": "Rate limit exceeded",
-                        "message": f"Too many requests. Please try again in {retry_after} seconds.",
-                        "retry_after": retry_after,
-                        "reset_at": reset_timestamp,
-                    }
-                })
-                continue
-
-            # DEBUG: Log system prompt flow
-            logger.info(f"🎭 [WebSocket] System prompt from frontend: {chat_request.system_prompt[:100] if chat_request.system_prompt else 'None'}...")
-            
-            personal_context = await build_user_personal_context(db, user)
-            logger.info(f"👤 [WebSocket] Personal context: {personal_context[:100] if personal_context else 'None'}...")
-            
-            active_system_prompt = _compose_system_prompt(chat_request.system_prompt, personal_context)
-            logger.info(f"✅ [WebSocket] Active system prompt (composed): {active_system_prompt[:100] if active_system_prompt else 'None'}...")
-
-            if chat_request.event:
-                result = await process_chat_event(
-                    request=chat_request,
-                    current_user=user,
-                    db=db,
-                    session_id=session_id,
-                    conversation_id=conversation_id,
-                    active_system_prompt=active_system_prompt,
-                )
-                await websocket.send_json(
-                    {
-                        "type": "completed",
-                        "response": result.response_text,
-                        "history": result.final_history,
-                        "provider": result.provider_used,
-                        "model": result.model_used,
-                        "moduleCompletedId": result.module_completed_id,
-                        "sessionId": session_id,
-                        "conversationId": conversation_id,
-                    }
-                )
-                continue
-
-            if not chat_request.message:
-                await websocket.send_json({"type": "error", "detail": "Missing message payload."})
-                continue
-
-            async def stream_callback(chunk: str) -> None:
-                await emit_token(chunk, session_id=session_id, conversation_id=conversation_id)
-            
-            # Activity callback for real-time agent activity streaming
-            async def activity_callback(activity_data: dict) -> None:
-                """Send activity logs to WebSocket in real-time"""
-                await websocket.send_json(activity_data)
-
-            # ✅ NOTE: AikaOrchestrator doesn't support streaming yet
-            # The stream_callback is not used in the LangGraph workflow
-            # Future enhancement: Add streaming support to orchestrator
-
-            try:
-                result = await process_chat_message(
-                    request=chat_request,
-                    current_user=user,
-                    db=db,
-                    session_id=session_id,
-                    conversation_id=conversation_id,
-                    active_system_prompt=active_system_prompt,
-                    schedule_summary=None,
-                    summarize_now=summarize_and_save,
-                    llm_responder=None,  # Not used with AikaOrchestrator
-                    activity_callback=activity_callback,  # Enable activity streaming
-                )
-            except HTTPException as exc:
-                await websocket.send_json({"type": "error", "detail": exc.detail})
-                continue
-            except Exception as exc:  # pragma: no cover - defensive logging
-                logger.error("Streaming chat failed: %s", exc, exc_info=True)
-                await websocket.send_json({"type": "error", "detail": "Internal server error."})
-                continue
-
-            await websocket.send_json(
-                {
-                    "type": "completed",
-                    "response": result.response_text,
-                    "history": result.final_history,
-                    "provider": result.provider_used,
-                    "model": result.model_used,
-                    "moduleCompletedId": result.module_completed_id,
-                    "interventionPlan": result.intervention_plan.model_dump() if result.intervention_plan else None,
-                    "sessionId": session_id,
-                    "conversationId": conversation_id,
-                }
-            )
-
-    except WebSocketDisconnect:
-        logger.debug("Chat WebSocket disconnected for user_id=%s", user_id)
-    except Exception as exc:  # pragma: no cover - defensive logging
-        logger.error("Chat WebSocket error for user_id=%s: %s", user_id, exc, exc_info=True)
-        await websocket.close(code=status.WS_1011_INTERNAL_ERROR)
-
-
-async def summarize_and_save(user_id: int, session_id_to_summarize: str) -> None:
-    """Fetch history, create a summary, and persist it for future context injection."""
-    logger.info(
-        "Background Task: Starting summarization for user %s, session %s",
-        user_id,
-        session_id_to_summarize,
-    )
-    from app.database import AsyncSessionLocal
-
-    async with AsyncSessionLocal() as db:
-        try:
-            stmt = (
-                select(Conversation)
-                .where(
-                    Conversation.session_id == session_id_to_summarize,
-                    Conversation.user_id == user_id,
-                )
-                .order_by(Conversation.timestamp.asc())
-            )
-            result = await db.execute(stmt)
-            conversation_history = result.scalars().all()
-
-            if not conversation_history or len(conversation_history) < MIN_TURNS_FOR_SUMMARY:
-                logger.info(
-                    "Background Task: Skipping summarization for session %s (too short).",
-                    session_id_to_summarize,
-                )
-                return
-
-            history_lines = []
-            for turn in conversation_history:
-                history_lines.append(f"user: {turn.message}")
-                history_lines.append(f"assistant: {turn.response}")
-            formatted_history = "\n".join(history_lines)
-
-            if len(formatted_history) > MAX_HISTORY_CHARS_FOR_SUMMARY:
-                original_len = len(formatted_history)
-                formatted_history = formatted_history[-MAX_HISTORY_CHARS_FOR_SUMMARY :]
-                logger.warning(
-                    "Background Task: Truncated conversation history for session %s from %s to %s chars.",
-                    session_id_to_summarize,
-                    original_len,
-                    len(formatted_history),
-                )
-
-            summarization_prompt = f"""Kamu adalah Aika, AI pendamping dari UGM-AICare. Tugasmu adalah membuat ringkasan singkat dari percakapan sebelumnya dengan pengguna. Ringkasan ini akan kamu gunakan untuk mengingatkan pengguna tentang apa yang telah dibahas jika mereka bertanya \"apakah kamu ingat percakapan kita?\".
-
-Buatlah ringkasan dalam 1-2 kalimat saja, dalam Bahasa Indonesia yang alami dan kasual, seolah-olah kamu sedang berbicara santai dengan teman. Fokus pada inti atau perasaan utama yang diungkapkan pengguna.
-Hindari penggunaan daftar, poin-poin, judul seperti \"Poin Utama\", atau format markdown. Cukup tuliskan sebagai paragraf singkat yang mengalir.
-
-Contoh output yang baik:
-\"kita sempat ngobrolin soal kamu yang lagi ngerasa nggak nyaman karena pernah gagal memimpin organisasi.\"
-\"kamu cerita tentang perasaanmu yang campur aduk setelah kejadian di kampus.\"
-\"kita kemarin membahas tentang kesulitanmu mencari teman dan bagaimana itu membuatmu merasa kesepian.\"
-
-Percakapan yang perlu diringkas:
-{formatted_history}
-
-Ringkasan singkat dan kasual:"""
-
-            summary_llm_history = [{"role": "user", "content": summarization_prompt}]
-
-            summary_text = await llm.generate_response(
-                history=summary_llm_history,
-                model="gemini_google",
-                max_tokens=2048,
-                temperature=0.5,
-            )
-
-            if summary_text.startswith("Error:"):
-                logger.error(
-                    "Background Task: LLM error during summarization for session %s: %s",
-                    session_id_to_summarize,
-                    summary_text,
-                )
-                raise RuntimeError("LLM error during summarization")
-
-            new_summary = UserSummary(
-                user_id=user_id,
-                summarized_session_id=session_id_to_summarize,
-                summary_text=summary_text.strip(),
-                timestamp=datetime.now(),
-            )
-            db.add(new_summary)
-            await db.commit()
-            logger.info(
-                "Background Task: Saved summary for user %s from session %s",
-                user_id,
-                session_id_to_summarize,
-            )
-            await invalidate_user_personal_context(user_id)
-
-        except Exception as exc:  # pragma: no cover - defensive logging
-            await db.rollback()
-            logger.error(
-                "Background Task: Failed to summarize session %s for user %s: %s",
-                session_id_to_summarize,
-                user_id,
-                exc,
-                exc_info=True,
-            )
 
 
 @router.get("/history", response_model=List[ConversationHistoryItem])

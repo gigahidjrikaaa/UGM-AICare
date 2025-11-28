@@ -160,36 +160,40 @@ FOR STUDENTS (user):
   * Expresses emotional distress or overwhelm
   * Contains self-harm or suicide signals
   * Requests therapeutic support or coping strategies
-  * Asks for intervention plan, action plan, or structured exercises
-  * Wants personalized guidance or step-by-step help
-  * Requests CBT modules, coping techniques, or skill-building activities
-  
-- NO AGENTS NEEDED (direct response):
+  * Requests for intervention plan, action plan, or structured exercises
+  * Complex/Vague appointment requests ("find me an appointment", "I need to talk to someone", "schedule counseling") - Route to CMA for intelligent matching!
+
+- NO AGENTS NEEDED (direct response + ReAct tools):
   * Simple greetings ("hi", "hello", "hai")
-  * Casual questions ("how are you?", "what can you do?")
+  * Casual questions ("how are you?", "what can you do?", "do you know me?")
   * General mental health education ("what is CBT?" - definition only)
   * Simple factual questions about the system
+  * Questions requiring database lookups (e.g., "who am I?", "my profile") - Aika can handle these with tools!
+  * Specific/Direct appointment actions ("book with Dr. X at 2 PM", "cancel appointment #123", "reschedule to tomorrow", "check my schedule") - Aika handles this directly!
+  * General knowledge questions
 
 FOR ADMINS:
 - NEEDS AGENTS (invoke IA for analytics):
-  * Requests data/analytics ("trending topics", "case statistics")
-  * Complex queries requiring database aggregation
+  * Requests complex data/analytics ("trending topics", "case statistics")
+  * Aggregated reports requiring specialized processing
   
 - NO AGENTS NEEDED:
   * Simple status checks ("is system healthy?")
   * General platform questions
+  * Specific user lookups (Aika can use tools for this)
 
 FOR COUNSELORS:
 - NEEDS AGENTS (invoke CMA for case management):
-  * Requests assigned cases or patient data
-  * Clinical insights or treatment recommendations
+  * Requests to CREATE or MODIFY cases
+  * Clinical insights requiring deep analysis
   
 - NO AGENTS NEEDED:
   * General clinical questions
+  * Viewing patient data (Aika can use tools)
 
 Return JSON with:
 {{
-  "intent": "string (e.g., 'emotional_support', 'crisis', 'casual_chat')",
+  "intent": "string (e.g., 'emotional_support', 'crisis', 'casual_chat', 'information_seeking')",
   "intent_confidence": float (0.0-1.0),
   "needs_agents": boolean,
   "reasoning": "string explaining decision",
@@ -214,7 +218,7 @@ IMMEDIATE RISK ASSESSMENT CRITERIA:
   Examples: "I'm stressed about exams", "feeling anxious about presentation"
   
 - "none": No distress signals
-  Examples: "Hello, how are you?", "What is CBT?", "Thanks for the help"
+  Examples: "Hello, how are you?", "What is CBT?", "Thanks for the help", "Do you know me?"
 
 CRISIS KEYWORDS TO DETECT (Indonesian + English):
 suicide, bunuh diri, kill myself, end my life, tidak ingin hidup lagi, 
@@ -240,7 +244,8 @@ want to die, mau mati, ingin mati, etc.
             model=preferred_model,  # Use preferred model with fallback chain
             temperature=0.3,
             max_tokens=2048,
-            system_prompt=system_instruction
+            system_prompt=system_instruction,
+            json_mode=True  # Force valid JSON output
         )
         
         # Parse decision (response_text is already a string from fallback function)
@@ -327,8 +332,24 @@ want to die, mau mati, ingin mati, etc.
                 # Get preferred model from state
                 preferred_model = state.get("preferred_model")
                 
-                # Generate conversational response with Aika personality
-                aika_response = await generate_response(
+                # Enable ReAct: Use generate_with_tools instead of simple generate_response
+                from app.domains.mental_health.services.tool_calling import generate_with_tools
+                from app.domains.mental_health.schemas.chat import ChatRequest
+                
+                # Construct ChatRequest for tool calling service
+                # We need a valid ChatRequest object to use the service
+                chat_request = ChatRequest(
+                    google_sub=str(state.get("user_id")),
+                    session_id=state.get("session_id", "unknown_session"),
+                    conversation_id=state.get("conversation_id", "unknown_conversation"),
+                    message=state["message"],
+                    history=state.get("conversation_history", []),
+                    model=preferred_model,
+                    temperature=0.7
+                )
+                
+                # Generate response with potential tool usage (ReAct loop)
+                response_text, tool_calls = await generate_with_tools(
                     history=[{
                         "role": "system",
                         "content": system_instruction
@@ -338,19 +359,22 @@ want to die, mau mati, ingin mati, etc.
                     ] + [
                         {"role": "user", "content": state["message"]}
                     ],
-                    model="gemini_google",
-                    temperature=0.7,
-                    preferred_gemini_model=preferred_model  # Pass user's preferred model
+                    system_prompt=system_instruction,
+                    request=chat_request,
+                    db=db,
+                    user_id=state.get("user_id"),
+                    max_tool_iterations=5
                 )
                 
-                # Clean up any accidental tool call syntax (shouldn't happen but safety net)
-                import re
-                aika_response = re.sub(r'<tool_code>.*?</tool_code>', '', aika_response, flags=re.DOTALL)
-                aika_response = aika_response.strip()
+                state["aika_direct_response"] = response_text
+                state["final_response"] = response_text
                 
-                state["aika_direct_response"] = aika_response
-                state["final_response"] = aika_response
-                state["response_source"] = "aika_direct"
+                if tool_calls:
+                    state["response_source"] = "aika_react_tools"
+                    state["agents_invoked"] = ["AikaTools"] # Mark that tools were used
+                    state["tool_calls"] = tool_calls
+                else:
+                    state["response_source"] = "aika_direct"
             
         except json.JSONDecodeError as e:
             logger.warning(f"Failed to parse Gemini decision JSON: {e}")
@@ -745,6 +769,11 @@ Keep response natural and conversational in Indonesian (for students) or profess
 
 IMPORTANT: If an intervention plan was created (TCA), you MUST explicitly mention it in your response.
 Say something like: "Aku sudah buatkan rencana khusus buat kamu. Cek di sidebar ya!" or "I've prepared a plan for you, please check the sidebar."
+
+If the Risk Level is 'low' or 'none' and no other agents were active:
+- Just respond naturally to the user's message.
+- Do NOT mention "Safety Triage" or "Risk Level" explicitly.
+- Keep the response concise (under 100 words).
 """
         
         # Get preferred model from state

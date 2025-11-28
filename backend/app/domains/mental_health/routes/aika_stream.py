@@ -255,7 +255,7 @@ async def stream_aika_execution(
         yield f"data: {json.dumps(error_data)}\n\n"
 
 
-@router.post("/aika/stream", dependencies=[Depends(check_rate_limit_dependency)])
+@router.post("/aika", dependencies=[Depends(check_rate_limit_dependency)])
 async def aika_stream_endpoint(
     request: AikaRequest,
     current_user: User = Depends(get_current_active_user),

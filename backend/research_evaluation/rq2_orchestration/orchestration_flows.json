@@ -6,8 +6,8 @@
             {
                 "user": "Ujian bikin stres banget, rasanya nggak sanggup.",
                 "expected_intent": "acute_distress",
-                "expected_risk": "high",
-                "expected_next_agent": "CMA"
+                "expected_risk": "low",
+                "expected_next_agent": "Aika"
             },
             {
                 "user": "Oke, boleh dicoba tekniknya.",

@@ -32,7 +32,7 @@ from app.domains.mental_health.models import (
     QuestStatusEnum,
 )
 
-from . import tool_registry
+from app.agents.shared.tools.registry import register_tool
 
 logger = logging.getLogger(__name__)
 
@@ -44,25 +44,44 @@ MAX_BADGES = 50
 MAX_JOURNAL_CONTENT_LENGTH = 300
 
 
+@register_tool(
+    name="get_journal_entries",
+    description="Get user's recent journal entries. Use to understand user's mood patterns, recent experiences, and emotional state. Can search by keywords.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "integer",
+                "description": "The user's ID"
+            },
+            "days": {
+                "type": "integer",
+                "description": f"Number of days to look back (default 30, max 90)"
+            },
+            "keywords": {
+                "type": "string",
+                "description": "Optional keywords to search for in journal content"
+            },
+            "limit": {
+                "type": "integer",
+                "description": f"Maximum entries to return (default {MAX_JOURNAL_ENTRIES})"
+            }
+        },
+        "required": ["user_id"]
+    },
+    category="progress_tracking",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_journal_entries(
     db: AsyncSession,
     user_id: int,
     days: int = 30,
     keywords: Optional[str] = None,
-    limit: int = MAX_JOURNAL_ENTRIES
+    limit: int = MAX_JOURNAL_ENTRIES,
+    **kwargs
 ) -> Dict[str, Any]:
-    """Get user's recent journal entries.
-    
-    Args:
-        db: Database session
-        user_id: User ID
-        days: Number of days to look back (default 30)
-        keywords: Optional keywords to search for in content
-        limit: Maximum entries to return
-    
-    Returns:
-        Dict with journal entries or error
-    """
+    """Get user's recent journal entries."""
     try:
         cutoff_date = datetime.utcnow() - timedelta(days=days)
         
@@ -106,23 +125,40 @@ async def get_journal_entries(
         }
 
 
+@register_tool(
+    name="get_appointment_history",
+    description="Get user's counseling appointment history. Shows scheduled, completed, and cancelled appointments with psychologists.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "integer",
+                "description": "The user's ID"
+            },
+            "status": {
+                "type": "string",
+                "description": "Filter by status: all, pending, completed, cancelled (default: all)",
+                "enum": ["all", "pending", "completed", "cancelled"]
+            },
+            "limit": {
+                "type": "integer",
+                "description": f"Maximum appointments to return (default {MAX_APPOINTMENTS})"
+            }
+        },
+        "required": ["user_id"]
+    },
+    category="progress_tracking",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_appointment_history(
     db: AsyncSession,
     user_id: int,
     status: str = "all",
-    limit: int = MAX_APPOINTMENTS
+    limit: int = MAX_APPOINTMENTS,
+    **kwargs
 ) -> Dict[str, Any]:
-    """Get user's counseling appointment history.
-    
-    Args:
-        db: Database session
-        user_id: User ID
-        status: Filter by status ("all", "pending", "completed", "cancelled")
-        limit: Maximum appointments to return
-    
-    Returns:
-        Dict with appointments or error
-    """
+    """Get user's counseling appointment history."""
     try:
         query = select(Appointment).where(Appointment.user_id == user_id)
         
@@ -159,21 +195,34 @@ async def get_appointment_history(
         }
 
 
+@register_tool(
+    name="get_active_quests",
+    description="Get user's currently active gamification quests. Shows progress, targets, and expiration dates. Use to encourage quest completion.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "integer",
+                "description": "The user's ID"
+            },
+            "limit": {
+                "type": "integer",
+                "description": f"Maximum quests to return (default {MAX_QUESTS})"
+            }
+        },
+        "required": ["user_id"]
+    },
+    category="progress_tracking",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_active_quests(
     db: AsyncSession,
     user_id: int,
-    limit: int = MAX_QUESTS
+    limit: int = MAX_QUESTS,
+    **kwargs
 ) -> Dict[str, Any]:
-    """Get user's active quests.
-    
-    Args:
-        db: Database session
-        user_id: User ID
-        limit: Maximum quests to return
-    
-    Returns:
-        Dict with active quests or error
-    """
+    """Get user's active quests."""
     try:
         # Use string literal "in_progress" instead of enum
         result = await db.execute(
@@ -213,21 +262,34 @@ async def get_active_quests(
         }
 
 
+@register_tool(
+    name="get_completed_quests",
+    description="Get user's completed quests and achievements. Use to celebrate accomplishments and motivate continued engagement.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "integer",
+                "description": "The user's ID"
+            },
+            "limit": {
+                "type": "integer",
+                "description": f"Maximum quests to return (default {MAX_QUESTS})"
+            }
+        },
+        "required": ["user_id"]
+    },
+    category="progress_tracking",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_completed_quests(
     db: AsyncSession,
     user_id: int,
-    limit: int = MAX_QUESTS
+    limit: int = MAX_QUESTS,
+    **kwargs
 ) -> Dict[str, Any]:
-    """Get user's completed quests.
-    
-    Args:
-        db: Database session
-        user_id: User ID
-        limit: Maximum quests to return
-    
-    Returns:
-        Dict with completed quests or error
-    """
+    """Get user's completed quests."""
     try:
         result = await db.execute(
             select(QuestInstance)
@@ -264,21 +326,34 @@ async def get_completed_quests(
         }
 
 
+@register_tool(
+    name="get_quest_progress",
+    description="Get detailed progress for a specific quest. Shows current progress, target, percentage complete, and time remaining.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "integer",
+                "description": "The user's ID"
+            },
+            "quest_id": {
+                "type": "integer",
+                "description": "The quest instance ID to check"
+            }
+        },
+        "required": ["user_id", "quest_id"]
+    },
+    category="progress_tracking",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_quest_progress(
     db: AsyncSession,
     user_id: int,
-    quest_id: int
+    quest_id: int,
+    **kwargs
 ) -> Dict[str, Any]:
-    """Get specific quest progress details.
-    
-    Args:
-        db: Database session
-        user_id: User ID
-        quest_id: Quest instance ID
-    
-    Returns:
-        Dict with quest progress or error
-    """
+    """Get specific quest progress details."""
     try:
         result = await db.execute(
             select(QuestInstance).where(
@@ -320,21 +395,34 @@ async def get_quest_progress(
         }
 
 
+@register_tool(
+    name="get_achievement_badges",
+    description="Get user's earned achievement badges (NFTs). Use to acknowledge accomplishments and encourage continued progress.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "integer",
+                "description": "The user's ID"
+            },
+            "limit": {
+                "type": "integer",
+                "description": f"Maximum badges to return (default {MAX_BADGES})"
+            }
+        },
+        "required": ["user_id"]
+    },
+    category="progress_tracking",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_achievement_badges(
     db: AsyncSession,
     user_id: int,
-    limit: int = MAX_BADGES
+    limit: int = MAX_BADGES,
+    **kwargs
 ) -> Dict[str, Any]:
-    """Get user's earned achievement badges (NFTs).
-    
-    Args:
-        db: Database session
-        user_id: User ID
-        limit: Maximum badges to return
-    
-    Returns:
-        Dict with badges or error
-    """
+    """Get user's earned achievement badges (NFTs)."""
     try:
         result = await db.execute(
             select(UserBadge)
@@ -368,22 +456,29 @@ async def get_achievement_badges(
         }
 
 
+@register_tool(
+    name="get_activity_streak",
+    description="Get user's daily engagement streak. Shows how many consecutive days the user has been active. Use to motivate continued engagement.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "integer",
+                "description": "The user's ID"
+            }
+        },
+        "required": ["user_id"]
+    },
+    category="progress_tracking",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_activity_streak(
     db: AsyncSession,
-    user_id: int
+    user_id: int,
+    **kwargs
 ) -> Dict[str, Any]:
-    """Get user's daily engagement streak.
-    
-    Calculates streak based on journal entries (for now).
-    TODO: Expand to include other activities (quests, appointments, etc.)
-    
-    Args:
-        db: Database session
-        user_id: User ID
-    
-    Returns:
-        Dict with streak info or error
-    """
+    """Get user's daily engagement streak."""
     try:
         # Get journal entries for last 90 days
         cutoff = datetime.utcnow() - timedelta(days=90)
@@ -426,21 +521,34 @@ async def get_activity_streak(
         }
 
 
+@register_tool(
+    name="get_intervention_plan_progress",
+    description="Get progress on intervention plans (CBT modules, coping strategies). Shows step completion status and overall progress percentage.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "integer",
+                "description": "The user's ID"
+            },
+            "plan_id": {
+                "type": "integer",
+                "description": "Optional specific plan ID (if omitted, returns all active plans)"
+            }
+        },
+        "required": ["user_id"]
+    },
+    category="progress_tracking",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_intervention_plan_progress(
     db: AsyncSession,
     user_id: int,
-    plan_id: Optional[int] = None
+    plan_id: Optional[int] = None,
+    **kwargs
 ) -> Dict[str, Any]:
-    """Get intervention plan completion progress.
-    
-    Args:
-        db: Database session
-        user_id: User ID
-        plan_id: Optional specific plan ID (if None, returns active plans)
-    
-    Returns:
-        Dict with intervention progress or error
-    """
+    """Get intervention plan completion progress."""
     try:
         if plan_id:
             # Get specific plan
@@ -512,252 +620,3 @@ async def get_intervention_plan_progress(
             "error": str(e),
             "user_id": user_id
         }
-
-
-# Tool schemas for Gemini function calling
-
-GET_JOURNAL_ENTRIES_SCHEMA = {
-    "name": "get_journal_entries",
-    "description": (
-        "Get user's recent journal entries. Use to understand user's mood patterns, "
-        "recent experiences, and emotional state. Can search by keywords."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "integer",
-                "description": "The user's ID"
-            },
-            "days": {
-                "type": "integer",
-                "description": f"Number of days to look back (default 30, max 90)"
-            },
-            "keywords": {
-                "type": "string",
-                "description": "Optional keywords to search for in journal content"
-            },
-            "limit": {
-                "type": "integer",
-                "description": f"Maximum entries to return (default {MAX_JOURNAL_ENTRIES})"
-            }
-        },
-        "required": ["user_id"]
-    }
-}
-
-GET_APPOINTMENT_HISTORY_SCHEMA = {
-    "name": "get_appointment_history",
-    "description": (
-        "Get user's counseling appointment history. Shows scheduled, completed, "
-        "and cancelled appointments with psychologists."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "integer",
-                "description": "The user's ID"
-            },
-            "status": {
-                "type": "string",
-                "description": "Filter by status: all, pending, completed, cancelled (default: all)",
-                "enum": ["all", "pending", "completed", "cancelled"]
-            },
-            "limit": {
-                "type": "integer",
-                "description": f"Maximum appointments to return (default {MAX_APPOINTMENTS})"
-            }
-        },
-        "required": ["user_id"]
-    }
-}
-
-GET_ACTIVE_QUESTS_SCHEMA = {
-    "name": "get_active_quests",
-    "description": (
-        "Get user's currently active gamification quests. Shows progress, targets, "
-        "and expiration dates. Use to encourage quest completion."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "integer",
-                "description": "The user's ID"
-            },
-            "limit": {
-                "type": "integer",
-                "description": f"Maximum quests to return (default {MAX_QUESTS})"
-            }
-        },
-        "required": ["user_id"]
-    }
-}
-
-GET_COMPLETED_QUESTS_SCHEMA = {
-    "name": "get_completed_quests",
-    "description": (
-        "Get user's completed quests and achievements. Use to celebrate accomplishments "
-        "and motivate continued engagement."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "integer",
-                "description": "The user's ID"
-            },
-            "limit": {
-                "type": "integer",
-                "description": f"Maximum quests to return (default {MAX_QUESTS})"
-            }
-        },
-        "required": ["user_id"]
-    }
-}
-
-GET_QUEST_PROGRESS_SCHEMA = {
-    "name": "get_quest_progress",
-    "description": (
-        "Get detailed progress for a specific quest. Shows current progress, "
-        "target, percentage complete, and time remaining."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "integer",
-                "description": "The user's ID"
-            },
-            "quest_id": {
-                "type": "integer",
-                "description": "The quest instance ID to check"
-            }
-        },
-        "required": ["user_id", "quest_id"]
-    }
-}
-
-GET_ACHIEVEMENT_BADGES_SCHEMA = {
-    "name": "get_achievement_badges",
-    "description": (
-        "Get user's earned achievement badges (NFTs). Use to acknowledge accomplishments "
-        "and encourage continued progress."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "integer",
-                "description": "The user's ID"
-            },
-            "limit": {
-                "type": "integer",
-                "description": f"Maximum badges to return (default {MAX_BADGES})"
-            }
-        },
-        "required": ["user_id"]
-    }
-}
-
-GET_ACTIVITY_STREAK_SCHEMA = {
-    "name": "get_activity_streak",
-    "description": (
-        "Get user's daily engagement streak. Shows how many consecutive days "
-        "the user has been active. Use to motivate continued engagement."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "integer",
-                "description": "The user's ID"
-            }
-        },
-        "required": ["user_id"]
-    }
-}
-
-GET_INTERVENTION_PLAN_PROGRESS_SCHEMA = {
-    "name": "get_intervention_plan_progress",
-    "description": (
-        "Get progress on intervention plans (CBT modules, coping strategies). "
-        "Shows step completion status and overall progress percentage."
-    ),
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "integer",
-                "description": "The user's ID"
-            },
-            "plan_id": {
-                "type": "integer",
-                "description": "Optional specific plan ID (if omitted, returns all active plans)"
-            }
-        },
-        "required": ["user_id"]
-    }
-}
-
-
-# Register tools with the global registry
-tool_registry.register(
-    "get_journal_entries",
-    get_journal_entries,
-    GET_JOURNAL_ENTRIES_SCHEMA,
-    "progress_tracking"
-)
-
-tool_registry.register(
-    "get_appointment_history",
-    get_appointment_history,
-    GET_APPOINTMENT_HISTORY_SCHEMA,
-    "progress_tracking"
-)
-
-tool_registry.register(
-    "get_active_quests",
-    get_active_quests,
-    GET_ACTIVE_QUESTS_SCHEMA,
-    "progress_tracking"
-)
-
-tool_registry.register(
-    "get_completed_quests",
-    get_completed_quests,
-    GET_COMPLETED_QUESTS_SCHEMA,
-    "progress_tracking"
-)
-
-tool_registry.register(
-    "get_quest_progress",
-    get_quest_progress,
-    GET_QUEST_PROGRESS_SCHEMA,
-    "progress_tracking"
-)
-
-tool_registry.register(
-    "get_achievement_badges",
-    get_achievement_badges,
-    GET_ACHIEVEMENT_BADGES_SCHEMA,
-    "progress_tracking"
-)
-
-tool_registry.register(
-    "get_activity_streak",
-    get_activity_streak,
-    GET_ACTIVITY_STREAK_SCHEMA,
-    "progress_tracking"
-)
-
-tool_registry.register(
-    "get_intervention_plan_progress",
-    get_intervention_plan_progress,
-    GET_INTERVENTION_PLAN_PROGRESS_SCHEMA,
-    "progress_tracking"
-)
-
-
-logger.info("✅ Progress tracking tools registered (8 tools)")

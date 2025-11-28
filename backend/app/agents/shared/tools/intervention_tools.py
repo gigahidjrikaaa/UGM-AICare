@@ -23,7 +23,7 @@ from app.domains.mental_health.models import (
     CbtModule,
     CbtModuleStep
 )
-from app.agents.shared.tools import tool_registry
+from app.agents.shared.tools.registry import register_tool
 
 import logging
 
@@ -33,23 +33,39 @@ MAX_MODULES = 20
 MAX_STEPS = 50
 
 
+@register_tool(
+    name="get_available_cbt_modules",
+    description="Get list of available CBT modules with descriptions and difficulty levels. PUBLIC DATA - module catalog.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "category": {
+                "type": "string",
+                "description": "Optional category filter (e.g., 'anxiety', 'depression', 'stress')"
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of modules to return (default 20, max 20)",
+                "default": 20
+            }
+        },
+        "required": []
+    },
+    category="intervention",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_available_cbt_modules(
     db: AsyncSession,
     category: Optional[str] = None,
-    limit: int = MAX_MODULES
+    limit: int = MAX_MODULES,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get list of available CBT modules.
     
     Returns CBT modules with descriptions, categories, and step counts.
     PUBLIC DATA - module catalog.
-    
-    Args:
-        category: Filter by category (optional)
-        limit: Maximum number of modules (default 20, max 20)
-        
-    Returns:
-        Dict with modules list or error
     """
     try:
         if limit > MAX_MODULES:
@@ -98,21 +114,33 @@ async def get_available_cbt_modules(
         }
 
 
+@register_tool(
+    name="get_intervention_plan_details",
+    description="Get details of a specific intervention plan including progress and completions. SENSITIVE DATA.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "plan_id": {
+                "type": "string",
+                "description": "Intervention plan ID"
+            }
+        },
+        "required": ["plan_id"]
+    },
+    category="intervention",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_intervention_plan_details(
     db: AsyncSession,
-    plan_id: str
+    plan_id: str,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get details of a specific intervention plan.
     
     Returns plan info, assigned modules, completion status.
     SENSITIVE DATA - treatment information.
-    
-    Args:
-        plan_id: Intervention plan ID
-        
-    Returns:
-        Dict with plan details or error
     """
     try:
         # Get plan
@@ -170,6 +198,88 @@ async def get_intervention_plan_details(
         }
 
 
+@register_tool(
+    name="create_intervention_plan",
+    description="Create a guided self-help intervention plan with steps and resources for the user. Use this when user needs structured support or coping strategies. SENSITIVE DATA - creates treatment record.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "string",
+                "description": "User's database ID"
+            },
+            "plan_title": {
+                "type": "string",
+                "description": "Title of the intervention plan (e.g., 'Strategi Mengatasi Kecemasan', 'Panduan Mengelola Stres Akademik')"
+            },
+            "plan_steps": {
+                "type": "array",
+                "description": "List of action steps with title and description",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": "Step title/action"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Detailed description of the step"
+                        }
+                    },
+                    "required": ["title", "description"]
+                }
+            },
+            "resource_cards": {
+                "type": "array",
+                "description": "Optional resource cards with helpful links",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "title": {
+                            "type": "string",
+                            "description": "Resource title"
+                        },
+                        "url": {
+                            "type": "string",
+                            "description": "URL to resource"
+                        },
+                        "description": {
+                            "type": "string",
+                            "description": "Resource description"
+                        }
+                    }
+                }
+            },
+            "next_check_in": {
+                "type": "object",
+                "description": "Optional check-in schedule",
+                "properties": {
+                    "timeframe": {
+                        "type": "string",
+                        "description": "When to check in (e.g., '1 hari', '3 hari', '1 minggu')"
+                    },
+                    "method": {
+                        "type": "string",
+                        "description": "How to check in (e.g., 'chat', 'form')"
+                    }
+                }
+            },
+            "risk_level": {
+                "type": "integer",
+                "description": "Risk level 0-3 (0=none, 1=low, 2=moderate, 3=high)"
+            },
+            "session_id": {
+                "type": "string",
+                "description": "Optional session ID"
+            }
+        },
+        "required": ["user_id", "plan_title", "plan_steps"]
+    },
+    category="intervention",
+    requires_db=True,
+    requires_user_id=False
+)
 async def create_intervention_plan(
     db: AsyncSession,
     user_id: str,
@@ -178,25 +288,14 @@ async def create_intervention_plan(
     resource_cards: Optional[List[Dict[str, str]]] = None,
     next_check_in: Optional[Dict[str, str]] = None,
     risk_level: Optional[int] = None,
-    session_id: Optional[str] = None
+    session_id: Optional[str] = None,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Create a new intervention plan for user.
     
     Creates a structured guided self-help plan with steps and resources.
     SENSITIVE DATA - creates treatment record.
-    
-    Args:
-        user_id: User's database ID
-        plan_title: Title of the intervention plan
-        plan_steps: List of steps with title and description
-        resource_cards: Optional resource cards with title, url, description
-        next_check_in: Optional check-in info with timeframe and method
-        risk_level: Optional risk level (0-3)
-        session_id: Optional session ID
-        
-    Returns:
-        Dict with created plan details or error
     """
     try:
         from app.domains.mental_health.schemas.intervention_plans import (
@@ -279,151 +378,3 @@ async def create_intervention_plan(
             "success": False,
             "error": str(e)
         }
-
-
-# ============================================================================
-# GEMINI FUNCTION CALLING SCHEMAS
-# ============================================================================
-
-get_available_cbt_modules_schema = {
-    "name": "get_available_cbt_modules",
-    "description": "Get list of available CBT modules with descriptions and difficulty levels. PUBLIC DATA - module catalog.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "category": {
-                "type": "string",
-                "description": "Optional category filter (e.g., 'anxiety', 'depression', 'stress')"
-            },
-            "limit": {
-                "type": "integer",
-                "description": "Maximum number of modules to return (default 20, max 20)",
-                "default": 20
-            }
-        },
-        "required": []
-    }
-}
-
-get_intervention_plan_details_schema = {
-    "name": "get_intervention_plan_details",
-    "description": "Get details of a specific intervention plan including progress and completions. SENSITIVE DATA.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "plan_id": {
-                "type": "string",
-                "description": "Intervention plan ID"
-            }
-        },
-        "required": ["plan_id"]
-    }
-}
-
-create_intervention_plan_schema = {
-    "name": "create_intervention_plan",
-    "description": "Create a guided self-help intervention plan with steps and resources for the user. Use this when user needs structured support or coping strategies. SENSITIVE DATA - creates treatment record.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "user_id": {
-                "type": "string",
-                "description": "User's database ID"
-            },
-            "plan_title": {
-                "type": "string",
-                "description": "Title of the intervention plan (e.g., 'Strategi Mengatasi Kecemasan', 'Panduan Mengelola Stres Akademik')"
-            },
-            "plan_steps": {
-                "type": "array",
-                "description": "List of action steps with title and description",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "title": {
-                            "type": "string",
-                            "description": "Step title/action"
-                        },
-                        "description": {
-                            "type": "string",
-                            "description": "Detailed description of the step"
-                        }
-                    },
-                    "required": ["title", "description"]
-                }
-            },
-            "resource_cards": {
-                "type": "array",
-                "description": "Optional resource cards with helpful links",
-                "items": {
-                    "type": "object",
-                    "properties": {
-                        "title": {
-                            "type": "string",
-                            "description": "Resource title"
-                        },
-                        "url": {
-                            "type": "string",
-                            "description": "URL to resource"
-                        },
-                        "description": {
-                            "type": "string",
-                            "description": "Resource description"
-                        }
-                    }
-                }
-            },
-            "next_check_in": {
-                "type": "object",
-                "description": "Optional check-in schedule",
-                "properties": {
-                    "timeframe": {
-                        "type": "string",
-                        "description": "When to check in (e.g., '1 hari', '3 hari', '1 minggu')"
-                    },
-                    "method": {
-                        "type": "string",
-                        "description": "How to check in (e.g., 'chat', 'form')"
-                    }
-                }
-            },
-            "risk_level": {
-                "type": "integer",
-                "description": "Risk level 0-3 (0=none, 1=low, 2=moderate, 3=high)"
-            },
-            "session_id": {
-                "type": "string",
-                "description": "Optional session ID"
-            }
-        },
-        "required": ["user_id", "plan_title", "plan_steps"]
-    }
-}
-
-
-# ============================================================================
-# REGISTER TOOLS WITH CENTRAL REGISTRY
-# ============================================================================
-
-tool_registry.register(
-    name="get_available_cbt_modules",
-    func=get_available_cbt_modules,
-    schema=get_available_cbt_modules_schema,
-    category="intervention"
-)
-
-tool_registry.register(
-    name="get_intervention_plan_details",
-    func=get_intervention_plan_details,
-    schema=get_intervention_plan_details_schema,
-    category="intervention"
-)
-
-tool_registry.register(
-    name="create_intervention_plan",
-    func=create_intervention_plan,
-    schema=create_intervention_plan_schema,
-    category="intervention"
-)
-
-logger.info("🔧 Registered 3 intervention tools in 'intervention' category")

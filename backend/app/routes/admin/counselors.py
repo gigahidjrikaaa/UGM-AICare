@@ -3,7 +3,8 @@ from app.routes.admin.utils import decrypt_user_email, decrypt_user_field
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, or_, select
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.exc import IntegrityError
 from typing import Optional
 from app.database import get_async_db
 from app.models.user import User
@@ -51,41 +52,57 @@ def _prepare_counselor_display(profile: CounselorProfile) -> CounselorProfile:
 # List and Search Counselors
 # ========================================
 
-
 async def _ensure_counselor_profiles(db: AsyncSession) -> None:
     """Ensure counselor users have matching profile records."""
-    counselor_rows = await db.execute(
-        select(User.id, User.name, User.email).where(User.role == "counselor")
-    )
-    counselor_users = counselor_rows.all()
-    if not counselor_users:
-        return
-
-    user_map = {row.id: row for row in counselor_users}
-    existing_rows = await db.execute(
-        select(CounselorProfile.user_id).where(CounselorProfile.user_id.is_not(None))
-    )
-    existing_ids = {row[0] for row in existing_rows if row[0] is not None}
-    missing_ids = [user_id for user_id in user_map if user_id not in existing_ids]
-
-    if not missing_ids:
-        return
-
-    for user_id in missing_ids:
-        row = user_map[user_id]
-        email = getattr(row, "email", None)
-        display_name_encrypted = getattr(row, "name", None)
-        display_name = decrypt_user_field(display_name_encrypted) or (
-            decrypt_user_email(email) if email else f"Counselor {user_id}"
+    try:
+        counselor_rows = await db.execute(
+            select(User.id, User.name, User.email).where(User.role == "counselor")
         )
-        profile = CounselorProfile(
-            user_id=user_id,
-            name=display_name,
-            is_available=True,
-        )
-        db.add(profile)
+        counselor_users = counselor_rows.all()
+        if not counselor_users:
+            return
 
-    await db.commit()
+        user_map = {row.id: row for row in counselor_users}
+        existing_rows = await db.execute(
+            select(CounselorProfile.user_id).where(CounselorProfile.user_id.is_not(None))
+        )
+        existing_ids = {row[0] for row in existing_rows if row[0] is not None}
+        missing_ids = [user_id for user_id in user_map if user_id not in existing_ids]
+
+        if not missing_ids:
+            return
+
+        for user_id in missing_ids:
+            row = user_map[user_id]
+            email = getattr(row, "email", None)
+            display_name_encrypted = getattr(row, "name", None)
+            
+            # Try to get name from user profile first
+            display_name = decrypt_user_field(display_name_encrypted)
+            
+            # If no name, try to get from email
+            if not display_name and email:
+                display_name = decrypt_user_email(email)
+                
+            # If still no name (decryption failed or empty), use raw email or ID fallback
+            if not display_name:
+                display_name = email or f"Counselor {user_id}"
+
+            profile = CounselorProfile(
+                user_id=user_id,
+                name=display_name,
+                is_available=True,
+            )
+            db.add(profile)
+
+        await db.commit()
+    except IntegrityError:
+        # Handle race condition where profile was created by another request
+        await db.rollback()
+    except Exception as e:
+        # Log other errors but don't crash the list endpoint
+        print(f"Error ensuring counselor profiles: {e}")
+        await db.rollback()
 
 
 @router.get("", response_model=CounselorListResponse)
@@ -104,7 +121,7 @@ async def list_counselors(
     max_page_size = 100
     effective_page_size = min(page_size, max_page_size)
 
-    query = select(CounselorProfile)
+    query = select(CounselorProfile).options(selectinload(CounselorProfile.user))
 
     if search:
         query = query.filter(

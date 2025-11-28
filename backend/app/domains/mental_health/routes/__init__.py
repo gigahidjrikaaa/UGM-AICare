@@ -38,6 +38,7 @@ from . import agents_graph
 from . import safety_triage
 from . import langgraph
 from . import langgraph_analytics
+from . import aika_stream
 
 # Feature routes
 from . import quests
@@ -65,6 +66,7 @@ __all__ = [
     "safety_triage",
     "langgraph",
     "langgraph_analytics",
+    "aika_stream",
     # Features
     "quests",
     "surveys",

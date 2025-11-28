@@ -38,6 +38,7 @@ from app.domains.mental_health.routes import (
     clinical_analytics_routes,
     intervention_plans,
     langgraph_analytics,
+    aika_stream,
 )
 
 # Finance domain routes (commented out - domain incomplete)
@@ -47,7 +48,7 @@ from app.agents.sta.router import router as sta_router
 from app.agents.tca.router import router as tca_router
 from app.agents.cma.router import router as cma_router
 from app.agents.ia.router import router as ia_router
-from app.agents.aika.router import router as aika_router  # Aika Meta-Agent
+# app.include_router(aika_router)  # Aika Meta-Agent orchestrator - REMOVED (Legacy)
 from contextlib import asynccontextmanager
 from app.core.scheduler import start_scheduler, shutdown_scheduler
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
@@ -209,7 +210,8 @@ app.include_router(sta_router)
 app.include_router(tca_router)
 app.include_router(cma_router)
 app.include_router(ia_router)
-app.include_router(aika_router)  # Aika Meta-Agent orchestrator
+# app.include_router(aika_router)  # Aika Meta-Agent orchestrator
+app.include_router(aika_stream.router, prefix="/api/v1")  # Aika Streaming Endpoint
 app.include_router(intervention_plans.router)  # Intervention plan records
 app.include_router(sca_admin.router)  # SCA admin management endpoints
 app.include_router(appointments.router)

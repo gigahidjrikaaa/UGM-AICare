@@ -21,7 +21,7 @@ import re
 import os
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.shared.tools import tool_registry
+from app.agents.shared.tools.registry import register_tool
 
 import logging
 
@@ -44,12 +44,6 @@ def sanitize_query(query: str) -> str:
     - Phone numbers
     - Specific names (common Indonesian names)
     - Student IDs
-    
-    Args:
-        query: Original search query
-        
-    Returns:
-        Sanitized query safe for external APIs
     """
     # Remove email addresses
     query = re.sub(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', '[EMAIL]', query)
@@ -68,23 +62,39 @@ def sanitize_query(query: str) -> str:
     return query.strip()
 
 
+@register_tool(
+    name="web_search",
+    description="Privacy-friendly web search using DuckDuckGo. Queries are sanitized to remove PII. Use for general information lookup.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "Search query (will be sanitized to remove personal information)"
+            },
+            "max_results": {
+                "type": "integer",
+                "description": "Maximum number of results to return (default 5, max 5)",
+                "default": 5
+            }
+        },
+        "required": ["query"]
+    },
+    category="external_context",
+    requires_db=True,
+    requires_user_id=False
+)
 async def web_search(
     db: AsyncSession,
     query: str,
-    max_results: int = MAX_SEARCH_RESULTS
+    max_results: int = MAX_SEARCH_RESULTS,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Privacy-friendly web search using DuckDuckGo Instant Answer API.
     
     Searches the web for general information without tracking.
     Query is sanitized to remove PII before searching.
-    
-    Args:
-        query: Search query (will be sanitized)
-        max_results: Maximum number of results (default 5, max 5)
-        
-    Returns:
-        Dict with search results or error
     """
     try:
         if max_results > MAX_SEARCH_RESULTS:
@@ -159,10 +169,34 @@ async def web_search(
         }
 
 
+@register_tool(
+    name="get_mental_health_news",
+    description="Get recent mental health news articles for contextual awareness. Helps conversations feel more connected to current events.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "country": {
+                "type": "string",
+                "description": "Country to get news for (default 'Indonesia')",
+                "default": "Indonesia"
+            },
+            "limit": {
+                "type": "integer",
+                "description": "Maximum number of articles to return (default 5, max 5)",
+                "default": 5
+            }
+        },
+        "required": []
+    },
+    category="external_context",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_mental_health_news(
     db: AsyncSession,
     country: str = "Indonesia",
-    limit: int = MAX_NEWS_ARTICLES
+    limit: int = MAX_NEWS_ARTICLES,
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get recent mental health news articles.
@@ -172,13 +206,6 @@ async def get_mental_health_news(
     
     Note: Requires NEWS_API_KEY in environment (optional feature).
     Falls back to curated resources if API unavailable.
-    
-    Args:
-        country: Country code (default "Indonesia")
-        limit: Maximum number of articles (default 5, max 5)
-        
-    Returns:
-        Dict with news articles or error
     """
     try:
         if limit > MAX_NEWS_ARTICLES:
@@ -263,9 +290,28 @@ async def get_mental_health_news(
         }
 
 
+@register_tool(
+    name="get_weather",
+    description="Get current weather for mood context. Weather affects mood, use this for empathetic conversations (e.g., 'It's raining today...').",
+    parameters={
+        "type": "object",
+        "properties": {
+            "location": {
+                "type": "string",
+                "description": "City name to get weather for (default 'Yogyakarta')",
+                "default": "Yogyakarta"
+            }
+        },
+        "required": []
+    },
+    category="external_context",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_weather(
     db: AsyncSession,
-    location: str = "Yogyakarta"
+    location: str = "Yogyakarta",
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get current weather for mood context.
@@ -274,12 +320,6 @@ async def get_weather(
     for more empathetic conversations (e.g., "It's raining today...").
     
     Note: Uses Open-Meteo API (free, no API key required).
-    
-    Args:
-        location: City name (default "Yogyakarta")
-        
-    Returns:
-        Dict with weather data or error
     """
     try:
         # Geocoding to get coordinates (Open-Meteo Geocoding API)
@@ -386,9 +426,28 @@ async def get_weather(
         }
 
 
+@register_tool(
+    name="get_academic_calendar",
+    description="Get academic calendar events like exam periods and holidays. Provides context about stressful academic periods.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "university": {
+                "type": "string",
+                "description": "University code (default 'UGM')",
+                "default": "UGM"
+            }
+        },
+        "required": []
+    },
+    category="external_context",
+    requires_db=True,
+    requires_user_id=False
+)
 async def get_academic_calendar(
     db: AsyncSession,
-    university: str = "UGM"
+    university: str = "UGM",
+    **kwargs
 ) -> Dict[str, Any]:
     """
     Get academic calendar events (exam periods, holidays).
@@ -397,12 +456,6 @@ async def get_academic_calendar(
     affect student mental health (e.g., midterms, finals).
     
     Note: Currently returns static calendar. Future: scrape university websites.
-    
-    Args:
-        university: University code (default "UGM")
-        
-    Returns:
-        Dict with calendar events or error
     """
     try:
         # Static calendar for now (could be database-driven or scraped in future)
@@ -496,116 +549,3 @@ async def get_academic_calendar(
             "error": str(e),
             "university": university
         }
-
-
-# ============================================================================
-# GEMINI FUNCTION CALLING SCHEMAS
-# ============================================================================
-
-web_search_schema = {
-    "name": "web_search",
-    "description": "Privacy-friendly web search using DuckDuckGo. Queries are sanitized to remove PII. Use for general information lookup.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "query": {
-                "type": "string",
-                "description": "Search query (will be sanitized to remove personal information)"
-            },
-            "max_results": {
-                "type": "integer",
-                "description": "Maximum number of results to return (default 5, max 5)",
-                "default": 5
-            }
-        },
-        "required": ["query"]
-    }
-}
-
-get_mental_health_news_schema = {
-    "name": "get_mental_health_news",
-    "description": "Get recent mental health news articles for contextual awareness. Helps conversations feel more connected to current events.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "country": {
-                "type": "string",
-                "description": "Country to get news for (default 'Indonesia')",
-                "default": "Indonesia"
-            },
-            "limit": {
-                "type": "integer",
-                "description": "Maximum number of articles to return (default 5, max 5)",
-                "default": 5
-            }
-        },
-        "required": []
-    }
-}
-
-get_weather_schema = {
-    "name": "get_weather",
-    "description": "Get current weather for mood context. Weather affects mood, use this for empathetic conversations (e.g., 'It's raining today...').",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "location": {
-                "type": "string",
-                "description": "City name to get weather for (default 'Yogyakarta')",
-                "default": "Yogyakarta"
-            }
-        },
-        "required": []
-    }
-}
-
-get_academic_calendar_schema = {
-    "name": "get_academic_calendar",
-    "description": "Get academic calendar events like exam periods and holidays. Provides context about stressful academic periods.",
-    "parameters": {
-        "type": "object",
-        "properties": {
-            "university": {
-                "type": "string",
-                "description": "University code (default 'UGM')",
-                "default": "UGM"
-            }
-        },
-        "required": []
-    }
-}
-
-
-# ============================================================================
-# REGISTER TOOLS WITH CENTRAL REGISTRY
-# ============================================================================
-
-tool_registry.register(
-    name="web_search",
-    func=web_search,
-    schema=web_search_schema,
-    category="external_context"
-)
-
-tool_registry.register(
-    name="get_mental_health_news",
-    func=get_mental_health_news,
-    schema=get_mental_health_news_schema,
-    category="external_context"
-)
-
-tool_registry.register(
-    name="get_weather",
-    func=get_weather,
-    schema=get_weather_schema,
-    category="external_context"
-)
-
-tool_registry.register(
-    name="get_academic_calendar",
-    func=get_academic_calendar,
-    schema=get_academic_calendar_schema,
-    category="external_context"
-)
-
-logger.info("🔧 Registered 4 external context tools in 'external_context' category")

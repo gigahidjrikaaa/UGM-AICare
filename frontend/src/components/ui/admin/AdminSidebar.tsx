@@ -32,40 +32,40 @@ const navGroups = [
   {
     label: 'People & Content',
     items: [
-      { name: 'Users', icon: <FiUsers size={18}/>, href: '/admin/users' },
-      { name: 'Counselors', icon: <FiUserCheck size={18}/>, href: '/admin/counselors' },
-      { name: 'Appointments', icon: <FiCalendar size={18}/>, href: '/admin/appointments' },
-      { name: 'Conversations', icon: <FiMessageSquare size={18}/>, href: '/admin/conversations' },
-      { name: 'Content Resources', icon: <FiBookOpen size={18}/>, href: '/admin/content-resources' },
-      { name: 'Surveys', icon: <FiClipboard size={18}/>, href: '/admin/surveys' },
-      { name: 'CBT Modules', icon: <FiHeart size={18}/>, href: '/admin/cbt-modules' },
+      { name: 'Users', icon: <FiUsers size={18} />, href: '/admin/users' },
+      { name: 'Counselors', icon: <FiUserCheck size={18} />, href: '/admin/counselors' },
+      { name: 'Appointments', icon: <FiCalendar size={18} />, href: '/admin/appointments' },
+      { name: 'Conversations', icon: <FiMessageSquare size={18} />, href: '/admin/conversations' },
+      { name: 'Content Resources', icon: <FiBookOpen size={18} />, href: '/admin/content-resources' },
+      { name: 'Surveys', icon: <FiClipboard size={18} />, href: '/admin/surveys' },
+      { name: 'CBT Modules', icon: <FiHeart size={18} />, href: '/admin/cbt-modules' },
     ]
   },
   {
     label: 'Agents & Intelligence',
     items: [
-      { name: 'Dashboard', icon: <FiBarChart2 size={18}/>, href: '/admin/dashboard' },
-      { name: 'Cases', icon: <FiShield size={18}/>, href: '/admin/cases' },
-      { name: 'Case Management', icon: <FiBriefcase size={18}/>, href: '/admin/service-desk' },
-      { name: 'TCA Outreach', icon: <FiSend size={18}/>, href: '/admin/campaigns' },
-      { name: 'Quest Templates', icon: <FiZap size={18}/>, href: '/admin/quests' },
-      { name: 'Insights Analytics', icon: <FiTrendingUp size={18}/>, href: '/admin/insights' },
-      { name: 'LangGraph Monitoring', icon: <FiActivity size={18}/>, href: '/admin/langgraph' },
-      { name: 'Agents Command Center', icon: <FiMonitor size={18}/>, href: '/admin/agents-command-center' },
+      { name: 'Dashboard', icon: <FiBarChart2 size={18} />, href: '/admin/dashboard' },
+      { name: 'Cases', icon: <FiShield size={18} />, href: '/admin/cases' },
+      { name: 'Case Management', icon: <FiBriefcase size={18} />, href: '/admin/service-desk' },
+      { name: 'TCA Outreach', icon: <FiSend size={18} />, href: '/admin/campaigns' },
+      { name: 'Intervention Plans', icon: <FiClipboard size={18} />, href: '/admin/interventions' },
+      { name: 'Quest Templates', icon: <FiZap size={18} />, href: '/admin/quests' },
+      { name: 'Insights Analytics', icon: <FiTrendingUp size={18} />, href: '/admin/insights' },
+      { name: 'LangGraph Monitoring', icon: <FiActivity size={18} />, href: '/admin/langgraph' },
     ]
   },
   {
     label: 'Development Tools',
     items: [
-      { name: 'Testing Scenarios', icon: <FiTarget size={18}/>, href: '/admin/testing' },
+      { name: 'Testing Scenarios', icon: <FiTarget size={18} />, href: '/admin/testing' },
     ]
   }
 ];
 
 const secondaryNavItems = [
-  { name: 'My Profile', icon: <FiUser size={18}/>, href: '/admin/profile' },
-  { name: 'System Settings', icon: <FiSettings size={18}/>, href: '/admin/settings' },
-  { name: 'Help & Support', icon: <FiHelpCircle size={18}/>, href: '/admin/support' },
+  { name: 'My Profile', icon: <FiUser size={18} />, href: '/admin/profile' },
+  { name: 'System Settings', icon: <FiSettings size={18} />, href: '/admin/settings' },
+  { name: 'Help & Support', icon: <FiHelpCircle size={18} />, href: '/admin/support' },
 ];
 export default function AdminSidebar() {
   // useRouter is not needed here if signOut is used directly with callbackUrl
@@ -76,7 +76,7 @@ export default function AdminSidebar() {
       <div className="p-4 border-b border-white/10 h-16 flex items-center shrink-0">
         <Link href="/admin/dashboard" className="flex items-center group">
           <Image
-            src="/UGM_Lambang.png" 
+            src="/UGM_Lambang.png"
             alt="UGM Logo"
             width={36}
             height={36}
@@ -131,7 +131,7 @@ export default function AdminSidebar() {
           onClick={() => signOut({ callbackUrl: '/admin' })} // Use signOut from next-auth
           className="flex items-center w-full px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 group text-white/70 hover:bg-red-500/15 hover:text-red-300"
         >
-          <FiLogOut className="mr-3 flex-shrink-0 text-white/60 group-hover:text-red-300" size={18}/>
+          <FiLogOut className="mr-3 flex-shrink-0 text-white/60 group-hover:text-red-300" size={18} />
           <span className="truncate">Sign Out</span>
         </button>
       </div>

@@ -323,6 +323,7 @@ async def persist_plan_node(state: SCAState, db: AsyncSession) -> SCAState:
         
         db.add(plan)
         await db.flush()
+        await db.commit()  # Explicit commit to ensure persistence
         
         # DEBUG: Log plan creation details
         logger.info(f"📋 TCA persisted intervention plan: ID={plan.id}, user_id={plan.user_id}, is_active={plan.is_active}, status={plan.status}")

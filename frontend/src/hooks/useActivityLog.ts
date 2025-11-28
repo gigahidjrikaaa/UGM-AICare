@@ -20,6 +20,7 @@ interface UseActivityLogReturn {
   activeAgents: string[];
   clearActivities: () => void;
   isReceiving: boolean;
+  addActivity: (activity: ActivityLog) => void;
 }
 
 export function useActivityLog(
@@ -35,7 +36,7 @@ export function useActivityLog(
   const [latestActivity, setLatestActivity] = useState<ActivityLog | null>(null);
   const [activeAgents, setActiveAgents] = useState<string[]>([]);
   const [isReceiving, setIsReceiving] = useState(false);
-  
+
   const activeAgentsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   /**
@@ -129,6 +130,7 @@ export function useActivityLog(
     activeAgents,
     clearActivities,
     isReceiving,
+    addActivity,
   };
 }
 
@@ -146,12 +148,12 @@ export function useActivityLogProcessor(options: UseActivityLogOptions = {}) {
     (message: MessageEvent) => {
       try {
         const data = JSON.parse(message.data);
-        
+
         // Check if this is an activity log message
         if (data.type === 'activity_log' && data.data) {
           const activityMsg = data as ActivityLogMessage;
           activityLog.clearActivities(); // Clear old activities for new message
-          
+
           // In case of batch activities (from REST API response)
           if (Array.isArray(data.data)) {
             data.data.forEach((activity: ActivityLog) => {

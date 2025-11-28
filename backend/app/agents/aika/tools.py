@@ -30,27 +30,49 @@ from app.agents.shared.tools import (
 logger = logging.getLogger(__name__)
 
 
-def get_aika_tools() -> List[Dict[str, Any]]:
+def get_aika_tools() -> List[Any]:
     """Return list of tools available to Aika.
     
-    This function is used by legacy code that expects a list of tool schemas.
-    For new code, use generate_gemini_tools() directly from the registry.
+    This function returns tools in the format expected by the Google GenAI SDK.
+    It filters out agent-invoking tools to prevent conflicts with LangGraph routing.
     
     Returns:
-        List[Dict]: Tool schemas for Gemini function calling
+        List[types.Tool]: Tool schemas for Gemini function calling
     """
     try:
-        # Use NEW registry to get all tools
-        # The registry contains:
-        # - agent tools (STA, TCA, CMA, IA, general_query)
-        # - scheduling tools (book_appointment, get_available_counselors, etc.)
-        all_tools_dict = get_all_tools()  # Returns Dict[str, Dict]
-        all_tools = list(all_tools_dict.values())  # Convert to List[Dict]
+        # Use NEW registry to get all tools in Gemini format
+        all_gemini_tools = generate_gemini_tools()
         
-        logger.info(f"✅ Loaded {len(all_tools)} tools for Aika from registry")
+        # Tools to exclude (agent runners that conflict with LangGraph routing)
+        excluded_tools = {
+            "run_safety_triage_agent",
+            "run_support_coach_agent",
+            "run_service_desk_agent",
+            "run_insights_agent"
+        }
         
-        # Return list of tool configurations
-        return all_tools
+        filtered_tools = []
+        
+        for tool in all_gemini_tools:
+            # Each tool object has function_declarations list
+            # We need to filter the declarations inside
+            if not hasattr(tool, "function_declarations"):
+                continue
+                
+            valid_decls = []
+            for decl in tool.function_declarations:
+                if decl.name not in excluded_tools:
+                    valid_decls.append(decl)
+            
+            if valid_decls:
+                # Create new Tool object with filtered declarations
+                # We can't modify the existing one safely if it's shared
+                from google.genai import types
+                filtered_tools.append(types.Tool(function_declarations=valid_decls))
+        
+        logger.info(f"✅ Loaded {len(filtered_tools)} tool groups for Aika (filtered agent runners)")
+        
+        return filtered_tools
         
     except Exception as e:
         logger.error(f"Error loading Aika tools: {e}")

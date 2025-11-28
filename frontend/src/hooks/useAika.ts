@@ -79,6 +79,9 @@ export function useAika(options: UseAikaOptions = {}) {
   /**
    * Send a message to Aika Meta-Agent
    */
+  /**
+   * Send a message to Aika Meta-Agent (Streaming Support)
+   */
   const sendMessage = useCallback(async (
     message: string,
     conversationHistory: AikaMessage[] = [],
@@ -106,7 +109,7 @@ export function useAika(options: UseAikaOptions = {}) {
         preferred_model: preferredModel,
       };
 
-      const response = await fetch('/api/mental-health/aika', {
+      const response = await fetch('/api/v1/aika', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -119,26 +122,76 @@ export function useAika(options: UseAikaOptions = {}) {
         throw new Error(errorData.error || `HTTP ${response.status}`);
       }
 
-      const data: AikaResponse = await response.json();
-
-      if (!data.success) {
-        throw new Error(data.error || 'Aika request failed');
+      if (!response.body) {
+        throw new Error('Response body is empty');
       }
 
-      // Store metadata
-      setLastMetadata(data.metadata);
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
 
-      // Handle agent activity
-      if (onAgentActivity && data.metadata.agents_invoked.length > 0) {
-        onAgentActivity(data.metadata.agents_invoked);
+      let finalResponse = '';
+      let finalMetadata: AikaMetadata | null = null;
+      const invokedAgents = new Set<string>();
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('event: ')) {
+            const [eventLine, dataLine] = line.split('\n');
+            const eventType = eventLine.replace('event: ', '').trim();
+            const dataStr = dataLine?.replace('data: ', '').trim();
+
+            if (!dataStr) continue;
+
+            try {
+              const data = JSON.parse(dataStr);
+
+              if (eventType === 'agent_start') {
+                const agentName = data.agent;
+                invokedAgents.add(agentName);
+                if (onAgentActivity) {
+                  onAgentActivity(Array.from(invokedAgents));
+                }
+              } else if (eventType === 'agent_update') {
+                // Optional: Handle granular updates
+              } else if (eventType === 'final_response') {
+                finalResponse = data.response;
+              } else if (eventType === 'metadata') {
+                finalMetadata = data;
+                setLastMetadata(data);
+              } else if (eventType === 'error') {
+                throw new Error(data.message);
+              }
+            } catch (e) {
+              console.error('Error parsing SSE data:', e);
+            }
+          }
+        }
       }
+
+      if (!finalMetadata) {
+        throw new Error('Incomplete response from Aika');
+      }
+
+      const result: AikaResponse = {
+        success: true,
+        response: finalResponse,
+        metadata: finalMetadata,
+      };
 
       // Handle risk detection
-      if (data.metadata.risk_assessment) {
-        const { risk_level, risk_score } = data.metadata.risk_assessment;
+      if (finalMetadata.risk_assessment) {
+        const { risk_level } = finalMetadata.risk_assessment;
 
         if (onRiskDetected) {
-          onRiskDetected(data.metadata.risk_assessment);
+          onRiskDetected(finalMetadata.risk_assessment);
         }
 
         // Show risk notifications
@@ -151,7 +204,7 @@ export function useAika(options: UseAikaOptions = {}) {
           } else if (risk_level === 'high') {
             toast(
               '⚠️ Keselamatanmu penting. Pertimbangkan untuk menghubungi layanan dukungan.',
-              { 
+              {
                 duration: 5000,
                 icon: '⚠️',
                 style: {
@@ -166,9 +219,9 @@ export function useAika(options: UseAikaOptions = {}) {
       }
 
       // Handle escalation
-      if (data.metadata.escalation_triggered && data.metadata.case_id) {
+      if (finalMetadata.escalation_triggered && finalMetadata.case_id) {
         if (onEscalation) {
-          onEscalation(data.metadata.case_id);
+          onEscalation(finalMetadata.case_id);
         }
 
         if (showToasts) {
@@ -179,19 +232,8 @@ export function useAika(options: UseAikaOptions = {}) {
         }
       }
 
-      // Show multi-agent activity
-      if (showToasts && data.metadata.agents_invoked.length > 1) {
-        const agentNames = data.metadata.agents_invoked.join(', ');
-        toast(
-          `Aika berkonsultasi dengan: ${agentNames}`,
-          { 
-            duration: 3000,
-            icon: '🤖',
-          }
-        );
-      }
+      return result;
 
-      return data;
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
       setError(errorMessage);

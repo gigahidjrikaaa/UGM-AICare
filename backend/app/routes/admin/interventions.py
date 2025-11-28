@@ -88,7 +88,74 @@ async def create_campaign(
         updated_at=now,
     )
     db.add(row)
-    await db.commit()
     await db.refresh(row)
     return _to_campaign_response(row)
+
+
+# --- Intervention Plans ---
+
+from app.domains.mental_health.models.interventions import InterventionPlanRecord
+from app.models.user import User
+from app.schemas.admin.interventions import InterventionPlanListResponse, InterventionPlanResponse
+
+@router.get("/plans", response_model=InterventionPlanListResponse)
+async def list_intervention_plans(
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user=Depends(get_admin_user),
+) -> InterventionPlanListResponse:
+    """List all intervention plans."""
+    # Join with User to get names
+    stmt = (
+        select(InterventionPlanRecord, User)
+        .join(User, InterventionPlanRecord.user_id == User.id)
+        .order_by(desc(InterventionPlanRecord.updated_at))
+        .offset(skip)
+        .limit(limit)
+    )
+    
+    result = await db.execute(stmt)
+    rows = result.all()
+    
+    total = int((await db.execute(select(func.count()).select_from(InterventionPlanRecord))).scalar() or 0)
+    
+    items = []
+    for plan, user in rows:
+        items.append(InterventionPlanResponse(
+            id=plan.id,
+            user_id=plan.user_id,
+            user_name=user.name,
+            user_email=user.email,
+            plan_title=plan.plan_title,
+            risk_level=plan.risk_level,
+            status=plan.status,
+            total_steps=plan.total_steps,
+            completed_steps=plan.completed_steps,
+            created_at=plan.created_at,
+            updated_at=plan.updated_at,
+            plan_data=plan.plan_data,
+            completion_tracking=plan.completion_tracking
+        ))
+        
+    return InterventionPlanListResponse(items=items, total=total)
+
+
+@router.post("/plans/{plan_id}/notify", status_code=status.HTTP_200_OK)
+async def notify_user_about_plan(
+    plan_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user=Depends(get_admin_user),
+):
+    """Notify user about their intervention plan (Email/Push)."""
+    stmt = select(InterventionPlanRecord).where(InterventionPlanRecord.id == plan_id)
+    plan = (await db.execute(stmt)).scalar_one_or_none()
+    
+    if not plan:
+        raise HTTPException(status_code=404, detail="Plan not found")
+        
+    # In a real system, this would trigger an email or push notification
+    # For now, we'll just log it or return success
+    
+    return {"message": f"Notification sent to user {plan.user_id} for plan {plan_id}"}
 

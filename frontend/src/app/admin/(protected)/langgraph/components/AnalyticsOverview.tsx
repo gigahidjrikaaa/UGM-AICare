@@ -44,12 +44,12 @@ export function AnalyticsOverview({ days }: AnalyticsOverviewProps) {
 
   if (loading) {
     return (
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
-        <div className="animate-pulse space-y-4">
-          <div className="h-6 bg-white/20 rounded w-1/3"></div>
-          <div className="grid grid-cols-4 gap-4">
+      <div className="bg-[#00153a]/40 backdrop-blur-md border border-white/10 rounded-2xl p-6 shadow-xl">
+        <div className="animate-pulse space-y-6">
+          <div className="h-8 bg-white/10 rounded w-1/3"></div>
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {[...Array(4)].map((_, i) => (
-              <div key={i} className="h-24 bg-white/20 rounded"></div>
+              <div key={i} className="h-32 bg-white/5 rounded-xl border border-white/5"></div>
             ))}
           </div>
         </div>
@@ -68,71 +68,83 @@ export function AnalyticsOverview({ days }: AnalyticsOverviewProps) {
   if (!data) return null;
 
   return (
-    <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-bold text-white">Analytics Overview</h2>
-        <span className="text-sm text-white/60">Last {days} days</span>
+    <div className="bg-[#00153a]/40 backdrop-blur-md border border-white/10 rounded-2xl p-6 shadow-xl">
+      <div className="flex justify-between items-center mb-8">
+        <h2 className="text-xl font-bold text-white tracking-tight">Analytics Overview</h2>
+        <span className="text-xs font-mono text-white/40 uppercase tracking-wider bg-white/5 px-3 py-1 rounded-full border border-white/5">Last {days} days</span>
       </div>
 
       {/* Key Metrics Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
         {/* Total Executions */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
+        <div className="bg-blue-500/10 border border-blue-500/20 rounded-xl p-5 relative overflow-hidden group hover:bg-blue-500/20 transition-all">
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-blue-500/20 rounded-full blur-2xl group-hover:bg-blue-500/30 transition-all"></div>
+          <div className="flex items-center justify-between relative z-10">
             <div>
-              <p className="text-sm text-blue-600 font-medium">Total Executions</p>
-              <p className="text-2xl font-bold text-blue-900 mt-1">
+              <p className="text-xs font-bold text-blue-400 uppercase tracking-wider mb-1">Total Executions</p>
+              <p className="text-3xl font-bold text-white tracking-tight">
                 {data.data.total_executions.toLocaleString()}
               </p>
             </div>
-            <svg className="h-8 w-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-            </svg>
+            <div className="bg-blue-500/20 p-3 rounded-lg">
+              <svg className="h-6 w-6 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+              </svg>
+            </div>
           </div>
         </div>
 
         {/* Success Rate */}
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
+        <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-5 relative overflow-hidden group hover:bg-emerald-500/20 transition-all">
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-emerald-500/20 rounded-full blur-2xl group-hover:bg-emerald-500/30 transition-all"></div>
+          <div className="flex items-center justify-between relative z-10">
             <div>
-              <p className="text-sm text-green-600 font-medium">Success Rate</p>
-              <p className="text-2xl font-bold text-green-900 mt-1">
+              <p className="text-xs font-bold text-emerald-400 uppercase tracking-wider mb-1">Success Rate</p>
+              <p className="text-3xl font-bold text-white tracking-tight">
                 {data.data.success_rate_percent.toFixed(1)}%
               </p>
             </div>
-            <svg className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <div className="bg-emerald-500/20 p-3 rounded-lg">
+              <svg className="h-6 w-6 text-emerald-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
           </div>
         </div>
 
         {/* Successful Executions */}
-        <div className="bg-purple-50 border border-purple-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
+        <div className="bg-purple-500/10 border border-purple-500/20 rounded-xl p-5 relative overflow-hidden group hover:bg-purple-500/20 transition-all">
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-purple-500/20 rounded-full blur-2xl group-hover:bg-purple-500/30 transition-all"></div>
+          <div className="flex items-center justify-between relative z-10">
             <div>
-              <p className="text-sm text-purple-600 font-medium">Successful</p>
-              <p className="text-2xl font-bold text-purple-900 mt-1">
+              <p className="text-xs font-bold text-purple-400 uppercase tracking-wider mb-1">Successful</p>
+              <p className="text-3xl font-bold text-white tracking-tight">
                 {data.data.successful_executions.toLocaleString()}
               </p>
             </div>
-            <svg className="h-8 w-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
+            <div className="bg-purple-500/20 p-3 rounded-lg">
+              <svg className="h-6 w-6 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
           </div>
         </div>
 
         {/* Average Execution Time */}
-        <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-          <div className="flex items-center justify-between">
+        <div className="bg-[#FFCA40]/10 border border-[#FFCA40]/20 rounded-xl p-5 relative overflow-hidden group hover:bg-[#FFCA40]/20 transition-all">
+          <div className="absolute -right-6 -top-6 w-24 h-24 bg-[#FFCA40]/20 rounded-full blur-2xl group-hover:bg-[#FFCA40]/30 transition-all"></div>
+          <div className="flex items-center justify-between relative z-10">
             <div>
-              <p className="text-sm text-orange-600 font-medium">Avg Duration</p>
-              <p className="text-2xl font-bold text-orange-900 mt-1">
-                {data.data.average_execution_time_ms.toFixed(0)}ms
+              <p className="text-xs font-bold text-[#FFCA40] uppercase tracking-wider mb-1">Avg Duration</p>
+              <p className="text-3xl font-bold text-white tracking-tight">
+                {data.data.average_execution_time_ms.toFixed(0)}<span className="text-lg font-normal text-white/50 ml-1">ms</span>
               </p>
             </div>
-            <svg className="h-8 w-8 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
+            <div className="bg-[#FFCA40]/20 p-3 rounded-lg">
+              <svg className="h-6 w-6 text-[#FFCA40]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
           </div>
         </div>
       </div>
@@ -140,30 +152,34 @@ export function AnalyticsOverview({ days }: AnalyticsOverviewProps) {
       {/* Most Active Nodes */}
       {data.data.most_active_nodes && data.data.most_active_nodes.length > 0 && (
         <div>
-          <h3 className="text-sm font-semibold text-white/70 mb-3">Most Active Nodes</h3>
-          <div className="space-y-2">
+          <h3 className="text-sm font-bold text-white/50 uppercase tracking-wider mb-4">Most Active Nodes</h3>
+          <div className="space-y-3">
             {data.data.most_active_nodes.slice(0, 5).map((node, index) => (
-              <div key={index} className="flex items-center justify-between bg-white/5 p-3 rounded-lg">
-                <div className="flex items-center gap-3">
-                  <span className="flex items-center justify-center w-6 h-6 bg-white/20 rounded-full text-xs font-semibold text-white/70">
+              <div key={index} className="flex items-center justify-between bg-white/5 p-4 rounded-xl border border-white/5 hover:bg-white/10 transition-colors">
+                <div className="flex items-center gap-4">
+                  <span className="flex items-center justify-center w-8 h-8 bg-white/10 rounded-lg text-xs font-bold text-white/70 font-mono">
                     {index + 1}
                   </span>
-                  <span className="text-sm font-medium text-white">{node.node_name}</span>
+                  <span className="text-sm font-bold text-white tracking-tight">{node.node_name}</span>
                 </div>
-                <div className="flex items-center gap-4 text-sm text-white/60">
-                  <div>
-                    <span className="font-semibold">{node.execution_count.toLocaleString()}</span> executions
+                <div className="flex items-center gap-6 text-sm text-white/60">
+                  <div className="flex flex-col items-end">
+                    <span className="font-bold text-white">{node.execution_count.toLocaleString()}</span>
+                    <span className="text-[10px] uppercase tracking-wider opacity-60">executions</span>
                   </div>
-                  <div>
-                    <span className="font-semibold">{node.avg_time_ms?.toFixed(0) ?? 'N/A'}ms</span> avg
+                  <div className="w-px h-8 bg-white/10"></div>
+                  <div className="flex flex-col items-end">
+                    <span className="font-bold text-white font-mono">{node.avg_time_ms?.toFixed(0) ?? 'N/A'}ms</span>
+                    <span className="text-[10px] uppercase tracking-wider opacity-60">avg time</span>
                   </div>
-                  <div>
-                    <span className={`font-semibold ${
-                      (node.success_rate_percent ?? 0) >= 95 ? 'text-green-600' :
-                      (node.success_rate_percent ?? 0) >= 70 ? 'text-yellow-600' : 'text-red-600'
-                    }`}>
+                  <div className="w-px h-8 bg-white/10"></div>
+                  <div className="flex flex-col items-end w-20">
+                    <span className={`font-bold ${(node.success_rate_percent ?? 0) >= 95 ? 'text-emerald-400' :
+                        (node.success_rate_percent ?? 0) >= 70 ? 'text-[#FFCA40]' : 'text-red-400'
+                      }`}>
                       {node.success_rate_percent?.toFixed(1) ?? 'N/A'}%
-                    </span> success
+                    </span>
+                    <span className="text-[10px] uppercase tracking-wider opacity-60">success</span>
                   </div>
                 </div>
               </div>

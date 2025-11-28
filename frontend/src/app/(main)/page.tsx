@@ -4,9 +4,9 @@ import Image from 'next/image';
 import Link from 'next/link';
 import { useState, useEffect, useRef } from 'react';
 import { motion, useScroll, useTransform, useInView } from 'framer-motion';
-import { 
-  FaComments, 
-  FaHeartbeat, 
+import {
+  FaComments,
+  FaHeartbeat,
   FaArrowRight,
   FaStar
 } from 'react-icons/fa';
@@ -48,7 +48,7 @@ const RevealOnScroll = ({ children, direction = "up" }: { children: React.ReactN
 
 export default function Home() {
   const [mounted, setMounted] = useState(false);
-  
+
   useEffect(() => {
     setMounted(true);
   }, []);
@@ -57,7 +57,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen w-full bg-[#00112e] text-white selection:bg-[#FFCA40] selection:text-[#001D58] font-sans">
-      
+
       {/* ============================ */}
       {/* HERO SECTION */}
       {/* ============================ */}
@@ -91,7 +91,7 @@ export default function Home() {
             <p className="text-lg md:text-xl text-white/70 max-w-2xl mx-auto font-light leading-relaxed mb-12 font-sans">
               Bridging the gap between students and mental health support. UGM-AICare offers proactive intervention, resource management, and a safe space for you to be heard.
             </p>
-            
+
             <div className="flex flex-col sm:flex-row items-center justify-center gap-6">
               <Link href="/signup">
                 <button className="px-8 py-4 bg-[#FFCA40] text-[#001D58] rounded-full font-medium text-lg hover:bg-white transition-colors duration-300 font-sans">
@@ -105,10 +105,31 @@ export default function Home() {
               </Link>
             </div>
           </motion.div>
+
+          {/* Floating Aika Widget */}
+          <motion.div
+            initial={{ opacity: 0, x: 50 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ delay: 1.2, duration: 0.8 }}
+            className="absolute hidden lg:flex top-1/2 -right-12 xl:-right-32 transform -translate-y-1/2 bg-white/10 backdrop-blur-md border border-white/20 p-4 rounded-2xl items-center gap-4 max-w-xs text-left shadow-2xl"
+          >
+            <div className="relative w-12 h-12 rounded-full overflow-hidden border-2 border-[#FFCA40]">
+              <Image
+                src="/aika-human.jpeg"
+                alt="Aika Avatar"
+                fill
+                className="object-cover"
+              />
+            </div>
+            <div>
+              <p className="text-[#FFCA40] text-xs font-bold uppercase tracking-wider mb-1">Aika Agent</p>
+              <p className="text-white text-sm leading-snug">"Hi there! I'm here to listen whenever you're ready."</p>
+            </div>
+          </motion.div>
         </div>
 
         {/* Scroll Indicator */}
-        <motion.div 
+        <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 1.5, duration: 1 }}
@@ -162,14 +183,14 @@ export default function Home() {
       <section className="relative py-32 px-6 bg-[#000d24]">
         <div className="max-w-7xl mx-auto grid lg:grid-cols-2 gap-16 items-center">
           <RevealOnScroll direction="right">
-            <div className="relative aspect-square w-full overflow-hidden rounded-sm order-2 lg:order-1">
+            <div className="relative aspect-square w-full overflow-hidden rounded-2xl order-2 lg:order-1 border border-white/10 shadow-2xl">
               <Image
-                src="https://images.unsplash.com/photo-1499750310159-52f0f83ad497?q=80&w=1920&auto=format&fit=crop"
-                alt="Calm Sea"
+                src="/aika-human.jpeg"
+                alt="Aika AI Companion"
                 fill
                 className="object-cover hover:scale-105 transition-transform duration-700"
               />
-              <div className="absolute inset-0 bg-[#FFCA40]/10 mix-blend-overlay" />
+              <div className="absolute inset-0 bg-gradient-to-t from-[#000d24]/80 via-transparent to-transparent" />
             </div>
           </RevealOnScroll>
 
@@ -184,7 +205,7 @@ export default function Home() {
               <p className="text-white/70 text-lg font-light leading-relaxed font-sans">
                 Aika is an intelligent AI agent designed to provide immediate, non-judgmental support. Whether you need to vent, seek advice, or just have a quiet companion, Aika is available 24/7. She helps bridge the gap until you can connect with human counselors if needed.
               </p>
-              
+
               <div className="grid grid-cols-2 gap-8 pt-4 font-sans">
                 <div>
                   <h3 className="text-xl font-serif mb-2 text-white">24/7 Availability</h3>
@@ -214,7 +235,7 @@ export default function Home() {
       <section className="relative py-40 px-6 overflow-hidden">
         {/* Gradient Background */}
         <div className="absolute inset-0 bg-gradient-to-br from-[#001D58] via-[#5e3a00] to-[#000000] opacity-80" />
-        
+
         <div className="relative z-10 max-w-4xl mx-auto text-center space-y-10">
           <RevealOnScroll direction="up">
             <div className="flex justify-center mb-8">
