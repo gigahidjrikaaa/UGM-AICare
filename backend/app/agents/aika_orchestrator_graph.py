@@ -155,22 +155,11 @@ Message: {state["message"]}
 Decision Criteria:
 
 FOR STUDENTS (user):
-- NEEDS AGENTS (invoke STA → TCA/CMA):
-  * Mentions stress, anxiety, depression, crisis
-  * Expresses emotional distress or overwhelm
-  * Contains self-harm or suicide signals
-  * Requests therapeutic support or coping strategies
-  * Requests for intervention plan, action plan, or structured exercises
-  * Complex/Vague appointment requests ("find me an appointment", "I need to talk to someone", "schedule counseling") - Route to CMA for intelligent matching!
-
-- NO AGENTS NEEDED (direct response + ReAct tools):
-  * Simple greetings ("hi", "hello", "hai")
-  * Casual questions ("how are you?", "what can you do?", "do you know me?")
-  * General mental health education ("what is CBT?" - definition only)
-  * Simple factual questions about the system
-  * Questions requiring database lookups (e.g., "who am I?", "my profile") - Aika can handle these with tools!
-  * Specific/Direct appointment actions ("book with Dr. X at 2 PM", "cancel appointment #123", "reschedule to tomorrow", "check my schedule") - Aika handles this directly!
-  * General knowledge questions
+- ALWAYS HANDLE DIRECTLY (needs_agents=false):
+  * Aika is the primary responder for ALL student interactions.
+  * Aika handles emotional support, crisis de-escalation, and appointment booking directly using tools.
+  * DO NOT invoke specialized agents (STA/TCA/CMA) synchronously.
+  * Background processes will handle deep risk analysis later.
 
 FOR ADMINS:
 - NEEDS AGENTS (invoke IA for analytics):
@@ -272,8 +261,14 @@ want to die, mau mati, ingin mati, etc.
             
             state["intent"] = decision.get("intent", "unknown")
             state["intent_confidence"] = decision.get("intent_confidence", 0.5)
-            state["needs_agents"] = decision.get("needs_agents", False)
-            state["agent_reasoning"] = decision.get("reasoning", "No reasoning provided")
+            
+            # FORCE needs_agents=False for students to ensure background processing
+            if normalized_role == "student":
+                state["needs_agents"] = False
+                state["agent_reasoning"] = "Student interaction - enforcing background STA processing"
+            else:
+                state["needs_agents"] = decision.get("needs_agents", False)
+                state["agent_reasoning"] = decision.get("reasoning", "No reasoning provided")
             
             # ========================================================================
             # TWO-TIER RISK MONITORING: Parse immediate risk fields (Tier 1)

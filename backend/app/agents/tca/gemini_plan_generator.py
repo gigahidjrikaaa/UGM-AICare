@@ -254,10 +254,10 @@ async def generate_personalized_plan(
         
         logger.debug(f"User prompt: {user_prompt[:200]}...")
         
-        # Call Gemini API - Using Gemini 2.5 Flash for TCA
+        # Call Gemini API - Using Gemini 2.5 Pro for TCA (Complex Reasoning)
         response_text = await generate_gemini_response(
             history=[{"role": "user", "content": user_prompt}],
-            model="gemini-2.5-flash",  # Gemini 2.5 Flash for Support Coach Agent
+            model="gemini-2.5-pro",  # Gemini 2.5 Pro for Support Coach Agent
             max_tokens=2048,
             temperature=0.7,  # Balance between creativity and consistency
             system_prompt=system_prompt,

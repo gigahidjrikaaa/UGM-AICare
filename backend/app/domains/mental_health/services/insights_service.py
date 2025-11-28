@@ -19,6 +19,7 @@ from app.services.event_bus import publish_event, EventType
 
 logger = logging.getLogger(__name__)
 
+K_ANONYMITY_THRESHOLD = 5
 
 class InsightsService:
     """Service for generating and managing IA insights reports."""
@@ -55,7 +56,17 @@ class InsightsService:
         result = await self.db.execute(stmt)
         assessments = result.scalars().all()
         
-        logger.info(f"Found {len(assessments)} assessments in period")
+        # Enforce K-Anonymity (Application Layer Check)
+        # While SQL aggregation handles the metrics, we must ensure we don't process 
+        # individual records for topic extraction if the group is too small.
+        if len(assessments) < K_ANONYMITY_THRESHOLD:
+            logger.warning(
+                f"K-Anonymity threshold not met (n={len(assessments)} < {K_ANONYMITY_THRESHOLD}). "
+                "Suppressing individual data processing."
+            )
+            assessments = []
+
+        logger.info(f"Found {len(assessments)} assessments in period (after privacy check)")
         
         # Calculate trending topics
         trending_topics = await self._extract_trending_topics(assessments)
@@ -265,14 +276,28 @@ class InsightsService:
             Dict with sentiment metrics
         """
         # Query average risk score (inverse of sentiment)
+        # Enforce k-anonymity at the SQL level for aggregation
         stmt = select(
             func.avg(TriageAssessment.risk_score).label('avg_risk')
         ).where(
             TriageAssessment.created_at >= period_start,
             TriageAssessment.created_at <= period_end
+        ).having(
+            func.count(TriageAssessment.id) >= K_ANONYMITY_THRESHOLD
         )
+        
         result = await self.db.execute(stmt)
-        avg_risk = result.scalar() or 0.0
+        avg_risk = result.scalar()
+        
+        if avg_risk is None:
+            # Handle insufficient data or no data
+            return {
+                'avg_sentiment': 0.0,
+                'avg_risk': 0.0,
+                'period_start': period_start.isoformat(),
+                'period_end': period_end.isoformat(),
+                'note': 'Insufficient data for k-anonymity or no records.'
+            }
         
         # Convert risk to sentiment (1.0 - risk_score)
         avg_sentiment = 1.0 - float(avg_risk)

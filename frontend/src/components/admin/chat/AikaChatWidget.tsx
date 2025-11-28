@@ -3,6 +3,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { FiMessageSquare, FiX, FiSend, FiMinimize2, FiMaximize2 } from 'react-icons/fi';
 import { decodeJwt } from 'jose';
+import CounselorCard from '@/components/features/chat/CounselorCard';
+import TimeSlotCard from '@/components/features/chat/TimeSlotCard';
 
 interface OrchestrateChatMessage {
     id: string;
@@ -65,23 +67,23 @@ export default function AikaChatWidget() {
         }
     }, []);
 
-    const handleSubmit = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!input.trim() || isLoading || !config?.apiBase || !userId) return;
+    // Helper to handle card selection
+    const handleCardSelection = (text: string) => {
+        if (isLoading) return;
 
-        const question = input.trim();
-        setInput('');
-        setIsLoading(true);
-
+        // Optimistic update for user selection
         const correlationId = `orc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-
-        // Optimistic update
         setMessages(prev => [
             ...prev,
-            { id: `u-${correlationId}`, role: 'user', content: question, ts: new Date().toISOString(), correlationId },
+            { id: `u-${correlationId}`, role: 'user', content: text, ts: new Date().toISOString(), correlationId },
             { id: `a-${correlationId}`, role: 'assistant', content: '', ts: new Date().toISOString(), correlationId, pending: true }
         ]);
 
+        submitMessage(text, correlationId);
+    };
+
+    const submitMessage = async (text: string, correlationId: string) => {
+        setIsLoading(true);
         try {
             const getCookie = (name: string) => {
                 if (typeof document === 'undefined') return undefined;
@@ -91,19 +93,18 @@ export default function AikaChatWidget() {
             };
             const token = getCookie('access_token');
 
-            // Construct AikaRequest
             const payload = {
-                message: question,
+                message: text,
                 user_id: userId,
                 role: "admin",
                 conversation_history: messages.map(m => ({
                     role: m.role,
                     content: m.content
                 })),
-                session_id: `sess_${userId}_admin` // Simple session ID for admin
+                session_id: `sess_${userId}_admin`
             };
 
-            const res = await fetch(`${config.apiBase}/aika`, {
+            const res = await fetch(`${config?.apiBase}/aika`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -119,7 +120,6 @@ export default function AikaChatWidget() {
 
             const data = await res.json();
 
-            // Update with response
             setMessages(prev => prev.map(m => (m.correlationId === correlationId && m.role === 'assistant')
                 ? ({
                     ...m,
@@ -138,6 +138,25 @@ export default function AikaChatWidget() {
         } finally {
             setIsLoading(false);
         }
+    };
+
+    const handleSubmit = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!input.trim() || isLoading || !config?.apiBase || !userId) return;
+
+        const question = input.trim();
+        setInput('');
+
+        const correlationId = `orc-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+
+        // Optimistic update
+        setMessages(prev => [
+            ...prev,
+            { id: `u-${correlationId}`, role: 'user', content: question, ts: new Date().toISOString(), correlationId },
+            { id: `a-${correlationId}`, role: 'assistant', content: '', ts: new Date().toISOString(), correlationId, pending: true }
+        ]);
+
+        await submitMessage(question, correlationId);
     };
 
     if (!isOpen) {
@@ -201,7 +220,7 @@ export default function AikaChatWidget() {
                         )}
 
                         {messages.map((m) => (
-                            <div key={m.id} className={`flex ${m.role === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div key={m.id} className={`flex flex-col ${m.role === 'user' ? 'items-end' : 'items-start'}`}>
                                 <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${m.role === 'user'
                                     ? 'bg-[#FFCA40] text-[#001D58] rounded-tr-none'
                                     : 'bg-white/10 text-gray-100 rounded-tl-none border border-white/5'
@@ -244,6 +263,37 @@ export default function AikaChatWidget() {
                                         </div>
                                     )}
                                 </div>
+
+                                {/* Render Interactive Cards based on Tool Calls */}
+                                {m.role === 'assistant' && m.metrics?.tool_calls && Array.isArray(m.metrics.tool_calls) && (
+                                    <div className="mt-2 w-full overflow-x-auto pb-2 custom-scrollbar">
+                                        <div className="flex gap-3 px-1">
+                                            {m.metrics.tool_calls.map((tool: any, idx: number) => {
+                                                // Check for get_available_counselors result
+                                                if (tool.tool_name === 'get_available_counselors' && tool.result?.counselors) {
+                                                    return tool.result.counselors.map((counselor: any) => (
+                                                        <CounselorCard
+                                                            key={counselor.id}
+                                                            counselor={counselor}
+                                                            onSelect={(c) => handleCardSelection(`Saya pilih ${c.name} (ID: ${c.id})`)}
+                                                        />
+                                                    ));
+                                                }
+                                                // Check for suggest_appointment_times result
+                                                if (tool.tool_name === 'suggest_appointment_times' && tool.result?.suggestions) {
+                                                    return tool.result.suggestions.map((slot: any, sIdx: number) => (
+                                                        <TimeSlotCard
+                                                            key={sIdx}
+                                                            slot={slot}
+                                                            onSelect={(s) => handleCardSelection(`Saya pilih waktu ${s.time_label} (${s.datetime})`)}
+                                                        />
+                                                    ));
+                                                }
+                                                return null;
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
                             </div>
                         ))}
                         <div ref={messagesEndRef} />

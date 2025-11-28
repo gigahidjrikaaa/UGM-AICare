@@ -3,7 +3,6 @@ from typing import Iterable, List
 
 from fastapi import APIRouter, Depends, Query, WebSocket, WebSocketDisconnect
 
-from app.agents.orchestrator_graph_spec import ORCHESTRATOR_GRAPH_SPEC
 from app.agents.safety_graph_specs import (
     IA_GRAPH_SPEC,
     SCA_GRAPH_SPEC,
@@ -26,7 +25,6 @@ router = APIRouter(prefix="/api/v1/admin/agents-config", tags=["Admin"])
 GRAPH_SPECS = {
     spec["id"]: spec
     for spec in (
-    ORCHESTRATOR_GRAPH_SPEC,
     STA_GRAPH_SPEC,
     SCA_GRAPH_SPEC,
     SDA_GRAPH_SPEC,

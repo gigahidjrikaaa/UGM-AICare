@@ -305,6 +305,7 @@ export default function AikaEnhancedPage() {
                 chatContainerRef={chatContainerRef}
                 isLoading={isLoading}
                 activeAgents={activeAgents}
+                onCardSelect={handleSendMessage}
               />
 
               {/* Chat Input - using original component */}

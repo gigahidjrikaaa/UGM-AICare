@@ -40,7 +40,7 @@ case "${1:-deploy}" in
 
         # 3. Build and restart Docker containers in detached mode
         echo "Building and restarting Docker containers..."
-        docker compose up --build -d --remove-orphans
+        docker compose -f docker-compose.prod.yml up --build -d --remove-orphans
 
         # 4. Display logs
         echo "Displaying logs for frontend and backend (Ctrl+C to stop)..."
