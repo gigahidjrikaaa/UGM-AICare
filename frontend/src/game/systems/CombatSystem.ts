@@ -37,10 +37,46 @@ const DAMAGE_BASE_MULTIPLIER = 0.5;
 
 export class CombatSystem {
   private currentMonster: MonsterStats;
+  private combo: number = 0;
 
   constructor(initialStage: number = 1) {
     this.currentMonster = this.generateMonster(initialStage);
     console.log(`[CombatSystem] Initialized at stage ${initialStage}`, this.currentMonster);
+  }
+
+  get hp(): number {
+    return this.currentMonster.hp;
+  }
+
+  get maxHp(): number {
+    return this.currentMonster.maxHp;
+  }
+
+  getComboCount(): number {
+    return this.combo;
+  }
+
+  incrementCombo(): void {
+    this.combo++;
+  }
+
+  resetCombo(): void {
+    this.combo = 0;
+  }
+
+  getComboMultiplier(): number {
+    // Combo multiplier (from Combo Mastery upgrade - assuming level 1 for now or passed in?)
+    // For now, hardcode or use default logic
+    let comboMultiplier = 1;
+    if (this.combo >= 20) comboMultiplier = 2.0;
+    else if (this.combo >= 10) comboMultiplier = 1.5;
+    else if (this.combo >= 5) comboMultiplier = 1.25;
+    else if (this.combo >= 3) comboMultiplier = 1.1;
+    return comboMultiplier;
+  }
+
+  isDefeated(): boolean {
+    return this.isMonsterDefeated();
   }
 
   /**
@@ -50,13 +86,13 @@ export class CombatSystem {
   generateMonster(stage: number): MonsterStats {
     const isBoss = stage % 10 === 0;
     const typeMultiplier = isBoss ? BOSS_HP_MULTIPLIER : 1;
-    
+
     const maxHp = Math.floor(
       BASE_MONSTER_HP * (1 + stage * STAGE_HP_SCALING) * typeMultiplier
     );
 
     const monsterType = isBoss ? 'boss' : 'common';
-    const monsterName = isBoss 
+    const monsterName = isBoss
       ? `Gloom Boss (Stage ${stage})`
       : `Gloom Monster (Stage ${stage})`;
 
@@ -91,7 +127,7 @@ export class CombatSystem {
 
     // Critical hit multiplier (100% accuracy = 2.5x, boosted by Critical Insight)
     const critInsightBoost = input.upgrades.criticalInsight * 0.1; // +10% per level
-    const critMultiplier = input.isCritical 
+    const critMultiplier = input.isCritical
       ? CRIT_MULTIPLIER + critInsightBoost
       : 1.0;
 

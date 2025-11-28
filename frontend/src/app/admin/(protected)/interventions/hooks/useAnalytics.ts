@@ -61,7 +61,7 @@ export function useAnalytics(days: number = 30) {
                 setError(null);
                 // Updated API path
                 const response = await apiClient.get<SCAAnalytics>(`/admin/analytics/interventions?days=${days}`);
-                setAnalytics(response);
+                setAnalytics(response.data);
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Failed to load analytics');
             } finally {
@@ -100,7 +100,7 @@ export function useUserProgress(params: { limit?: number; min_plans?: number } =
                 const response = await apiClient.get<UserProgress[]>(
                     `/admin/analytics/users/progress?${queryParams.toString()}`
                 );
-                setUsers(response);
+                setUsers(response.data);
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Failed to load user progress');
             } finally {
@@ -131,7 +131,7 @@ export function useCBTModuleUsage(days: number = 30) {
                 const response = await apiClient.get<CBTModuleUsage[]>(
                     `/admin/analytics/cbt-modules/usage?days=${days}`
                 );
-                setModules(response);
+                setModules(response.data);
             } catch (err) {
                 setError(err instanceof Error ? err.message : 'Failed to load module usage');
             } finally {

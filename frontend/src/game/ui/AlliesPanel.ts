@@ -85,10 +85,9 @@ export class AlliesPanel {
     }).setOrigin(0, 0);
 
     const nameText = this.scene.add.text(50, 8, `${ally.name} x${ally.count}`, {
-      fontSize: '16px',
       color: '#ffffff',
       fontStyle: 'bold',
-    }).setOrigin(0, 0);
+    }).setOrigin(0, 0).setFontSize(16);
 
     const dpsText = this.scene.add.text(50, 28, `${ally.dps} DPS each`, {
       fontSize: '12px',
@@ -104,9 +103,9 @@ export class AlliesPanel {
     buttonContainer.add([buttonBg, icon, nameText, dpsText, costText]);
 
     // Store references for updates
-    (buttonContainer as Record<string, Phaser.GameObjects.Text>).nameText = nameText;
-    (buttonContainer as Record<string, Phaser.GameObjects.Text>).costText = costText;
-    (buttonContainer as Record<string, Phaser.GameObjects.Text>).dpsText = dpsText;
+    (buttonContainer as any).nameText = nameText;
+    (buttonContainer as any).costText = costText;
+    (buttonContainer as any).dpsText = dpsText;
 
     // Click handler
     buttonBg.on('pointerdown', () => {
@@ -139,8 +138,8 @@ export class AlliesPanel {
     ally.count = newCount;
     ally.cost = newCost;
 
-    const nameText = (button as Record<string, Phaser.GameObjects.Text>).nameText;
-    const costText = (button as Record<string, Phaser.GameObjects.Text>).costText;
+    const nameText = (button as any).nameText;
+    const costText = (button as any).costText;
 
     nameText.setText(`${ally.name} x${newCount}`);
     costText.setText(`${newCost} 🌟`);
@@ -149,13 +148,13 @@ export class AlliesPanel {
 
   public updateResources(resources: { joy: number }): void {
     this.config.resources = resources;
-    
+
     // Update all cost text colors
     this.config.allies.forEach((ally) => {
       const button = this.allyButtons.get(ally.key);
       if (!button) return;
 
-      const costText = (button as Record<string, Phaser.GameObjects.Text>).costText;
+      const costText = (button as any).costText;
       costText.setColor(resources.joy >= ally.cost ? '#FFD700' : '#666666');
     });
   }

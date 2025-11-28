@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { SDAGraphRequest } from '@/services/langGraphApi';
+import { CMAGraphRequest } from '@/services/langGraphApi';
 import { PaperAirplaneIcon } from '@heroicons/react/24/outline';
 
 interface CaseCreationFormProps {
-  onSubmit: (request: SDAGraphRequest) => Promise<void>;
+  onSubmit: (request: CMAGraphRequest) => Promise<void>;
   loading: boolean;
 }
 
@@ -28,8 +28,8 @@ export function CaseCreationForm({ onSubmit, loading }: CaseCreationFormProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
-    const request: SDAGraphRequest = {
+
+    const request: CMAGraphRequest = {
       user_id: parseInt(formData.user_id),
       session_id: formData.session_id,
       user_hash: formData.user_hash,
@@ -40,7 +40,7 @@ export function CaseCreationForm({ onSubmit, loading }: CaseCreationFormProps) {
     };
 
     await onSubmit(request);
-    
+
     // Reset form
     setFormData({
       user_id: '',

@@ -13,7 +13,7 @@ interface OrchestrateChatMessage {
     ts: string;
     correlationId?: string;
     resolvedAgent?: string;
-    metrics?: Record<string, unknown>;
+    metrics?: Record<string, any>;
     pending?: boolean;
 }
 

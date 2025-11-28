@@ -99,7 +99,7 @@ export function AlertsPanel() {
         ) : (
           activeAlerts.map((alert) => (
             <div
-              key={alert.alert_id}
+              key={alert.id}
               className={`p-4 rounded-xl border backdrop-blur-sm transition-all hover:scale-[1.02] ${getSeverityStyles(alert.severity)}`}
             >
               <div className="flex justify-between items-start mb-2">
@@ -123,7 +123,7 @@ export function AlertsPanel() {
                   {alert.severity} Priority
                 </span>
                 <button
-                  onClick={() => handleResolve(alert.alert_id)}
+                  onClick={() => handleResolve(alert.id)}
                   className="text-xs font-bold hover:underline opacity-80 hover:opacity-100 transition-opacity"
                 >
                   Dismiss

@@ -39,6 +39,7 @@ export interface AikaMetadata {
   risk_assessment?: AikaRiskAssessment;
   escalation_triggered: boolean;
   case_id?: string;  // If case was created
+  activity_logs?: any[]; // Detailed execution logs from LangGraph
 }
 
 export interface AikaResponse {

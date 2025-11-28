@@ -56,7 +56,7 @@ export interface Message {
   feedback_id?: string;
   annotations?: unknown[]; // Or a more specific type if annotations have a defined structure
   run_id?: string;
-  metadata?: Record<string, unknown>; // To store things like module_id for event messages
+  metadata?: Record<string, any>; // To store things like module_id for event messages
   timestamp: Date;
   interventionPlan?: InterventionPlan; // TCA-generated support plan
   appointment?: Appointment; // Scheduling confirmation
@@ -117,43 +117,43 @@ export interface ChatEventPayload {
 }
 
 export interface ChatRequestPayload {
-    google_sub: string;
-    session_id: string;
-    conversation_id: string; // <<< ADDED THIS FIELD based on error analysis
-    provider?: 'togetherai' | 'gemini';
-    model?: string;
-    max_tokens?: number;
-    temperature?: number;
-    system_prompt?: string;
-    // Conditionally include message/history OR event
-    message?: string; // User's message content (string)
-    history?: ApiMessage[];
-    event?: ChatEventPayload;
-  }
+  google_sub: string;
+  session_id: string;
+  conversation_id: string; // <<< ADDED THIS FIELD based on error analysis
+  provider?: 'togetherai' | 'gemini';
+  model?: string;
+  max_tokens?: number;
+  temperature?: number;
+  system_prompt?: string;
+  // Conditionally include message/history OR event
+  message?: string; // User's message content (string)
+  history?: ApiMessage[];
+  event?: ChatEventPayload;
+}
 
 export interface ChatResponsePayload {
-    response: string; // The AI's response content (string)
-    provider_used: string;
-    model_used: string;
-    history: ApiMessage[]; // Expect the updated history back from backend
-    // NO session_id or conversation_id at the root of the response based on your file.
-    // These will need to be taken from the client-side context when creating assistant messages.
-    module_state?: { module: string; step: number }; // Example if backend sends state
-    suggestions?: ChatModule[]; // Example if backend sends suggestions
-    module_completed_id?: string;
-    intervention_plan?: InterventionPlan; // NEW: Intervention plan from TCA
-    appointment?: Appointment; // NEW: Appointment booking from scheduling tools
-    metadata?: {
-      // Agent Activity metadata from unified orchestrator
-      execution_path?: string[];
-      agents_invoked?: string[];
-      intent?: string;
-      intent_confidence?: number;
-      needs_agents?: boolean;
-      agent_reasoning?: string;
-      response_source?: string;
-      processing_time_ms?: number;
-      risk_level?: string;
-      risk_score?: number;
-    };
-  }
+  response: string; // The AI's response content (string)
+  provider_used: string;
+  model_used: string;
+  history: ApiMessage[]; // Expect the updated history back from backend
+  // NO session_id or conversation_id at the root of the response based on your file.
+  // These will need to be taken from the client-side context when creating assistant messages.
+  module_state?: { module: string; step: number }; // Example if backend sends state
+  suggestions?: ChatModule[]; // Example if backend sends suggestions
+  module_completed_id?: string;
+  intervention_plan?: InterventionPlan; // NEW: Intervention plan from TCA
+  appointment?: Appointment; // NEW: Appointment booking from scheduling tools
+  metadata?: {
+    // Agent Activity metadata from unified orchestrator
+    execution_path?: string[];
+    agents_invoked?: string[];
+    intent?: string;
+    intent_confidence?: number;
+    needs_agents?: boolean;
+    agent_reasoning?: string;
+    response_source?: string;
+    processing_time_ms?: number;
+    risk_level?: string;
+    risk_score?: number;
+  };
+}

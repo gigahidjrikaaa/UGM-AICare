@@ -184,8 +184,8 @@ export class CombatScene extends Phaser.Scene {
     const damage = this.combatSystem.calculateDamage({
       wpm,
       accuracy,
-      upgrades: {}, // TODO: Fetch from gameStore
-      combo: this.combatSystem.getComboMultiplier(),
+      upgrades: { typingPower: 1, criticalInsight: 1, comboMastery: 1 }, // TODO: Fetch from gameStore
+      combo: this.combatSystem.getComboCount(),
       isCritical,
     });
 
@@ -225,27 +225,27 @@ export class CombatScene extends Phaser.Scene {
    */
   private updateMonsterHP() {
     const percentage = this.combatSystem.getHPPercentage();
-    
+
     this.monsterHPBar.clear();
-    
+
     // HP bar background (scaled for FHD)
     this.monsterHPBar.fillStyle(0x333333);
     this.monsterHPBar.fillRect(660, 390, 600, 38);
-    
+
     // HP bar fill (green → yellow → red)
     let color = 0x00ff00;
     if (percentage < 0.5) color = 0xffff00;
     if (percentage < 0.25) color = 0xff0000;
-    
+
     this.monsterHPBar.fillStyle(color);
     this.monsterHPBar.fillRect(663, 393, 594 * percentage, 32);
-    
+
     // Border
     this.monsterHPBar.lineStyle(2, 0xffffff);
     this.monsterHPBar.strokeRect(660, 390, 600, 38);
 
     // HP text
-    const hpText = `${Math.ceil(this.combatSystem['monsterHP'])} / ${this.combatSystem['monsterMaxHP']} HP`;
+    const hpText = `${Math.ceil(this.combatSystem.hp)} / ${this.combatSystem.maxHp} HP`;
     this.monsterHPBar.fillStyle(0xffffff, 1);
     // Note: Can't use graphics.text, need to create separate text object
     if (!this.monsterHPBar.getData('hpText')) {
@@ -266,7 +266,7 @@ export class CombatScene extends Phaser.Scene {
   private showDamageNumber(damage: number, isCritical: boolean) {
     const { width, height } = this.cameras.main;
     const centerX = width / 2;
-    
+
     const text = this.add.text(centerX, height * 0.28, `-${damage.toFixed(1)}`, {
       fontSize: isCritical ? `${Math.min(width, height) * 0.052}px` : `${Math.min(width, height) * 0.037}px`,
       color: isCritical ? '#ffff00' : '#ff6600',

@@ -275,7 +275,7 @@ export class CombatScene extends Phaser.Scene {
     }
 
     const result = this.typingEngine.handleKeyPress(event.key);
-    
+
     // Update sentence display with color coding
     this.updateSentenceDisplay(result);
 
@@ -389,7 +389,7 @@ export class CombatScene extends Phaser.Scene {
       onComplete: () => {
         this.gameState.stage++;
         this.combatSystem = new CombatSystem(this.gameState.stage);
-        
+
         const monster = this.combatSystem.getMonster();
         this.gameState.monster = {
           hp: monster.hp,
@@ -400,7 +400,7 @@ export class CombatScene extends Phaser.Scene {
 
         this.monster.setAlpha(1).setScale(this.gameState.monster.isBoss ? 4 : 3);
         this.monster.setTint(this.gameState.monster.isBoss ? 0xff0000 : 0xff6666);
-        
+
         this.updateMonsterHP();
         this.getNewSentence();
         this.updateUI();
@@ -410,16 +410,16 @@ export class CombatScene extends Phaser.Scene {
 
   private getNewSentence(): void {
     const difficulty = Math.min(5, Math.floor(this.gameState.stage / 2) + 1);
-    const sentence = this.typingEngine.getSentence({ difficulty, language: 'en' });
+    const sentence = this.typingEngine.getSentence({ difficulty, category: 'Affirmations', language: 'en' });
     this.sentenceText.forEach((char) => char.destroy());
     this.sentenceText = [];
   }
 
   private updateMonsterHP(): void {
     const percentage = this.gameState.monster.hp / this.gameState.monster.maxHp;
-    
+
     this.monsterHPBar.clear();
-    
+
     // HP bar fill
     const color = percentage > 0.5 ? 0xFFCA40 : percentage > 0.25 ? 0xFFB020 : 0xFF4400;
     this.monsterHPBar.fillStyle(color);
