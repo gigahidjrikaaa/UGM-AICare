@@ -264,12 +264,13 @@ want to die, mau mati, ingin mati, etc.
             state["intent_confidence"] = decision.get("intent_confidence", 0.5)
             
             # FORCE needs_agents=False for students to ensure background processing
-            if normalized_role == "student":
-                state["needs_agents"] = False
-                state["agent_reasoning"] = "Student interaction - enforcing background STA processing"
-            else:
-                state["needs_agents"] = decision.get("needs_agents", False)
-                state["agent_reasoning"] = decision.get("reasoning", "No reasoning provided")
+            # REFACTOR: User requested direct routing (Aika -> TCA/CMA) without STA consultation
+            # if normalized_role == "student":
+            #     state["needs_agents"] = False
+            #     state["agent_reasoning"] = "Student interaction - enforcing background STA processing"
+            # else:
+            state["needs_agents"] = decision.get("needs_agents", False)
+            state["agent_reasoning"] = decision.get("reasoning", "No reasoning provided")
             
             # ========================================================================
             # TWO-TIER RISK MONITORING: Parse immediate risk fields (Tier 1)
@@ -306,15 +307,32 @@ want to die, mau mati, ingin mati, etc.
             state["conversation_ended"] = conversation_ended
             
             # Auto-escalate to CMA if high/critical immediate risk detected
+            # REFACTOR: Direct routing logic based on risk level
             if state["immediate_risk_level"] in ("high", "critical"):
                 state["needs_cma_escalation"] = True
+                state["next_step"] = "cma"
+                state["needs_agents"] = True
                 logger.warning(
                     f"🚨 IMMEDIATE CRISIS DETECTED: {state['immediate_risk_level']} "
                     f"(keywords: {state['crisis_keywords_detected']}) "
                     f"- Auto-escalating to CMA"
                 )
+            elif state["immediate_risk_level"] == "moderate":
+                state["next_step"] = "tca"
+                state["needs_agents"] = True
+                logger.info(f"⚠️ Moderate risk detected - Routing to TCA")
+            elif state["immediate_risk_level"] == "low" and state["intent"] in ("emotional_support", "crisis"):
+                 state["next_step"] = "tca"
+                 state["needs_agents"] = True
+                 logger.info(f"ℹ️ Low risk support requested - Routing to TCA")
             else:
                 state["needs_cma_escalation"] = False
+                # If needs_agents was set to True by LLM but risk is None/Low (and not support), 
+                # we might want to respect LLM's decision or override it.
+                # For now, let's trust the LLM's 'needs_agents' but default next_step to 'tca' if it says yes.
+                if state["needs_agents"] and not state.get("next_step"):
+                     state["next_step"] = "tca" # Default to TCA if agents needed but no risk
+
             
             # Log risk assessment
             if state["immediate_risk_level"] != "none":
@@ -824,16 +842,16 @@ def should_invoke_agents(state: AikaOrchestratorState) -> str:
     
     Returns:
         "invoke_cma" if immediate crisis escalation needed (Tier 1),
-        "invoke_sta" if agents needed for normal flow,
+        "invoke_tca" if support needed (Moderate/Low risk),
         "end" if direct response
     """
     needs_agents = state.get("needs_agents", False)
-    needs_cma = state.get("needs_cma_escalation", False)
+    next_step = state.get("next_step", "end")
     
     execution_id = state.get("execution_id")
     
-    # TWO-TIER: Check immediate crisis escalation first (Tier 1)
-    if needs_cma:
+    # Direct routing based on next_step
+    if next_step == "cma":
         if execution_id:
             execution_tracker.trigger_edge(
                 execution_id,
@@ -846,21 +864,36 @@ def should_invoke_agents(state: AikaOrchestratorState) -> str:
         )
         return "invoke_cma"
     
-    # Normal flow: invoke agents or respond directly
+    if next_step == "tca":
+        if execution_id:
+            execution_tracker.trigger_edge(
+                execution_id,
+                "aika::decision->tca",
+                condition_result=True
+            )
+        logger.info(f"🔀 Routing after Aika: TCA (Support)")
+        return "invoke_tca"
+
+    # Fallback: if needs_agents is True but next_step not set, default to TCA
+    if needs_agents:
+        if execution_id:
+            execution_tracker.trigger_edge(
+                execution_id,
+                "aika::decision->tca",
+                condition_result=True
+            )
+        return "invoke_tca"
+    
+    # Direct response
     if execution_id:
-        target = "invoke_sta" if needs_agents else "end"
         execution_tracker.trigger_edge(
             execution_id,
-            f"aika::decision->{target}",
+            "aika::decision->end",
             condition_result=True
         )
     
-    logger.info(
-        f"🔀 Routing after Aika: needs_agents={needs_agents} → "
-        f"{'invoke agents' if needs_agents else 'direct response'}"
-    )
-    
-    return "invoke_sta" if needs_agents else "end"
+    logger.info("🔀 Routing after Aika: Direct Response")
+    return "end"
 
 
 def should_route_to_sca(state: AikaOrchestratorState) -> str:
@@ -980,8 +1013,8 @@ def create_aika_unified_graph(db: AsyncSession) -> StateGraph:
         "aika_decision",
         should_invoke_agents,
         {
-            "invoke_cma": "execute_sda",  # TWO-TIER: Immediate crisis escalation
-            "invoke_sta": "execute_sta",
+            "invoke_cma": "execute_sda",  # Direct to CMA
+            "invoke_tca": "execute_sca",  # Direct to TCA
             "end": END
         }
     )

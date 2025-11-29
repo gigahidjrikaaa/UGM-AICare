@@ -58,9 +58,7 @@ backend/aika.db
 backend/*.db
 
 # Alembic
-alembic.ini
-alembic/*.ini
-backend/*.ini
+# alembic/*.ini
 
 # ONNX Models - Large binary files (502 MB), auto-downloaded on build
 # These are automatically rebuilt from HuggingFace during Docker build
