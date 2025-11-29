@@ -156,7 +156,8 @@ export default function TestingPage() {
   const [batchSummary, setBatchSummary] = useState<{ total: number, passed: number, failed: number, metrics?: any } | null>(null);
   const [rq2Results, setRq2Results] = useState<RQ2Result[]>([]);
   const [rq3Responses, setRq3Responses] = useState<RQ3Response[]>([]);
-  const [verificationTab, setVerificationTab] = useState<"rq1" | "rq2" | "rq3">("rq1");
+  const [privacyResults, setPrivacyResults] = useState<any>(null);
+  const [verificationTab, setVerificationTab] = useState<"rq1" | "rq2" | "rq3" | "privacy">("rq1");
 
   // --- Effects ---
   useEffect(() => {
@@ -468,6 +469,26 @@ export default function TestingPage() {
     } catch (error) {
       console.error("Error:", error);
       toast.error("Failed to generate responses");
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const runPrivacyTest = async () => {
+    setLoading("privacy");
+    try {
+      const response = await fetch("http://localhost:8000/api/v1/admin/testing/rq3/privacy-test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+      });
+      if (!response.ok) throw new Error("Failed to run privacy test");
+      const data = await response.json();
+      setPrivacyResults(data);
+      toast.success(data.passed ? "Privacy Test Passed" : "Privacy Test Failed");
+    } catch (error) {
+      console.error("Error:", error);
+      toast.error("Failed to run privacy test");
     } finally {
       setLoading(null);
     }
@@ -823,6 +844,12 @@ export default function TestingPage() {
             >
               RQ3: Coaching Quality
             </button>
+            <button
+              onClick={() => setVerificationTab("privacy")}
+              className={`px-4 py-2 rounded-lg text-sm font-semibold transition-all ${verificationTab === "privacy" ? "bg-[#FFCA40] text-[#001D58]" : "bg-white/5 text-white/60 hover:bg-white/10"}`}
+            >
+              RQ3: Privacy (k-anonymity)
+            </button>
           </div>
 
           {/* RQ1 Content */}
@@ -1059,6 +1086,87 @@ export default function TestingPage() {
               ) : (
                 <div className="text-center py-12 text-white/40 border border-dashed border-white/10 rounded-lg">
                   Click "Generate Responses" to start the evaluation.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Privacy Content */}
+          {verificationTab === "privacy" && (
+            <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <FiServer className="text-[#FFCA40]" />
+                    RQ3: Privacy Preservation (k-anonymity)
+                  </h2>
+                  <p className="text-white/60 text-sm mt-1">
+                    Verify that the Insights Agent enforces k-anonymity (k=5) to prevent re-identification.
+                  </p>
+                </div>
+                <button
+                  onClick={runPrivacyTest}
+                  disabled={loading === "privacy"}
+                  className="px-6 py-3 bg-cyan-500 text-white font-semibold rounded-lg hover:bg-cyan-600 disabled:opacity-50 transition-all shadow-lg"
+                >
+                  {loading === "privacy" ? "Verifying..." : "Run Privacy Verification"}
+                </button>
+              </div>
+
+              {privacyResults && (
+                <div className="space-y-6">
+                  <div className={`p-4 rounded-lg border ${privacyResults.passed ? 'bg-green-500/10 border-green-500/30' : 'bg-red-500/10 border-red-500/30'}`}>
+                    <div className="flex items-center gap-2 mb-2">
+                      {privacyResults.passed ? <FiCheckCircle className="text-green-400" size={24} /> : <FiAlertCircle className="text-red-400" size={24} />}
+                      <h3 className={`text-lg font-bold ${privacyResults.passed ? 'text-green-300' : 'text-red-300'}`}>
+                        {privacyResults.passed ? "Privacy Compliance Verified" : "Privacy Compliance Failed"}
+                      </h3>
+                    </div>
+                    <p className="text-white/70 text-sm">
+                      {privacyResults.passed 
+                        ? "The system successfully suppressed small cohorts (k < 5) while preserving aggregate utility."
+                        : "The system failed to enforce k-anonymity constraints."}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-6">
+                    <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                      <h4 className="text-white font-semibold mb-4">High Severity Cohort (n=7)</h4>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-white/60">Expected Visibility:</span>
+                        <span className="text-green-400 font-mono">VISIBLE</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-white/60">Actual Status:</span>
+                        <span className={`font-mono ${privacyResults.high_severity_visible ? 'text-green-400' : 'text-red-400'}`}>
+                          {privacyResults.high_severity_visible ? "VISIBLE" : "HIDDEN"}
+                        </span>
+                      </div>
+                    </div>
+
+                    <div className="p-4 bg-white/5 rounded-lg border border-white/10">
+                      <h4 className="text-white font-semibold mb-4">Critical Severity Cohort (n=3)</h4>
+                      <div className="flex justify-between items-center mb-2">
+                        <span className="text-white/60">Expected Visibility:</span>
+                        <span className="text-red-400 font-mono">SUPPRESSED</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-white/60">Actual Status:</span>
+                        <span className={`font-mono ${privacyResults.critical_severity_suppressed ? 'text-green-400' : 'text-red-400'}`}>
+                          {privacyResults.critical_severity_suppressed ? "SUPPRESSED" : "LEAKED"}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {privacyResults.details && privacyResults.details.length > 0 && (
+                    <div className="p-4 bg-black/30 rounded-lg border border-white/10 font-mono text-xs text-white/60">
+                      <div className="uppercase font-bold mb-2 opacity-50">Verification Log</div>
+                      {privacyResults.details.map((log: string, i: number) => (
+                        <div key={i}>{log}</div>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

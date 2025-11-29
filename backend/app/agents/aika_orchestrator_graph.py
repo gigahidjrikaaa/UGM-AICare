@@ -43,6 +43,7 @@ if TYPE_CHECKING:
     from app.agents.sta.sta_graph import create_sta_graph
     from app.agents.tca.tca_graph import create_tca_graph
     from app.agents.cma.cma_graph import create_cma_graph
+    from app.agents.ia.ia_graph import create_ia_graph
 
 logger = logging.getLogger(__name__)
 
@@ -165,6 +166,7 @@ FOR ADMINS:
 - NEEDS AGENTS (invoke IA for analytics):
   * Requests complex data/analytics ("trending topics", "case statistics")
   * Aggregated reports requiring specialized processing
+  * Questions about system usage, user engagement, or mental health trends
   
 - NO AGENTS NEEDED:
   * Simple status checks ("is system healthy?")
@@ -176,13 +178,17 @@ FOR COUNSELORS:
   * Requests to CREATE or MODIFY cases
   * Clinical insights requiring deep analysis
   
+- NEEDS AGENTS (invoke IA for analytics):
+  * Requests for population-level insights or trends
+  * "How many students are stressed this week?"
+  
 - NO AGENTS NEEDED:
   * General clinical questions
   * Viewing patient data (Aika can use tools)
 
 Return JSON with:
 {{
-  "intent": "string (e.g., 'emotional_support', 'crisis', 'casual_chat', 'information_seeking')",
+  "intent": "string (MUST be one of: 'casual_chat', 'emotional_support', 'crisis_intervention', 'information_inquiry', 'appointment_scheduling', 'emergency_escalation', 'analytics_query')",
   "intent_confidence": float (0.0-1.0),
   "needs_agents": boolean,
   "reasoning": "string explaining decision",
@@ -190,8 +196,23 @@ Return JSON with:
   
   "immediate_risk": "none|low|moderate|high|critical",
   "crisis_keywords": ["list of crisis keywords found, empty if none"],
-  "risk_reasoning": "Brief 1-sentence explanation of risk assessment"
+  "risk_reasoning": "Brief 1-sentence explanation of risk assessment",
+
+  "analytics_params": {{
+      "question_id": "string (MUST be one of: 'crisis_trend', 'dropoffs', 'resource_reuse', 'fallback_reduction', 'cost_per_helpful', 'coverage_windows')",
+      "start_date": "YYYY-MM-DD (default to 30 days ago if not specified)",
+      "end_date": "YYYY-MM-DD (default to today if not specified)"
+  }}
 }}
+
+INTENT DEFINITIONS:
+- 'casual_chat': Greetings, small talk, thanks, closing conversation.
+- 'emotional_support': Venting, sharing feelings, relationship issues, stress (non-crisis).
+- 'crisis_intervention': Self-harm, suicide, severe danger, "want to die".
+- 'information_inquiry': Questions about mental health concepts, app features, or general info.
+- 'appointment_scheduling': Requests to book, check, or manage appointments with counselors.
+- 'emergency_escalation': Explicit request for immediate human help or emergency services.
+- 'analytics_query': Requests for data, statistics, trends, or reports (Admin/Counselor only).
 
 IMMEDIATE RISK ASSESSMENT CRITERIA:
 - "critical": Explicit suicide plan/intent with method and timeframe OR active crisis in progress.
@@ -277,6 +298,31 @@ want to die, mau mati, ingin mati, etc.
             # ========================================================================
             state["immediate_risk_level"] = decision.get("immediate_risk", "none")
             state["crisis_keywords_detected"] = decision.get("crisis_keywords", [])
+            
+            # ========================================================================
+            # ANALYTICS PARAMS (for IA)
+            # ========================================================================
+            if decision.get("intent") == "analytics_query" and "analytics_params" in decision:
+                params = decision["analytics_params"]
+                state["question_id"] = params.get("question_id")
+                
+                # Parse dates
+                from datetime import datetime, timedelta
+                try:
+                    if params.get("start_date"):
+                        state["start_date"] = datetime.strptime(params["start_date"], "%Y-%m-%d")
+                    else:
+                        state["start_date"] = datetime.now() - timedelta(days=30)
+                        
+                    if params.get("end_date"):
+                        state["end_date"] = datetime.strptime(params["end_date"], "%Y-%m-%d")
+                    else:
+                        state["end_date"] = datetime.now()
+                except Exception as e:
+                    logger.warning(f"Failed to parse analytics dates: {e}")
+                    state["start_date"] = datetime.now() - timedelta(days=30)
+                    state["end_date"] = datetime.now()
+
             state["risk_reasoning"] = decision.get("risk_reasoning", "")
             
             # Detect conversation end - Method 1: Time-based inactivity (5 minutes)
@@ -325,13 +371,21 @@ want to die, mau mati, ingin mati, etc.
                  state["next_step"] = "tca"
                  state["needs_agents"] = True
                  logger.info(f"ℹ️ Low risk support requested - Routing to TCA")
+            elif state["intent"] == "analytics_query" and normalized_role in ("admin", "counselor"):
+                 state["next_step"] = "ia"
+                 state["needs_agents"] = True
+                 logger.info(f"📊 Analytics query detected - Routing to IA")
             else:
                 state["needs_cma_escalation"] = False
                 # If needs_agents was set to True by LLM but risk is None/Low (and not support), 
                 # we might want to respect LLM's decision or override it.
                 # For now, let's trust the LLM's 'needs_agents' but default next_step to 'tca' if it says yes.
                 if state["needs_agents"] and not state.get("next_step"):
-                     state["next_step"] = "tca" # Default to TCA if agents needed but no risk
+                     # Check if it might be an analytics query that wasn't explicitly caught
+                     if normalized_role in ("admin", "counselor") and "analytics" in state.get("agent_reasoning", "").lower():
+                         state["next_step"] = "ia"
+                     else:
+                         state["next_step"] = "tca" # Default to TCA if agents needed but no risk
 
             
             # Log risk assessment
@@ -377,7 +431,8 @@ want to die, mau mati, ingin mati, etc.
                     request=chat_request,
                     db=db,
                     user_id=state.get("user_id"),
-                    max_tool_iterations=5
+                    max_tool_iterations=5,
+                    execution_id=execution_id
                 )
                 
                 state["aika_direct_response"] = response_text
@@ -739,6 +794,63 @@ async def execute_sda_subgraph(
     return state
 
 
+async def execute_ia_subgraph(
+    state: AikaOrchestratorState,
+    db: AsyncSession
+) -> AikaOrchestratorState:
+    """Execute Insights Agent subgraph.
+    
+    Runs the IA workflow to generate analytics and reports.
+    """
+    execution_id = state.get("execution_id")
+    if execution_id:
+        execution_tracker.start_node(execution_id, "aika::ia", "aika")
+    
+    try:
+        # Lazy import to avoid circular dependency
+        from app.agents.ia.ia_graph import create_ia_graph
+        
+        # Create and execute IA subgraph
+        ia_graph = create_ia_graph(db)
+        ia_result = await ia_graph.ainvoke(state)
+        
+        # Construct ia_report from IA outputs
+        if ia_result.get("interpretation"):
+            ia_report = f"**Summary:** {ia_result.get('summary', '')}\n\n**Interpretation:** {ia_result.get('interpretation', '')}"
+            if ia_result.get("pdf_url"):
+                ia_report += f"\n\n[Download PDF Report]({ia_result.get('pdf_url')})"
+            ia_result["ia_report"] = ia_report
+        
+        # Merge IA outputs into orchestrator state
+        state.update(ia_result)
+        state.setdefault("agents_invoked", []).append("IA")
+        state.setdefault("execution_path", []).append("ia_subgraph")
+        
+        if execution_id:
+            execution_tracker.complete_node(
+                execution_id,
+                "aika::ia",
+                metrics={
+                    "report_generated": bool(ia_result.get("ia_report")),
+                    "query_type": ia_result.get("query_type")
+                }
+            )
+        
+        logger.info(
+            f"✅ IA completed: report_generated={bool(ia_result.get('ia_report'))}"
+        )
+        
+    except Exception as e:
+        error_msg = f"IA subgraph failed: {str(e)}"
+        logger.error(error_msg, exc_info=True)
+        state.setdefault("errors", []).append(error_msg)
+        
+        if execution_id:
+            execution_tracker.fail_node(execution_id, "aika::ia", str(e))
+    
+    return state
+
+
 async def synthesize_final_response(
     state: AikaOrchestratorState,
     db: AsyncSession
@@ -797,6 +909,13 @@ Agent Results:
   * Case Created: {state.get('case_created', False)}
   * Case ID: {state.get('case_id', 'none')}
   * Assigned Counselor: {state.get('assigned_counsellor_id', 'none')}
+"""
+
+        if "IA" in agents_invoked:
+            synthesis_prompt += f"""
+- Insights Agent (IA):
+  * Report: {state.get('ia_report', 'No report generated')}
+  * Query Type: {state.get('query_type', 'unknown')}
 """
         
         synthesis_prompt += """
@@ -901,6 +1020,16 @@ def should_invoke_agents(state: AikaOrchestratorState) -> str:
             )
         logger.info(f"🔀 Routing after Aika: TCA (Support)")
         return "invoke_tca"
+
+    if next_step == "ia":
+        if execution_id:
+            execution_tracker.trigger_edge(
+                execution_id,
+                "aika::decision->ia",
+                condition_result=True
+            )
+        logger.info(f"🔀 Routing after Aika: IA (Analytics)")
+        return "invoke_ia"
 
     # Fallback: if needs_agents is True but next_step not set, default to TCA
     if needs_agents:
@@ -1031,6 +1160,7 @@ def create_aika_unified_graph(db: AsyncSession) -> StateGraph:
     workflow.add_node("execute_sta", partial(execute_sta_subgraph, db=db))
     workflow.add_node("execute_sca", partial(execute_sca_subgraph, db=db))
     workflow.add_node("execute_sda", partial(execute_sda_subgraph, db=db))
+    workflow.add_node("execute_ia", partial(execute_ia_subgraph, db=db))
     workflow.add_node("synthesize", partial(synthesize_final_response, db=db))
     
     # Entry point: Aika decision node
@@ -1043,6 +1173,7 @@ def create_aika_unified_graph(db: AsyncSession) -> StateGraph:
         {
             "invoke_cma": "execute_sda",  # Direct to CMA
             "invoke_tca": "execute_sca",  # Direct to TCA
+            "invoke_ia": "execute_ia",    # Direct to IA
             "end": END
         }
     )
@@ -1070,6 +1201,7 @@ def create_aika_unified_graph(db: AsyncSession) -> StateGraph:
     
     # Terminal nodes → END
     workflow.add_edge("execute_sda", "synthesize")
+    workflow.add_edge("execute_ia", "synthesize")
     workflow.add_edge("synthesize", END)
     
     logger.info("✅ Unified Aika orchestrator graph created")

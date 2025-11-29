@@ -277,7 +277,7 @@ async def login_for_access_token(
 
     access_token = create_access_token(build_token_payload(user))
 
-    logger.info("Login successful for user: %s, role: %s", user.email, user.role)
+    logger.info("Login successful for user_id: %s, email: %s, role: %s", user.id, request.email, user.role)
     body = {
         "access_token": access_token,
         "token_type": "bearer",

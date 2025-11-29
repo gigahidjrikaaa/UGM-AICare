@@ -30,6 +30,7 @@ from google import genai
 from google.genai import types
 
 from app.agents.aika.tools import execute_tool_call, get_aika_tools
+from app.agents.execution_tracker import execution_tracker
 from app.core import llm
 from app.domains.mental_health.schemas.chat import ChatRequest
 
@@ -51,6 +52,7 @@ async def generate_with_tools(
     user_id: int,
     stream_callback: Optional[StreamCallback] = None,
     max_tool_iterations: int = MAX_TOOL_ITERATIONS,
+    execution_id: Optional[str] = None,
 ) -> tuple[str, List[Dict[str, Any]]]:
     """Generate response with tool calling support.
     
@@ -65,6 +67,7 @@ async def generate_with_tools(
         user_id: User ID for scoping tool queries
         stream_callback: Optional callback for streaming responses
         max_tool_iterations: Maximum number of tool calling iterations
+        execution_id: Optional execution ID for tracking tool calls
         
     Returns:
         Tuple of (final_response_text, list_of_tool_calls_executed)
@@ -98,6 +101,7 @@ async def generate_with_tools(
                     db=db,
                     user_id=user_id,
                     stream_callback=stream_callback,
+                    execution_id=execution_id,
                 )
                 # Note: Gemini's streaming mode with tools is complex
                 # For now, we return after first iteration for streaming
@@ -122,6 +126,8 @@ async def generate_with_tools(
                     response=response_obj,  # Pass full response object
                     db=db,
                     user_id=user_id,
+                    execution_id=execution_id,
+                    previous_tool_calls=tool_calls_executed,
                 )
                 
                 if not tool_results:
@@ -225,6 +231,8 @@ async def generate_with_tools(
                     response=response_obj,
                     db=db,
                     user_id=user_id,
+                    execution_id=execution_id,
+                    previous_tool_calls=tool_calls_executed,
                 )
                 
                 if new_tool_results:
@@ -274,6 +282,7 @@ async def _generate_streaming_with_tools(
     db: AsyncSession,
     user_id: int,
     stream_callback: StreamCallback,
+    execution_id: Optional[str] = None,
 ) -> str:
     """Generate streaming response with tool calling support.
     
@@ -289,6 +298,7 @@ async def _generate_streaming_with_tools(
         db: Database session
         user_id: User ID
         stream_callback: Callback for streaming chunks
+        execution_id: Optional execution ID for tracking
         
     Returns:
         Complete response text
@@ -313,6 +323,7 @@ async def _generate_streaming_with_tools(
             response=response_obj,
             db=db,
             user_id=user_id,
+            execution_id=execution_id,
         )
         
         if tool_results:
@@ -415,6 +426,8 @@ async def _check_and_execute_tool_calls(
     response: Any,  # Full Gemini response object
     db: AsyncSession,
     user_id: int,
+    execution_id: Optional[str] = None,
+    previous_tool_calls: Optional[List[Dict[str, Any]]] = None,
 ) -> List[Dict[str, Any]]:
     """Check if response contains tool calls and execute them.
     
@@ -424,6 +437,8 @@ async def _check_and_execute_tool_calls(
         response: Full response object from Gemini
         db: Database session
         user_id: User ID
+        execution_id: Optional execution ID for tracking
+        previous_tool_calls: List of previously executed tool calls for retry tracking
         
     Returns:
         List of executed tool calls with their results
@@ -458,6 +473,22 @@ async def _check_and_execute_tool_calls(
                 
                 logger.info(f"Executing tool call: {tool_name} with args: {tool_args}")
                 
+                # Calculate retry count
+                retry_count = 0
+                if previous_tool_calls:
+                    retry_count = sum(1 for tc in previous_tool_calls if tc["tool_name"] == tool_name)
+                
+                # Track tool execution start
+                if execution_id:
+                    execution_tracker.start_node(
+                        execution_id, 
+                        f"tool::{tool_name}", 
+                        "tool_executor",
+                        input_data=tool_args,
+                        node_type="tool",
+                        retry_count=retry_count
+                    )
+                
                 # Execute the tool
                 try:
                     result = await execute_tool_call(
@@ -473,10 +504,27 @@ async def _check_and_execute_tool_calls(
                         "result": result,
                     })
                     
+                    # Track tool execution success
+                    if execution_id:
+                        execution_tracker.complete_node(
+                            execution_id,
+                            f"tool::{tool_name}",
+                            output_data={"result": str(result)[:500]} # Truncate for storage
+                        )
+                    
                     logger.info(f"✓ Tool {tool_name} executed successfully")
                     
                 except Exception as tool_error:
                     logger.error(f"Error executing tool {tool_name}: {tool_error}", exc_info=True)
+                    
+                    # Track tool execution failure
+                    if execution_id:
+                        execution_tracker.fail_node(
+                            execution_id,
+                            f"tool::{tool_name}",
+                            str(tool_error)
+                        )
+                        
                     tool_results.append({
                         "tool_name": tool_name,
                         "arguments": tool_args,

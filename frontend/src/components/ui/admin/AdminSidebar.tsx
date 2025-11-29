@@ -24,6 +24,7 @@ import {
   FiMonitor,
   FiTarget,
   FiZap,
+  FiDatabase,
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink'; // Assuming SidebarLink component exists
 
@@ -58,6 +59,7 @@ const navGroups = [
     label: 'Development Tools',
     items: [
       { name: 'Testing Scenarios', icon: <FiTarget size={18} />, href: '/admin/testing' },
+      { name: 'Database Viewer', icon: <FiDatabase size={18} />, href: '/admin/database' },
     ]
   }
 ];

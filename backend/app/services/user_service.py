@@ -104,26 +104,14 @@ async def async_get_user_by_google_sub(db: AsyncSession, google_sub: str) -> Opt
     return result.scalar_one_or_none()
 
 async def async_get_user_by_plain_email(db: AsyncSession, plain_email: str) -> Optional[User]:
-    """Best-effort lookup by plaintext email, handling encrypted storage."""
-    lowered = plain_email.lower()
-
-    # First attempt direct match (covers unencrypted storage)
+    """Lookup by plaintext email."""
+    # Since encryption is disabled, we can do a direct DB lookup.
+    # We use ILIKE or func.lower() for case-insensitive match if needed, but exact match is faster.
+    # For now, let's assume stored emails are normalized or just do exact match.
+    
     stmt = select(User).where(User.email == plain_email)
     result = await db.execute(stmt)
-    direct_match = result.scalar_one_or_none()
-    if direct_match:
-        return direct_match
-
-    # Fallback: scan likely candidates (admins/users) and compare decrypted values
-    stmt_all = select(User).where(User.email.isnot(None))
-    result_all = await db.execute(stmt_all)
-    for candidate in result_all.scalars():
-        decrypted = decrypt_data(candidate.email)
-        if decrypted and decrypted.lower() == lowered:
-            return candidate
-        if candidate.email and candidate.email.lower() == lowered:
-            return candidate
-    return None
+    return result.scalar_one_or_none()
 
 
 

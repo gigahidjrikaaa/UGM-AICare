@@ -55,6 +55,7 @@ class ChatProcessingResult:
 
     module_completed_id: Optional[int] = None
     intervention_plan: Optional[Dict[str, Any]] = None
+    metadata: Optional[Dict[str, Any]] = None
     
     def __post_init__(self):
         if self.final_history is None:
@@ -187,6 +188,16 @@ async def process_chat_message(
                 )
             )
         
+        # Build metadata for testing/verification
+        metadata = {
+            "agents_invoked": agents_invoked,
+            "response_source": response_source,
+            "execution_path": result.get("execution_path", []),
+            "intent": result.get("intent"),
+            "risk_level": result.get("sta_risk_assessment", {}).get("risk_level") or result.get("severity"),
+            "risk_score": result.get("sta_risk_assessment", {}).get("risk_score") or result.get("risk_score"),
+        }
+
         return ChatProcessingResult(
             response_text=final_response,
             provider_used="aika-langgraph",
@@ -194,6 +205,7 @@ async def process_chat_message(
             final_history=history_items,
             module_completed_id=None,
             intervention_plan=result.get("intervention_plan"),
+            metadata=metadata,
         )
         
     except Exception as e:

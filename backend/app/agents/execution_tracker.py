@@ -64,7 +64,8 @@ class ExecutionStateTracker:
         return execution_id
     
     def start_node(self, execution_id: str, node_id: str, agent_id: Optional[str] = None,
-                  input_data: Optional[Dict] = None) -> None:
+                  input_data: Optional[Dict] = None, node_type: Optional[str] = None, 
+                  retry_count: int = 0) -> None:
         """Mark a node as started with database persistence."""
         if execution_id not in self._active_executions:
             return
@@ -95,7 +96,8 @@ class ExecutionStateTracker:
         # Persist to database (Phase 2 enhancement)
         if self._persist_to_db:
             asyncio.create_task(self._persist_node_execution(
-                execution_id, node_id, "running", agent_id, input_data
+                execution_id, node_id, "running", agent_id, input_data,
+                node_type=node_type, retry_count=retry_count
             ))
             
         self._notify_subscribers("node_started", execution)
@@ -302,7 +304,9 @@ class ExecutionStateTracker:
                                     input_data: Optional[Dict] = None,
                                     output_data: Optional[Dict] = None,
                                     error_message: Optional[str] = None,
-                                    execution_time_ms: Optional[float] = None) -> None:
+                                    execution_time_ms: Optional[float] = None,
+                                    node_type: Optional[str] = None,
+                                    retry_count: int = 0) -> None:
         """Persist node execution to database."""
         try:
             async with AsyncSessionLocal() as db:
@@ -316,7 +320,9 @@ class ExecutionStateTracker:
                     execution_time_ms=execution_time_ms,
                     input_data=input_data,
                     output_data=output_data,
-                    error_message=error_message
+                    error_message=error_message,
+                    node_type=node_type,
+                    retry_count=retry_count
                 )
                 db.add(db_node)
                 await db.commit()

@@ -405,6 +405,21 @@ class AikaOrchestratorState(TypedDict, total=False):
     """Whether notification was sent to assigned counselor."""
     
     # ============================================================================
+    # IA (Insights Agent) OUTPUTS
+    # ============================================================================
+    ia_report: Optional[str]
+    """Synthesized report from IA (interpretation + summary)."""
+    
+    query_type: Optional[str]
+    """Type of analytics query executed."""
+    
+    analytics_result: Optional[Dict[str, Any]]
+    """Raw analytics data (chart, table)."""
+    
+    pdf_url: Optional[str]
+    """URL to downloadable PDF report."""
+    
+    # ============================================================================
     # TWO-TIER RISK MONITORING FIELDS
     # ============================================================================
     

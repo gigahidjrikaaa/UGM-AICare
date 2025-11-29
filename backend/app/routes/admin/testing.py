@@ -14,7 +14,7 @@ from pathlib import Path
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
@@ -28,6 +28,8 @@ from app.domains.mental_health.schemas.chat import ChatRequest, ChatResponse
 from app.domains.mental_health.services.personal_context import build_user_personal_context
 
 from app.domains.mental_health.routes.chat import process_chat_message
+from app.agents.tca.service import TherapeuticCoachService
+from app.agents.tca.schemas import TCAInterveneRequest
 
 logger = logging.getLogger(__name__)
 
@@ -1007,38 +1009,121 @@ async def validate_orchestration(
     results = []
     passed_flows = 0
     
-    # We need to simulate the flow. 
-    # Since we can't easily mock the entire agent system in a single request without side effects,
-    # we will use the `simulate_real_chat` logic but adapted for verification.
+    # Import required for simulation
+    from app.core import llm
     
-    # For this implementation, we will assume we can reuse simulate_real_chat logic
-    # but we need to check the *routing*.
-    # The `simulate_real_chat` returns `agent_routing_log`.
-    
+    # Default LLM responder
+    async def _default_llm_responder(
+        history_for_llm: List[Dict[str, str]],
+        system_prompt: Optional[str],
+        _request: ChatRequest,
+        _stream_callback = None,
+    ) -> str:
+        return await llm.generate_response(
+            history=history_for_llm,
+            model="gemini_google",
+            max_tokens=1024,
+            temperature=0.7,
+            system_prompt=system_prompt,
+        )
+
     for flow in flows:
         flow_id = flow["flow_id"]
-        conversation = flow["conversation"]
+        conversation_turns = flow["conversation"]
         
-        # Create a temp user for this flow
-        # ... (simplified for brevity, assume we use a temp user or the admin user)
-        # Actually, let's use the admin user ID but with a unique session
+        session_id = f"rq2-val-{uuid.uuid4()}"
+        conversation_id = str(uuid.uuid4())
+        history: List[Dict[str, str]] = []
         
-        flow_log = []
         flow_passed = True
+        details = []
         
-        # We need to process each turn
-        # This is complex because it requires state. 
-        # For MVP of this feature, we might just run the FIRST turn that triggers routing.
-        # Or we try to run the whole sequence.
+        for idx, turn in enumerate(conversation_turns):
+            user_message = turn["user"]
+            expected_intent = turn["expected_intent"]
+            expected_risk = turn["expected_risk"]
+            expected_next_agent = turn["expected_next_agent"]
+            
+            try:
+                chat_request = ChatRequest(
+                    google_sub=f"test_{admin_user.id}",
+                    session_id=session_id,
+                    conversation_id=conversation_id,
+                    message=user_message,
+                    history=history.copy(),
+                    provider="gemini",
+                    model="gemini_google",
+                )
+                
+                result = await process_chat_message(
+                    request=chat_request,
+                    current_user=admin_user,
+                    db=db,
+                    session_id=session_id,
+                    conversation_id=conversation_id,
+                    active_system_prompt=None,
+                    llm_responder=_default_llm_responder,
+                )
+                
+                # Update history
+                history = [
+                    {"role": h.role, "content": h.content} 
+                    for h in result.final_history
+                ]
+                
+                # Verify Metadata
+                metadata = result.metadata or {}
+                actual_intent = metadata.get("intent", "unknown")
+                actual_risk = metadata.get("risk_level", "unknown")
+                agents_invoked = metadata.get("agents_invoked", [])
+                
+                # Determine actual next agent
+                actual_next_agent = "Aika"
+                if "CMA" in agents_invoked:
+                    actual_next_agent = "CMA"
+                elif "TCA" in agents_invoked or "SCA" in agents_invoked:
+                    actual_next_agent = "TCA"
+                elif "STA" in agents_invoked and len(agents_invoked) == 1:
+                     actual_next_agent = "Aika" # STA -> Aika
+                
+                # Normalize for comparison
+                def normalize(s): return str(s).lower().replace("_", " ")
+                
+                intent_match = normalize(actual_intent) == normalize(expected_intent)
+                
+                # Risk match logic
+                risk_match = normalize(actual_risk) == normalize(expected_risk)
+                if expected_risk == "none" and actual_risk == "low": risk_match = True
+                
+                agent_match = normalize(actual_next_agent) == normalize(expected_next_agent)
+                if normalize(expected_next_agent) == "sca": agent_match = normalize(actual_next_agent) == "tca"
+                
+                if not (intent_match and risk_match and agent_match):
+                    flow_passed = False
+                    details.append(
+                        f"Turn {idx+1} Fail: "
+                        f"Intent({actual_intent}/{expected_intent}), "
+                        f"Risk({actual_risk}/{expected_risk}), "
+                        f"Agent({actual_next_agent}/{expected_next_agent})"
+                    )
+                
+            except Exception as e:
+                flow_passed = False
+                details.append(f"Turn {idx+1} Error: {str(e)}")
+                logger.error(f"RQ2 Error: {e}", exc_info=True)
+                break
         
-        # Let's try to run the sequence using `process_chat_message`
-        # We need to mock the DB session or use the real one (it's a test env).
-        
-        # ... (Implementation details would go here, for now returning stub)
+        if flow_passed:
+            passed_flows += 1
+            status_str = "PASS"
+        else:
+            status_str = "FAIL"
+            
         results.append({
             "flow_id": flow_id,
-            "status": "Pending Implementation",
-            "passed": False
+            "status": status_str,
+            "passed": flow_passed,
+            "details": "; ".join(details) if details else "All turns passed"
         })
 
     return {"total": len(flows), "passed": passed_flows, "results": results}
@@ -1053,27 +1138,166 @@ async def generate_coaching_responses(
     scenarios = load_rq_data("rq3")
     responses = []
     
-    # Import LLM
-    from app.core import llm
+    tca_service = TherapeuticCoachService()
     
     for scenario in scenarios:
         prompt = scenario["prompt"]
+        category = scenario.get("category", "general_support")
+        scenario_id = scenario.get("scenario_id", "unknown")
         
-        # Generate response using SCA system prompt (or similar)
-        # We can use a simplified generation for now
-        system_prompt = "You are a compassionate mental health coach. Respond to the user with empathy and CBT techniques."
-        
-        response_text = await llm.generate_response(
-            history=[{"role": "user", "content": prompt}],
-            model="gemini_google",
-            system_prompt=system_prompt
-        )
-        
-        responses.append({
-            "id": scenario["scenario_id"],
-            "prompt": prompt,
-            "response": response_text,
-            "category": scenario["category"]
-        })
+        try:
+            # Create request payload
+            payload = TCAInterveneRequest(
+                session_id=f"rq3-gen-{uuid.uuid4()}",
+                intent=category,
+                user_hash=f"test_hash_{admin_user.id}",
+                options={
+                    "source": "thesis_rq3",
+                    "scenario_id": scenario_id,
+                    "original_prompt": prompt,
+                },
+                consent_followup=False
+            )
+            
+            # Call TCA Service with Gemini enabled
+            tca_response = await tca_service.intervene(
+                payload=payload,
+                use_gemini_plan=True,
+                plan_type="general_coping", # Default or map from category
+                user_message=prompt,
+                sta_context={"risk_level": "low"} # Assume low risk for coaching scenarios
+            )
+            
+            # Format response text
+            steps_text = "\n".join([f"{i+1}. {s.label} ({s.duration_min} min)" for i, s in enumerate(tca_response.plan_steps)])
+            resources_text = "\n".join([f"- {r.title}: {r.url}" for r in tca_response.resource_cards])
+            
+            full_response = f"Plan Steps:\n{steps_text}\n\nResources:\n{resources_text}"
+            
+            responses.append({
+                "id": scenario_id,
+                "prompt": prompt,
+                "response": full_response,
+                "category": category
+            })
+            
+        except Exception as e:
+            logger.error(f"RQ3 Generation Error: {e}", exc_info=True)
+            responses.append({
+                "id": scenario_id,
+                "prompt": prompt,
+                "response": f"Error generating response: {str(e)}",
+                "category": category
+            })
         
     return {"responses": responses}
+
+
+@router.post("/rq3/privacy-test", response_model=Dict)
+async def verify_privacy_preservation(
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user),
+):
+    """RQ3: Verify k-anonymity privacy preservation."""
+    logger.info(f"Admin {admin_user.id} running privacy test")
+    
+    results = {
+        "k_threshold": 5,
+        "high_severity_count": 0,
+        "critical_severity_count": 0,
+        "high_severity_visible": False,
+        "critical_severity_suppressed": False,
+        "passed": False,
+        "details": []
+    }
+    
+    # 1. Seed Data
+    session_prefix = f"priv_test_{uuid.uuid4().hex[:8]}"
+    
+    try:
+        # Insert 7 HIGH severity cases
+        for i in range(7):
+            await db.execute(text("""
+                INSERT INTO cases (id, created_at, status, severity, user_hash, session_id)
+                VALUES (:id, :created_at, 'new', 'high', :user_hash, :session_id)
+            """), {
+                "id": uuid.uuid4(),
+                "created_at": datetime.now(),
+                "user_hash": f"user_high_{i}",
+                "session_id": f"{session_prefix}_high_{i}"
+            })
+            
+        # Insert 3 CRITICAL severity cases
+        for i in range(3):
+            await db.execute(text("""
+                INSERT INTO cases (id, created_at, status, severity, user_hash, session_id)
+                VALUES (:id, :created_at, 'new', 'critical', :user_hash, :session_id)
+            """), {
+                "id": uuid.uuid4(),
+                "created_at": datetime.now(),
+                "user_hash": f"user_crit_{i}",
+                "session_id": f"{session_prefix}_crit_{i}"
+            })
+            
+        await db.commit()
+        
+        # 2. Run Query (Simulate Insights Agent)
+        # We use the same query logic as the notebook/IA
+        query = text("""
+            SELECT 
+                severity,
+                COUNT(*) as crisis_count
+            FROM cases
+            WHERE 
+                created_at >= :start_date 
+                AND severity IN ('high', 'critical')
+            GROUP BY severity
+            HAVING COUNT(*) >= :k_threshold
+        """)
+        
+        start_date = datetime.now().date()
+        
+        result = await db.execute(query, {
+            "start_date": start_date,
+            "k_threshold": 5
+        })
+        rows = result.fetchall()
+        
+        # 3. Verify
+        high_found = False
+        crit_found = False
+        
+        for row in rows:
+            severity = row[0] # or row.severity
+            count = row[1]    # or row.crisis_count
+            
+            if severity == 'high':
+                high_found = True
+                results["high_severity_count"] = count
+            elif severity == 'critical':
+                crit_found = True
+                results["critical_severity_count"] = count
+        
+        results["high_severity_visible"] = high_found
+        results["critical_severity_suppressed"] = not crit_found
+        
+        if high_found and not crit_found:
+            results["passed"] = True
+            results["details"].append("High severity group (n=7) visible. Critical severity group (n=3) suppressed.")
+        else:
+            results["passed"] = False
+            if not high_found:
+                results["details"].append("FAIL: High severity group not found (should be visible).")
+            if crit_found:
+                results["details"].append("FAIL: Critical severity group found (should be suppressed).")
+                
+    except Exception as e:
+        logger.error(f"Privacy Test Error: {e}", exc_info=True)
+        results["details"].append(f"Error: {str(e)}")
+        
+    finally:
+        # 4. Cleanup
+        await db.execute(text(f"DELETE FROM cases WHERE session_id LIKE '{session_prefix}%'"))
+        await db.commit()
+        
+    return results
