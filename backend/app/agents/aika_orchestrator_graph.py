@@ -434,12 +434,40 @@ want to die, mau mati, ingin mati, etc.
         logger.error(error_msg, exc_info=True)
         state.setdefault("errors", []).append(error_msg)
         
-        # Fallback: invoke agents for safety
-        state["needs_agents"] = True
-        state["agent_reasoning"] = f"Error occurred, invoking agents for safety: {str(e)}"
-        
-        if execution_id:
-            execution_tracker.fail_node(execution_id, "aika::decision", str(e))
+        # Check for Rate Limit / Overload (Graceful Fallback)
+        error_str = str(e)
+        if "429" in error_str or "RESOURCE_EXHAUSTED" in error_str or "All Gemini models failed" in error_str:
+            logger.warning("⚠️ Rate limit hit in decision node. Returning graceful fallback.")
+            
+            # Graceful fallback: Keep as Aika, don't escalate to TCA
+            state["needs_agents"] = False
+            state["intent"] = "system_busy" 
+            state["intent_confidence"] = 1.0
+            state["immediate_risk_level"] = "none"
+            state["risk_score"] = 0.0
+            
+            # Polite fallback response
+            state["aika_direct_response"] = (
+                "Maaf ya, saat ini aku sedang melayani banyak teman-teman lain. "
+                "Boleh coba kirim pesan lagi dalam 1 menit? "
+                "Kalau kamu butuh bantuan darurat, jangan ragu hubungi Crisis Centre UGM."
+            )
+            state["agent_reasoning"] = f"System overloaded (Rate Limit), returning graceful fallback: {error_str}"
+            
+            if execution_id:
+                # Mark as warning instead of fail if possible, or just complete with fallback
+                execution_tracker.complete_node(
+                    execution_id, 
+                    "aika::decision", 
+                    metrics={"fallback": "rate_limit"}
+                )
+        else:
+            # Standard Fallback: invoke agents for safety (unknown error)
+            state["needs_agents"] = True
+            state["agent_reasoning"] = f"Error occurred, invoking agents for safety: {str(e)}"
+            
+            if execution_id:
+                execution_tracker.fail_node(execution_id, "aika::decision", str(e))
     
     return state
 

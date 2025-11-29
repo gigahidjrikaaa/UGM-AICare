@@ -391,59 +391,84 @@ async def generate_gemini_response_with_fallback(
         Generated response or raises exception if all models fail
     """
     from google.genai.errors import ClientError, ServerError
+    import re
+    import asyncio
     
     # Build model list: requested model + fallback chain (deduplicated)
     models_to_try = [model] + [m for m in GEMINI_FALLBACK_CHAIN if m != model]
     
     last_error = None
     for idx, current_model in enumerate(models_to_try):
-        try:
-            logger.info(f"🔄 Attempting Gemini request with model: {current_model} (attempt {idx + 1}/{len(models_to_try)})")
-            
-            response = await generate_gemini_response(
-                history=history,
-                model=current_model,
-                max_tokens=max_tokens,
-                temperature=temperature,
-                system_prompt=system_prompt,
-                tools=tools,
-                return_full_response=return_full_response,
-                json_mode=json_mode
-            )
-            
-            # Success!
-            if idx > 0:
-                logger.warning(f"✅ Fallback successful! Used model: {current_model} (original: {model})")
-            return response
-            
-        except (ClientError, ServerError) as e:
-            error_code = getattr(e, 'status_code', 0)
-            error_msg = str(e)
-            
-            # Check if this is a quota/rate limit error (429) or overload (503)
-            should_fallback = (
-                error_code == 429 or  # RESOURCE_EXHAUSTED
-                error_code == 503 or  # UNAVAILABLE
-                "RESOURCE_EXHAUSTED" in error_msg or
-                "overloaded" in error_msg.lower()
-            )
-            
-            if should_fallback and idx < len(models_to_try) - 1:
-                logger.warning(
-                    f"⚠️ Model {current_model} unavailable (code={error_code}). "
-                    f"Trying fallback model {models_to_try[idx + 1]}..."
-                )
-                last_error = e
-                continue  # Try next model
-            else:
-                # No more fallbacks or non-retriable error
-                logger.error(f"❌ Model {current_model} failed with non-retriable error: {error_msg}")
-                raise
+        # Retry loop for the SAME model if we get a rate limit with a suggested delay
+        # We'll try up to 3 times per model if a delay is provided
+        max_retries_per_model = 3
+        
+        for retry_attempt in range(max_retries_per_model):
+            try:
+                logger.info(f"🔄 Attempting Gemini request with model: {current_model} (model_idx={idx}, retry={retry_attempt})")
                 
-        except Exception as e:
-            # Unexpected error - don't fallback
-            logger.error(f"❌ Unexpected error with model {current_model}: {e}")
-            raise
+                response = await generate_gemini_response(
+                    history=history,
+                    model=current_model,
+                    max_tokens=max_tokens,
+                    temperature=temperature,
+                    system_prompt=system_prompt,
+                    tools=tools,
+                    return_full_response=return_full_response,
+                    json_mode=json_mode
+                )
+                
+                # Success!
+                if idx > 0 or retry_attempt > 0:
+                    logger.warning(f"✅ Fallback/Retry successful! Used model: {current_model}")
+                return response
+                
+            except (ClientError, ServerError) as e:
+                error_code = getattr(e, 'status_code', 0)
+                error_msg = str(e)
+                
+                # Check if this is a quota/rate limit error (429) or overload (503)
+                should_fallback = (
+                    error_code == 429 or  # RESOURCE_EXHAUSTED
+                    error_code == 503 or  # UNAVAILABLE
+                    "RESOURCE_EXHAUSTED" in error_msg or
+                    "overloaded" in error_msg.lower()
+                )
+                
+                if should_fallback:
+                    # Check for retry delay in error message
+                    # Pattern: "Please retry in 45.63936562s." or similar
+                    delay_match = re.search(r"retry in (\d+(\.\d+)?)s", error_msg)
+                    if delay_match:
+                        delay_seconds = float(delay_match.group(1))
+                        # Cap delay to avoid hanging too long (e.g. 60s)
+                        delay_seconds = min(delay_seconds, 60.0)
+                        
+                        if retry_attempt < max_retries_per_model - 1:
+                            logger.warning(f"⏳ Rate limit hit. Sleeping for {delay_seconds:.2f}s before retrying same model...")
+                            await asyncio.sleep(delay_seconds + 1.0) # Add 1s buffer
+                            continue
+                    
+                    # If no delay found or retries exhausted for this model, try next model
+                    if idx < len(models_to_try) - 1:
+                        logger.warning(
+                            f"⚠️ Model {current_model} unavailable (code={error_code}). "
+                            f"Trying fallback model {models_to_try[idx + 1]}..."
+                        )
+                        last_error = e
+                        break # Break inner loop to go to next model
+                    else:
+                        # No more fallbacks
+                        logger.error(f"❌ Model {current_model} failed with non-retriable error: {error_msg}")
+                        raise
+                else:
+                    # Non-retriable error
+                    logger.error(f"❌ Unexpected error with model {current_model}: {e}")
+                    raise
+            except Exception as e:
+                # Unexpected error - don't fallback
+                logger.error(f"❌ Unexpected error with model {current_model}: {e}")
+                raise
     
     # All models failed
     logger.error(f"❌ All fallback models exhausted. Last error: {last_error}")
