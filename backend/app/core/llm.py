@@ -20,7 +20,18 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # --- Configuration ---
-GOOGLE_API_KEY = os.environ.get("GOOGLE_GENAI_API_KEY")
+# Load primary key and any additional keys (GOOGLE_GENAI_API_KEY_2, _3, etc.)
+GEMINI_API_KEYS = []
+if os.environ.get("GOOGLE_GENAI_API_KEY"):
+    GEMINI_API_KEYS.append(os.environ.get("GOOGLE_GENAI_API_KEY"))
+
+# Check for additional keys (up to 5)
+for i in range(2, 6):
+    key = os.environ.get(f"GOOGLE_GENAI_API_KEY_{i}")
+    if key:
+        GEMINI_API_KEYS.append(key)
+
+logger.info(f"Loaded {len(GEMINI_API_KEYS)} Gemini API keys for rotation.")
 
 # Gemini 2.5 models for different use cases
 DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"  # Default for general use (GA - Stable)
@@ -41,32 +52,41 @@ GEMINI_FALLBACK_CHAIN = [
 
 DEFAULT_GEMMA_LOCAL_MODEL = "gemma-3-12b-it-gguf"  # Local inference via Ollama/vLLM
 
-# --- Client Singleton ---
+# --- Client Management ---
 _gemini_client: Optional[genai.Client] = None
+_current_key_index: int = 0
 
-def get_gemini_client() -> genai.Client:
-    """Get or create Gemini client instance (singleton pattern).
+def get_gemini_client(force_rotate: bool = False) -> genai.Client:
+    """Get Gemini client, optionally rotating to the next API key.
     
-    This replaces the old global genai.configure() pattern with a client-based approach.
-    The client is created once and reused across the application.
-    
+    Args:
+        force_rotate: If True, switches to the next available API key before returning client.
+        
     Returns:
         genai.Client: Initialized Gemini client
         
     Raises:
-        ValueError: If GOOGLE_API_KEY is not configured
+        ValueError: If no API keys are configured
     """
-    global _gemini_client
-    if _gemini_client is None:
-        if not GOOGLE_API_KEY:
-            logger.error("GOOGLE_API_KEY not found. Gemini API will not be available.")
-            raise ValueError("Google API key not configured.")
+    global _gemini_client, _current_key_index
+    
+    if not GEMINI_API_KEYS:
+        logger.error("No GOOGLE_GENAI_API_KEYs found. Gemini API will not be available.")
+        raise ValueError("Google API keys not configured.")
+        
+    if _gemini_client is None or force_rotate:
+        if force_rotate:
+            _current_key_index = (_current_key_index + 1) % len(GEMINI_API_KEYS)
+            logger.info(f"🔄 Rotating Gemini API Key to index {_current_key_index} (Key ending in ...{GEMINI_API_KEYS[_current_key_index][-4:]})")
+            
         try:
-            _gemini_client = genai.Client(api_key=GOOGLE_API_KEY)
-            logger.info("Gemini client initialized successfully with new google-genai SDK.")
+            _gemini_client = genai.Client(api_key=GEMINI_API_KEYS[_current_key_index])
+            if not force_rotate:
+                logger.info("Gemini client initialized successfully.")
         except Exception as e:
             logger.error(f"Failed to initialize Gemini client: {e}")
             raise
+            
     return _gemini_client
 
 # --- Provider Type ---
@@ -436,6 +456,16 @@ async def generate_gemini_response_with_fallback(
                 )
                 
                 if should_fallback:
+                    # KEY ROTATION STRATEGY
+                    # If we have multiple keys, try rotating first before waiting or changing models
+                    if len(GEMINI_API_KEYS) > 1:
+                        # We can try rotating keys up to N times (where N is number of keys)
+                        # We use a simple heuristic: if we haven't tried all keys for this model attempt yet
+                        if retry_attempt < len(GEMINI_API_KEYS) - 1:
+                            logger.warning(f"🔑 Rate limit hit (429). Rotating API Key and retrying immediately...")
+                            get_gemini_client(force_rotate=True)
+                            continue
+
                     # Check for retry delay in error message
                     # Pattern: "Please retry in 45.63936562s." or similar
                     delay_match = re.search(r"retry in (\d+(\.\d+)?)s", error_msg)
