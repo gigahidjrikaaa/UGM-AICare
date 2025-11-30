@@ -91,19 +91,15 @@ services:
       - internal_network_dev
 
   #################
-  # Backend (FastAPI)
+  # Backend (FastAPI) - PREPROD MODE (Production Build)
   #################
   backend:
     container_name: ugm_aicare_backend_dev
     build:
       context: ./backend
       dockerfile: app/Dockerfile
-    # Override CMD for development with hot reload
-    command: >
-      bash -c "
-        echo '🚀 Starting backend with hot reload...' &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app --log-level info
-      "
+      # Default target is production
+    # No command override - use default CMD (gunicorn)
     ports:
       - "8000:8000"
     # Resource limits to prevent memory issues
@@ -142,7 +138,7 @@ services:
       REDIS_URL: ""
       
       # Environment
-      APP_ENV: development # Explicitly set for development
+      APP_ENV: production # Set to production for preprod
       PYTHONPATH: /app
       
       # MinIO
@@ -159,11 +155,7 @@ services:
       # Langfuse (Dev Override)
       LANGFUSE_ENABLED: "false"
       LANGFUSE_HOST: "http://langfuse-server:3000"
-      # OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://langfuse-server:3000/api/public/otel/v1/traces"
-    volumes:
-      - ./backend:/app # Mount backend code for live reloading
-      - /app/.venv # Exclude virtual env from mount
-      - /app/__pycache__ # Exclude pycache
+    # NO VOLUMES - Use built image code
     depends_on:
       migrate:
         condition: service_completed_successfully
@@ -179,14 +171,14 @@ services:
     dns: 8.8.8.8
 
   #################
-  # Frontend (Next.js)
+  # Frontend (Next.js) - PREPROD MODE (Production Build)
   #################
   frontend:
     container_name: ugm_aicare_frontend_dev
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      target: development # Assuming a development stage in Dockerfile
+      target: production # Use production target
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     ports:
@@ -201,15 +193,13 @@ services:
     env_file:
       - .env
     environment:
-      NODE_ENV: development
+      NODE_ENV: production
       PORT: 3000
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       INTERNAL_API_URL: http://backend:8000
-    volumes:
-      - ./frontend:/app # Mount frontend code for live reloading
-      - /app/node_modules # Exclude node_modules from host mount
+    # NO VOLUMES - Use built image code
     depends_on:
       - backend
     restart: unless-stopped

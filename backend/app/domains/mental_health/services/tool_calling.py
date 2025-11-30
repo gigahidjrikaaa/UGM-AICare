@@ -29,6 +29,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from google import genai
 from google.genai import types
 
+# LangChain Core for Custom Events
+try:
+    from langchain_core.callbacks.manager import adispatch_custom_event
+except ImportError:
+    # Fallback if langchain_core is not available (should not happen with langgraph)
+    async def adispatch_custom_event(*args, **kwargs):
+        pass
+
 from app.agents.aika.tools import execute_tool_call, get_aika_tools
 from app.agents.execution_tracker import execution_tracker
 from app.core import llm
@@ -327,14 +335,38 @@ async def _generate_streaming_with_tools(
         )
         
         if tool_results:
-            # Function calls detected, execute them and get final response
-            logger.info(f"Streaming: Detected {len(tool_results)} tool call(s), executing...")
-            
+            # 1. Check for and emit any initial text (explanation) from the model
+            # This allows "Explain -> Act" behavior like ChatGPT
+            if hasattr(response_obj, 'candidates') and response_obj.candidates:
+                candidate = response_obj.candidates[0]
+                if hasattr(candidate, 'content') and candidate.content:
+                    initial_text = ""
+                    for part in candidate.content.parts:
+                        if hasattr(part, 'text') and part.text:
+                            initial_text += part.text
+                    
+                    if initial_text:
+                        # Emit custom event for LangGraph streaming
+                        await adispatch_custom_event(
+                            "partial_response",
+                            {"text": initial_text},
+                        )
+                        # Also use callback if provided (legacy)
+                        if stream_callback:
+                            await stream_callback(initial_text + "\n\n")
+
+            # Emit tool usage event
+            tool_names = [result["tool_name"] for result in tool_results]
+            await adispatch_custom_event(
+                "tool_use",
+                {"tools": tool_names},
+            )
+
             # Send tool indicator as a special event (not regular text)
             # The frontend should handle this specially
-            tool_names = [result["tool_name"] for result in tool_results]
             tool_indicator_msg = f"🔧 _Menggunakan: {', '.join(tool_names)}_\n\n"
-            await stream_callback(tool_indicator_msg)
+            if stream_callback:
+                await stream_callback(tool_indicator_msg)
             
             # NEW SDK: Build contents array with function call and response
             # This replaces the old chat.send_message_async pattern
@@ -459,6 +491,16 @@ async def _check_and_execute_tool_calls(
         if not hasattr(content, 'parts') or not content.parts:
             return tool_results
         
+        # NEW: Check for initial text (explanation) and emit event
+        # This ensures "Explain -> Act" works even in non-streaming graph nodes
+        initial_text = ""
+        for part in content.parts:
+            if hasattr(part, 'text') and part.text:
+                initial_text += part.text
+        
+        if initial_text:
+            await adispatch_custom_event("partial_response", {"text": initial_text})
+
         # Look for function calls in parts
         for part in content.parts:
             if hasattr(part, 'function_call') and part.function_call:

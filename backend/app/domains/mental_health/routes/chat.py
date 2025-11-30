@@ -416,6 +416,9 @@ async def handle_aika_request(
         try:
             start_time = datetime.now()
             
+            # Determine effective session ID
+            effective_session_id = request.session_id or f"sess_{request.user_id}_{int(datetime.now().timestamp())}"
+            
             # Create Aika agent with in-memory checkpointing
             memory = MemorySaver()
             aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=memory)
@@ -431,7 +434,7 @@ async def handle_aika_request(
                 "user_hash": user_hash,
                 "message": request.message,
                 "conversation_history": request.conversation_history,
-                "session_id": request.session_id or f"sess_{request.user_id}_{int(datetime.now().timestamp())}",
+                "session_id": effective_session_id,
                 "execution_path": [],
                 "agents_invoked": [],
                 "errors": [],
@@ -439,7 +442,7 @@ async def handle_aika_request(
             
             config = {
                 "configurable": {
-                    "thread_id": f"user_{request.user_id}_session_{request.session_id or 'default'}"
+                    "thread_id": f"user_{request.user_id}_session_{effective_session_id}"
                 }
             }
             
@@ -473,6 +476,17 @@ async def handle_aika_request(
                     
                 elif kind == "on_tool_end":
                     yield f"event: agent_update\ndata: {json.dumps({'status': 'tool_end', 'tool': event['name']})}\n\n"
+
+                # NEW: Handle custom events from tool_calling.py for transparency
+                elif kind == "on_custom_event":
+                    if event["name"] == "partial_response":
+                        text = event["data"]["text"]
+                        # Send as a special event that frontend can interpret as "append text"
+                        yield f"event: agent_update\ndata: {json.dumps({'status': 'partial_response', 'text': text})}\n\n"
+                    
+                    elif event["name"] == "tool_use":
+                        tools = event["data"]["tools"]
+                        yield f"event: agent_update\ndata: {json.dumps({'status': 'tool_use', 'tools': tools})}\n\n"
 
                 # Custom node events (mapped from graph node names)
                 if kind == "on_chain_start" and event["name"] in ["aika_decision_node", "execute_sta_subgraph", "execute_sca_subgraph", "execute_sda_subgraph", "synthesize_final_response"]:
@@ -534,6 +548,21 @@ async def handle_aika_request(
                 
                 # Send metadata
                 yield f"event: metadata\ndata: {json.dumps(metadata)}\n\n"
+                
+                # Save conversation to DB
+                import uuid
+                conversation_entry = Conversation(
+                    user_id=request.user_id,
+                    session_id=effective_session_id,
+                    conversation_id=str(uuid.uuid4()),
+                    message=request.message,
+                    response=final_response,
+                    timestamp=datetime.now()
+                )
+                db.add(conversation_entry)
+                
+                # Log metadata since we can't store it in the model yet
+                logger.info(f"Conversation metadata: {json.dumps(metadata)}")
                 
                 # Commit DB changes
                 await db.commit()

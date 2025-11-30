@@ -11,6 +11,7 @@
 # Web Framework
 fastapi>=0.115.5,<0.116.0
 uvicorn>=0.30.0,<1.0.0
+scalar-fastapi>=1.0.3
 pydantic>=2.9.0,<3.0.0
 email-validator>=2.0.0  # Required for Pydantic EmailStr validation
 python-multipart>=0.0.18  # Updated to fix CVE-2024-24762 and CVE-2024-53981

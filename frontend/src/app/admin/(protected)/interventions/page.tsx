@@ -60,7 +60,12 @@ export default function InterventionPlansPage() {
             });
             if (!response.ok) throw new Error("Failed to load plans");
             const data = await response.json();
-            setPlans(data.items);
+            // Parse plan_data if it's a string (defensive coding)
+            const parsedItems = data.items.map((plan: any) => ({
+                ...plan,
+                plan_data: typeof plan.plan_data === 'string' ? JSON.parse(plan.plan_data) : plan.plan_data
+            }));
+            setPlans(parsedItems);
         } catch (error) {
             console.error("Error:", error);
             toast.error("Failed to load intervention plans");
@@ -120,8 +125,8 @@ export default function InterventionPlansPage() {
                         <button
                             onClick={() => setActiveTab('dashboard')}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'dashboard'
-                                    ? 'bg-[#FFCA40] text-black'
-                                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                                ? 'bg-[#FFCA40] text-black'
+                                : 'text-white/60 hover:text-white hover:bg-white/5'
                                 }`}
                         >
                             <FiBarChart2 /> Dashboard
@@ -129,8 +134,8 @@ export default function InterventionPlansPage() {
                         <button
                             onClick={() => setActiveTab('plans')}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'plans'
-                                    ? 'bg-[#FFCA40] text-black'
-                                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                                ? 'bg-[#FFCA40] text-black'
+                                : 'text-white/60 hover:text-white hover:bg-white/5'
                                 }`}
                         >
                             <FiList /> All Plans
@@ -138,8 +143,8 @@ export default function InterventionPlansPage() {
                         <button
                             onClick={() => setActiveTab('users')}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'users'
-                                    ? 'bg-[#FFCA40] text-black'
-                                    : 'text-white/60 hover:text-white hover:bg-white/5'
+                                ? 'bg-[#FFCA40] text-black'
+                                : 'text-white/60 hover:text-white hover:bg-white/5'
                                 }`}
                         >
                             <FiUsers /> User Progress

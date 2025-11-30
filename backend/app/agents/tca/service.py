@@ -23,33 +23,36 @@ PlanMatrix = dict[str, list[PlanStep]]
 
 _DEFAULT_PLAN_STEPS: PlanMatrix = {
     "academic_stress": [
-        PlanStep(id="grounding", label="Box breathing to reset focus", duration_min=4),
-        PlanStep(id="plan", label="Break assignments into smaller actions", duration_min=6),
-        PlanStep(id="support", label="Message a study buddy or mentor", duration_min=3),
+        PlanStep(title="Grounding", description="Box breathing to reset focus", duration_min=4),
+        PlanStep(title="Planning", description="Break assignments into smaller actions", duration_min=6),
+        PlanStep(title="Support", description="Message a study buddy or mentor", duration_min=3),
     ],
     "acute_distress": [
-        PlanStep(id="breathing", label="Guided 4-7-8 breathing", duration_min=5),
-        PlanStep(id="body_scan", label="Progressive muscle relaxation", duration_min=7),
-        PlanStep(id="safety_plan", label="Review personal safety plan", duration_min=5),
+        PlanStep(title="Breathing", description="Guided 4-7-8 breathing", duration_min=5),
+        PlanStep(title="Body Scan", description="Progressive muscle relaxation", duration_min=7),
+        PlanStep(title="Safety Plan", description="Review personal safety plan", duration_min=5),
     ],
     "relationship_strain": [
-        PlanStep(id="reflect", label="Name the need behind the feeling", duration_min=5),
-        PlanStep(id="communicate", label="Draft an 'I feel / I need' message", duration_min=6),
-        PlanStep(id="connect", label="Reach out to a trusted friend", duration_min=4),
+        PlanStep(title="Reflect", description="Name the need behind the feeling", duration_min=5),
+        PlanStep(title="Communicate", description="Draft an 'I feel / I need' message", duration_min=6),
+        PlanStep(title="Connect", description="Reach out to a trusted friend", duration_min=4),
     ],
     "financial_pressure": [
-        PlanStep(id="budget", label="List fixed vs. flexible expenses", duration_min=8),
-        PlanStep(id="relief", label="Explore campus aid and scholarships", duration_min=6),
-        PlanStep(id="self_care", label="Schedule a restorative break", duration_min=4),
+        PlanStep(title="Budget", description="List fixed vs. flexible expenses", duration_min=8),
+        PlanStep(title="Relief", description="Explore campus aid and scholarships", duration_min=6),
+        PlanStep(title="Self Care", description="Schedule a restorative break", duration_min=4),
     ],
 }
 
 _FALLBACK_PLAN = [
-    PlanStep(id="check_in", label="Pause and notice how your body feels", duration_min=3),
-    PlanStep(id="cope", label="Use a favourite coping skill for 5 minutes", duration_min=5),
-    PlanStep(id="reach_out", label="Share how you're feeling with someone you trust", duration_min=4),
+    PlanStep(title="Check In", description="Pause and notice how your body feels", duration_min=3),
+    PlanStep(title="Cope", description="Use a favourite coping skill for 5 minutes", duration_min=5),
+    PlanStep(title="Reach Out", description="Share how you're feeling with someone you trust", duration_min=4),
 ]
 
+
+from app.models.user import User
+from sqlalchemy.ext.asyncio import AsyncSession
 
 class TherapeuticCoachService:
     """
@@ -94,7 +97,9 @@ class TherapeuticCoachService:
         use_gemini_plan: bool = False,
         plan_type: Optional[str] = None,
         user_message: Optional[str] = None,
-        sta_context: Optional[Dict[str, Any]] = None
+        sta_context: Optional[Dict[str, Any]] = None,
+        user: Optional[User] = None,
+        db: Optional[AsyncSession] = None
     ) -> TCAInterveneResponse:
         """Generate intervention plan - uses Gemini AI if requested, otherwise static plans.
         
@@ -109,6 +114,8 @@ class TherapeuticCoachService:
                 - "behavioral_activation": CBT activity scheduling (replaces legacy CBT module)
             user_message: Original user message for context (required if use_gemini_plan=True)
             sta_context: Additional context from STA (risk_level, etc.)
+            user: Optional user object for saving the plan
+            db: Optional database session for saving the plan
         
         Returns:
             TCAInterveneResponse with plan steps and resources
@@ -147,19 +154,20 @@ class TherapeuticCoachService:
                 # Convert to PlanStep and ResourceCard objects
                 plan_steps = [
                     PlanStep(
-                        id=step.get("id", f"step_{i}"),
-                        label=step.get("label", ""),
-                        duration_min=step.get("duration_min")
+                        title=step.get("title", "Step"),
+                        description=step.get("description", ""),
+                        duration_min=step.get("duration_min"),
+                        id=step.get("id")
                     )
                     for i, step in enumerate(plan_data.get("plan_steps", []))
                 ]
                 
                 resources = [
                     ResourceCard(
-                        resource_id=card.get("resource_id", f"resource_{i}"),
                         title=card.get("title", ""),
-                        summary=card.get("summary", ""),
-                        url=card.get("url")
+                        description=card.get("description", ""),
+                        url=card.get("url"),
+                        resource_id=card.get("resource_id")
                     )
                     for i, card in enumerate(plan_data.get("resource_cards", []))
                 ]
@@ -188,6 +196,76 @@ class TherapeuticCoachService:
             resource_cards=resources,
             next_check_in=next_check_in,
         )
+
+        # Save to database if user and db are provided
+        if user and db:
+            try:
+                from app.domains.mental_health.services.intervention_plan_service import InterventionPlanService
+                from app.domains.mental_health.schemas.intervention_plans import InterventionPlanRecordCreate
+                
+                # Map TCA response to InterventionPlanRecordCreate
+                # TCA PlanStep: title, description, duration_min
+                # Storage PlanStep: title, description, completed
+                storage_steps = []
+                for step in plan_steps:
+                    desc = step.description
+                    if step.duration_min:
+                        desc += f" ({step.duration_min} min)"
+                        
+                    storage_steps.append({
+                        "title": step.title,
+                        "description": desc,
+                        "completed": False
+                    })
+                
+                # TCA ResourceCard: title, description, url
+                # Storage ResourceCard: title, url, description
+                storage_resources = []
+                for card in resources:
+                    storage_resources.append({
+                        "title": card.title,
+                        "url": card.url or "#",
+                        "description": card.description
+                    })
+                
+                # TCA next_check_in: datetime
+                # Storage NextCheckIn: timeframe, method
+                check_in_str = next_check_in.isoformat() if next_check_in else "None"
+                storage_check_in = {
+                    "timeframe": check_in_str,
+                    "method": "automated"
+                }
+                
+                plan_data = {
+                    "plan_steps": storage_steps,
+                    "resource_cards": storage_resources,
+                    "next_check_in": storage_check_in
+                }
+                
+                # Determine risk level from context or payload options
+                risk_level = None
+                if sta_context and "risk_level" in sta_context:
+                    risk_level = sta_context["risk_level"]
+                elif payload.options and "risk_level" in payload.options:
+                    try:
+                        risk_level = int(payload.options["risk_level"])
+                    except (ValueError, TypeError):
+                        pass
+
+                plan_create = InterventionPlanRecordCreate(
+                    user_id=user.id,
+                    session_id=payload.session_id,
+                    conversation_id=None,
+                    plan_title=f"Intervention Plan: {intent_key.replace('_', ' ').title()}",
+                    risk_level=risk_level,
+                    plan_data=plan_data,
+                    total_steps=len(plan_steps)
+                )
+                
+                await InterventionPlanService.create_plan(db, plan_create)
+                logger.info(f"Saved intervention plan for user {user.id}")
+            except Exception as e:
+                logger.error(f"Failed to save intervention plan: {e}", exc_info=True)
 
         await self._emit_event(
             AgentEvent(

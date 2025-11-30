@@ -15,16 +15,17 @@ class TCAInterveneRequest(BaseModel):
 
 
 class PlanStep(BaseModel):
-    id: str
-    label: str
+    title: str
+    description: str
     duration_min: Optional[int] = None
+    id: Optional[str] = None  # Optional for backward compatibility or internal tracking
 
 
 class ResourceCard(BaseModel):
-    resource_id: str
     title: str
-    summary: str
+    description: str
     url: Optional[str] = None
+    resource_id: Optional[str] = None  # Optional for backward compatibility
 
 
 class TCAInterveneResponse(BaseModel):

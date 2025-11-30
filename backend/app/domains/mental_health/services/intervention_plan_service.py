@@ -34,10 +34,10 @@ class InterventionPlanService:
             conversation_id=plan_data.conversation_id,
             plan_title=plan_data.plan_title,
             risk_level=plan_data.risk_level,
-            plan_data=plan_data.plan_data.model_dump(),
+            plan_data=plan_data.plan_data.model_dump(mode='json'),
             total_steps=plan_data.total_steps,
             completed_steps=0,
-            completion_tracking=completion_tracking.model_dump(),
+            completion_tracking=completion_tracking.model_dump(mode='json'),
             status="active",
             is_active=True
         )

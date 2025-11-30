@@ -36,12 +36,16 @@ REQUIREMENTS PENTING:
 Output format (JSON):
 {
   "plan_steps": [
-    {"id": "step1", "label": "Tarik napas dalam 5 kali - hirup 4 hitungan, tahan 4, hembuskan 6", "duration_min": 2},
-    {"id": "step2", "label": "Sebutin 5 hal yang kamu lihat sekarang untuk grounding diri", "duration_min": 3}
+    {"title": "Tarik napas dalam", "description": "Tarik napas dalam 5 kali - hirup 4 hitungan, tahan 4, hembuskan 6", "duration_min": 2},
+    {"title": "Grounding", "description": "Sebutin 5 hal yang kamu lihat sekarang untuk grounding diri", "duration_min": 3}
   ],
   "resource_cards": [
-    {"resource_id": "breathing", "title": "Latihan Napas Terpandu", "summary": "Follow pola napas yang calming", "url": "https://aicare.example/calm/breathing"}
-  ]
+    {"title": "Latihan Napas Terpandu", "description": "Follow pola napas yang calming", "url": "https://aicare.example/calm/breathing"}
+  ],
+  "next_check_in": {
+    "timeframe": "1 jam",
+    "method": "chat"
+  }
 }
 """
 
@@ -67,13 +71,17 @@ REQUIREMENTS PENTING:
 Output format (JSON):
 {
   "plan_steps": [
-    {"id": "step1", "label": "Tulis concern utama kamu dalam satu kalimat", "duration_min": 3},
-    {"id": "step2", "label": "List 3 bagian kecil dari masalah ini yang bisa kamu kerjain terpisah", "duration_min": 5},
-    {"id": "step3", "label": "Pilih bagian yang paling gampang untuk mulai hari ini", "duration_min": 2}
+    {"title": "Definisikan Masalah", "description": "Tulis concern utama kamu dalam satu kalimat", "duration_min": 3},
+    {"title": "Pecah Masalah", "description": "List 3 bagian kecil dari masalah ini yang bisa kamu kerjain terpisah", "duration_min": 5},
+    {"title": "Mulai Kecil", "description": "Pilih bagian yang paling gampang untuk mulai hari ini", "duration_min": 2}
   ],
   "resource_cards": [
-    {"resource_id": "problem_solving", "title": "Worksheet Problem Solving", "summary": "Template terstruktur untuk break down tantangan", "url": "https://aicare.example/tools/problem-solving"}
-  ]
+    {"title": "Worksheet Problem Solving", "description": "Template terstruktur untuk break down tantangan", "url": "https://aicare.example/tools/problem-solving"}
+  ],
+  "next_check_in": {
+    "timeframe": "Besok pagi",
+    "method": "chat"
+  }
 }
 """
 
@@ -97,12 +105,16 @@ REQUIREMENTS PENTING:
 Output format (JSON):
 {
   "plan_steps": [
-    {"id": "step1", "label": "Ambil 10 menit untuk self-care - lakukan satu hal yang kamu enjoy", "duration_min": 10},
-    {"id": "step2", "label": "Tulis satu hal yang udah kamu handle dengan baik recently", "duration_min": 3}
+    {"title": "Self-Care", "description": "Ambil 10 menit untuk self-care - lakukan satu hal yang kamu enjoy", "duration_min": 10},
+    {"title": "Refleksi Positif", "description": "Tulis satu hal yang udah kamu handle dengan baik recently", "duration_min": 3}
   ],
   "resource_cards": [
-    {"resource_id": "coping", "title": "Strategi Coping yang Healthy", "summary": "Teknik evidence-based untuk manage stress", "url": "https://aicare.example/coping/strategies"}
-  ]
+    {"title": "Strategi Coping yang Healthy", "description": "Teknik evidence-based untuk manage stress", "url": "https://aicare.example/coping/strategies"}
+  ],
+  "next_check_in": {
+    "timeframe": "2 hari lagi",
+    "method": "chat"
+  }
 }
 """
 
@@ -129,16 +141,20 @@ PRINSIP CBT PENTING:
 Output format (JSON):
 {
   "plan_steps": [
-    {"id": "step1", "label": "Describe situasi yang bikin kamu upset dalam 2-3 kalimat", "duration_min": 3},
-    {"id": "step2", "label": "Apa thought yang langsung muncul? Tulis persis seperti yang kamu pikirkan", "duration_min": 2},
-    {"id": "step3", "label": "Sebutin emosi yang kamu rasakan: cemas, sedih, marah, frustrasi, malu?", "duration_min": 2},
-    {"id": "step4", "label": "Cari bukti: Fakta apa yang support thought ini? Fakta apa yang contradict?", "duration_min": 5},
-    {"id": "step5", "label": "Bikin thought yang lebih balanced yang consider semua bukti", "duration_min": 4},
-    {"id": "step6", "label": "Gimana perasaan kamu sekarang dengan perspektif baru ini? Rate 0-10", "duration_min": 2}
+    {"title": "Situasi", "description": "Describe situasi yang bikin kamu upset dalam 2-3 kalimat", "duration_min": 3},
+    {"title": "Pikiran Otomatis", "description": "Apa thought yang langsung muncul? Tulis persis seperti yang kamu pikirkan", "duration_min": 2},
+    {"title": "Emosi", "description": "Sebutin emosi yang kamu rasakan: cemas, sedih, marah, frustrasi, malu?", "duration_min": 2},
+    {"title": "Bukti", "description": "Cari bukti: Fakta apa yang support thought ini? Fakta apa yang contradict?", "duration_min": 5},
+    {"title": "Perspektif Baru", "description": "Bikin thought yang lebih balanced yang consider semua bukti", "duration_min": 4},
+    {"title": "Evaluasi Ulang", "description": "Gimana perasaan kamu sekarang dengan perspektif baru ini? Rate 0-10", "duration_min": 2}
   ],
   "resource_cards": [
-    {"resource_id": "cbt_thoughts", "title": "Jebakan Pikiran yang Umum", "summary": "Kenali pola seperti all-or-nothing thinking, catastrophizing, mind-reading", "url": "https://aicare.example/cbt/thinking-traps"}
-  ]
+    {"title": "Jebakan Pikiran yang Umum", "description": "Kenali pola seperti all-or-nothing thinking, catastrophizing, mind-reading", "url": "https://aicare.example/cbt/thinking-traps"}
+  ],
+  "next_check_in": {
+    "timeframe": "Besok sore",
+    "method": "chat"
+  }
 }
 """
 
@@ -164,15 +180,19 @@ PRINSIP BEHAVIORAL ACTIVATION PENTING:
 Output format (JSON):
 {
   "plan_steps": [
-    {"id": "step1", "label": "Sebutin satu hal yang dulu bring you joy atau meaning sebelum kamu merasa kayak gini", "duration_min": 3},
-    {"id": "step2", "label": "Pilih versi paling kecil dari aktivitas itu yang bisa kamu lakukan hari ini (15 menit max)", "duration_min": 4},
-    {"id": "step3", "label": "Schedule: Tulis exactly kapan dan di mana kamu akan lakuin hari ini", "duration_min": 2},
-    {"id": "step4", "label": "Sebelum mulai, rate mood kamu 1-10. Terus lakukan aktivitasnya", "duration_min": 15},
-    {"id": "step5", "label": "Setelah selesai, rate mood kamu lagi. Notice perubahan apapun", "duration_min": 2}
+    {"title": "Identifikasi", "description": "Sebutin satu hal yang dulu bring you joy atau meaning sebelum kamu merasa kayak gini", "duration_min": 3},
+    {"title": "Sederhanakan", "description": "Pilih versi paling kecil dari aktivitas itu yang bisa kamu lakukan hari ini (15 menit max)", "duration_min": 4},
+    {"title": "Jadwalkan", "description": "Schedule: Tulis exactly kapan dan di mana kamu akan lakuin hari ini", "duration_min": 2},
+    {"title": "Rate Mood Awal", "description": "Sebelum mulai, rate mood kamu 1-10. Terus lakukan aktivitasnya", "duration_min": 15},
+    {"title": "Rate Mood Akhir", "description": "Setelah selesai, rate mood kamu lagi. Notice perubahan apapun", "duration_min": 2}
   ],
   "resource_cards": [
-    {"resource_id": "behavioral_activation", "title": "Breaking the Inactivity Cycle", "summary": "Gimana small actions boost mood dan motivation", "url": "https://aicare.example/cbt/activation"}
-  ]
+    {"title": "Breaking the Inactivity Cycle", "description": "Gimana small actions boost mood dan motivation", "url": "https://aicare.example/cbt/activation"}
+  ],
+  "next_check_in": {
+    "timeframe": "Nanti malam",
+    "method": "chat"
+  }
 }
 """
 
@@ -412,9 +432,8 @@ def _get_default_resources(intent: str) -> List[Dict[str, Any]]:
     resource_objs = list(get_default_resources(intent))
     return [
         {
-            "resource_id": r.resource_id,
             "title": r.title,
-            "summary": r.summary,
+            "description": r.summary,
             "url": r.url
         }
         for r in resource_objs
@@ -426,50 +445,55 @@ def _get_fallback_plan(plan_type: str, intent: str) -> Dict[str, Any]:
     fallback_plans = {
         "calm_down": {
             "plan_steps": [
-                {"id": "breathing", "label": "Box breathing: Inhale 4 counts, hold 4, exhale 4, hold 4", "duration_min": 3},
-                {"id": "grounding", "label": "5-4-3-2-1 grounding: Name 5 things you see, 4 you hear, 3 you feel, 2 you smell, 1 you taste", "duration_min": 5},
-                {"id": "self_talk", "label": "Say to yourself: 'I am safe. This feeling will pass. I can handle this.'", "duration_min": 2},
+                {"title": "Box breathing", "description": "Inhale 4 counts, hold 4, exhale 4, hold 4", "duration_min": 3},
+                {"title": "5-4-3-2-1 grounding", "description": "Name 5 things you see, 4 you hear, 3 you feel, 2 you smell, 1 you taste", "duration_min": 5},
+                {"title": "Positive Self-talk", "description": "Say to yourself: 'I am safe. This feeling will pass. I can handle this.'", "duration_min": 2},
             ],
-            "resource_cards": _get_default_resources(intent)
+            "resource_cards": _get_default_resources(intent),
+            "next_check_in": {"timeframe": "1 hour", "method": "chat"}
         },
         "break_down_problem": {
             "plan_steps": [
-                {"id": "define", "label": "Write down your main problem in 1-2 sentences", "duration_min": 3},
-                {"id": "chunk", "label": "Break it into 3-4 smaller, specific parts", "duration_min": 5},
-                {"id": "prioritize", "label": "Number them from easiest to hardest", "duration_min": 2},
-                {"id": "first_step", "label": "Write one tiny action you can take on the easiest part today", "duration_min": 3},
+                {"title": "Define Problem", "description": "Write down your main problem in 1-2 sentences", "duration_min": 3},
+                {"title": "Chunk It", "description": "Break it into 3-4 smaller, specific parts", "duration_min": 5},
+                {"title": "Prioritize", "description": "Number them from easiest to hardest", "duration_min": 2},
+                {"title": "First Step", "description": "Write one tiny action you can take on the easiest part today", "duration_min": 3},
             ],
-            "resource_cards": _get_default_resources(intent)
+            "resource_cards": _get_default_resources(intent),
+            "next_check_in": {"timeframe": "Tomorrow morning", "method": "chat"}
         },
         "general_coping": {
             "plan_steps": [
-                {"id": "self_care", "label": "Take 10 minutes for something you enjoy - music, tea, walk, anything", "duration_min": 10},
-                {"id": "validate", "label": "Write: 'It's okay to struggle. I'm doing my best.'", "duration_min": 2},
-                {"id": "support", "label": "Reach out to one trusted person today - even just to say hi", "duration_min": 5},
+                {"title": "Self Care", "description": "Take 10 minutes for something you enjoy - music, tea, walk, anything", "duration_min": 10},
+                {"title": "Self Validation", "description": "Write: 'It's okay to struggle. I'm doing my best.'", "duration_min": 2},
+                {"title": "Social Support", "description": "Reach out to one trusted person today - even just to say hi", "duration_min": 5},
             ],
-            "resource_cards": _get_default_resources(intent)
+            "resource_cards": _get_default_resources(intent),
+            "next_check_in": {"timeframe": "2 days", "method": "chat"}
         },
         "cognitive_restructuring": {
             "plan_steps": [
-                {"id": "situation", "label": "Describe the situation that upset you in 2-3 sentences", "duration_min": 3},
-                {"id": "thought", "label": "What automatic thought came to mind? Write it exactly", "duration_min": 2},
-                {"id": "emotion", "label": "Name the emotion: anxious, sad, angry, frustrated, ashamed?", "duration_min": 2},
-                {"id": "evidence", "label": "List facts that support AND contradict this thought", "duration_min": 5},
-                {"id": "reframe", "label": "Create a more balanced thought considering all evidence", "duration_min": 4},
-                {"id": "reassess", "label": "How do you feel now? Rate your emotion 0-10", "duration_min": 2},
+                {"title": "Describe Situation", "description": "Describe the situation that upset you in 2-3 sentences", "duration_min": 3},
+                {"title": "Identify Thought", "description": "What automatic thought came to mind? Write it exactly", "duration_min": 2},
+                {"title": "Name Emotion", "description": "Name the emotion: anxious, sad, angry, frustrated, ashamed?", "duration_min": 2},
+                {"title": "Examine Evidence", "description": "List facts that support AND contradict this thought", "duration_min": 5},
+                {"title": "Reframe", "description": "Create a more balanced thought considering all evidence", "duration_min": 4},
+                {"title": "Re-assess", "description": "How do you feel now? Rate your emotion 0-10", "duration_min": 2},
             ],
-            "resource_cards": _get_default_resources(intent)
+            "resource_cards": _get_default_resources(intent),
+            "next_check_in": {"timeframe": "Tomorrow evening", "method": "chat"}
         },
         "behavioral_activation": {
             "plan_steps": [
-                {"id": "identify", "label": "Name one activity you used to enjoy or find meaningful", "duration_min": 3},
-                {"id": "simplify", "label": "Choose the smallest version you can do today (15 min max)", "duration_min": 3},
-                {"id": "schedule", "label": "Write exactly when and where you'll do it today", "duration_min": 2},
-                {"id": "track_before", "label": "Rate your mood 1-10 before starting the activity", "duration_min": 1},
-                {"id": "do_it", "label": "Do the activity you scheduled", "duration_min": 15},
-                {"id": "track_after", "label": "Rate your mood 1-10 again. Notice any change", "duration_min": 2},
+                {"title": "Identify Activity", "description": "Name one activity you used to enjoy or find meaningful", "duration_min": 3},
+                {"title": "Simplify", "description": "Choose the smallest version you can do today (15 min max)", "duration_min": 3},
+                {"title": "Schedule", "description": "Write exactly when and where you'll do it today", "duration_min": 2},
+                {"title": "Rate Mood Before", "description": "Rate your mood 1-10 before starting the activity", "duration_min": 1},
+                {"title": "Do It", "description": "Do the activity you scheduled", "duration_min": 15},
+                {"title": "Rate Mood After", "description": "Rate your mood 1-10 again. Notice any change", "duration_min": 2},
             ],
-            "resource_cards": _get_default_resources(intent)
+            "resource_cards": _get_default_resources(intent),
+            "next_check_in": {"timeframe": "Tonight", "method": "chat"}
         }
     }
     

@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import api from '@/services/api';
-import { FiDatabase, FiRefreshCw, FiChevronLeft, FiChevronRight, FiAlertCircle } from 'react-icons/fi';
+import { FiDatabase, FiRefreshCw, FiChevronLeft, FiChevronRight, FiAlertCircle, FiChevronDown, FiSearch, FiTrash2 } from 'react-icons/fi';
 
 interface Column {
     name: string;
@@ -32,9 +32,31 @@ export default function DatabaseViewerPage() {
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(50);
 
+    // Selection state
+    const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
+    const [isDeleting, setIsDeleting] = useState(false);
+
+    // Dropdown state
+    const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+    const [searchQuery, setSearchQuery] = useState('');
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
     // Fetch table list on mount
     useEffect(() => {
         fetchTables();
+    }, []);
+
+    // Close dropdown when clicking outside
+    useEffect(() => {
+        function handleClickOutside(event: MouseEvent) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsDropdownOpen(false);
+            }
+        }
+        document.addEventListener("mousedown", handleClickOutside);
+        return () => {
+            document.removeEventListener("mousedown", handleClickOutside);
+        };
     }, []);
 
     // Fetch table data when selected table or page changes
@@ -44,14 +66,21 @@ export default function DatabaseViewerPage() {
         }
     }, [selectedTable, page, limit]);
 
+    // Clear selection when table or page changes
+    useEffect(() => {
+        setSelectedRows(new Set());
+    }, [selectedTable, page]);
+
     const fetchTables = async () => {
         try {
             setLoading(true);
             const response = await api.get('/admin/database/tables');
-            setTables(response.data);
-            if (response.data.length > 0 && !selectedTable) {
+            // Sort tables alphabetically
+            const sortedTables = (response.data as string[]).sort((a, b) => a.localeCompare(b));
+            setTables(sortedTables);
+            if (sortedTables.length > 0 && !selectedTable) {
                 // Optionally select first table
-                // setSelectedTable(response.data[0]);
+                // setSelectedTable(sortedTables[0]);
             }
         } catch (err: any) {
             setError(err.message || 'Failed to fetch tables');
@@ -76,10 +105,68 @@ export default function DatabaseViewerPage() {
         }
     };
 
-    const handleTableChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-        setSelectedTable(e.target.value);
-        setPage(1); // Reset to first page on table change
+    const handleSelectAll = (e: React.ChangeEvent<HTMLInputElement>) => {
+        if (e.target.checked && tableData) {
+            const allIndices = new Set(tableData.data.map((_, idx) => idx));
+            setSelectedRows(allIndices);
+        } else {
+            setSelectedRows(new Set());
+        }
     };
+
+    const handleSelectRow = (index: number) => {
+        const newSelected = new Set(selectedRows);
+        if (newSelected.has(index)) {
+            newSelected.delete(index);
+        } else {
+            newSelected.add(index);
+        }
+        setSelectedRows(newSelected);
+    };
+
+    const handleDelete = async () => {
+        if (!tableData || selectedRows.size === 0) return;
+        
+        if (!confirm(`Are you sure you want to delete ${selectedRows.size} rows? This action cannot be undone.`)) {
+            return;
+        }
+
+        setIsDeleting(true);
+        try {
+            // Identify PK columns
+            const pkColumns = tableData.columns.filter(col => col.primary_key).map(col => col.name);
+            
+            if (pkColumns.length === 0) {
+                throw new Error("Cannot delete rows from a table without a primary key.");
+            }
+
+            // Construct payload
+            const rowsToDelete = Array.from(selectedRows).map(idx => {
+                const row = tableData.data[idx];
+                const keyMap: Record<string, any> = {};
+                pkColumns.forEach(pk => {
+                    keyMap[pk] = row[pk];
+                });
+                return keyMap;
+            });
+
+            await api.delete(`/admin/database/tables/${selectedTable}`, {
+                data: { rows: rowsToDelete }
+            });
+
+            // Refresh data
+            fetchTableData(selectedTable, page, limit);
+            setSelectedRows(new Set());
+        } catch (err: any) {
+            setError(err.message || "Failed to delete rows");
+        } finally {
+            setIsDeleting(false);
+        }
+    };
+
+    const filteredTables = tables.filter(table => 
+        table.toLowerCase().includes(searchQuery.toLowerCase())
+    );
 
     return (
         <div className="p-6 max-w-[1600px] mx-auto space-y-6">
@@ -96,20 +183,80 @@ export default function DatabaseViewerPage() {
                 </div>
 
                 <div className="flex items-center gap-3">
-                    <select
-                        value={selectedTable}
-                        onChange={handleTableChange}
-                        className="px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    >
-                        <option value="">Select a table...</option>
-                        {tables.map(table => (
-                            <option key={table} value={table}>{table}</option>
-                        ))}
-                    </select>
+                    {/* Delete Button */}
+                    {selectedRows.size > 0 && (
+                        <button
+                            onClick={handleDelete}
+                            disabled={isDeleting}
+                            className="flex items-center gap-2 px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors text-sm font-medium disabled:opacity-50"
+                        >
+                            <FiTrash2 />
+                            {isDeleting ? 'Deleting...' : `Delete (${selectedRows.size})`}
+                        </button>
+                    )}
+
+                    {/* Custom Searchable Dropdown */}
+                    <div className="relative w-64" ref={dropdownRef}>
+                        <div
+                            className="flex items-center justify-between px-4 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg text-sm cursor-pointer hover:border-blue-500 transition-colors"
+                            onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                        >
+                            <span className={`truncate ${!selectedTable ? "text-slate-400" : "text-slate-900 dark:text-slate-200"}`}>
+                                {selectedTable || "Select a table..."}
+                            </span>
+                            <FiChevronDown className={`transition-transform ${isDropdownOpen ? "rotate-180" : ""}`} />
+                        </div>
+
+                        {isDropdownOpen && (
+                            <div className="absolute top-full left-0 mt-1 w-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-xl z-50 max-h-80 flex flex-col overflow-hidden">
+                                <div className="p-2 border-b border-slate-100 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50">
+                                    <div className="flex items-center px-2 bg-white dark:bg-slate-900 rounded border border-slate-200 dark:border-slate-700 focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-500">
+                                        <FiSearch className="text-slate-400 shrink-0" />
+                                        <input
+                                            type="text"
+                                            value={searchQuery}
+                                            onChange={(e) => setSearchQuery(e.target.value)}
+                                            placeholder="Search tables..."
+                                            className="w-full p-2 bg-transparent border-none focus:ring-0 text-sm outline-none text-slate-900 dark:text-slate-200 placeholder:text-slate-400"
+                                            autoFocus
+                                            onClick={(e) => e.stopPropagation()}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-slate-200 dark:scrollbar-thumb-slate-700">
+                                    {filteredTables.length === 0 ? (
+                                        <div className="px-4 py-3 text-slate-400 text-sm text-center italic">
+                                            No tables found
+                                        </div>
+                                    ) : (
+                                        filteredTables.map(table => (
+                                            <div
+                                                key={table}
+                                                className={`px-4 py-2 cursor-pointer text-sm transition-colors flex items-center justify-between
+                                                    ${selectedTable === table 
+                                                        ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400 font-medium' 
+                                                        : 'hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300'
+                                                    }`}
+                                                onClick={() => {
+                                                    setSelectedTable(table);
+                                                    setPage(1);
+                                                    setIsDropdownOpen(false);
+                                                    setSearchQuery("");
+                                                }}
+                                            >
+                                                {table}
+                                                {selectedTable === table && <div className="w-1.5 h-1.5 rounded-full bg-blue-500"></div>}
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+                    </div>
 
                     <button
                         onClick={() => selectedTable && fetchTableData(selectedTable, page, limit)}
-                        className="p-2 text-slate-500 hover:text-blue-500 transition-colors"
+                        className="p-2 text-slate-500 hover:text-blue-500 transition-colors bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
                         title="Refresh Data"
                     >
                         <FiRefreshCw className={loading ? "animate-spin" : ""} size={20} />
@@ -147,6 +294,14 @@ export default function DatabaseViewerPage() {
                         <table className="w-full text-left text-sm border-collapse">
                             <thead className="bg-slate-50 dark:bg-slate-900/50 sticky top-0 z-10 shadow-sm">
                                 <tr>
+                                    <th className="px-4 py-3 w-10 border-b border-slate-200 dark:border-slate-700">
+                                        <input 
+                                            type="checkbox" 
+                                            className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                            checked={tableData.data.length > 0 && selectedRows.size === tableData.data.length}
+                                            onChange={handleSelectAll}
+                                        />
+                                    </th>
                                     {tableData.columns.map((col) => (
                                         <th
                                             key={col.name}
@@ -164,13 +319,25 @@ export default function DatabaseViewerPage() {
                             <tbody className="divide-y divide-slate-100 dark:divide-slate-700/50">
                                 {tableData.data.length === 0 ? (
                                     <tr>
-                                        <td colSpan={tableData.columns.length} className="px-4 py-8 text-center text-slate-500">
+                                        <td colSpan={tableData.columns.length + 1} className="px-4 py-8 text-center text-slate-500">
                                             No data found in this table.
                                         </td>
                                     </tr>
                                 ) : (
                                     tableData.data.map((row, idx) => (
-                                        <tr key={idx} className="hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors">
+                                        <tr 
+                                            key={idx} 
+                                            className={`hover:bg-slate-50 dark:hover:bg-slate-700/30 transition-colors ${selectedRows.has(idx) ? 'bg-blue-50/50 dark:bg-blue-900/10' : ''}`}
+                                            onClick={() => handleSelectRow(idx)}
+                                        >
+                                            <td className="px-4 py-2.5 border-b border-slate-100 dark:border-slate-800" onClick={(e) => e.stopPropagation()}>
+                                                <input 
+                                                    type="checkbox" 
+                                                    className="rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                                                    checked={selectedRows.has(idx)}
+                                                    onChange={() => handleSelectRow(idx)}
+                                                />
+                                            </td>
                                             {tableData.columns.map((col) => {
                                                 const cellValue = row[col.name];
                                                 let displayValue = cellValue;

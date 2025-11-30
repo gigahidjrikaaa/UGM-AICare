@@ -57,7 +57,7 @@ class RateLimiter:
     
     def __init__(self):
         """Initialize rate limiter."""
-        self.enabled = settings.rate_limit_enabled
+        self.enabled = False # settings.rate_limit_enabled
         self._hit_count = 0  # For metrics
         self._block_count = 0  # For metrics
     

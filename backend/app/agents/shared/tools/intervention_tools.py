@@ -204,10 +204,6 @@ async def get_intervention_plan_details(
     parameters={
         "type": "object",
         "properties": {
-            "user_id": {
-                "type": "string",
-                "description": "User's database ID"
-            },
             "plan_title": {
                 "type": "string",
                 "description": "Title of the intervention plan (e.g., 'Strategi Mengatasi Kecemasan', 'Panduan Mengelola Stres Akademik')"
@@ -274,15 +270,15 @@ async def get_intervention_plan_details(
                 "description": "Optional session ID"
             }
         },
-        "required": ["user_id", "plan_title", "plan_steps"]
+        "required": ["plan_title", "plan_steps"]
     },
     category="intervention",
     requires_db=True,
-    requires_user_id=False
+    requires_user_id=True
 )
 async def create_intervention_plan(
     db: AsyncSession,
-    user_id: str,
+    user_id: int,
     plan_title: str,
     plan_steps: List[Dict[str, Any]],
     resource_cards: Optional[List[Dict[str, str]]] = None,
@@ -346,7 +342,7 @@ async def create_intervention_plan(
         
         # Create InterventionPlanRecordCreate
         plan_create = InterventionPlanRecordCreate(
-            user_id=int(user_id),
+            user_id=user_id,
             session_id=session_id,
             plan_title=plan_title,
             risk_level=risk_level,

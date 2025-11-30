@@ -1,6 +1,7 @@
 import json
 import logging
 from fastapi import FastAPI, Request as FastAPIRequest # type: ignore
+from scalar_fastapi import get_scalar_api_reference
 from datetime import datetime, timezone
 from app.database import init_db, close_db
 from sqlalchemy import text
@@ -135,6 +136,8 @@ app = FastAPI(
     description="API for Aika Chatbot - UGM AI Care. Uses FastAPI.",
     version="0.1",
     lifespan=lifespan, # Use the async context manager for startup/shutdown
+    docs_url=None, # Disable default Swagger UI to use Scalar
+    redoc_url=None, # Disable ReDoc
 )
 
 # ============================================
@@ -247,6 +250,19 @@ async def custom_openapi():
         logger.error(f"OpenAPI generation failed: {str(e)}")
         logger.error(f"Traceback: {traceback.format_exc()}")
         return {"error": str(e), "traceback": traceback.format_exc()}
+
+
+@app.get("/docs", include_in_schema=False)
+async def scalar_html():
+    """Scalar API Reference"""
+    return get_scalar_api_reference(
+        openapi_url=app.openapi_url,
+        title=app.title,
+        servers=[
+            {"url": "http://localhost:8000", "description": "Local Development"},
+            {"url": "https://api.aicare.ina17.com", "description": "Production"},
+        ]
+    )
 
 
 @app.get("/")

@@ -50,6 +50,31 @@ export function useAikaChat({
     onEscalation: (caseId) => {
       console.log('🚨 Case escalated:', caseId);
     },
+    onPartialResponse: (text) => {
+      setIsLoading(false); // Stop showing generic loading indicator
+      setMessages((prev) => {
+        const lastMsg = prev[prev.length - 1];
+        if (lastMsg.role === 'assistant' && lastMsg.isStreaming) {
+          return prev.map((m, i) => 
+            i === prev.length - 1 ? { ...m, content: m.content + text } : m
+          );
+        } else {
+          const newMessage: Message = {
+            id: `streaming-${Date.now()}`,
+            role: 'assistant',
+            content: text,
+            timestamp: new Date(),
+            session_id: sessionId,
+            conversation_id: lastConversationIdRef.current || uuidv4(),
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            isStreaming: true,
+            isLoading: false,
+          };
+          return [...prev, newMessage];
+        }
+      });
+    },
   });
 
   /**
@@ -141,21 +166,46 @@ export function useAikaChat({
         // Store metadata for UI display
         setLastMetadata(aikaResponse.metadata);
 
-        // Add assistant response
-        const assistantMessage: Message = {
-          id: uuidv4(),
-          role: 'assistant',
-          content: aikaResponse.response,
-          timestamp: new Date(),
-          session_id: sessionId,
-          conversation_id: activeConversationId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          // Add Aika-specific metadata
-          aikaMetadata: aikaResponse.metadata,
-        };
-
-        setMessages((prev) => [...prev, assistantMessage]);
+        // Update or Add assistant response
+        setMessages((prev) => {
+          const streamingMsgIndex = prev.findIndex(m => m.isStreaming);
+          
+          if (streamingMsgIndex !== -1) {
+            // Update existing streaming message
+            const streamingMsg = prev[streamingMsgIndex];
+            // Avoid duplication if final response already contains the explanation (unlikely but possible)
+            // For now, we assume they are separate parts.
+            // We add a newline if there was previous content
+            const separator = streamingMsg.content ? '\n\n' : '';
+            const finalContent = streamingMsg.content + separator + aikaResponse.response;
+            
+            const finalMessage: Message = {
+              ...streamingMsg,
+              id: uuidv4(), // Finalize ID
+              content: finalContent,
+              isStreaming: false,
+              aikaMetadata: aikaResponse.metadata,
+            };
+            
+            const newMessages = [...prev];
+            newMessages[streamingMsgIndex] = finalMessage;
+            return newMessages;
+          } else {
+            // No streaming happened, add new message
+            const assistantMessage: Message = {
+              id: uuidv4(),
+              role: 'assistant',
+              content: aikaResponse.response,
+              timestamp: new Date(),
+              session_id: sessionId,
+              conversation_id: activeConversationId,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              aikaMetadata: aikaResponse.metadata,
+            };
+            return [...prev, assistantMessage];
+          }
+        });
       } catch (error) {
         console.error('Aika chat error:', error);
 

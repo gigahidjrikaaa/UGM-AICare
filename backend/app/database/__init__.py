@@ -39,7 +39,8 @@ if DATABASE_URL.startswith("postgresql+asyncpg://"):
                 "jit": "off",                    # Disable JIT for better compatibility
                 "application_name": "ugm_aicare", # Identify our application in pg_stat_activity
             },
-            "command_timeout": 5,     # Timeout for individual commands
+            "command_timeout": 60,     # Timeout for individual commands
+            "ssl": False,
         }
     )
 else:

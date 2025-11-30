@@ -61,6 +61,7 @@ export interface Message {
   interventionPlan?: InterventionPlan; // TCA-generated support plan
   appointment?: Appointment; // Scheduling confirmation
   isError?: boolean; // For error messages
+  isStreaming?: boolean; // For streaming messages
   agentActivity?: {
     // Agent Activity Log for transparency
     execution_path: string[]; // ["aika_decision", "sta_subgraph", "tca_subgraph", "synthesize_response"]

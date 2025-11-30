@@ -1,12 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Body
 from sqlalchemy import text, inspect
 from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Dict, Any, Optional
+from pydantic import BaseModel
 
 from app.database import get_async_db, async_engine
 from app.dependencies import get_admin_user
 
 router = APIRouter(prefix="/database", tags=["Admin Database Viewer"])
+
+class DeleteRowsRequest(BaseModel):
+    rows: List[Dict[str, Any]]
 
 @router.get("/tables", response_model=List[str])
 async def list_tables(
@@ -95,4 +99,66 @@ async def get_table_data(
     except HTTPException:
         raise
     except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.delete("/tables/{table_name}")
+async def delete_table_rows(
+    table_name: str,
+    request: DeleteRowsRequest,
+    admin: Any = Depends(get_admin_user),
+    db: AsyncSession = Depends(get_async_db)
+):
+    """Delete specific rows from a table."""
+    try:
+        # 1. Verify table and get PKs
+        async with async_engine.connect() as conn:
+            tables = await conn.run_sync(
+                lambda sync_conn: inspect(sync_conn).get_table_names()
+            )
+            if table_name not in tables:
+                raise HTTPException(status_code=404, detail=f"Table '{table_name}' not found")
+
+            pk_constraint = await conn.run_sync(
+                lambda sync_conn: inspect(sync_conn).get_pk_constraint(table_name)
+            )
+            primary_keys = pk_constraint.get('constrained_columns', [])
+            
+            if not primary_keys:
+                raise HTTPException(status_code=400, detail=f"Table '{table_name}' has no primary key, cannot delete rows safely.")
+
+        # 2. Delete Rows
+        deleted_count = 0
+        
+        for row_keys in request.rows:
+            # Validate that we have all PKs for this row
+            if not all(pk in row_keys for pk in primary_keys):
+                continue # Skip invalid requests
+                
+            # Construct WHERE clause
+            conditions = []
+            params = {}
+            for i, pk in enumerate(primary_keys):
+                param_name = f"val_{i}"
+                conditions.append(f"{pk} = :{param_name}")
+                params[param_name] = row_keys[pk]
+            
+            where_clause = " AND ".join(conditions)
+            stmt = text(f"DELETE FROM {table_name} WHERE {where_clause}")
+            
+            result = await db.execute(stmt, params)
+            deleted_count += result.rowcount
+            
+        await db.commit()
+        
+        return {
+            "success": True,
+            "deleted_count": deleted_count,
+            "message": f"Successfully deleted {deleted_count} rows from {table_name}"
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        await db.rollback()
         raise HTTPException(status_code=500, detail=str(e))

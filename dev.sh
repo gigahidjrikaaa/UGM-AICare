@@ -24,6 +24,7 @@ OVERRIDE_FILE="docker-compose.override.yml"
 BACKUP_FILE="docker-compose.override.yml.disabled"
 ELK_COMPOSE="docker-compose.elk.yml"
 MONITORING_COMPOSE="docker-compose.monitoring.yml"
+DEV_MONITORING_COMPOSE="docker-compose.dev-monitoring.yml"
 
 show_help() {
     echo "UGM-AICare Docker Development Helper"
@@ -31,18 +32,19 @@ show_help() {
     echo "Usage: ./dev.sh [command]"
     echo ""
     echo "Commands:"
-    echo "  up              Start in development mode (HOT RELOAD enabled)"
-    echo "  up-all          Start dev + monitoring stack (ELK + Prometheus + Grafana)"
+    echo "  up              Start in development mode (App + Minimal Monitoring)"
+    echo "  up-all          Start dev + FULL monitoring stack (ELK + All Exporters)"
     echo "  down            Stop all services"
     echo "  down-all        Stop dev + monitoring services"
     echo "  restart [svc]   Restart all services or specific service (backend/frontend)"
-    echo "  logs [service]  View logs with follow mode (Ctrl+C to exit)"
+    echo "  logs [svc]      View logs with follow mode (Ctrl+C to exit)"
     echo "  build           Rebuild containers (needed after dependency changes)"
     echo "  rebuild-fast    Quick rebuild (parallel, uses cache)"
     echo "  rebuild-clean   Clean rebuild (no cache, slower but fresh)"
     echo "  test-build      Test backend build and verify all imports work"
     echo "  clear-cache     Clear Next.js and Docker build cache"
     echo "  prod            Run in production mode (disable hot-reload)"
+    echo "  preprod         Run production builds with dev infrastructure"
     echo "  dev             Re-enable development mode"
     echo "  clean           Stop and remove all containers, volumes"
     echo "  clean-all       Stop and remove all containers including monitoring"
@@ -64,7 +66,7 @@ show_help() {
     echo ""
     echo "Examples:"
     echo "  ./dev.sh up-all                    # Start everything including monitoring"
-    echo "  ./dev.sh up                        # Start dev without monitoring"
+    echo "  ./dev.sh up                        # Start dev with minimal monitoring"
     echo "  ./dev.sh monitoring start          # Start only monitoring stack"
     echo "  ./dev.sh logs backend              # Watch backend logs"
     echo "  ./dev.sh monitoring logs kibana    # Watch Kibana logs"
@@ -87,7 +89,7 @@ show_help() {
 
 case "${1:-}" in
     up)
-        echo "🚀 Starting development environment with HOT RELOAD (App + Core Monitoring)..."
+        echo "🚀 Starting development environment with HOT RELOAD (App + Minimal Monitoring)..."
         echo ""
         echo "📝 Changes to your code will automatically reload:"
         echo "   • Backend: Python files in /backend/app/"
@@ -96,13 +98,9 @@ case "${1:-}" in
         "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" up -d
         echo "✅ Application services started"
         echo ""
-        echo "📈 Starting Core Monitoring (Prometheus + Grafana + Langfuse)..."
-        "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" up -d
+        echo "📈 Starting Minimal Monitoring (Prometheus + Grafana + Langfuse)..."
+        "$DOCKER_COMPOSE_CMD" -f "$DEV_MONITORING_COMPOSE" up -d
         echo "✅ Monitoring services started"
-        echo ""
-        echo "📜 Starting Loki Stack (Logs)..."
-        "$DOCKER_COMPOSE_CMD" -f "docker-compose.loki.yml" up -d
-        echo "✅ Loki services started"
         echo ""
         echo "✅ All services started!"
         echo "   Frontend: http://localhost:4000 (Next.js dev server)"
@@ -134,7 +132,7 @@ case "${1:-}" in
         "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" up -d
         echo "✅ ELK Stack started"
         echo ""
-        echo "📈 Starting Prometheus + Grafana (Metrics)..."
+        echo "📈 Starting Full Monitoring Stack..."
         "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" up -d
         echo "✅ Monitoring Stack started"
         echo ""
@@ -167,9 +165,12 @@ case "${1:-}" in
         "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" down
         echo "✅ Application services stopped"
         echo ""
-        echo "💡 Monitoring stack still running. To stop:"
-        echo "   ./dev.sh monitoring stop"
-        echo "   OR use './dev.sh down-all' to stop everything"
+        echo "🛑 Stopping minimal monitoring..."
+        "$DOCKER_COMPOSE_CMD" -f "$DEV_MONITORING_COMPOSE" down
+        echo "✅ Minimal monitoring stopped"
+        echo ""
+        echo "💡 Full monitoring stack might still be running. To stop everything:"
+        echo "   ./dev.sh down-all"
         ;;
     
     down-all)
@@ -180,6 +181,7 @@ case "${1:-}" in
         echo ""
         echo "Stopping monitoring stack..."
         "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" down
+        "$DOCKER_COMPOSE_CMD" -f "$DEV_MONITORING_COMPOSE" down
         "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" down
         echo ""
         echo "✅ All services stopped"
@@ -193,6 +195,7 @@ case "${1:-}" in
         else
             echo "   Restarting all services..."
             "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" restart
+            "$DOCKER_COMPOSE_CMD" -f "$DEV_MONITORING_COMPOSE" restart
         fi
         echo "✅ Services restarted"
         ;;
@@ -397,6 +400,24 @@ print(f'Web3.py version: {web3.__version__}')
             echo "ℹ️  Already in production mode"
             "$DOCKER_COMPOSE_CMD" -f docker-compose.yml up -d
         fi
+        ;;
+
+    preprod)
+        echo "🏭 Starting PRE-PRODUCTION environment (Prod Build + Dev Infra)..."
+        echo ""
+        echo "⚠️  This mode runs PRODUCTION BUILDS of Backend and Frontend."
+        echo "   • No hot-reload (changes require rebuild)"
+        echo "   • Optimized performance"
+        echo "   • Uses local dev database and services"
+        echo ""
+        "$DOCKER_COMPOSE_CMD" -f docker-compose.preprod.yml up --build -d
+        echo ""
+        echo "✅ Pre-production environment started!"
+        echo "   Frontend: http://localhost:4000"
+        echo "   Backend:  http://localhost:8000"
+        echo ""
+        echo "💡 To rebuild after code changes:"
+        echo "   ./dev.sh preprod"
         ;;
     
     dev)

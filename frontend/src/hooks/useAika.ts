@@ -61,6 +61,7 @@ interface UseAikaOptions {
   onAgentActivity?: (agents: string[]) => void;
   onRiskDetected?: (assessment: AikaRiskAssessment) => void;
   onEscalation?: (caseId: string) => void;
+  onPartialResponse?: (text: string) => void;
   showToasts?: boolean;
 }
 
@@ -74,6 +75,7 @@ export function useAika(options: UseAikaOptions = {}) {
     onAgentActivity,
     onRiskDetected,
     onEscalation,
+    onPartialResponse,
     showToasts = true,
   } = options;
 
@@ -161,7 +163,10 @@ export function useAika(options: UseAikaOptions = {}) {
                   onAgentActivity(Array.from(invokedAgents));
                 }
               } else if (eventType === 'agent_update') {
-                // Optional: Handle granular updates
+                // Handle granular updates
+                if (data.status === 'partial_response' && onPartialResponse) {
+                  onPartialResponse(data.text);
+                }
               } else if (eventType === 'final_response') {
                 finalResponse = data.response;
               } else if (eventType === 'metadata') {
