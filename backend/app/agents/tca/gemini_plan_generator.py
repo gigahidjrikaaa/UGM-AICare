@@ -26,6 +26,12 @@ Generate personalized support plan dengan 3-5 langkah spesifik dan actionable ya
 4. Culturally sensitive dengan konteks Indonesia/Asia
 5. Pakai bahasa yang clear, compassionate, non-clinical
 
+CRITICAL EVALUATION CRITERIA (MUST FOLLOW):
+1. SAFETY (Score 5/5): Pastikan semua teknik aman. Jangan pernah kasih saran berbahaya.
+2. ACTIONABILITY (Score 5/5): HINDARI saran vague ("Tenang saja"). Berikan langkah KONKRET & EVIDENCE-BASED (misal: "Teknik 5-4-3-2-1", "Box Breathing"). Jelaskan CARA melakukannya.
+3. EMPATHY (Score 5/5): Gunakan nada yang VALIDATING & HANGAT. Validasi perasaan user ("Wajar kamu merasa panik...").
+4. RELEVANCE (Score 5/5): Address LANGSUNG detail situasi user. Jangan generik.
+
 REQUIREMENTS PENTING:
 - Setiap step harus immediately actionable (nggak vague)
 - Include durasi waktu spesifik (misal "5 menit", "3 napas dalam")
@@ -58,6 +64,12 @@ Generate personalized support plan dengan 4-6 langkah spesifik yang:
 4. Kasih concrete next actions
 5. Build momentum dan confidence
 6. Culturally sensitive dengan konteks Indonesia/Asia
+
+CRITICAL EVALUATION CRITERIA (MUST FOLLOW):
+1. SAFETY (Score 5/5): Pastikan langkah-langkah aman dan tidak membahayakan user.
+2. ACTIONABILITY (Score 5/5): HINDARI saran vague. Berikan langkah KONKRET & EVIDENCE-BASED (teknik "Chunking", "Eisenhower Matrix"). Jelaskan CARA melakukannya.
+3. EMPATHY (Score 5/5): Gunakan nada yang VALIDATING & HANGAT. Validasi perasaan overwhelmed user ("Wajar merasa berat dengan beban ini...").
+4. RELEVANCE (Score 5/5): Address LANGSUNG detail masalah user. Jangan generik.
 
 REQUIREMENTS PENTING:
 - Mulai dengan clarity: bantu user define apa yang mereka hadapi
@@ -94,6 +106,12 @@ Generate personalized support plan dengan 3-5 langkah yang:
 4. Build on existing strengths user
 5. Culturally sensitive dengan konteks Indonesia/Asia
 
+CRITICAL EVALUATION CRITERIA (MUST FOLLOW):
+1. SAFETY (Score 5/5): Pastikan coping mechanism aman dan sehat.
+2. ACTIONABILITY (Score 5/5): HINDARI saran vague ("Jangan stress"). Berikan langkah KONKRET & EVIDENCE-BASED (misal: "Journaling", "Progressive Muscle Relaxation"). Jelaskan CARA melakukannya.
+3. EMPATHY (Score 5/5): Gunakan nada yang VALIDATING & HANGAT. Validasi perasaan user ("Sangat wajar kamu merasa tertekan...").
+4. RELEVANCE (Score 5/5): Address LANGSUNG detail stressor user. Jangan generik.
+
 REQUIREMENTS PENTING:
 - Balance immediate relief dengan sustainable coping
 - Include active coping (problem-focused) dan emotion-focused strategies
@@ -127,6 +145,12 @@ Generate personalized CBT-based plan dengan 4-6 langkah yang follow cognitive re
 4. Examine evidence for dan against the thought
 5. Generate alternative thoughts yang lebih balanced
 6. Re-evaluate emotions setelah reframing
+
+CRITICAL EVALUATION CRITERIA (MUST FOLLOW):
+1. SAFETY (Score 5/5): Pastikan proses reframing aman dan tidak invalidating trauma.
+2. ACTIONABILITY (Score 5/5): HINDARI saran vague. Berikan langkah KONKRET & EVIDENCE-BASED (teknik "Thought Record", "Socratic Questioning"). Jelaskan CARA melakukannya.
+3. EMPATHY (Score 5/5): Gunakan nada yang VALIDATING & HANGAT. Validasi perasaan user sebelum menantang pikiran mereka.
+4. RELEVANCE (Score 5/5): Address LANGSUNG detail pikiran/situasi user. Jangan generik.
 
 PRINSIP CBT PENTING:
 - Guide Socratic questioning (jangan tell, tapi ask)
@@ -166,6 +190,12 @@ Generate personalized CBT-based plan dengan 3-5 langkah yang follow behavioral a
 3. Schedule waktu spesifik untuk aktivitas
 4. Break aktivitas jadi tiny steps kalau perlu
 5. Track mood sebelum dan sesudah aktivitas
+
+CRITICAL EVALUATION CRITERIA (MUST FOLLOW):
+1. SAFETY (Score 5/5): Pastikan aktivitas aman dilakukan user.
+2. ACTIONABILITY (Score 5/5): HINDARI saran vague ("Coba aktif"). Berikan langkah KONKRET & EVIDENCE-BASED (teknik "Activity Scheduling", "Graded Task Assignment"). Jelaskan CARA melakukannya.
+3. EMPATHY (Score 5/5): Gunakan nada yang VALIDATING & HANGAT. Validasi betapa sulitnya memulai aktivitas saat depresi/low motivation.
+4. RELEVANCE (Score 5/5): Address LANGSUNG detail minat/situasi user. Jangan generik.
 
 PRINSIP BEHAVIORAL ACTIVATION PENTING:
 - Mulai dengan aktivitas yang user DULU enjoy atau find meaningful
@@ -432,9 +462,9 @@ def _get_default_resources(intent: str) -> List[Dict[str, Any]]:
     resource_objs = list(get_default_resources(intent))
     return [
         {
-            "title": r.title,
-            "description": r.summary,
-            "url": r.url
+            "title": getattr(r, "title", getattr(r, "label", "Resource")),
+            "description": getattr(r, "description", getattr(r, "summary", "")),
+            "url": getattr(r, "url", None)
         }
         for r in resource_objs
     ]

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from datetime import datetime
@@ -25,6 +26,7 @@ from langgraph.checkpoint.memory import MemorySaver
 
 from app import auth_utils
 from app.agents.aika.tools import get_aika_tools
+from app.agents.execution_tracker import execution_tracker
 # ✅ REMOVED: Legacy AikaOrchestrator - Now using unified orchestrator only
 from app.agents.aika_orchestrator_graph import create_aika_agent_with_checkpointing  # ✨ Direct LangGraph invocation
 from app.core import llm
@@ -413,11 +415,24 @@ async def handle_aika_request(
     )
     
     async def event_generator() -> AsyncGenerator[str, None]:
+        execution_id = None
         try:
             start_time = datetime.now()
             
             # Determine effective session ID
             effective_session_id = request.session_id or f"sess_{request.user_id}_{int(datetime.now().timestamp())}"
+            
+            # Start execution tracking
+            execution_id = execution_tracker.start_execution(
+                graph_id="aika_unified_graph",
+                agent_name="aika",
+                input_data={
+                    "user_id": request.user_id,
+                    "message": request.message,
+                    "role": request.role,
+                    "session_id": effective_session_id
+                }
+            )
             
             # Create Aika agent with in-memory checkpointing
             memory = MemorySaver()
@@ -435,6 +450,7 @@ async def handle_aika_request(
                 "message": request.message,
                 "conversation_history": request.conversation_history,
                 "session_id": effective_session_id,
+                "execution_id": execution_id,  # ✅ Added for tracking
                 "execution_path": [],
                 "agents_invoked": [],
                 "errors": [],
@@ -567,11 +583,32 @@ async def handle_aika_request(
                 # Commit DB changes
                 await db.commit()
                 
+                # Complete execution tracking
+                if execution_id:
+                    execution_tracker.complete_execution(
+                        execution_id, 
+                        success=True, 
+                        output_data={
+                            "response": final_response,
+                            "agents_invoked": agents_invoked
+                        }
+                    )
+                
             else:
+                if execution_id:
+                    execution_tracker.complete_execution(execution_id, success=False, error="No final state received")
                 yield f"event: error\ndata: {json.dumps({'message': 'No final state received'})}\n\n"
+        
+        except asyncio.CancelledError:
+            logger.warning(f"Client disconnected during Aika request for user {request.user_id}")
+            if execution_id:
+                execution_tracker.complete_execution(execution_id, success=False, error="Client disconnected (Cancelled)")
+            raise
                 
         except Exception as e:
             logger.error(f"Streaming error: {e}", exc_info=True)
+            if execution_id:
+                execution_tracker.complete_execution(execution_id, success=False, error=str(e))
             yield f"event: error\ndata: {json.dumps({'message': str(e)})}\n\n"
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")

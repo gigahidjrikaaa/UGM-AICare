@@ -173,9 +173,10 @@ async def generate_plan_node(state: SCAState) -> SCAState:
         state["intervention_plan"] = {
             "plan_steps": [
                 {
-                    "id": step.id,
-                    "label": step.label,
-                    "duration_min": step.duration_min
+                    "id": getattr(step, "id", None),
+                    "title": getattr(step, "title", getattr(step, "label", "Step")),
+                    "description": getattr(step, "description", getattr(step, "summary", "")),
+                    "duration_min": getattr(step, "duration_min", 5)
                 }
                 for step in response.plan_steps
             ],
@@ -183,7 +184,7 @@ async def generate_plan_node(state: SCAState) -> SCAState:
                 {
                     "resource_id": card.resource_id,
                     "title": card.title,
-                    "summary": card.summary,
+                    "description": card.description,
                     "url": card.url
                 }
                 for card in response.resource_cards

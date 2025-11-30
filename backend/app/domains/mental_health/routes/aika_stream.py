@@ -21,6 +21,7 @@ from app.models import User
 from app.domains.mental_health.schemas.chat import AikaRequest
 from app.agents.aika_orchestrator_graph import create_aika_agent_with_checkpointing
 from app.core.rate_limiter import check_rate_limit_dependency
+from app.agents.execution_tracker import execution_tracker
 
 logger = logging.getLogger(__name__)
 
@@ -60,12 +61,20 @@ async def stream_aika_execution(
     - type: 'complete' - Final response with metadata
     - type: 'error' - Error occurred
     """
+    execution_id = None
     try:
         # Initial thinking indicator
         thinking_data = {'type': 'thinking', 'message': 'Memproses...'}
         yield f"data: {json.dumps(thinking_data)}\n\n"
         await asyncio.sleep(0.05)
         
+        # Start execution tracking
+        execution_id = execution_tracker.start_execution(
+            graph_id="aika_unified_graph",
+            agent_name="aika",
+            input_data={"message": request.message, "role": request.role}
+        )
+
         # Prepare initial state
         user_hash = hashlib.sha256(f"user_{current_user.id}".encode()).hexdigest()[:16]
         initial_state = {
@@ -75,13 +84,14 @@ async def stream_aika_execution(
             "message": request.message,
             "conversation_history": request.conversation_history or [],
             "session_id": request.session_id or f"sess_{current_user.id}_{int(datetime.now().timestamp())}",
+            "execution_id": execution_id,  # Inject execution_id for tracking
             "execution_path": [],
             "agents_invoked": [],
             "errors": [],
             "preferred_model": request.preferred_model,  # Pass user's preferred model
         }
         
-        logger.info(f"🌊 Starting streaming execution for user {current_user.id} with model: {request.preferred_model or 'default'}")
+        logger.info(f"🌊 Starting streaming execution for user {current_user.id} with model: {request.preferred_model or 'default'} (exec_id={execution_id})")
         
         # Create Aika agent with checkpointing
         memory = MemorySaver()
@@ -232,20 +242,27 @@ async def stream_aika_execution(
         final_response = result.get("final_response", "Maaf, terjadi kesalahan.")
         metadata_dict = {
             'session_id': result.get('session_id', request.session_id),
+            'execution_id': execution_id,  # Return execution_id for evaluation
             'agents_invoked': result.get('agents_invoked', []),
             'response_source': result.get('response_source', 'unknown'),
             'processing_time_ms': processing_time_ms,
         }
         yield f"data: {json.dumps({'type': 'complete', 'response': final_response, 'metadata': metadata_dict})}\n\n"
         
+        execution_tracker.complete_execution(execution_id, success=True)
+
         logger.info(
             f"✅ Streaming complete: user={current_user.id}, "
             f"agents={result.get('agents_invoked', [])}, time={processing_time_ms:.2f}ms"
         )
         
     except HTTPException:
+        if execution_id:
+            execution_tracker.complete_execution(execution_id, success=False)
         raise
     except Exception as exc:
+        if execution_id:
+            execution_tracker.complete_execution(execution_id, success=False)
         logger.error(f"❌ Streaming error for user {current_user.id}: {exc}", exc_info=True)
         error_data = {
             'type': 'error',

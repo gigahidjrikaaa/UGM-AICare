@@ -208,7 +208,7 @@ class ExecutionStateTracker:
             
         self._notify_subscribers("edge_triggered", execution)
     
-    def complete_execution(self, execution_id: str, success: bool = True) -> None:
+    def complete_execution(self, execution_id: str, success: bool = True, error: Optional[str] = None, output_data: Optional[Dict] = None) -> None:
         """Complete an execution."""
         if execution_id not in self._active_executions:
             return
@@ -225,6 +225,12 @@ class ExecutionStateTracker:
         # Keep only last 100 executions
         if len(self._execution_history) > 100:
             self._execution_history = self._execution_history[-100:]
+            
+        # Persist to database (Phase 2 enhancement)
+        if self._persist_to_db:
+            asyncio.create_task(self._persist_execution_completion(
+                execution_id, success, error, output_data
+            ))
             
         self._notify_subscribers("execution_completed", execution)
     
@@ -298,6 +304,34 @@ class ExecutionStateTracker:
                 await db.commit()
         except Exception as e:
             print(f"Error persisting execution start: {e}")
+
+    async def _persist_execution_completion(self, execution_id: str, success: bool, 
+                                          error: Optional[str] = None, 
+                                          output_data: Optional[Dict] = None) -> None:
+        """Persist execution completion to database."""
+        try:
+            async with AsyncSessionLocal() as db:
+                # Find the execution record
+                result = await db.execute(
+                    select(LangGraphExecution).where(LangGraphExecution.execution_id == execution_id)
+                )
+                db_execution = result.scalar_one_or_none()
+                
+                if db_execution:
+                    db_execution.status = "completed" if success else "failed"
+                    db_execution.completed_at = datetime.now()
+                    db_execution.error_message = error
+                    db_execution.output_data = output_data
+                    
+                    # Calculate total execution time
+                    if db_execution.started_at:
+                        db_execution.total_execution_time_ms = (
+                            db_execution.completed_at - db_execution.started_at
+                        ).total_seconds() * 1000
+                    
+                    await db.commit()
+        except Exception as e:
+            print(f"Error persisting execution completion: {e}")
 
     async def _persist_node_execution(self, execution_id: str, node_id: str, 
                                     status: str, agent_id: Optional[str] = None,

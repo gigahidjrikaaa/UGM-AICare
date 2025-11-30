@@ -343,8 +343,12 @@ async def generate_gemini_response(
         
         # Extract text from response
         try:
-            response_text = response.text
-            return response_text.strip()
+            if hasattr(response, 'text') and response.text:
+                return response.text.strip()
+            
+            # If we get here, response.text is None or empty, or doesn't exist
+            logger.warning(f"Gemini response text is missing or empty.")
+            
         except (ValueError, AttributeError) as e:
             # Check if this is a function call (not an error)
             if response.candidates and len(response.candidates) > 0:
