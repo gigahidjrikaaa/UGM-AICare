@@ -99,7 +99,7 @@ services:
     ports:
       - "8259:9187"
     environment:
-      DATA_SOURCE_NAME: "postgresql://giga:${DB_PASSWORD:-giga123}@db:5432/aicare_db?sslmode=disable"
+      DATA_SOURCE_NAME: "postgresql://giga:${DB_PASSWORD:-giga123}@ugm_aicare_db_dev:5432/aicare_db?sslmode=disable"
     networks:
       - monitoring
       - aicare_dev
@@ -111,7 +111,7 @@ services:
     ports:
       - "8260:9121"
     environment:
-      REDIS_ADDR: "redis:6379"
+      REDIS_ADDR: "ugm_aicare_redis_dev:6379"
     networks:
       - monitoring
       - aicare_dev
@@ -125,15 +125,13 @@ services:
       - "8262:3000"
     environment:
       - NODE_ENV=production
-      - DATABASE_URL=postgresql://giga:${POSTGRES_PASSWORD:-giga123456}@db:5432/langfuse_db?schema=public
+      - DATABASE_URL=postgresql://giga:${POSTGRES_PASSWORD:-giga123456}@ugm_aicare_db_dev:5432/langfuse_db?schema=public
       - NEXTAUTH_URL=http://localhost:8262
       - NEXTAUTH_SECRET=${LANGFUSE_SECRET:-change-this-to-a-random-string-min-32-chars}
       - SALT=${LANGFUSE_SALT:-change-this-to-another-random-string}
       - TELEMETRY_ENABLED=false
       - LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES=true
       - HOSTNAME=0.0.0.0
-    depends_on:
-      - db
     networks:
       - monitoring
       - aicare_dev

@@ -37,6 +37,7 @@ from app.agents.graph_state import AikaOrchestratorState
 from app.agents.execution_tracker import execution_tracker
 # Import identity module at runtime to avoid circular imports
 from app.core.llm import generate_response
+from app.core.langfuse_config import trace_agent
 
 # Lazy imports to avoid circular dependencies
 if TYPE_CHECKING:
@@ -84,6 +85,7 @@ def _normalize_user_role(role: str) -> str:
     return role_mapping.get(role, "student")  # Default to student
 
 
+@trace_agent("AikaDecision")
 async def aika_decision_node(
     state: AikaOrchestratorState,
     db: AsyncSession
@@ -148,7 +150,7 @@ async def aika_decision_node(
         
         # Create specialized decision prompt
         decision_prompt = f"""
-Analyze this message and determine if specialized safety agents are needed.
+Analyze this message and determine the next step.
 
 User Role: {user_role}
 Message: {state["message"]}
@@ -156,10 +158,10 @@ Message: {state["message"]}
 Decision Criteria:
 
 FOR STUDENTS (user):
-- ALWAYS HANDLE DIRECTLY (needs_agents=false):
+- ASSESS AND ROUTE DIRECTLY:
   * Aika is the primary responder for ALL student interactions.
   * Aika handles emotional support, crisis de-escalation, and appointment booking directly using tools.
-  * DO NOT invoke specialized agents (STA/TCA/CMA) synchronously.
+  * Route to TCA or CMA directly if needed. DO NOT route to STA synchronously.
   * Background processes will handle deep risk analysis later.
 
 FOR ADMINS:
@@ -167,6 +169,10 @@ FOR ADMINS:
   * Requests complex data/analytics ("trending topics", "case statistics")
   * Aggregated reports requiring specialized processing
   * Questions about system usage, user engagement, or mental health trends
+
+- NEEDS AGENTS (invoke STA for manual risk check):
+  * Explicit requests to analyze risk for a specific text or user.
+  * "Check if this message is risky: ..."
   
 - NO AGENTS NEEDED:
   * Simple status checks ("is system healthy?")
@@ -181,6 +187,10 @@ FOR COUNSELORS:
 - NEEDS AGENTS (invoke IA for analytics):
   * Requests for population-level insights or trends
   * "How many students are stressed this week?"
+
+- NEEDS AGENTS (invoke STA for manual risk check):
+  * "Analyze the risk level of this student input..."
+  * "Is this text suicidal?"
   
 - NO AGENTS NEEDED:
   * General clinical questions
@@ -191,6 +201,7 @@ Return JSON with:
   "intent": "string (MUST be one of: 'casual_chat', 'emotional_support', 'crisis_intervention', 'information_inquiry', 'appointment_scheduling', 'emergency_escalation', 'analytics_query')",
   "intent_confidence": float (0.0-1.0),
   "needs_agents": boolean,
+  "next_step": "string (MUST be one of: 'tca', 'cma', 'ia', 'sta', 'none')",
   "reasoning": "string explaining decision",
   "suggested_response": "string (only if needs_agents=false, provide direct response)",
   
@@ -284,13 +295,30 @@ want to die, mau mati, ingin mati, etc.
             state["intent"] = decision.get("intent", "unknown")
             state["intent_confidence"] = decision.get("intent_confidence", 0.5)
             
-            # FORCE needs_agents=False for students to ensure background processing
-            # REFACTOR: User requested direct routing (Aika -> TCA/CMA) without STA consultation
-            # if normalized_role == "student":
-            #     state["needs_agents"] = False
-            #     state["agent_reasoning"] = "Student interaction - enforcing background STA processing"
-            # else:
-            state["needs_agents"] = decision.get("needs_agents", False)
+            # Parse next_step from decision
+            next_step = decision.get("next_step", "none").lower()
+            
+            # Logic for Students: Direct routing, NO STA synchronous
+            if normalized_role == "student":
+                if next_step in ("tca", "cma"):
+                    state["needs_agents"] = True
+                    state["next_step"] = next_step
+                elif next_step == "sta":
+                    # Override STA for students - handle directly or route to TCA if moderate
+                    if decision.get("immediate_risk") in ("moderate", "high", "critical"):
+                         state["needs_agents"] = True
+                         state["next_step"] = "cma" if decision.get("immediate_risk") in ("high", "critical") else "tca"
+                    else:
+                         state["needs_agents"] = False
+                         state["next_step"] = "none"
+                else:
+                    state["needs_agents"] = False
+                    state["next_step"] = "none"
+            else:
+                # Admin/Counselor logic
+                state["needs_agents"] = decision.get("needs_agents", False)
+                state["next_step"] = next_step
+                
             state["agent_reasoning"] = decision.get("reasoning", "No reasoning provided")
             
             # ========================================================================
@@ -382,10 +410,11 @@ want to die, mau mati, ingin mati, etc.
                 # For now, let's trust the LLM's 'needs_agents' but default next_step to 'tca' if it says yes.
                 if state["needs_agents"] and not state.get("next_step"):
                      # Check if it might be an analytics query that wasn't explicitly caught
-                     if normalized_role in ("admin", "counselor") and "analytics" in state.get("agent_reasoning", "").lower():
+                     if normalized_role in ("admin", "counselor") and "analytics" in str(state.get("agent_reasoning", "")).lower():
                          state["next_step"] = "ia"
                      else:
-                         state["next_step"] = "tca" # Default to TCA if agents needed but no risk
+                         # Default fallback if LLM says needs_agents but didn't specify next_step
+                         state["next_step"] = "tca" 
 
             
             # Log risk assessment
@@ -398,7 +427,7 @@ want to die, mau mati, ingin mati, etc.
             # If agents not needed, store direct response
             if not state["needs_agents"]:
                 # Get preferred model from state
-                preferred_model = state.get("preferred_model")
+                preferred_model = state.get("preferred_model") or "gemini-2.0-flash"
                 
                 # Enable ReAct: Use generate_with_tools instead of simple generate_response
                 from app.domains.mental_health.services.tool_calling import generate_with_tools
@@ -407,10 +436,10 @@ want to die, mau mati, ingin mati, etc.
                 # Construct ChatRequest for tool calling service
                 # We need a valid ChatRequest object to use the service
                 chat_request = ChatRequest(
-                    google_sub=str(state.get("user_id")),
+                    google_sub=str(state.get("user_id", 0)),
                     session_id=state.get("session_id", "unknown_session"),
-                    conversation_id=state.get("conversation_id", "unknown_conversation"),
-                    message=state["message"],
+                    conversation_id=state.get("conversation_id") or "unknown_conversation",
+                    message=state.get("message", ""),
                     history=state.get("conversation_history", []),
                     model=preferred_model,
                     temperature=0.7
@@ -425,12 +454,12 @@ want to die, mau mati, ingin mati, etc.
                         {"role": h.get("role", "user"), "content": h.get("content", "")}
                         for h in state.get("conversation_history", [])
                     ] + [
-                        {"role": "user", "content": state["message"]}
+                        {"role": "user", "content": state.get("message", "")}
                     ],
                     system_prompt=system_instruction,
                     request=chat_request,
                     db=db,
-                    user_id=state.get("user_id"),
+                    user_id=state.get("user_id", 0),
                     max_tool_iterations=5,
                     execution_id=execution_id
                 )
@@ -584,9 +613,9 @@ async def trigger_sta_conversation_analysis_background(
         assessment = await analyze_conversation_risk(
             conversation_history=state.get("conversation_history", []),
             current_message=state.get("message", ""),
-            user_context=state.get("personal_context", {}),
-            conversation_start_time=start_timestamp,
-            preferred_model=state.get("preferred_model")
+            user_context=state.get("personal_context") or {},
+            conversation_start_time=start_timestamp or time.time(),
+            preferred_model=state.get("preferred_model") or "gemini-2.0-flash"
         )
         
         assessment_record = None
@@ -597,7 +626,7 @@ async def trigger_sta_conversation_analysis_background(
                 session_id=state.get("session_id"),
                 user_id=user_id,
                 assessment=assessment,
-                force_refresh=force_refresh,
+                force_refresh=bool(force_refresh),
             )
         else:
             # Ensure pending transactions are flushed even when no persistence occurs
@@ -640,6 +669,7 @@ async def trigger_sta_conversation_analysis_background(
         )
 
 
+@trace_agent("STA_Subgraph")
 async def execute_sta_subgraph(
     state: AikaOrchestratorState,
     db: AsyncSession
@@ -692,6 +722,7 @@ async def execute_sta_subgraph(
     return state
 
 
+@trace_agent("TCA_Subgraph")
 async def execute_sca_subgraph(
     state: AikaOrchestratorState,
     db: AsyncSession
@@ -743,6 +774,7 @@ async def execute_sca_subgraph(
     return state
 
 
+@trace_agent("CMA_Subgraph")
 async def execute_sda_subgraph(
     state: AikaOrchestratorState,
     db: AsyncSession
@@ -1031,6 +1063,16 @@ def should_invoke_agents(state: AikaOrchestratorState) -> str:
         logger.info(f"🔀 Routing after Aika: IA (Analytics)")
         return "invoke_ia"
 
+    if next_step == "sta":
+        if execution_id:
+            execution_tracker.trigger_edge(
+                execution_id,
+                "aika::decision->sta",
+                condition_result=True
+            )
+        logger.info(f"🔀 Routing after Aika: STA (Manual Invocation)")
+        return "invoke_sta"
+
     # Fallback: if needs_agents is True but next_step not set, default to TCA
     if needs_agents:
         if execution_id:
@@ -1105,9 +1147,10 @@ def should_route_to_sda_after_sca(state: AikaOrchestratorState) -> str:
     Currently always routes to synthesize (TCA doesn't escalate to CMA).
     Future: Could check if TCA detected escalation need.
     """
-    if state.get("execution_id"):
+    execution_id = state.get("execution_id")
+    if execution_id:
         execution_tracker.trigger_edge(
-            state["execution_id"],
+            execution_id,
             "aika::sca->synthesize",
             condition_result=True
         )
@@ -1174,6 +1217,7 @@ def create_aika_unified_graph(db: AsyncSession) -> StateGraph:
             "invoke_cma": "execute_sda",  # Direct to CMA
             "invoke_tca": "execute_sca",  # Direct to TCA
             "invoke_ia": "execute_ia",    # Direct to IA
+            "invoke_sta": "execute_sta",  # Manual STA invocation
             "end": END
         }
     )

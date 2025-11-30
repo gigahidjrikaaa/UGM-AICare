@@ -1,2 +1,0 @@
-INFO:app.core.llm:Google Generative AI SDK configured successfully.
-INFO:app.database:Using async database with asyncpg: postgresql+asyncpg://giga:giga123456@localhost:5432/aicare_db

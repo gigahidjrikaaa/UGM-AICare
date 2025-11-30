@@ -31,6 +31,7 @@ from app.agents.ia.service import InsightsAgentService
 from app.agents.ia.schemas import IAQueryRequest, IAQueryResponse, QuestionId
 from app.agents.ia.llm_interpreter import InsightsInterpreter
 from app.agents.execution_tracker import execution_tracker
+from app.core.langfuse_config import trace_agent
 
 logger = logging.getLogger(__name__)
 
@@ -39,6 +40,7 @@ logger = logging.getLogger(__name__)
 # Graph Nodes
 # ============================================================================
 
+@trace_agent("IA_IngestQuery")
 def ingest_query_node(state: IAState) -> IAState:
     """Node: Validate and ingest analytics query request.
     
@@ -97,6 +99,7 @@ def ingest_query_node(state: IAState) -> IAState:
     return state
 
 
+@trace_agent("IA_ValidateConsent")
 def validate_consent_node(state: IAState) -> IAState:
     """Node: Validate user consent for analytics aggregation.
     
@@ -144,6 +147,7 @@ def validate_consent_node(state: IAState) -> IAState:
     return state
 
 
+@trace_agent("IA_ApplyKAnonymity")
 def apply_k_anonymity_node(state: IAState) -> IAState:
     """Node: Apply k-anonymity enforcement before executing query.
     
@@ -187,6 +191,7 @@ def apply_k_anonymity_node(state: IAState) -> IAState:
     return state
 
 
+@trace_agent("IA_ExecuteAnalytics")
 async def execute_analytics_node(state: IAState, db: AsyncSession) -> IAState:
     """Node: Execute analytics query with privacy safeguards.
     
@@ -274,6 +279,7 @@ async def execute_analytics_node(state: IAState, db: AsyncSession) -> IAState:
 # Phase 2: LLM Intelligence Layer Nodes
 # ============================================================================
 
+@trace_agent("IA_InterpretResults")
 async def interpret_results_node(state: IAState) -> IAState:
     """Node: Generate LLM interpretation of analytics results.
     
@@ -360,6 +366,7 @@ async def interpret_results_node(state: IAState) -> IAState:
     return state
 
 
+@trace_agent("IA_ExportPDF")
 async def export_pdf_node(state: IAState) -> IAState:
     """Node: Export comprehensive analytics report as PDF.
     

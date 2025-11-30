@@ -18,11 +18,13 @@ from app.domains.mental_health.models.appointments import Psychologist, Appointm
 from app.models.agent_user import AgentUser, AgentRoleEnum
 from app.models.system import CaseAssignment
 from app.services.event_bus import EventType, publish_event
+from app.core.langfuse_config import trace_agent
 
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
 
+@trace_agent("CMA_Ingest")
 async def ingest_escalation_node(state: SDAState) -> SDAState:
     """Node: Ingest escalation signal from STA.
     
@@ -69,6 +71,7 @@ async def ingest_escalation_node(state: SDAState) -> SDAState:
     return state
 
 
+@trace_agent("CMA_CreateCase")
 async def create_case_node(state: SDAState, db: AsyncSession) -> SDAState:
     """Node: Create case record for manual intervention.
     
@@ -154,6 +157,7 @@ async def create_case_node(state: SDAState, db: AsyncSession) -> SDAState:
     return state
 
 
+@trace_agent("CMA_CalculateSLA")
 async def calculate_sla_node(state: SDAState, db: AsyncSession) -> SDAState:
     """Node: Calculate SLA breach time based on severity.
     
@@ -222,6 +226,7 @@ async def calculate_sla_node(state: SDAState, db: AsyncSession) -> SDAState:
     return state
 
 
+@trace_agent("CMA_AutoAssign")
 async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
     """Node: Auto-assign case to available counsellor with workload balancing.
     
@@ -362,6 +367,7 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
     return state
 
 
+@trace_agent("CMA_NotifyCounsellor")
 async def notify_counsellor_node(state: SDAState) -> SDAState:
     """Node: Emit event to notify counsellors of new case.
     
@@ -424,6 +430,7 @@ async def notify_counsellor_node(state: SDAState) -> SDAState:
     return state
 
 
+@trace_agent("CMA_ScheduleAppointment")
 async def schedule_appointment_node(state: SDAState, db: AsyncSession) -> SDAState:
     """Node: Schedule appointment with counselor (LLM-powered).
     

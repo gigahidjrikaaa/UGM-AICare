@@ -1,0 +1,9 @@
+apiVersion: 1
+
+datasources:
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://ugm_aicare_loki:3100
+    jsonData:
+      maxLines: 1000

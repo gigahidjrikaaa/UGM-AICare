@@ -5,8 +5,7 @@ Provides detailed trace-level monitoring for LangGraph agents.
 import os
 from typing import Optional
 from functools import wraps
-from langfuse import Langfuse
-from langfuse.decorators import observe, langfuse_context
+from langfuse import Langfuse, observe
 
 # Initialize Langfuse client
 def get_langfuse_client() -> Optional[Langfuse]:
@@ -57,20 +56,21 @@ def trace_agent(agent_name: str):
         @wraps(func)
         async def wrapper(*args, **kwargs):
             # Add agent context to trace
-            langfuse_context.update_current_trace(
-                name=agent_name,
-                metadata={
-                    "agent": agent_name,
-                    "function": func.__name__
-                },
-                tags=[agent_name, "agent", "langgraph"]
-            )
+            if langfuse_client:
+                langfuse_client.update_current_trace(
+                    name=agent_name,
+                    metadata={
+                        "agent": agent_name,
+                        "function": func.__name__
+                    },
+                    tags=[agent_name, "agent", "langgraph"]
+                )
             
             result = await func(*args, **kwargs)
             
             # Update trace with result metadata
-            if hasattr(result, '__dict__'):
-                langfuse_context.update_current_observation(
+            if hasattr(result, '__dict__') and langfuse_client:
+                langfuse_client.update_current_span(
                     output=str(result)
                 )
             
@@ -100,17 +100,18 @@ def trace_llm_call(model_name: str):
         @observe(as_type="generation", name=f"LLM_{model_name}")
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            langfuse_context.update_current_observation(
-                model=model_name,
-                metadata={"provider": "google-genai"}
-            )
+            if langfuse_client:
+                langfuse_client.update_current_generation(
+                    model=model_name,
+                    metadata={"provider": "google-genai"}
+                )
             
             result = await func(*args, **kwargs)
             
             # Track token usage if available
-            if hasattr(result, 'usage_metadata'):
-                langfuse_context.update_current_observation(
-                    usage={
+            if hasattr(result, 'usage_metadata') and langfuse_client:
+                langfuse_client.update_current_generation(
+                    usage_details={
                         "input": getattr(result.usage_metadata, 'prompt_token_count', 0),
                         "output": getattr(result.usage_metadata, 'candidates_token_count', 0),
                         "total": getattr(result.usage_metadata, 'total_token_count', 0)
@@ -143,12 +144,13 @@ def trace_tool_call(tool_name: str):
         @observe(name=f"Tool_{tool_name}")
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            langfuse_context.update_current_observation(
-                metadata={
-                    "tool": tool_name,
-                    "type": "function_call"
-                }
-            )
+            if langfuse_client:
+                langfuse_client.update_current_span(
+                    metadata={
+                        "tool": tool_name,
+                        "type": "function_call"
+                    }
+                )
             
             result = await func(*args, **kwargs)
             return result
@@ -170,25 +172,27 @@ class LangfuseTrace:
     def __init__(self, name: str, **kwargs):
         self.name = name
         self.metadata = kwargs
-        self.trace = None
+        self.span = None
     
     async def __aenter__(self):
         if langfuse_client:
-            self.trace = langfuse_client.trace(
+            self.span = langfuse_client.start_span(
                 name=self.name,
                 metadata=self.metadata
             )
         return self
     
     async def __aexit__(self, exc_type, exc_val, exc_tb):
-        if self.trace and langfuse_client:
-            langfuse_client.flush()
+        if self.span:
+            self.span.end()
+            if langfuse_client:
+                langfuse_client.flush()
         return False
     
     def update(self, **kwargs):
         """Update trace with additional metadata"""
-        if self.trace:
-            self.trace.update(**kwargs)
+        if self.span:
+            self.span.update(**kwargs)
 
 
 def flush_langfuse():

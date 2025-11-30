@@ -20,10 +20,12 @@ from app.agents.tca.service import TherapeuticCoachService
 from app.agents.tca.schemas import SCAInterveneRequest
 from app.agents.execution_tracker import execution_tracker
 from app.domains.mental_health.models import InterventionPlanRecord
+from app.core.langfuse_config import trace_agent
 
 logger = logging.getLogger(__name__)
 
 
+@trace_agent("TCA_Ingest")
 async def ingest_triage_signal_node(state: SCAState) -> SCAState:
     """Node: Ingest triage signal from STA.
     
@@ -63,6 +65,7 @@ async def ingest_triage_signal_node(state: SCAState) -> SCAState:
     return state
 
 
+@trace_agent("TCA_DetermineType")
 async def determine_intervention_type_node(state: SCAState) -> SCAState:
     """Node: Determine appropriate intervention type.
     
@@ -121,6 +124,7 @@ async def determine_intervention_type_node(state: SCAState) -> SCAState:
     return state
 
 
+@trace_agent("TCA_GeneratePlan")
 async def generate_plan_node(state: SCAState) -> SCAState:
     """Node: Generate personalized intervention plan using Gemini AI.
     
@@ -214,6 +218,7 @@ async def generate_plan_node(state: SCAState) -> SCAState:
     return state
 
 
+@trace_agent("TCA_SafetyReview")
 async def safety_review_node(state: SCAState) -> SCAState:
     """Node: Apply safety checks before plan activation.
     
@@ -264,6 +269,7 @@ async def safety_review_node(state: SCAState) -> SCAState:
     return state
 
 
+@trace_agent("TCA_PersistPlan")
 async def persist_plan_node(state: SCAState, db: AsyncSession) -> SCAState:
     """Node: Persist intervention plan to database.
     

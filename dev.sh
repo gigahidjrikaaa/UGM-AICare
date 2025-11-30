@@ -87,27 +87,40 @@ show_help() {
 
 case "${1:-}" in
     up)
-        echo "🚀 Starting development environment with HOT RELOAD..."
+        echo "🚀 Starting development environment with HOT RELOAD (App + Core Monitoring)..."
         echo ""
         echo "📝 Changes to your code will automatically reload:"
         echo "   • Backend: Python files in /backend/app/"
         echo "   • Frontend: TypeScript/React files in /frontend/src/"
         echo ""
         "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" up -d
+        echo "✅ Application services started"
         echo ""
-        echo "✅ Services started!"
+        echo "📈 Starting Core Monitoring (Prometheus + Grafana + Langfuse)..."
+        "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" up -d
+        echo "✅ Monitoring services started"
+        echo ""
+        echo "📜 Starting Loki Stack (Logs)..."
+        "$DOCKER_COMPOSE_CMD" -f "docker-compose.loki.yml" up -d
+        echo "✅ Loki services started"
+        echo ""
+        echo "✅ All services started!"
         echo "   Frontend: http://localhost:4000 (Next.js dev server)"
         echo "   Backend:  http://localhost:8000 (Uvicorn with --reload)"
         echo "   API Docs: http://localhost:8000/docs"
         echo ""
+        echo "📍 Monitoring Access:"
+        echo "   • Langfuse (Traces):   http://localhost:8262"
+        echo "   • Grafana (Metrics):   http://localhost:8256 (admin/admin123)"
+        echo "   • Prometheus:          http://localhost:8255"
+        echo ""
         echo "💡 Tip: Watch logs in real-time:"
         echo "   ./dev.sh logs -f"
         echo ""
-        echo "� Want monitoring? Run:"
-        echo "   ./dev.sh monitoring start"
-        echo "   OR use './dev.sh up-all' to start everything at once"
+        echo "👉 Want full logging (ELK)? Run:"
+        echo "   ./dev.sh up-all"
         echo ""
-        echo "��� Hot reload is enabled. Edit your code and save!"
+        echo "🔥 Hot reload is enabled. Edit your code and save!"
         ;;
     
     up-all)

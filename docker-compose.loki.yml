@@ -15,7 +15,7 @@ services:
       - ./infra/loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
       - loki-data:/loki
     networks:
-      - loki
+      - monitoring
     restart: unless-stopped
 
   promtail:
@@ -29,14 +29,14 @@ services:
     depends_on:
       - loki
     networks:
-      - loki
+      - monitoring
     restart: unless-stopped
-
-networks:
-  loki:
-    name: ugm_aicare_loki
-    driver: bridge
 
 volumes:
   loki-data:
     driver: local
+
+networks:
+  monitoring:
+    external: true
+    name: ugm_aicare_monitoring

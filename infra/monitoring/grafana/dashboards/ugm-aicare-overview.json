@@ -265,7 +265,7 @@
     },
     {
       "datasource": "Prometheus",
-      "description": "Processing time for each safety agent (STA, SCA, SDA, IA)",
+      "description": "Processing time for each safety agent (STA, TCA, CMA, IA)",
       "fieldConfig": {
         "defaults": {
           "color": {
@@ -332,7 +332,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "SCA"
+              "options": "TCA"
             },
             "properties": [
               {
@@ -347,7 +347,7 @@
           {
             "matcher": {
               "id": "byName",
-              "options": "SDA"
+              "options": "CMA"
             },
             "properties": [
               {
@@ -402,25 +402,25 @@
       "targets": [
         {
           "datasource": "Prometheus",
-          "expr": "rate(agent_processing_time_seconds_sum{agent=\"STA\"}[5m]) / rate(agent_processing_time_seconds_count{agent=\"STA\"}[5m])",
+          "expr": "rate(agent_processing_time_seconds_sum{agent_name=\"STA\"}[5m]) / rate(agent_processing_time_seconds_count{agent_name=\"STA\"}[5m])",
           "legendFormat": "STA",
           "refId": "A"
         },
         {
           "datasource": "Prometheus",
-          "expr": "rate(agent_processing_time_seconds_sum{agent=\"SCA\"}[5m]) / rate(agent_processing_time_seconds_count{agent=\"SCA\"}[5m])",
-          "legendFormat": "SCA",
+          "expr": "rate(agent_processing_time_seconds_sum{agent_name=\"TCA\"}[5m]) / rate(agent_processing_time_seconds_count{agent_name=\"TCA\"}[5m])",
+          "legendFormat": "TCA",
           "refId": "B"
         },
         {
           "datasource": "Prometheus",
-          "expr": "rate(agent_processing_time_seconds_sum{agent=\"SDA\"}[5m]) / rate(agent_processing_time_seconds_count{agent=\"SDA\"}[5m])",
-          "legendFormat": "SDA",
+          "expr": "rate(agent_processing_time_seconds_sum{agent_name=\"CMA\"}[5m]) / rate(agent_processing_time_seconds_count{agent_name=\"CMA\"}[5m])",
+          "legendFormat": "CMA",
           "refId": "C"
         },
         {
           "datasource": "Prometheus",
-          "expr": "rate(agent_processing_time_seconds_sum{agent=\"IA\"}[5m]) / rate(agent_processing_time_seconds_count{agent=\"IA\"}[5m])",
+          "expr": "rate(agent_processing_time_seconds_sum{agent_name=\"IA\"}[5m]) / rate(agent_processing_time_seconds_count{agent_name=\"IA\"}[5m])",
           "legendFormat": "IA",
           "refId": "D"
         }

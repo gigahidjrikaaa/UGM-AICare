@@ -20,10 +20,12 @@ from app.agents.sta.service import get_safety_triage_service
 from app.agents.sta.schemas import STAClassifyRequest
 from app.agents.execution_tracker import execution_tracker
 from app.core.redaction import redact_pii_regex
+from app.core.langfuse_config import trace_agent
 
 logger = logging.getLogger(__name__)
 
 
+@trace_agent("STA_Ingest")
 async def ingest_message_node(state: STAState) -> STAState:
     """Node: Ingest and validate user message.
     
@@ -56,6 +58,7 @@ async def ingest_message_node(state: STAState) -> STAState:
     return state
 
 
+@trace_agent("STA_Redaction")
 async def apply_redaction_node(state: STAState, db: AsyncSession) -> STAState:
     """Node: Apply PII redaction to message.
     
@@ -97,6 +100,7 @@ async def apply_redaction_node(state: STAState, db: AsyncSession) -> STAState:
     return state
 
 
+@trace_agent("STA_AssessRisk")
 async def assess_risk_node(state: STAState, db: AsyncSession) -> STAState:
     """Node: Assess safety risk using STA Gemini-based classifier.
     

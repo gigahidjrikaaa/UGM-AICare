@@ -12,6 +12,9 @@ from dotenv import load_dotenv
 import logging
 from typing import List, Dict, Literal, Optional, Tuple
 
+# Langfuse Tracing
+from app.core.langfuse_config import trace_llm_call
+
 # Load environment variables
 load_dotenv()
 
@@ -231,6 +234,7 @@ def _convert_tool_schemas_for_new_sdk(tool_wrappers: List[Dict[str, Any]]) -> Li
 
 
 # --- Gemini API Function (Async) - Migrated to new SDK ---
+@trace_llm_call("gemini-genai-sdk")
 async def generate_gemini_response(
     history: List[Dict[str, str]],
     model: str = DEFAULT_GEMINI_MODEL,
@@ -385,6 +389,7 @@ async def generate_gemini_response(
         raise
 
 
+@trace_llm_call("gemini-fallback-chain")
 async def generate_gemini_response_with_fallback(
     history: List[Dict[str, str]],
     model: str = DEFAULT_GEMINI_MODEL,

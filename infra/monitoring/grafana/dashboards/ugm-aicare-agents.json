@@ -10,14 +10,23 @@
   "liveNow": false,
   "panels": [
     {
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 100,
+      "title": "Agent Performance Overview",
+      "type": "row"
+    },
+    {
       "datasource": "Prometheus",
-      "description": "Success rate by agent type",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "thresholds"
           },
-          "mappings": [],
           "max": 1,
           "min": 0,
           "thresholds": {
@@ -38,33 +47,18 @@
             ]
           },
           "unit": "percentunit"
-        },
-        "overrides": []
+        }
       },
       "gridPos": {
-        "h": 8,
+        "h": 6,
         "w": 6,
         "x": 0,
-        "y": 0
+        "y": 1
       },
       "id": 1,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "pluginVersion": "10.2.2",
       "targets": [
         {
-          "datasource": "Prometheus",
-          "expr": "agent_success_rate{agent=\"STA\"}",
+          "expr": "agent_success_rate{agent_name=\"STA\"}",
           "legendFormat": "STA",
           "refId": "A"
         }
@@ -79,7 +73,6 @@
           "color": {
             "mode": "thresholds"
           },
-          "mappings": [],
           "max": 1,
           "min": 0,
           "thresholds": {
@@ -100,37 +93,23 @@
             ]
           },
           "unit": "percentunit"
-        },
-        "overrides": []
+        }
       },
       "gridPos": {
-        "h": 8,
+        "h": 6,
         "w": 6,
         "x": 6,
-        "y": 0
+        "y": 1
       },
       "id": 2,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "pluginVersion": "10.2.2",
       "targets": [
         {
-          "datasource": "Prometheus",
-          "expr": "agent_success_rate{agent=\"SCA\"}",
+          "expr": "agent_success_rate{agent_name=\"TCA\"}",
+          "legendFormat": "TCA",
           "refId": "A"
         }
       ],
-      "title": "SCA Success Rate",
+      "title": "TCA Success Rate",
       "type": "gauge"
     },
     {
@@ -140,7 +119,6 @@
           "color": {
             "mode": "thresholds"
           },
-          "mappings": [],
           "max": 1,
           "min": 0,
           "thresholds": {
@@ -161,37 +139,23 @@
             ]
           },
           "unit": "percentunit"
-        },
-        "overrides": []
+        }
       },
       "gridPos": {
-        "h": 8,
+        "h": 6,
         "w": 6,
         "x": 12,
-        "y": 0
+        "y": 1
       },
       "id": 3,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "pluginVersion": "10.2.2",
       "targets": [
         {
-          "datasource": "Prometheus",
-          "expr": "agent_success_rate{agent=\"SDA\"}",
+          "expr": "agent_success_rate{agent_name=\"CMA\"}",
+          "legendFormat": "CMA",
           "refId": "A"
         }
       ],
-      "title": "SDA Success Rate",
+      "title": "CMA Success Rate",
       "type": "gauge"
     },
     {
@@ -201,7 +165,6 @@
           "color": {
             "mode": "thresholds"
           },
-          "mappings": [],
           "max": 1,
           "min": 0,
           "thresholds": {
@@ -222,33 +185,19 @@
             ]
           },
           "unit": "percentunit"
-        },
-        "overrides": []
+        }
       },
       "gridPos": {
-        "h": 8,
+        "h": 6,
         "w": 6,
         "x": 18,
-        "y": 0
+        "y": 1
       },
       "id": 4,
-      "options": {
-        "orientation": "auto",
-        "reduceOptions": {
-          "values": false,
-          "calcs": [
-            "lastNotNull"
-          ],
-          "fields": ""
-        },
-        "showThresholdLabels": false,
-        "showThresholdMarkers": true
-      },
-      "pluginVersion": "10.2.2",
       "targets": [
         {
-          "datasource": "Prometheus",
-          "expr": "agent_success_rate{agent=\"IA\"}",
+          "expr": "agent_success_rate{agent_name=\"IA\"}",
+          "legendFormat": "IA",
           "refId": "A"
         }
       ],
@@ -256,465 +205,132 @@
       "type": "gauge"
     },
     {
-      "datasource": "Prometheus",
-      "description": "Agent errors by type",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            }
-          },
-          "mappings": []
-        },
-        "overrides": []
-      },
       "gridPos": {
-        "h": 10,
-        "w": 8,
+        "h": 1,
+        "w": 24,
         "x": 0,
-        "y": 8
+        "y": 7
       },
-      "id": 5,
-      "options": {
-        "legend": {
-          "displayMode": "table",
-          "placement": "right",
-          "showLegend": true,
-          "values": [
-            "value"
-          ]
-        },
-        "pieType": "pie",
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "10.2.2",
-      "targets": [
-        {
-          "datasource": "Prometheus",
-          "expr": "sum by (agent) (increase(agent_errors_total[1h]))",
-          "legendFormat": "{{agent}}",
-          "refId": "A"
-        }
-      ],
-      "title": "Agent Errors (1h)",
-      "type": "piechart"
+      "id": 101,
+      "title": "System Activity & Logs",
+      "type": "row"
     },
     {
       "datasource": "Prometheus",
-      "description": "Total invocations per agent",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
           "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "fillOpacity": 80,
-            "gradientMode": "none",
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            },
-            "lineWidth": 1,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
+            "axisLabel": "Messages / min",
+            "fillOpacity": 10
           }
-        },
-        "overrides": [
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "STA"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#FFCA40",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "SCA"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#A855F7",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "SDA"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#34D399",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          },
-          {
-            "matcher": {
-              "id": "byName",
-              "options": "IA"
-            },
-            "properties": [
-              {
-                "id": "color",
-                "value": {
-                  "fixedColor": "#38BDF8",
-                  "mode": "fixed"
-                }
-              }
-            ]
-          }
-        ]
+        }
       },
       "gridPos": {
-        "h": 10,
-        "w": 8,
-        "x": 8,
+        "h": 8,
+        "w": 12,
+        "x": 0,
         "y": 8
       },
-      "id": 6,
-      "options": {
-        "barRadius": 0,
-        "barWidth": 0.97,
-        "fullHighlight": false,
-        "groupWidth": 0.7,
-        "legend": {
-          "calcs": [],
-          "displayMode": "list",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "orientation": "horizontal",
-        "showValue": "auto",
-        "stacking": "none",
-        "tooltip": {
-          "mode": "single",
-          "sort": "none"
-        },
-        "xTickLabelRotation": 0,
-        "xTickLabelSpacing": 0
-      },
-      "pluginVersion": "10.2.2",
+      "id": 10,
       "targets": [
         {
-          "datasource": "Prometheus",
-          "expr": "sum by (agent) (increase(agent_invocations_total[1h]))",
-          "legendFormat": "{{agent}}",
+          "expr": "rate(user_messages_sent_total[5m]) * 60",
+          "legendFormat": "{{user_role}}",
           "refId": "A"
         }
       ],
-      "title": "Agent Invocations (1h)",
+      "title": "Chat Message Volume",
+      "type": "timeseries"
+    },
+    {
+      "datasource": "Loki",
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 8
+      },
+      "id": 11,
+      "options": {
+        "showTime": true,
+        "showLabels": false,
+        "wrapLogMessage": true
+      },
+      "targets": [
+        {
+          "expr": "{container_name=\"ugm_aicare_backend\"} |= \"chat\"",
+          "refId": "A"
+        }
+      ],
+      "title": "Backend Chat Logs",
+      "type": "logs"
+    },
+    {
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 16
+      },
+      "id": 102,
+      "title": "LLM & Cost Monitoring",
+      "type": "row"
+    },
+    {
+      "datasource": "Prometheus",
+      "fieldConfig": {
+        "defaults": {
+          "color": {
+            "mode": "palette-classic"
+          },
+          "unit": "short"
+        }
+      },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 17
+      },
+      "id": 12,
+      "targets": [
+        {
+          "expr": "increase(llm_token_usage_total[1h])",
+          "legendFormat": "{{model}} - {{type}}",
+          "refId": "A"
+        }
+      ],
+      "title": "LLM Token Usage (1h)",
       "type": "barchart"
     },
     {
       "datasource": "Prometheus",
-      "description": "Crisis escalations requiring immediate attention",
       "fieldConfig": {
         "defaults": {
           "color": {
             "mode": "palette-classic"
           },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 20,
-            "gradientMode": "none",
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            },
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
+          "unit": "s"
+        }
       },
       "gridPos": {
-        "h": 10,
-        "w": 8,
-        "x": 16,
-        "y": 8
-      },
-      "id": 7,
-      "options": {
-        "legend": {
-          "calcs": [
-            "sum"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "10.2.2",
-      "targets": [
-        {
-          "datasource": "Prometheus",
-          "expr": "rate(crisis_escalations_total[5m])",
-          "legendFormat": "Crisis Rate",
-          "refId": "A"
-        }
-      ],
-      "title": "Crisis Escalation Rate",
-      "type": "timeseries"
-    },
-    {
-      "datasource": "Prometheus",
-      "description": "Intervention plans created over time",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 20,
-            "gradientMode": "none",
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            },
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          }
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
-        "w": 12,
-        "x": 0,
-        "y": 18
-      },
-      "id": 8,
-      "options": {
-        "legend": {
-          "calcs": [
-            "sum"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "10.2.2",
-      "targets": [
-        {
-          "datasource": "Prometheus",
-          "expr": "rate(intervention_plans_created_total[5m])",
-          "legendFormat": "Plans Created",
-          "refId": "A"
-        },
-        {
-          "datasource": "Prometheus",
-          "expr": "rate(intervention_plan_steps_completed_total[5m])",
-          "legendFormat": "Steps Completed",
-          "refId": "B"
-        }
-      ],
-      "title": "Intervention Plans Activity",
-      "type": "timeseries"
-    },
-    {
-      "datasource": "Prometheus",
-      "description": "Completion vs abandonment rate",
-      "fieldConfig": {
-        "defaults": {
-          "color": {
-            "mode": "palette-classic"
-          },
-          "custom": {
-            "axisCenteredZero": false,
-            "axisColorMode": "text",
-            "axisLabel": "",
-            "axisPlacement": "auto",
-            "barAlignment": 0,
-            "drawStyle": "line",
-            "fillOpacity": 20,
-            "gradientMode": "none",
-            "hideFrom": {
-              "tooltip": false,
-              "viz": false,
-              "legend": false
-            },
-            "lineInterpolation": "smooth",
-            "lineWidth": 2,
-            "pointSize": 5,
-            "scaleDistribution": {
-              "type": "linear"
-            },
-            "showPoints": "never",
-            "spanNulls": false,
-            "stacking": {
-              "group": "A",
-              "mode": "none"
-            },
-            "thresholdsStyle": {
-              "mode": "off"
-            }
-          },
-          "mappings": [],
-          "max": 1,
-          "min": 0,
-          "thresholds": {
-            "mode": "absolute",
-            "steps": [
-              {
-                "color": "green",
-                "value": null
-              }
-            ]
-          },
-          "unit": "percentunit"
-        },
-        "overrides": []
-      },
-      "gridPos": {
-        "h": 9,
+        "h": 8,
         "w": 12,
         "x": 12,
-        "y": 18
+        "y": 17
       },
-      "id": 9,
-      "options": {
-        "legend": {
-          "calcs": [
-            "mean"
-          ],
-          "displayMode": "table",
-          "placement": "bottom",
-          "showLegend": true
-        },
-        "tooltip": {
-          "mode": "multi",
-          "sort": "none"
-        }
-      },
-      "pluginVersion": "10.2.2",
+      "id": 13,
       "targets": [
         {
-          "datasource": "Prometheus",
-          "expr": "intervention_plan_completion_rate",
-          "legendFormat": "Completion Rate",
+          "expr": "rate(llm_api_duration_seconds_sum[5m]) / rate(llm_api_duration_seconds_count[5m])",
+          "legendFormat": "{{model}}",
           "refId": "A"
-        },
-        {
-          "datasource": "Prometheus",
-          "expr": "intervention_plan_abandonment_rate",
-          "legendFormat": "Abandonment Rate",
-          "refId": "B"
         }
       ],
-      "title": "Plan Success Metrics",
+      "title": "Average LLM Latency",
       "type": "timeseries"
     }
   ],
@@ -726,17 +342,11 @@
     "agents",
     "mental-health"
   ],
-  "templating": {
-    "list": []
-  },
   "time": {
     "from": "now-6h",
     "to": "now"
   },
-  "timepicker": {},
-  "timezone": "",
-  "title": "UGM-AICare - Safety Agents",
+  "title": "UGM-AICare - Complete Dashboard",
   "uid": "ugm-aicare-agents",
-  "version": 1,
-  "weekStart": ""
+  "version": 1
 }

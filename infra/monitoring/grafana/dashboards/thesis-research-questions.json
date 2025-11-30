@@ -580,7 +580,7 @@
       "targets": [
         {
           "datasource": "Prometheus",
-          "expr": "rate(agent_invocations_total{agent_name=\"SCA\"}[5m])",
+          "expr": "rate(agent_invocations_total{agent_name=\"TCA\"}[5m])",
           "legendFormat": "{{intent}}",
           "refId": "A"
         }
