@@ -171,18 +171,16 @@ export function useAikaChat({
           const streamingMsgIndex = prev.findIndex(m => m.isStreaming);
           
           if (streamingMsgIndex !== -1) {
-            // Update existing streaming message
+            // Streaming message exists - finalize it with metadata
+            // The streaming content is already complete, just mark it as done
             const streamingMsg = prev[streamingMsgIndex];
-            // Avoid duplication if final response already contains the explanation (unlikely but possible)
-            // For now, we assume they are separate parts.
-            // We add a newline if there was previous content
-            const separator = streamingMsg.content ? '\n\n' : '';
-            const finalContent = streamingMsg.content + separator + aikaResponse.response;
             
             const finalMessage: Message = {
               ...streamingMsg,
               id: uuidv4(), // Finalize ID
-              content: finalContent,
+              // Use the streamed content as-is, don't append aikaResponse.response
+              // since it was already streamed via onPartialResponse
+              content: streamingMsg.content,
               isStreaming: false,
               aikaMetadata: aikaResponse.metadata,
             };
@@ -191,7 +189,7 @@ export function useAikaChat({
             newMessages[streamingMsgIndex] = finalMessage;
             return newMessages;
           } else {
-            // No streaming happened, add new message
+            // No streaming happened, add new message with full response
             const assistantMessage: Message = {
               id: uuidv4(),
               role: 'assistant',

@@ -248,12 +248,12 @@ export default function AikaEnhancedPage() {
 
   return (
     <>
-      {/* Content area */}
-      <div className="min-h-screen w-full text-white flex flex-col items-center justify-center p-2 md:p-4 lg:p-6 pt-40 gap-4">
+      {/* Content area - Fixed positioning to avoid navbar clash */}
+      <div className="fixed inset-0 top-[72px] md:top-[80px] w-full text-white flex flex-col p-2 md:p-4 lg:p-6 gap-4">
         {/* Main Layout Container */}
-        <div className="w-full max-w-7xl h-[calc(100vh-10rem)] flex gap-4">
+        <div className="w-full max-w-7xl mx-auto flex-1 flex gap-4 overflow-hidden">
           {/* Chat Panel */}
-          <div className={`${showActivityLog ? 'w-2/3' : 'w-full'} flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden transition-all duration-300`}>
+          <div className={`${showActivityLog ? 'lg:w-2/3' : 'w-full'} flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden transition-all duration-300 min-h-0`}>
             <HeaderBar
               onOpenMetadata={() => setShowMetadata(!showMetadata)}
               onToggleActivityLog={() => setShowActivityLog(!showActivityLog)}
@@ -332,13 +332,13 @@ export default function AikaEnhancedPage() {
               initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               exit={{ opacity: 0, x: 20 }}
-              className="w-1/3 flex flex-col"
+              className="hidden lg:flex lg:w-1/3 flex-col min-h-0 overflow-hidden"
             >
               <ActivityLogPanel
                 activities={activities}
                 isOpen={showActivityLog}
                 onClose={() => setShowActivityLog(false)}
-                maxHeight="calc(100vh - 10rem)"
+                maxHeight="100%"
               />
             </motion.div>
           )}
@@ -355,7 +355,7 @@ export default function AikaEnhancedPage() {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="pt-3 text-center text-xs text-gray-300/70"
+          className="flex-shrink-0 py-2 text-center text-xs text-gray-300/70"
         >
           <p>Disclaimer: Aika adalah AI dan bukan pengganti profesional medis.</p>
           <p className="mt-1">Built with ❤️ by UGM AICare Team • Powered by LangGraph</p>
