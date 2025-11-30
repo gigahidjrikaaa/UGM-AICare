@@ -11,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 import json
 from pathlib import Path
+import random
 
 from fastapi import APIRouter, Body, Depends, HTTPException, status
 from pydantic import BaseModel, EmailStr, Field
@@ -22,6 +23,7 @@ from app.dependencies import get_admin_user
 from app.models import User  # Core model
 from app.domains.mental_health.models import Conversation, Message
 from app.domains.mental_health.models.messages import MessageRoleEnum
+from app.domains.mental_health.models.appointments import Psychologist, AppointmentType
 from app.agents.sta.service import SafetyTriageService
 from app.domains.mental_health.schemas.chat import ChatRequest, ChatResponse
 # from app.domains.mental_health.services.chat_processing import process_chat_message
@@ -258,16 +260,124 @@ async def seed_database(
     db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user),
 ) -> SeedDatabaseResponse:
-    """Seed the database with a standard set of test users."""
+    """Seed the database with comprehensive test data including users, counselors with schedules."""
     logger.info(f"Admin {admin_user.id} seeding database")
     
-    import random
     from datetime import date
     
     created_details = []
     
-    # --- Data Generators ---
-    def random_date(start_year=1995, end_year=2005):
+    # --- Realistic Indonesian Names ---
+    student_names = [
+        "Budi Santoso", "Dewi Lestari", "Andi Pratama", "Siti Rahayu", "Rizky Aditya",
+        "Putri Wulandari", "Muhammad Faisal", "Ayu Kusuma", "Dimas Nugroho", "Intan Permata"
+    ]
+    
+    counselor_data = [
+        {
+            "name": "Dr. Sinta Dewi, M.Psi., Psikolog",
+            "specialization": "Clinical Psychology - Anxiety & Depression",
+            "bio": "Dr. Sinta adalah psikolog klinis berpengalaman dengan fokus pada gangguan kecemasan dan depresi pada mahasiswa. Beliau telah menangani lebih dari 500 klien selama 12 tahun karirnya di UGM.",
+            "education": {
+                "degrees": [
+                    {"degree": "S.Psi", "institution": "Universitas Gadjah Mada", "year": 2008},
+                    {"degree": "M.Psi (Psikologi Klinis)", "institution": "Universitas Indonesia", "year": 2012},
+                    {"degree": "Dr. (Psikologi)", "institution": "Universitas Gadjah Mada", "year": 2018}
+                ]
+            },
+            "certifications": {
+                "items": [
+                    "Surat Izin Praktik Psikolog (SIPP)",
+                    "Certified CBT Practitioner - Beck Institute",
+                    "Trauma-Informed Care Specialist",
+                    "Member of HIMPSI Yogyakarta"
+                ]
+            },
+            "years_of_experience": 12,
+            "languages": {"spoken": ["Indonesian", "English", "Javanese"]},
+            "availability_schedule": {
+                "Monday": ["08:00-12:00", "13:00-16:00"],
+                "Tuesday": ["09:00-12:00", "14:00-17:00"],
+                "Wednesday": ["08:00-12:00"],
+                "Thursday": ["09:00-12:00", "13:00-15:00"],
+                "Friday": ["08:00-11:00"]
+            },
+            "consultation_fee": 150000.0,
+            "rating": 4.9,
+            "total_reviews": 127
+        },
+        {
+            "name": "Pak Arif Wibowo, M.Psi., Psikolog",
+            "specialization": "Educational Psychology - Academic Stress",
+            "bio": "Pak Arif berfokus pada psikologi pendidikan dan membantu mahasiswa mengatasi stres akademik, burnout, dan masalah motivasi belajar. Pendekatan beliau ramah dan solution-focused.",
+            "education": {
+                "degrees": [
+                    {"degree": "S.Psi", "institution": "Universitas Airlangga", "year": 2010},
+                    {"degree": "M.Psi (Psikologi Pendidikan)", "institution": "Universitas Gadjah Mada", "year": 2014}
+                ]
+            },
+            "certifications": {
+                "items": [
+                    "Surat Izin Praktik Psikolog (SIPP)",
+                    "Solution-Focused Brief Therapy Practitioner",
+                    "Academic Coaching Specialist",
+                    "Member of Asosiasi Psikologi Pendidikan Indonesia"
+                ]
+            },
+            "years_of_experience": 8,
+            "languages": {"spoken": ["Indonesian", "English"]},
+            "availability_schedule": {
+                "Monday": ["13:00-17:00"],
+                "Tuesday": ["08:00-12:00", "13:00-16:00"],
+                "Wednesday": ["13:00-17:00"],
+                "Thursday": ["08:00-12:00"],
+                "Friday": ["09:00-12:00", "13:00-15:00"]
+            },
+            "consultation_fee": 100000.0,
+            "rating": 4.7,
+            "total_reviews": 89
+        },
+        {
+            "name": "Ibu Ratna Sari, M.Psi., Psikolog",
+            "specialization": "Counseling Psychology - Crisis Intervention",
+            "bio": "Ibu Ratna adalah spesialis intervensi krisis dengan pengalaman menangani kasus darurat kesehatan mental. Beliau available untuk konsultasi urgent dan memiliki pendekatan yang warm dan supportive.",
+            "education": {
+                "degrees": [
+                    {"degree": "S.Psi", "institution": "Universitas Gadjah Mada", "year": 2005},
+                    {"degree": "M.Psi (Psikologi Konseling)", "institution": "Universitas Gadjah Mada", "year": 2009}
+                ]
+            },
+            "certifications": {
+                "items": [
+                    "Surat Izin Praktik Psikolog (SIPP)",
+                    "Crisis Intervention Specialist - IASP",
+                    "Suicide Prevention Gatekeeper",
+                    "Dialectical Behavior Therapy (DBT) Trained",
+                    "Member of HIMPSI DIY"
+                ]
+            },
+            "years_of_experience": 15,
+            "languages": {"spoken": ["Indonesian", "Javanese", "English"]},
+            "availability_schedule": {
+                "Monday": ["08:00-12:00", "13:00-17:00"],
+                "Tuesday": ["08:00-12:00", "13:00-17:00"],
+                "Wednesday": ["08:00-12:00", "13:00-17:00"],
+                "Thursday": ["08:00-12:00", "13:00-17:00"],
+                "Friday": ["08:00-12:00"]
+            },
+            "consultation_fee": 0.0,  # Free for crisis
+            "rating": 4.8,
+            "total_reviews": 156
+        }
+    ]
+    
+    admin_names = ["Admin Kesehatan Mental UGM", "Koordinator Layanan Konseling"]
+    
+    majors = ["Psikologi", "Teknik Informatika", "Kedokteran", "Hukum", "Ekonomi", "Teknik Sipil", "Filsafat", "Sastra Inggris"]
+    cities = ["Yogyakarta", "Jakarta", "Sleman", "Bantul", "Surabaya", "Bandung", "Semarang", "Malang"]
+    
+    # --- Helper Functions ---
+    def random_date(start_year: int = 1995, end_year: int = 2005) -> date:
         start_date = date(start_year, 1, 1)
         end_date = date(end_year, 12, 31)
         time_between_dates = end_date - start_date
@@ -275,129 +385,147 @@ async def seed_database(
         random_number_of_days = random.randrange(days_between_dates)
         return start_date + timedelta(days=random_number_of_days)
 
-    majors = ["Psychology", "Computer Science", "Medicine", "Law", "Economics", "Engineering", "Philosophy"]
-    cities = ["Yogyakarta", "Jakarta", "Sleman", "Bantul", "Surabaya", "Bandung"]
-    universities = ["Universitas Gadjah Mada"]
-    pronouns_list = ["He/Him", "She/Her", "They/Them"]
-    
-    specializations = ["Clinical Psychology", "Educational Psychology", "Industrial-Organizational Psychology", "Counseling"]
-    languages_list = ["Indonesian", "English", "Javanese"]
-    
-    # --- Helper to create user ---
-    async def _create_user(name: str, role: str, index: int) -> str:
+    # --- Create Students ---
+    for i in range(min(request.users_count, len(student_names))):
+        name = student_names[i]
         random_suffix = secrets.token_hex(4)
-        sanitized_name = name.lower().replace(" ", ".")
-        email = f"{sanitized_name}.test.{random_suffix}@ugm.ac.id"
+        sanitized_name = name.lower().replace(" ", ".").replace(",", "").replace(".", "")
+        email = f"{sanitized_name}.test.{random_suffix}@mail.ugm.ac.id"
         
-        gender = random.choice(["Male", "Female"])
-        pronouns = "He/Him" if gender == "Male" else "She/Her"
+        gender = "Male" if i % 2 == 0 else "Female"
         
-        # Base User Data
         user = User(
             email=email,
             name=name,
             first_name=name.split()[0],
             last_name=name.split()[-1] if " " in name else None,
-            role=role,
+            role="user",
             university="Universitas Gadjah Mada",
             is_active=True,
             email_verified=True,
             created_at=datetime.now(),
             google_sub=f"test_{secrets.token_hex(16)}",
-            
-            # Personal Info
-            date_of_birth=random_date(1998, 2004) if role == "user" else random_date(1970, 1990),
+            date_of_birth=random_date(2000, 2004),
             gender=gender,
             city=random.choice(cities),
-            major=random.choice(majors) if role == "user" else None,
-            year_of_study=str(random.randint(2020, 2024)) if role == "user" else None,
-            sentiment_score=random.uniform(-0.5, 0.8),
+            major=random.choice(majors),
+            year_of_study=str(random.randint(2021, 2024)),
+            sentiment_score=random.uniform(-0.3, 0.7),
             wallet_address=f"0x{secrets.token_hex(20)}",
-            
-            # Profile Extensions
             profile_photo_url=f"https://api.dicebear.com/7.x/avataaars/svg?seed={email}",
             preferred_name=name.split()[0],
-            pronouns=pronouns,
+            pronouns="He/Him" if gender == "Male" else "She/Her",
             phone=f"+628{random.randint(1000000000, 9999999999)}",
-            emergency_contact_name=f"Parent of {name.split()[0]}",
-            emergency_contact_phone=f"+628{random.randint(1000000000, 9999999999)}",
-            emergency_contact_relationship="Parent",
-            
-            # Clinical (Randomized for students)
-            clinical_summary="Student reports mild academic stress." if role == "user" else None,
-            primary_concerns="Academic performance, Time management" if role == "user" else None,
-            
-            # Consent
             consent_data_sharing=True,
             consent_research=True,
             consent_emergency_contact=True,
-            
-            # Preferences
             preferred_language="Indonesian",
-            communication_preferences="Email",
         )
         db.add(user)
-        await db.flush() # Get ID
+        created_details.append(f"Student: {name} ({email})")
+    
+    # --- Create Counselors with Full Psychologist Profiles ---
+    for i in range(min(request.counselors_count, len(counselor_data))):
+        data = counselor_data[i]
+        name = data["name"]
+        random_suffix = secrets.token_hex(4)
+        sanitized_name = name.lower().replace(" ", ".").replace(",", "").replace(".", "")[:20]
+        email = f"{sanitized_name}.test.{random_suffix}@ugm.ac.id"
         
-        # --- Counselor Profile ---
-        if role == "counselor":
-            specialty = random.choice(specializations)
-            counselor_profile = CounselorProfile(
-                user_id=user.id,
-                name=name,
-                specialization=specialty,
-                image_url=user.profile_photo_url,
-                is_available=True,
-                bio=f"Experienced {specialty} professional dedicated to helping students.",
-                years_of_experience=random.randint(3, 15),
-                consultation_fee=random.choice([0.0, 50000.0, 100000.0]),
-                rating=round(random.uniform(4.0, 5.0), 1),
-                total_reviews=random.randint(0, 50),
-                
-                # JSON Fields
-                education={
-                    "degrees": [
-                        {"degree": "S.Psi", "institution": "UGM", "year": 2010},
-                        {"degree": "M.Psi", "institution": "UI", "year": 2014}
-                    ]
-                },
-                certifications={
-                    "items": ["Licensed Clinical Psychologist", "CBT Practitioner"]
-                },
-                languages={
-                    "spoken": random.sample(languages_list, k=random.randint(1, 3))
-                },
-                availability_schedule={
-                    "Monday": ["09:00-12:00", "13:00-15:00"],
-                    "Wednesday": ["09:00-12:00"],
-                    "Friday": ["13:00-16:00"]
-                }
-            )
-            db.add(counselor_profile)
-            
-        return f"{role.capitalize()}: {name} ({email})"
-
-    # Create Students
-    for i in range(request.users_count):
-        detail = await _create_user(f"Student {i+1}", "user", i)
-        created_details.append(detail)
+        # Determine gender from name prefix
+        gender = "Female" if any(x in name.lower() for x in ["ibu", "dr. sinta", "ratna"]) else "Male"
         
-    # Create Counselors
-    for i in range(request.counselors_count):
-        detail = await _create_user(f"Counselor {i+1}", "counselor", i)
-        created_details.append(detail)
+        # Create User record
+        user = User(
+            email=email,
+            name=name,
+            first_name=name.split()[0],
+            last_name=name.split()[-1] if " " in name else None,
+            role="counselor",
+            university="Universitas Gadjah Mada",
+            is_active=True,
+            email_verified=True,
+            created_at=datetime.now(),
+            google_sub=f"test_{secrets.token_hex(16)}",
+            date_of_birth=random_date(1975, 1990),
+            gender=gender,
+            city="Yogyakarta",
+            profile_photo_url=f"https://api.dicebear.com/7.x/avataaars/svg?seed={email}",
+            preferred_name=name.split()[0],
+            pronouns="He/Him" if gender == "Male" else "She/Her",
+            phone=f"+628{random.randint(1000000000, 9999999999)}",
+            consent_data_sharing=True,
+            preferred_language="Indonesian",
+        )
+        db.add(user)
+        await db.flush()  # Get user.id
         
-    # Create Admins
-    for i in range(request.admins_count):
-        detail = await _create_user(f"Admin {i+1}", "admin", i)
-        created_details.append(detail)
+        # Create Psychologist profile (linked to user)
+        psychologist = Psychologist(
+            user_id=user.id,
+            name=name,
+            specialization=data["specialization"],
+            image_url=user.profile_photo_url,
+            is_available=True,
+            bio=data["bio"],
+            education=data["education"],
+            certifications=data["certifications"],
+            years_of_experience=data["years_of_experience"],
+            languages=data["languages"],
+            availability_schedule=data["availability_schedule"],
+            consultation_fee=data["consultation_fee"],
+            rating=data["rating"],
+            total_reviews=data["total_reviews"],
+        )
+        db.add(psychologist)
+        created_details.append(f"Counselor: {name} ({email}) - Schedule: {list(data['availability_schedule'].keys())}")
+    
+    # --- Create Admins ---
+    for i in range(min(request.admins_count, len(admin_names))):
+        name = admin_names[i]
+        random_suffix = secrets.token_hex(4)
+        sanitized_name = f"admin{i+1}.test.{random_suffix}"
+        email = f"{sanitized_name}@ugm.ac.id"
         
+        user = User(
+            email=email,
+            name=name,
+            first_name="Admin",
+            last_name=f"UGM {i+1}",
+            role="admin",
+            university="Universitas Gadjah Mada",
+            is_active=True,
+            email_verified=True,
+            created_at=datetime.now(),
+            google_sub=f"test_{secrets.token_hex(16)}",
+            city="Yogyakarta",
+            profile_photo_url=f"https://api.dicebear.com/7.x/avataaars/svg?seed={email}",
+            preferred_language="Indonesian",
+        )
+        db.add(user)
+        created_details.append(f"Admin: {name} ({email})")
+    
+    # --- Create Appointment Types if not exist ---
+    existing_types = await db.execute(select(AppointmentType))
+    if not existing_types.scalars().first():
+        appointment_types = [
+            AppointmentType(id=1, name="General Counseling", duration_minutes=60, description="Konseling umum untuk berbagai masalah kesehatan mental"),
+            AppointmentType(id=2, name="Academic Counseling", duration_minutes=45, description="Konseling terkait masalah akademik dan stres belajar"),
+            AppointmentType(id=3, name="Career Counseling", duration_minutes=45, description="Konseling karir dan perencanaan masa depan"),
+            AppointmentType(id=4, name="Crisis Intervention", duration_minutes=90, description="Intervensi krisis untuk keadaan darurat kesehatan mental"),
+        ]
+        for apt in appointment_types:
+            db.add(apt)
+        created_details.append("Created 4 appointment types")
+    
     await db.commit()
     
+    logger.info(f"Seeded database: {request.users_count} students, {request.counselors_count} counselors, {request.admins_count} admins")
+    
     return SeedDatabaseResponse(
-        users_created=request.users_count,
-        counselors_created=request.counselors_count,
-        admins_created=request.admins_count,
+        users_created=min(request.users_count, len(student_names)),
+        counselors_created=min(request.counselors_count, len(counselor_data)),
+        admins_created=min(request.admins_count, len(admin_names)),
         details=created_details
     )
 

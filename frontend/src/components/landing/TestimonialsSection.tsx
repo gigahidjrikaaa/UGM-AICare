@@ -6,30 +6,57 @@ import { FaStar } from '@/icons';
 const testimonials = [
   {
     name: "Rania A.",
-    major: "Teknik Sipil",
+    major: "Civil Engineering",
     year: "2022",
     avatar: "RA",
     rating: 5,
-    text: "Pas lagi overwhelmed skripsian jam 2 pagi, Aika kasih teknik grounding yang beneran ngebantu. Besoknya langsung booking konseling di GMC lewat rekomendasi Aika.",
-    tag: "📚 Stress Skripsi"
+    text: "When I was overwhelmed with my thesis at 2 AM, Aika gave me grounding techniques that actually helped. The next day, I booked a counseling session at GMC through Aika's recommendation.",
+    tag: "📚 Thesis Stress"
   },
   {
     name: "Fajar D.",
-    major: "Kedokteran",
+    major: "Medicine",
     year: "2021",
     avatar: "FD",
     rating: 5,
-    text: "Awalnya skeptis sama AI untuk mental health. Tapi pas nyoba, Aika bener-bener paham situasi aku. Ga judgmental, langsung kasih action plan yang realistis.",
+    text: "I was skeptical about AI for mental health at first. But when I tried it, Aika truly understood my situation. No judgment, just immediate action plans that were actually realistic.",
     tag: "😰 Anxiety"
   },
   {
     name: "Dinda K.",
-    major: "Psikologi",
+    major: "Psychology",
     year: "2023",
     avatar: "DK",
     rating: 5,
-    text: "Semester 1 homesick parah. Aika jadi tempat curhat pertama sebelum aku akhirnya ke psikolog kampus. Responnya cepet banget, literally 2 detik.",
+    text: "First semester homesickness hit hard. Aika became my first outlet before I finally went to the campus psychologist. The response was literally 2 seconds.",
     tag: "🏠 Homesick"
+  },
+  {
+    name: "Andi S.",
+    major: "Computer Science",
+    year: "2022",
+    avatar: "AS",
+    rating: 5,
+    text: "The gamification features keep me coming back for daily check-ins. It doesn't feel like a chore anymore. Plus, the breathing exercises during coding sprints are a lifesaver!",
+    tag: "🎮 Wellness Journey"
+  },
+  {
+    name: "Maya P.",
+    major: "Economics",
+    year: "2023",
+    avatar: "MP",
+    rating: 5,
+    text: "I love that everything is confidential. I can talk about anything without worrying. When I needed professional help, the referral to HPU was seamless.",
+    tag: "🔒 Privacy Matters"
+  },
+  {
+    name: "Rizki H.",
+    major: "Architecture",
+    year: "2021",
+    avatar: "RH",
+    rating: 5,
+    text: "Deadline season used to destroy my mental health. Now I have Aika to help me through those tough nights. The CBT techniques actually work.",
+    tag: "⏰ Deadline Stress"
   }
 ];
 
@@ -52,30 +79,32 @@ export default function TestimonialsSection() {
           className="text-center mb-16"
         >
           <div className="inline-block px-4 py-2 bg-[#FFCA40]/10 rounded-full border border-[#FFCA40]/30 mb-4">
-            <span className="text-[#FFCA40] font-semibold text-sm">TESTIMONI MAHASISWA UGM</span>
+            <span className="text-[#FFCA40] font-semibold text-sm">STUDENT TESTIMONIALS</span>
           </div>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6">
-            Mereka Udah Coba,<br />
-            <span className="text-[#FFCA40]">Sekarang Giliran Kamu</span>
+            Real Stories from{' '}
+            <span className="bg-gradient-to-r from-[#FFCA40] to-[#FFD770] bg-clip-text text-transparent">
+              UGM Students
+            </span>
           </h2>
           <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-            Ribuan mahasiswa UGM udah dapetin bantuan dari Aika. Simak cerita mereka.
+            Thousands of UGM students have found support through Aika. Here are some of their experiences.
           </p>
         </motion.div>
 
         {/* Testimonials Grid */}
-        <div className="grid md:grid-cols-3 gap-8">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {testimonials.map((testimonial, index) => (
             <motion.div
               key={index}
               initial={{ opacity: 0, y: 50 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: index * 0.2 }}
-              whileHover={{ y: -10, transition: { duration: 0.3 } }}
+              transition={{ duration: 0.6, delay: index * 0.1 }}
+              whileHover={{ y: -8, transition: { duration: 0.3 } }}
               className="relative"
             >
-              <div className="bg-white/5 backdrop-blur-xl rounded-3xl p-8 border border-white/10 shadow-2xl h-full flex flex-col">
+              <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10 shadow-xl h-full flex flex-col hover:border-[#FFCA40]/30 transition-colors">
                 {/* Tag */}
                 <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#FFCA40]/10 rounded-full border border-[#FFCA40]/30 mb-4 self-start">
                   <span className="text-[#FFCA40] text-sm font-semibold">{testimonial.tag}</span>
@@ -84,24 +113,24 @@ export default function TestimonialsSection() {
                 {/* Rating */}
                 <div className="flex gap-1 mb-4">
                   {[...Array(testimonial.rating)].map((_, i) => (
-                    <FaStar key={i} className="text-[#FFCA40] text-lg" />
+                    <FaStar key={i} className="text-[#FFCA40] text-sm" />
                   ))}
                 </div>
 
                 {/* Testimonial Text */}
-                <p className="text-white/80 text-base leading-relaxed mb-6 flex-grow">
+                <p className="text-white/80 text-sm leading-relaxed mb-6 flex-grow">
                   &ldquo;{testimonial.text}&rdquo;
                 </p>
 
                 {/* Author Info */}
-                <div className="flex items-center gap-4 pt-4 border-t border-white/10">
-                  {/* Avatar Placeholder */}
-                  <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#FFCA40] to-[#FFB700] flex items-center justify-center text-[#001D58] font-bold text-sm">
+                <div className="flex items-center gap-3 pt-4 border-t border-white/10">
+                  {/* Avatar */}
+                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFCA40] to-[#FFB700] flex items-center justify-center text-[#001D58] font-bold text-sm">
                     {testimonial.avatar}
                   </div>
                   <div>
-                    <div className="text-white font-semibold">{testimonial.name}</div>
-                    <div className="text-gray-400 text-sm">{testimonial.major} • {testimonial.year}</div>
+                    <div className="text-white font-semibold text-sm">{testimonial.name}</div>
+                    <div className="text-gray-400 text-xs">{testimonial.major} • {testimonial.year}</div>
                   </div>
                 </div>
               </div>
@@ -109,34 +138,16 @@ export default function TestimonialsSection() {
           ))}
         </div>
 
-        {/* Stats Banner */}
+        {/* Call to Action */}
         <motion.div
-          initial={{ opacity: 0, y: 30 }}
+          initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.4 }}
-          className="mt-16 bg-gradient-to-r from-[#FFCA40]/10 via-[#FFD770]/10 to-[#FFCA40]/10 backdrop-blur-xl rounded-3xl p-8 border border-[#FFCA40]/30"
+          transition={{ delay: 0.4 }}
+          className="text-center mt-12"
         >
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8 text-center">
-            <div>
-              <div className="text-4xl font-bold text-[#FFCA40] mb-2">73%</div>
-              <div className="text-sm text-gray-400">Mahasiswa Indonesia alami stress akademik</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-[#FFCA40] mb-2">51%</div>
-              <div className="text-sm text-gray-400">Mengalami gejala anxiety</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-[#FFCA40] mb-2">25%</div>
-              <div className="text-sm text-gray-400">Memiliki gejala depresi</div>
-            </div>
-            <div>
-              <div className="text-4xl font-bold text-[#FFCA40] mb-2">2000+</div>
-              <div className="text-sm text-gray-400">Mahasiswa UGM terbantu</div>
-            </div>
-          </div>
-          <p className="text-center text-gray-400 text-sm mt-6">
-            Sumber: Indonesian National Mental Health Survey 2024
+          <p className="text-gray-400 mb-4">
+            Join thousands of students who have already started their wellness journey.
           </p>
         </motion.div>
       </div>

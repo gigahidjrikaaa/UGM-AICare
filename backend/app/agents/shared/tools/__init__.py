@@ -59,12 +59,6 @@ except ImportError as e:
     logger.error(f"❌ Could not load user_tools: {e}")
 
 try:
-    from . import analytics_tools  # noqa: F401
-    logger.info("✅ Loaded analytics_tools")
-except ImportError as e:
-    logger.error(f"❌ Could not load analytics_tools: {e}")
-
-try:
     from . import case_management_tools  # noqa: F401
     logger.info("✅ Loaded case_management_tools")
 except ImportError as e:
@@ -75,12 +69,6 @@ try:
     logger.info("✅ Loaded conversation_tools")
 except ImportError as e:
     logger.error(f"❌ Could not load conversation_tools: {e}")
-
-try:
-    from . import external_tools  # noqa: F401
-    logger.info("✅ Loaded external_tools")
-except ImportError as e:
-    logger.error(f"❌ Could not load external_tools: {e}")
 
 try:
     from . import intervention_tools  # noqa: F401
@@ -114,10 +102,8 @@ __all__ = [
     "agent_tools",
     "scheduling_tools",
     "user_tools",
-    "analytics_tools",
     "case_management_tools",
     "conversation_tools",
-    "external_tools",
     "intervention_tools",
     "progress_tools",
     "safety_tools",

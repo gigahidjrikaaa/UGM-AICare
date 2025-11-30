@@ -6,22 +6,22 @@ import { FiCheckCircle, FiZap, FiHeart, FiUsers } from '@/icons';
 const benefits = [
   {
     icon: FiZap,
-    title: "Deteksi Krisis Otomatis",
-    description: "AI kami langsung detect kalau kamu lagi dalam kondisi darurat dan kasih emergency resources dalam hitungan detik.",
+    title: "Automatic Crisis Detection",
+    description: "Our AI instantly detects if you're in an emergency situation and provides immediate emergency resources within seconds.",
     stat: "<1s",
     statLabel: "Response Time",
     color: "from-[#FF6B9D] to-[#FF8FAB]",
     features: [
-      "Crisis detection realtime",
-      "Emergency hotline UGM",
-      "Auto-connect ke konselor",
+      "Real-time crisis detection",
+      "UGM emergency hotline",
+      "Auto-connect to counselors",
       "24/7 monitoring"
     ]
   },
   {
     icon: FiHeart,
-    title: "Rencana Aksi Personal",
-    description: "Setiap orang beda. Aika bikin intervention plan yang disesuaikan sama situasi dan kebutuhan kamu.",
+    title: "Personalized Action Plans",
+    description: "Everyone is different. Aika creates intervention plans tailored specifically to your situation and needs.",
     stat: "100%",
     statLabel: "Personalized",
     color: "from-[#FFCA40] to-[#FFD770]",
@@ -34,16 +34,16 @@ const benefits = [
   },
   {
     icon: FiUsers,
-    title: "Connect ke Konselor UGM",
-    description: "Butuh bantuan profesional? Aika langsung hubungin kamu ke konselor di GMC, HPU, atau Fakultas Psikologi UGM.",
+    title: "Connect to UGM Counselors",
+    description: "Need professional help? Aika directly connects you to counselors at GMC, HPU, or UGM Psychology Faculty.",
     stat: "24/7",
     statLabel: "Available",
     color: "from-[#6A98F0] to-[#8AABF5]",
     features: [
-      "Direct booking ke GMC",
-      "Terintegrasi dengan HPU",
-      "Referral ke psikolog",
-      "Follow-up otomatis"
+      "Direct booking to GMC",
+      "Integrated with HPU",
+      "Psychologist referrals",
+      "Automatic follow-ups"
     ]
   }
 ];
@@ -67,14 +67,14 @@ export default function BenefitsSection() {
           className="text-center mb-16"
         >
           <div className="inline-block px-4 py-2 bg-[#FFCA40]/10 rounded-full border border-[#FFCA40]/30 mb-4">
-            <span className="text-[#FFCA40] font-semibold text-sm">KENAPA PILIH AIKA?</span>
+            <span className="text-[#FFCA40] font-semibold text-sm">WHY CHOOSE AIKA?</span>
           </div>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6">
-            Bukan Cuma Chatbot Biasa,<br />
-            <span className="text-[#FFCA40]">Ini Sistem Lengkap</span>
+            Not Just Another Chatbot,<br />
+            <span className="text-[#FFCA40]">A Complete System</span>
           </h2>
           <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-            Aika punya 3 keunggulan utama yang ga bakal kamu temuin di chatbot mental health lainnya.
+            Aika offers three core advantages you won&apos;t find in other mental health chatbots.
           </p>
         </motion.div>
 
@@ -183,8 +183,8 @@ export default function BenefitsSection() {
             {/* Right: Text Content */}
             <div>
               <h3 className="text-3xl font-bold text-white mb-6">
-                Bedanya Aika dengan<br />
-                <span className="text-[#FFCA40]">Chatbot Lain</span>
+                What Makes Aika<br />
+                <span className="text-[#FFCA40]">Different</span>
               </h3>
               
               <div className="space-y-4">
@@ -195,8 +195,8 @@ export default function BenefitsSection() {
                     </svg>
                   </div>
                   <div>
-                    <h4 className="text-white font-semibold mb-1">Terintegrasi dengan Sistem UGM</h4>
-                    <p className="text-gray-400 text-sm">Langsung terhubung ke GMC, HPU, dan layanan kesehatan mental kampus.</p>
+                    <h4 className="text-white font-semibold mb-1">Integrated with UGM Systems</h4>
+                    <p className="text-gray-400 text-sm">Directly connected to GMC, HPU, and campus mental health services.</p>
                   </div>
                 </div>
 
@@ -208,7 +208,7 @@ export default function BenefitsSection() {
                   </div>
                   <div>
                     <h4 className="text-white font-semibold mb-1">Evidence-Based CBT</h4>
-                    <p className="text-gray-400 text-sm">Semua teknik yang dikasih Aika berbasis riset ilmiah Cognitive Behavioral Therapy.</p>
+                    <p className="text-gray-400 text-sm">All techniques provided by Aika are based on Cognitive Behavioral Therapy research.</p>
                   </div>
                 </div>
 
@@ -220,7 +220,7 @@ export default function BenefitsSection() {
                   </div>
                   <div>
                     <h4 className="text-white font-semibold mb-1">Multi-Agent AI System</h4>
-                    <p className="text-gray-400 text-sm">Bukan 1 AI, tapi 4 specialized agents yang kerja bareng untuk bantu kamu.</p>
+                    <p className="text-gray-400 text-sm">Not just one AI, but 4 specialized agents working together to help you.</p>
                   </div>
                 </div>
 
@@ -232,7 +232,7 @@ export default function BenefitsSection() {
                   </div>
                   <div>
                     <h4 className="text-white font-semibold mb-1">Privacy-First Design</h4>
-                    <p className="text-gray-400 text-sm">Data kamu aman dengan differential privacy dan enkripsi end-to-end.</p>
+                    <p className="text-gray-400 text-sm">Your data is secure with differential privacy and end-to-end encryption.</p>
                   </div>
                 </div>
               </div>

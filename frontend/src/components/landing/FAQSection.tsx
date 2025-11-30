@@ -6,20 +6,24 @@ import { FiChevronDown } from '@/icons';
 
 const faqs = [
   {
-    question: "Aika nggak bakal gantiin konselor profesional kan?",
-    answer: "Engga kok! Aika itu complementary, bukan replacement. Fungsi Aika adalah kasih first-line support, teknik coping CBT-based, dan kalau situasinya butuh bantuan profesional, Aika bakal langsung referral kamu ke konselor di GMC atau psikolog kampus. Think of Aika as your 24/7 companion yang bisa bridge kamu ke professional help."
+    question: "Will Aika replace professional counselors?",
+    answer: "Absolutely not! Aika is complementary, not a replacement. Aika's role is to provide first-line support, CBT-based coping techniques, and if the situation requires professional help, Aika will immediately refer you to counselors at GMC or campus psychologists. Think of Aika as your 24/7 companion that bridges you to professional help."
   },
   {
-    question: "Kalau aku lagi krisis, gimana? Aika bisa handle?",
-    answer: "Yes, Aika punya crisis detection system. Kalau Aika detect kamu lagi dalam kondisi darurat (misal ada suicidal thoughts atau self-harm tendencies), Aika bakal:\n\n1. Langsung kasih emergency resources (UGM Crisis Line, SEJIWA 119, Emergency 112)\n2. Auto-escalate ke sistem UGM untuk immediate intervention\n3. Kasih grounding techniques untuk stabilize kondisi kamu\n4. Connect kamu ke on-call counselor (kalau available)\n\nTapi ingat: untuk situasi life-threatening, selalu hubungi emergency services (112) atau datang langsung ke UGM Health Center."
+    question: "What if I'm in crisis? Can Aika handle it?",
+    answer: "Yes, Aika has a crisis detection system. If Aika detects you're in an emergency (e.g., suicidal thoughts or self-harm tendencies), Aika will:\n\n1. Immediately provide emergency resources (UGM Crisis Line, SEJIWA 119, Emergency 112)\n2. Auto-escalate to the UGM system for immediate intervention\n3. Provide grounding techniques to stabilize your condition\n4. Connect you to an on-call counselor (if available)\n\nRemember: for life-threatening situations, always contact emergency services (112) or go directly to UGM Health Center."
   },
   {
-    question: "Chat aku sama Aika aman nggak? Privasi gimana?",
-    answer: "100% aman dan confidential. Semua chat:\n\n• Encrypted end-to-end\n• Ga disimpan di server external\n• Cuma bisa diakses sama kamu (dan konselor kalau kamu opt-in untuk sharing)\n• Pakai differential privacy untuk analytics (jadi data kamu ga bisa di-trace back)\n• Comply dengan standar GDPR dan UU Perlindungan Data Pribadi Indonesia\n\nKamu juga bisa request full deletion of your data kapanpun mau."
+    question: "Is my chat with Aika secure? What about privacy?",
+    answer: "100% secure and confidential. All chats:\n\n• End-to-end encrypted\n• Not stored on external servers\n• Only accessible by you (and counselors if you opt-in for sharing)\n• Use differential privacy for analytics (your data cannot be traced back)\n• Comply with GDPR standards and Indonesian Personal Data Protection Law\n\nYou can also request full deletion of your data anytime."
   },
   {
-    question: "Beneran gratis? Ada hidden cost-nya nggak?",
-    answer: "Gratis selamanya untuk mahasiswa UGM. Ga ada hidden cost, ga ada subscription, ga ada paywall. Ini funded by UGM as part of student wellness initiative. Yang kamu butuhkan cuma email UGM aktif untuk verifikasi (tapi ga perlu login setiap kali chat)."
+    question: "Is it really free? Any hidden costs?",
+    answer: "Free forever for UGM students. No hidden costs, no subscriptions, no paywalls. This is funded by UGM as part of the student wellness initiative. All you need is an active UGM email for verification (but you don't need to login every time you chat)."
+  },
+  {
+    question: "What makes Aika different from other mental health chatbots?",
+    answer: "Several key differences:\n\n• Integrated directly with UGM's mental health infrastructure (GMC, HPU, Psychology Faculty)\n• Multi-agent AI system with specialized agents for different needs\n• Evidence-based CBT techniques validated by professionals\n• Gamification for sustained engagement\n• Privacy-first architecture with differential privacy\n• Designed specifically for Indonesian university students"
   }
 ];
 
@@ -47,11 +51,11 @@ export default function FAQSection() {
             <span className="text-[#FFCA40] font-semibold text-sm">FAQ</span>
           </div>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6">
-            Masih Ada Pertanyaan?<br />
-            <span className="text-[#FFCA40]">Kami Jawab</span>
+            Got Questions?<br />
+            <span className="text-[#FFCA40]">We Have Answers</span>
           </h2>
           <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-            Questions yang paling sering ditanyain sama mahasiswa UGM.
+            Common questions asked by UGM students about Aika.
           </p>
         </motion.div>
 
@@ -111,10 +115,10 @@ export default function FAQSection() {
         >
           <div className="text-center">
             <h3 className="text-2xl font-bold text-white mb-4">
-              Masih ada pertanyaan lain?
+              Still have more questions?
             </h3>
             <p className="text-gray-400 mb-6">
-              Langsung aja chat Aika atau hubungi tim support kami.
+              Chat directly with Aika or contact our support team.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <a 

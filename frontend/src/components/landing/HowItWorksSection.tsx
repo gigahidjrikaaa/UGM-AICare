@@ -8,23 +8,23 @@ const steps = [
   {
     number: "01",
     emoji: "💬",
-    title: "Mulai Chat",
-    description: "Langsung buka Aika dan ceritain apa yang lagi kamu rasain. Ga perlu daftar, ga perlu login.",
-    time: "10 detik"
+    title: "Start Chatting",
+    description: "Open Aika and share what you're feeling. No sign-up needed, no login required.",
+    time: "10 seconds"
   },
   {
     number: "02",
     emoji: "🤝",
-    title: "Dapetin Bantuan",
-    description: "Aika bakal dengerin, kasih teknik coping, dan bikin action plan yang cocok sama situasi kamu.",
-    time: "2-5 menit"
+    title: "Get Support",
+    description: "Aika listens, provides coping techniques, and creates an action plan tailored to your situation.",
+    time: "2-5 minutes"
   },
   {
     number: "03",
     emoji: "👨‍⚕️",
-    title: "Connect ke Konselor",
-    description: "Kalau butuh bantuan profesional, Aika langsung booking-in kamu ke konselor UGM. Opsional, sesuai kebutuhan.",
-    time: "Kapanpun siap"
+    title: "Connect to Counselor",
+    description: "If you need professional help, Aika directly books you with a UGM counselor. Optional, based on your needs.",
+    time: "Whenever ready"
   }
 ];
 
@@ -47,20 +47,20 @@ export default function HowItWorksSection() {
           className="text-center mb-16"
         >
           <div className="inline-block px-4 py-2 bg-[#FFCA40]/10 rounded-full border border-[#FFCA40]/30 mb-4">
-            <span className="text-[#FFCA40] font-semibold text-sm">GIMANA CARANYA?</span>
+            <span className="text-[#FFCA40] font-semibold text-sm">HOW IT WORKS</span>
           </div>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6">
-            Gampang Banget,<br />
-            <span className="text-[#FFCA40]">Cuma 3 Langkah</span>
+            Super Easy,<br />
+            <span className="text-[#FFCA40]">Just 3 Steps</span>
           </h2>
           <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-4">
-            Dari stress sampai dapet bantuan, cuma butuh 60 detik. Literally.
+            From stress to support in 60 seconds. Literally.
           </p>
           <div className="inline-flex items-center gap-2 px-6 py-3 bg-[#4ADE80]/10 rounded-full border border-[#4ADE80]/30">
             <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
               <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd"/>
             </svg>
-            <span className="text-[#4ADE80] font-semibold">Total waktu: ~60 detik untuk dapetin support</span>
+            <span className="text-[#4ADE80] font-semibold">Total time: ~60 seconds to get support</span>
           </div>
         </motion.div>
 
@@ -168,16 +168,16 @@ export default function HowItWorksSection() {
             {/* Right: CTA */}
             <div>
               <h3 className="text-3xl font-bold text-white mb-6">
-                Siap Coba Sekarang?<br />
-                <span className="text-[#FFCA40]">Gratis Selamanya</span>
+                Ready to Try Now?<br />
+                <span className="text-[#FFCA40]">Free Forever</span>
               </h3>
               
               <div className="space-y-4 mb-8">
                 {[
-                  "✓ Ga perlu daftar atau login",
-                  "✓ Response time < 2 detik",
+                  "✓ No sign-up or login required",
+                  "✓ Response time < 2 seconds",
                   "✓ 100% confidential & private",
-                  "✓ Terintegrasi dengan layanan UGM",
+                  "✓ Integrated with UGM services",
                   "✓ Available 24/7, even during weekends"
                 ].map((item, index) => (
                   <motion.div
@@ -203,7 +203,7 @@ export default function HowItWorksSection() {
                   className="group relative px-12 py-5 bg-gradient-to-r from-[#FFCA40] via-[#FFD770] to-[#FFB700] text-[#001D58] rounded-full font-bold text-xl flex items-center justify-center shadow-2xl transition-all w-full sm:w-auto overflow-hidden"
                 >
                   <span className="relative z-10 flex items-center gap-3">
-                    Mulai Chat Sekarang
+                    Start Chatting Now
                     <motion.span
                       animate={{ x: [0, 5, 0] }}
                       transition={{ repeat: Infinity, duration: 1.5 }}
@@ -221,7 +221,7 @@ export default function HowItWorksSection() {
               </Link>
 
               <p className="text-gray-400 text-sm mt-4">
-                🔥 <span className="text-[#FFCA40] font-semibold">500+ mahasiswa</span> dibantu minggu ini
+                🔥 <span className="text-[#FFCA40] font-semibold">500+ students</span> helped this week
               </p>
             </div>
           </div>

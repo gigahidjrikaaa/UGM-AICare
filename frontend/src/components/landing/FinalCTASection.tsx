@@ -54,7 +54,7 @@ export default function FinalCTASection() {
                 🔥
               </motion.span>
               <span className="text-white font-semibold">
-                <span className="text-[#FFCA40]">500+ mahasiswa</span> dibantu minggu ini
+                <span className="text-[#FFCA40]">500+ students</span> helped this week
               </span>
             </motion.div>
 
@@ -66,9 +66,9 @@ export default function FinalCTASection() {
               transition={{ duration: 0.6, delay: 0.3 }}
               className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6 leading-tight"
             >
-              Kamu Ga Sendirian.<br />
+              You Are Not Alone.<br />
               <span className="bg-gradient-to-r from-[#FFCA40] via-[#FFD770] to-[#FFCA40] bg-clip-text text-transparent">
-                Yuk, Mulai Sekarang.
+                Start Your Journey Today.
               </span>
             </motion.h2>
 
@@ -80,8 +80,8 @@ export default function FinalCTASection() {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="text-xl sm:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto"
             >
-              Jutaan mahasiswa di dunia ngalamin yang sama. Tapi bedanya, sekarang kamu punya Aika. 
-              AI companion yang siap 24/7, empathetic, dan evidence-based.
+              Millions of students worldwide go through the same thing. But now, you have Aika. 
+              An AI companion available 24/7, empathetic, and evidence-based.
             </motion.p>
 
             {/* Primary CTA Button */}
@@ -102,7 +102,7 @@ export default function FinalCTASection() {
                   className="group relative px-16 py-6 bg-gradient-to-r from-[#FFCA40] via-[#FFD770] to-[#FFB700] text-[#001D58] rounded-full font-bold text-2xl flex items-center justify-center shadow-2xl transition-all overflow-hidden"
                 >
                   <span className="relative z-10 flex items-center gap-3">
-                    Mulai Chat Sekarang
+                    Start Chatting Now
                     <motion.span
                       animate={{ x: [0, 8, 0] }}
                       transition={{ repeat: Infinity, duration: 1.5 }}
@@ -132,19 +132,19 @@ export default function FinalCTASection() {
                 <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
                 </svg>
-                <span className="text-white font-medium">Tanpa Daftar</span>
+                <span className="text-white font-medium">No Sign-up Required</span>
               </div>
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
                 </svg>
-                <span className="text-white font-medium">Gratis Selamanya</span>
+                <span className="text-white font-medium">Free Forever</span>
               </div>
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
                 </svg>
-                <span className="text-white font-medium">100% Privasi Terjamin</span>
+                <span className="text-white font-medium">100% Private & Secure</span>
               </div>
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
@@ -166,10 +166,10 @@ export default function FinalCTASection() {
         >
           <div className="text-center">
             <h3 className="text-xl font-bold text-white mb-4">
-              🚨 Dalam Kondisi Darurat?
+              🚨 In an Emergency?
             </h3>
             <p className="text-gray-400 mb-6">
-              Kalau kamu atau temen kamu dalam kondisi krisis, hubungi layanan darurat ini:
+              If you or a friend are in crisis, contact these emergency services:
             </p>
             <div className="grid sm:grid-cols-3 gap-4">
               <a 
@@ -184,14 +184,14 @@ export default function FinalCTASection() {
                 className="px-6 py-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-all border border-white/20"
               >
                 <div className="text-[#FF6B9D] font-bold text-lg mb-1">SEJIWA</div>
-                <div className="text-white text-sm">Tekan 119</div>
+                <div className="text-white text-sm">Dial 119</div>
               </a>
               <a 
                 href="tel:112" 
                 className="px-6 py-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-all border border-white/20"
               >
                 <div className="text-[#FF6B9D] font-bold text-lg mb-1">Emergency</div>
-                <div className="text-white text-sm">Tekan 112</div>
+                <div className="text-white text-sm">Dial 112</div>
               </a>
             </div>
           </div>
