@@ -46,6 +46,8 @@ class User(Base):
     longest_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_activity_date: Mapped[Optional[Date]] = mapped_column(Date, nullable=True)
     allow_email_checkins: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
+    last_checkin_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    checkin_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Extended profile fields
     profile_photo_url: Mapped[Optional[str]] = mapped_column(String, nullable=True)
