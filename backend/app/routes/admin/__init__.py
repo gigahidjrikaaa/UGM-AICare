@@ -20,6 +20,7 @@ from .sse import router as sse_router
 from .campaigns import router as campaigns_router
 from .quests import router as quests_router
 from .database import router as database_router
+from .screening import router as screening_router
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
 router.include_router(appointments_router)
@@ -40,6 +41,7 @@ router.include_router(sse_router)
 router.include_router(campaigns_router)
 router.include_router(quests_router)
 router.include_router(database_router)
+router.include_router(screening_router)
 
 __all__ = [
     "router",
@@ -53,4 +55,5 @@ __all__ = [
     "users",
     "quests",
     "database",
+    "screening",
 ]

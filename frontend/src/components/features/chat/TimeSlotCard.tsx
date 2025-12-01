@@ -1,14 +1,14 @@
 import React from 'react';
 import { FiCalendar, FiClock, FiCheckCircle } from 'react-icons/fi';
 
-interface TimeSlot {
+export interface TimeSlot {
     datetime: string;
     day_name: string;
     time_label: string;
     reason: string;
 }
 
-interface TimeSlotCardProps {
+export interface TimeSlotCardProps {
     slot: TimeSlot;
     onSelect: (slot: TimeSlot) => void;
 }

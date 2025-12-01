@@ -1,7 +1,7 @@
 import React from 'react';
 import { FiStar, FiClock, FiDollarSign, FiCheck } from 'react-icons/fi';
 
-interface Counselor {
+export interface Counselor {
     id: number;
     name: string;
     specialization: string;
@@ -14,7 +14,7 @@ interface Counselor {
     has_availability: boolean;
 }
 
-interface CounselorCardProps {
+export interface CounselorCardProps {
     counselor: Counselor;
     onSelect: (counselor: Counselor) => void;
 }

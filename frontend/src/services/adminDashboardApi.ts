@@ -5,6 +5,7 @@ export interface GenerateReportRequest {
   report_type: 'weekly' | 'monthly' | 'ad_hoc';
   period_start?: string;
   period_end?: string;
+  use_llm?: boolean; // Whether to use Gemini LLM for intelligent analysis
 }
 
 export interface InsightsReport {
@@ -14,7 +15,31 @@ export interface InsightsReport {
   period_end: string;
   summary: string | null;
   trending_topics: Record<string, unknown> | null;
-  sentiment_data: Record<string, unknown> | null;
+  sentiment_data: {
+    avg_sentiment?: number;
+    avg_risk?: number;
+    period_start?: string;
+    period_end?: string;
+    patterns?: Array<{
+      title: string;
+      description: string;
+      severity: 'low' | 'medium' | 'high';
+      trend: 'increasing' | 'stable' | 'decreasing';
+    }>;
+    recommendations?: Array<{
+      title: string;
+      description: string;
+      priority: 'low' | 'medium' | 'high';
+      category: 'intervention' | 'resource' | 'communication' | 'monitoring';
+    }>;
+    severity_distribution?: {
+      low: number;
+      medium: number;
+      high: number;
+      critical: number;
+    };
+    llm_powered?: boolean;
+  } | null;
   high_risk_count: number;
   assessment_count: number;
   generated_at: string;

@@ -7,6 +7,7 @@ import {
   SparklesIcon,
   CalendarIcon,
   ClockIcon,
+  CpuChipIcon,
 } from '@heroicons/react/24/outline';
 
 interface GenerateReportModalProps {
@@ -19,12 +20,14 @@ export interface GenerateReportParams {
   report_type: 'weekly' | 'monthly' | 'ad_hoc';
   period_start?: string; // ISO datetime
   period_end?: string; // ISO datetime
+  use_llm?: boolean; // Whether to use Gemini LLM for intelligent analysis
 }
 
 export function GenerateReportModal({ isOpen, onClose, onGenerate }: GenerateReportModalProps) {
   const [reportType, setReportType] = useState<'weekly' | 'monthly' | 'ad_hoc'>('ad_hoc');
   const [periodStart, setPeriodStart] = useState('');
   const [periodEnd, setPeriodEnd] = useState('');
+  const [useLLM, setUseLLM] = useState(true); // Default to using LLM
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -36,6 +39,7 @@ export function GenerateReportModal({ isOpen, onClose, onGenerate }: GenerateRep
     try {
       const params: GenerateReportParams = {
         report_type: reportType,
+        use_llm: useLLM,
       };
 
       // Add dates if provided (for ad_hoc or overriding defaults)
@@ -52,6 +56,7 @@ export function GenerateReportModal({ isOpen, onClose, onGenerate }: GenerateRep
       setReportType('ad_hoc');
       setPeriodStart('');
       setPeriodEnd('');
+      setUseLLM(true);
       onClose();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to generate report');
@@ -112,7 +117,7 @@ export function GenerateReportModal({ isOpen, onClose, onGenerate }: GenerateRep
                     </div>
                     <div>
                       <h2 className="text-xl font-semibold text-white">Generate IA Report</h2>
-                      <p className="text-sm text-white/60">Manually trigger Insights Agent analysis</p>
+                      <p className="text-sm text-white/60">AI-powered Insights Agent analysis</p>
                     </div>
                   </div>
                   <button
@@ -156,6 +161,44 @@ export function GenerateReportModal({ isOpen, onClose, onGenerate }: GenerateRep
                     {reportType === 'monthly' && 'Analyze data from the last 30 days'}
                     {reportType === 'ad_hoc' && 'Create a custom report with your own date range'}
                   </p>
+                </div>
+
+                {/* LLM Toggle */}
+                <div className="p-4 rounded-lg bg-gradient-to-r from-purple-500/10 to-blue-500/10 border border-purple-500/20">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="p-2 rounded-lg bg-purple-500/20">
+                        <CpuChipIcon className="w-5 h-5 text-purple-400" />
+                      </div>
+                      <div>
+                        <label htmlFor="use-llm" className="text-sm font-medium text-white cursor-pointer">
+                          Gemini AI Analysis
+                        </label>
+                        <p className="text-xs text-white/50">
+                          Generate intelligent summaries, pattern recognition, and recommendations
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      id="use-llm"
+                      type="button"
+                      role="switch"
+                      aria-checked={useLLM}
+                      onClick={() => setUseLLM(!useLLM)}
+                      className={`
+                        relative w-12 h-6 rounded-full transition-colors duration-200
+                        ${useLLM ? 'bg-purple-500' : 'bg-white/20'}
+                      `}
+                    >
+                      <span
+                        className={`
+                          absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-md
+                          transition-transform duration-200
+                          ${useLLM ? 'translate-x-6' : 'translate-x-0'}
+                        `}
+                      />
+                    </button>
+                  </div>
                 </div>
 
                 {/* Date Range */}
@@ -211,6 +254,12 @@ export function GenerateReportModal({ isOpen, onClose, onGenerate }: GenerateRep
                         This will analyze <strong>{reportType === 'weekly' ? '7' : reportType === 'monthly' ? '30' : 'custom'}</strong> days
                         of triage assessments, generate trending topics, calculate sentiment scores, 
                         and identify high-risk cases.
+                        {useLLM && (
+                          <span className="block mt-1 text-purple-300">
+                            <SparklesIcon className="w-3 h-3 inline mr-1" />
+                            Gemini will provide intelligent summaries, pattern recognition, and actionable recommendations.
+                          </span>
+                        )}
                       </p>
                     </div>
                   </div>
@@ -247,7 +296,7 @@ export function GenerateReportModal({ isOpen, onClose, onGenerate }: GenerateRep
                     {isGenerating ? (
                       <>
                         <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                        Generating...
+                        {useLLM ? 'AI Analyzing...' : 'Generating...'}
                       </>
                     ) : (
                       <>

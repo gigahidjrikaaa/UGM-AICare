@@ -12,20 +12,28 @@ Architecture:
                                    ↓
                                  END
 
+Enhanced with Conversational Intelligence Extraction (CIE):
+    - Parallel screening runs alongside normal conversation
+    - Seamlessly extracts mental health indicators
+    - Builds longitudinal screening profile
+    - Triggers proactive interventions when warranted
+
 Benefits:
 - Single unified LangGraph workflow
 - Aika personality throughout
 - Smart conditional routing (only invoke agents when needed)
+- Covert mental health screening without explicit questions
 - Better execution tracking
 - Easier debugging
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import os
 import time
 from datetime import datetime
-from typing import Dict, Any, List, TYPE_CHECKING
+from typing import Dict, Any, List, Optional, TYPE_CHECKING
 
 from langgraph.graph import StateGraph, END
 from sqlalchemy import select
@@ -429,6 +437,39 @@ want to die, mau mati, ingin mati, etc.
                 # Get preferred model from state
                 preferred_model = state.get("preferred_model") or "gemini-2.0-flash"
                 
+                # ================================================================
+                # SCREENING AWARENESS: Enhance prompt with natural probing guidance
+                # Only for students - gives Aika awareness of information gaps
+                # ================================================================
+                screening_prompt_addition = ""
+                gap_analysis = None
+                
+                if normalized_role == "student" and state.get("user_id"):
+                    try:
+                        from app.agents.aika.screening_awareness import (
+                            get_screening_aware_prompt_addition
+                        )
+                        screening_prompt_addition, gap_analysis = await get_screening_aware_prompt_addition(
+                            db=db,
+                            user_id=state.get("user_id"),
+                            conversation_history=state.get("conversation_history", []),
+                            current_message=state.get("message", ""),
+                            session_id=state.get("session_id"),
+                        )
+                        
+                        if screening_prompt_addition:
+                            logger.debug(
+                                f"🔍 Screening awareness added for user {state.get('user_id')}: "
+                                f"suggested_probe={gap_analysis.suggested_probe.dimension.value if gap_analysis and gap_analysis.suggested_probe else 'none'}"
+                            )
+                    except Exception as e:
+                        logger.warning(f"Screening awareness failed (non-blocking): {e}")
+                
+                # Build enhanced system instruction with screening awareness
+                enhanced_system_instruction = system_instruction
+                if screening_prompt_addition:
+                    enhanced_system_instruction = f"{system_instruction}\n\n{screening_prompt_addition}"
+                
                 # Enable ReAct: Use generate_with_tools instead of simple generate_response
                 from app.domains.mental_health.services.tool_calling import generate_with_tools
                 from app.domains.mental_health.schemas.chat import ChatRequest
@@ -449,14 +490,14 @@ want to die, mau mati, ingin mati, etc.
                 response_text, tool_calls = await generate_with_tools(
                     history=[{
                         "role": "system",
-                        "content": system_instruction
+                        "content": enhanced_system_instruction
                     }] + [
                         {"role": h.get("role", "user"), "content": h.get("content", "")}
                         for h in state.get("conversation_history", [])
                     ] + [
                         {"role": "user", "content": state.get("message", "")}
                     ],
-                    system_prompt=system_instruction,
+                    system_prompt=enhanced_system_instruction,
                     request=chat_request,
                     db=db,
                     user_id=state.get("user_id", 0),
@@ -507,10 +548,12 @@ want to die, mau mati, ingin mati, etc.
         # ========================================================================
         # TWO-TIER RISK MONITORING: Trigger background STA analysis if conversation ended
         # ========================================================================
+        # STA now also handles screening extraction (merged from SCA) in the same
+        # LLM call to avoid redundant API calls. The screening profile is updated
+        # inside trigger_sta_conversation_analysis_background() after analysis.
         if state.get("conversation_ended", False):
-            logger.info("🔍 Conversation ended - triggering background STA analysis")
+            logger.info("🔍 Conversation ended - triggering background STA analysis (includes screening)")
             # Fire-and-forget: create background task without awaiting
-            import asyncio
             asyncio.create_task(trigger_sta_conversation_analysis_background(state.copy(), db))
         
     except Exception as e:
@@ -651,6 +694,79 @@ async def trigger_sta_conversation_analysis_background(
                 assessment_record.id,
                 assessment_record.session_id,
             )
+        
+        # ====================================================================
+        # SCREENING PROFILE UPDATE (Using validated psychological instruments)
+        # ====================================================================
+        # Update screening profile with extracted dimensions from conversation
+        # Based on: PHQ-9, GAD-7, DASS-21, PSQI, UCLA-LS3, RSES, AUDIT, C-SSRS
+        if user_id and assessment.screening:
+            try:
+                from app.domains.mental_health.screening import (
+                    update_screening_profile,
+                    ExtractionResult,
+                )
+                
+                # Convert STA screening extraction to ExtractionResult format
+                extraction_result = ExtractionResult()
+                extraction_result.crisis_detected = assessment.crisis_detected
+                extraction_result.confidence = 0.8  # High confidence from full conversation
+                
+                # Map dimension scores to extraction result
+                dimension_mapping = [
+                    ("depression", assessment.screening.depression),
+                    ("anxiety", assessment.screening.anxiety),
+                    ("stress", assessment.screening.stress),
+                    ("sleep", assessment.screening.sleep),
+                    ("social", assessment.screening.social),
+                    ("academic", assessment.screening.academic),
+                    ("self_worth", assessment.screening.self_worth),
+                    ("substance", assessment.screening.substance),
+                    ("crisis", assessment.screening.crisis),
+                ]
+                
+                for dim_name, dim_score in dimension_mapping:
+                    if dim_score is not None:
+                        if dim_score.is_protective:
+                            extraction_result.protective_updates[dim_name] = dim_score.score
+                        else:
+                            extraction_result.dimension_updates[dim_name] = dim_score.score
+                        
+                        # Add indicators for logging
+                        for evidence in dim_score.evidence:
+                            extraction_result.indicators_found.append({
+                                "dimension": dim_name,
+                                "weight": dim_score.score,
+                                "is_protective": dim_score.is_protective,
+                                "excerpt": evidence[:100],
+                            })
+                
+                # Update the screening profile if we have any dimension data
+                if extraction_result.dimension_updates or extraction_result.protective_updates:
+                    screening_profile = await update_screening_profile(
+                        db=db,
+                        user_id=user_id,
+                        extraction_result=extraction_result,
+                        session_id=state.get("session_id"),
+                        decay_factor=0.95  # Slow decay for longitudinal tracking
+                    )
+                    
+                    logger.info(
+                        f"📊 [BACKGROUND] Screening profile updated from STA analysis:\n"
+                        f"   User ID: {user_id}\n"
+                        f"   Risk Level: {screening_profile.overall_risk_level.value}\n"
+                        f"   Primary Concerns: {screening_profile.primary_concerns}\n"
+                        f"   Requires Attention: {screening_profile.requires_attention}"
+                    )
+                else:
+                    logger.debug(
+                        f"📊 [BACKGROUND] No screening indicators extracted for user {user_id}"
+                    )
+                    
+            except Exception as screening_err:
+                logger.warning(
+                    f"[BACKGROUND] Screening profile update failed (non-critical): {screening_err}"
+                )
         
         state["sta_analysis_completed"] = True
         state["conversation_assessment"] = assessment.model_dump()

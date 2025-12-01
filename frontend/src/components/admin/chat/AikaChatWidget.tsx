@@ -3,8 +3,8 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { FiMessageSquare, FiX, FiSend, FiMinimize2, FiMaximize2, FiActivity, FiShield, FiUsers, FiCalendar } from 'react-icons/fi';
 import { decodeJwt } from 'jose';
-import CounselorCard from '@/components/features/chat/CounselorCard';
-import TimeSlotCard from '@/components/features/chat/TimeSlotCard';
+import CounselorCard, { Counselor } from '@/components/features/chat/CounselorCard';
+import TimeSlotCard, { TimeSlot } from '@/components/features/chat/TimeSlotCard';
 
 interface OrchestrateChatMessage {
     id: string;
@@ -469,23 +469,23 @@ export default function AikaChatWidget() {
                                 {m.role === 'assistant' && m.metrics?.tool_calls && Array.isArray(m.metrics.tool_calls) && (
                                     <div className="mt-2 w-full overflow-x-auto pb-2 custom-scrollbar">
                                         <div className="flex gap-3 px-1">
-                                            {m.metrics.tool_calls.map((tool: Record<string, unknown>, idx: number) => {
+                                            {m.metrics.tool_calls.map((tool: Record<string, unknown>) => {
                                                 const toolResult = tool.result as Record<string, unknown> | undefined;
                                                 if (tool.tool_name === 'get_available_counselors' && toolResult?.counselors) {
-                                                    return (toolResult.counselors as Array<Record<string, unknown>>).map((counselor) => (
+                                                    return (toolResult.counselors as Counselor[]).map((counselor) => (
                                                         <CounselorCard
-                                                            key={counselor.id as string | number}
+                                                            key={counselor.id}
                                                             counselor={counselor}
-                                                            onSelect={(c: Record<string, unknown>) => handleCardSelection(`Saya pilih ${c.name} (ID: ${c.id})`)}
+                                                            onSelect={(c: Counselor) => handleCardSelection(`Saya pilih ${c.name} (ID: ${c.id})`)}
                                                         />
                                                     ));
                                                 }
                                                 if (tool.tool_name === 'suggest_appointment_times' && toolResult?.suggestions) {
-                                                    return (toolResult.suggestions as Array<Record<string, unknown>>).map((slot, sIdx: number) => (
+                                                    return (toolResult.suggestions as TimeSlot[]).map((slot, sIdx: number) => (
                                                         <TimeSlotCard
                                                             key={sIdx}
                                                             slot={slot}
-                                                            onSelect={(s: Record<string, unknown>) => handleCardSelection(`Saya pilih waktu ${s.time_label} (${s.datetime})`)}
+                                                            onSelect={(s: TimeSlot) => handleCardSelection(`Saya pilih waktu ${s.time_label} (${s.datetime})`)}
                                                         />
                                                     ));
                                                 }

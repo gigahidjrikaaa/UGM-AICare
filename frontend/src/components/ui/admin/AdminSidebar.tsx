@@ -25,6 +25,7 @@ import {
   FiTarget,
   FiZap,
   FiDatabase,
+  FiEye,
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink'; // Assuming SidebarLink component exists
 
@@ -46,6 +47,7 @@ const navGroups = [
     label: 'Agents & Intelligence',
     items: [
       { name: 'Dashboard', icon: <FiBarChart2 size={18} />, href: '/admin/dashboard' },
+      { name: 'Screening Intel', icon: <FiEye size={18} />, href: '/admin/screening' },
       { name: 'Cases', icon: <FiShield size={18} />, href: '/admin/cases' },
       { name: 'Case Management', icon: <FiBriefcase size={18} />, href: '/admin/service-desk' },
       { name: 'TCA Outreach', icon: <FiSend size={18} />, href: '/admin/campaigns' },

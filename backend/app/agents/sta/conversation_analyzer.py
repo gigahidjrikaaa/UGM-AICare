@@ -2,15 +2,22 @@
 
 This module performs deep analysis of entire conversations (not individual messages)
 to identify risk patterns, trends, and user context. Runs ONLY at conversation end.
+
+Now also performs SCREENING EXTRACTION (merged from SCA) to capture mental health
+dimension scores in a single LLM call, avoiding redundant API calls.
 """
 import logging
 import time
 import json
 import re
-from typing import List, Dict, Any
+from typing import List, Dict, Any, Optional
 from datetime import datetime
 
-from app.agents.sta.conversation_assessment import ConversationAssessment
+from app.agents.sta.conversation_assessment import (
+    ConversationAssessment,
+    ScreeningExtraction,
+    ScreeningDimensionScore
+)
 from app.core.llm import generate_gemini_response_with_fallback, DEFAULT_GEMINI_MODEL
 
 logger = logging.getLogger(__name__)
@@ -58,7 +65,7 @@ async def analyze_conversation_risk(
     # Calculate conversation duration
     duration = time.time() - conversation_start_time if conversation_start_time else 0.0
     
-    # Build analysis prompt
+    # Build analysis prompt with integrated screening extraction
     analysis_prompt = f"""
 You are a clinical mental health analyst reviewing a complete conversation between a university student and Aika (AI mental health assistant).
 
@@ -67,9 +74,11 @@ CONVERSATION HISTORY ({len(conversation_history) + 1} total messages, duration: 
 {conversation_text}
 {'='*80}
 
-TASK: Perform comprehensive conversation-level risk assessment
+TASK: Perform DUAL-PURPOSE analysis - both RISK ASSESSMENT and SCREENING EXTRACTION
 
-Analyze the ENTIRE conversation (not just individual messages) for:
+==============================================================================
+PART 1: RISK ASSESSMENT (Clinical Safety Analysis)
+==============================================================================
 
 1. OVERALL RISK LEVEL: Considering all messages together, what is the overall mental health risk?
    - low: General stress, manageable challenges
@@ -98,7 +107,40 @@ Analyze the ENTIRE conversation (not just individual messages) for:
    - true if: Critical risk, escalating pattern with high severity, user requests human help
    - false if: Manageable with AI support, user improving, low-moderate stable risk
 
-Return ONLY valid JSON (no markdown):
+==============================================================================
+PART 2: SCREENING EXTRACTION (Covert Mental Health Profiling)
+==============================================================================
+
+Extract mental health indicators for these 9 dimensions (only include if present):
+
+SCREENING DIMENSIONS (Based on validated instruments):
+- depression: PHQ-9 domains - Mood, anhedonia, hopelessness, fatigue
+- anxiety: GAD-7 domains - Excessive worry, tension, panic, physical symptoms
+- stress: DASS-21 - Overwhelm, burnout, pressure, inability to cope
+- sleep: PSQI - Insomnia, nightmares, fatigue, poor sleep quality
+- social: UCLA Loneliness - Isolation, loneliness, relationship issues, withdrawal
+- academic: University-specific - Academic pressure, fear of failure, thesis stress
+- self_worth: Rosenberg - Low self-esteem, self-criticism, worthlessness
+- substance: AUDIT/DAST - Alcohol/drug use for coping
+- crisis: CRITICAL - Self-harm, suicidal ideation (flag IMMEDIATELY if detected)
+
+For each dimension present in the conversation, provide:
+- score: 0.0-1.0 (0=none, 0.3=mild, 0.5=moderate, 0.7=severe, 1.0=critical)
+- evidence: 1-3 brief quotes or paraphrases supporting this score
+- is_protective: true if this dimension shows POSITIVE factors (e.g., good sleep, social support)
+
+IMPORTANT FOR SCREENING:
+- Be conservative - only flag clear indicators
+- Consider Indonesian cultural context (e.g., "banyak pikiran" = overthinking)
+- Understand sarcasm and joking (don't over-flag)
+- Empty/null for dimensions not mentioned in conversation
+- Protective factors are equally important to track
+
+==============================================================================
+RETURN FORMAT
+==============================================================================
+
+Return ONLY valid JSON (no markdown, no code blocks):
 {{
   "overall_risk_level": "low|moderate|high|critical",
   "risk_trend": "stable|escalating|de-escalating|insufficient_data",
@@ -112,10 +154,27 @@ Return ONLY valid JSON (no markdown):
   "concerns": ["Specific concern 1", "Specific concern 2"],
   "recommended_actions": ["Specific action 1", "Specific action 2"],
   "should_invoke_cma": true or false,
-  "reasoning": "Detailed chain-of-thought explanation: Why this risk level? Why this trend? Why CMA decision?"
+  "reasoning": "Detailed chain-of-thought explanation: Why this risk level? Why this trend? Why CMA decision?",
+  "screening": {{
+    "depression": {{"score": 0.0-1.0, "evidence": ["quote 1"], "is_protective": false}},
+    "anxiety": {{"score": 0.0-1.0, "evidence": ["quote 1"], "is_protective": false}},
+    "stress": {{"score": 0.0-1.0, "evidence": ["quote 1"], "is_protective": false}},
+    "sleep": {{"score": 0.0-1.0, "evidence": ["quote 1"], "is_protective": false}},
+    "social": {{"score": 0.0-1.0, "evidence": ["quote 1"], "is_protective": false}},
+    "academic": {{"score": 0.0-1.0, "evidence": ["quote 1"], "is_protective": false}},
+    "self_worth": {{"score": 0.0-1.0, "evidence": ["quote 1"], "is_protective": false}},
+    "substance": {{"score": 0.0-1.0, "evidence": ["quote 1"], "is_protective": false}},
+    "crisis": {{"score": 0.0-1.0, "evidence": ["quote 1"], "is_protective": false}},
+    "protective_dimensions": ["dimension1", "dimension2"]
+  }},
+  "crisis_detected": true or false
 }}
 
-Be thorough but concise. Focus on actionable clinical insights.
+NOTES:
+- Only include screening dimensions that have evidence in the conversation
+- null/omit dimensions with no relevant content
+- crisis_detected should be true if crisis dimension score > 0.5 OR explicit self-harm/suicide mentions
+- Be thorough but concise. Focus on actionable clinical insights.
 """
     
     model = preferred_model or DEFAULT_GEMINI_MODEL
@@ -140,21 +199,58 @@ Be thorough but concise. Focus on actionable clinical insights.
         
         assessment_data = json.loads(response_text)
         
+        # Parse screening extraction data
+        screening_data = assessment_data.pop("screening", None)
+        screening_extraction = None
+        
+        if screening_data:
+            # Build ScreeningExtraction from parsed data
+            dimension_scores = {}
+            for dim in ["depression", "anxiety", "stress", "sleep", "social", 
+                       "academic", "self_worth", "substance", "crisis"]:
+                dim_data = screening_data.get(dim)
+                if dim_data and isinstance(dim_data, dict):
+                    dimension_scores[dim] = ScreeningDimensionScore(
+                        score=dim_data.get("score", 0.0),
+                        evidence=dim_data.get("evidence", []),
+                        is_protective=dim_data.get("is_protective", False)
+                    )
+            
+            screening_extraction = ScreeningExtraction(
+                **dimension_scores,
+                protective_dimensions=screening_data.get("protective_dimensions", [])
+            )
+        
+        # Extract crisis_detected from response
+        crisis_detected = assessment_data.pop("crisis_detected", False)
+        
         # Create assessment object
         assessment = ConversationAssessment(
             **assessment_data,
             message_count_analyzed=len(conversation_history) + 1,
             analysis_timestamp=datetime.utcnow(),
-            conversation_duration_seconds=duration
+            conversation_duration_seconds=duration,
+            screening=screening_extraction,
+            crisis_detected=crisis_detected
         )
         
         analysis_time_ms = (time.time() - start_time) * 1000
         
+        # Count extracted screening dimensions
+        screening_dims = 0
+        if assessment.screening:
+            for dim in ["depression", "anxiety", "stress", "sleep", "social",
+                       "academic", "self_worth", "substance", "crisis"]:
+                if getattr(assessment.screening, dim, None) is not None:
+                    screening_dims += 1
+        
         logger.info(
-            f"✅ STA conversation analysis complete: "
+            f"✅ STA+Screening analysis complete: "
             f"risk={assessment.overall_risk_level}, "
             f"trend={assessment.risk_trend}, "
             f"cma={assessment.should_invoke_cma}, "
+            f"screening_dims={screening_dims}, "
+            f"crisis={assessment.crisis_detected}, "
             f"time={analysis_time_ms:.0f}ms"
         )
         

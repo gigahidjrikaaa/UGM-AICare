@@ -1,10 +1,13 @@
 """Insights analytics service for generating IA reports.
 
 Provides automated analysis of triage data, trending topics, and sentiment.
+Uses Gemini LLM for intelligent summary generation, pattern recognition,
+and actionable recommendations.
 """
 
 from __future__ import annotations
 
+import json
 import logging
 from datetime import datetime, timedelta
 from typing import Any
@@ -21,22 +24,41 @@ logger = logging.getLogger(__name__)
 
 K_ANONYMITY_THRESHOLD = 5
 
+# Gemini model for insights generation - use Flash for cost efficiency
+INSIGHTS_GEMINI_MODEL = "gemini-2.5-flash"
+
 class InsightsService:
-    """Service for generating and managing IA insights reports."""
+    """Service for generating and managing IA insights reports.
+    
+    Uses Gemini LLM for:
+    - Intelligent natural language summaries
+    - Pattern recognition in mental health trends
+    - Actionable recommendations for administrators
+    """
     
     def __init__(self, db: AsyncSession) -> None:
         self.db = db
+        self._gemini_client = None
+    
+    def _get_gemini_client(self):
+        """Lazy initialization of Gemini client."""
+        if self._gemini_client is None:
+            from app.core.llm import get_gemini_client
+            self._gemini_client = get_gemini_client()
+        return self._gemini_client
     
     async def generate_weekly_report(
         self,
         period_start: datetime | None = None,
-        period_end: datetime | None = None
+        period_end: datetime | None = None,
+        use_llm: bool = True
     ) -> InsightsReport:
         """Generate weekly insights report for admin dashboard.
         
         Args:
             period_start: Start of reporting period (defaults to 7 days ago)
             period_end: End of reporting period (defaults to now)
+            use_llm: Whether to use Gemini LLM for intelligent analysis
             
         Returns:
             Created InsightsReport object
@@ -46,7 +68,7 @@ class InsightsService:
         if not period_start:
             period_start = period_end - timedelta(days=7)
         
-        logger.info(f"Generating weekly IA report: {period_start} to {period_end}")
+        logger.info(f"Generating weekly IA report: {period_start} to {period_end} (LLM: {use_llm})")
         
         # Query assessments for the period
         stmt = select(TriageAssessment).where(
@@ -82,13 +104,52 @@ class InsightsService:
             if a.severity_level and a.severity_level.lower() in ('high', 'critical')
         )
         
-        # Generate summary text
-        summary = self._generate_summary(
+        # Count severity distribution
+        severity_distribution = self._calculate_severity_distribution(assessments)
+        
+        # Generate LLM-powered analysis if enabled and we have data
+        llm_summary = None
+        patterns = None
+        recommendations = None
+        
+        if use_llm and len(assessments) >= K_ANONYMITY_THRESHOLD:
+            try:
+                # Generate all LLM insights in parallel-ish manner
+                llm_analysis = await self._generate_llm_insights(
+                    total_count=len(assessments),
+                    high_risk_count=high_risk_count,
+                    trending_topics=trending_topics,
+                    sentiment_data=sentiment_data,
+                    severity_distribution=severity_distribution,
+                    period_start=period_start,
+                    period_end=period_end
+                )
+                llm_summary = llm_analysis.get('summary')
+                patterns = llm_analysis.get('patterns', [])
+                recommendations = llm_analysis.get('recommendations', [])
+                logger.info("✨ LLM-powered insights generated successfully")
+            except Exception as e:
+                logger.error(f"LLM insight generation failed, falling back to template: {e}")
+                llm_summary = None
+                patterns = []
+                recommendations = []
+        
+        # Use LLM summary if available, otherwise fall back to template
+        summary = llm_summary if llm_summary else self._generate_summary(
             total_count=len(assessments),
             high_risk_count=high_risk_count,
             trending_topics=trending_topics,
             sentiment_data=sentiment_data
         )
+        
+        # Enhance sentiment_data with LLM analysis
+        enhanced_sentiment_data = {
+            **sentiment_data,
+            'patterns': patterns or [],
+            'recommendations': recommendations or [],
+            'severity_distribution': severity_distribution,
+            'llm_powered': llm_summary is not None
+        }
         
         # Create report
         report = InsightsReport(
@@ -98,7 +159,7 @@ class InsightsService:
             period_end=period_end,
             summary=summary,
             trending_topics=trending_topics,
-            sentiment_data=sentiment_data,
+            sentiment_data=enhanced_sentiment_data,
             high_risk_count=high_risk_count,
             assessment_count=len(assessments),
             generated_at=datetime.utcnow()
@@ -121,22 +182,191 @@ class InsightsService:
                 'period_end': period_end.isoformat() if period_end else None,
                 'trending_topics': trending_topics[:5] if trending_topics else [],
                 'high_risk_count': high_risk_count,
-                'assessment_count': len(assessments)
+                'assessment_count': len(assessments),
+                'llm_powered': llm_summary is not None
             }
         )
         
         return report
     
+    async def _generate_llm_insights(
+        self,
+        total_count: int,
+        high_risk_count: int,
+        trending_topics: list[dict[str, Any]],
+        sentiment_data: dict[str, Any],
+        severity_distribution: dict[str, int],
+        period_start: datetime,
+        period_end: datetime
+    ) -> dict[str, Any]:
+        """Generate LLM-powered insights using Gemini.
+        
+        Produces:
+        - Natural language summary
+        - Pattern recognition insights
+        - Actionable recommendations for administrators
+        
+        Args:
+            total_count: Total assessments in period
+            high_risk_count: High/critical risk count
+            trending_topics: Extracted trending topics
+            sentiment_data: Sentiment metrics
+            severity_distribution: Count by severity level
+            period_start: Report period start
+            period_end: Report period end
+            
+        Returns:
+            Dict with 'summary', 'patterns', and 'recommendations'
+        """
+        client = self._get_gemini_client()
+        
+        # Prepare k-anonymized data summary for LLM
+        high_risk_pct = (high_risk_count / total_count * 100) if total_count > 0 else 0
+        avg_sentiment = sentiment_data.get('avg_sentiment', 0.0)
+        avg_risk = sentiment_data.get('avg_risk', 0.0)
+        
+        topics_summary = ', '.join([
+            f"{t['topic']} ({t['count']})" for t in trending_topics[:5]
+        ]) if trending_topics else 'No trending topics identified'
+        
+        severity_summary = ', '.join([
+            f"{level}: {count}" for level, count in severity_distribution.items()
+        ]) if severity_distribution else 'No severity data'
+        
+        period_days = (period_end - period_start).days
+        
+        prompt = f"""You are an expert mental health analytics specialist for a university counseling system. 
+Analyze the following aggregated, k-anonymized mental health assessment data and provide actionable insights for administrators.
+
+**IMPORTANT:** All data has been aggregated and anonymized to protect student privacy. You are analyzing population-level trends, NOT individual students.
+
+**Report Period:** {period_start.strftime('%Y-%m-%d')} to {period_end.strftime('%Y-%m-%d')} ({period_days} days)
+
+**Aggregated Statistics:**
+- Total Assessments: {total_count}
+- High/Critical Risk Cases: {high_risk_count} ({high_risk_pct:.1f}%)
+- Average Sentiment Score: {avg_sentiment:.2f} (scale 0-1, higher is better)
+- Average Risk Score: {avg_risk:.2f} (scale 0-1, lower is better)
+- Severity Distribution: {severity_summary}
+
+**Trending Topics (Top 5):**
+{topics_summary}
+
+**Your Task:**
+Generate a comprehensive analysis in JSON format with three components:
+
+1. **summary** (2-4 sentences): A professional, actionable summary for administrators. Highlight key findings, concerning trends, and overall mental health climate. Be specific with numbers.
+
+2. **patterns** (array of 3-5 patterns): Identify emerging patterns or trends. Each pattern should have:
+   - "title": Short descriptive title
+   - "description": What the pattern indicates
+   - "severity": "low", "medium", or "high"
+   - "trend": "increasing", "stable", or "decreasing" (based on the data)
+
+3. **recommendations** (array of 3-5 actionable items): Specific recommendations for administrators. Each should have:
+   - "title": Short action title
+   - "description": Detailed recommendation
+   - "priority": "low", "medium", or "high"
+   - "category": "intervention", "resource", "communication", or "monitoring"
+
+**Guidelines:**
+- Be objective and evidence-based
+- Avoid alarmist language while being direct about concerns
+- Focus on actionable insights, not generic advice
+- Consider university counseling context (exam periods, academic stress, etc.)
+- If data shows positive trends, acknowledge them
+
+**Output ONLY valid JSON (no markdown, no explanation):**
+```json
+{{
+  "summary": "Your professional summary here...",
+  "patterns": [
+    {{"title": "...", "description": "...", "severity": "...", "trend": "..."}}
+  ],
+  "recommendations": [
+    {{"title": "...", "description": "...", "priority": "...", "category": "..."}}
+  ]
+}}
+```"""
+        
+        try:
+            response = client.models.generate_content(
+                model=INSIGHTS_GEMINI_MODEL,
+                contents=prompt,
+            )
+            response_text = response.text.strip()
+            
+            # Extract JSON from response
+            if "```json" in response_text:
+                json_start = response_text.find("```json") + 7
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+            elif "```" in response_text:
+                json_start = response_text.find("```") + 3
+                json_end = response_text.find("```", json_start)
+                response_text = response_text[json_start:json_end].strip()
+            
+            analysis = json.loads(response_text)
+            
+            # Validate response structure
+            if not isinstance(analysis.get('summary'), str):
+                analysis['summary'] = self._generate_summary(
+                    total_count, high_risk_count, trending_topics, sentiment_data
+                )
+            if not isinstance(analysis.get('patterns'), list):
+                analysis['patterns'] = []
+            if not isinstance(analysis.get('recommendations'), list):
+                analysis['recommendations'] = []
+            
+            return analysis
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse Gemini JSON response: {e}")
+            raise
+        except Exception as e:
+            logger.error(f"Gemini API call failed: {e}")
+            raise
+    
+    def _calculate_severity_distribution(
+        self,
+        assessments: list[TriageAssessment]
+    ) -> dict[str, int]:
+        """Calculate distribution of severity levels.
+        
+        Args:
+            assessments: List of triage assessments
+            
+        Returns:
+            Dict mapping severity level to count
+        """
+        distribution: dict[str, int] = {
+            'low': 0,
+            'medium': 0,
+            'high': 0,
+            'critical': 0
+        }
+        
+        for assessment in assessments:
+            level = (assessment.severity_level or 'low').lower()
+            if level in distribution:
+                distribution[level] += 1
+            else:
+                distribution['low'] += 1  # Default unknown to low
+        
+        return distribution
+    
     async def generate_monthly_report(
         self,
         period_start: datetime | None = None,
-        period_end: datetime | None = None
+        period_end: datetime | None = None,
+        use_llm: bool = True
     ) -> InsightsReport:
         """Generate monthly insights report.
         
         Args:
             period_start: Start of reporting period (defaults to 30 days ago)
             period_end: End of reporting period (defaults to now)
+            use_llm: Whether to use Gemini LLM for intelligent analysis
             
         Returns:
             Created InsightsReport object
@@ -147,7 +377,7 @@ class InsightsService:
             period_start = period_end - timedelta(days=30)
         
         # Reuse weekly logic with different period
-        report = await self.generate_weekly_report(period_start, period_end)
+        report = await self.generate_weekly_report(period_start, period_end, use_llm)
         
         # Update report type
         report.report_type = 'monthly'

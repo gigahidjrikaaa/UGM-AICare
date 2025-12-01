@@ -41,7 +41,7 @@ from .interventions import (
     InterventionPlanRecord,
     InterventionPlanStepCompletion,
 )
-from .assessments import TriageAssessment
+from .assessments import TriageAssessment, ConversationRiskAssessment, UserScreeningProfile
 
 # Agents subdomain
 from .agents import AgentRun, AgentMessage
@@ -90,6 +90,8 @@ __all__ = [
     "InterventionPlanRecord",
     "InterventionPlanStepCompletion",
     "TriageAssessment",
+    "ConversationRiskAssessment",
+    "UserScreeningProfile",
     # Agents
     "AgentRun",
     "AgentMessage",

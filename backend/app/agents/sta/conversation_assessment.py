@@ -2,10 +2,60 @@
 
 This assessment is generated ONCE at the end of each conversation,
 analyzing the full conversation history for risk patterns and trends.
+
+Now also includes SCREENING EXTRACTION (merged from SCA) to capture
+mental health dimension scores in a single LLM call.
 """
-from typing import Dict, List, Any, Literal
+from typing import Dict, List, Any, Literal, Optional
 from pydantic import BaseModel, Field
 from datetime import datetime
+
+
+class ScreeningDimensionScore(BaseModel):
+    """Score for a single screening dimension extracted from conversation."""
+    score: float = Field(
+        ge=0.0, le=1.0,
+        description="Indicator strength from 0 (none) to 1 (severe)"
+    )
+    evidence: List[str] = Field(
+        default_factory=list,
+        description="Brief quotes or paraphrases supporting this score"
+    )
+    is_protective: bool = Field(
+        default=False,
+        description="True if this dimension shows positive/protective factors"
+    )
+
+
+class ScreeningExtraction(BaseModel):
+    """Screening data extracted from conversation (merged from SCA).
+    
+    Maps to validated instruments:
+    - depression: PHQ-9 domains (mood, anhedonia, hopelessness)
+    - anxiety: GAD-7 domains (worry, tension, panic)
+    - stress: DASS-21 stress subscale (overwhelm, burnout)
+    - sleep: PSQI indicators (insomnia, fatigue)
+    - social: UCLA Loneliness Scale (isolation, relationships)
+    - academic: University-specific academic pressure
+    - self_worth: Rosenberg Self-Esteem indicators
+    - substance: AUDIT/DAST screening indicators
+    - crisis: Self-harm, suicidal ideation (CRITICAL)
+    """
+    depression: Optional[ScreeningDimensionScore] = None
+    anxiety: Optional[ScreeningDimensionScore] = None
+    stress: Optional[ScreeningDimensionScore] = None
+    sleep: Optional[ScreeningDimensionScore] = None
+    social: Optional[ScreeningDimensionScore] = None
+    academic: Optional[ScreeningDimensionScore] = None
+    self_worth: Optional[ScreeningDimensionScore] = None
+    substance: Optional[ScreeningDimensionScore] = None
+    crisis: Optional[ScreeningDimensionScore] = None
+    
+    # Protective factors detected across dimensions
+    protective_dimensions: List[str] = Field(
+        default_factory=list,
+        description="Dimensions showing positive/protective indicators"
+    )
 
 
 class ConversationAssessment(BaseModel):
@@ -13,6 +63,9 @@ class ConversationAssessment(BaseModel):
     
     Generated at conversation end to provide comprehensive risk assessment
     based on the entire conversation context.
+    
+    Now also includes screening extraction (merged from SCA) to capture
+    mental health dimension scores in the same analysis call.
     """
     
     overall_risk_level: Literal["low", "moderate", "high", "critical"] = Field(
@@ -75,6 +128,19 @@ class ConversationAssessment(BaseModel):
     conversation_duration_seconds: float = Field(
         default=0.0,
         description="Duration of conversation from start to end"
+    )
+    
+    # =========================================================================
+    # SCREENING EXTRACTION (Merged from SCA)
+    # =========================================================================
+    screening: Optional[ScreeningExtraction] = Field(
+        default=None,
+        description="Mental health dimension scores extracted from conversation"
+    )
+    
+    crisis_detected: bool = Field(
+        default=False,
+        description="Whether immediate crisis indicators were detected"
     )
     
     class Config:

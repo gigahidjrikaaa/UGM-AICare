@@ -71,6 +71,7 @@ class GenerateReportRequest(BaseModel):
     report_type: str = Field(default='ad_hoc', description="Report type: weekly, monthly, or ad_hoc")
     period_start: datetime | None = Field(default=None, description="Start of reporting period")
     period_end: datetime | None = Field(default=None, description="End of reporting period")
+    use_llm: bool = Field(default=True, description="Use Gemini LLM for intelligent analysis")
 
 
 # Helper function to check admin permissions
@@ -231,12 +232,16 @@ async def generate_report(
     **Admin only** - Requires admin role.
     
     This endpoint allows admins to generate reports on-demand rather than
-    waiting for the scheduled job.
+    waiting for the scheduled job. When use_llm=true (default), the report
+    will include:
+    - Intelligent natural language summary (Gemini-powered)
+    - Pattern recognition insights
+    - Actionable recommendations for administrators
     """
     try:
         logger.info(
             f"Manual report generation triggered by user {current_user.id}: "
-            f"type={request.report_type}"
+            f"type={request.report_type}, use_llm={request.use_llm}"
         )
         
         insights_service = InsightsService(db)
@@ -245,22 +250,25 @@ async def generate_report(
         if request.report_type == 'weekly':
             report = await insights_service.generate_weekly_report(
                 period_start=request.period_start,
-                period_end=request.period_end
+                period_end=request.period_end,
+                use_llm=request.use_llm
             )
         elif request.report_type == 'monthly':
             report = await insights_service.generate_monthly_report(
                 period_start=request.period_start,
-                period_end=request.period_end
+                period_end=request.period_end,
+                use_llm=request.use_llm
             )
         else:  # ad_hoc
             # For ad_hoc, use weekly logic with custom period
             report = await insights_service.generate_weekly_report(
                 period_start=request.period_start,
-                period_end=request.period_end
+                period_end=request.period_end,
+                use_llm=request.use_llm
             )
             # Update type to ad_hoc (already done in service if we add that branch)
         
-        logger.info(f"Successfully generated report {report.id}")
+        logger.info(f"Successfully generated report {report.id} (LLM: {request.use_llm})")
         
         return InsightsReportSchema(  # type: ignore[call-arg]
             id=str(report.id),

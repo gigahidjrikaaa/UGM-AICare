@@ -25,11 +25,40 @@ export interface AlertItem {
   summary?: string | null;
 }
 
+// LLM-generated pattern insight
+export interface PatternInsight {
+  title: string;
+  description: string;
+  severity: 'low' | 'medium' | 'high';
+  trend: 'increasing' | 'stable' | 'decreasing';
+}
+
+// LLM-generated recommendation
+export interface RecommendationItem {
+  title: string;
+  description: string;
+  priority: 'low' | 'medium' | 'high';
+  category: 'intervention' | 'resource' | 'communication' | 'monitoring';
+}
+
+// Severity distribution from assessments
+export interface SeverityDistribution {
+  low: number;
+  medium: number;
+  high: number;
+  critical: number;
+}
+
 export interface InsightsPanel {
   trending_topics: TrendingTopic[];
   ia_summary: string;
   report_generated_at?: string | null;
   report_period?: string | null;
+  // New LLM-powered fields
+  patterns?: PatternInsight[];
+  recommendations?: RecommendationItem[];
+  severity_distribution?: SeverityDistribution;
+  llm_powered?: boolean;
 }
 
 export interface DashboardOverview {

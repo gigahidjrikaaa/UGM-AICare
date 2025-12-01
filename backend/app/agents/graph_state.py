@@ -480,6 +480,29 @@ class AikaOrchestratorState(TypedDict, total=False):
     """Previous conversation ID to detect new conversation starts."""
     
     # ============================================================================
+    # COVERT SCREENING (Conversational Intelligence Extraction)
+    # ============================================================================
+    screening_profile: Optional[Dict[str, Any]]
+    """User's accumulated screening profile from CIE analysis."""
+    
+    intervention_suggestion: Optional[Dict[str, Any]]
+    """Suggested proactive intervention if screening warrants it.
+    
+    Structure:
+        {
+            "type": str (e.g., "gentle_check_in", "coping_strategy"),
+            "priority": int (1-5),
+            "trigger": str (dimension that triggered it),
+            "approach": str (suggested approach),
+            "talking_points": List[str],
+            "execute_now": bool
+        }
+    """
+    
+    screening_enhanced_response: Optional[str]
+    """Response enhanced with intervention if applicable."""
+    
+    # ============================================================================
     # FINAL RESPONSE
     # ============================================================================
     final_response: Optional[str]

@@ -34,6 +34,45 @@ class TriageAssessment(Base):
     user: Mapped["User"] = relationship("User")
 
 
+class UserScreeningProfile(Base):
+    """Accumulated screening profile from conversational intelligence extraction.
+    
+    This table stores the longitudinal mental health screening data gathered
+    seamlessly during natural conversations with Aika. It enables proactive
+    intervention without explicit assessment questionnaires.
+    
+    Key Features:
+    - Tracks multiple mental health dimensions (PHQ-9, GAD-7 aligned)
+    - Uses exponential decay for temporal weighting
+    - Stores intervention history for follow-up
+    - Enables counselor visibility into student wellbeing trends
+    """
+
+    __tablename__ = "user_screening_profiles"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    
+    # Aggregated profile data (JSONB for flexible schema)
+    profile_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
+    
+    # Quick access fields for querying
+    overall_risk: Mapped[str] = mapped_column(String(32), default="none", nullable=False, index=True)
+    requires_attention: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    
+    # Metadata
+    total_messages_analyzed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    total_sessions_analyzed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    
+    # Timestamps
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    last_intervention_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+
+    # Relationship
+    user: Mapped["User"] = relationship("User")
+
+
 class ConversationRiskAssessment(Base):
     """Persistent record of STA conversation-level risk analyses."""
 
