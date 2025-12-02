@@ -201,9 +201,15 @@ class TherapeuticCoachService:
         if user and db:
             try:
                 from app.domains.mental_health.services.intervention_plan_service import InterventionPlanService
-                from app.domains.mental_health.schemas.intervention_plans import InterventionPlanRecordCreate
+                from app.domains.mental_health.schemas.intervention_plans import (
+                    InterventionPlanRecordCreate,
+                    InterventionPlanData,
+                    PlanStep as StoragePlanStep,
+                    ResourceCard as StorageResourceCard,
+                    NextCheckIn as StorageNextCheckIn
+                )
                 
-                # Map TCA response to InterventionPlanRecordCreate
+                # Map TCA response to storage schema models
                 # TCA PlanStep: title, description, duration_min
                 # Storage PlanStep: title, description, completed
                 storage_steps = []
@@ -212,35 +218,36 @@ class TherapeuticCoachService:
                     if step.duration_min:
                         desc += f" ({step.duration_min} min)"
                         
-                    storage_steps.append({
-                        "title": step.title,
-                        "description": desc,
-                        "completed": False
-                    })
+                    storage_steps.append(StoragePlanStep(
+                        title=step.title,
+                        description=desc,
+                        completed=False
+                    ))
                 
                 # TCA ResourceCard: title, description, url
                 # Storage ResourceCard: title, url, description
                 storage_resources = []
                 for card in resources:
-                    storage_resources.append({
-                        "title": card.title,
-                        "url": card.url or "#",
-                        "description": card.description
-                    })
+                    storage_resources.append(StorageResourceCard(
+                        title=card.title,
+                        url=card.url or "#",
+                        description=card.description
+                    ))
                 
                 # TCA next_check_in: datetime
                 # Storage NextCheckIn: timeframe, method
-                check_in_str = next_check_in.isoformat() if next_check_in else "None"
-                storage_check_in = {
-                    "timeframe": check_in_str,
-                    "method": "automated"
-                }
+                check_in_str = next_check_in.isoformat() if next_check_in else "24 hours"
+                storage_check_in = StorageNextCheckIn(
+                    timeframe=check_in_str,
+                    method="automated"
+                )
                 
-                plan_data = {
-                    "plan_steps": storage_steps,
-                    "resource_cards": storage_resources,
-                    "next_check_in": storage_check_in
-                }
+                # Create proper InterventionPlanData model
+                plan_data_model = InterventionPlanData(
+                    plan_steps=storage_steps,
+                    resource_cards=storage_resources,
+                    next_check_in=storage_check_in
+                )
                 
                 # Determine risk level from context or payload options
                 risk_level = None
@@ -258,7 +265,7 @@ class TherapeuticCoachService:
                     conversation_id=None,
                     plan_title=f"Intervention Plan: {intent_key.replace('_', ' ').title()}",
                     risk_level=risk_level,
-                    plan_data=plan_data,
+                    plan_data=plan_data_model,
                     total_steps=len(plan_steps)
                 )
                 

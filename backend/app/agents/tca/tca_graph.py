@@ -20,6 +20,12 @@ from app.agents.tca.service import TherapeuticCoachService
 from app.agents.tca.schemas import SCAInterveneRequest
 from app.agents.execution_tracker import execution_tracker
 from app.domains.mental_health.models import InterventionPlanRecord
+from app.domains.mental_health.schemas.intervention_plans import (
+    InterventionPlanData,
+    PlanStep,
+    ResourceCard,
+    NextCheckIn
+)
 from app.core.langfuse_config import trace_agent
 
 logger = logging.getLogger(__name__)
@@ -296,16 +302,52 @@ async def persist_plan_node(state: SCAState, db: AsyncSession) -> SCAState:
                 execution_tracker.complete_node(execution_id, "tca::persist_plan")
             return state
         
-        # Get intervention_type string and plan data
+        # Get intervention_type string and raw plan data from state
         intervention_type = state.get("intervention_type", "general_coping")
-        plan_data = state.get("intervention_plan", {})
+        raw_plan_data = state.get("intervention_plan", {})
         
-        # Ensure intervention_type is stored in plan_data
-        if plan_data and "intervention_type" not in plan_data:
-            plan_data["intervention_type"] = intervention_type
+        # Validate and ensure proper structure using schema models
+        plan_steps_raw = raw_plan_data.get("plan_steps", []) if raw_plan_data else []
+        resources_raw = raw_plan_data.get("resource_cards", []) if raw_plan_data else []
+        next_check_in_raw = raw_plan_data.get("next_check_in") if raw_plan_data else None
         
-        # Calculate total_steps from plan_data
-        plan_steps = plan_data.get("plan_steps", []) if plan_data else []
+        # Convert to proper schema models
+        plan_steps = [
+            PlanStep(
+                title=step.get("title", step.get("label", "Step")),
+                description=step.get("description", ""),
+                completed=step.get("completed", False)
+            )
+            for step in plan_steps_raw
+        ]
+        
+        resource_cards = [
+            ResourceCard(
+                title=card.get("title", "Resource"),
+                url=card.get("url", "#"),
+                description=card.get("description", card.get("summary", ""))
+            )
+            for card in resources_raw
+        ]
+        
+        next_check_in = None
+        if next_check_in_raw:
+            next_check_in = NextCheckIn(
+                timeframe=next_check_in_raw.get("timeframe", "24 hours"),
+                method=next_check_in_raw.get("method", "chat")
+            )
+        
+        # Create validated InterventionPlanData model
+        validated_plan_data = InterventionPlanData(
+            plan_steps=plan_steps,
+            resource_cards=resource_cards,
+            next_check_in=next_check_in
+        )
+        
+        # Convert to dict for storage, preserving intervention_type
+        plan_data_dict = validated_plan_data.model_dump(mode='json')
+        plan_data_dict["intervention_type"] = intervention_type
+        
         total_steps = len(plan_steps)
         
         # Create InterventionPlanRecord
@@ -321,7 +363,7 @@ async def persist_plan_node(state: SCAState, db: AsyncSession) -> SCAState:
             conversation_id=conv_id,
             plan_title=f"{intervention_type.replace('_', ' ').title() if intervention_type else 'General'} Intervention Plan",
             risk_level=state.get("risk_level", 0),
-            plan_data=plan_data or {},
+            plan_data=plan_data_dict,
             total_steps=total_steps,
             completed_steps=0,
             completion_tracking={},

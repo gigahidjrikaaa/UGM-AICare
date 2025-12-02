@@ -8,8 +8,7 @@ import { CMAGraphRequest, CMAGraphResponse } from '@/services/langGraphApi';
 import { CaseCreationForm } from './components/CaseCreationForm';
 import { SummaryCards } from './components/SummaryCards';
 import { PriorityQueue } from './components/PriorityQueue';
-import { useSSE } from '@/hooks/useSSE';
-import type { SSEEvent } from '@/hooks/useSSE';
+import { useAdminSSE, useSSEEventHandler } from '@/contexts/AdminSSEContext';
 
 interface CaseRecord {
   case_id: string;
@@ -24,69 +23,53 @@ export default function ServiceDeskClient() {
   const [loading, setLoading] = useState(false);
   const [recentCases, setRecentCases] = useState<CaseRecord[]>([]);
 
-  // Handle SSE events for real-time case updates
-  const handleSSEEvent = useCallback((event: SSEEvent) => {
-    console.log('[ServiceDesk] SSE Event:', event);
+  // Get SSE connection status from centralized context
+  const { isConnected } = useAdminSSE();
 
-    switch (event.type) {
-      case 'case_created':
-      case 'case_updated': {
-        const caseData = event.data as CaseRecord;
-
-        // Show toast for new high/critical severity cases
-        if (event.type === 'case_created' && (caseData.severity === 'critical' || caseData.severity === 'high')) {
-          toast.success(`🚨 New ${caseData.severity.toUpperCase()} case created: ${caseData.case_id}`, {
-            duration: 5000,
-            icon: '🚨',
-          });
-        }
-
-        // Update or add case to recent cases list
-        setRecentCases(prev => {
-          const existingIndex = prev.findIndex(c => c.case_id === caseData.case_id);
-
-          if (existingIndex >= 0) {
-            // Update existing case
-            const updated = [...prev];
-            updated[existingIndex] = caseData;
-            return updated;
-          } else {
-            // Add new case to top of list
-            return [caseData, ...prev].slice(0, 10);
-          }
-        });
-        break;
-      }
-
-      case 'sla_breach': {
-        const caseData = event.data as CaseRecord;
-        toast.error(`⚠️ SLA BREACH: Case ${caseData.case_id}`, {
-          duration: 8000,
-        });
-        break;
-      }
-
-      case 'connected':
-        console.log('[ServiceDesk] SSE connected');
-        break;
-
-      case 'ping':
-        // Heartbeat - no action needed
-        break;
-
-      default:
-        console.log('[ServiceDesk] Unhandled event type:', event.type);
+  // Handle case_created events
+  useSSEEventHandler('case_created', useCallback((data: CaseRecord) => {
+    // Show toast for new high/critical severity cases
+    if (data.severity === 'critical' || data.severity === 'high') {
+      toast.success(`🚨 New ${data.severity.toUpperCase()} case created: ${data.case_id}`, {
+        duration: 5000,
+        icon: '🚨',
+      });
     }
-  }, []);
 
-  // Initialize SSE connection for real-time updates
-  const { isConnected } = useSSE({
-    url: '/api/v1/admin/sse/events',
-    onEvent: handleSSEEvent,
-    eventTypes: ['connected', 'case_created', 'case_updated', 'sla_breach', 'ping'],
-    autoReconnect: true,
-    debug: process.env.NODE_ENV === 'development',
-  });
+    // Add case to recent cases list
+    setRecentCases(prev => {
+      const existingIndex = prev.findIndex(c => c.case_id === data.case_id);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = data;
+        return updated;
+      } else {
+        return [data, ...prev].slice(0, 10);
+      }
+    });
+  }, []));
+
+  // Handle case_updated events
+  useSSEEventHandler('case_updated', useCallback((data: CaseRecord) => {
+    // Update case in recent cases list
+    setRecentCases(prev => {
+      const existingIndex = prev.findIndex(c => c.case_id === data.case_id);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = data;
+        return updated;
+      } else {
+        return [data, ...prev].slice(0, 10);
+      }
+    });
+  }, []));
+
+  // Handle sla_breach events
+  useSSEEventHandler('sla_breach', useCallback((data: CaseRecord) => {
+    toast.error(`⚠️ SLA BREACH: Case ${data.case_id}`, {
+      duration: 8000,
+    });
+  }, []));
 
   const handleCreateCase = useCallback<(request: CMAGraphRequest) => Promise<void>>(async (request) => {
     setLoading(true);

@@ -24,8 +24,7 @@ import LangGraphHealthWidget from '@/components/admin/dashboard/LangGraphHealthW
 import type { GenerateReportParams } from '@/components/admin/dashboard/GenerateReportModal';
 import { getDashboardOverview, getDashboardTrends, generateInsightsReport } from '@/services/adminDashboardApi';
 import type { DashboardOverview, TrendsResponse, TimeRange } from '@/types/admin/dashboard';
-import { useSSE } from '@/hooks/useSSE';
-import type { SSEEvent } from '@/hooks/useSSE';
+import { useAdminSSE, useSSEEventHandler } from '@/contexts/AdminSSEContext';
 import type { AlertData, IAReportGeneratedData } from '@/types/sse';
 
 export default function AdminDashboardPage() {
@@ -58,70 +57,46 @@ export default function AdminDashboardPage() {
     }
   };
 
-  // Handle SSE events
-  const handleSSEEvent = useCallback((event: SSEEvent) => {
-    console.log('[Dashboard] SSE Event received:', event);
+  // Get SSE connection status from centralized context
+  const { isConnected, error: sseError, reconnect } = useAdminSSE();
 
-    switch (event.type) {
-      case 'connected':
-        console.log('[Dashboard] SSE connected:', event.data);
-        break;
-
-      case 'alert_created':
-        const alertData = event.data as AlertData;
-        // Show toast notification for critical/high severity alerts
-        if (alertData.severity === 'critical' || alertData.severity === 'high') {
-          setToast({
-            message: `🚨 ${alertData.title}: ${alertData.message}`,
-            type: alertData.severity === 'critical' ? 'error' : 'info',
-          });
-        }
-        // Reload dashboard to update KPIs
-        loadDashboard();
-        break;
-
-      case 'case_updated':
-        // Reload dashboard to update case statistics
-        loadDashboard();
-        break;
-
-      case 'sla_breach':
-        const breachData = event.data as AlertData;
-        setToast({
-          message: `⚠️ SLA BREACH: ${breachData.message}`,
-          type: 'error',
-        });
-        loadDashboard();
-        break;
-
-      case 'ia_report_generated':
-        const reportData = event.data as IAReportGeneratedData;
-        setToast({
-          message: `📊 New IA Report: ${reportData.message}`,
-          type: 'success',
-        });
-        // Reload to show new insights
-        loadDashboard();
-        break;
-
-      case 'ping':
-        // Heartbeat - no action needed
-        break;
-
-      default:
-        console.log('[Dashboard] Unhandled SSE event type:', event.type);
+  // Handle alert_created events
+  useSSEEventHandler('alert_created', useCallback((data: AlertData) => {
+    // Show toast notification for critical/high severity alerts
+    if (data.severity === 'critical' || data.severity === 'high') {
+      setToast({
+        message: `🚨 ${data.title}: ${data.message}`,
+        type: data.severity === 'critical' ? 'error' : 'info',
+      });
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    // Reload dashboard to update KPIs
+    loadDashboard();
+  }, []));
 
-  // Initialize SSE connection
-  const { isConnected, error: sseError, reconnect } = useSSE({
-    url: '/api/v1/admin/sse/events',
-    onEvent: handleSSEEvent,
-    eventTypes: ['connected', 'alert_created', 'case_updated', 'sla_breach', 'ia_report_generated', 'ping'],
-    autoReconnect: true,
-    debug: process.env.NODE_ENV === 'development',
-  });
+  // Handle case_updated events
+  useSSEEventHandler('case_updated', useCallback(() => {
+    // Reload dashboard to update case statistics
+    loadDashboard();
+  }, []));
+
+  // Handle SLA breach events
+  useSSEEventHandler('sla_breach', useCallback((data: AlertData) => {
+    setToast({
+      message: `⚠️ SLA BREACH: ${data.message}`,
+      type: 'error',
+    });
+    loadDashboard();
+  }, []));
+
+  // Handle IA report generated events
+  useSSEEventHandler('ia_report_generated', useCallback((data: IAReportGeneratedData) => {
+    setToast({
+      message: `📊 New IA Report: ${data.message}`,
+      type: 'success',
+    });
+    // Reload to show new insights
+    loadDashboard();
+  }, []));
 
   const handleGenerateReport = async (params: GenerateReportParams) => {
     try {
@@ -335,41 +310,69 @@ export default function AdminDashboardPage() {
       <div className="flex justify-center">
         <button
           onClick={() => setShowTrends(!showTrends)}
-          className="px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-medium text-white/80 transition-all duration-200 shadow-lg shadow-[#00153a]/20 backdrop-blur"
+          className="group px-6 py-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-xl text-sm font-medium text-white/80 transition-all duration-200 shadow-lg shadow-[#00153a]/20 backdrop-blur flex items-center gap-2"
         >
-          {showTrends ? '▼ Hide Historical Trends' : '▶ Show Historical Trends'}
+          <svg 
+            className={`w-4 h-4 transition-transform duration-200 ${showTrends ? 'rotate-180' : ''}`} 
+            fill="none" 
+            viewBox="0 0 24 24" 
+            stroke="currentColor"
+          >
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+          {showTrends ? 'Hide Historical Trends' : 'Show Historical Trends'}
         </button>
       </div>
 
       {/* Historical Trends Section (Collapsible) */}
       {showTrends && (
         <motion.div
-          initial={{ opacity: 0, height: 0 }}
-          animate={{ opacity: 1, height: 'auto' }}
-          exit={{ opacity: 0, height: 0 }}
+          initial={{ opacity: 0, y: -10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.3 }}
-          className="space-y-4"
+          className="space-y-5"
         >
-          <h2 className="text-xl font-semibold text-white/90">📊 Historical Trends</h2>
+          {/* Section Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500/20 to-purple-500/20 border border-white/10">
+                <svg className="w-5 h-5 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                </svg>
+              </div>
+              <div>
+                <h2 className="text-lg font-semibold text-white">Historical Trends</h2>
+                <p className="text-xs text-white/50">Last {timeRange} days performance metrics</p>
+              </div>
+            </div>
+          </div>
           
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          {/* Charts Grid */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
             <TrendChart
               title="Sentiment Trend"
               data={trends.sentiment_trend}
               color="blue"
               suffix="%"
+              height={200}
+              showGrid
             />
             
             <TrendChart
               title="Cases Opened"
               data={trends.cases_opened_trend}
               color="purple"
+              height={200}
+              showGrid
             />
             
             <TrendChart
               title="Cases Closed"
               data={trends.cases_closed_trend}
               color="green"
+              height={200}
+              showGrid
             />
             
             {/* Show first topic trend if available */}
@@ -378,6 +381,8 @@ export default function AdminDashboardPage() {
                 title={`Topic: ${Object.keys(trends.topic_trends)[0]}`}
                 data={trends.topic_trends[Object.keys(trends.topic_trends)[0]]}
                 color="orange"
+                height={200}
+                showGrid
               />
             )}
           </div>

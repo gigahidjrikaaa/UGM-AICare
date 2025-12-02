@@ -8,6 +8,7 @@ import AdminFooter from '@/components/ui/admin/AdminFooter';
 import AikaChatWidget from '@/components/admin/chat/AikaChatWidget';
 import { useAdminSessionGuard } from '@/hooks/useAdminSessionGuard';
 import { useAdminSessionExpiry } from '@/hooks/useSessionExpiry';
+import { AdminSSEProvider } from '@/contexts/AdminSSEContext';
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
@@ -55,16 +56,18 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
 
   // Render layout if authenticated as admin
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] text-white flex">
-      <AdminSidebar />
-      <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden relative">
-        <AdminHeader />
-        <main className={`flex-1 overflow-y-auto bg-[#001030]/30 ${isFullWidthPage ? '' : 'p-4 md:p-6 lg:p-8'}`}>
-          {children}
-        </main>
-        <AdminFooter />
-        <AikaChatWidget />
+    <AdminSSEProvider>
+      <div className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] text-white flex">
+        <AdminSidebar />
+        <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden relative">
+          <AdminHeader />
+          <main className={`flex-1 overflow-y-auto bg-[#001030]/30 ${isFullWidthPage ? '' : 'p-4 md:p-6 lg:p-8'}`}>
+            {children}
+          </main>
+          <AdminFooter />
+          <AikaChatWidget />
+        </div>
       </div>
-    </div>
+    </AdminSSEProvider>
   );
 }

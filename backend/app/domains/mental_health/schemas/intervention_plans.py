@@ -1,8 +1,8 @@
 """Pydantic schemas for intervention plan records."""
 
 from datetime import datetime
-from typing import Optional, List, Sequence, Dict, Any
-from pydantic import BaseModel, Field, ConfigDict
+from typing import Optional, List, Sequence, Dict, Any, Union
+from pydantic import BaseModel, Field, ConfigDict, field_validator, model_validator
 
 
 class PlanStep(BaseModel):
@@ -26,10 +26,13 @@ class NextCheckIn(BaseModel):
 
 
 class InterventionPlanData(BaseModel):
-    """Full intervention plan structure from SCA."""
-    plan_steps: List[PlanStep]
-    resource_cards: List[ResourceCard]
-    next_check_in: NextCheckIn
+    """Full intervention plan structure from SCA.
+    
+    All fields have defaults to handle legacy plans with empty/incomplete data.
+    """
+    plan_steps: List[PlanStep] = Field(default_factory=list)
+    resource_cards: List[ResourceCard] = Field(default_factory=list)
+    next_check_in: Optional[NextCheckIn] = None
 
 
 class CompletionTracking(BaseModel):
@@ -80,7 +83,31 @@ class InterventionPlanRecordResponse(InterventionPlanRecordBase):
     last_viewed_at: Optional[datetime]
     archived_at: Optional[datetime]
 
-    model_config = ConfigDict(from_attributes = True)
+    model_config = ConfigDict(from_attributes=True)
+
+    @field_validator('plan_data', mode='before')
+    @classmethod
+    def ensure_plan_data_model(cls, v: Union[dict, InterventionPlanData]) -> InterventionPlanData:
+        """Convert raw dict to InterventionPlanData, handling empty/malformed data."""
+        if isinstance(v, InterventionPlanData):
+            return v
+        if v is None or v == {}:
+            return InterventionPlanData()
+        if isinstance(v, dict):
+            return InterventionPlanData(**v)
+        return InterventionPlanData()
+
+    @field_validator('completion_tracking', mode='before')
+    @classmethod
+    def ensure_completion_tracking_model(cls, v: Union[dict, CompletionTracking]) -> CompletionTracking:
+        """Convert raw dict to CompletionTracking, handling empty/malformed data."""
+        if isinstance(v, CompletionTracking):
+            return v
+        if v is None or v == {}:
+            return CompletionTracking()
+        if isinstance(v, dict):
+            return CompletionTracking(**v)
+        return CompletionTracking()
 
 
 class InterventionPlanListResponse(BaseModel):

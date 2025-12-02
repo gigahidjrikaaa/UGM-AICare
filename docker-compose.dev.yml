@@ -70,14 +70,42 @@ services:
       dockerfile: app/Dockerfile.migrate  # Use lightweight migration-only Dockerfile
     entrypoint: >
       bash -c "
-        /app/scripts/wait-for-it.sh db:5432 -t 60 -- echo 'Database is ready!' &&
-        echo 'Running Alembic migrations...' &&
-        if ! alembic upgrade head; then
-          echo 'Migration failed - attempting to fix alembic_version...' &&
-          psql postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB} -c 'DROP TABLE IF EXISTS alembic_version CASCADE;' &&
-          echo 'Retrying migrations...' &&
-          alembic upgrade head
+        set -e
+        echo '[migrate] Waiting for database...'
+        /app/scripts/wait-for-it.sh db:5432 -t 60 -- echo '[migrate] Database is ready!'
+        
+        echo '[migrate] Running Alembic migrations...'
+        if alembic upgrade head; then
+          echo '[migrate] ✓ Migrations completed successfully'
+          exit 0
         fi
+        
+        echo '[migrate] ⚠ Initial migration attempt failed'
+        
+        # Check if it's a revision chain issue
+        CURRENT_REV=\$$(psql -t -A postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB} -c \"SELECT version_num FROM alembic_version LIMIT 1\" 2>/dev/null || echo '')
+        if [ -n \"\$$CURRENT_REV\" ]; then
+          echo \"[migrate] Current revision: \$$CURRENT_REV\"
+          
+          # Check if the revision exists in migration files
+          if ! grep -r \"revision = '\$$CURRENT_REV'\" /app/alembic/versions/ >/dev/null 2>&1; then
+            echo '[migrate] ⚠ Revision not found in migration files - stamping to head'
+            alembic stamp head
+            echo '[migrate] ✓ Database stamped at head'
+            exit 0
+          fi
+        fi
+        
+        echo '[migrate] Attempting fresh migration...'
+        psql postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB} -c 'TRUNCATE TABLE alembic_version;' 2>/dev/null || true
+        
+        if alembic upgrade head; then
+          echo '[migrate] ✓ Migrations completed after retry'
+          exit 0
+        fi
+        
+        echo '[migrate] ✗ Migration failed after all attempts'
+        exit 1
       "
     env_file:
       - .env

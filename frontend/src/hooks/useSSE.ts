@@ -1,8 +1,11 @@
 /**
  * useSSE Hook - Server-Sent Events (SSE) connection management
  * 
+ * Uses @microsoft/fetch-event-source for proper header support and
+ * better reconnection handling compared to native EventSource.
+ * 
  * Features:
- * - Auto-connect on mount
+ * - Supports Authorization header (not possible with native EventSource)
  * - Auto-reconnect with exponential backoff
  * - Event type filtering
  * - Connection status tracking
@@ -23,6 +26,8 @@
  */
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { fetchEventSource, EventStreamContentType } from '@microsoft/fetch-event-source';
+import { useSession } from 'next-auth/react';
 
 export interface SSEEvent {
   id?: string;
@@ -63,6 +68,9 @@ export interface UseSSEReturn {
   clearEvents: () => void;
 }
 
+// Custom error class for fatal errors that shouldn't trigger retry
+class FatalError extends Error {}
+
 export function useSSE(options: UseSSEOptions): UseSSEReturn {
   const {
     url,
@@ -74,14 +82,32 @@ export function useSSE(options: UseSSEOptions): UseSSEReturn {
     debug = false,
   } = options;
 
+  const { data: session, status: sessionStatus } = useSession();
+
   const [isConnected, setIsConnected] = useState(false);
   const [events, setEvents] = useState<SSEEvent[]>([]);
   const [error, setError] = useState<string | null>(null);
 
-  const eventSourceRef = useRef<EventSource | null>(null);
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
   const reconnectAttemptsRef = useRef(0);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isMountedRef = useRef(true);
+  const isConnectingRef = useRef(false);
+  const connectionIdRef = useRef(0); // Track connection attempts to handle Strict Mode
+  
+  // Stable refs for callbacks and options to avoid dependency changes
+  const onEventRef = useRef(onEvent);
+  const eventTypesRef = useRef(eventTypes);
+  const autoReconnectRef = useRef(autoReconnect);
+  const urlRef = useRef(url);
+  
+  // Update refs when values change
+  useEffect(() => {
+    onEventRef.current = onEvent;
+    eventTypesRef.current = eventTypes;
+    autoReconnectRef.current = autoReconnect;
+    urlRef.current = url;
+  }, [onEvent, eventTypes, autoReconnect, url]);
 
   const log = useCallback(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -113,101 +139,78 @@ export function useSSE(options: UseSSEOptions): UseSSEReturn {
     return delay;
   }, [reconnectDelay, maxReconnectDelay]);
 
-  const connect = useCallback(() => {
+  const connect = useCallback(async (accessToken: string) => {
     if (!isMountedRef.current) return;
-
-    // Clean up existing connection
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+    if (isConnectingRef.current) {
+      log('Already connecting, skipping duplicate connect call');
+      return;
     }
 
-    log('Connecting to SSE endpoint:', url);
+    // Increment connection ID for this attempt
+    const currentConnectionId = ++connectionIdRef.current;
+
+    // Clean up existing connection
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+
+    isConnectingRef.current = true;
+    log(`Connecting to SSE endpoint (attempt #${currentConnectionId}):`, urlRef.current);
+    const controller = new AbortController();
+    abortControllerRef.current = controller;
 
     try {
-      const eventSource = new EventSource(url, {
-        withCredentials: true, // Include cookies for authentication
-      });
+      await fetchEventSource(urlRef.current, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${accessToken}`,
+          'Accept': 'text/event-stream',
+          'Cache-Control': 'no-cache',
+        },
+        signal: controller.signal,
+        openWhenHidden: true, // Keep connection alive even when tab is hidden
 
-      eventSourceRef.current = eventSource;
-
-      // Connection opened
-      eventSource.onopen = () => {
-        if (!isMountedRef.current) return;
-        
-        log('SSE connection established');
-        setIsConnected(true);
-        setError(null);
-        reconnectAttemptsRef.current = 0; // Reset reconnect attempts on success
-      };
-
-      // Connection error
-      eventSource.onerror = (event) => {
-        if (!isMountedRef.current) return;
-
-        log('SSE connection error:', event);
-        setIsConnected(false);
-
-        if (eventSource.readyState === EventSource.CLOSED) {
-          setError('Connection closed by server');
-          
-          // Auto-reconnect if enabled
-          if (autoReconnect) {
-            const delay = calculateReconnectDelay();
-            reconnectAttemptsRef.current++;
-            
-            log(`Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})...`);
-            
-            reconnectTimeoutRef.current = setTimeout(() => {
-              if (isMountedRef.current && autoReconnect) {
-                connect();
-              }
-            }, delay);
+        async onopen(response) {
+          // Check if this connection was superseded by a newer one (React Strict Mode)
+          if (currentConnectionId !== connectionIdRef.current) {
+            log(`Connection #${currentConnectionId} superseded by #${connectionIdRef.current}, closing`);
+            controller.abort();
+            return;
           }
-        } else {
-          setError('Connection error occurred');
-        }
-      };
-
-      // Generic message handler (fallback)
-      eventSource.onmessage = (event) => {
-        if (!isMountedRef.current) return;
-
-        try {
-          const data = JSON.parse(event.data);
-          const sseEvent: SSEEvent = {
-            id: event.lastEventId,
-            type: 'message',
-            data,
-            timestamp: new Date().toISOString(),
-          };
-
-          log('Received message event:', sseEvent);
           
-          if (eventTypes.length === 0 || eventTypes.includes('message')) {
-            addEvent(sseEvent);
-            onEvent?.(sseEvent);
+          if (!isMountedRef.current) return;
+          isConnectingRef.current = false;
+
+          if (response.ok && response.headers.get('content-type')?.includes(EventStreamContentType)) {
+            log(`SSE connection #${currentConnectionId} established`);
+            setIsConnected(true);
+            setError(null);
+            reconnectAttemptsRef.current = 0; // Reset reconnect attempts on success
+            return;
+          } else if (response.status === 401 || response.status === 403) {
+            // Authentication error - don't retry
+            throw new FatalError(`Authentication failed: ${response.status}`);
+          } else if (response.status >= 400 && response.status < 500) {
+            // Client error - don't retry
+            throw new FatalError(`Client error: ${response.status}`);
+          } else {
+            // Server error - will retry
+            throw new Error(`Server error: ${response.status}`);
           }
-        } catch (err) {
-          log('Failed to parse SSE message:', err);
-        }
-      };
+        },
 
-      // Register listeners for specific event types
-      const typesToListen = eventTypes.length > 0 
-        ? eventTypes 
-        : ['connected', 'alert_created', 'case_updated', 'sla_breach', 'ia_report_generated', 'ping'];
-
-      typesToListen.forEach((eventType) => {
-        eventSource.addEventListener(eventType, (event: Event) => {
+        onmessage(ev) {
+          // Ignore messages if this connection was superseded
+          if (currentConnectionId !== connectionIdRef.current) return;
           if (!isMountedRef.current) return;
 
-          const messageEvent = event as MessageEvent;
-          
           try {
-            const data = JSON.parse(messageEvent.data);
+            const eventType = ev.event || 'message';
+            const data = ev.data ? JSON.parse(ev.data) : {};
+            
             const sseEvent: SSEEvent = {
-              id: messageEvent.lastEventId,
+              id: ev.id,
               type: eventType,
               data,
               timestamp: new Date().toISOString(),
@@ -215,25 +218,89 @@ export function useSSE(options: UseSSEOptions): UseSSEReturn {
 
             log(`Received ${eventType} event:`, sseEvent);
 
-            // Add to events buffer (except ping)
-            if (eventType !== 'ping') {
-              addEvent(sseEvent);
+            // Check if we should process this event type
+            const shouldProcess = 
+              eventTypesRef.current.length === 0 || 
+              eventTypesRef.current.includes(eventType);
+
+            if (shouldProcess) {
+              // Add to events buffer (except ping)
+              if (eventType !== 'ping') {
+                addEvent(sseEvent);
+              }
+
+              // Call event handler
+              onEventRef.current?.(sseEvent);
             }
-
-            // Call event handler
-            onEvent?.(sseEvent);
           } catch (err) {
-            log(`Failed to parse ${eventType} event:`, err);
+            log('Failed to parse SSE event:', err);
           }
-        });
-      });
+        },
 
+        onclose() {
+          // Ignore close if this connection was superseded
+          if (currentConnectionId !== connectionIdRef.current) {
+            log(`Connection #${currentConnectionId} close ignored (superseded)`);
+            return;
+          }
+          if (!isMountedRef.current) return;
+
+          log(`SSE connection #${currentConnectionId} closed by server`);
+          setIsConnected(false);
+          isConnectingRef.current = false;
+          
+          // Auto-reconnect if enabled
+          if (autoReconnectRef.current && accessToken) {
+            const delay = calculateReconnectDelay();
+            reconnectAttemptsRef.current++;
+            log(`Reconnecting in ${delay}ms (attempt ${reconnectAttemptsRef.current})...`);
+            
+            reconnectTimeoutRef.current = setTimeout(() => {
+              if (isMountedRef.current && autoReconnectRef.current && currentConnectionId === connectionIdRef.current) {
+                connect(accessToken);
+              }
+            }, delay);
+          }
+        },
+
+        onerror(err) {
+          // Ignore errors if this connection was superseded
+          if (currentConnectionId !== connectionIdRef.current) return;
+          if (!isMountedRef.current) return;
+
+          log(`SSE connection #${currentConnectionId} error:`, err);
+          setIsConnected(false);
+          isConnectingRef.current = false;
+
+          if (err instanceof FatalError) {
+            // Don't retry on fatal errors
+            setError(err.message);
+            throw err; // Stop retrying
+          }
+
+          setError('Connection error occurred');
+          
+          // Track our attempts
+          reconnectAttemptsRef.current++;
+          
+          // Return the calculated delay for the library's retry mechanism
+          return calculateReconnectDelay();
+        },
+      });
     } catch (err) {
-      log('Failed to create EventSource:', err);
-      setError(err instanceof Error ? err.message : 'Failed to connect');
+      isConnectingRef.current = false;
+      if (err instanceof FatalError) {
+        log('Fatal error, not retrying:', err.message);
+        setError(err.message);
+      } else if (err instanceof Error && err.name === 'AbortError') {
+        log(`Connection #${currentConnectionId} aborted (intentional disconnect or superseded)`);
+      } else {
+        log('Connection failed:', err);
+        setError(err instanceof Error ? err.message : 'Connection failed');
+      }
       setIsConnected(false);
     }
-  }, [url, eventTypes, autoReconnect, onEvent, addEvent, calculateReconnectDelay, log]);
+  }, [addEvent, calculateReconnectDelay, log]);
 
   const disconnect = useCallback(() => {
     log('Disconnecting SSE...');
@@ -244,12 +311,13 @@ export function useSSE(options: UseSSEOptions): UseSSEReturn {
       reconnectTimeoutRef.current = null;
     }
 
-    // Close connection
-    if (eventSourceRef.current) {
-      eventSourceRef.current.close();
-      eventSourceRef.current = null;
+    // Abort the fetch request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
     }
 
+    isConnectingRef.current = false;
     setIsConnected(false);
   }, [log]);
 
@@ -257,20 +325,50 @@ export function useSSE(options: UseSSEOptions): UseSSEReturn {
     log('Manual reconnect triggered');
     reconnectAttemptsRef.current = 0; // Reset attempts for manual reconnect
     disconnect();
-    connect();
-  }, [connect, disconnect, log]);
+    
+    // Get access token and reconnect
+    const accessToken = session?.accessToken || session?.user?.accessToken;
+    if (accessToken) {
+      // Small delay before reconnecting
+      setTimeout(() => {
+        if (isMountedRef.current) {
+          connect(accessToken);
+        }
+      }, 100);
+    }
+  }, [connect, disconnect, log, session?.accessToken, session?.user?.accessToken]);
 
-  // Auto-connect on mount
+  // Auto-connect when session is available - stable effect
   useEffect(() => {
     isMountedRef.current = true;
-    connect();
+    
+    // Only connect when session is authenticated and we have a token
+    if (sessionStatus !== 'authenticated') {
+      return;
+    }
+    
+    const accessToken = session?.accessToken || session?.user?.accessToken;
+    if (!accessToken) {
+      return;
+    }
+
+    // Small delay to allow React Strict Mode's double-mount to settle
+    // This prevents the first connection from being immediately aborted
+    const connectTimeout = setTimeout(() => {
+      if (isMountedRef.current) {
+        connect(accessToken);
+      }
+    }, 100);
 
     // Cleanup on unmount
     return () => {
       isMountedRef.current = false;
+      clearTimeout(connectTimeout);
       disconnect();
     };
-  }, [connect, disconnect]);
+  // Only depend on session status changing, not the full session object
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionStatus]);
 
   return {
     isConnected,

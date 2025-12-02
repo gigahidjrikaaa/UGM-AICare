@@ -6,21 +6,24 @@
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
-import { ChartBarIcon, ExclamationTriangleIcon } from '@heroicons/react/24/outline';
+import { ChartBarIcon, ExclamationTriangleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
 
 interface GraphHealth {
   graph_type: string;
-  status: 'healthy' | 'degraded' | 'down';
+  status: 'healthy' | 'degraded' | 'down' | 'unknown';
   success_rate: number;
+  total_executions: number;
 }
 
 interface HealthData {
-  overall_status: 'healthy' | 'degraded' | 'down';
+  overall_status: 'healthy' | 'degraded' | 'down' | 'unknown';
   graphs: GraphHealth[];
   last_updated: string;
+  total_executions: number;
+  success_rate_percent: number;
 }
 
 const GRAPH_NAMES: Record<string, string> = {
@@ -28,49 +31,127 @@ const GRAPH_NAMES: Record<string, string> = {
   tca: 'TCA',
   cma: 'CMA',
   ia: 'IA',
+  sca: 'SCA',
+  sda: 'SDA',
   orchestrator: 'Orch',
+};
+
+const GRAPH_FULL_NAMES: Record<string, string> = {
+  sta: 'Safety Triage Agent',
+  tca: 'Therapeutic Chat Agent',
+  cma: 'Case Management Agent',
+  ia: 'Insights Agent',
+  sca: 'Student Communication Agent',
+  sda: 'Service Desk Agent',
+  orchestrator: 'Orchestrator',
 };
 
 export default function LangGraphHealthWidget() {
   const [healthData, setHealthData] = useState<HealthData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
-  useEffect(() => {
-    const fetchHealth = async () => {
-      try {
-        // Use existing LangGraph endpoint instead of non-existent analytics endpoint
-        const response = await fetch('/api/v1/agents/langgraph');
-        if (!response.ok) throw new Error('Failed to fetch graph state');
-        await response.json(); // Verify response is valid JSON
+  const fetchHealth = useCallback(async (showRefresh = false) => {
+    if (showRefresh) setIsRefreshing(true);
+    
+    try {
+      // Use relative URL - Next.js rewrites /api to backend
+      const token = localStorage.getItem('adminToken');
+      
+      if (!token) {
+        throw new Error('Not authenticated');
+      }
+
+      // Fetch analytics overview from the correct endpoint
+      const response = await fetch(`/api/v1/admin/langgraph/analytics/overview?days=1`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (!response.ok) {
+        if (response.status === 401) {
+          throw new Error('Authentication required');
+        }
+        throw new Error(`Failed to fetch health data: ${response.status}`);
+      }
+
+      const result = await response.json();
+      
+      if (result.success && result.data) {
+        const analytics = result.data;
         
-        // Mock health data based on graph state - real analytics would come from metrics endpoint
-        const mockGraphs: GraphHealth[] = [
-          { graph_type: 'sta', status: 'healthy', success_rate: 98.5 },
-          { graph_type: 'tca', status: 'healthy', success_rate: 97.2 },
-          { graph_type: 'cma', status: 'healthy', success_rate: 99.1 },
-          { graph_type: 'ia', status: 'healthy', success_rate: 96.8 },
-          { graph_type: 'orchestrator', status: 'healthy', success_rate: 98.0 },
-        ];
+        // Determine overall status based on success rate
+        let overallStatus: 'healthy' | 'degraded' | 'down' | 'unknown' = 'unknown';
+        const successRate = analytics.success_rate_percent || 0;
         
+        if (analytics.total_executions === 0) {
+          overallStatus = 'unknown';
+        } else if (successRate >= 95) {
+          overallStatus = 'healthy';
+        } else if (successRate >= 70) {
+          overallStatus = 'degraded';
+        } else {
+          overallStatus = 'down';
+        }
+
+        // Build graph health from most_active_nodes or default graphs
+        const graphTypes = ['sta', 'tca', 'cma', 'ia'];
+        const graphs: GraphHealth[] = graphTypes.map(graphType => {
+          // Check if we have specific metrics for this graph
+          const nodeMetrics = analytics.most_active_nodes?.find(
+            (n: { node_id: string }) => n.node_id.toLowerCase().includes(graphType)
+          );
+          
+          return {
+            graph_type: graphType,
+            status: nodeMetrics 
+              ? (nodeMetrics.success_rate >= 95 ? 'healthy' : nodeMetrics.success_rate >= 70 ? 'degraded' : 'down')
+              : (analytics.total_executions > 0 ? overallStatus : 'unknown'),
+            success_rate: nodeMetrics?.success_rate || successRate,
+            total_executions: nodeMetrics?.execution_count || 0,
+          };
+        });
+
         setHealthData({
-          overall_status: 'healthy',
-          graphs: mockGraphs,
-          last_updated: new Date().toISOString(),
+          overall_status: overallStatus,
+          graphs,
+          last_updated: result.generated_at || new Date().toISOString(),
+          total_executions: analytics.total_executions || 0,
+          success_rate_percent: successRate,
         });
         setError(null);
-      } catch (err) {
-        console.error('LangGraph Health Widget error:', err);
-        setError(err instanceof Error ? err.message : 'Failed to load');
-      } finally {
-        setLoading(false);
+      } else {
+        // No data available, show unknown state
+        setHealthData({
+          overall_status: 'unknown',
+          graphs: ['sta', 'tca', 'cma', 'ia'].map(g => ({
+            graph_type: g,
+            status: 'unknown',
+            success_rate: 0,
+            total_executions: 0,
+          })),
+          last_updated: new Date().toISOString(),
+          total_executions: 0,
+          success_rate_percent: 0,
+        });
       }
-    };
-
-    fetchHealth();
-    const interval = setInterval(fetchHealth, 30000); // Refresh every 30s
-    return () => clearInterval(interval);
+    } catch (err) {
+      console.error('LangGraph Health Widget error:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load');
+    } finally {
+      setLoading(false);
+      setIsRefreshing(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchHealth();
+    const interval = setInterval(() => fetchHealth(), 30000); // Refresh every 30s
+    return () => clearInterval(interval);
+  }, [fetchHealth]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -81,8 +162,14 @@ export default function LangGraphHealthWidget() {
       case 'down':
         return { bg: 'bg-red-500/20', border: 'border-red-500/30', dot: 'bg-red-400', text: 'text-red-300' };
       default:
-        return { bg: 'bg-white/5', border: 'border-white/10', dot: 'bg-white/40', text: 'text-white/60' };
+        return { bg: 'bg-gray-500/20', border: 'border-gray-500/30', dot: 'bg-gray-400', text: 'text-gray-300' };
     }
+  };
+
+  const handleRefresh = (e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    fetchHealth(true);
   };
 
   if (loading) {
@@ -90,31 +177,41 @@ export default function LangGraphHealthWidget() {
       <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-4 animate-pulse">
         <div className="h-6 bg-white/10 rounded mb-3 w-2/3"></div>
         <div className="flex gap-2">
-          {[1, 2, 3, 4, 5].map((i) => (
-            <div key={i} className="h-10 bg-white/10 rounded flex-1"></div>
+          {[1, 2, 3, 4].map((i) => (
+            <div key={i} className="h-14 bg-white/10 rounded flex-1"></div>
           ))}
         </div>
       </div>
     );
   }
 
-  if (error || !healthData) {
+  if (error) {
     return (
       <div className="bg-red-500/10 backdrop-blur-sm border border-red-500/30 rounded-xl p-4">
-        <div className="flex items-center gap-2 text-red-300 text-sm">
-          <ExclamationTriangleIcon className="w-4 h-4" />
-          <span>LangGraph health unavailable</span>
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2 text-red-300 text-sm">
+            <ExclamationTriangleIcon className="w-4 h-4" />
+            <span>LangGraph: {error}</span>
+          </div>
+          <button
+            onClick={handleRefresh}
+            className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 transition-colors"
+          >
+            <ArrowPathIcon className={`w-4 h-4 text-red-300 ${isRefreshing ? 'animate-spin' : ''}`} />
+          </button>
         </div>
       </div>
     );
   }
+
+  if (!healthData) return null;
 
   const overallColors = getStatusColor(healthData.overall_status);
 
   return (
     <Link href="/admin/langgraph" className="block group">
       <motion.div
-        whileHover={{ scale: 1.02 }}
+        whileHover={{ scale: 1.01 }}
         transition={{ duration: 0.2 }}
         className={`${overallColors.bg} backdrop-blur-sm border ${overallColors.border} rounded-xl p-4 hover:shadow-lg transition-all`}
       >
@@ -123,30 +220,54 @@ export default function LangGraphHealthWidget() {
           <div className="flex items-center gap-2">
             <ChartBarIcon className="w-5 h-5 text-white/70" />
             <h3 className="font-semibold text-white">LangGraph Status</h3>
+            {healthData.total_executions > 0 && (
+              <span className="text-xs text-white/50 ml-2">
+                ({healthData.total_executions} executions today)
+              </span>
+            )}
           </div>
-          <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${overallColors.dot} animate-pulse`}></div>
-            <span className={`text-xs font-semibold uppercase ${overallColors.text}`}>
-              {healthData.overall_status}
-            </span>
+          <div className="flex items-center gap-3">
+            <button
+              onClick={handleRefresh}
+              className="p-1.5 rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+              title="Refresh"
+            >
+              <ArrowPathIcon className={`w-4 h-4 text-white/60 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+            <div className="flex items-center gap-2">
+              <div className={`w-2 h-2 rounded-full ${overallColors.dot} ${healthData.overall_status === 'healthy' ? 'animate-pulse' : ''}`}></div>
+              <span className={`text-xs font-semibold uppercase ${overallColors.text}`}>
+                {healthData.overall_status === 'unknown' ? 'No Data' : healthData.overall_status}
+              </span>
+            </div>
           </div>
         </div>
 
         {/* Graph Status Pills */}
-        <div className="flex gap-2 flex-wrap">
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {healthData.graphs.map((graph) => {
             const colors = getStatusColor(graph.status);
             return (
               <div
                 key={graph.graph_type}
-                className={`${colors.bg} border ${colors.border} rounded-lg px-3 py-2 flex-1 min-w-[60px]`}
+                className={`${colors.bg} border ${colors.border} rounded-lg px-3 py-2.5 group/pill hover:scale-[1.02] transition-transform`}
+                title={GRAPH_FULL_NAMES[graph.graph_type] || graph.graph_type}
               >
-                <div className="text-xs text-white/50 mb-1">{GRAPH_NAMES[graph.graph_type] || graph.graph_type.toUpperCase()}</div>
-                <div className="flex items-center gap-2">
-                  <div className={`w-1.5 h-1.5 rounded-full ${colors.dot}`}></div>
-                  <span className={`text-sm font-bold ${colors.text}`}>
-                    {Math.round(graph.success_rate)}%
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-xs font-medium text-white/60">
+                    {GRAPH_NAMES[graph.graph_type] || graph.graph_type.toUpperCase()}
                   </span>
+                  <div className={`w-1.5 h-1.5 rounded-full ${colors.dot}`}></div>
+                </div>
+                <div className="flex items-baseline gap-1">
+                  <span className={`text-lg font-bold ${colors.text}`}>
+                    {graph.status === 'unknown' ? '—' : `${Math.round(graph.success_rate)}%`}
+                  </span>
+                  {graph.total_executions > 0 && (
+                    <span className="text-xs text-white/40">
+                      ({graph.total_executions})
+                    </span>
+                  )}
                 </div>
               </div>
             );
@@ -160,7 +281,7 @@ export default function LangGraphHealthWidget() {
           </span>
           <span className="text-[#FFCA40] group-hover:text-[#FFD666] font-medium flex items-center gap-1">
             View Details
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-3 h-3 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </span>

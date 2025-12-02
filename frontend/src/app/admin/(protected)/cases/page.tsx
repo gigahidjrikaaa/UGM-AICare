@@ -18,8 +18,7 @@ import {
   FiAlertCircle, FiClock, FiUsers, FiCheckCircle, 
   FiAlertTriangle, FiActivity, FiInfo 
 } from 'react-icons/fi';
-import { useSSE } from '@/hooks/useSSE';
-import type { SSEEvent } from '@/hooks/useSSE';
+import { useSSEEventHandler } from '@/contexts/AdminSSEContext';
 
 export default function CasesPage() {
   const [response, setResponse] = useState<CaseListResponse>({
@@ -44,52 +43,26 @@ export default function CasesPage() {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
 
-  // Handle SSE events for real-time case updates
-  const handleSSEEvent = useCallback((event: SSEEvent) => {
-    console.log('[Cases] SSE Event:', event);
+  // Handle case_created events via centralized SSE context
+  useSSEEventHandler('case_created', useCallback(() => {
+    toast.success('📬 New case created', { duration: 3000 });
+    // Trigger refetch
+    setFilters(prev => ({ ...prev }));
+  }, []));
 
-    switch (event.type) {
-      case 'case_created':
-      case 'case_updated': {
-        // Show notification badge for updates
-        if (event.type === 'case_created') {
-          toast.success('📬 New case created', { duration: 3000 });
-        } else {
-          toast('🔄 Case updated', { duration: 2000 });
-        }
+  // Handle case_updated events
+  useSSEEventHandler('case_updated', useCallback(() => {
+    toast('🔄 Case updated', { duration: 2000 });
+    // Trigger refetch
+    setFilters(prev => ({ ...prev }));
+  }, []));
 
-        // Reload cases to show updates
-        setFilters(prev => ({ ...prev }));
-        break;
-      }
-
-      case 'sla_breach': {
-        toast.error('⚠️ SLA breach detected', { duration: 5000 });
-        setFilters(prev => ({ ...prev }));
-        break;
-      }
-
-      case 'connected':
-        console.log('[Cases] SSE connected');
-        break;
-
-      case 'ping':
-        // Heartbeat - no action needed
-        break;
-
-      default:
-        console.log('[Cases] Unhandled event type:', event.type);
-    }
-  }, []);
-
-  // Initialize SSE connection for real-time updates
-  useSSE({
-    url: '/api/v1/admin/sse/events',
-    onEvent: handleSSEEvent,
-    eventTypes: ['connected', 'case_created', 'case_updated', 'sla_breach', 'ping'],
-    autoReconnect: true,
-    debug: process.env.NODE_ENV === 'development',
-  });
+  // Handle sla_breach events
+  useSSEEventHandler('sla_breach', useCallback(() => {
+    toast.error('⚠️ SLA breach detected', { duration: 5000 });
+    // Trigger refetch
+    setFilters(prev => ({ ...prev }));
+  }, []));
 
   useEffect(() => {
     const fetchCases = async () => {
