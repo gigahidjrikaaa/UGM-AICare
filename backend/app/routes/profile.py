@@ -48,6 +48,8 @@ from app.schemas.user import (
 )
 from app.utils.security_utils import decrypt_data, encrypt_data
 from app.domains.mental_health.services.user_stats_service import UserStatsService
+from pydantic import BaseModel, Field
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 router = APIRouter(
@@ -55,6 +57,33 @@ router = APIRouter(
     tags=["Profile"],
     dependencies=[Depends(get_current_active_user)],
 )
+
+
+# =============================================================================
+# SIMASTER Import Schema
+# =============================================================================
+
+class SimasterImportRequest(BaseModel):
+    """Request schema for importing SIMASTER profile data."""
+    nim: Optional[str] = Field(None, description="Student ID (NIM)")
+    name: Optional[str] = Field(None, description="Full name from SIMASTER")
+    faculty: Optional[str] = Field(None, description="Faculty name")
+    major: Optional[str] = Field(None, description="Study program/major")
+    year: Optional[str] = Field(None, description="Year of enrollment")
+    email: Optional[str] = Field(None, description="Email from SIMASTER")
+    photo_url: Optional[str] = Field(None, description="Profile photo URL")
+
+
+class SimasterImportResponse(BaseModel):
+    """Response schema for SIMASTER import."""
+    success: bool
+    message: str
+    updated_fields: List[str]
+
+
+# =============================================================================
+# Constants
+# =============================================================================
 
 LET_THERE_BE_BADGE_BADGE_ID = 1
 TRIPLE_THREAT_OF_THOUGHTS_BADGE_ID = 2
@@ -781,3 +810,120 @@ async def get_my_earned_badges(
         logger.error("Error fetching badges for user %s", current_user.id, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not retrieve earned badges.") from exc
 
+
+# =============================================================================
+# SIMASTER Import Endpoint
+# =============================================================================
+
+@router.post("/import-simaster", response_model=SimasterImportResponse)
+async def import_simaster_data(
+    payload: SimasterImportRequest,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_active_user),
+) -> SimasterImportResponse:
+    """
+    Import profile data from SIMASTER.
+    
+    This endpoint receives data extracted by the client-side bookmarklet
+    from the user's SIMASTER profile page.
+    """
+    logger.info("SIMASTER import request for user %s", current_user.id)
+    
+    updated_fields: List[str] = []
+    
+    try:
+        # Load user with profile relationship
+        result = await db.execute(
+            select(User)
+            .options(selectinload(User.profile))
+            .where(User.id == current_user.id)
+        )
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        # Ensure UserProfile exists
+        if not user.profile:
+            user.profile = UserProfile(user_id=user.id)
+            db.add(user.profile)
+        
+        # Update fields from SIMASTER data
+        if payload.nim:
+            # Store NIM in a custom field or notes
+            # For now, we can store it as student_id in profile
+            user.profile.student_id = payload.nim
+            updated_fields.append("nim")
+        
+        if payload.name:
+            # Parse name into first/last if possible
+            name_parts = payload.name.strip().split(" ", 1)
+            first_name = name_parts[0]
+            last_name = name_parts[1] if len(name_parts) > 1 else ""
+            
+            user.profile.first_name = encrypt_data(first_name)
+            user.profile.last_name = encrypt_data(last_name)
+            user.name = encrypt_data(payload.name)
+            updated_fields.append("name")
+        
+        if payload.faculty:
+            # Store faculty - could be in university field or a new field
+            # For now, append to university or store separately
+            user.profile.faculty = encrypt_data(payload.faculty)
+            updated_fields.append("faculty")
+        
+        if payload.major:
+            user.profile.major = encrypt_data(payload.major)
+            user.major = encrypt_data(payload.major)  # Legacy field
+            updated_fields.append("major")
+        
+        if payload.year:
+            # Try to extract year number
+            year_str = payload.year.strip()
+            try:
+                year_num = int(year_str)
+                user.profile.year_of_study = year_num
+                user.year_of_study = str(year_num)  # Legacy field
+                updated_fields.append("year")
+            except ValueError:
+                # If not a number, store as-is in legacy field
+                user.year_of_study = year_str
+                updated_fields.append("year")
+        
+        if payload.photo_url:
+            user.profile.profile_photo_url = payload.photo_url
+            updated_fields.append("photo_url")
+        
+        # Set university as UGM since we're importing from SIMASTER
+        user.profile.university = encrypt_data("Universitas Gadjah Mada")
+        user.university = encrypt_data("Universitas Gadjah Mada")
+        if "university" not in updated_fields:
+            updated_fields.append("university")
+        
+        # Mark profile as verified from SIMASTER
+        user.profile.simaster_verified = True
+        user.profile.simaster_verified_at = datetime.now()
+        
+        await db.commit()
+        
+        logger.info(
+            "SIMASTER import successful for user %s: updated %s",
+            current_user.id,
+            ", ".join(updated_fields)
+        )
+        
+        return SimasterImportResponse(
+            success=True,
+            message=f"Successfully imported {len(updated_fields)} fields from SIMASTER",
+            updated_fields=updated_fields
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as exc:
+        await db.rollback()
+        logger.error("SIMASTER import failed for user %s: %s", current_user.id, exc, exc_info=True)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to import SIMASTER data"
+        ) from exc

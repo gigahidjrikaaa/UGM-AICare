@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import Image from "next/image";
+import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import QRCode from "react-qr-code";
@@ -13,6 +14,7 @@ import {
   FiCalendar,
   FiCheckCircle,
   FiCopy,
+  FiDownload,
   FiEdit3,
   FiGlobe,
   FiMapPin,
@@ -567,6 +569,15 @@ export default function ProfilePage() {
                     <FiEdit3 className="h-4 w-4" />
                     Edit profile
                   </button>
+                )}
+                {!isEditing && (
+                  <Link
+                    href="/profile/simaster-import"
+                    className="inline-flex items-center gap-2 rounded-lg border border-white/20 bg-transparent px-4 py-2 text-sm font-semibold text-white transition hover:border-[#FFCA40] hover:text-[#FFCA40]"
+                  >
+                    <FiDownload className="h-4 w-4" />
+                    Import from SIMASTER
+                  </Link>
                 )}
               </div>
               <p className="text-xs text-white/50">

@@ -12,7 +12,7 @@ Industry Best Practices Applied:
 - student_id as UNIQUE (official NIM for UGM integration)
 """
 
-from sqlalchemy import Column, Integer, String, Date, Float, ForeignKey, Text, ARRAY
+from sqlalchemy import Column, Integer, String, Date, Float, ForeignKey, Text, ARRAY, Boolean, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -106,6 +106,19 @@ class UserProfile(Base):
     batch_year = Column(
         Integer,
         comment="Enrollment year (e.g., 2021)"
+    )
+    
+    # =====================================================================
+    # SIMASTER INTEGRATION
+    # =====================================================================
+    simaster_verified = Column(
+        Boolean,
+        default=False,
+        comment="Whether profile was verified via SIMASTER import"
+    )
+    simaster_verified_at = Column(
+        DateTime,
+        comment="Timestamp when SIMASTER verification occurred"
     )
     
     # =====================================================================
