@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   FiAlertTriangle,
   FiClock,
@@ -10,17 +10,18 @@ import {
   FiRefreshCw,
   FiBell,
 } from 'react-icons/fi';
+import apiClient from '@/services/api';
 
 interface Escalation {
-  escalation_id: string;
-  user_id_hash: string;
-  severity: 'low' | 'moderate' | 'high' | 'critical';
-  trigger_type: 'crisis_keywords' | 'high_distress_score' | 'repeated_negative_thoughts' | 'manual_escalation';
-  agent_type: 'STA' | 'TCA' | 'CMA' | 'IA';
-  agent_notes: string;
+  id: string;
+  user_hash: string;
+  severity: 'low' | 'med' | 'high' | 'critical';
+  status: 'new' | 'in_progress' | 'waiting' | 'closed';
   created_at: string;
-  status: 'pending' | 'accepted' | 'reassigned' | 'resolved';
-  message_excerpt?: string;
+  updated_at: string;
+  assigned_to?: string;
+  summary_redacted?: string;
+  sla_breach_at?: string;
 }
 
 const severityConfig = {
@@ -34,7 +35,7 @@ const severityConfig = {
     icon: 'bg-orange-500',
     label: 'High',
   },
-  moderate: {
+  med: {
     color: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
     icon: 'bg-yellow-500',
     label: 'Moderate',
@@ -46,66 +47,33 @@ const severityConfig = {
   },
 };
 
-const agentColors = {
-  STA: 'bg-purple-500/20 text-purple-300',
-  TCA: 'bg-blue-500/20 text-blue-300',
-  CMA: 'bg-green-500/20 text-green-300',
-  IA: 'bg-pink-500/20 text-pink-300',
-};
-
 export default function CounselorEscalationsPage() {
   const [escalations, setEscalations] = useState<Escalation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'pending' | 'accepted'>('pending');
+  const [filter, setFilter] = useState<'all' | 'new' | 'in_progress'>('new');
 
-  useEffect(() => {
-    loadEscalations();
-  }, []);
-
-  const loadEscalations = async () => {
+  const loadEscalations = useCallback(async () => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API endpoint
-      // const data = await apiCall<Escalation[]>('/api/counselor/escalations');
-      
-      // Mock data
-      const mockEscalations: Escalation[] = [
-        {
-          escalation_id: 'ESC-001',
-          user_id_hash: 'user_abc123',
-          severity: 'critical',
-          trigger_type: 'crisis_keywords',
-          agent_type: 'STA',
-          agent_notes: 'User mentioned self-harm thoughts. Immediate intervention recommended.',
-          created_at: new Date().toISOString(),
-          status: 'pending',
-          message_excerpt: 'I feel like there is no way out...',
-        },
-        {
-          escalation_id: 'ESC-002',
-          user_id_hash: 'user_def456',
-          severity: 'high',
-          trigger_type: 'high_distress_score',
-          agent_type: 'TCA',
-          agent_notes: 'Distress score: 8.5/10. Multiple negative thought patterns detected.',
-          created_at: new Date(Date.now() - 3600000).toISOString(),
-          status: 'pending',
-        },
-      ];
-      
-      setEscalations(mockEscalations);
       setError(null);
+      // Fetch cases assigned to this counselor
+      const response = await apiClient.get<{ cases: Escalation[] }>('/counselor/cases');
+      setEscalations(response.data.cases || []);
     } catch (err) {
       console.error('Failed to load escalations:', err);
       setError('Failed to load escalations');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadEscalations();
+  }, [loadEscalations]);
 
   const handleAccept = async (escalationId: string) => {
-    // TODO: Implement accept logic
+    // TODO: Implement accept logic - update case status to in_progress
     console.log('Accept escalation:', escalationId);
   };
 
@@ -130,8 +98,8 @@ export default function CounselorEscalationsPage() {
     return e.status === filter;
   });
 
-  const pendingCount = escalations.filter(e => e.status === 'pending').length;
-  const criticalCount = escalations.filter(e => e.severity === 'critical' && e.status === 'pending').length;
+  const newCount = escalations.filter(e => e.status === 'new').length;
+  const criticalCount = escalations.filter(e => e.severity === 'critical' && e.status === 'new').length;
 
   if (loading) {
     return (
@@ -202,40 +170,40 @@ export default function CounselorEscalationsPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
-          <div className="text-2xl font-bold text-white">{pendingCount}</div>
+          <div className="text-2xl font-bold text-white">{newCount}</div>
           <div className="text-xs text-white/60 mt-1">Pending Review</div>
         </div>
         <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
-          <div className="text-2xl font-bold text-white">{criticalCount}</div>
+          <div className="text-2xl font-bold text-red-400">{criticalCount}</div>
           <div className="text-xs text-white/60 mt-1">Critical Priority</div>
         </div>
         <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
-          <div className="text-2xl font-bold text-white">{escalations.filter(e => e.status === 'accepted').length}</div>
-          <div className="text-xs text-white/60 mt-1">Accepted Today</div>
+          <div className="text-2xl font-bold text-white">{escalations.filter(e => e.status === 'in_progress').length}</div>
+          <div className="text-xs text-white/60 mt-1">In Progress</div>
         </div>
       </div>
 
       {/* Filter Tabs */}
       <div className="flex gap-2 border-b border-white/10">
         <button
-          onClick={() => setFilter('pending')}
+          onClick={() => setFilter('new')}
           className={`px-4 py-2 font-medium text-sm transition-all ${
-            filter === 'pending'
+            filter === 'new'
               ? 'text-[#FFCA40] border-b-2 border-[#FFCA40]'
               : 'text-white/60 hover:text-white/80'
           }`}
         >
-          Pending ({pendingCount})
+          New ({newCount})
         </button>
         <button
-          onClick={() => setFilter('accepted')}
+          onClick={() => setFilter('in_progress')}
           className={`px-4 py-2 font-medium text-sm transition-all ${
-            filter === 'accepted'
+            filter === 'in_progress'
               ? 'text-[#FFCA40] border-b-2 border-[#FFCA40]'
               : 'text-white/60 hover:text-white/80'
           }`}
         >
-          Accepted ({escalations.filter(e => e.status === 'accepted').length})
+          In Progress ({escalations.filter(e => e.status === 'in_progress').length})
         </button>
         <button
           onClick={() => setFilter('all')}
@@ -255,11 +223,12 @@ export default function CounselorEscalationsPage() {
           <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-12 text-center">
             <FiCheckCircle className="w-12 h-12 text-white/20 mx-auto mb-3" />
             <p className="text-white/60">No escalations found</p>
+            <p className="text-white/40 text-sm mt-1">Cases assigned to you will appear here</p>
           </div>
         ) : (
           filteredEscalations.map((escalation) => (
             <div
-              key={escalation.escalation_id}
+              key={escalation.id}
               className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-6 hover:bg-white/10 transition-all"
             >
               <div className="flex items-start justify-between gap-4">
@@ -272,12 +241,12 @@ export default function CounselorEscalationsPage() {
                 <div className="flex-1 space-y-3">
                   {/* Header Row */}
                   <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-sm font-mono text-white/90">{escalation.escalation_id}</span>
+                    <span className="text-sm font-mono text-white/90">{escalation.id.substring(0, 8)}...</span>
                     <span className={`px-2 py-0.5 rounded text-xs font-medium border ${severityConfig[escalation.severity].color}`}>
                       {severityConfig[escalation.severity].label}
                     </span>
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium ${agentColors[escalation.agent_type]}`}>
-                      {escalation.agent_type}
+                    <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-500/20 text-purple-300">
+                      CMA
                     </span>
                     <div className="flex items-center gap-1.5 text-xs text-white/50">
                       <FiClock className="w-3 h-3" />
@@ -288,36 +257,38 @@ export default function CounselorEscalationsPage() {
                   {/* Patient ID */}
                   <div className="flex items-center gap-2">
                     <FiUser className="w-4 h-4 text-white/40" />
-                    <span className="text-sm font-mono text-white/70">{escalation.user_id_hash}</span>
+                    <span className="text-sm font-mono text-white/70">{escalation.user_hash.substring(0, 16)}...</span>
                   </div>
 
-                  {/* Agent Notes */}
-                  <div className="bg-white/5 rounded-lg p-3">
-                    <p className="text-sm font-medium text-white/90 mb-1">Agent Notes:</p>
-                    <p className="text-sm text-white/70">{escalation.agent_notes}</p>
-                  </div>
+                  {/* Summary */}
+                  {escalation.summary_redacted && (
+                    <div className="bg-white/5 rounded-lg p-3">
+                      <p className="text-sm font-medium text-white/90 mb-1">Case Summary:</p>
+                      <p className="text-sm text-white/70">{escalation.summary_redacted}</p>
+                    </div>
+                  )}
 
-                  {/* Message Excerpt if available */}
-                  {escalation.message_excerpt && (
+                  {/* SLA Warning */}
+                  {escalation.sla_breach_at && (
                     <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
-                      <p className="text-xs font-medium text-orange-300 mb-1">Recent Message:</p>
-                      <p className="text-sm italic text-orange-200/80">&quot;{escalation.message_excerpt}&quot;</p>
+                      <p className="text-xs font-medium text-orange-300 mb-1">SLA Deadline:</p>
+                      <p className="text-sm text-orange-200/80">{new Date(escalation.sla_breach_at).toLocaleString()}</p>
                     </div>
                   )}
                 </div>
 
                 {/* Right: Actions */}
-                {escalation.status === 'pending' && (
+                {escalation.status === 'new' && (
                   <div className="flex-shrink-0 flex flex-col gap-2">
                     <button
-                      onClick={() => handleAccept(escalation.escalation_id)}
+                      onClick={() => handleAccept(escalation.id)}
                       className="px-4 py-2 bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 rounded-lg text-sm font-medium text-[#FFCA40] transition-all flex items-center gap-2 whitespace-nowrap"
                     >
                       <FiCheckCircle className="w-4 h-4" />
                       Accept Case
                     </button>
                     <button
-                      onClick={() => handleReassign(escalation.escalation_id)}
+                      onClick={() => handleReassign(escalation.id)}
                       className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/20 rounded-lg text-sm text-white/70 hover:text-white transition-all flex items-center gap-2 whitespace-nowrap"
                     >
                       <FiArrowRight className="w-4 h-4" />

@@ -10,9 +10,15 @@ from sqlalchemy.orm import joinedload
 
 from app.database import get_async_db
 from app.dependencies import get_current_active_user
-from app.domains.mental_health.models import Psychologist as CounselorProfile, Appointment
+from app.domains.mental_health.models import (
+    Psychologist as CounselorProfile,
+    Appointment,
+    Case,
+    CaseStatusEnum,
+)
 from app.models.user import User
 from app.domains.mental_health.schemas.appointments import AppointmentWithUser
+from app.agents.cma.schemas import SDACase, SDAListCasesResponse
 from app.schemas.counselor import (
     CounselorAvailabilityToggle,
     CounselorDashboardStats,
@@ -277,6 +283,150 @@ async def get_my_dashboard_stats(
         total_patients=total_patients,
         total_completed_appointments=completed_appointments,
     )
+
+
+# ========================================
+# Case Management (Escalations)
+# ========================================
+
+@router.get("/cases", response_model=SDAListCasesResponse)
+async def get_my_cases(
+    status: Optional[str] = Query(
+        None, description="Filter by status: new, in_progress, waiting, closed"
+    ),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+):
+    """
+    Get all cases assigned to the current counselor.
+    
+    Cases are assigned via the CMA (Case Management Agent) auto-assignment
+    algorithm based on counselor workload.
+    """
+    # Find the psychologist profile for this user
+    profile_query = select(CounselorProfile).where(CounselorProfile.user_id == current_user.id)
+    profile_result = await db.execute(profile_query)
+    profile = profile_result.scalar_one_or_none()
+    
+    if not profile:
+        # No psychologist profile means no cases can be assigned
+        return SDAListCasesResponse(cases=[])
+    
+    # Query cases assigned to this counselor (assigned_to stores psychologist.id as string)
+    psychologist_id_str = str(profile.id)
+    query = select(Case).where(Case.assigned_to == psychologist_id_str).order_by(Case.created_at.desc())
+    
+    if status:
+        try:
+            status_enum = CaseStatusEnum(status)
+            query = query.where(Case.status == status_enum)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid status filter")
+    
+    result = await db.execute(query)
+    cases = result.scalars().all()
+    
+    # Convert to schema
+    from typing import cast
+    from app.domains.mental_health.models import CaseSeverityEnum
+    
+    payload: list[SDACase] = []
+    for case in cases:
+        created_at = cast(datetime, case.created_at)
+        updated_at = cast(datetime, case.updated_at)
+        status_val = case.status.value if isinstance(case.status, CaseStatusEnum) else "new"
+        severity_val = case.severity.value if isinstance(case.severity, CaseSeverityEnum) else "low"
+        
+        payload.append(SDACase(
+            id=str(case.id),
+            created_at=created_at,
+            updated_at=updated_at,
+            status=status_val,  # type: ignore[arg-type]
+            severity=severity_val,  # type: ignore[arg-type]
+            assigned_to=str(case.assigned_to) if case.assigned_to else None,
+            user_hash=str(case.user_hash) if case.user_hash else "",
+            session_id=str(case.session_id) if case.session_id else None,
+            summary_redacted=str(case.summary_redacted) if case.summary_redacted else None,
+            sla_breach_at=cast(datetime | None, case.sla_breach_at),
+        ))
+    
+    return SDAListCasesResponse(cases=payload)
+
+
+@router.get("/cases/stats")
+async def get_my_case_stats(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+):
+    """Get case statistics for the current counselor."""
+    # Find the psychologist profile for this user
+    profile_query = select(CounselorProfile).where(CounselorProfile.user_id == current_user.id)
+    profile_result = await db.execute(profile_query)
+    profile = profile_result.scalar_one_or_none()
+    
+    if not profile:
+        return {
+            "total_cases": 0,
+            "open_cases": 0,
+            "in_progress_cases": 0,
+            "closed_cases": 0,
+            "critical_cases": 0,
+            "high_priority_cases": 0,
+        }
+    
+    # Case.assigned_to stores psychologist.id as string
+    psychologist_id_str = str(profile.id)
+    
+    # Total cases
+    total_query = select(func.count(Case.id)).where(Case.assigned_to == psychologist_id_str)
+    total = await db.scalar(total_query) or 0
+    
+    # Open cases (new status)
+    open_query = select(func.count(Case.id)).where(
+        Case.assigned_to == psychologist_id_str,
+        Case.status == CaseStatusEnum.new
+    )
+    open_cases = await db.scalar(open_query) or 0
+    
+    # In progress cases
+    in_progress_query = select(func.count(Case.id)).where(
+        Case.assigned_to == psychologist_id_str,
+        Case.status == CaseStatusEnum.in_progress
+    )
+    in_progress = await db.scalar(in_progress_query) or 0
+    
+    # Closed cases
+    closed_query = select(func.count(Case.id)).where(
+        Case.assigned_to == psychologist_id_str,
+        Case.status == CaseStatusEnum.closed
+    )
+    closed = await db.scalar(closed_query) or 0
+    
+    # Critical severity
+    from app.domains.mental_health.models import CaseSeverityEnum
+    critical_query = select(func.count(Case.id)).where(
+        Case.assigned_to == psychologist_id_str,
+        Case.severity == CaseSeverityEnum.critical,
+        Case.status != CaseStatusEnum.closed
+    )
+    critical = await db.scalar(critical_query) or 0
+    
+    # High priority (high severity)
+    high_query = select(func.count(Case.id)).where(
+        Case.assigned_to == psychologist_id_str,
+        Case.severity == CaseSeverityEnum.high,
+        Case.status != CaseStatusEnum.closed
+    )
+    high = await db.scalar(high_query) or 0
+    
+    return {
+        "total_cases": total,
+        "open_cases": open_cases,
+        "in_progress_cases": in_progress,
+        "closed_cases": closed,
+        "critical_cases": critical,
+        "high_priority_cases": high,
+    }
 
 
 # ========================================

@@ -15,7 +15,6 @@ from app.core.settings import get_settings
 from app.core.llm import get_gemini_client, GEMINI_FLASH_MODEL
 from app.domains.mental_health.models import Case, CaseSeverityEnum, CaseStatusEnum
 from app.domains.mental_health.models.appointments import Psychologist, Appointment
-from app.models.agent_user import AgentUser, AgentRoleEnum
 from app.models.system import CaseAssignment
 from app.services.event_bus import EventType, publish_event
 from app.core.langfuse_config import trace_agent
@@ -255,9 +254,9 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
         if not case_id:
             raise ValueError("No case_id found for assignment")
         
-        # Step 1: Query all counsellors
-        counsellors_stmt = select(AgentUser).where(
-            AgentUser.role == AgentRoleEnum.counselor
+        # Step 1: Query all available counsellors from psychologists table
+        counsellors_stmt = select(Psychologist).where(
+            Psychologist.is_available == True  # noqa: E712
         )
         counsellors_result = await db.execute(counsellors_stmt)
         counsellors = counsellors_result.scalars().all()
@@ -291,8 +290,10 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
         
         counsellor_workload = {}
         for counsellor in counsellors:
+            # Convert psychologist.id to string for comparison with Case.assigned_to (String field)
+            counsellor_id_str = str(counsellor.id)
             workload_stmt = select(func.count(Case.id)).where(
-                Case.assigned_to == counsellor.id,
+                Case.assigned_to == counsellor_id_str,
                 Case.status.in_(active_statuses)
             )
             workload_result = await db.execute(workload_stmt)
@@ -307,10 +308,13 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
         )
         assigned_workload = counsellor_workload[assigned_counsellor_id]
         
+        # Convert to string for storage (Case.assigned_to is String type)
+        assigned_counsellor_id_str = str(assigned_counsellor_id)
+        
         # Step 4: Create CaseAssignment record
         assignment = CaseAssignment(
             case_id=case_id,
-            assigned_to=assigned_counsellor_id,
+            assigned_to=assigned_counsellor_id_str,
             assigned_by=None,  # System auto-assignment (no user)
             assigned_at=datetime.now(),
             reassignment_reason=None,  # First assignment, not a reassignment
@@ -322,14 +326,14 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
         # Step 5: Update Case with assignment
         case = await db.get(Case, case_id)
         if case:
-            case.assigned_to = assigned_counsellor_id  # type: ignore[assignment]
+            case.assigned_to = assigned_counsellor_id_str  # type: ignore[assignment]
             case.status = CaseStatusEnum.in_progress  # type: ignore[assignment]
             case.updated_at = datetime.now()  # type: ignore[assignment]
             db.add(case)
             await db.flush()
         
         # Update state
-        state["assigned_to"] = assigned_counsellor_id
+        state["assigned_to"] = assigned_counsellor_id_str
         state["assignment_id"] = str(assignment.id)
         state["assignment_reason"] = "auto_assigned_lowest_workload"
         state["assigned_workload"] = assigned_workload
