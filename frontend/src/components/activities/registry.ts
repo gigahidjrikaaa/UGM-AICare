@@ -73,7 +73,7 @@ class ActivityRegistry {
    */
   getByTags(tags: string[]): ActivityMetadata[] {
     return this.getAll().filter(a => 
-      a.tags.some(tag => tags.includes(tag))
+      a.tags.some((tag: string) => tags.includes(tag))
     );
   }
   
@@ -99,7 +99,7 @@ class ActivityRegistry {
     return this.getAll().filter(a => 
       a.name.toLowerCase().includes(lowercaseQuery) ||
       a.description.toLowerCase().includes(lowercaseQuery) ||
-      a.tags.some(tag => tag.toLowerCase().includes(lowercaseQuery))
+      a.tags.some((tag: string) => tag.toLowerCase().includes(lowercaseQuery))
     );
   }
   
@@ -130,7 +130,7 @@ class ActivityRegistry {
     // Score activities by how many tags they match
     const scored = this.getAll().map(activity => ({
       activity,
-      score: activity.tags.filter(tag => relevantTags.includes(tag)).length,
+      score: activity.tags.filter((tag: string) => relevantTags.includes(tag)).length,
     }));
     
     return scored

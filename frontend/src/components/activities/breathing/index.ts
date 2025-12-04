@@ -5,11 +5,13 @@
  * Add new breathing activities here to make them available system-wide.
  */
 
+import type { ActivityMetadata } from '../types';
+
 export { default as BoxBreathing } from './BoxBreathing';
 export { default as FourSevenEight } from './FourSevenEight';
 
 // Activity metadata for the registry
-export const breathingActivities = [
+export const breathingActivities: ActivityMetadata[] = [
   {
     id: 'box-breathing',
     name: 'Box Breathing',

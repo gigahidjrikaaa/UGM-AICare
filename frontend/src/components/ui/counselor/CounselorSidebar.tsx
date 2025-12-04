@@ -16,6 +16,7 @@ import {
   FiMessageSquare,
   FiBarChart2,
   FiBookOpen,
+  FiActivity,
 } from 'react-icons/fi';
 import SidebarLink from '../admin/SidebarLink';
 
@@ -36,6 +37,7 @@ const navGroups = [
       { name: 'Session Notes', icon: <FiMessageSquare size={18}/>, href: '/counselor/notes' },
       { name: 'Treatment Plans', icon: <FiBookOpen size={18}/>, href: '/counselor/treatment-plans' },
       { name: 'Progress Tracking', icon: <FiBarChart2 size={18}/>, href: '/counselor/progress' },
+      { name: 'Activities', icon: <FiActivity size={18}/>, href: '/counselor/activities' },
     ]
   }
 ];

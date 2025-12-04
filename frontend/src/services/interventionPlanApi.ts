@@ -14,6 +14,9 @@ export interface ResourceCard {
   title: string;
   url: string;
   description: string;
+  resource_type?: 'link' | 'activity' | 'video' | 'article';
+  activity_id?: string;
+  resource_id?: string;
 }
 
 export interface NextCheckIn {

@@ -246,6 +246,8 @@ def _build_user_prompt(
     context: Optional[Dict[str, Any]] = None
 ) -> str:
     """Build personalized user prompt with context."""
+    from app.agents.tca.activities_catalog import get_all_activities_prompt_context
+    
     prompt_parts = [
         f"USER'S MESSAGE: \"{user_message}\"\n",
         f"DETECTED INTENT: {intent}\n",
@@ -264,7 +266,11 @@ def _build_user_prompt(
             if demo.get("student_status"):
                 prompt_parts.append(f"STUDENT STATUS: {demo['student_status']}\n")
     
+    # Include available interactive activities
+    prompt_parts.append("\n" + get_all_activities_prompt_context() + "\n")
+    
     prompt_parts.append("\nBased on the above information, generate a hyper-personalized support plan that directly addresses this user's specific situation.")
+    prompt_parts.append("\nPRIORITIZE including 1-2 interactive activities in resource_cards when relevant (breathing for anxiety, grounding for panic).")
     prompt_parts.append("\nIMPORTANT: Respond ONLY with valid JSON in the exact format specified. No additional text or explanation.")
     
     return "".join(prompt_parts)
@@ -456,18 +462,27 @@ def _repair_truncated_json(response_text: str, intent: str) -> Optional[Dict[str
 
 
 def _get_default_resources(intent: str) -> List[Dict[str, Any]]:
-    """Get default resource cards based on intent."""
+    """Get default resource cards based on intent, including interactive activities."""
     from app.agents.tca.resources import get_default_resources
+    from app.agents.tca.activities_catalog import get_recommended_activities
     
+    resources = []
+    
+    # Add recommended interactive activities first (priority)
+    activities = get_recommended_activities(intent, max_activities=2)
+    resources.extend(activities)
+    
+    # Add traditional resource links
     resource_objs = list(get_default_resources(intent))
-    return [
-        {
+    for r in resource_objs:
+        resources.append({
             "title": getattr(r, "title", getattr(r, "label", "Resource")),
             "description": getattr(r, "description", getattr(r, "summary", "")),
-            "url": getattr(r, "url", None)
-        }
-        for r in resource_objs
-    ]
+            "url": getattr(r, "url", None),
+            "resource_type": "link",
+        })
+    
+    return resources
 
 
 def _get_fallback_plan(plan_type: str, intent: str) -> Dict[str, Any]:

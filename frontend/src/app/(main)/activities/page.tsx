@@ -5,18 +5,36 @@
  * 
  * Browse and play therapeutic activities for mental wellness.
  * Integrated with intervention plans from the TCA agent.
+ * 
+ * Supports deep linking via ?play=activity-id query parameter.
  */
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useRouter } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ActivityPlayer, ActivityBrowser, activityRegistry, ActivityMetadata } from '@/components/activities';
 
 export default function ActivitiesPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
   const [selectedActivity, setSelectedActivity] = useState<ActivityMetadata | null>(null);
   const [completedActivities, setCompletedActivities] = useState<string[]>([]);
   
+  // Handle deep link via ?play=activity-id
+  useEffect(() => {
+    const playParam = searchParams.get('play');
+    if (playParam) {
+      const activity = activityRegistry.get(playParam);
+      if (activity) {
+        setSelectedActivity(activity);
+      }
+    }
+  }, [searchParams]);
+  
   const handleSelect = (activity: ActivityMetadata) => {
     setSelectedActivity(activity);
+    // Update URL without full navigation
+    router.push(`/activities?play=${activity.id}`, { scroll: false });
   };
   
   const handleComplete = (result: { activityId: string; completed: boolean }) => {
@@ -29,6 +47,8 @@ export default function ActivitiesPage() {
   
   const handleExit = () => {
     setSelectedActivity(null);
+    // Clear the play parameter from URL
+    router.push('/activities', { scroll: false });
   };
   
   return (

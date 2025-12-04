@@ -10,6 +10,8 @@ export interface ResourceCard {
   title: string;
   summary: string;
   url?: string;
+  resource_type?: 'link' | 'activity' | 'video' | 'article';  // Type of resource
+  activity_id?: string;  // For interactive activities (e.g., "box-breathing")
 }
 
 export interface InterventionPlan {

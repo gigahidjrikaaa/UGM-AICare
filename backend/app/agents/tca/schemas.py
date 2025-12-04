@@ -26,6 +26,8 @@ class ResourceCard(BaseModel):
     description: str
     url: Optional[str] = None
     resource_id: Optional[str] = None  # Optional for backward compatibility
+    resource_type: Optional[str] = "link"  # "link", "activity", "video", "article"
+    activity_id: Optional[str] = None  # For interactive activities (e.g., "box-breathing")
 
 
 class TCAInterveneResponse(BaseModel):

@@ -39,6 +39,7 @@ const navGroups = [
       { name: 'Appointments', icon: <FiCalendar size={18} />, href: '/admin/appointments' },
       { name: 'Conversations', icon: <FiMessageSquare size={18} />, href: '/admin/conversations' },
       { name: 'Content Resources', icon: <FiBookOpen size={18} />, href: '/admin/content-resources' },
+      { name: 'Activities', icon: <FiActivity size={18} />, href: '/admin/activities' },
       { name: 'Surveys', icon: <FiClipboard size={18} />, href: '/admin/surveys' },
       { name: 'CBT Modules', icon: <FiHeart size={18} />, href: '/admin/cbt-modules' },
     ]

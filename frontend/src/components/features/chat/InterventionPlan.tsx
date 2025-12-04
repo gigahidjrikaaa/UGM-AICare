@@ -3,6 +3,7 @@ import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { InterventionPlan as InterventionPlanType } from '@/types/chat';
 import { cn } from '@/lib/utils';
+import Link from 'next/link';
 import {
   CheckCircle2,
   Clock,
@@ -12,6 +13,7 @@ import {
   Sparkles,
   Heart,
   BookOpen,
+  Play,
 } from 'lucide-react';
 
 interface InterventionPlanProps {
@@ -186,37 +188,83 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
                   </div>
                   Sumber Bantuan Tambahan
                 </h5>
-                {plan.resource_cards.map((card, index) => (
-                  <motion.a
-                    key={card.resource_id}
-                    initial={{ opacity: 0, y: 5 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: (plan.plan_steps.length + index) * 0.1 }}
-                    href={card.url || '#'}
-                    target={card.url ? '_blank' : undefined}
-                    rel={card.url ? 'noopener noreferrer' : undefined}
-                    className={cn(
-                      'block p-4 rounded-xl border-2 transition-all',
-                      card.url
-                        ? 'bg-white border-purple-200/80 hover:border-ugm-gold/60 hover:shadow-lg cursor-pointer group'
-                        : 'bg-gray-50 border-gray-200 cursor-default'
-                    )}
-                  >
-                    <div className="flex items-start gap-3">
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-semibold text-ugm-blue-dark group-hover:text-ugm-blue transition-colors">
-                          {card.title}
-                        </p>
-                        <p className="text-xs text-gray-600 mt-1 leading-relaxed">
-                          {card.summary}
-                        </p>
-                      </div>
-                      {card.url && (
-                        <ExternalLink className="w-4 h-4 text-ugm-blue flex-shrink-0 mt-0.5 group-hover:text-ugm-gold transition-colors" />
+                {plan.resource_cards.map((card, index) => {
+                  // Check if this is an interactive activity
+                  const isActivity = card.resource_type === 'activity' && card.activity_id;
+                  
+                  if (isActivity) {
+                    // Render activity card with special styling
+                    return (
+                      <motion.div
+                        key={card.resource_id}
+                        initial={{ opacity: 0, y: 5 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: (plan.plan_steps.length + index) * 0.1 }}
+                      >
+                        <Link
+                          href={`/activities?play=${card.activity_id}`}
+                          className="block p-4 rounded-xl border-2 bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-300/60 hover:border-emerald-400 hover:shadow-lg transition-all cursor-pointer group"
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                              <Play className="w-5 h-5 text-white" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-semibold text-emerald-800 group-hover:text-emerald-700 transition-colors">
+                                  {card.title}
+                                </p>
+                                <span className="text-xs font-medium text-emerald-600 bg-emerald-100 px-2 py-0.5 rounded-full">
+                                  Interaktif
+                                </span>
+                              </div>
+                              <p className="text-xs text-emerald-700/80 mt-1 leading-relaxed">
+                                {card.summary}
+                              </p>
+                              <p className="text-xs text-emerald-600 mt-2 font-medium flex items-center gap-1">
+                                <Play className="w-3 h-3" />
+                                Klik untuk mulai latihan
+                              </p>
+                            </div>
+                          </div>
+                        </Link>
+                      </motion.div>
+                    );
+                  }
+                  
+                  // Regular link resource card
+                  return (
+                    <motion.a
+                      key={card.resource_id}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: (plan.plan_steps.length + index) * 0.1 }}
+                      href={card.url || '#'}
+                      target={card.url ? '_blank' : undefined}
+                      rel={card.url ? 'noopener noreferrer' : undefined}
+                      className={cn(
+                        'block p-4 rounded-xl border-2 transition-all',
+                        card.url
+                          ? 'bg-white border-purple-200/80 hover:border-ugm-gold/60 hover:shadow-lg cursor-pointer group'
+                          : 'bg-gray-50 border-gray-200 cursor-default'
                       )}
-                    </div>
-                  </motion.a>
-                ))}
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-semibold text-ugm-blue-dark group-hover:text-ugm-blue transition-colors">
+                            {card.title}
+                          </p>
+                          <p className="text-xs text-gray-600 mt-1 leading-relaxed">
+                            {card.summary}
+                          </p>
+                        </div>
+                        {card.url && (
+                          <ExternalLink className="w-4 h-4 text-ugm-blue flex-shrink-0 mt-0.5 group-hover:text-ugm-gold transition-colors" />
+                        )}
+                      </div>
+                    </motion.a>
+                  );
+                })}
               </div>
             )}
 

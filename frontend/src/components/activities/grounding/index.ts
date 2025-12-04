@@ -5,10 +5,12 @@
  * Grounding techniques help anchor users to the present moment.
  */
 
+import type { ActivityMetadata } from '../types';
+
 export { default as FiveFourThreeTwoOne } from './FiveFourThreeTwoOne';
 
 // Activity metadata for the registry
-export const groundingActivities = [
+export const groundingActivities: ActivityMetadata[] = [
   {
     id: 'five-four-three-two-one',
     name: '5-4-3-2-1 Grounding',

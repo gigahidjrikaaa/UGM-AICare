@@ -73,7 +73,7 @@ export default function ActivityBrowser({
     // Apply tag filter
     if (filterTags && filterTags.length > 0) {
       activities = activities.filter(a => 
-        a.tags.some(tag => filterTags.includes(tag))
+        a.tags.some((tag: string) => filterTags.includes(tag))
       );
     }
     
@@ -83,7 +83,7 @@ export default function ActivityBrowser({
       activities = activities.filter(a => 
         a.name.toLowerCase().includes(query) ||
         a.description.toLowerCase().includes(query) ||
-        a.tags.some(tag => tag.toLowerCase().includes(query))
+        a.tags.some((tag: string) => tag.toLowerCase().includes(query))
       );
     }
     

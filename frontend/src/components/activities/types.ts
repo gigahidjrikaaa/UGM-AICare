@@ -6,6 +6,62 @@
  */
 
 // ============================================================================
+// Activity Metadata (for Registry)
+// ============================================================================
+
+/**
+ * Metadata for an activity in the registry
+ */
+export interface ActivityMetadata {
+  /** Unique identifier */
+  id: string;
+  
+  /** Display name */
+  name: string;
+  
+  /** Brief description */
+  description: string;
+  
+  /** Category for grouping */
+  category: string;
+  
+  /** Estimated duration in seconds */
+  estimatedDuration: number;
+  
+  /** Difficulty level */
+  difficulty: 'beginner' | 'intermediate' | 'advanced';
+  
+  /** Tags for filtering and recommendation */
+  tags: string[];
+  
+  /** Emoji or icon identifier */
+  icon: string;
+  
+  /** Component name for dynamic loading */
+  component: string;
+}
+
+/**
+ * Progress tracking for activities
+ */
+export interface ActivityProgress {
+  /** Current step or phase */
+  currentStep: number;
+  
+  /** Total steps or phases */
+  totalSteps: number;
+  
+  /** Progress percentage (0-100) */
+  percentage: number;
+  
+  /** Time elapsed in seconds */
+  elapsed: number;
+  
+  /** Time remaining in seconds */
+  remaining: number;
+}
+
+// ============================================================================
 // Activity Props & Results
 // ============================================================================
 
@@ -67,6 +123,12 @@ export interface UserPreferences {
   
   /** Reduce motion for users with vestibular disorders */
   reducedMotion?: boolean;
+  
+  /** Enable/disable sound effects */
+  soundEnabled?: boolean;
+  
+  /** Enable/disable vibration feedback (mobile) */
+  vibrationEnabled?: boolean;
 }
 
 /**
