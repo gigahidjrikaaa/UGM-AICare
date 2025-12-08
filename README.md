@@ -6,6 +6,17 @@
 
 ---
 
+## 🔒 Security Notice
+
+**Critical Security Update (Dec 8, 2025):** This project has been patched against **CVE-2025-66478** (CVSS 10.0) and **CVE-2025-55182** - critical Remote Code Execution vulnerabilities affecting React Server Components and Next.js App Router.
+
+✅ **Current Versions (Patched):**
+
+- Next.js: **16.0.7** (was 16.0.0)
+- React: **19.2.2** (was 19.2.0)
+
+---
+
 ## 📖 Chapter 1: Introduction & Problem Statement
 
 ### 1.1 The Challenge

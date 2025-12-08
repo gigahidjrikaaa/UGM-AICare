@@ -48,7 +48,10 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 # Add other NEXT_PUBLIC_ ARGs and ENVs here
 
 # Build the Next.js application
-RUN npm run build
+# Disable Turbopack in production (use webpack for stability)
+# Increase Node memory limit to prevent OOM during build
+ENV NODE_OPTIONS="--max-old-space-size=3072"
+RUN npm run build -- --no-turbo
 RUN echo "NEXT_PUBLIC_API_URL is $NEXT_PUBLIC_API_URL"
 
 

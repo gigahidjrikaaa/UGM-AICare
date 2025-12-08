@@ -6,6 +6,7 @@
     "dev": "next dev -p 4000 --turbopack",
     "dev:docker": "next dev --hostname 0.0.0.0 --turbopack",
     "build": "next build",
+    "build:prod": "next build --no-turbo",
     "start": "next start",
     "lint": "next lint",
     "test": "echo \"No frontend tests configured\""
@@ -29,12 +30,12 @@
     "jose": "^6.1.0",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.507.0",
-    "next": "16.0.0",
+    "next": "16.0.7",
     "next-auth": "^4.24.11",
     "onnxruntime-web": "^1.18.0",
     "phaser": "^3.87.0",
-    "react": "19.2.0",
-    "react-dom": "19.2.0",
+    "react": "19.2.2",
+    "react-dom": "19.2.2",
     "react-hot-toast": "^2.5.2",
     "react-icons": "^5.5.0",
     "react-leaflet": "^5.0.0",
@@ -59,7 +60,7 @@
     "@types/react-dom": "19.2.2",
     "@types/uuid": "^10.0.0",
     "eslint": "^9",
-    "eslint-config-next": "16.0.0",
+    "eslint-config-next": "16.0.7",
     "postcss": "^8.5.4",
     "tailwindcss": "^4.1.8",
     "typescript": "^5"
@@ -68,7 +69,7 @@
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",
     "next-auth": {
-      "next": "16.0.0"
+      "next": "16.0.7"
     }
   }
 }

@@ -11,6 +11,8 @@ const nextConfig = {
   },
 
   // Turbopack configuration (Next.js 16 default bundler)
+  // Disabled in production builds due to timeout issues in Docker
+  // Use webpack for production builds with --no-turbo flag
   turbopack: {
     // Turbopack handles resolve.fallback automatically for browser builds
     // Web3 externals are handled via serverExternalPackages below

@@ -429,8 +429,8 @@ async def generate_gemini_response_with_fallback(
     last_error = None
     for idx, current_model in enumerate(models_to_try):
         # Retry loop for the SAME model if we get a rate limit with a suggested delay
-        # We'll try up to 3 times per model if a delay is provided
-        max_retries_per_model = 3
+        # We'll try up to 3 times per model, OR enough times to cycle through all keys
+        max_retries_per_model = max(3, len(GEMINI_API_KEYS))
         
         for retry_attempt in range(max_retries_per_model):
             try:
@@ -453,6 +453,7 @@ async def generate_gemini_response_with_fallback(
                 return response
                 
             except (ClientError, ServerError) as e:
+                last_error = e # Capture error immediately to ensure it's preserved if loop exits
                 error_code = getattr(e, 'status_code', 0)
                 error_msg = str(e)
                 
@@ -494,7 +495,6 @@ async def generate_gemini_response_with_fallback(
                             f"⚠️ Model {current_model} unavailable (code={error_code}). "
                             f"Trying fallback model {models_to_try[idx + 1]}..."
                         )
-                        last_error = e
                         break # Break inner loop to go to next model
                     else:
                         # No more fallbacks
