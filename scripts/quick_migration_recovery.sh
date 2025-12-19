@@ -23,11 +23,11 @@ fi
 
 echo ""
 echo "Step 1: Stopping containers..."
-docker-compose -f docker-compose.dev.yml down
+docker compose -f infra/compose/docker-compose.dev.yml down
 
 echo ""
 echo "Step 2: Starting database only..."
-docker-compose -f docker-compose.dev.yml up -d db
+docker compose -f infra/compose/docker-compose.dev.yml up -d db
 sleep 10
 
 echo ""
@@ -37,7 +37,7 @@ docker exec ugm_aicare_db_dev psql -U giga -d postgres -c "CREATE DATABASE aicar
 
 echo ""
 echo "Step 4: Starting migrate container..."
-docker-compose -f docker-compose.dev.yml up -d migrate
+docker compose -f infra/compose/docker-compose.dev.yml up -d migrate
 sleep 5
 
 echo ""
@@ -46,7 +46,7 @@ docker exec ugm_aicare_migrate_dev alembic stamp head
 
 echo ""
 echo "Step 6: Starting all services..."
-docker-compose -f docker-compose.dev.yml up -d
+docker compose -f infra/compose/docker-compose.dev.yml up -d
 
 echo ""
 echo "=========================================="
@@ -60,6 +60,6 @@ echo "⚠️  WARNING: You still need to fix the migrations properly!"
 echo "   Follow the steps in URGENT_ACTION_PLAN.md"
 echo ""
 echo "Check status with:"
-echo "  docker-compose -f docker-compose.dev.yml ps"
+echo "  docker compose -f infra/compose/docker-compose.dev.yml ps"
 echo "  docker logs ugm_aicare_migrate_dev"
 echo ""

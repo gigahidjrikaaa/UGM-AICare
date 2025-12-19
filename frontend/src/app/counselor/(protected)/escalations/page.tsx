@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   FiAlertTriangle,
   FiClock,
@@ -48,6 +49,13 @@ const severityConfig = {
 };
 
 export default function CounselorEscalationsPage() {
+  const router = useRouter();
+  const redirecting = true;
+
+  useEffect(() => {
+    router.replace('/counselor/cases');
+  }, [router]);
+
   const [escalations, setEscalations] = useState<Escalation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -69,8 +77,9 @@ export default function CounselorEscalationsPage() {
   }, []);
 
   useEffect(() => {
+    if (redirecting) return;
     loadEscalations();
-  }, [loadEscalations]);
+  }, [loadEscalations, redirecting]);
 
   const handleAccept = async (escalationId: string) => {
     // TODO: Implement accept logic - update case status to in_progress
@@ -100,6 +109,10 @@ export default function CounselorEscalationsPage() {
 
   const newCount = escalations.filter(e => e.status === 'new').length;
   const criticalCount = escalations.filter(e => e.severity === 'critical' && e.status === 'new').length;
+
+  if (redirecting) {
+    return null;
+  }
 
   if (loading) {
     return (
@@ -233,7 +246,7 @@ export default function CounselorEscalationsPage() {
             >
               <div className="flex items-start justify-between gap-4">
                 {/* Left: Severity Indicator */}
-                <div className="flex-shrink-0">
+                <div className="shrink-0">
                   <div className={`w-3 h-3 rounded-full ${severityConfig[escalation.severity].icon} animate-pulse`}></div>
                 </div>
 
@@ -279,7 +292,7 @@ export default function CounselorEscalationsPage() {
 
                 {/* Right: Actions */}
                 {escalation.status === 'new' && (
-                  <div className="flex-shrink-0 flex flex-col gap-2">
+                  <div className="shrink-0 flex flex-col gap-2">
                     <button
                       onClick={() => handleAccept(escalation.id)}
                       className="px-4 py-2 bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 rounded-lg text-sm font-medium text-[#FFCA40] transition-all flex items-center gap-2 whitespace-nowrap"

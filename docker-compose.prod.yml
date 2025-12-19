@@ -27,25 +27,6 @@ services:
       - ugm_aicare_network
 
   #################
-  # Cache (Redis)
-  #################
-  redis:
-    image: redis/redis-stack-server:latest
-    container_name: ugm_aicare_redis_prod
-    volumes:
-      - redisdata_prod:/data
-    ports:
-      - "${REDIS_EXTERNAL_PORT:-20004}:6379"
-    restart: always
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - ugm_aicare_network
-
-  #################
   # Object Storage (MinIO)
   #################
   minio:
@@ -114,19 +95,14 @@ services:
       - .env
     environment:
       DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-giga}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB:-aicare_db}
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
       MINIO_ENDPOINT: minio:9000
       APP_ENV: production
-      # Langfuse configuration
-      LANGFUSE_ENABLED: ${LANGFUSE_ENABLED:-false}
-      LANGFUSE_HOST: http://langfuse-server:3000
+      # Redis and Monitoring disabled
+      LANGFUSE_ENABLED: "false"
     depends_on:
       migrate:
         condition: service_completed_successfully
       db:
-        condition: service_healthy
-      redis:
         condition: service_healthy
       minio:
         condition: service_started
@@ -177,7 +153,6 @@ services:
 
 volumes:
   pgdata_prod:
-  redisdata_prod:
   minio_data_prod:
 
 networks:

@@ -15,7 +15,7 @@ Before you begin, ensure your target VM meets the following requirements:
 - **Docker:** Install the latest version of Docker.
   - [Install Docker Engine on Ubuntu](https://docs.docker.com/engine/install/ubuntu/)
   - [Install Docker Engine on CentOS](https://docs.docker.com/engine/install/centos/)
-- **Docker Compose V2:** Ensure `docker compose` command is available (not `docker compose`). Docker Compose V2 is usually installed with Docker Desktop or can be installed separately.
+- **Docker Compose V2:** Ensure the `docker compose` command is available (not `docker-compose`). Docker Compose V2 is usually installed with Docker Desktop or can be installed separately.
   - [Install Docker Compose](https://docs.docker.com/compose/install/)
 - **Firewall Configuration:** Configure your VM's firewall to allow incoming traffic on the necessary ports:
   - **Port 8000:** For the Backend (FastAPI) service.
@@ -118,7 +118,8 @@ Any `push` event to the `main` branch will automatically trigger the `CD Pipelin
     - Log in to GHCR.
     - Pull the latest `backend` and `frontend` Docker images.
     - Run database migrations using `./infra/scripts/migrate.sh`.
-    - Bring up the services using `docker compose -f infra/compose/docker-compose.prod.yml` up -d.
+        - Bring up the services using `docker compose -f infra/compose/docker-compose.prod.yml` up -d.
+            - Optional components are enabled via profiles, e.g. `--profile monitoring`, `--profile elk`, `--profile loki`.
     - Perform health checks against the locally exposed service ports.
 
 ### Manual Deployment
@@ -189,16 +190,13 @@ For temporary changes, local testing, or specific VM setups where you don't want
             - "4001:3000"
         ```
 
-3. **Apply overrides:** When running `docker compose`, it automatically looks for `docker-compose.override.yml` in the same directory as `docker-compose.yml` (or `docker-compose.prod.yml` in our case). The `deploy.sh` script already uses `-f infra/compose/docker-compose.prod.yml`, so if you place `docker-compose.override.yml` in the `infra/compose/` directory, it will be picked up automatically.
+3. **Apply overrides:** Because deployment uses an explicit `-f infra/compose/docker-compose.prod.yml`, Docker Compose will not implicitly merge `docker-compose.override.yml`. Pass the override explicitly.
 
         ```bash
-        # The deploy.sh script will implicitly use this if present in infra/compose/
-        docker compose -f infra/compose/docker-compose.prod.yml up -d
-        # Or explicitly:
         docker compose -f infra/compose/docker-compose.prod.yml -f infra/compose/docker-compose.override.yml up -d
         ```
 
-    **Note:** For this to work seamlessly with the `deploy.sh` script, you would typically place `docker-compose.override.yml` alongside `docker-compose.prod.yml` in `infra/compose/`. However, since `deploy.sh` only explicitly references `docker-compose.prod.yml`, you would need to modify `deploy.sh` to explicitly include the override file if it's not automatically picked up by Docker Compose's default behavior (which it usually is if named `docker-compose.override.yml` in the same directory).
+    **Note:** If you want the GitHub Actions deployment to use an override file, update `infra/scripts/deploy.sh` to include `-f infra/compose/docker-compose.override.yml`.
 
 ### Environment Variables
 

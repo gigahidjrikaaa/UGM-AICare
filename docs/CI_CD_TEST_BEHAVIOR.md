@@ -278,7 +278,8 @@ View pipeline health:
 
 ## 📚 Related Documentation
 
-- [Production Monitoring Guide](./PRODUCTION_MONITORING_GUIDE.md)
+- [Monitoring (how to run, profiles)](../infra/MONITORING_README.md)
+- [Production monitoring strategy](./PRODUCTION_MONITORING.md)
 - [Development Workflow](./development-workflow.md)
 - [Deployment Checklist](./VM_DEPLOYMENT_CHECKLIST.md)
 

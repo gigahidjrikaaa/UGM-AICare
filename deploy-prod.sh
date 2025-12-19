@@ -40,7 +40,7 @@ case "${1:-deploy}" in
 
         # 3. Build and restart Docker containers in detached mode
         echo "Building and restarting Docker containers..."
-        docker compose -f docker-compose.prod.yml up --build -d --remove-orphans
+        docker compose -f infra/compose/docker-compose.prod.yml --env-file .env up --build -d --remove-orphans
 
         # 4. Display logs
         echo "Displaying logs for frontend and backend (Ctrl+C to stop)..."
@@ -84,15 +84,7 @@ case "${1:-deploy}" in
         
         # 4. Build and restart with monitoring
         echo "Building and restarting Docker containers WITH MONITORING..."
-        docker compose -f docker-compose.yml -f docker-compose.monitoring.yml up --build -d --remove-orphans 2>/dev/null || {
-            # Fallback: use infra/compose files if they exist
-            if [ -f "infra/compose/docker-compose.prod.yml" ]; then
-                docker compose -f infra/compose/docker-compose.prod.yml -f infra/compose/docker-compose.prod-monitoring.yml --env-file .env up --build -d --remove-orphans
-            else
-                echo "ERROR: Could not find production docker compose files"
-                exit 1
-            fi
-        }
+        docker compose -f infra/compose/docker-compose.prod.yml --env-file .env --profile monitoring --profile elk up --build -d --remove-orphans
         
         # 5. Create langfuse_db if needed
         echo "Setting up Langfuse database..."
@@ -118,12 +110,12 @@ case "${1:-deploy}" in
         echo "========================================="
         echo ""
         echo "Application:"
-        echo "  • Backend:  http://localhost:8000"
-        echo "  • Frontend: http://localhost:4000"
+        echo "  • Backend:  http://localhost:${BACKEND_EXTERNAL_PORT:-20002}"
+        echo "  • Frontend: http://localhost:${FRONTEND_EXTERNAL_PORT:-20001}"
         echo ""
         echo "Monitoring Stack:"
         echo "  • Kibana (Logs):       http://localhost:8254"
-        echo "  • Grafana (Metrics):   http://localhost:8256 (admin/admin123)"
+        echo "  • Grafana (Metrics):   http://localhost:8256 (admin/\$GRAFANA_ADMIN_PASSWORD)"
         echo "  • Prometheus:          http://localhost:8255"
         echo "  • Langfuse (Traces):   http://localhost:8262"
         echo "  • AlertManager:        http://localhost:8261"
@@ -221,7 +213,7 @@ EOL
         
         # Start Langfuse service
         echo "[5/5] Starting Langfuse service..."
-        docker compose -f docker-compose.monitoring.yml up -d langfuse-server
+        docker compose -f infra/compose/docker-compose.prod.yml --env-file .env --profile monitoring up -d langfuse-server
         echo "✓ Langfuse service started"
         echo ""
         
@@ -249,7 +241,7 @@ EOL
             echo "⚠ Langfuse health check timed out"
             echo ""
             echo "Check logs with:"
-            echo "  docker logs ugm_aicare_langfuse"
+            echo "  docker logs ugm_aicare_langfuse_prod"
         fi
         
         echo ""

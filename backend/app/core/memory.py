@@ -3,6 +3,7 @@ import redis.asyncio as redis # type: ignore
 import json
 import logging
 import os
+import time
 
 # Load environment variables from .env file
 from dotenv import load_dotenv
@@ -27,21 +28,85 @@ logger = logging.getLogger(__name__)
 # --- Redis Client Setup ---
 # Global client instance (or use a dependency injection pattern)
 redis_pool = None
+mock_redis_instance = None
 
-async def get_redis_client() -> redis.Redis:
+class MockRedis:
+    """
+    A simple in-memory mock for Redis to allow the application to run without a Redis server.
+    Note: Data is not persistent and is shared only within the same process.
+    """
+    def __init__(self):
+        self.data = {}
+        self.expiries = {}
+        logger.warning("Using MockRedis. Data will be lost on restart and is not shared across workers.")
+
+    async def get(self, key):
+        self._check_expiry(key)
+        return self.data.get(key)
+
+    async def set(self, key, value, ex=None):
+        self.data[key] = value
+        if ex:
+            self.expiries[key] = time.time() + ex
+        elif key in self.expiries:
+            del self.expiries[key]
+        return True
+
+    async def incr(self, key):
+        self._check_expiry(key)
+        val = self.data.get(key, 0)
+        try:
+            val = int(val) + 1
+        except (ValueError, TypeError):
+            val = 1
+        self.data[key] = str(val)
+        return val
+
+    async def expire(self, key, seconds):
+        if key in self.data:
+            self.expiries[key] = time.time() + seconds
+            return True
+        return False
+
+    async def delete(self, key):
+        if key in self.data:
+            del self.data[key]
+            if key in self.expiries:
+                del self.expiries[key]
+            return 1
+        return 0
+
+    async def ping(self):
+        return True
+    
+    async def close(self):
+        pass
+
+    def _check_expiry(self, key):
+        if key in self.expiries and time.time() > self.expiries[key]:
+            if key in self.data:
+                del self.data[key]
+            del self.expiries[key]
+
+async def get_redis_client() -> Any:
     """
     Gets a connection from the Redis connection pool.
     Initializes the pool if it doesn't exist.
-    Adjust this function based on your project's Redis setup (e.g., using FastAPI dependencies).
+    Returns a MockRedis instance if REDIS_HOST is not set.
     """
-    global redis_pool
+    global redis_pool, mock_redis_instance
+
+    # Check if Redis is configured
+    if not REDIS_HOST_ENV:
+        if mock_redis_instance is None:
+            mock_redis_instance = MockRedis()
+        return mock_redis_instance
+
     if redis_pool is None:
         try:
             # Check environment variables
-            if not REDIS_HOST_ENV or not REDIS_PORT_ENV:
-                raise ValueError("REDIS_HOST and REDIS_PORT must be set in environment variables.")
-            if not REDIS_DB_ENV:
-                logger.warning("REDIS_DB not set, defaulting to 0.")
+            if not REDIS_PORT_ENV:
+                raise ValueError("REDIS_PORT must be set if REDIS_HOST is set.")
             
             # Prepare connection arguments
             connection_args = {
@@ -53,9 +118,9 @@ async def get_redis_client() -> redis.Redis:
 
             # Only add username and password if they are provided
             if REDIS_USERNAME_ENV:
-                connection_args["username"] = REDIS_USERNAME_ENV # Changed variable name
+                connection_args["username"] = REDIS_USERNAME_ENV
             if REDIS_PASSWORD_ENV:
-                connection_args["password"] = REDIS_PASSWORD_ENV # Changed variable name
+                connection_args["password"] = REDIS_PASSWORD_ENV
             
             logger.info(f"Initializing Redis connection pool with args: {connection_args}")
             redis_pool = redis.ConnectionPool(**connection_args)

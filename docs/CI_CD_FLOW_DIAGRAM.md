@@ -248,7 +248,7 @@ needs.validate-env.result == 'success' &&
 **Post-Deploy:**
 1. **Generate Deployment Summary**:
    ```markdown
-   # Ì∫Ä Deployment Summary
+   # ÔøΩÔøΩÔøΩ Deployment Summary
    
    **Environment:** Production
    **SHA:** abc123def456
@@ -338,7 +338,7 @@ build-*: ‚úÖ PASS
   ‚Üì
 scan-backend: ‚ùå CRITICAL VULNERABILITIES
   ‚Üì
-deploy: Ì∫´ BLOCKED
+deploy: ÔøΩÔøΩÔøΩ BLOCKED
 
 Pipeline stops - no deployment
 Security issues must be fixed first
@@ -506,7 +506,8 @@ Track in your team:
 
 **Related Documentation:**
 - [CI/CD Test Behavior Guide](./CI_CD_TEST_BEHAVIOR.md)
-- [Production Monitoring Guide](./PRODUCTION_MONITORING_GUIDE.md)
+- [Monitoring (how to run, profiles)](../infra/MONITORING_README.md)
+- [Production monitoring strategy](./PRODUCTION_MONITORING.md)
 - [Development Workflow](./development-workflow.md)
 
 ---

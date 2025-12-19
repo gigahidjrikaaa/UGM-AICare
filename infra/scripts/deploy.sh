@@ -90,6 +90,8 @@ echo "[deploy.sh] Bringing up services with docker-compose.prod.yml..."
 # Export environment variables for docker compose
 export GIT_SHA="$GIT_SHA"
 export GHCR_REPOSITORY_OWNER="$GHCR_REPOSITORY_OWNER_LOWER"
+export BACKEND_IMAGE="$BACKEND_IMAGE"
+export FRONTEND_IMAGE="$FRONTEND_IMAGE"
 
 # Load all variables from .env file so docker compose can use them
 # Use a safer method that handles comments, empty lines, and malformed entries
@@ -157,8 +159,8 @@ if [[ "$DEPLOY_MONITORING" == "true" ]]; then
     echo "[deploy.sh] langfuse_db database already exists."
   fi
   
-  # Start monitoring services
-  docker compose -f infra/compose/docker-compose.prod.yml -f infra/compose/docker-compose.prod-monitoring.yml --env-file "$ENV_FILE" up -d
+  # Start monitoring services (profiles)
+  docker compose -f infra/compose/docker-compose.prod.yml --env-file "$ENV_FILE" --profile monitoring --profile elk up -d
   echo "[deploy.sh] Monitoring stack started."
   
   # Wait for monitoring services to be ready

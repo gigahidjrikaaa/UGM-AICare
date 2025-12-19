@@ -4,8 +4,26 @@
 
 set -e
 
-ELK_COMPOSE="docker-compose.elk.yml"
-MONITORING_COMPOSE="docker-compose.monitoring.yml"
+COMPOSE_FILE="infra/compose/docker-compose.dev.yml"
+
+MONITORING_SERVICES=(
+    prometheus
+    grafana
+    node-exporter
+    cadvisor
+    postgres-exporter
+    redis-exporter
+    langfuse-server
+)
+
+ELK_SERVICES=(
+    elasticsearch
+    logstash
+    kibana
+    filebeat
+)
+
+COMPOSE_PROFILES=(--profile monitoring --profile elk)
 
 show_help() {
     echo "UGM-AICare Monitoring Stack Manager"
@@ -29,11 +47,10 @@ show_help() {
     echo ""
     echo "Access URLs (after start):"
     echo "  • Kibana (Logs):       http://localhost:8254"
-    echo "  • Grafana (Metrics):   http://localhost:8256 (admin/admin123)"
+    echo "  • Grafana (Metrics):   http://localhost:8256 (user: ${GRAFANA_ADMIN_USER:-admin}; password from env)"
     echo "  • Prometheus:          http://localhost:8255"
-    echo "  • AlertManager:        http://localhost:8261"
     echo "  • Elasticsearch:       http://localhost:8250"
-    echo "  • Backend Metrics:     http://localhost:8000/metrics"
+    echo "  • Backend Metrics:     http://localhost:8000/metrics (requires backend running)"
     echo ""
 }
 
@@ -50,7 +67,12 @@ wait_for_health() {
     local counter=0
     
     while [ $counter -lt $timeout ]; do
-        if docker exec ugm_aicare_elasticsearch curl -f http://localhost:9200/_cluster/health 2>/dev/null | grep -q '"status":"green"\|"status":"yellow"'; then
+        ES_CONTAINER="ugm_aicare_elasticsearch_dev"
+        if ! docker ps --format "{{.Names}}" | grep -q "^${ES_CONTAINER}$"; then
+            ES_CONTAINER="ugm_aicare_elasticsearch"
+        fi
+
+        if docker exec "$ES_CONTAINER" curl -f http://localhost:9200/_cluster/health 2>/dev/null | grep -q '"status":"green"\|"status":"yellow"'; then
             echo "✅ Elasticsearch is healthy"
             break
         fi
@@ -68,17 +90,14 @@ case "${1:-}" in
         echo "🚀 Starting UGM-AICare Monitoring Stack..."
         echo ""
         
-        echo "📊 Starting ELK Stack (Elasticsearch, Logstash, Kibana, Filebeat)..."
-        docker compose -f "$ELK_COMPOSE" up -d
-        echo "✅ ELK Stack started"
+        echo "📊 Starting monitoring stack (profiles: monitoring + elk)..."
+        docker compose -f "$COMPOSE_FILE" "${COMPOSE_PROFILES[@]}" up -d \
+            "${MONITORING_SERVICES[@]}" \
+            "${ELK_SERVICES[@]}"
+        echo "✅ Monitoring stack started"
         echo ""
-        
+
         wait_for_health
-        echo ""
-        
-        echo "📈 Starting Prometheus + Grafana Stack..."
-        docker compose -f "$MONITORING_COMPOSE" up -d
-        echo "✅ Monitoring Stack started"
         echo ""
         
         echo "⏳ Waiting for services to initialize..."
@@ -89,12 +108,11 @@ case "${1:-}" in
         echo ""
         echo "📍 Access Points:"
         echo "  • Kibana (Logs):       http://localhost:8254"
-        echo "  • Grafana (Metrics):   http://localhost:8256 (admin/admin123)"
+        echo "  • Grafana (Metrics):   http://localhost:8256 (user: ${GRAFANA_ADMIN_USER:-admin}; password from env)"
         echo "  • Prometheus:          http://localhost:8255"
-        echo "  • AlertManager:        http://localhost:8261"
         echo "  • Langfuse (Traces):   http://localhost:8262 (setup on first access)"
         echo "  • Elasticsearch:       http://localhost:8250"
-        echo "  • Backend Metrics:     http://localhost:8000/metrics"
+        echo "  • Backend Metrics:     http://localhost:8000/metrics (requires backend running)"
         echo ""
         echo "📚 Quick Commands:"
         echo "  • View logs:           ./monitoring.sh logs [service]"
@@ -107,11 +125,9 @@ case "${1:-}" in
     stop)
         echo "🛑 Stopping monitoring stack..."
         echo ""
-        echo "Stopping Prometheus + Grafana..."
-        docker compose -f "$MONITORING_COMPOSE" down
-        echo ""
-        echo "Stopping ELK Stack..."
-        docker compose -f "$ELK_COMPOSE" down
+        docker compose -f "$COMPOSE_FILE" "${COMPOSE_PROFILES[@]}" stop \
+            "${MONITORING_SERVICES[@]}" \
+            "${ELK_SERVICES[@]}"
         echo ""
         echo "✅ Monitoring stack stopped"
         echo ""
@@ -122,8 +138,9 @@ case "${1:-}" in
     restart)
         echo "🔄 Restarting monitoring stack..."
         echo ""
-        docker compose -f "$MONITORING_COMPOSE" restart
-        docker compose -f "$ELK_COMPOSE" restart
+        docker compose -f "$COMPOSE_FILE" "${COMPOSE_PROFILES[@]}" restart \
+            "${MONITORING_SERVICES[@]}" \
+            "${ELK_SERVICES[@]}"
         echo ""
         echo "✅ Monitoring stack restarted"
         ;;
@@ -134,12 +151,12 @@ case "${1:-}" in
         echo "═══════════════════════════════════════════════════════"
         echo "ELK Stack:"
         echo "═══════════════════════════════════════════════════════"
-        docker compose -f "$ELK_COMPOSE" ps
+        docker compose -f "$COMPOSE_FILE" "${COMPOSE_PROFILES[@]}" ps "${ELK_SERVICES[@]}" || true
         echo ""
         echo "═══════════════════════════════════════════════════════"
         echo "Prometheus + Grafana:"
         echo "═══════════════════════════════════════════════════════"
-        docker compose -f "$MONITORING_COMPOSE" ps
+        docker compose -f "$COMPOSE_FILE" "${COMPOSE_PROFILES[@]}" ps "${MONITORING_SERVICES[@]}" || true
         echo ""
         echo "💡 Check service health:"
         echo "  Elasticsearch:  curl http://localhost:8250/_cluster/health"
@@ -153,12 +170,9 @@ case "${1:-}" in
             echo "📜 Viewing logs for: $SERVICE"
             echo "   (Press Ctrl+C to exit)"
             echo ""
-            
-            # Try to find service in either compose file
-            if docker compose -f "$MONITORING_COMPOSE" ps | grep -q "$SERVICE"; then
-                docker compose -f "$MONITORING_COMPOSE" logs -f "$SERVICE"
-            elif docker compose -f "$ELK_COMPOSE" ps | grep -q "$SERVICE"; then
-                docker compose -f "$ELK_COMPOSE" logs -f "$SERVICE"
+
+            if docker compose -f "$COMPOSE_FILE" "${COMPOSE_PROFILES[@]}" config --services | grep -q "^${SERVICE}$"; then
+                docker compose -f "$COMPOSE_FILE" "${COMPOSE_PROFILES[@]}" logs -f "$SERVICE"
             else
                 echo "❌ Service '$SERVICE' not found"
                 echo ""
@@ -211,11 +225,34 @@ case "${1:-}" in
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             echo ""
-            echo "Removing Prometheus + Grafana..."
-            docker compose -f "$MONITORING_COMPOSE" down -v
+
+            echo "Stopping and removing monitoring containers..."
+            docker compose -f "$COMPOSE_FILE" "${COMPOSE_PROFILES[@]}" stop \
+                "${MONITORING_SERVICES[@]}" \
+                "${ELK_SERVICES[@]}" || true
+            docker compose -f "$COMPOSE_FILE" "${COMPOSE_PROFILES[@]}" rm -f -v \
+                "${MONITORING_SERVICES[@]}" \
+                "${ELK_SERVICES[@]}" || true
+
             echo ""
-            echo "Removing ELK Stack..."
-            docker compose -f "$ELK_COMPOSE" down -v
+            echo "Removing monitoring volumes (metrics/logs only)..."
+
+            VOLUME_SUFFIXES=(
+                prometheus-data-dev
+                grafana-data-dev
+                loki-data-dev
+                elasticsearch-data-dev
+                filebeat-data-dev
+            )
+
+            for suffix in "${VOLUME_SUFFIXES[@]}"; do
+                while IFS= read -r vol; do
+                    if [ -n "$vol" ]; then
+                        docker volume rm "$vol" || true
+                    fi
+                done < <(docker volume ls -q | grep -E "(_${suffix}$|^${suffix}$)" || true)
+            done
+
             echo ""
             echo "✅ Monitoring stack cleaned"
             echo ""
@@ -235,9 +272,8 @@ case "${1:-}" in
         echo ""
         echo "Metrics (Prometheus + Grafana):"
         echo "  • Grafana:          http://localhost:8256"
-        echo "    Credentials:      admin / admin123"
+        echo "    Credentials:      see GRAFANA_ADMIN_USER / GRAFANA_ADMIN_PASSWORD env vars"
         echo "  • Prometheus:       http://localhost:8255"
-        echo "  • AlertManager:     http://localhost:8261"
         echo ""
         echo "Application Metrics:"
         echo "  • Backend Metrics:  http://localhost:8000/metrics"

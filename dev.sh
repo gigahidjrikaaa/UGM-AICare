@@ -19,12 +19,8 @@ fi
 
 echo "Using Docker Compose: $DOCKER_COMPOSE_CMD"
 
-COMPOSE_FILE="docker-compose.dev.yml"
-OVERRIDE_FILE="docker-compose.override.yml"
-BACKUP_FILE="docker-compose.override.yml.disabled"
-ELK_COMPOSE="docker-compose.elk.yml"
-MONITORING_COMPOSE="docker-compose.monitoring.yml"
-DEV_MONITORING_COMPOSE="docker-compose.dev-monitoring.yml"
+COMPOSE_FILE="infra/compose/docker-compose.dev.yml"
+PROD_COMPOSE_FILE="infra/compose/docker-compose.prod.yml"
 
 show_help() {
     echo "UGM-AICare Docker Development Helper"
@@ -75,7 +71,7 @@ show_help() {
     echo ""
     echo "Monitoring Access:"
     echo "  • Kibana (Logs):       http://localhost:8254"
-    echo "  • Grafana (Metrics):   http://localhost:8256 (admin/admin123)"
+    echo "  • Grafana (Metrics):   http://localhost:8256 (admin/$GRAFANA_ADMIN_PASSWORD)"
     echo "  • Prometheus:          http://localhost:8255"
     echo "  • Langfuse (Traces):   http://localhost:8262"
     echo "  • Backend Metrics:     http://localhost:8000/metrics"
@@ -99,7 +95,7 @@ case "${1:-}" in
         echo "✅ Application services started"
         echo ""
         echo "📈 Starting Minimal Monitoring (Prometheus + Grafana + Langfuse)..."
-        "$DOCKER_COMPOSE_CMD" -f "$DEV_MONITORING_COMPOSE" up -d
+        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" --profile monitoring up -d
         echo "✅ Monitoring services started"
         echo ""
         echo "✅ All services started!"
@@ -109,7 +105,7 @@ case "${1:-}" in
         echo ""
         echo "📍 Monitoring Access:"
         echo "   • Langfuse (Traces):   http://localhost:8262"
-        echo "   • Grafana (Metrics):   http://localhost:8256 (admin/admin123)"
+        echo "   • Grafana (Metrics):   http://localhost:8256 (admin/$GRAFANA_ADMIN_PASSWORD)"
         echo "   • Prometheus:          http://localhost:8255"
         echo ""
         echo "💡 Tip: Watch logs in real-time:"
@@ -129,11 +125,11 @@ case "${1:-}" in
         echo "✅ Application started"
         echo ""
         echo "📊 Starting ELK Stack (Logs)..."
-        "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" up -d
+        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" --profile elk up -d
         echo "✅ ELK Stack started"
         echo ""
         echo "📈 Starting Full Monitoring Stack..."
-        "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" up -d
+        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" --profile monitoring --profile elk up -d
         echo "✅ Monitoring Stack started"
         echo ""
         echo "⏳ Waiting for services to be ready..."
@@ -148,7 +144,7 @@ case "${1:-}" in
         echo ""
         echo "📍 Monitoring Access:"
         echo "   • Kibana (Logs):       http://localhost:8254"
-        echo "   • Grafana (Metrics):   http://localhost:8256 (admin/admin123)"
+        echo "   • Grafana (Metrics):   http://localhost:8256 (admin/$GRAFANA_ADMIN_PASSWORD)"
         echo "   • Prometheus:          http://localhost:8255"
         echo "   • Langfuse (Traces):   http://localhost:8262"
         echo "   • AlertManager:        http://localhost:8261"
@@ -165,24 +161,13 @@ case "${1:-}" in
         "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" down
         echo "✅ Application services stopped"
         echo ""
-        echo "🛑 Stopping minimal monitoring..."
-        "$DOCKER_COMPOSE_CMD" -f "$DEV_MONITORING_COMPOSE" down
-        echo "✅ Minimal monitoring stopped"
-        echo ""
-        echo "💡 Full monitoring stack might still be running. To stop everything:"
-        echo "   ./dev.sh down-all"
+        echo "💡 If you started monitoring/ELK profiles, this also stops them."
         ;;
     
     down-all)
         echo "🛑 Stopping ALL services (App + Monitoring)..."
         echo ""
-        echo "Stopping application..."
         "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" down
-        echo ""
-        echo "Stopping monitoring stack..."
-        "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" down
-        "$DOCKER_COMPOSE_CMD" -f "$DEV_MONITORING_COMPOSE" down
-        "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" down
         echo ""
         echo "✅ All services stopped"
         ;;
@@ -195,7 +180,6 @@ case "${1:-}" in
         else
             echo "   Restarting all services..."
             "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" restart
-            "$DOCKER_COMPOSE_CMD" -f "$DEV_MONITORING_COMPOSE" restart
         fi
         echo "✅ Services restarted"
         ;;
@@ -390,16 +374,8 @@ print(f'Web3.py version: {web3.__version__}')
         ;;
     
     prod)
-        echo "🏭 Switching to production mode..."
-        if [ -f "$OVERRIDE_FILE" ]; then
-            mv "$OVERRIDE_FILE" "$BACKUP_FILE"
-            echo "✅ Development override disabled"
-            echo "   Starting in production mode..."
-            "$DOCKER_COMPOSE_CMD" -f docker-compose.yml up -d
-        else
-            echo "ℹ️  Already in production mode"
-            "$DOCKER_COMPOSE_CMD" -f docker-compose.yml up -d
-        fi
+        echo "🏭 Starting production compose (no hot-reload)..."
+        "$DOCKER_COMPOSE_CMD" -f "$PROD_COMPOSE_FILE" --env-file .env up -d
         ;;
 
     preprod)
@@ -410,24 +386,18 @@ print(f'Web3.py version: {web3.__version__}')
         echo "   • Optimized performance"
         echo "   • Uses local dev database and services"
         echo ""
-        "$DOCKER_COMPOSE_CMD" -f docker-compose.preprod.yml up --build -d
+        "$DOCKER_COMPOSE_CMD" -f "$PROD_COMPOSE_FILE" --env-file .env up --build -d
         echo ""
         echo "✅ Pre-production environment started!"
-        echo "   Frontend: http://localhost:4000"
-        echo "   Backend:  http://localhost:8000"
+        echo "   Frontend: http://localhost:${FRONTEND_EXTERNAL_PORT:-20001}"
+        echo "   Backend:  http://localhost:${BACKEND_EXTERNAL_PORT:-20002}"
         echo ""
         echo "💡 To rebuild after code changes:"
         echo "   ./dev.sh preprod"
         ;;
     
     dev)
-        echo "💻 Enabling development mode..."
-        if [ -f "$BACKUP_FILE" ]; then
-            mv "$BACKUP_FILE" "$OVERRIDE_FILE"
-            echo "✅ Development override enabled"
-        else
-            echo "ℹ️  Already in development mode"
-        fi
+        echo "💻 Starting development compose (hot-reload enabled)..."
         "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" up -d
         ;;
     
@@ -452,12 +422,7 @@ print(f'Web3.py version: {web3.__version__}')
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             echo ""
-            echo "Removing application..."
             "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" down -v
-            echo ""
-            echo "Removing monitoring stack..."
-            "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" down -v
-            "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" down -v
             echo ""
             echo "✅ Complete cleanup done"
         else
@@ -469,9 +434,7 @@ print(f'Web3.py version: {web3.__version__}')
         echo "📊 Application Services:"
         "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" ps
         echo ""
-        echo "📊 Monitoring Services:"
-        "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" ps 2>/dev/null || echo "  (not running)"
-        "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" ps 2>/dev/null || echo "  (not running)"
+        echo "📊 Optional stacks are enabled via profiles: monitoring / elk / loki"
         ;;
     
     monitoring)
@@ -479,11 +442,7 @@ print(f'Web3.py version: {web3.__version__}')
             start)
                 echo "📊 Starting monitoring stack..."
                 echo ""
-                echo "Starting ELK Stack..."
-                "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" up -d
-                echo ""
-                echo "Starting Prometheus + Grafana..."
-                "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" up -d
+                "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" --profile monitoring --profile elk up -d
                 echo ""
                 echo "⏳ Waiting for services to be healthy..."
                 sleep 15
@@ -491,32 +450,28 @@ print(f'Web3.py version: {web3.__version__}')
                 echo "✅ Monitoring stack started!"
                 echo ""
                 echo "Access Points:"
-                echo "  • Kibana (Logs):       http://localhost:5601"
-                echo "  • Grafana (Metrics):   http://localhost:3001 (admin/admin123)"
-                echo "  • Prometheus:          http://localhost:9090"
-                echo "  • AlertManager:        http://localhost:9093"
+                echo "  • Kibana (Logs):       http://localhost:8254"
+                echo "  • Grafana (Metrics):   http://localhost:8256 (admin/$GRAFANA_ADMIN_PASSWORD)"
+                echo "  • Prometheus:          http://localhost:8255"
                 echo "  • Backend Metrics:     http://localhost:8000/metrics"
                 ;;
             
             stop)
                 echo "🛑 Stopping monitoring stack..."
-                "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" down
-                "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" down
+                "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" stop prometheus grafana node-exporter cadvisor postgres-exporter redis-exporter langfuse-server elasticsearch logstash kibana filebeat 2>/dev/null || true
+                "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" rm -f prometheus grafana node-exporter cadvisor postgres-exporter redis-exporter langfuse-server elasticsearch logstash kibana filebeat 2>/dev/null || true
                 echo "✅ Monitoring stack stopped"
                 ;;
             
             restart)
                 echo "🔄 Restarting monitoring stack..."
-                "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" restart
-                "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" restart
+                "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" restart prometheus grafana node-exporter cadvisor postgres-exporter redis-exporter langfuse-server elasticsearch logstash kibana filebeat 2>/dev/null || true
                 echo "✅ Monitoring stack restarted"
                 ;;
             
             logs)
                 if [ -n "${3:-}" ]; then
-                    # Try to find service in either compose file
-                    "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" logs -f "$3" 2>/dev/null || \
-                    "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" logs -f "$3"
+                    "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" logs -f "$3"
                 else
                     echo "Available monitoring services:"
                     echo ""
@@ -542,12 +497,7 @@ print(f'Web3.py version: {web3.__version__}')
             
             status)
                 echo "📊 Monitoring Stack Status:"
-                echo ""
-                echo "ELK Stack:"
-                "$DOCKER_COMPOSE_CMD" -f "$ELK_COMPOSE" ps
-                echo ""
-                echo "Prometheus + Grafana:"
-                "$DOCKER_COMPOSE_CMD" -f "$MONITORING_COMPOSE" ps
+                "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" ps
                 ;;
             
             *)
@@ -633,7 +583,7 @@ EOL
         
         # Start Langfuse service
         echo "[5/5] Starting Langfuse service..."
-        "$DOCKER_COMPOSE_CMD" -f docker-compose.monitoring.yml up -d langfuse-server
+        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" --profile monitoring up -d langfuse-server
         echo "✓ Langfuse service started"
         echo ""
         
@@ -661,7 +611,7 @@ EOL
             echo "⚠ Langfuse health check timed out"
             echo ""
             echo "Check logs with:"
-            echo "  docker logs ugm_aicare_langfuse"
+            echo "  docker logs ugm_aicare_langfuse_dev"
         fi
         
         echo ""

@@ -11,7 +11,31 @@ import {
   FiXCircle,
   FiEdit,
 } from 'react-icons/fi';
-import { apiCall } from '@/utils/adminApi';
+import apiClient from '@/services/api';
+
+type AppointmentStatus = 'scheduled' | 'completed' | 'cancelled' | 'no_show';
+type AppointmentType = 'in_person' | 'video_call' | 'phone_call';
+
+interface BackendAppointmentType {
+  id: number;
+  name: string;
+  duration_minutes: number;
+}
+
+interface BackendAppointmentUser {
+  id: number;
+  name?: string | null;
+}
+
+interface BackendAppointment {
+  id: number;
+  user_id: number;
+  appointment_datetime: string;
+  status: string;
+  notes?: string | null;
+  appointment_type?: BackendAppointmentType;
+  user?: BackendAppointmentUser;
+}
 
 interface Appointment {
   appointment_id: string;
@@ -20,8 +44,8 @@ interface Appointment {
   date: string;
   time: string;
   duration_minutes: number;
-  type: 'in_person' | 'video_call' | 'phone_call';
-  status: 'scheduled' | 'completed' | 'cancelled' | 'no_show';
+  type: AppointmentType;
+  status: AppointmentStatus;
   location?: string;
   notes?: string;
 }
@@ -49,50 +73,65 @@ export default function CounselorAppointmentsPage() {
     loadAppointments();
   }, []);
 
+  const toYmd = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const toHm = (date: Date) => {
+    const hours = String(date.getHours()).padStart(2, '0');
+    const minutes = String(date.getMinutes()).padStart(2, '0');
+    return `${hours}:${minutes}`;
+  };
+
+  const mapStatus = (raw: string): AppointmentStatus => {
+    switch (raw) {
+      case 'scheduled':
+      case 'completed':
+      case 'cancelled':
+      case 'no_show':
+        return raw;
+      case 'moved':
+        return 'scheduled';
+      default:
+        return 'scheduled';
+    }
+  };
+
+  const inferType = (appointmentTypeName?: string): AppointmentType => {
+    const name = (appointmentTypeName || '').toLowerCase();
+    if (name.includes('video') || name.includes('online')) return 'video_call';
+    if (name.includes('phone') || name.includes('call')) return 'phone_call';
+    return 'in_person';
+  };
+
   const loadAppointments = async () => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API endpoint
-      const data = await apiCall<Appointment[]>('/api/counselor/appointments');
-      
-      // Mock fallback if API fails
-      const mockAppointments: Appointment[] = [
-        {
-          appointment_id: 'APT-001',
-          patient_id_hash: 'user_abc123',
-          patient_name: 'Patient A',
-          date: '2025-10-22',
-          time: '10:00',
-          duration_minutes: 60,
-          type: 'video_call',
-          status: 'scheduled',
-        },
-        {
-          appointment_id: 'APT-002',
-          patient_id_hash: 'user_def456',
-          patient_name: 'Patient B',
-          date: '2025-10-22',
-          time: '14:00',
-          duration_minutes: 45,
-          type: 'in_person',
-          status: 'scheduled',
-          location: 'Room 301',
-        },
-        {
-          appointment_id: 'APT-003',
-          patient_id_hash: 'user_ghi789',
-          patient_name: 'Patient C',
-          date: '2025-10-21',
-          time: '09:00',
-          duration_minutes: 60,
-          type: 'video_call',
-          status: 'completed',
-        },
-      ];
-      
-      setAppointments(data || mockAppointments);
+      const response = await apiClient.get<BackendAppointment[]>('/counselor/appointments');
+
+      const mapped: Appointment[] = (response.data || []).map((apt) => {
+        const dt = new Date(apt.appointment_datetime);
+        const appointmentTypeName = apt.appointment_type?.name;
+        return {
+          appointment_id: String(apt.id),
+          patient_id_hash: `user_${apt.user_id}`,
+          patient_name: apt.user?.name || undefined,
+          date: toYmd(dt),
+          time: toHm(dt),
+          duration_minutes: apt.appointment_type?.duration_minutes ?? 60,
+          type: inferType(appointmentTypeName),
+          status: mapStatus(apt.status),
+          notes: apt.notes || undefined,
+        };
+      });
+
+      setAppointments(mapped);
     } catch (err) {
       console.error('Failed to load appointments:', err);
+      setAppointments([]);
     } finally {
       setLoading(false);
     }
@@ -212,7 +251,7 @@ export default function CounselorAppointmentsPage() {
                 >
                   <div className="flex items-start justify-between gap-4">
                     {/* Left: Date/Time */}
-                    <div className="flex-shrink-0 text-center bg-[#FFCA40]/10 rounded-xl p-4 min-w-[120px]">
+                    <div className="shrink-0 text-center bg-[#FFCA40]/10 rounded-xl p-4 min-w-[120px]">
                       <div className="text-2xl font-bold text-[#FFCA40]">
                         {new Date(appointment.date).getDate()}
                       </div>
@@ -260,7 +299,7 @@ export default function CounselorAppointmentsPage() {
                     </div>
 
                     {/* Right: Actions */}
-                    <div className="flex-shrink-0 flex flex-col gap-2">
+                    <div className="shrink-0 flex flex-col gap-2">
                       {appointment.status === 'scheduled' && (
                         <>
                           <button className="px-4 py-2 bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 rounded-lg text-sm font-medium text-[#FFCA40] transition-all flex items-center gap-2 whitespace-nowrap">

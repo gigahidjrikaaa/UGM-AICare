@@ -1,9 +1,4 @@
 "use client";
-
-import Image from 'next/image';
-import Link from 'next/link';
-import { signOut } from 'next-auth/react';
-import {
   FiHome,
   FiClipboard,
   FiCalendar,
@@ -49,7 +44,7 @@ const secondaryNavItems = [
 
 export default function CounselorSidebar() {
   return (
-    <aside className="w-64 bg-[#000c24] h-screen sticky top-0 flex-shrink-0 overflow-y-auto hidden md:flex flex-col border-r border-white/10">
+    <aside className="w-64 bg-[#000c24] h-screen sticky top-0 shrink-0 overflow-y-auto hidden md:flex flex-col border-r border-white/10">
       {/* Logo/Header */}
       <div className="p-4 border-b border-white/10 h-16 flex items-center shrink-0">
         <Link href="/counselor/dashboard" className="flex items-center group">
@@ -109,7 +104,7 @@ export default function CounselorSidebar() {
           onClick={() => signOut({ callbackUrl: '/counselor' })}
           className="flex items-center w-full px-3 py-2.5 rounded-md text-sm font-medium transition-colors duration-150 group text-white/70 hover:bg-red-500/15 hover:text-red-300"
         >
-          <FiLogOut className="mr-3 flex-shrink-0 text-white/60 group-hover:text-red-300" size={18}/>
+          <FiLogOut className="mr-3 shrink-0 text-white/60 group-hover:text-red-300" size={18}/>
           <span className="truncate">Sign Out</span>
         </button>
       </div>

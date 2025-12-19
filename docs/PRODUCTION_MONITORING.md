@@ -1,5 +1,7 @@
 # Production Monitoring Guide for UGM-AICare
 
+This document is a conceptual guide (logging/metrics/alerting design). For operational commands (how to run ELK/Prometheus/Grafana/Langfuse), use the profile-based Compose runbook in `infra/MONITORING_README.md`.
+
 ## Table of Contents
 
 1. [Logging Strategy](#logging-strategy)
@@ -173,7 +175,7 @@ configure_logging(log_level=LOG_LEVEL)
 
 #### **Step 2: Deploy ELK Stack**
 
-Create `infra/docker/docker-compose.elk.yml`:
+Operational note: the ELK stack is implemented via Compose profiles in `infra/compose/docker-compose.*.yml`.
 
 ```yaml
 version: '3.8'
@@ -313,7 +315,7 @@ output {
 
 ```bash
 cd infra/docker
-docker compose -f docker-compose.elk.yml up -d
+docker compose -f infra/compose/docker-compose.dev.yml --profile elk up -d
 ```
 
 Access Kibana at: `http://localhost:5601`
@@ -636,7 +638,7 @@ class SafetyTriageAgent:
 
 #### **Deploy Prometheus + Grafana:**
 
-Create `infra/docker/docker-compose.monitoring.yml`:
+Operational note: the monitoring stack is implemented via Compose profiles in `infra/compose/docker-compose.*.yml`.
 
 ```yaml
 version: '3.8'

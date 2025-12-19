@@ -13,11 +13,31 @@
 ✅ **Current Versions (Patched):**
 
 - Next.js: **16.0.7** (was 16.0.0)
-- React: **19.2.2** (was 19.2.0)
 
----
 
-## 📖 Chapter 1: Introduction & Problem Statement
+## 🐳 Docker Compose (Profiles)
+
+This repository uses Docker Compose **profiles** to reduce duplicated compose files. The canonical Compose files live in `infra/compose/`.
+
+```bash
+# Dev (app only)
+docker compose -f infra/compose/docker-compose.dev.yml up -d
+
+# Dev + monitoring (Prometheus/Grafana/exporters/Langfuse)
+docker compose -f infra/compose/docker-compose.dev.yml --profile monitoring up -d
+
+# Dev + monitoring + ELK (Elasticsearch/Logstash/Kibana/Filebeat)
+docker compose -f infra/compose/docker-compose.dev.yml --profile monitoring --profile elk up -d
+
+# Prod (app only)
+docker compose -f infra/compose/docker-compose.prod.yml --env-file .env up -d
+
+# Prod + monitoring/logging (enable profiles as needed)
+docker compose -f infra/compose/docker-compose.prod.yml --env-file .env --profile monitoring --profile elk up -d
+```
+
+If you prefer scripts, `./dev.sh` wraps the most common local commands.
+
 
 ### 1.1 The Challenge
 
@@ -69,7 +89,7 @@ The system is orchestrated by **Aika**, a Meta-Agent that coordinates four speci
            ┌─────────────┘           │            │            └─────────────┐
            ▼                         ▼            ▼                          ▼
     ┌─────────────┐           ┌─────────────┐  ┌─────────────┐        ┌─────────────┐
-    │  🛡️ STA     │           │  🧠 TCA     │  │  📋 CMA     │        │  📊 IA      │
+    │  🛡️STA     │           │  🧠 TCA    │  │  📋 CMA     │        │  📊 IA      │
     │  Safety     │           │  Therapeutic│  │  Case       │        │  Insights   │
     │  Triage     │           │  Coach      │  │  Management │        │  Analytics  │
     └─────────────┘           └─────────────┘  └─────────────┘        └─────────────┘

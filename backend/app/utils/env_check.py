@@ -13,9 +13,9 @@ def check_env():
         "POSTGRES_PASSWORD",
         "POSTGRES_DB",
 
-        # Redis
-        "REDIS_HOST",
-        "REDIS_PORT",
+        # Redis (Optional/Mocked)
+        # "REDIS_HOST",
+        # "REDIS_PORT",
         # Optional: "REDIS_DB", "REDIS_USERNAME", "REDIS_PASSWORD"
 
         # Auth/JWT

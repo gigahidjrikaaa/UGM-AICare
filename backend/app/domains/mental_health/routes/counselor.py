@@ -143,18 +143,22 @@ async def get_my_appointments(
 
     query = (
         select(Appointment)
-        .options(joinedload(Appointment.user), joinedload(Appointment.psychologist))
+        .options(
+            joinedload(Appointment.user),
+            joinedload(Appointment.psychologist),
+            joinedload(Appointment.appointment_type),
+        )
         .filter(Appointment.psychologist_id == profile.id)
     )
 
     if status:
         query = query.filter(Appointment.status == status)
     if start_date:
-        query = query.filter(Appointment.scheduled_time >= start_date)
+        query = query.filter(Appointment.appointment_datetime >= start_date)
     if end_date:
-        query = query.filter(Appointment.scheduled_time <= end_date)
+        query = query.filter(Appointment.appointment_datetime <= end_date)
 
-    query = query.order_by(Appointment.scheduled_time.desc())
+    query = query.order_by(Appointment.appointment_datetime.desc())
     offset = (page - 1) * page_size
     query = query.offset(offset).limit(page_size)
 
@@ -193,7 +197,11 @@ async def get_single_appointment(
 
     query = (
         select(Appointment)
-        .options(joinedload(Appointment.user), joinedload(Appointment.psychologist))
+        .options(
+            joinedload(Appointment.user),
+            joinedload(Appointment.psychologist),
+            joinedload(Appointment.appointment_type),
+        )
         .filter(
             Appointment.id == appointment_id,
             Appointment.psychologist_id == profile.id,
@@ -244,15 +252,15 @@ async def get_my_dashboard_stats(
 
     this_week_query = select(func.count(Appointment.id)).filter(
         Appointment.psychologist_id == profile.id,
-        Appointment.scheduled_time >= week_start,
-        Appointment.scheduled_time < week_end,
+        Appointment.appointment_datetime >= week_start,
+        Appointment.appointment_datetime < week_end,
     )
     this_week_appointments = await db.scalar(this_week_query) or 0
 
     upcoming_query = select(func.count(Appointment.id)).filter(
         Appointment.psychologist_id == profile.id,
         Appointment.status == "scheduled",
-        Appointment.scheduled_time >= today,
+        Appointment.appointment_datetime >= today,
     )
     upcoming_appointments = await db.scalar(upcoming_query) or 0
 
@@ -335,6 +343,9 @@ async def get_my_cases(
         created_at = cast(datetime, case.created_at)
         updated_at = cast(datetime, case.updated_at)
         status_val = case.status.value if isinstance(case.status, CaseStatusEnum) else "new"
+        # Counselor UI currently models resolved cases as closed.
+        if status_val == "resolved":
+            status_val = "closed"
         severity_val = case.severity.value if isinstance(case.severity, CaseSeverityEnum) else "low"
         
         payload.append(SDACase(
@@ -398,7 +409,7 @@ async def get_my_case_stats(
     # Closed cases
     closed_query = select(func.count(Case.id)).where(
         Case.assigned_to == psychologist_id_str,
-        Case.status == CaseStatusEnum.closed
+        Case.status.in_([CaseStatusEnum.closed, CaseStatusEnum.resolved])
     )
     closed = await db.scalar(closed_query) or 0
     
@@ -446,14 +457,18 @@ async def get_today_appointments(
 
     query = (
         select(Appointment)
-        .options(joinedload(Appointment.user), joinedload(Appointment.psychologist))
+        .options(
+            joinedload(Appointment.user),
+            joinedload(Appointment.psychologist),
+            joinedload(Appointment.appointment_type),
+        )
         .filter(
             Appointment.psychologist_id == profile.id,
             Appointment.status == "scheduled",
-            Appointment.scheduled_time >= datetime.combine(today, datetime.min.time()),
-            Appointment.scheduled_time < datetime.combine(tomorrow, datetime.min.time()),
+            Appointment.appointment_datetime >= datetime.combine(today, datetime.min.time()),
+            Appointment.appointment_datetime < datetime.combine(tomorrow, datetime.min.time()),
         )
-        .order_by(Appointment.scheduled_time)
+        .order_by(Appointment.appointment_datetime)
     )
 
     result = await db.execute(query)
