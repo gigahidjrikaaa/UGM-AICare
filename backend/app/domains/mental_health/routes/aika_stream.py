@@ -13,7 +13,6 @@ from typing import AsyncGenerator, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
-from langgraph.checkpoint.memory import MemorySaver
 
 from app.database import get_async_db
 from app.dependencies import get_current_active_user
@@ -22,6 +21,8 @@ from app.domains.mental_health.schemas.chat import AikaRequest
 from app.agents.aika_orchestrator_graph import create_aika_agent_with_checkpointing
 from app.core.rate_limiter import check_rate_limit_dependency
 from app.agents.execution_tracker import execution_tracker
+from app.core.langgraph_checkpointer import get_langgraph_checkpointer
+from app.services.ai_memory_facts_service import list_user_fact_texts_for_agent, remember_from_user_message
 
 logger = logging.getLogger(__name__)
 
@@ -77,6 +78,7 @@ async def stream_aika_execution(
 
         # Prepare initial state
         user_hash = hashlib.sha256(f"user_{current_user.id}".encode()).hexdigest()[:16]
+        remembered_facts = await list_user_fact_texts_for_agent(db, current_user, limit=20)
         initial_state = {
             "user_id": current_user.id,
             "user_role": request.role,
@@ -84,6 +86,9 @@ async def stream_aika_execution(
             "message": request.message,
             "conversation_history": request.conversation_history or [],
             "session_id": request.session_id or f"sess_{current_user.id}_{int(datetime.now().timestamp())}",
+            "personal_context": {
+                "remembered_facts": remembered_facts,
+            },
             "execution_id": execution_id,  # Inject execution_id for tracking
             "execution_path": [],
             "agents_invoked": [],
@@ -93,9 +98,12 @@ async def stream_aika_execution(
         
         logger.info(f"🌊 Starting streaming execution for user {current_user.id} with model: {request.preferred_model or 'default'} (exec_id={execution_id})")
         
-        # Create Aika agent with checkpointing
-        memory = MemorySaver()
-        aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=memory)
+        # Create Aika agent with app-lifetime checkpointing (Postgres when available)
+        checkpointer = get_langgraph_checkpointer()
+        if checkpointer is None:
+            from langgraph.checkpoint.memory import MemorySaver
+            checkpointer = MemorySaver()
+        aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=checkpointer)
         
         config: dict = {
             "configurable": {
@@ -144,6 +152,9 @@ async def stream_aika_execution(
         
         # Get final result
         result = await aika_agent.ainvoke(initial_state, config)  # type: ignore
+
+        # Best-effort memory write (consent-gated)
+        await remember_from_user_message(db, current_user, request.message, source="conversation")
         
         processing_time_ms = (datetime.now() - start_time).total_seconds() * 1000
         

@@ -1,6 +1,7 @@
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy.ext.declarative import declarative_base
 from typing import AsyncGenerator
+
+from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
+from sqlalchemy.orm import declarative_base
 import os
 from dotenv import load_dotenv
 import logging
@@ -20,6 +21,8 @@ if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
 elif DATABASE_URL.startswith("postgresql+psycopg2://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg2://", "postgresql+asyncpg://")
+elif DATABASE_URL.startswith("postgresql+psycopg://"):
+    DATABASE_URL = DATABASE_URL.replace("postgresql+psycopg://", "postgresql+asyncpg://")
 
 # Create async engine with optimal asyncpg configuration
 if DATABASE_URL.startswith("postgresql+asyncpg://"):
@@ -52,16 +55,31 @@ else:
         # No specific connect_args needed for aiosqlite in this context
     )
 
-logger.info(f"Using async database with asyncpg: {DATABASE_URL}")
+logger.info(f"Using async database: {DATABASE_URL}")
 
-# Create async session maker
-AsyncSessionLocal = async_sessionmaker(
-    bind=async_engine,
-    class_=AsyncSession,
-    expire_on_commit=False,
-    autoflush=False,  # Better control over when to flush
-    autocommit=False
-)
+# Create async session factory.
+# Prefer SQLAlchemy 2.x's async_sessionmaker when available, but fall back to
+# sessionmaker for compatibility (e.g., when alembic is executed in a different env).
+try:
+    from sqlalchemy.ext.asyncio import async_sessionmaker  # type: ignore
+
+    AsyncSessionLocal = async_sessionmaker(
+        bind=async_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autoflush=False,
+        autocommit=False,
+    )
+except Exception:
+    from sqlalchemy.orm import sessionmaker
+
+    AsyncSessionLocal = sessionmaker(
+        bind=async_engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autoflush=False,
+        autocommit=False,
+    )
 
 Base = declarative_base()
 

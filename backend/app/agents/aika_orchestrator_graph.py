@@ -93,6 +93,28 @@ def _normalize_user_role(role: str) -> str:
     return role_mapping.get(role, "student")  # Default to student
 
 
+def _format_personal_memory_block(state: AikaOrchestratorState) -> str:
+    """Format user-consented memory facts for prompt injection.
+
+    The source of truth is `state["personal_context"]["remembered_facts"]`.
+    """
+    personal_context = state.get("personal_context") or {}
+    facts = personal_context.get("remembered_facts") or []
+    if not isinstance(facts, list) or not facts:
+        return ""
+
+    # Keep it compact; the user can inspect/delete these in Profile.
+    rendered = [str(f).strip() for f in facts if str(f).strip()]
+    rendered = rendered[:20]
+    if not rendered:
+        return ""
+
+    return (
+        "User memory (user-provided, reviewable in Profile; use only if relevant):\n"
+        + "\n".join(f"- {f}" for f in rendered)
+    )
+
+
 @trace_agent("AikaDecision")
 async def aika_decision_node(
     state: AikaOrchestratorState,
@@ -135,6 +157,8 @@ async def aika_decision_node(
         user_role = state.get("user_role", "user")
         normalized_role = _normalize_user_role(user_role)
         system_instruction = AIKA_SYSTEM_PROMPTS.get(normalized_role, AIKA_SYSTEM_PROMPTS["student"])
+
+        personal_memory_block = _format_personal_memory_block(state)
         
         # Prepare conversation history for Gemini
         history_contents = []
@@ -256,6 +280,9 @@ self-harm, cutting, mutilasi diri, menyakiti diri, overdose,
 jump from building, loncat dari gedung, gantung diri, hanging,
 want to die, mau mati, ingin mati, etc.
 """
+
+        if personal_memory_block:
+            decision_prompt = f"{decision_prompt}\n\n{personal_memory_block}"
         
         # Call Gemini for decision with fallback support
         from app.core.llm import generate_gemini_response_with_fallback, DEFAULT_GEMINI_MODEL
@@ -469,6 +496,10 @@ want to die, mau mati, ingin mati, etc.
                 enhanced_system_instruction = system_instruction
                 if screening_prompt_addition:
                     enhanced_system_instruction = f"{system_instruction}\n\n{screening_prompt_addition}"
+
+                # Inject user-consented memory facts for grounding
+                if personal_memory_block:
+                    enhanced_system_instruction = f"{enhanced_system_instruction}\n\n{personal_memory_block}"
                 
                 # Enable ReAct: Use generate_with_tools instead of simple generate_response
                 from app.domains.mental_health.services.tool_calling import generate_with_tools
@@ -1023,6 +1054,8 @@ async def synthesize_final_response(
         user_role = state.get("user_role", "user")
         normalized_role = _normalize_user_role(user_role)
         system_instruction = AIKA_SYSTEM_PROMPTS.get(normalized_role, AIKA_SYSTEM_PROMPTS["student"])
+
+        personal_memory_block = _format_personal_memory_block(state)
         
         # Build synthesis prompt with agent results
         agents_invoked = state.get("agents_invoked", [])
@@ -1031,6 +1064,8 @@ async def synthesize_final_response(
 You are Aika. Synthesize a final response based on the specialized agent outputs.
 
 Original Message: {state.get('message')}
+
+{personal_memory_block if personal_memory_block else ''}
 
 Agent Results:
 """

@@ -1,36 +1,34 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# UGM-AICare Frontend (Next.js)
 
-## Getting Started
+## Local development
 
-First, run the development server:
+This frontend is typically developed via Docker Compose from the repo root:
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+./dev.sh up
 ```
 
-Open [http://localhost:4000](http://localhost:4000) with your browser to see the result.
+The frontend is exposed at `http://localhost:22000`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Development API routing
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+This repo supports two practical development modes:
 
-## Learn More
+1. Direct mode (recommended)
 
-To learn more about Next.js, take a look at the following resources:
+- Set `NEXT_PUBLIC_API_URL=http://localhost:22001`.
+- Browser requests go directly to the backend.
+- This matches the split-subdomain production deployment pattern.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+1. Proxy mode (optional)
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+- Leave `NEXT_PUBLIC_API_URL` unset or empty.
+- The frontend uses relative `/api/v1/*` paths.
+- In Docker Compose, Next.js can proxy `/api/v1/*` to the backend service.
 
-## Deploy on Vercel
+## Production deployment (split subdomain)
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+The intended deployment uses distinct subdomains:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Frontend: `https://aicare.sumbu.xyz`
+- Backend: `https://api.aicare.sumbu.xyz`

@@ -5,8 +5,9 @@ scikit-learn
 requests
 sqlalchemy
 nest_asyncio
-psycopg2-binary
+psycopg[binary]
 passlib[bcrypt]
 python-dotenv
 asyncpg
+tqdm
 nbformat>=4.2.0

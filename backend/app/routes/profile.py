@@ -7,7 +7,7 @@ from datetime import date, datetime
 from typing import Any, Dict, List, Set, cast
 from urllib.parse import quote
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
@@ -46,6 +46,7 @@ from app.schemas.user import (
     UserProfileOverviewUpdate,
     UserStatsResponse,
 )
+from app.schemas.ai_memory import AIMemoryFactResponse
 from app.utils.security_utils import decrypt_data, encrypt_data
 from app.domains.mental_health.services.user_stats_service import UserStatsService
 from pydantic import BaseModel, Field
@@ -100,6 +101,11 @@ def _safe_decrypt(value: str | None) -> str | None:
         return None
     decrypted = decrypt_data(value)
     return decrypted or value
+
+
+def _decrypt_required(value: str) -> str:
+    decrypted = decrypt_data(value)
+    return decrypted or ""
 
 
 def _normalize_optional_string(value: str | None) -> str | None:
@@ -416,6 +422,7 @@ async def get_profile_overview(
         consent_research=user.consent_research,
         consent_emergency_contact=user.consent_emergency_contact,
         consent_marketing=user.consent_marketing,
+        consent_ai_memory=getattr(user, "consent_ai_memory", False),
     )
 
     # Localization - read from UserPreferences with fallback to legacy User columns
@@ -512,7 +519,8 @@ async def update_profile_overview(
     }
     consent_fields = {
         "consent_data_sharing", "consent_research",
-        "consent_emergency_contact", "consent_marketing"
+        "consent_emergency_contact", "consent_marketing",
+        "consent_ai_memory",
     }
     # Legacy User table fields (for backward compatibility)
     legacy_user_fields = {
@@ -687,6 +695,52 @@ async def update_checkin_settings(
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update settings") from exc
 
     return CheckinSettingsResponse(allow_email_checkins=current_user.allow_email_checkins)
+
+
+@router.get("/ai-memory/facts", response_model=List[AIMemoryFactResponse])
+async def list_ai_memory_facts(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_active_user),
+) -> List[AIMemoryFactResponse]:
+    """List user AI memory facts.
+
+    Facts are always visible to the user to enable explicit deletion control,
+    regardless of whether consent is currently enabled.
+    """
+    from app.services.ai_memory_facts_service import list_user_facts
+
+    facts = await list_user_facts(db, current_user.id, limit=100)
+    return [
+        AIMemoryFactResponse(
+            id=fact.id,
+            fact=_decrypt_required(fact.fact_encrypted),
+            category=fact.category,
+            source=fact.source,
+            created_at=fact.created_at,
+            updated_at=fact.updated_at,
+        )
+        for fact in facts
+    ]
+
+
+@router.delete(
+    "/ai-memory/facts/{fact_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    response_class=Response,
+)
+async def delete_ai_memory_fact(
+    fact_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(get_current_active_user),
+) -> Response:
+    """Forget a single AI memory fact."""
+    from app.services.ai_memory_facts_service import delete_user_fact
+
+    deleted = await delete_user_fact(db, current_user.id, fact_id)
+    if not deleted:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Memory fact not found")
+
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.post("/sync-achievements", response_model=SyncAchievementsResponse)

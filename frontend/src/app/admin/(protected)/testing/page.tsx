@@ -8,6 +8,9 @@ import {
   FiDatabase, FiActivity, FiClipboard, FiServer, FiCpu
 } from "react-icons/fi";
 
+const apiOrigin = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+const apiUrl = (path: string) => (apiOrigin ? `${apiOrigin}${path}` : path);
+
 // --- Types ---
 interface ConversationScenario {
   id: string;
@@ -170,7 +173,7 @@ export default function TestingPage() {
   const loadTestUsers = async () => {
     setLoadingUsers(true);
     try {
-      const response = await fetch("http://localhost:8000/api/v1/admin/testing/users", {
+      const response = await fetch(apiUrl("/api/v1/admin/testing/users"), {
         credentials: "include",
       });
       if (!response.ok) throw new Error("Failed to load users");
@@ -192,7 +195,7 @@ export default function TestingPage() {
 
     setLoadingUsers(true);
     try {
-      const response = await fetch("http://localhost:8000/api/v1/admin/testing/users", {
+      const response = await fetch(apiUrl("/api/v1/admin/testing/users"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -229,7 +232,7 @@ export default function TestingPage() {
 
     setLoadingUsers(true);
     try {
-      const response = await fetch("http://localhost:8000/api/v1/admin/testing/seed", {
+      const response = await fetch(apiUrl("/api/v1/admin/testing/seed"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -259,7 +262,7 @@ export default function TestingPage() {
 
     setLoadingUsers(true);
     try {
-      const response = await fetch("http://localhost:8000/api/v1/admin/testing/cleanup", {
+      const response = await fetch(apiUrl("/api/v1/admin/testing/cleanup"), {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -299,7 +302,7 @@ export default function TestingPage() {
 
     setLoading("custom-conversation");
     try {
-      const response = await fetch("http://localhost:8000/api/v1/admin/testing/chat-simulation", {
+      const response = await fetch(apiUrl("/api/v1/admin/testing/chat-simulation"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -344,7 +347,7 @@ export default function TestingPage() {
     const testUser = testUsers[0]; // Use first test user
 
     try {
-      const response = await fetch("http://localhost:8000/api/v1/admin/testing/chat-simulation", {
+      const response = await fetch(apiUrl("/api/v1/admin/testing/chat-simulation"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -404,7 +407,7 @@ export default function TestingPage() {
         body = { scenarios: batchScenarios };
       }
 
-      const response = await fetch("http://localhost:8000/api/v1/admin/testing/batch-test", {
+      const response = await fetch(apiUrl("/api/v1/admin/testing/batch-test"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -435,7 +438,7 @@ export default function TestingPage() {
   const runRQ2Validation = async () => {
     setLoading("rq2");
     try {
-      const response = await fetch("http://localhost:8000/api/v1/admin/testing/rq2/validation", {
+      const response = await fetch(apiUrl("/api/v1/admin/testing/rq2/validation"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -456,7 +459,7 @@ export default function TestingPage() {
   const runRQ3Generation = async () => {
     setLoading("rq3");
     try {
-      const response = await fetch("http://localhost:8000/api/v1/admin/testing/rq3/generate", {
+      const response = await fetch(apiUrl("/api/v1/admin/testing/rq3/generate"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -477,7 +480,7 @@ export default function TestingPage() {
   const runPrivacyTest = async () => {
     setLoading("privacy");
     try {
-      const response = await fetch("http://localhost:8000/api/v1/admin/testing/rq3/privacy-test", {
+      const response = await fetch(apiUrl("/api/v1/admin/testing/rq3/privacy-test"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",

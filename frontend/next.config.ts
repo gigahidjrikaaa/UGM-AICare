@@ -143,9 +143,16 @@ const nextConfig = {
 
   // Proxy API requests to backend
   async rewrites() {
+    // If a public API origin is configured, prefer direct calls to that origin
+    // (split-subdomain deployment: aicare.* -> frontend, api.aicare.* -> backend).
+    // In that setup, Next.js should not act as a proxy.
+    const publicApiOrigin = process.env.NEXT_PUBLIC_API_URL;
+    if (publicApiOrigin) {
+      return [];
+    }
+
     // INTERNAL_API_URL is set in docker-compose for container-to-container communication
     const backendUrl = process.env.INTERNAL_API_URL || process.env.BACKEND_URL || 'http://backend:8000';
-    console.log(`[Next.js] Rewriting /api requests to ${backendUrl}`);
     return [
       {
         source: '/api/v1/:path*',

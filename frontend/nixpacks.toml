@@ -1,0 +1,19 @@
+# Nixpacks configuration for UGM-AICare frontend (Next.js)
+# Intended for Coolify/Nixpacks deployments.
+
+providers = ["node"]
+
+[phases.install]
+cmds = [
+  "npm ci"
+]
+
+[phases.build]
+# Prefer the non-turbopack production build.
+cmds = [
+  "npm run build:prod"
+]
+
+[start]
+# Coolify sets PORT automatically.
+cmd = "npx next start -H 0.0.0.0 -p ${PORT:-3000}"

@@ -11,6 +11,7 @@
 # Web Framework
 fastapi>=0.115.5,<0.116.0
 uvicorn>=0.30.0,<1.0.0
+watchfiles>=0.21.0  # Enables efficient Uvicorn reload watcher (avoids StatReload directory scans)
 scalar-fastapi>=1.0.3
 pydantic>=2.9.0,<3.0.0
 email-validator>=2.0.0  # Required for Pydantic EmailStr validation
@@ -27,7 +28,7 @@ sqlalchemy[asyncio]>=2.0.36
 alembic>=1.13.0,<2.0.0
 redis==5.0.1
 asyncpg>=0.29.0  # Fast PostgreSQL Database Client Library for Python/asyncio
-psycopg2-binary>=2.9.0  # For Alembic migrations (sync operations)
+psycopg[binary]>=3.2.0,<4.0.0  # Sync PostgreSQL driver (Alembic, LangGraph saver)
 aiosqlite  # For async SQLite support (dev/testing only)
 aiofiles>=23.0.0 # For async file operations
 PyPDF2==3.0.1
@@ -57,6 +58,7 @@ opentelemetry-exporter-otlp-proto-common==1.35.0
 
 # LangGraph
 langgraph>=0.2.0,<0.3.0
+langgraph-checkpoint-postgres>=0.0.10
 langfuse>=2.0.0  # LLM observability and agent tracing
 
 # Safety Triage Agent (STA) - Crisis Detection

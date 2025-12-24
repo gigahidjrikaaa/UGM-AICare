@@ -35,6 +35,7 @@ from .user_emergency_contact import UserEmergencyContact
 from .user_consent_ledger import UserConsentLedger
 from .user_audit_log import UserAuditLog
 from .user_session import UserSession
+from .user_ai_memory_fact import UserAIMemoryFact
 
 # Revenue reporting - imported directly from models file to avoid loading blockchain dependencies
 from app.domains.finance.models import RevenueReport, RevenueApproval, ReportStatus
@@ -82,6 +83,9 @@ __all__ = [
     "User",
     "AgentUser",
     "AgentRoleEnum",
+
+    # AI Memory
+    "UserAIMemoryFact",
     
     # Revenue Models (Shared)
     "RevenueReport",

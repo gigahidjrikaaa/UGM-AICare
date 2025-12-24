@@ -47,14 +47,17 @@ def _database_url() -> str:
 def _sync_database_url(url: str) -> str:
     """Alembic uses sync drivers; coerce async URLs to sync equivalents."""
     if url.startswith("postgresql+asyncpg"):
-        return url.replace("postgresql+asyncpg", "postgresql+psycopg2")
+        return url.replace("postgresql+asyncpg", "postgresql+psycopg")
     if url.startswith("postgresql+psycopg_async"):
-        return url.replace("postgresql+psycopg_async", "postgresql+psycopg2")
+        return url.replace("postgresql+psycopg_async", "postgresql+psycopg")
+    if url.startswith("postgresql://"):
+        # Avoid implicit psycopg2 fallback by being explicit about the driver.
+        return url.replace("postgresql://", "postgresql+psycopg://", 1)
     return url
 
 
 DATABASE_URL: Final[str] = _database_url()
-config.set_main_option("sqlalchemy.url", DATABASE_URL)
+config.set_main_option("sqlalchemy.url", _sync_database_url(DATABASE_URL))
 
 # add your model's MetaData object here
 # for 'autogenerate' support
@@ -102,9 +105,7 @@ def run_migrations_online() -> None:
     and associate a connection with the context.
 
     """
-    sync_db_url = _sync_database_url(DATABASE_URL)
-
-    connectable = create_engine(sync_db_url)
+    connectable = create_engine(_sync_database_url(DATABASE_URL))
 
     with connectable.connect() as connection:
         context.configure(

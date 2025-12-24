@@ -39,20 +39,20 @@ docker compose -f infra/compose/docker-compose.prod.yml --env-file .env --profil
 
 ## Access points (default)
 
-- Elasticsearch: <http://localhost:8250>
-- Kibana: <http://localhost:8254>
-- Logstash API: <http://localhost:8253>
-- Prometheus: <http://localhost:8255>
-- Grafana: <http://localhost:8256> (credentials: `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`)
-- Langfuse: <http://localhost:8262>
-- Backend metrics (if backend is running): <http://localhost:8000/metrics> and <http://localhost:8000/metrics/fastapi>
+- Elasticsearch: <http://localhost:22020>
+- Kibana: <http://localhost:22024>
+- Logstash API: <http://localhost:22023>
+- Prometheus: <http://localhost:22010>
+- Grafana: <http://localhost:22011> (credentials: `GRAFANA_ADMIN_USER` / `GRAFANA_ADMIN_PASSWORD`)
+- Langfuse: <http://localhost:22016>
+- Backend metrics (if backend is running): <http://localhost:22001/metrics> and <http://localhost:22001/metrics/fastapi>
 
 ## Troubleshooting
 
 Check Prometheus targets:
 
 ```bash
-curl -s http://localhost:8255/targets | head
+curl -s http://localhost:22010/targets | head
 ```
 
 Restart Grafana:
@@ -64,8 +64,8 @@ docker compose -f infra/compose/docker-compose.dev.yml --profile monitoring rest
 ELK health:
 
 ```bash
-curl -s http://localhost:8250/_cluster/health
-curl -s http://localhost:8254/api/status | head
+curl -s http://localhost:22020/_cluster/health
+curl -s http://localhost:22024/api/status | head
 ```
 
 For monitoring design/metrics strategy (conceptual, not operational commands), see `docs/PRODUCTION_MONITORING.md`.

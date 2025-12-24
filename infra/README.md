@@ -89,7 +89,7 @@ Before you begin, ensure your target VM meets the following requirements:
         ```
 
 - **Project Path:** Decide on an absolute path on the VM where the project repository will be cloned (e.g., `/opt/ugm-aicare`). Ensure the `deployuser` has write permissions to this directory.
-- **Reverse Proxy Configuration (Nginx/Apache):** You will need to configure your existing Nginx (or other reverse proxy) to forward traffic from your domain (e.g., `aicare.sumbu.xyz`) to the Docker containers running on `localhost:4000` (frontend) and `localhost:8000` (backend). This includes handling HTTPS/SSL termination at the Nginx level.
+- **Reverse Proxy Configuration (Nginx/Apache):** You will need to configure your existing Nginx (or other reverse proxy) to forward traffic from your domain (e.g., `aicare.sumbu.xyz`) to the Docker containers running on `localhost:22000` (frontend) and `localhost:22001` (backend). This includes handling HTTPS/SSL termination at the Nginx level.
 
 ## 2. GitHub Secrets Configuration
 
@@ -212,7 +212,7 @@ Environment variables like `FRONTEND_URL`, `BACKEND_URL`, `ALLOWED_ORIGINS`, and
         NEXT_PUBLIC_API_URL=https://your-domain.com/api
         ```
 
-    If Nginx is proxying to `localhost:4000` and `localhost:8000`, then the current default values in `infra/compose/docker-compose.prod.yml` (e.g., `http://localhost:4000`) are appropriate for the containers' internal view. The `ENV_FILE_PRODUCTION` secret should then contain the values that the application itself needs to know about its public-facing URLs.
+    If Nginx is proxying to `localhost:22000` and `localhost:22001`, then the current default values in `infra/compose/docker-compose.prod.yml` (e.g., `http://localhost:22000`) are appropriate for the containers' internal view. The `ENV_FILE_PRODUCTION` secret should then contain the values that the application itself needs to know about its public-facing URLs.
 
 ## 7. Troubleshooting Tips
 
@@ -284,6 +284,6 @@ crontab -e
 
 ### Nginx/Reverse Proxy Issues
 
-- Ensure Nginx is running and correctly configured to proxy requests to `localhost:4000` (frontend) and `localhost:8000` (backend).
+- Ensure Nginx is running and correctly configured to proxy requests to `localhost:22000` (frontend) and `localhost:22001` (backend).
 - Verify Nginx's SSL configuration is correct and certificates are valid.
 - Check Nginx access and error logs for clues.

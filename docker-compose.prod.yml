@@ -16,7 +16,7 @@ services:
     volumes:
       - pgdata_prod:/var/lib/postgresql/data
     ports:
-      - "${DB_EXTERNAL_PORT:-20003}:5432"
+      - "${DB_EXTERNAL_PORT:-22002}:5432"
     restart: always
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER:-giga} -d ${POSTGRES_DB:-aicare_db}"]
@@ -39,8 +39,8 @@ services:
     volumes:
       - minio_data_prod:/data
     ports:
-      - "${MINIO_EXTERNAL_PORT:-20005}:9000"
-      - "${MINIO_CONSOLE_PORT:-20006}:9001"
+      - "${MINIO_EXTERNAL_PORT:-22004}:9000"
+      - "${MINIO_CONSOLE_PORT:-22005}:9001"
     restart: always
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
@@ -84,7 +84,7 @@ services:
       context: ./backend
       dockerfile: app/Dockerfile
     ports:
-      - "${BACKEND_EXTERNAL_PORT:-20002}:8000"
+      - "${BACKEND_EXTERNAL_PORT:-22001}:8000"
     deploy:
       resources:
         limits:
@@ -127,7 +127,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     ports:
-      - "${FRONTEND_EXTERNAL_PORT:-20001}:3000"
+      - "${FRONTEND_EXTERNAL_PORT:-22000}:3000"
     deploy:
       resources:
         limits:

@@ -3,6 +3,11 @@
 
 set -e
 
+# Always treat the repo root (this script's directory) as the project directory.
+# On Windows (Git Bash/MSYS), docker-compose.exe path handling can be finicky; the most
+# reliable approach is to run compose from the repo root and explicitly pass `--env-file .env`.
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Detect docker-compose command (handle Windows Docker Desktop CLI plugin path)
 # Prioritize the CLI plugin path over the wrapper script
 if [ -f "/c/Program Files/Docker/Docker/resources/cli-plugins/docker-compose.exe" ]; then
@@ -19,8 +24,16 @@ fi
 
 echo "Using Docker Compose: $DOCKER_COMPOSE_CMD"
 
-COMPOSE_FILE="infra/compose/docker-compose.dev.yml"
-PROD_COMPOSE_FILE="infra/compose/docker-compose.prod.yml"
+COMPOSE_FILE_REL="infra/compose/docker-compose.dev.yml"
+PROD_COMPOSE_FILE_REL="infra/compose/docker-compose.prod.yml"
+
+dc() {
+    (cd "$PROJECT_DIR" && "$DOCKER_COMPOSE_CMD" --env-file .env -f "$COMPOSE_FILE_REL" "$@")
+}
+
+dc_prod() {
+    (cd "$PROJECT_DIR" && "$DOCKER_COMPOSE_CMD" --env-file .env -f "$PROD_COMPOSE_FILE_REL" "$@")
+}
 
 show_help() {
     echo "UGM-AICare Docker Development Helper"
@@ -70,11 +83,11 @@ show_help() {
     echo "  ./dev.sh test-build                # Test backend build for errors"
     echo ""
     echo "Monitoring Access:"
-    echo "  • Kibana (Logs):       http://localhost:8254"
-    echo "  • Grafana (Metrics):   http://localhost:8256 (admin/$GRAFANA_ADMIN_PASSWORD)"
-    echo "  • Prometheus:          http://localhost:8255"
-    echo "  • Langfuse (Traces):   http://localhost:8262"
-    echo "  • Backend Metrics:     http://localhost:8000/metrics"
+    echo "  • Kibana (Logs):       http://localhost:22024"
+    echo "  • Grafana (Metrics):   http://localhost:22011 (admin/$GRAFANA_ADMIN_PASSWORD)"
+    echo "  • Prometheus:          http://localhost:22010"
+    echo "  • Langfuse (Traces):   http://localhost:22016"
+    echo "  • Backend Metrics:     http://localhost:${BACKEND_EXTERNAL_PORT:-22001}/metrics"
     echo ""
     echo "Performance Tips:"
     echo "  • First build? Run 'clear-cache' to remove old artifacts"
@@ -91,22 +104,22 @@ case "${1:-}" in
         echo "   • Backend: Python files in /backend/app/"
         echo "   • Frontend: TypeScript/React files in /frontend/src/"
         echo ""
-        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" up -d
+        dc up -d
         echo "✅ Application services started"
         echo ""
         echo "📈 Starting Minimal Monitoring (Prometheus + Grafana + Langfuse)..."
-        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" --profile monitoring up -d
+        dc --profile monitoring up -d
         echo "✅ Monitoring services started"
         echo ""
         echo "✅ All services started!"
-        echo "   Frontend: http://localhost:4000 (Next.js dev server)"
-        echo "   Backend:  http://localhost:8000 (Uvicorn with --reload)"
-        echo "   API Docs: http://localhost:8000/docs"
+        echo "   Frontend: http://localhost:${FRONTEND_EXTERNAL_PORT:-22000} (Next.js dev server)"
+        echo "   Backend:  http://localhost:${BACKEND_EXTERNAL_PORT:-22001} (Uvicorn with --reload)"
+        echo "   API Docs: http://localhost:${BACKEND_EXTERNAL_PORT:-22001}/docs"
         echo ""
         echo "📍 Monitoring Access:"
-        echo "   • Langfuse (Traces):   http://localhost:8262"
-        echo "   • Grafana (Metrics):   http://localhost:8256 (admin/$GRAFANA_ADMIN_PASSWORD)"
-        echo "   • Prometheus:          http://localhost:8255"
+        echo "   • Langfuse (Traces):   http://localhost:22016"
+        echo "   • Grafana (Metrics):   http://localhost:22011 (admin/$GRAFANA_ADMIN_PASSWORD)"
+        echo "   • Prometheus:          http://localhost:22010"
         echo ""
         echo "💡 Tip: Watch logs in real-time:"
         echo "   ./dev.sh logs -f"
@@ -121,15 +134,15 @@ case "${1:-}" in
         echo "🚀 Starting FULL development environment (App + Monitoring)..."
         echo ""
         echo "📦 Starting application services..."
-        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" up -d
+        dc up -d
         echo "✅ Application started"
         echo ""
         echo "📊 Starting ELK Stack (Logs)..."
-        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" --profile elk up -d
+        dc --profile elk up -d
         echo "✅ ELK Stack started"
         echo ""
         echo "📈 Starting Full Monitoring Stack..."
-        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" --profile monitoring --profile elk up -d
+        dc --profile monitoring --profile elk up -d
         echo "✅ Monitoring Stack started"
         echo ""
         echo "⏳ Waiting for services to be ready..."
@@ -138,17 +151,16 @@ case "${1:-}" in
         echo "✅ All services started!"
         echo ""
         echo "📍 Application Access:"
-        echo "   • Frontend:   http://localhost:4000"
-        echo "   • Backend:    http://localhost:8000"
-        echo "   • API Docs:   http://localhost:8000/docs"
+        echo "   • Frontend:   http://localhost:${FRONTEND_EXTERNAL_PORT:-22000}"
+        echo "   • Backend:    http://localhost:${BACKEND_EXTERNAL_PORT:-22001}"
+        echo "   • API Docs:   http://localhost:${BACKEND_EXTERNAL_PORT:-22001}/docs"
         echo ""
         echo "📍 Monitoring Access:"
-        echo "   • Kibana (Logs):       http://localhost:8254"
-        echo "   • Grafana (Metrics):   http://localhost:8256 (admin/$GRAFANA_ADMIN_PASSWORD)"
-        echo "   • Prometheus:          http://localhost:8255"
-        echo "   • Langfuse (Traces):   http://localhost:8262"
-        echo "   • AlertManager:        http://localhost:8261"
-        echo "   • Backend Metrics:     http://localhost:8000/metrics"
+        echo "   • Kibana (Logs):       http://localhost:22024"
+        echo "   • Grafana (Metrics):   http://localhost:22011 (admin/$GRAFANA_ADMIN_PASSWORD)"
+        echo "   • Prometheus:          http://localhost:22010"
+        echo "   • Langfuse (Traces):   http://localhost:22016"
+        echo "   • Backend Metrics:     http://localhost:${BACKEND_EXTERNAL_PORT:-22001}/metrics"
         echo ""
         echo "💡 View logs:"
         echo "   ./dev.sh logs backend              # App logs"
@@ -158,7 +170,7 @@ case "${1:-}" in
     
     down)
         echo "🛑 Stopping application services..."
-        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" down
+        dc down
         echo "✅ Application services stopped"
         echo ""
         echo "💡 If you started monitoring/ELK profiles, this also stops them."
@@ -167,7 +179,7 @@ case "${1:-}" in
     down-all)
         echo "🛑 Stopping ALL services (App + Monitoring)..."
         echo ""
-        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" down
+        dc down
         echo ""
         echo "✅ All services stopped"
         ;;
@@ -176,25 +188,25 @@ case "${1:-}" in
         echo "🔄 Restarting services..."
         if [ -n "${2:-}" ]; then
             echo "   Restarting $2..."
-            "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" restart "$2"
+            dc restart "$2"
         else
             echo "   Restarting all services..."
-            "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" restart
+            dc restart
         fi
         echo "✅ Services restarted"
         ;;
     
     logs)
         if [ -n "${2:-}" ]; then
-            "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" logs -f "$2"
+            dc logs -f "$2"
         else
-            "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" logs -f
+            dc logs -f
         fi
         ;;
     
     build)
         echo "🔨 Rebuilding containers..."
-        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" up --build -d
+        dc up --build -d
         echo "✅ Rebuild complete"
         ;;
     
@@ -203,10 +215,10 @@ case "${1:-}" in
         echo "   This will rebuild with Docker cache for faster builds"
         echo ""
         # Use BuildKit for faster builds
-        COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" build --parallel backend frontend
+        COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 dc build --parallel backend frontend
         echo ""
         echo "🚀 Restarting services..."
-        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" up -d backend frontend
+        dc up -d backend frontend
         echo ""
         echo "✅ Fast rebuild complete!"
         echo "   Backend and frontend have been rebuilt and restarted"
@@ -224,10 +236,10 @@ case "${1:-}" in
         echo "✅ Docker cache cleaned"
         echo ""
         echo "🔨 Building with no cache..."
-        COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" build --parallel --no-cache backend frontend
+        COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 dc build --parallel --no-cache backend frontend
         echo ""
         echo "🚀 Restarting services..."
-        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" up -d backend frontend
+        dc up -d backend frontend
         echo ""
         echo "✅ Clean rebuild complete!"
         echo "   • Docker cache cleared"
@@ -247,7 +259,7 @@ case "${1:-}" in
             echo "💡 Tip: To rebuild from scratch, run: ./dev.sh rebuild-clean"
         else
             echo "⚠️  No existing image found. Building..."
-            COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" build backend
+            COMPOSE_DOCKER_CLI_BUILD=1 DOCKER_BUILDKIT=1 dc build backend
             
             if [ $? -ne 0 ]; then
                 echo ""
@@ -263,7 +275,7 @@ case "${1:-}" in
         
         echo ""
         echo "2️⃣ Testing Python imports..."
-        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" run --rm --no-deps backend python -c "
+        dc run --rm --no-deps backend python -c "
 import sys
 print('Python version:', sys.version)
 print('')
@@ -342,7 +354,7 @@ print('🎉 All tests passed! Backend is ready for deployment.')
         
         echo ""
         echo "3️⃣ Checking Web3.py version..."
-        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" run --rm --no-deps backend python -c "
+        dc run --rm --no-deps backend python -c "
 import web3
 print(f'Web3.py version: {web3.__version__}')
 "
@@ -375,7 +387,7 @@ print(f'Web3.py version: {web3.__version__}')
     
     prod)
         echo "🏭 Starting production compose (no hot-reload)..."
-        "$DOCKER_COMPOSE_CMD" -f "$PROD_COMPOSE_FILE" --env-file .env up -d
+        dc_prod --env-file .env up -d
         ;;
 
     preprod)
@@ -386,11 +398,11 @@ print(f'Web3.py version: {web3.__version__}')
         echo "   • Optimized performance"
         echo "   • Uses local dev database and services"
         echo ""
-        "$DOCKER_COMPOSE_CMD" -f "$PROD_COMPOSE_FILE" --env-file .env up --build -d
+        dc_prod --env-file .env up --build -d
         echo ""
         echo "✅ Pre-production environment started!"
-        echo "   Frontend: http://localhost:${FRONTEND_EXTERNAL_PORT:-20001}"
-        echo "   Backend:  http://localhost:${BACKEND_EXTERNAL_PORT:-20002}"
+        echo "   Frontend: http://localhost:${FRONTEND_EXTERNAL_PORT:-22000}"
+        echo "   Backend:  http://localhost:${BACKEND_EXTERNAL_PORT:-22001}"
         echo ""
         echo "💡 To rebuild after code changes:"
         echo "   ./dev.sh preprod"
@@ -398,7 +410,7 @@ print(f'Web3.py version: {web3.__version__}')
     
     dev)
         echo "💻 Starting development compose (hot-reload enabled)..."
-        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" up -d
+        dc up -d
         ;;
     
     clean)
@@ -406,7 +418,7 @@ print(f'Web3.py version: {web3.__version__}')
         read -p "This will remove application containers and volumes. Continue? (y/N) " -n 1 -r
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
-            "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" down -v
+            dc down -v
             echo "✅ Application cleanup complete"
             echo ""
             echo "💡 Monitoring stack not affected. To clean monitoring:"
@@ -422,7 +434,7 @@ print(f'Web3.py version: {web3.__version__}')
         echo
         if [[ $REPLY =~ ^[Yy]$ ]]; then
             echo ""
-            "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" down -v
+            dc down -v
             echo ""
             echo "✅ Complete cleanup done"
         else
@@ -432,7 +444,7 @@ print(f'Web3.py version: {web3.__version__}')
     
     status)
         echo "📊 Application Services:"
-        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" ps
+        dc ps
         echo ""
         echo "📊 Optional stacks are enabled via profiles: monitoring / elk / loki"
         ;;
@@ -442,7 +454,7 @@ print(f'Web3.py version: {web3.__version__}')
             start)
                 echo "📊 Starting monitoring stack..."
                 echo ""
-                "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" --profile monitoring --profile elk up -d
+                dc --profile monitoring --profile elk up -d
                 echo ""
                 echo "⏳ Waiting for services to be healthy..."
                 sleep 15
@@ -450,28 +462,28 @@ print(f'Web3.py version: {web3.__version__}')
                 echo "✅ Monitoring stack started!"
                 echo ""
                 echo "Access Points:"
-                echo "  • Kibana (Logs):       http://localhost:8254"
-                echo "  • Grafana (Metrics):   http://localhost:8256 (admin/$GRAFANA_ADMIN_PASSWORD)"
-                echo "  • Prometheus:          http://localhost:8255"
-                echo "  • Backend Metrics:     http://localhost:8000/metrics"
+                echo "  • Kibana (Logs):       http://localhost:22024"
+                echo "  • Grafana (Metrics):   http://localhost:22011 (admin/$GRAFANA_ADMIN_PASSWORD)"
+                echo "  • Prometheus:          http://localhost:22010"
+                echo "  • Backend Metrics:     http://localhost:${BACKEND_EXTERNAL_PORT:-22001}/metrics"
                 ;;
             
             stop)
                 echo "🛑 Stopping monitoring stack..."
-                "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" stop prometheus grafana node-exporter cadvisor postgres-exporter redis-exporter langfuse-server elasticsearch logstash kibana filebeat 2>/dev/null || true
-                "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" rm -f prometheus grafana node-exporter cadvisor postgres-exporter redis-exporter langfuse-server elasticsearch logstash kibana filebeat 2>/dev/null || true
+                dc stop prometheus grafana node-exporter cadvisor postgres-exporter redis-exporter langfuse-server elasticsearch logstash kibana filebeat 2>/dev/null || true
+                dc rm -f prometheus grafana node-exporter cadvisor postgres-exporter redis-exporter langfuse-server elasticsearch logstash kibana filebeat 2>/dev/null || true
                 echo "✅ Monitoring stack stopped"
                 ;;
             
             restart)
                 echo "🔄 Restarting monitoring stack..."
-                "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" restart prometheus grafana node-exporter cadvisor postgres-exporter redis-exporter langfuse-server elasticsearch logstash kibana filebeat 2>/dev/null || true
+                dc restart prometheus grafana node-exporter cadvisor postgres-exporter redis-exporter langfuse-server elasticsearch logstash kibana filebeat 2>/dev/null || true
                 echo "✅ Monitoring stack restarted"
                 ;;
             
             logs)
                 if [ -n "${3:-}" ]; then
-                    "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" logs -f "$3"
+                    dc logs -f "$3"
                 else
                     echo "Available monitoring services:"
                     echo ""
@@ -497,7 +509,7 @@ print(f'Web3.py version: {web3.__version__}')
             
             status)
                 echo "📊 Monitoring Stack Status:"
-                "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" ps
+                dc ps
                 ;;
             
             *)
@@ -570,7 +582,7 @@ print(f'Web3.py version: {web3.__version__}')
 # Langfuse (Agent Tracing & LLM Observability)
 # ============================================
 LANGFUSE_ENABLED=true
-LANGFUSE_HOST=http://localhost:8262
+LANGFUSE_HOST=http://localhost:22016
 LANGFUSE_SECRET=$LANGFUSE_SECRET
 LANGFUSE_SALT=$LANGFUSE_SALT
 # Note: Generate LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY from Langfuse UI after first start
@@ -583,7 +595,7 @@ EOL
         
         # Start Langfuse service
         echo "[5/5] Starting Langfuse service..."
-        "$DOCKER_COMPOSE_CMD" -f "$COMPOSE_FILE" --profile monitoring up -d langfuse-server
+        dc --profile monitoring up -d langfuse-server
         echo "✓ Langfuse service started"
         echo ""
         
@@ -596,7 +608,7 @@ EOL
         MAX_RETRIES=10
         RETRY_COUNT=0
         while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            if curl -s http://localhost:8262/api/public/health > /dev/null 2>&1; then
+            if curl -s http://localhost:22016/api/public/health > /dev/null 2>&1; then
                 echo "✓ Langfuse is healthy!"
                 break
             fi
@@ -622,7 +634,7 @@ EOL
         echo "📝 Next Steps:"
         echo ""
         echo "1. Access Langfuse UI:"
-        echo "   → http://localhost:8262"
+        echo "   → http://localhost:22016"
         echo ""
         echo "2. Complete initial setup:"
         echo "   • Create your account"

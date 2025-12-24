@@ -10,6 +10,9 @@ import { CBTModuleUsage } from "./components/CBTModuleUsage";
 import { UserProgressTable } from "./components/UserProgressTable";
 import { useAnalytics } from "./hooks/useAnalytics";
 
+const apiOrigin = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+const apiUrl = (path: string) => (apiOrigin ? `${apiOrigin}${path}` : path);
+
 interface InterventionPlan {
     id: number;
     user_id: number;
@@ -55,7 +58,7 @@ export default function InterventionPlansPage() {
     const loadPlans = async () => {
         try {
             setLoading(true);
-            const response = await fetch("http://localhost:8000/api/v1/admin/interventions/plans", {
+            const response = await fetch(apiUrl("/api/v1/admin/interventions/plans"), {
                 credentials: "include",
             });
             if (!response.ok) throw new Error("Failed to load plans");
@@ -80,7 +83,7 @@ export default function InterventionPlansPage() {
 
         setNotifying(planId);
         try {
-            const response = await fetch(`http://localhost:8000/api/v1/admin/interventions/plans/${planId}/notify`, {
+            const response = await fetch(apiUrl(`/api/v1/admin/interventions/plans/${planId}/notify`), {
                 method: "POST",
                 credentials: "include",
             });
@@ -253,7 +256,7 @@ export default function InterventionPlansPage() {
                                                     <div className="space-y-3">
                                                         {plan.plan_data.plan_steps.map((step, idx) => (
                                                             <div key={idx} className="bg-white/5 p-3 rounded border border-white/10 flex gap-3">
-                                                                <div className={`mt-1 w-5 h-5 rounded-full border flex items-center justify-center flex-shrink-0 ${step.completed ? "bg-green-500/20 border-green-500 text-green-500" : "border-white/30 text-transparent"
+                                                                <div className={`mt-1 w-5 h-5 rounded-full border flex items-center justify-center shrink-0 ${step.completed ? "bg-green-500/20 border-green-500 text-green-500" : "border-white/30 text-transparent"
                                                                     }`}>
                                                                     <FiCheckCircle size={12} />
                                                                 </div>

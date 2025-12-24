@@ -56,6 +56,7 @@ class ConsentAndPrivacySettings(BaseModel):
     consent_research: bool = False
     consent_emergency_contact: bool = False
     consent_marketing: bool = False
+    consent_ai_memory: bool = False
 
 
 class LocalizationAndAccessibility(BaseModel):
@@ -131,6 +132,7 @@ class UserProfileOverviewUpdate(BaseModel):
     consent_research: Optional[bool] = None
     consent_emergency_contact: Optional[bool] = None
     consent_marketing: Optional[bool] = None
+    consent_ai_memory: Optional[bool] = None
     preferred_language: Optional[str] = None
     preferred_timezone: Optional[str] = None
     accessibility_needs: Optional[str] = None

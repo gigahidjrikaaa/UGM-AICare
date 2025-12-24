@@ -33,6 +33,16 @@ export interface ConsentAndPrivacySettings {
   consent_research: boolean;
   consent_emergency_contact: boolean;
   consent_marketing: boolean;
+  consent_ai_memory: boolean;
+}
+
+export interface AIMemoryFact {
+  id: number;
+  fact: string;
+  category?: string | null;
+  source?: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface LocalizationAndAccessibility {
@@ -109,6 +119,7 @@ export interface UserProfileOverviewUpdate {
   consent_research?: boolean;
   consent_emergency_contact?: boolean;
   consent_marketing?: boolean;
+  consent_ai_memory?: boolean;
   preferred_language?: string | null;
   preferred_timezone?: string | null;
   accessibility_needs?: string | null;

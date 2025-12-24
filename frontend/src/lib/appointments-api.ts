@@ -1,7 +1,7 @@
 // lib/appointments-api.ts
 import { getSession } from 'next-auth/react';
 
-const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
 
 /**
  * Get authentication headers with JWT token

@@ -171,7 +171,7 @@ if [[ "$DEPLOY_MONITORING" == "true" ]]; then
   echo "[deploy.sh] Checking Elasticsearch health..."
   ELASTICSEARCH_READY=false
   for i in $(seq 1 12); do
-    if curl -s http://localhost:8250/_cluster/health > /dev/null 2>&1; then
+    if curl -s http://localhost:22020/_cluster/health > /dev/null 2>&1; then
       echo "[deploy.sh] Elasticsearch is ready."
       ELASTICSEARCH_READY=true
       break
@@ -188,7 +188,7 @@ if [[ "$DEPLOY_MONITORING" == "true" ]]; then
   echo "[deploy.sh] Checking Prometheus health..."
   PROMETHEUS_READY=false
   for i in $(seq 1 6); do
-    if curl -s http://localhost:8255/-/healthy > /dev/null 2>&1; then
+    if curl -s http://localhost:22010/-/healthy > /dev/null 2>&1; then
       echo "[deploy.sh] Prometheus is ready."
       PROMETHEUS_READY=true
       break
@@ -205,7 +205,7 @@ if [[ "$DEPLOY_MONITORING" == "true" ]]; then
   echo "[deploy.sh] Checking Langfuse health..."
   LANGFUSE_READY=false
   for i in $(seq 1 12); do
-    if curl -s http://localhost:8262/api/public/health > /dev/null 2>&1; then
+    if curl -s http://localhost:22016/api/public/health > /dev/null 2>&1; then
       echo "[deploy.sh] Langfuse is ready."
       LANGFUSE_READY=true
       break
@@ -309,8 +309,8 @@ echo "[deploy.sh] Performing health checks..."
 # - Frontend: Use /api/health endpoint (stateless, fast, non-cached)
 # - Accept 2xx/3xx status codes (success or redirect)
 # - Use reasonable timeouts and retries for container startup time
-BACKEND_HEALTH_URL="http://localhost:8000/health"
-FRONTEND_HEALTH_URL="http://localhost:4000/api/health"
+BACKEND_HEALTH_URL="http://localhost:${BACKEND_EXTERNAL_PORT:-22001}/health"
+FRONTEND_HEALTH_URL="http://localhost:${FRONTEND_EXTERNAL_PORT:-22000}/api/health"
 
 HEALTH_CHECK_RETRIES=10
 HEALTH_CHECK_INTERVAL=10
@@ -382,20 +382,19 @@ echo "========================================="
 echo "Deployment Summary"
 echo "========================================="
 echo "Application:"
-echo "  • Backend:  http://localhost:8000"
-echo "  • Frontend: http://localhost:4000"
+echo "  • Backend:  http://localhost:${BACKEND_EXTERNAL_PORT:-22001}"
+echo "  • Frontend: http://localhost:${FRONTEND_EXTERNAL_PORT:-22000}"
 echo ""
 
 if [[ "$DEPLOY_MONITORING" == "true" ]]; then
   echo "Monitoring Stack:"
-  echo "  • Kibana (Logs):       http://localhost:8254"
-  echo "  • Grafana (Metrics):   http://localhost:8256 (admin/admin123)"
-  echo "  • Prometheus:          http://localhost:8255"
-  echo "  • Langfuse (Traces):   http://localhost:8262"
-  echo "  • AlertManager:        http://localhost:8261"
+  echo "  • Kibana (Logs):       http://localhost:22024"
+  echo "  • Grafana (Metrics):   http://localhost:22011 (admin/admin123)"
+  echo "  • Prometheus:          http://localhost:22010"
+  echo "  • Langfuse (Traces):   http://localhost:22016"
   echo ""
   echo "Next Steps for Langfuse:"
-  echo "  1. Access http://localhost:8262"
+  echo "  1. Access http://localhost:22016"
   echo "  2. Create account and project"
   echo "  3. Generate API keys from Settings"
   echo "  4. Update .env with LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY"

@@ -37,8 +37,13 @@ import GlobalSkeleton from "@/components/ui/GlobalSkeleton";
 import ParticleBackground from "@/components/ui/ParticleBackground";
 import EarnedBadgesDisplay from "@/components/ui/EarnedBadgesDisplay";
 import WalletLinkButton from "@/components/ui/WalletLinkButton";
-import apiClient, { fetchUserProfileOverview, updateUserProfileOverview } from "@/services/api";
-import type { TimelineEntry, UserProfileOverviewResponse, UserProfileOverviewUpdate } from "@/types/profile";
+import apiClient, {
+  deleteUserAIMemoryFact,
+  fetchUserAIMemoryFacts,
+  fetchUserProfileOverview,
+  updateUserProfileOverview,
+} from "@/services/api";
+import type { AIMemoryFact, TimelineEntry, UserProfileOverviewResponse, UserProfileOverviewUpdate } from "@/types/profile";
 
 
 
@@ -76,6 +81,7 @@ type ProfileFormState = {
   consent_research: boolean;
   consent_emergency_contact: boolean;
   consent_marketing: boolean;
+  consent_ai_memory: boolean;
 };
 
 const timelineIcons: Record<string, React.JSX.Element> = {
@@ -203,6 +209,7 @@ function mapProfileToForm(profile: UserProfileOverviewResponse): ProfileFormStat
     consent_research: profile.consent.consent_research,
     consent_emergency_contact: profile.consent.consent_emergency_contact,
     consent_marketing: profile.consent.consent_marketing,
+    consent_ai_memory: profile.consent.consent_ai_memory,
   };
 }
 
@@ -243,6 +250,7 @@ const buildUpdatePayload = (state: ProfileFormState): UserProfileOverviewUpdate 
   consent_research: state.consent_research,
   consent_emergency_contact: state.consent_emergency_contact,
   consent_marketing: state.consent_marketing,
+  consent_ai_memory: state.consent_ai_memory,
 });
 
 
@@ -272,6 +280,10 @@ export default function ProfilePage() {
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [form, setForm] = useState<ProfileFormState | null>(null);
   const [showAllTimelineEntries, setShowAllTimelineEntries] = useState(false);
+
+  const [aiMemoryFacts, setAiMemoryFacts] = useState<AIMemoryFact[]>([]);
+  const [aiMemoryFactsLoading, setAiMemoryFactsLoading] = useState(false);
+  const [aiMemoryFactsError, setAiMemoryFactsError] = useState<string | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -308,6 +320,18 @@ export default function ProfilePage() {
       setAllowCheckins(data.consent.allow_email_checkins);
       setForm(mapProfileToForm(data));
       setShowAllTimelineEntries(false);
+
+      setAiMemoryFactsLoading(true);
+      setAiMemoryFactsError(null);
+      try {
+        const facts = await fetchUserAIMemoryFacts();
+        setAiMemoryFacts(facts);
+      } catch (error) {
+        console.warn("Failed to load AI memory facts (non-critical)", error);
+        setAiMemoryFactsError("We could not load your AI memory facts right now.");
+      } finally {
+        setAiMemoryFactsLoading(false);
+      }
     } catch (error) {
       console.error("Failed to load profile overview", error);
       setProfileError(
@@ -338,6 +362,35 @@ export default function ProfilePage() {
       setAllowCheckins((prev) => !prev);
     } finally {
       setIsSavingCheckinSetting(false);
+    }
+  };
+
+  const handleAIMemoryConsentToggle = async (enabled: boolean) => {
+    if (!profile || !form) {
+      return;
+    }
+
+    setForm((prev) => (prev ? { ...prev, consent_ai_memory: enabled } : prev));
+    try {
+      const updated = await updateUserProfileOverview({ consent_ai_memory: enabled });
+      setProfile(updated);
+      toast.success(enabled ? "AI memory enabled" : "AI memory disabled");
+    } catch (error) {
+      console.error("Failed to update AI memory consent", error);
+      toast.error("Failed to update AI memory consent");
+      // Revert local state
+      setForm(mapProfileToForm(profile));
+    }
+  };
+
+  const handleForgetAIMemoryFact = async (factId: number) => {
+    try {
+      await deleteUserAIMemoryFact(factId);
+      setAiMemoryFacts((prev) => prev.filter((f) => f.id !== factId));
+      toast.success("Forgot memory fact");
+    } catch (error) {
+      console.error("Failed to forget AI memory fact", error);
+      toast.error("Failed to forget memory fact");
     }
   };
 
@@ -958,6 +1011,67 @@ export default function ProfilePage() {
                 {checkinSettingError && (
                   <p className="text-xs text-red-400">{checkinSettingError}</p>
                 )}
+
+                <div className="flex items-center justify-between text-xs text-white/60">
+                  <span>Allow Aika to remember facts about you</span>
+                  <Switch
+                    checked={form?.consent_ai_memory ?? profile.consent.consent_ai_memory}
+                    onChange={handleAIMemoryConsentToggle}
+                    className={clsx(
+                      "relative inline-flex h-6 w-11 items-center rounded-full transition focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/80 focus:ring-offset-2 focus:ring-offset-gray-900",
+                      (form?.consent_ai_memory ?? profile.consent.consent_ai_memory) ? "bg-[#FFCA40]" : "bg-gray-600",
+                    )}
+                  >
+                    <span className="sr-only">Toggle AI memory</span>
+                    <span
+                      className={clsx(
+                        "inline-block h-4 w-4 transform rounded-full bg-white transition",
+                        (form?.consent_ai_memory ?? profile.consent.consent_ai_memory) ? "translate-x-6" : "translate-x-1",
+                      )}
+                    />
+                  </Switch>
+                </div>
+
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                  <p className="text-xs uppercase tracking-wide text-white/50">Remembered facts</p>
+                  {aiMemoryFactsLoading ? (
+                    <p className="mt-2 text-sm text-white/60">Loading…</p>
+                  ) : aiMemoryFactsError ? (
+                    <p className="mt-2 text-sm text-red-400">{aiMemoryFactsError}</p>
+                  ) : !aiMemoryFacts.length ? (
+                    <p className="mt-2 text-sm text-white/60">No facts saved yet.</p>
+                  ) : (
+                    <div className="mt-3 overflow-x-auto">
+                      <table className="min-w-full text-left text-sm">
+                        <thead className="text-xs uppercase tracking-wide text-white/40">
+                          <tr>
+                            <th className="py-2 pr-4">Fact</th>
+                            <th className="py-2 pr-4">Learned</th>
+                            <th className="py-2">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/10">
+                          {aiMemoryFacts.map((fact) => (
+                            <tr key={fact.id}>
+                              <td className="py-3 pr-4 text-white/80">{fact.fact}</td>
+                              <td className="py-3 pr-4 text-white/60">{format(new Date(fact.created_at), "PP")}</td>
+                              <td className="py-3">
+                                <button
+                                  type="button"
+                                  onClick={() => handleForgetAIMemoryFact(fact.id)}
+                                  className="inline-flex items-center gap-2 rounded-full border border-white/20 px-3 py-1 text-xs font-medium uppercase tracking-wide text-white transition hover:border-[#FFCA40] hover:text-[#FFCA40]"
+                                >
+                                  Forget
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+
                 <ul className="space-y-2 text-sm text-white/80">
                   <li className="flex items-center gap-2">
                     {profile.consent.consent_data_sharing ? (

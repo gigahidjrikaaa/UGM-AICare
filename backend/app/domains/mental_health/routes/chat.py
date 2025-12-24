@@ -22,7 +22,6 @@ from fastapi import (
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
-from langgraph.checkpoint.memory import MemorySaver
 
 from app import auth_utils
 from app.agents.aika.tools import get_aika_tools
@@ -42,6 +41,12 @@ from app.domains.mental_health.services.personal_context import (
     invalidate_user_personal_context,
 )
 from app.domains.mental_health.services.tool_calling import generate_with_tools
+
+from app.core.langgraph_checkpointer import get_langgraph_checkpointer
+from app.services.ai_memory_facts_service import (
+    list_user_fact_texts_for_agent,
+    remember_from_user_message,
+)
 
 from dataclasses import dataclass
 from typing import Optional, List, Dict, Any
@@ -134,10 +139,16 @@ async def process_chat_message(
             f"🤖 Invoking Aika Agent (LangGraph) for user {current_user.id}, role={user_role}"
         )
         
-        # Create Aika agent with in-memory checkpointing
-        # For production, consider AsyncSqliteSaver for persistence
-        memory = MemorySaver()
-        aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=memory)
+        # Create Aika agent with app-lifetime checkpointing (Postgres when available)
+        checkpointer = get_langgraph_checkpointer()
+        if checkpointer is None:
+            # Dev fallback
+            from langgraph.checkpoint.memory import MemorySaver
+            checkpointer = MemorySaver()
+        aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=checkpointer)
+
+        # Inject user-controlled cross-conversation memory facts (consent-gated for agent use)
+        remembered_facts = await list_user_fact_texts_for_agent(db, current_user, limit=20)
         
         # Prepare initial state for LangGraph
         initial_state = {
@@ -146,6 +157,9 @@ async def process_chat_message(
             "message": request.message,
             "conversation_history": conversation_history,
             "session_id": session_id,
+            "personal_context": {
+                "remembered_facts": remembered_facts,
+            },
         }
         
         # Invoke Aika agent directly (no wrapper needed - the graph IS the agent)
@@ -199,6 +213,9 @@ async def process_chat_message(
             "risk_level": result.get("sta_risk_assessment", {}).get("risk_level") or result.get("severity"),
             "risk_score": result.get("sta_risk_assessment", {}).get("risk_score") or result.get("risk_score"),
         }
+
+        # Best-effort memory write (consent-gated)
+        await remember_from_user_message(db, current_user, request.message, source="conversation")
 
         return ChatProcessingResult(
             response_text=final_response,
@@ -434,9 +451,20 @@ async def handle_aika_request(
                 }
             )
             
-            # Create Aika agent with in-memory checkpointing
-            memory = MemorySaver()
-            aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=memory)
+            # Create Aika agent with app-lifetime checkpointing (Postgres when available)
+            checkpointer = get_langgraph_checkpointer()
+            if checkpointer is None:
+                from langgraph.checkpoint.memory import MemorySaver
+                checkpointer = MemorySaver()
+            aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=checkpointer)
+
+            # Inject user-controlled cross-conversation memory facts (consent-gated for agent use)
+            user_obj = await db.get(User, request.user_id)
+            remembered_facts = (
+                await list_user_fact_texts_for_agent(db, user_obj, limit=20)
+                if user_obj is not None
+                else []
+            )
             
             # Generate user hash for privacy
             import hashlib
@@ -450,6 +478,9 @@ async def handle_aika_request(
                 "message": request.message,
                 "conversation_history": request.conversation_history,
                 "session_id": effective_session_id,
+                "personal_context": {
+                    "remembered_facts": remembered_facts,
+                },
                 "execution_id": execution_id,  # ✅ Added for tracking
                 "execution_path": [],
                 "agents_invoked": [],

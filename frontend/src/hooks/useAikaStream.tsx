@@ -75,7 +75,10 @@ export function useAikaStream() {
         throw new Error('Not authenticated');
       }
 
-      const response = await fetch('/api/v1/aika/stream', {
+      const apiOrigin = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const endpoint = apiOrigin ? `${apiOrigin}/api/v1/aika/stream` : '/api/v1/aika/stream';
+
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

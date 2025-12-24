@@ -12,7 +12,7 @@ services:
     volumes:
       - pgdata_dev:/var/lib/postgresql/data # Persist data
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-22002}:5432"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
@@ -31,7 +31,7 @@ services:
     volumes:
       - redisdata_dev:/data
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_PORT:-22003}:6379"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -54,8 +54,8 @@ services:
     volumes:
       - minio_data_dev:/data
     ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "${MINIO_PORT:-22004}:9000"
+      - "${MINIO_CONSOLE_PORT:-22005}:9001"
     restart: unless-stopped
     networks:
       - internal_network_dev
@@ -133,7 +133,7 @@ services:
         uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app --log-level info
       "
     ports:
-      - "8000:8000"
+      - "${BACKEND_EXTERNAL_PORT:-22001}:8000"
     # Resource limits to prevent memory issues
     deploy:
       resources:
@@ -160,7 +160,7 @@ services:
       # App URLs
       FRONTEND_URL: ${FRONTEND_URL}
       BACKEND_URL: ${BACKEND_URL}
-      ALLOWED_ORIGINS: "https://aicare.ina17.com,http://localhost:4000,http://127.0.0.1:4000,http://localhost:3000,http://127.0.0.1:3000,http://frontend:4000,http://backend:8000"
+      ALLOWED_ORIGINS: "https://aicare.ina17.com,http://localhost:22000,http://127.0.0.1:22000,http://localhost:3000,http://127.0.0.1:3000,http://frontend:3000,http://backend:8000"
       
       # Redis
       REDIS_HOST: redis
@@ -218,7 +218,7 @@ services:
       args:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     ports:
-      - "4000:3000"
+      - "${FRONTEND_EXTERNAL_PORT:-22000}:3000"
     # Resource limits
     deploy:
       resources:

@@ -76,6 +76,7 @@ class User(Base):
     consent_research: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     consent_emergency_contact: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     consent_marketing: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    consent_ai_memory: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     
     # Preferences
     preferred_language: Mapped[Optional[str]] = mapped_column(String, nullable=True)

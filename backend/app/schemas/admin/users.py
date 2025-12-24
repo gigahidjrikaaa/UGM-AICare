@@ -85,6 +85,7 @@ class UserDetailResponse(BaseModel):
     consent_research: Optional[bool] = None
     consent_emergency_contact: Optional[bool] = None
     consent_marketing: Optional[bool] = None
+    consent_ai_memory: Optional[bool] = None
     preferred_language: Optional[str] = None
     preferred_timezone: Optional[str] = None
     accessibility_needs: Optional[str] = None

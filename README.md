@@ -14,7 +14,6 @@
 
 - Next.js: **16.0.7** (was 16.0.0)
 
-
 ## 🐳 Docker Compose (Profiles)
 
 This repository uses Docker Compose **profiles** to reduce duplicated compose files. The canonical Compose files live in `infra/compose/`.
@@ -38,6 +37,14 @@ docker compose -f infra/compose/docker-compose.prod.yml --env-file .env --profil
 
 If you prefer scripts, `./dev.sh` wraps the most common local commands.
 
+## Development and split-subdomain deployment
+
+The repository is commonly deployed with distinct subdomains:
+
+- Frontend: `https://aicare.sumbu.xyz`
+- Backend: `https://api.aicare.sumbu.xyz`
+
+For local development, a typical configuration is `NEXTAUTH_URL=http://localhost:22000` and `NEXT_PUBLIC_API_URL=http://localhost:22001`.
 
 ### 1.1 The Challenge
 

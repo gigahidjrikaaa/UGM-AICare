@@ -13,15 +13,15 @@ import type {
   Appointment
 } from '@/types/api'; // Import types
 import toast from 'react-hot-toast';
-import type { UserProfileOverviewResponse, UserProfileOverviewUpdate } from '@/types/profile';
+import type { AIMemoryFact, UserProfileOverviewResponse, UserProfileOverviewUpdate } from '@/types/profile';
 import { signOut } from 'next-auth/react';
 
 // Define the base URL for your backend API
 // Use NEXT_PUBLIC_API_URL for client-side requests (browser)
 // INTERNAL_API_URL is only for server-side requests (SSR/API routes)
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL 
-  ? `${process.env.NEXT_PUBLIC_API_URL}/api/v1`
-  : 'http://localhost:8000/api/v1'; // Fallback for local development
+const apiOrigin = (process.env.NEXT_PUBLIC_API_URL || "").replace(/\/$/, "");
+// If NEXT_PUBLIC_API_URL is not set, use relative URLs so Next.js can proxy via rewrites.
+const API_BASE_URL = apiOrigin ? `${apiOrigin}/api/v1` : "/api/v1";
 
 
 const apiClient = axios.create({
@@ -84,6 +84,16 @@ apiClient.interceptors.response.use(
 );
 
 export default apiClient; // Export the configured client if needed elsewhere
+
+// --- Profile: AI Memory Facts ---
+export const fetchUserAIMemoryFacts = async (): Promise<AIMemoryFact[]> => {
+  const response = await apiClient.get<AIMemoryFact[]>("/profile/ai-memory/facts");
+  return response.data;
+};
+
+export const deleteUserAIMemoryFact = async (factId: number): Promise<void> => {
+  await apiClient.delete(`/profile/ai-memory/facts/${factId}`);
+};
 
 /**
  * Sends conversation history to the backend chat endpoint and retrieves the AI response.

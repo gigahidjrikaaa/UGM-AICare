@@ -73,12 +73,12 @@ case "${1:-deploy}" in
             echo "" >> .env
             echo "# Langfuse Configuration (Auto-generated)" >> .env
             echo "LANGFUSE_ENABLED=true" >> .env
-            echo "LANGFUSE_HOST=http://localhost:8262" >> .env
+            echo "LANGFUSE_HOST=http://localhost:22016" >> .env
             echo "LANGFUSE_SECRET=$LANGFUSE_SECRET" >> .env
             echo "LANGFUSE_SALT=$LANGFUSE_SALT" >> .env
             echo "LANGFUSE_PUBLIC_KEY=pk-lf-your-public-key-here" >> .env
             echo "LANGFUSE_SECRET_KEY=sk-lf-your-secret-key-here" >> .env
-            echo "LANGFUSE_NEXTAUTH_URL=http://localhost:8262" >> .env
+            echo "LANGFUSE_NEXTAUTH_URL=http://localhost:22016" >> .env
             echo "✓ Langfuse secrets added to .env"
         fi
         
@@ -110,18 +110,17 @@ case "${1:-deploy}" in
         echo "========================================="
         echo ""
         echo "Application:"
-        echo "  • Backend:  http://localhost:${BACKEND_EXTERNAL_PORT:-20002}"
-        echo "  • Frontend: http://localhost:${FRONTEND_EXTERNAL_PORT:-20001}"
+        echo "  • Backend:  http://localhost:${BACKEND_EXTERNAL_PORT:-22001}"
+        echo "  • Frontend: http://localhost:${FRONTEND_EXTERNAL_PORT:-22000}"
         echo ""
         echo "Monitoring Stack:"
-        echo "  • Kibana (Logs):       http://localhost:8254"
-        echo "  • Grafana (Metrics):   http://localhost:8256 (admin/\$GRAFANA_ADMIN_PASSWORD)"
-        echo "  • Prometheus:          http://localhost:8255"
-        echo "  • Langfuse (Traces):   http://localhost:8262"
-        echo "  • AlertManager:        http://localhost:8261"
+        echo "  • Kibana (Logs):       http://localhost:22024"
+        echo "  • Grafana (Metrics):   http://localhost:22011 (admin/\$GRAFANA_ADMIN_PASSWORD)"
+        echo "  • Prometheus:          http://localhost:22010"
+        echo "  • Langfuse (Traces):   http://localhost:22016"
         echo ""
         echo "📝 Next Steps for Langfuse:"
-        echo "  1. Access http://localhost:8262"
+        echo "  1. Access http://localhost:22016"
         echo "  2. Create account and project: 'ugm-aicare-agents'"
         echo "  3. Go to Settings → API Keys → Create new key"
         echo "  4. Update .env with:"
@@ -200,7 +199,7 @@ case "${1:-deploy}" in
 # Langfuse (Agent Tracing & LLM Observability)
 # ============================================
 LANGFUSE_ENABLED=true
-LANGFUSE_HOST=http://localhost:8262
+LANGFUSE_HOST=http://localhost:22016
 LANGFUSE_SECRET=$LANGFUSE_SECRET
 LANGFUSE_SALT=$LANGFUSE_SALT
 # Note: Generate LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY from Langfuse UI after first start
@@ -226,7 +225,7 @@ EOL
         MAX_RETRIES=10
         RETRY_COUNT=0
         while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-            if curl -s http://localhost:8262/api/public/health > /dev/null 2>&1; then
+            if curl -s http://localhost:22016/api/public/health > /dev/null 2>&1; then
                 echo "✓ Langfuse is healthy!"
                 break
             fi
@@ -252,7 +251,7 @@ EOL
         echo "📝 Next Steps:"
         echo ""
         echo "1. Access Langfuse UI:"
-        echo "   → http://your-server-ip:8262"
+        echo "   → http://your-server-ip:22016"
         echo "   (Configure reverse proxy for HTTPS access)"
         echo ""
         echo "2. Complete initial setup:"

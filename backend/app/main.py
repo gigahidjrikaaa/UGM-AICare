@@ -100,6 +100,13 @@ async def lifespan(app: FastAPI):
     if inspect.isawaitable(db_result):
         await db_result
 
+    # Initialize LangGraph durable checkpointer (Postgres)
+    try:
+        from app.core.langgraph_checkpointer import init_langgraph_checkpointer
+        await init_langgraph_checkpointer()
+    except Exception:
+        logger.warning("LangGraph checkpointer init failed (non-blocking)", exc_info=True)
+
     # Initialize blockchain connection (EDU Chain NFT)
     from app.domains.blockchain import init_nft_client
     nft_result = init_nft_client()
@@ -126,6 +133,11 @@ async def lifespan(app: FastAPI):
     stop_finance_scheduler()
     logger.info("Finance revenue scheduler stopped")
     # Close database connections
+    try:
+        from app.core.langgraph_checkpointer import close_langgraph_checkpointer
+        await close_langgraph_checkpointer()
+    except Exception:
+        logger.warning("LangGraph checkpointer shutdown failed (non-blocking)", exc_info=True)
     await close_db()
 
 # You will need to add the lifespan manager to your FastAPI app instance.

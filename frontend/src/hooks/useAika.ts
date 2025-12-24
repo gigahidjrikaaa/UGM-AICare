@@ -104,6 +104,9 @@ export function useAika(options: UseAikaOptions = {}) {
     setError(null);
 
     try {
+      const apiOrigin = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+      const endpoint = apiOrigin ? `${apiOrigin}/api/v1/aika` : '/api/v1/aika';
+
       const requestBody: AikaRequest = {
         user_id: parseInt(session.user.id),
         role,
@@ -112,7 +115,7 @@ export function useAika(options: UseAikaOptions = {}) {
         preferred_model: preferredModel,
       };
 
-      const response = await fetch('/api/v1/aika', {
+      const response = await fetch(endpoint, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

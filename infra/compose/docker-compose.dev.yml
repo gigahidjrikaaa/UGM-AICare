@@ -12,7 +12,7 @@ services:
     volumes:
       - pgdata_dev:/var/lib/postgresql/data
     ports:
-      - "${POSTGRES_PORT:-5432}:5432"
+      - "${POSTGRES_PORT:-22002}:5432"
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
@@ -31,7 +31,7 @@ services:
     volumes:
       - redisdata_dev:/data
     ports:
-      - "${REDIS_PORT:-6379}:6379"
+      - "${REDIS_PORT:-22003}:6379"
     restart: unless-stopped
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
@@ -54,8 +54,8 @@ services:
     volumes:
       - minio_data_dev:/data
     ports:
-      - "${MINIO_PORT:-9000}:9000"
-      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+      - "${MINIO_PORT:-22004}:9000"
+      - "${MINIO_CONSOLE_PORT:-22005}:9001"
     restart: unless-stopped
     networks:
       - internal_network_dev
@@ -126,10 +126,17 @@ services:
     command: >
       bash -c "
         echo 'Starting backend with hot reload...' &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app --log-level info
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 \
+          --reload \
+          --reload-dir /app/app \
+          --reload-include '*.py' \
+          --reload-exclude '**/__pycache__/**' \
+          --reload-exclude '**/.venv/**' \
+          --reload-exclude '**/node_modules/**' \
+          --log-level info
       "
     ports:
-      - "8000:8000"
+      - "${BACKEND_EXTERNAL_PORT:-22001}:8000"
     deploy:
       resources:
         limits:
@@ -152,7 +159,7 @@ services:
 
       FRONTEND_URL: ${FRONTEND_URL}
       BACKEND_URL: ${BACKEND_URL}
-      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-http://localhost:4000,http://127.0.0.1:4000,http://localhost:3000,http://127.0.0.1:3000}"
+      ALLOWED_ORIGINS: "${ALLOWED_ORIGINS:-http://localhost:22000,http://127.0.0.1:22000,http://localhost:3000,http://127.0.0.1:3000}"
 
       REDIS_HOST: redis
       REDIS_PORT: 6379
@@ -202,9 +209,9 @@ services:
       dockerfile: Dockerfile
       target: development
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
     ports:
-      - "4000:3000"
+      - "${FRONTEND_EXTERNAL_PORT:-22000}:3000"
     deploy:
       resources:
         limits:
@@ -216,7 +223,7 @@ services:
     environment:
       NODE_ENV: development
       PORT: 3000
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
       INTERNAL_API_URL: http://backend:8000
@@ -240,7 +247,7 @@ services:
     container_name: ugm_aicare_prometheus_dev
     user: root
     ports:
-      - "8255:9090"
+      - "22010:9090"
     volumes:
       - prometheus-data-dev:/prometheus
     command:
@@ -266,12 +273,12 @@ services:
     image: grafana/grafana:10.2.2
     container_name: ugm_aicare_grafana_dev
     ports:
-      - "8256:3000"
+      - "22011:3000"
     environment:
       GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
       GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-admin}
       GF_USERS_ALLOW_SIGN_UP: "false"
-      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:8256}
+      GF_SERVER_ROOT_URL: ${GRAFANA_ROOT_URL:-http://localhost:22011}
       GF_ANALYTICS_REPORTING_ENABLED: "false"
       GF_ANALYTICS_CHECK_FOR_UPDATES: "false"
     volumes:
@@ -295,7 +302,7 @@ services:
     image: prom/node-exporter:v1.7.0
     container_name: ugm_aicare_node_exporter_dev
     ports:
-      - "8257:9100"
+      - "22012:9100"
     command:
       - '--path.rootfs=/host'
       - '--path.procfs=/host/proc'
@@ -314,7 +321,7 @@ services:
     image: gcr.io/cadvisor/cadvisor:v0.47.2
     container_name: ugm_aicare_cadvisor_dev
     ports:
-      - "8258:8080"
+      - "22013:8080"
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
@@ -333,7 +340,7 @@ services:
     image: prometheuscommunity/postgres-exporter:v0.15.0
     container_name: ugm_aicare_postgres_exporter_dev
     ports:
-      - "8259:9187"
+      - "22014:9187"
     environment:
       DATA_SOURCE_NAME: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}?sslmode=disable"
     networks:
@@ -346,7 +353,7 @@ services:
     image: oliver006/redis_exporter:v1.55.0
     container_name: ugm_aicare_redis_exporter_dev
     ports:
-      - "8260:9121"
+      - "22015:9121"
     environment:
       REDIS_ADDR: "redis:6379"
     networks:
@@ -359,11 +366,11 @@ services:
     image: ghcr.io/langfuse/langfuse:2
     container_name: ugm_aicare_langfuse_dev
     ports:
-      - "8262:3000"
+      - "22016:3000"
     environment:
       NODE_ENV: production
       DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/langfuse_db?schema=public"
-      NEXTAUTH_URL: ${LANGFUSE_PUBLIC_URL:-http://localhost:8262}
+      NEXTAUTH_URL: ${LANGFUSE_PUBLIC_URL:-http://localhost:22016}
       NEXTAUTH_SECRET: ${LANGFUSE_SECRET:-dev-only-change-me-please}
       SALT: ${LANGFUSE_SALT:-dev-only-change-me-too}
       TELEMETRY_ENABLED: "false"
@@ -384,7 +391,7 @@ services:
     image: grafana/loki:2.9.3
     container_name: ugm_aicare_loki_dev
     ports:
-      - "3100:3100"
+      - "22030:3100"
     command: -config.file=/etc/loki/local-config.yaml
     volumes:
       - ../loki/loki-config.yaml:/etc/loki/local-config.yaml:ro
@@ -423,8 +430,8 @@ services:
       http.host: 0.0.0.0
       transport.host: 127.0.0.1
     ports:
-      - "8250:9200"
-      - "8251:9300"
+      - "22020:9200"
+      - "22021:9300"
     volumes:
       - elasticsearch-data-dev:/usr/share/elasticsearch/data
     networks:
@@ -445,9 +452,9 @@ services:
       - ../elk/logstash/pipeline:/usr/share/logstash/pipeline:ro
       - ../elk/logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml:ro
     ports:
-      - "8252:5000/tcp"
-      - "8252:5000/udp"
-      - "8253:9600"
+      - "22022:5000/tcp"
+      - "22022:5000/udp"
+      - "22023:9600"
     environment:
       LS_JAVA_OPTS: "-Xmx512m -Xms512m"
     depends_on:
@@ -468,7 +475,7 @@ services:
     image: docker.elastic.co/kibana/kibana:8.11.0
     container_name: ugm_aicare_kibana_dev
     ports:
-      - "8254:5601"
+      - "22024:5601"
     environment:
       ELASTICSEARCH_HOSTS: http://elasticsearch:9200
       SERVER_NAME: ugm-aicare-kibana
