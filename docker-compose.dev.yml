@@ -1,132 +1,14 @@
+# docker-compose.dev.yml
+# Development environment - backend & frontend with hot reload
+# External services: PostgreSQL, Redis, S3 (configured in .env)
+# Usage: docker compose -f docker-compose.base.yml -f docker-compose.dev.yml up -d
+
 services:
   #################
-  # Database (PostgreSQL)
-  #################
-  db:
-    image: postgres:16-alpine # Using Alpine for smaller size
-    container_name: ugm_aicare_db_dev
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB} # Use default if not set in .env
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - pgdata_dev:/var/lib/postgresql/data # Persist data
-    ports:
-      - "${POSTGRES_PORT:-22002}:5432"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - internal_network_dev
-
-  #################
-  # Cache (Redis)
-  #################
-  redis:
-    image: redis/redis-stack-server:latest
-    container_name: ugm_aicare_redis_dev
-    volumes:
-      - redisdata_dev:/data
-    ports:
-      - "${REDIS_PORT:-22003}:6379"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - internal_network_dev
-
-  #################
-  # Object Storage (MinIO)
-  #################
-  minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
-    container_name: ugm_aicare_minio_dev
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio_data_dev:/data
-    ports:
-      - "${MINIO_PORT:-22004}:9000"
-      - "${MINIO_CONSOLE_PORT:-22005}:9001"
-    restart: unless-stopped
-    networks:
-      - internal_network_dev
-
-  #################
-  # Migration Service
-  #################
-  migrate:
-    container_name: ugm_aicare_migrate_dev
-    build:
-      context: ./backend
-      dockerfile: app/Dockerfile.migrate  # Use lightweight migration-only Dockerfile
-    entrypoint: >
-      bash -c "
-        set -e
-        echo '[migrate] Waiting for database...'
-        /app/scripts/wait-for-it.sh db:5432 -t 60 -- echo '[migrate] Database is ready!'
-        
-        echo '[migrate] Running Alembic migrations...'
-        if alembic upgrade head; then
-          echo '[migrate] ✓ Migrations completed successfully'
-          exit 0
-        fi
-        
-        echo '[migrate] ⚠ Initial migration attempt failed'
-        
-        # Check if it's a revision chain issue
-        CURRENT_REV=\$$(psql -t -A postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB} -c \"SELECT version_num FROM alembic_version LIMIT 1\" 2>/dev/null || echo '')
-        if [ -n \"\$$CURRENT_REV\" ]; then
-          echo \"[migrate] Current revision: \$$CURRENT_REV\"
-          
-          # Check if the revision exists in migration files
-          if ! grep -r \"revision = '\$$CURRENT_REV'\" /app/alembic/versions/ >/dev/null 2>&1; then
-            echo '[migrate] ⚠ Revision not found in migration files - stamping to head'
-            alembic stamp head
-            echo '[migrate] ✓ Database stamped at head'
-            exit 0
-          fi
-        fi
-        
-        echo '[migrate] Attempting fresh migration...'
-        psql postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB} -c 'TRUNCATE TABLE alembic_version;' 2>/dev/null || true
-        
-        if alembic upgrade head; then
-          echo '[migrate] ✓ Migrations completed after retry'
-          exit 0
-        fi
-        
-        echo '[migrate] ✗ Migration failed after all attempts'
-        exit 1
-      "
-    env_file:
-      - .env
-    environment:
-      PYTHONPATH: /app
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - internal_network_dev
-
-  #################
-  # Backend (FastAPI)
+  # Backend (FastAPI) - DEV (hot reload)
   #################
   backend:
     container_name: ugm_aicare_backend_dev
-    build:
-      context: ./backend
-      dockerfile: app/Dockerfile
-    # Override CMD for development with hot reload
     command: >
       bash -c "
         echo '🚀 Starting backend with hot reload...' &&
@@ -134,120 +16,63 @@ services:
       "
     ports:
       - "${BACKEND_EXTERNAL_PORT:-22001}:8000"
-    # Resource limits to prevent memory issues
     deploy:
       resources:
         limits:
           memory: 2G
         reservations:
           memory: 1G
-    env_file:
-      - .env
     environment:
-      # Database connection
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      
-      # Admin & Counselor credentials
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       COUNSELOR_EMAIL: ${COUNSELOR_EMAIL}
       COUNSELOR_PASSWORD: ${COUNSELOR_PASSWORD}
       COUNSELOR_NAME: ${COUNSELOR_NAME:-Main Counselor}
-      
-      # App URLs
       FRONTEND_URL: ${FRONTEND_URL}
       BACKEND_URL: ${BACKEND_URL}
       ALLOWED_ORIGINS: "https://aicare.ina17.com,http://localhost:22000,http://127.0.0.1:22000,http://localhost:3000,http://127.0.0.1:3000,http://frontend:3000,http://backend:8000"
-      
-      # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_USERNAME: ""
-      REDIS_PASSWORD: ""
-      REDIS_URL: ""
-      
-      # Environment
-      APP_ENV: development # Explicitly set for development
-      PYTHONPATH: /app
-      
-      # MinIO
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
-      MINIO_BUCKET: ${MINIO_BUCKET:-content-resources}
-      MINIO_SECURE: ${MINIO_SECURE:-false}
-      
-      # Security
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      EMAIL_ENCRYPTION_KEY: ${EMAIL_ENCRYPTION_KEY}
-
-      # Langfuse (Dev Override)
+      APP_ENV: development
       LANGFUSE_ENABLED: "false"
       LANGFUSE_HOST: "http://langfuse-server:3000"
-      # OTEL_EXPORTER_OTLP_TRACES_ENDPOINT: "http://langfuse-server:3000/api/public/otel/v1/traces"
     volumes:
-      - ./backend:/app # Mount backend code for live reloading
-      - /app/.venv # Exclude virtual env from mount
-      - /app/__pycache__ # Exclude pycache
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      minio:
-        condition: service_started
+      - ./backend:/app
+      - /app/.venv
+      - /app/__pycache__
     restart: unless-stopped
     networks:
-      internal_network_dev: {}
+      - internal_network_dev
     dns: 8.8.8.8
 
   #################
-  # Frontend (Next.js)
+  # Frontend (Next.js) - DEV (hot reload)
   #################
   frontend:
     container_name: ugm_aicare_frontend_dev
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: development # Assuming a development stage in Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      target: development
     ports:
       - "${FRONTEND_EXTERNAL_PORT:-22000}:3000"
-    # Resource limits
     deploy:
       resources:
         limits:
           memory: 4G
         reservations:
           memory: 2G
-    env_file:
-      - .env
     environment:
       NODE_ENV: development
-      PORT: 3000
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      INTERNAL_API_URL: http://backend:8000
     volumes:
-      - ./frontend:/app # Mount frontend code for live reloading
-      - /app/node_modules # Exclude node_modules from host mount
-    depends_on:
-      - backend
+      - ./frontend:/app
+      - /app/node_modules
     restart: unless-stopped
     networks:
       - internal_network_dev
 
-volumes:
-  pgdata_dev:
-  redisdata_dev:
-  minio_data_dev:
+volumes: {}
 
 networks:
   internal_network_dev:

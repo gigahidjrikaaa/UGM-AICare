@@ -1,0 +1,65 @@
+# docker-compose.base.yml
+# Shared service definitions - only application containers
+# Database, Redis, and S3 storage are managed services (external)
+# Individual environment files extend/override these settings
+
+services:
+  #################
+  # Backend (FastAPI)
+  #################
+  backend:
+    build:
+      context: ./backend
+      dockerfile: app/Dockerfile
+    env_file:
+      - .env
+    environment:
+      # Database (managed service)
+      DATABASE_URL: ${DATABASE_URL}
+      
+      # Cache (managed service)
+      REDIS_HOST: ${REDIS_HOST}
+      REDIS_PORT: ${REDIS_PORT:-6379}
+      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
+      REDIS_USERNAME: ${REDIS_USERNAME:-}
+      REDIS_URL: ${REDIS_URL:-}
+      
+      # S3 Storage (managed service)
+      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
+      MINIO_BUCKET: ${MINIO_BUCKET:-content-resources}
+      MINIO_SECURE: ${MINIO_SECURE:-true}
+      
+      # Security & App Config
+      PYTHONPATH: /app
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
+      EMAIL_ENCRYPTION_KEY: ${EMAIL_ENCRYPTION_KEY}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+
+  #################
+  # Frontend (Next.js)
+  #################
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    environment:
+      PORT: 3000
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      INTERNAL_API_URL: http://backend:8000
+    depends_on:
+      - backend
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:3000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped

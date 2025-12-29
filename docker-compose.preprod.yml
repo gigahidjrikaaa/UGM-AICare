@@ -1,216 +1,67 @@
+# docker-compose.preprod.yml
+# Pre-production environment - production build, no hot reload
+# External services: PostgreSQL, Redis, S3 (configured in .env)
+# Usage: docker compose -f docker-compose.base.yml -f docker-compose.preprod.yml up -d
+
 services:
   #################
-  # Database (PostgreSQL)
-  #################
-  db:
-    image: postgres:16-alpine # Using Alpine for smaller size
-    container_name: ugm_aicare_db_dev
-    environment:
-      POSTGRES_DB: ${POSTGRES_DB} # Use default if not set in .env
-      POSTGRES_USER: ${POSTGRES_USER}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-    volumes:
-      - pgdata_dev:/var/lib/postgresql/data # Persist data
-    ports:
-      - "${POSTGRES_PORT:-22002}:5432"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -h localhost -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - internal_network_dev
-
-  #################
-  # Cache (Redis)
-  #################
-  redis:
-    image: redis/redis-stack-server:latest
-    container_name: ugm_aicare_redis_dev
-    volumes:
-      - redisdata_dev:/data
-    ports:
-      - "${REDIS_PORT:-22003}:6379"
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-    networks:
-      - internal_network_dev
-
-  #################
-  # Object Storage (MinIO)
-  #################
-  minio:
-    image: minio/minio:RELEASE.2025-09-07T16-13-09Z
-    container_name: ugm_aicare_minio_dev
-    environment:
-      MINIO_ROOT_USER: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_SECRET_KEY:-minioadmin}
-    command: server /data --console-address ":9001"
-    volumes:
-      - minio_data_dev:/data
-    ports:
-      - "${MINIO_PORT:-22004}:9000"
-      - "${MINIO_CONSOLE_PORT:-22005}:9001"
-    restart: unless-stopped
-    networks:
-      - internal_network_dev
-
-  #################
-  # Migration Service
-  #################
-  migrate:
-    container_name: ugm_aicare_migrate_dev
-    build:
-      context: ./backend
-      dockerfile: app/Dockerfile.migrate  # Use lightweight migration-only Dockerfile
-    entrypoint: >
-      bash -c "
-        /app/scripts/wait-for-it.sh db:5432 -t 60 -- echo 'Database is ready!' &&
-        echo 'Running Alembic migrations...' &&
-        if ! alembic upgrade head; then
-          echo 'Migration failed - attempting to fix alembic_version...' &&
-          psql postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB} -c 'DROP TABLE IF EXISTS alembic_version CASCADE;' &&
-          echo 'Retrying migrations...' &&
-          alembic upgrade head
-        fi
-      "
-    env_file:
-      - .env
-    environment:
-      PYTHONPATH: /app
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
-    depends_on:
-      db:
-        condition: service_healthy
-    networks:
-      - internal_network_dev
-
-  #################
-  # Backend (FastAPI) - PREPROD MODE (Production Build)
+  # Backend (FastAPI) - PREPROD (production build)
   #################
   backend:
-    container_name: ugm_aicare_backend_dev
-    build:
-      context: ./backend
-      dockerfile: app/Dockerfile
-      # Default target is production
-    # No command override - use default CMD (gunicorn)
+    container_name: ugm_aicare_backend_preprod
     ports:
       - "${BACKEND_EXTERNAL_PORT:-22001}:8000"
-    # Resource limits to prevent memory issues
     deploy:
       resources:
         limits:
           memory: 2G
         reservations:
           memory: 1G
-    env_file:
-      - .env
     environment:
-      # Database connection
-      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       POSTGRES_USER: ${POSTGRES_USER}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
       POSTGRES_DB: ${POSTGRES_DB}
-      
-      # Admin & Counselor credentials
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       COUNSELOR_EMAIL: ${COUNSELOR_EMAIL}
       COUNSELOR_PASSWORD: ${COUNSELOR_PASSWORD}
       COUNSELOR_NAME: ${COUNSELOR_NAME:-Main Counselor}
-      
-      # App URLs
       FRONTEND_URL: ${FRONTEND_URL}
       BACKEND_URL: ${BACKEND_URL}
       ALLOWED_ORIGINS: "https://aicare.ina17.com,http://localhost:22000,http://127.0.0.1:22000,http://localhost:3000,http://127.0.0.1:3000,http://frontend:3000,http://backend:8000"
-      
-      # Redis
-      REDIS_HOST: redis
-      REDIS_PORT: 6379
-      REDIS_USERNAME: ""
-      REDIS_PASSWORD: ""
-      REDIS_URL: ""
-      
-      # Environment
-      APP_ENV: production # Set to production for preprod
-      PYTHONPATH: /app
-      
-      # MinIO
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT:-minio:9000}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
-      MINIO_BUCKET: ${MINIO_BUCKET:-content-resources}
-      MINIO_SECURE: ${MINIO_SECURE:-false}
-      
-      # Security
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      EMAIL_ENCRYPTION_KEY: ${EMAIL_ENCRYPTION_KEY}
-
-      # Langfuse (Dev Override)
+      APP_ENV: production
       LANGFUSE_ENABLED: "false"
       LANGFUSE_HOST: "http://langfuse-server:3000"
-    # NO VOLUMES - Use built image code
-    depends_on:
-      migrate:
-        condition: service_completed_successfully
-      db:
-        condition: service_healthy
-      redis:
-        condition: service_healthy
-      minio:
-        condition: service_started
     restart: unless-stopped
     networks:
-      internal_network_dev: {}
+      - internal_network_preprod
     dns: 8.8.8.8
 
   #################
-  # Frontend (Next.js) - PREPROD MODE (Production Build)
+  # Frontend (Next.js) - PREPROD (production build)
   #################
   frontend:
-    container_name: ugm_aicare_frontend_dev
+    container_name: ugm_aicare_frontend_preprod
     build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      target: production # Use production target
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      target: production
     ports:
       - "${FRONTEND_EXTERNAL_PORT:-22000}:3000"
-    # Resource limits
     deploy:
       resources:
         limits:
           memory: 4G
         reservations:
           memory: 2G
-    env_file:
-      - .env
     environment:
       NODE_ENV: production
-      PORT: 3000
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
-      INTERNAL_API_URL: http://backend:8000
-    # NO VOLUMES - Use built image code
-    depends_on:
-      - backend
     restart: unless-stopped
     networks:
-      - internal_network_dev
+      - internal_network_preprod
 
-volumes:
-  pgdata_dev:
-  redisdata_dev:
-  minio_data_dev:
+volumes: {}
 
 networks:
-  internal_network_dev:
+  internal_network_preprod:
     driver: bridge
