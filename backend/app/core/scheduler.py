@@ -32,9 +32,9 @@ import random
 import os
 import logging
 import asyncio
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-load_dotenv()
+load_dotenv(find_dotenv())
 logger = logging.getLogger(__name__)
 
 # Use AsyncIOScheduler to work properly with FastAPI's event loop

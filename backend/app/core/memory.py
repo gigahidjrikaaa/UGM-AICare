@@ -7,9 +7,9 @@ import os
 import time
 
 # Load environment variables from .env file
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
-load_dotenv()
+load_dotenv(find_dotenv())
 
 logger = logging.getLogger(__name__)
 

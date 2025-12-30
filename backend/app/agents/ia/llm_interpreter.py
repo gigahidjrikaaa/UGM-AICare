@@ -196,15 +196,17 @@ Pastikan setiap analisis didukung oleh angka spesifik dari data.
             line = line.strip()
             if not line:
                 continue
+
+            is_bullet = line.startswith(("- ", "• ", "* "))
             
             # Detect section headers
-            if "INTERPRETASI" in line.upper():
+            if not is_bullet and "INTERPRETASI" in line.upper():
                 current_section = "interpretation"
-            elif "TREN" in line.upper():
+            elif not is_bullet and "TREN" in line.upper():
                 current_section = "trends"
-            elif "RINGKASAN" in line.upper():
+            elif not is_bullet and "RINGKASAN" in line.upper():
                 current_section = "summary"
-            elif "REKOMENDASI" in line.upper():
+            elif not is_bullet and "REKOMENDASI" in line.upper():
                 current_section = "recommendations"
             elif current_section:
                 # Add content to current section

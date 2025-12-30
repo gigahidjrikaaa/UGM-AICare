@@ -4,7 +4,7 @@
 
 ### Before (Containerized Services)
 
-```
+```text
 8 compose files
 - Database (PostgreSQL) container
 - Redis container
@@ -17,7 +17,7 @@
 
 ### After (Managed Services)
 
-```
+```text
 4 compose files
 - Backend container (only)
 - Frontend container (only)
@@ -35,6 +35,14 @@
 
 ```bash
 docker compose -f docker-compose.base.yml -f docker-compose.dev.yml up -d
+```
+
+Note: The DEV compose is configured for stability (no hot reload).
+
+### Local (no Docker, no reload)
+
+```bash
+./dev.sh local
 ```
 
 ### Pre-production
@@ -85,9 +93,9 @@ See **`MANAGED_SERVICES_SETUP.md`** for complete configuration guide.
 ## 📊 What's in Docker Compose Now
 
 | File | Purpose | Services |
-|------|---------|----------|
+| --- | --- | --- |
 | `docker-compose.base.yml` | Shared config | Backend, Frontend |
-| `docker-compose.dev.yml` | Dev overrides | Backend (hot reload), Frontend (hot reload) |
+| `docker-compose.dev.yml` | Dev overrides | Backend (no reload), Frontend (no reload) |
 | `docker-compose.preprod.yml` | Preprod overrides | Backend (prod build), Frontend (prod build) |
 | `docker-compose.prod.yml` | Prod overrides | Backend (minimal), Frontend (minimal) |
 
@@ -219,7 +227,7 @@ DATABASE_URL=postgresql+asyncpg://...@db.supabase.co:5432/...
 
 All three configurations are validated:
 
-```
+```text
 ✅ Dev: VALID
 ✅ Preprod: VALID
 ✅ Prod: VALID

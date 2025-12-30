@@ -8,7 +8,7 @@ from typing import Any, AsyncIterator, cast
 # NEW SDK imports
 from google import genai
 from google.genai import types
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 import logging
 from typing import List, Dict, Literal, Optional, Tuple
 
@@ -16,7 +16,7 @@ from typing import List, Dict, Literal, Optional, Tuple
 from app.core.langfuse_config import trace_llm_call
 
 # Load environment variables
-load_dotenv()
+load_dotenv(find_dotenv())
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)

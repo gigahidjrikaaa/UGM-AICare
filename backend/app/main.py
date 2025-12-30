@@ -59,7 +59,7 @@ from app.core.scheduler import start_scheduler, shutdown_scheduler
 from fastapi.middleware.cors import CORSMiddleware # type: ignore
 from app.utils.env_check import check_env
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
 from app.core.memory import get_redis_client
 
@@ -67,7 +67,7 @@ from app.core.memory import get_redis_client
 from prometheus_client import make_asgi_app
 from prometheus_fastapi_instrumentator import Instrumentator
 
-load_dotenv()
+load_dotenv(find_dotenv())
 
 # This call is being moved to the lifespan event handler to avoid race conditions.
 # init_db()

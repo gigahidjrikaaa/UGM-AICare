@@ -23,11 +23,11 @@ except ImportError:
         # Fallback for newer versions
         geth_poa_middleware = None  # type: ignore
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 import logging
 
 logger = logging.getLogger(__name__)
-load_dotenv()
+load_dotenv(find_dotenv())
 
 # --- Configuration ---
 RPC_URL = os.getenv("EDU_TESTNET_RPC_URL")

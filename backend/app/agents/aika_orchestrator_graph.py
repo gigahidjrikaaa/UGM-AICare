@@ -32,8 +32,8 @@ import asyncio
 import logging
 import os
 import time
-from datetime import datetime
-from typing import Dict, Any, List, Optional, TYPE_CHECKING
+from datetime import datetime, timedelta
+from typing import Dict, Any, List, Optional, TYPE_CHECKING, Protocol, cast
 
 from langgraph.graph import StateGraph, END
 from sqlalchemy import select
@@ -41,7 +41,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from google import genai
 from google.genai import types
 
-from app.agents.graph_state import AikaOrchestratorState
+from app.agents.graph_state import AikaOrchestratorState, IAState
 from app.agents.execution_tracker import execution_tracker
 # Import identity module at runtime to avoid circular imports
 from app.core.llm import generate_response
@@ -55,6 +55,10 @@ if TYPE_CHECKING:
     from app.agents.ia.ia_graph import create_ia_graph
 
 logger = logging.getLogger(__name__)
+
+
+class _AsyncInvokable(Protocol):
+    async def ainvoke(self, input: Any, *args: Any, **kwargs: Any) -> Any: ...
 
 
 def _get_aika_prompts():
@@ -159,24 +163,25 @@ async def aika_decision_node(
         system_instruction = AIKA_SYSTEM_PROMPTS.get(normalized_role, AIKA_SYSTEM_PROMPTS["student"])
 
         personal_memory_block = _format_personal_memory_block(state)
+
+        current_message = state.get("message") or ""
         
         # Prepare conversation history for Gemini
         history_contents = []
-        if state.get("conversation_history"):
-            for msg in state["conversation_history"]:
-                role = "user" if msg.get("role") == "user" else "model"
-                history_contents.append(
-                    types.Content(
-                        role=role,
-                        parts=[types.Part(text=msg.get("content", ""))]
-                    )
+        for msg in state.get("conversation_history") or []:
+            role = "user" if msg.get("role") == "user" else "model"
+            history_contents.append(
+                types.Content(
+                    role=role,
+                    parts=[types.Part(text=msg.get("content", ""))]
                 )
+            )
         
         # Add current message
         history_contents.append(
             types.Content(
                 role="user",
-                parts=[types.Part(text=state["message"])]
+                parts=[types.Part(text=current_message)]
             )
         )
         
@@ -185,7 +190,7 @@ async def aika_decision_node(
 Analyze this message and determine the next step.
 
 User Role: {user_role}
-Message: {state["message"]}
+Message: {current_message}
 
 Decision Criteria:
 
@@ -471,14 +476,15 @@ want to die, mau mati, ingin mati, etc.
                 screening_prompt_addition = ""
                 gap_analysis = None
                 
-                if normalized_role == "student" and state.get("user_id"):
+                user_id = state.get("user_id")
+                if normalized_role == "student" and isinstance(user_id, int) and user_id > 0:
                     try:
                         from app.agents.aika.screening_awareness import (
                             get_screening_aware_prompt_addition
                         )
                         screening_prompt_addition, gap_analysis = await get_screening_aware_prompt_addition(
                             db=db,
-                            user_id=state.get("user_id"),
+                            user_id=user_id,
                             conversation_history=state.get("conversation_history", []),
                             current_message=state.get("message", ""),
                             session_id=state.get("session_id"),
@@ -834,11 +840,11 @@ async def execute_sta_subgraph(
         from app.agents.sta.sta_graph import create_sta_graph
         
         # Create and execute STA subgraph
-        sta_graph = create_sta_graph(db)
-        sta_result = await sta_graph.ainvoke(state)
+        sta_graph = cast(_AsyncInvokable, create_sta_graph(db))
+        sta_result = cast(dict[str, Any], await sta_graph.ainvoke(cast(dict[str, Any], state)))
         
         # Merge STA outputs into orchestrator state
-        state.update(sta_result)
+        cast(dict[str, Any], state).update(sta_result)
         state.setdefault("agents_invoked", []).append("STA")
         state.setdefault("execution_path", []).append("sta_subgraph")
         
@@ -887,11 +893,11 @@ async def execute_sca_subgraph(
         from app.agents.tca.tca_graph import create_tca_graph
         
         # Create and execute TCA subgraph
-        tca_graph = create_tca_graph(db)
-        sca_result = await tca_graph.ainvoke(state)
+        tca_graph = cast(_AsyncInvokable, create_tca_graph(db))
+        sca_result = cast(dict[str, Any], await tca_graph.ainvoke(cast(dict[str, Any], state)))
         
         # Merge TCA outputs into orchestrator state
-        state.update(sca_result)
+        cast(dict[str, Any], state).update(sca_result)
         state.setdefault("agents_invoked", []).append("TCA")
         state.setdefault("execution_path", []).append("sca_subgraph")
         
@@ -939,11 +945,11 @@ async def execute_sda_subgraph(
         from app.agents.cma.cma_graph import create_cma_graph
         
         # Create and execute CMA subgraph
-        cma_graph = create_cma_graph(db)
-        sda_result = await cma_graph.ainvoke(state)
+        cma_graph = cast(_AsyncInvokable, create_cma_graph(db))
+        sda_result = cast(dict[str, Any], await cma_graph.ainvoke(cast(dict[str, Any], state)))
         
         # Merge CMA outputs into orchestrator state
-        state.update(sda_result)
+        cast(dict[str, Any], state).update(sda_result)
         state.setdefault("agents_invoked", []).append("CMA")
         state.setdefault("execution_path", []).append("sda_subgraph")
         
@@ -990,8 +996,16 @@ async def execute_ia_subgraph(
         from app.agents.ia.ia_graph import create_ia_graph
         
         # Create and execute IA subgraph
-        ia_graph = create_ia_graph(db)
-        ia_result = await ia_graph.ainvoke(state)
+        ia_graph = cast(_AsyncInvokable, create_ia_graph(db))
+
+        now = datetime.utcnow()
+        ia_input: IAState = {
+            "question_id": state.get("question_id") or "crisis_trend",
+            "start_date": state.get("start_date") or (now - timedelta(days=30)),
+            "end_date": state.get("end_date") or now,
+            "user_hash": state.get("user_hash") or f"user_{state.get('user_id', 'unknown')}",
+        }
+        ia_result = cast(dict[str, Any], await ia_graph.ainvoke(ia_input))
         
         # Construct ia_report from IA outputs
         if ia_result.get("interpretation"):
@@ -1001,7 +1015,7 @@ async def execute_ia_subgraph(
             ia_result["ia_report"] = ia_report
         
         # Merge IA outputs into orchestrator state
-        state.update(ia_result)
+        cast(dict[str, Any], state).update(ia_result)
         state.setdefault("agents_invoked", []).append("IA")
         state.setdefault("execution_path", []).append("ia_subgraph")
         

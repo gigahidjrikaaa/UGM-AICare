@@ -1,11 +1,11 @@
 # backend/app/utils/security_utils.py
 import os
 from cryptography.fernet import Fernet, InvalidToken # type: ignore
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 import logging
 from typing import Optional
 
-load_dotenv() # Ensure environment variables are loaded
+load_dotenv(find_dotenv())  # Ensure environment variables are loaded
 
 logger = logging.getLogger(__name__)
 

@@ -12,7 +12,7 @@ const nextConfig = {
 
   // Turbopack configuration (Next.js 16 default bundler)
   // Disabled in production builds due to timeout issues in Docker
-  // Use webpack for production builds with --no-turbo flag
+  // If you need Webpack instead, opt out with the `--webpack` flag
   turbopack: {
     // Turbopack handles resolve.fallback automatically for browser builds
     // Web3 externals are handled via serverExternalPackages below
@@ -60,8 +60,8 @@ const nextConfig = {
       /Module not found: Can't resolve 'encoding'/,
     );
 
-    // Next.js 16 fixes the webpack minification bug - no workaround needed!
-    // Removed: config.optimization.minimize = false
+    // If Webpack builds are unstable in a given environment, consider setting:
+    // config.optimization.minimize = false
 
     return config;
   },

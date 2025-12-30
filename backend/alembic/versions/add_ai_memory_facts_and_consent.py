@@ -17,6 +17,25 @@ import sqlalchemy as sa
 # Import migration helpers for idempotent operations
 import sys
 import os
+from typing import Any, Callable
+
+
+def _missing_helper(*_args: Any, **_kwargs: Any) -> None:
+    raise RuntimeError(
+        "migration_helpers could not be imported; idempotent helper was referenced unexpectedly"
+    )
+
+
+# Default definitions for type-checkers; overwritten on successful import.
+table_exists: Callable[..., bool] = _missing_helper  # type: ignore[assignment]
+column_exists: Callable[..., bool] = _missing_helper  # type: ignore[assignment]
+index_exists: Callable[..., bool] = _missing_helper  # type: ignore[assignment]
+create_table_if_not_exists: Callable[..., Any] = _missing_helper  # type: ignore[assignment]
+create_index_if_not_exists: Callable[..., Any] = _missing_helper  # type: ignore[assignment]
+drop_table_if_exists: Callable[..., Any] = _missing_helper  # type: ignore[assignment]
+drop_index_if_exists: Callable[..., Any] = _missing_helper  # type: ignore[assignment]
+add_column_if_not_exists: Callable[..., Any] = _missing_helper  # type: ignore[assignment]
+drop_column_if_exists: Callable[..., Any] = _missing_helper  # type: ignore[assignment]
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 try:

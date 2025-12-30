@@ -1,10 +1,10 @@
 import tweepy # type: ignore
 import logging
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 
 # Load environment variables from .env file
-load_dotenv()
+load_dotenv(find_dotenv())
 
 # Retrieve Twitter API keys
 TWITTER_API_KEY = os.getenv("TWITTER_API_KEY")

@@ -6,7 +6,7 @@ from logging.config import fileConfig
 from pathlib import Path
 from typing import Final
 
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 from sqlalchemy import create_engine
 from alembic import context # type: ignore
 
@@ -35,7 +35,7 @@ else:
     pass
 
 # Load environment configuration before resolving connection info
-load_dotenv()
+load_dotenv(find_dotenv())
 
 def _database_url() -> str:
     url = os.getenv("DATABASE_URL")

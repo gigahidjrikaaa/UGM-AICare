@@ -1,5 +1,30 @@
 import os
 import logging
+from urllib.parse import urlparse, urlunparse
+
+
+def _redact_url_credentials(raw_url: str) -> str:
+    """Redact URL credentials for log output.
+
+    This prevents leaking passwords (e.g., DATABASE_URL, REDIS_URL) into container logs.
+    """
+    try:
+        parsed = urlparse(raw_url)
+        if parsed.username is None:
+            return raw_url
+
+        hostname = parsed.hostname or ""
+        if parsed.port is not None:
+            hostname = f"{hostname}:{parsed.port}"
+
+        auth = parsed.username
+        if parsed.password is not None:
+            auth = f"{auth}:***"
+
+        netloc = f"{auth}@{hostname}"
+        return urlunparse(parsed._replace(netloc=netloc))
+    except Exception:
+        return "<redacted>"
 
 def check_env():
     """
@@ -74,7 +99,11 @@ def check_env():
             logging.warning(f"ENV CHECK: {var} is an EMPTY STRING.")
         else:
             if var in ["DATABASE_URL", "REDIS_HOST", "REDIS_PORT", "ALLOWED_ORIGINS", "FRONTEND_URL", "APP_ENV", "PORT"]:
-                print(f"ENV CHECK: {var} is SET to: \"{value}\"")
+                if var in {"DATABASE_URL"}:
+                    safe_value = _redact_url_credentials(value)
+                    print(f"ENV CHECK: {var} is SET to: \"{safe_value}\"")
+                else:
+                    print(f"ENV CHECK: {var} is SET to: \"{value}\"")
             else:
                 print(f"ENV CHECK: {var} is SET (value hidden for security).")
 
@@ -87,7 +116,11 @@ def check_env():
             logging.warning(f"ENV CHECK: {var} is set but EMPTY STRING.")
             continue
         if var in ["REDIS_URL", "REDIS_HOST", "REDIS_PORT", "MINIO_ENDPOINT", "MINIO_BUCKET"]:
-            print(f"ENV CHECK: {var} is SET to: \"{value}\"")
+            if var in {"REDIS_URL"}:
+                safe_value = _redact_url_credentials(value)
+                print(f"ENV CHECK: {var} is SET to: \"{safe_value}\"")
+            else:
+                print(f"ENV CHECK: {var} is SET to: \"{value}\"")
         else:
             print(f"ENV CHECK: {var} is SET (value hidden for security).")
 

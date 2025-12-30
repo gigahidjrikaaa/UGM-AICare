@@ -9,19 +9,20 @@ services:
   #################
   backend:
     container_name: ugm_aicare_backend_dev
+    image: ugm-aicare-backend-dev
     command: >
       bash -c "
-        echo '🚀 Starting backend with hot reload...' &&
-        uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload --reload-dir /app/app --log-level info
+        echo '🚀 Starting backend (DEV, reload disabled in Docker)...' &&
+        uvicorn app.main:app --host 0.0.0.0 --port 8000 --log-level info
       "
     ports:
       - "${BACKEND_EXTERNAL_PORT:-22001}:8000"
     deploy:
       resources:
         limits:
-          memory: 2G
+          memory: 4G
         reservations:
-          memory: 1G
+          memory: 2G
     environment:
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
@@ -34,10 +35,6 @@ services:
       APP_ENV: development
       LANGFUSE_ENABLED: "false"
       LANGFUSE_HOST: "http://langfuse-server:3000"
-    volumes:
-      - ./backend:/app
-      - /app/.venv
-      - /app/__pycache__
     restart: unless-stopped
     networks:
       - internal_network_dev
@@ -48,6 +45,7 @@ services:
   #################
   frontend:
     container_name: ugm_aicare_frontend_dev
+    image: ugm-aicare-frontend-dev
     build:
       target: development
     ports:

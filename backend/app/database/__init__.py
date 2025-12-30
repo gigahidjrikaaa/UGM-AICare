@@ -5,12 +5,12 @@ from typing import AsyncGenerator, Optional
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base
 import os
-from dotenv import load_dotenv
+from dotenv import load_dotenv, find_dotenv
 import logging
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import parse_qs, urlparse, urlencode, urlunparse
 
-# Load environment variables from .env file
-load_dotenv()
+# Load environment variables from .env file (supports running from subdirectories)
+load_dotenv(find_dotenv())
 
 # Logging configuration
 logging.basicConfig(level=logging.INFO)
@@ -18,6 +18,24 @@ logger = logging.getLogger(__name__)
 
 # Determine the database URL from environment variables (should be using Dockerized setup)
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./aika.db")
+
+
+def _redact_database_url(database_url: str) -> str:
+    """Redact secrets in a DB URL for logging."""
+    try:
+        parsed = urlparse(database_url)
+        if parsed.username is None:
+            return database_url
+        netloc = parsed.hostname or ""
+        if parsed.port is not None:
+            netloc = f"{netloc}:{parsed.port}"
+        auth = parsed.username
+        if parsed.password is not None:
+            auth = f"{auth}:***"
+        netloc = f"{auth}@{netloc}"
+        return urlunparse(parsed._replace(netloc=netloc))
+    except Exception:
+        return "<redacted>"
 
 
 def _parse_bool_env(var_name: str) -> Optional[bool]:
@@ -53,6 +71,29 @@ def _ssl_required_from_database_url(database_url: str) -> Optional[bool]:
     except Exception:
         return None
 
+
+def _sanitize_asyncpg_database_url(database_url: str) -> str:
+    """Remove libpq-only params that SQLAlchemy will forward to asyncpg.connect().
+
+    asyncpg does not understand libpq parameters like `sslmode` or `channel_binding`.
+    If they remain in the URL, SQLAlchemy's asyncpg dialect will pass them as
+    keyword arguments to asyncpg.connect(), raising `TypeError`.
+    """
+    try:
+        parsed = urlparse(database_url)
+        if not parsed.query:
+            return database_url
+
+        query_map = parse_qs(parsed.query, keep_blank_values=True)
+        for key in ("sslmode", "channel_binding"):
+            query_map.pop(key, None)
+
+        # Keep remaining query params.
+        new_query = urlencode(query_map, doseq=True)
+        return urlunparse(parsed._replace(query=new_query))
+    except Exception:
+        return database_url
+
 # Ensure we're using asyncpg for PostgreSQL connections
 if DATABASE_URL.startswith("postgresql://"):
     DATABASE_URL = DATABASE_URL.replace("postgresql://", "postgresql+asyncpg://")
@@ -67,6 +108,9 @@ if DATABASE_URL.startswith("postgresql+asyncpg://"):
     db_ssl = _parse_bool_env("DB_SSL")
     if db_ssl is None:
         db_ssl = _ssl_required_from_database_url(DATABASE_URL)
+
+    # Strip libpq-only params after we've derived any settings from them.
+    DATABASE_URL = _sanitize_asyncpg_database_url(DATABASE_URL)
 
     connect_args = {
         "server_settings": {
@@ -99,7 +143,8 @@ else:
         # No specific connect_args needed for aiosqlite in this context
     )
 
-logger.info(f"Using async database: {DATABASE_URL}")
+# Avoid leaking DB credentials in logs
+logger.info(f"Using async database: {_redact_database_url(DATABASE_URL)}")
 
 # Create async session factory.
 # Prefer SQLAlchemy 2.x's async_sessionmaker when available, but fall back to
@@ -132,7 +177,7 @@ async def init_db():
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    logger.info(f"Database initialized with asyncpg: {DATABASE_URL}")
+    logger.info(f"Database initialized with asyncpg: {_redact_database_url(DATABASE_URL)}")
 
     from app.services.admin_bootstrap import ensure_default_admin, ensure_default_counselor
 

@@ -44,6 +44,9 @@ class BaseWeb3Client:
         
         # Initialize Web3
         self.w3 = Web3(Web3.HTTPProvider(self.rpc_url))
+
+        # Connection status (do not hard-fail by default in development)
+        self.is_connected: bool = False
         
         # Add POA middleware for EVM-compatible chains (SOMNIA uses POA consensus)
         # Note: Web3.py v6+ renamed ExtraDataToPOAMiddleware to geth_poa_middleware
@@ -51,12 +54,24 @@ class BaseWeb3Client:
             self.w3.middleware_onion.inject(geth_poa_middleware, layer=0)
         
         # Check connection
-        if not self.w3.is_connected():
-            raise ConnectionError(f"Failed to connect to SOMNIA blockchain at {self.rpc_url}")
-        
-        logger.info(f"✅ Connected to SOMNIA blockchain")
-        logger.info(f"   RPC: {self.rpc_url}")
-        logger.info(f"   Chain ID: {self.w3.eth.chain_id}")
+        self.is_connected = bool(self.w3.is_connected())
+        if not self.is_connected:
+            strict = (os.getenv("BLOCKCHAIN_STRICT", "").strip().lower() in {"1", "true", "yes", "on"})
+            if strict:
+                raise ConnectionError(f"Failed to connect to SOMNIA blockchain at {self.rpc_url}")
+
+            logger.warning(
+                "⚠️  Failed to connect to SOMNIA blockchain at %s (blockchain features disabled)",
+                self.rpc_url,
+            )
+            return
+
+        logger.info("✅ Connected to SOMNIA blockchain")
+        logger.info("   RPC: %s", self.rpc_url)
+        try:
+            logger.info("   Chain ID: %s", self.w3.eth.chain_id)
+        except Exception as exc:
+            logger.warning("⚠️  Connected, but failed to read chain id: %s", exc)
     
     def to_checksum_address(self, address: str) -> ChecksumAddress:
         """Convert address to checksum format"""

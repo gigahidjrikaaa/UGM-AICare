@@ -15,10 +15,11 @@ import logging
 import re
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Iterable, List, Optional
+from typing import Any, Iterable, List, Optional, cast
 
 from sqlalchemy import delete, select
 from sqlalchemy.dialects.postgresql import insert
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User, UserAIMemoryFact
@@ -152,7 +153,7 @@ async def upsert_facts(
                     },
                 )
             )
-            result = await db.execute(stmt)
+            result = cast(CursorResult[Any], await db.execute(stmt))
             # rowcount is 1 on insert or update; we treat only insert as unknown.
             # We keep it simple and count attempts as inserted=+1 if succeeded.
             if result.rowcount:
@@ -233,6 +234,6 @@ async def list_user_fact_texts_for_agent(db: AsyncSession, user: User, limit: in
 
 async def delete_user_fact(db: AsyncSession, user_id: int, fact_id: int) -> bool:
     stmt = delete(UserAIMemoryFact).where(UserAIMemoryFact.user_id == user_id, UserAIMemoryFact.id == fact_id)
-    result = await db.execute(stmt)
+    result = cast(CursorResult[Any], await db.execute(stmt))
     await db.commit()
     return bool(result.rowcount)
