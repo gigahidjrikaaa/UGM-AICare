@@ -21,7 +21,7 @@ interface AppLayoutProps {
 
 // Simple Loading Component (optional, adjust styling as needed)
 const AppLoadingIndicator = () => (
-    <div className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] flex items-center justify-center">
+    <div className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F] flex items-center justify-center">
         <div className="animate-pulse flex flex-col items-center">
             <div className="h-12 w-12 rounded-full bg-white/20 mb-4"></div>
             <div className="h-4 w-40 bg-white/20 rounded mb-2"></div>
@@ -55,7 +55,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
   return (
     // Use a relative container to position fixed elements relative to it if needed,
     // but for sidebar/feedback button, positioning relative to viewport is fine.
-    <div className="flex h-screen overflow-hidden bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a]"> {/* Add gradient background */}
+    <div className="flex h-screen overflow-hidden bg-linear-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a]"> {/* Add gradient background */}
 
       {/* Particle Background - absolute positioned, behind everything */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
@@ -87,7 +87,7 @@ export default function AppLayout({ children }: AppLayoutProps) {
         </NoSsr>
 
         {/* Content area - no padding, content flows naturally behind glassmorphic header */}
-        <main className="flex-grow relative overflow-auto">
+        <main id="app-scroll-container" className="grow relative overflow-auto">
             <div className="min-h-screen">
               {children}
             </div>

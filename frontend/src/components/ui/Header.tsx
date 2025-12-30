@@ -22,12 +22,26 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
 
   // Track scroll position
   useEffect(() => {
-    const handleScroll = () => {
-      setScrolled(window.scrollY > 10);
+    const scrollContainer = document.getElementById("app-scroll-container");
+    const target: (Window & typeof globalThis) | HTMLElement = scrollContainer ?? window;
+
+    const getScrollTop = () => {
+      if (target === window) {
+        return window.scrollY;
+      }
+      return (target as HTMLElement).scrollTop;
     };
 
-    window.addEventListener('scroll', handleScroll);
-    return () => window.removeEventListener('scroll', handleScroll);
+    const handleScroll = () => {
+      setScrolled(getScrollTop() > 10);
+    };
+
+    handleScroll();
+    target.addEventListener("scroll", handleScroll, { passive: true } as AddEventListenerOptions);
+
+    return () => {
+      target.removeEventListener("scroll", handleScroll as EventListener);
+    };
   }, []);
 
   const toggleProfile = () => {
@@ -49,8 +63,8 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
   return (
     <>
       <header
-        className={`fixed top-0 left-0 right-0 z-[100] transition-all duration-500 ease-in-out ${scrolled
-          ? "bg-[#001D58]/70 backdrop-blur-md border-b border-white/10 py-3 shadow-lg supports-[backdrop-filter]:bg-[#001D58]/60"
+        className={`fixed top-0 left-0 right-0 z-100 transition-all duration-500 ease-in-out ${scrolled
+          ? "bg-[#001D58]/70 backdrop-blur-md border-b border-white/10 py-3 shadow-lg supports-backdrop-filter:bg-[#001D58]/60"
           : "bg-transparent py-5"
           }`}
       >
