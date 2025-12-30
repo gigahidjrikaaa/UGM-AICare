@@ -69,7 +69,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./backend
-          file: ./infra/docker/backend.Dockerfile
+          file: ./backend/Dockerfile
           push: true
           tags: |
             ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-api:${{ github.sha }}
@@ -86,7 +86,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
-          file: ./infra/docker/frontend.Dockerfile
+          file: ./frontend/Dockerfile
           push: true
           tags: |
             ghcr.io/${{ steps.lowercase.outputs.owner }}/ugm-aicare-web:${{ github.sha }}
@@ -106,7 +106,6 @@ jobs:
           GHCR_USER: ${{ github.actor }}
           GHCR_REPOSITORY_OWNER: ${{ steps.lowercase.outputs.owner }}
           ENV_FILE_PRODUCTION: ${{ secrets.ENV_FILE_PRODUCTION }}
-          DEPLOY_MONITORING: ${{ inputs.deploy_monitoring }}
           FORCE_RECREATE: ${{ inputs.force_recreate }}
           PRUNE_SYSTEM: ${{ inputs.prune_system }}
           REBUILD_SCOPE: ${{ inputs.rebuild_scope }}
@@ -114,7 +113,7 @@ jobs:
           host: ${{ secrets.VM_SSH_HOST }}
           username: ${{ secrets.VM_SSH_USER }}
           key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          envs: GIT_SHA,GHCR_TOKEN,GHCR_USER,GHCR_REPOSITORY_OWNER,ENV_FILE_PRODUCTION,DEPLOY_MONITORING,FORCE_RECREATE,PRUNE_SYSTEM,REBUILD_SCOPE
+          envs: GIT_SHA,GHCR_TOKEN,GHCR_USER,GHCR_REPOSITORY_OWNER,ENV_FILE_PRODUCTION,FORCE_RECREATE,PRUNE_SYSTEM,REBUILD_SCOPE
           script: |
             set -e
             
@@ -125,7 +124,7 @@ jobs:
             echo "Rebuild Scope: $REBUILD_SCOPE"
             echo "Force Recreate: $FORCE_RECREATE"
             echo "Prune System: $PRUNE_SYSTEM"
-            echo "Deploy Monitoring: $DEPLOY_MONITORING"
+            echo "Deploy Monitoring: disabled (infra stack removed)"
             echo "=========================================="
             echo ""
             
@@ -189,7 +188,7 @@ jobs:
             echo "✅ All critical environment variables verified"
             echo ""
             echo "Sample of loaded variables:"
-            grep -E "^(ADMIN_EMAIL|COUNSELOR_EMAIL|DATABASE_URL|POSTGRES_|REDIS_HOST)=" .env | head -5 || true
+            grep -E "^(ADMIN_EMAIL|COUNSELOR_EMAIL|DATABASE_URL|REDIS_URL|REDIS_HOST)=" .env | head -5 || true
             
             # Copy .env to backend and frontend for safety
             echo ""
@@ -207,7 +206,7 @@ jobs:
               echo "🧹 Cleaning up Docker system..."
               
               # Now we can use --env-file since .env exists
-              docker compose -f infra/compose/docker-compose.prod.yml --env-file "$(pwd)/.env" down || true
+              docker compose -f docker-compose.base.yml -f docker-compose.prod.yml --env-file "$(pwd)/.env" down || true
               docker container prune -f || true
               docker image prune -f || true
               docker network prune -f || true
@@ -253,8 +252,7 @@ jobs:
             # ========================================
             echo ""
             echo "⏹️  Stopping existing containers..."
-            # Use absolute path to .env file
-            docker compose -f infra/compose/docker-compose.prod.yml --env-file "$(pwd)/.env" down
+            docker compose -f docker-compose.base.yml -f docker-compose.prod.yml --env-file "$(pwd)/.env" down
             echo "✅ Containers stopped"
             
             # ========================================
@@ -268,23 +266,14 @@ jobs:
             pwd
             echo ""
             echo "Debug: Sample variables from .env:"
-            grep -E "^(ADMIN_EMAIL|DATABASE_URL|POSTGRES_USER)=" .env | head -3 || true
+            grep -E "^(ADMIN_EMAIL|DATABASE_URL)=" .env | head -3 || true
             echo ""
             
             if [ "$FORCE_RECREATE" = "true" ]; then
               echo "Using --force-recreate to refresh environment variables..."
-              
-              if [ "$DEPLOY_MONITORING" = "true" ]; then
-                docker compose -f infra/compose/docker-compose.prod.yml -f infra/compose/docker-compose.prod-monitoring.yml --env-file "$(pwd)/.env" up -d --force-recreate --remove-orphans
-              else
-                docker compose -f infra/compose/docker-compose.prod.yml --env-file "$(pwd)/.env" up -d --force-recreate --remove-orphans
-              fi
+              docker compose -f docker-compose.base.yml -f docker-compose.prod.yml --env-file "$(pwd)/.env" up -d --force-recreate --remove-orphans --build
             else
-              if [ "$DEPLOY_MONITORING" = "true" ]; then
-                docker compose -f infra/compose/docker-compose.prod.yml -f infra/compose/docker-compose.prod-monitoring.yml --env-file "$(pwd)/.env" up -d --remove-orphans
-              else
-                docker compose -f infra/compose/docker-compose.prod.yml --env-file "$(pwd)/.env" up -d --remove-orphans
-              fi
+              docker compose -f docker-compose.base.yml -f docker-compose.prod.yml --env-file "$(pwd)/.env" up -d --remove-orphans --build
             fi
             
             echo "✅ Services started"
@@ -302,21 +291,21 @@ jobs:
             
             for i in {1..20}; do
               # Check if backend container is running first
-              if ! docker compose -f infra/compose/docker-compose.prod.yml ps backend | grep -q "Up"; then
+              if ! docker compose -f docker-compose.base.yml -f docker-compose.prod.yml ps backend | grep -q "Up"; then
                 echo "Attempt $i/20: Backend container not running yet..."
                 sleep 3
                 continue
               fi
               
               # Try Python-based health check (works without curl)
-              if docker compose -f infra/compose/docker-compose.prod.yml --env-file "$(pwd)/.env" exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5).read()" > /dev/null 2>&1; then
+              if docker compose -f docker-compose.base.yml -f docker-compose.prod.yml --env-file "$(pwd)/.env" exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5).read()" > /dev/null 2>&1; then
                 echo "✅ Backend is healthy (attempt $i/20)"
                 BACKEND_READY=true
                 break
               fi
               
               # Fallback: Check if backend process is running
-              if docker compose -f infra/compose/docker-compose.prod.yml --env-file "$(pwd)/.env" exec -T backend pgrep -f "uvicorn" > /dev/null 2>&1; then
+              if docker compose -f docker-compose.base.yml -f docker-compose.prod.yml --env-file "$(pwd)/.env" exec -T backend pgrep -f "uvicorn" > /dev/null 2>&1; then
                 echo "✅ Backend process is running (attempt $i/20)"
                 BACKEND_READY=true
                 break
@@ -329,7 +318,7 @@ jobs:
             if [ "$BACKEND_READY" = "false" ]; then
               echo "⚠️  Warning: Backend health check failed, but continuing..."
               echo "Checking backend logs for errors:"
-              docker compose -f infra/compose/docker-compose.prod.yml logs --tail=30 backend | grep -E "ERROR|CRITICAL|Traceback" || echo "No errors found"
+              docker compose -f docker-compose.base.yml -f docker-compose.prod.yml logs --tail=30 backend | grep -E "ERROR|CRITICAL|Traceback" || echo "No errors found"
             fi
             
             # ========================================
@@ -337,7 +326,7 @@ jobs:
             # ========================================
             echo ""
             echo "🗄️  Running database migrations..."
-            docker compose -f infra/compose/docker-compose.prod.yml --env-file "$(pwd)/.env" exec -T backend alembic upgrade head
+            docker compose -f docker-compose.base.yml -f docker-compose.prod.yml --env-file "$(pwd)/.env" exec -T backend alembic upgrade head
             echo "✅ Migrations completed"
             
             # ========================================
@@ -351,7 +340,7 @@ jobs:
             free -h || true
             
             # Run with timeout and error handling
-            if timeout 120 docker compose -f infra/compose/docker-compose.prod.yml --env-file "$(pwd)/.env" exec -T backend python scripts/init_production_accounts.py; then
+            if timeout 120 docker compose -f docker-compose.base.yml -f docker-compose.prod.yml --env-file "$(pwd)/.env" exec -T backend python scripts/init_production_accounts.py; then
               echo "✅ Accounts initialized successfully"
             else
               EXIT_CODE=$?
@@ -370,12 +359,12 @@ jobs:
               elif [ $EXIT_CODE -eq 124 ]; then
                 echo "❌ ERROR: Timeout - Account initialization took longer than 120 seconds"
                 echo "Backend logs:"
-                docker compose -f infra/compose/docker-compose.prod.yml logs --tail=50 backend
+                docker compose -f docker-compose.base.yml -f docker-compose.prod.yml logs --tail=50 backend
                 exit 1
               else
                 echo "❌ ERROR: Unknown failure"
                 echo "Backend logs:"
-                docker compose -f infra/compose/docker-compose.prod.yml logs --tail=50 backend
+                docker compose -f docker-compose.base.yml -f docker-compose.prod.yml logs --tail=50 backend
                 exit 1
               fi
             fi
@@ -388,12 +377,12 @@ jobs:
             
             # Check running containers
             echo "Running containers:"
-            docker compose -f infra/compose/docker-compose.prod.yml ps
+            docker compose -f docker-compose.base.yml -f docker-compose.prod.yml ps
             
             # Check backend logs
             echo ""
             echo "Recent backend logs:"
-            docker compose -f infra/compose/docker-compose.prod.yml logs --tail=50 backend | grep -E "ERROR|WARNING|admin|counselor" || echo "No critical messages in recent logs"
+            docker compose -f docker-compose.base.yml -f docker-compose.prod.yml logs --tail=50 backend | grep -E "ERROR|WARNING|admin|counselor" || echo "No critical messages in recent logs"
             
             # ========================================
             # 11. Summary

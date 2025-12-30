@@ -190,8 +190,8 @@ backend/
 
      | Category | Key | Notes |
      |----------|-----|-------|
-     | Database | `DATABASE_URL`, `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Use async URL (`postgresql+asyncpg://...`) for runtime |
-     | Redis | `REDIS_HOST`, `REDIS_PORT` | Include `REDIS_USERNAME`/`REDIS_PASSWORD` if your instance requires auth |
+       | Database | `DATABASE_URL` | Use async URL (`postgresql+asyncpg://...`). For managed Postgres (e.g., NeonDB), include `?sslmode=require` or set `DB_SSL=true`. |
+       | Redis | `REDIS_URL` (preferred) or `REDIS_HOST`, `REDIS_PORT` | Use `rediss://` if your provider requires TLS. Include `REDIS_USERNAME`/`REDIS_PASSWORD` only if needed. |
      | Auth | `JWT_SECRET_KEY`, `INTERNAL_API_KEY` | Keep secrets out of version control |
      | App URLs | `ALLOWED_ORIGINS`, `FRONTEND_URL`, `BACKEND_URL` | Comma-separated origins for CORS |
      | Email | `EMAIL_USERNAME`, `EMAIL_PASSWORD`, `EMAIL_SMTP_SERVER`, `EMAIL_SMTP_PORT` | Needed for outreach + crisis alerts |

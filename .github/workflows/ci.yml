@@ -177,11 +177,11 @@ jobs:
           filters: |
             backend:
               - 'backend/**'
-              - 'infra/docker/backend.Dockerfile'
+              - 'backend/Dockerfile'
               - 'requirements.txt'
             frontend:
               - 'frontend/**'
-              - 'infra/docker/frontend.Dockerfile'
+              - 'frontend/Dockerfile'
               - 'package.json'
               - 'package-lock.json'
 
@@ -478,7 +478,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./backend
-          file: ./infra/docker/backend.Dockerfile
+          file: ./backend/Dockerfile
           push: true
           pull: true  # Always pull base images to ensure freshness
           tags: |
@@ -550,7 +550,7 @@ jobs:
         uses: docker/build-push-action@v5
         with:
           context: ./frontend
-          file: ./infra/docker/frontend.Dockerfile
+          file: ./frontend/Dockerfile
           push: true
           pull: true  # Always pull base images to ensure freshness
           tags: |
@@ -728,9 +728,6 @@ jobs:
             git fetch origin
             git reset --hard origin/main
             
-            # Ensure scripts have execute permissions
-            chmod +x ./infra/scripts/*.sh
-            
             if [ -n "${{ secrets.ENV_FILE_PRODUCTION }}" ]; then
               echo "${{ secrets.ENV_FILE_PRODUCTION }}" > .env
               
@@ -741,10 +738,9 @@ jobs:
               chmod 600 backend/.env frontend/.env
               echo "✅ .env copied to backend/ and frontend/"
             fi
-            
-            # Deploy with or without monitoring based on workflow input or default to true for main branch
-            DEPLOY_MONITORING="${{ github.event.inputs.deploy_monitoring || 'true' }}"
-            ./infra/scripts/deploy.sh ${{ github.sha }} "$DEPLOY_MONITORING"
+
+            echo "[deploy] Bringing up app-only stack (no bundled monitoring profiles)..."
+            docker compose --env-file .env -f docker-compose.base.yml -f docker-compose.prod.yml up -d --build --remove-orphans
       
       - name: Generate Deployment Summary
         if: always()
@@ -753,7 +749,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Environment:** Production" >> $GITHUB_STEP_SUMMARY
           echo "**SHA:** \`${{ github.sha }}\`" >> $GITHUB_STEP_SUMMARY
-          echo "**Monitoring:** ${{ github.event.inputs.deploy_monitoring || 'true' }}" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           
           # Check test results
@@ -801,47 +796,6 @@ jobs:
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "**Deployment completed at:** $(date -u '+%Y-%m-%d %H:%M:%S UTC')" >> $GITHUB_STEP_SUMMARY
       
-      - name: Verify Monitoring Stack (if deployed)
-        if: github.event.inputs.deploy_monitoring != 'false'
-        uses: appleboy/ssh-action@v1.0.3
-        with:
-          host: ${{ secrets.VM_SSH_HOST }}
-          username: ${{ secrets.VM_SSH_USER }}
-          key: ${{ secrets.VM_SSH_PRIVATE_KEY }}
-          script: |
-            cd ${{ secrets.VM_PROJECT_PATH }}
-            
-            echo "Verifying monitoring services..."
-            
-            # Check Prometheus
-            if curl -sf http://localhost:8255/-/healthy > /dev/null 2>&1; then
-              echo "✓ Prometheus is healthy"
-            else
-              echo "⚠ Prometheus health check failed"
-            fi
-            
-            # Check Grafana
-            if curl -sf http://localhost:8256/api/health > /dev/null 2>&1; then
-              echo "✓ Grafana is healthy"
-            else
-              echo "⚠ Grafana health check failed"
-            fi
-            
-            # Check Elasticsearch
-            if curl -sf http://localhost:8250/_cluster/health > /dev/null 2>&1; then
-              echo "✓ Elasticsearch is healthy"
-            else
-              echo "⚠ Elasticsearch health check failed"
-            fi
-            
-            # Check Langfuse
-            if curl -sf http://localhost:8262/api/public/health > /dev/null 2>&1; then
-              echo "✓ Langfuse is healthy"
-            else
-              echo "⚠ Langfuse health check failed"
-            fi
-            
-            echo "Monitoring stack verification completed"
 
   rollback:
     runs-on: ubuntu-latest
@@ -876,11 +830,12 @@ jobs:
             git fetch origin
             git reset --hard origin/main
             
-            # Ensure scripts have execute permissions
-            chmod +x ./infra/scripts/*.sh
-            
             if [ -n "${{ secrets.ENV_FILE_PRODUCTION }}" ]; then
               echo "${{ secrets.ENV_FILE_PRODUCTION }}" > .env
             fi
-            
-            ./infra/scripts/deploy.sh ${{ github.event.inputs.rollback_sha }}
+
+            echo "[rollback] Checking out rollback SHA..."
+            git checkout --force ${{ github.event.inputs.rollback_sha }}
+
+            echo "[rollback] Bringing up app-only stack..."
+            docker compose --env-file .env -f docker-compose.base.yml -f docker-compose.prod.yml up -d --build --remove-orphans

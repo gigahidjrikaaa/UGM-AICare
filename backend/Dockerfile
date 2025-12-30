@@ -1,8 +1,8 @@
-# filepath: d:\Ngoding Moment\Github\UGM-AICare\backend\app\Dockerfile
+# backend/Dockerfile
 # Multi-stage build for a more efficient and secure container
 
 # ---- Build Stage (builder) ----
-FROM python:3.11-slim-bookworm as builder
+FROM python:3.11-slim-bookworm AS builder
 
 WORKDIR /app
 
@@ -18,8 +18,6 @@ COPY requirements.txt .
 # Install Python dependencies using BINARY wheels where possible
 # --prefer-binary: Use pre-built wheels instead of compiling from source
 # This avoids needing Rust compiler for cryptography and other packages
-# Note: No longer installing PyTorch/ONNX (migrated to pure Gemini-based approach)
-# This saves ~1GB in deployment size and eliminates CUDA dependency issues
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install --upgrade pip && \
     pip wheel --wheel-dir /app/wheels --prefer-binary -r requirements.txt
@@ -34,8 +32,8 @@ RUN groupadd -r appgroup && useradd --no-log-init -r -g appgroup -m -s /bin/bash
 WORKDIR /app
 
 # Set environment variables for Python
-ENV PYTHONDONTWRITEBYTECODE 1
-ENV PYTHONUNBUFFERED 1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV PYTHONUNBUFFERED=1
 
 # Install runtime system dependencies, including dos2unix and curl (for health checks)
 RUN apt-get update && \
@@ -58,17 +56,17 @@ RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels \
 # Copy the entire application code from the build context (./backend)
 COPY --chown=appuser:appgroup . .
 
-# --- Add this line for debugging ---
-RUN ls -laR /app
-
 # Find, convert line endings, and set permissions for all shell scripts
-# This is still needed for the 'migrate' service which uses wait-for-it.sh
 RUN find /app/scripts -name "*.sh" -exec dos2unix {} + -exec chmod +x {} +
 
 # Create and set permissions for the logs directory
-RUN mkdir -p /app/logs &&     chown -R appuser:appgroup /app/logs &&     chmod -R 750 /app/logs
+RUN mkdir -p /app/logs && \
+    chown -R appuser:appgroup /app/logs && \
+    chmod -R 750 /app/logs
 
-RUN mkdir -p /app/alembic/versions &&     chown -R appuser:appgroup /app/alembic/versions &&     chmod -R 750 /app/alembic/versions
+RUN mkdir -p /app/alembic/versions && \
+    chown -R appuser:appgroup /app/alembic/versions && \
+    chmod -R 750 /app/alembic/versions
 
 # Switch to the non-root user
 USER appuser
@@ -77,6 +75,5 @@ USER appuser
 EXPOSE 8000
 
 # Set the command to start the application.
-# This replaces the need for start.sh for the backend service.
 # Using shell form to allow environment variable expansion for WORKERS_PER_CORE.
 CMD exec gunicorn -k uvicorn.workers.UvicornWorker app.main:app --workers ${WORKERS_PER_CORE:-4} --worker-tmp-dir /dev/shm --bind 0.0.0.0:8000

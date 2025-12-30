@@ -14,28 +14,22 @@
 
 - Next.js: **16.0.7** (was 16.0.0)
 
-## 🐳 Docker Compose (Profiles)
+## 🐳 Docker Compose
 
-This repository uses Docker Compose **profiles** to reduce duplicated compose files. The canonical Compose files live in `infra/compose/`.
+This repository uses an **app-only** Docker Compose setup (backend + frontend). Database/Redis/S3 are treated as **external managed services** configured via `.env`.
 
 ```bash
-# Dev (app only)
-docker compose -f infra/compose/docker-compose.dev.yml up -d
+# Dev (hot reload)
+docker compose --env-file .env -f docker-compose.base.yml -f docker-compose.dev.yml up -d
 
-# Dev + monitoring (Prometheus/Grafana/exporters/Langfuse)
-docker compose -f infra/compose/docker-compose.dev.yml --profile monitoring up -d
+# Preprod (production builds, no hot reload)
+docker compose --env-file .env -f docker-compose.base.yml -f docker-compose.preprod.yml up -d
 
-# Dev + monitoring + ELK (Elasticsearch/Logstash/Kibana/Filebeat)
-docker compose -f infra/compose/docker-compose.dev.yml --profile monitoring --profile elk up -d
-
-# Prod (app only)
-docker compose -f infra/compose/docker-compose.prod.yml --env-file .env up -d
-
-# Prod + monitoring/logging (enable profiles as needed)
-docker compose -f infra/compose/docker-compose.prod.yml --env-file .env --profile monitoring --profile elk up -d
+# Prod (production config)
+docker compose --env-file .env -f docker-compose.base.yml -f docker-compose.prod.yml up -d
 ```
 
-If you prefer scripts, `./dev.sh` wraps the most common local commands.
+If you prefer scripts, `./dev.sh` wraps the common local commands.
 
 ## Development and split-subdomain deployment
 

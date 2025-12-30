@@ -10,31 +10,12 @@ services:
   backend:
     build:
       context: ./backend
-      dockerfile: app/Dockerfile
+      dockerfile: Dockerfile
     env_file:
       - .env
     environment:
-      # Database (managed service)
-      DATABASE_URL: ${DATABASE_URL}
-      
-      # Cache (managed service)
-      REDIS_HOST: ${REDIS_HOST}
-      REDIS_PORT: ${REDIS_PORT:-6379}
-      REDIS_PASSWORD: ${REDIS_PASSWORD:-}
-      REDIS_USERNAME: ${REDIS_USERNAME:-}
-      REDIS_URL: ${REDIS_URL:-}
-      
-      # S3 Storage (managed service)
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
-      MINIO_BUCKET: ${MINIO_BUCKET:-content-resources}
-      MINIO_SECURE: ${MINIO_SECURE:-true}
-      
-      # Security & App Config
+      # App Config
       PYTHONPATH: /app
-      JWT_SECRET_KEY: ${JWT_SECRET_KEY}
-      EMAIL_ENCRYPTION_KEY: ${EMAIL_ENCRYPTION_KEY}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s

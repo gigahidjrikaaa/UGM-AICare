@@ -42,24 +42,6 @@ for file in "${ROOT_FILES[@]}"; do
 done
 
 echo ""
-echo "🗑️  Cleaning up /infra/compose (if empty or duplicate)..."
-if [ -d "infra/compose" ]; then
-    if [ "$(ls -A infra/compose)" ]; then
-        # Check if files are duplicates (older versions)
-        if grep -q "# docker-compose.dev.yml\|# docker-compose.prod.yml" infra/compose/* 2>/dev/null || [ ! -s "infra/compose"/* ] 2>/dev/null; then
-            rm -rf "infra/compose"
-            echo "   ✓ Deleted: infra/compose/"
-        else
-            echo "   ⚠️  /infra/compose has files - review before deletion"
-            ls -la infra/compose/
-        fi
-    else
-        rm -rf "infra/compose"
-        echo "   ✓ Deleted: infra/compose/ (empty)"
-    fi
-fi
-
-echo ""
 echo "✅ Cleanup complete!"
 echo ""
 echo "📋 New compose files (ready to use):"

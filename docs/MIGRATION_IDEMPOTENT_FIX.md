@@ -7,7 +7,8 @@
 ## Problem
 
 Production deployment failed with:
-```
+
+```text
 psycopg2.errors.DuplicateColumn: column "updated_at" of relation "player_wellness_state" already exists
 ```
 
@@ -29,6 +30,7 @@ Made the migration **idempotent** by checking if the column exists before adding
 **File:** `backend/alembic/versions/28e1ce4c3187_add_updated_at_to_player_wellness_state.py`
 
 **Before (Non-Idempotent):**
+
 ```python
 def schema_upgrade() -> None:
     # Add updated_at column to player_wellness_state table
@@ -43,6 +45,7 @@ def schema_downgrade() -> None:
 ```
 
 **After (Idempotent):**
+
 ```python
 def schema_upgrade() -> None:
     """Add updated_at column to player_wellness_state table (idempotent)."""
@@ -151,6 +154,7 @@ def upgrade() -> None:
 ## Testing
 
 ### Local Testing
+
 ```bash
 cd backend
 alembic upgrade head  # Should succeed
@@ -160,6 +164,7 @@ alembic upgrade head  # Should succeed
 ```
 
 ### Production Deployment
+
 1. Push changes to repository
 2. GitHub Actions will run migration
 3. Migration will check for existing column
@@ -186,6 +191,7 @@ SELECT * FROM alembic_version;
 ```
 
 Expected output:
+
 - `updated_at` column should exist in `player_wellness_state` table
 - `alembic_version` should show `28e1ce4c3187` as current version
 
@@ -194,11 +200,12 @@ Expected output:
 - Migration: `backend/alembic/versions/28e1ce4c3187_add_updated_at_to_player_wellness_state.py`
 - Model: `backend/app/domains/mental_health/models/quests.py` (PlayerWellnessState)
 - Workflow: `.github/workflows/production.yml`
-- Deploy Script: `infra/scripts/migrate-safe.sh`
+- Deployment: `deploy-prod.sh` and `.github/workflows/ci.yml` (runs `docker compose ... up` for the app-only stack)
 
 ## Monitoring
 
 After deployment, monitor:
+
 - Application logs for any database errors
 - Alembic migration logs
 - Application startup time
@@ -209,18 +216,21 @@ After deployment, monitor:
 If issues persist:
 
 1. **Immediate**: Manually mark migration as completed
+
    ```sql
    -- SSH to production database
    UPDATE alembic_version SET version_num = '28e1ce4c3187' WHERE version_num = '4b77dfea8799';
    ```
 
 2. **If column is missing**: Run migration manually
+
    ```bash
    cd /app
    alembic upgrade head
    ```
 
 3. **If column exists but wrong**: Drop and recreate
+
    ```sql
    ALTER TABLE player_wellness_state DROP COLUMN IF EXISTS updated_at;
    -- Then run migration

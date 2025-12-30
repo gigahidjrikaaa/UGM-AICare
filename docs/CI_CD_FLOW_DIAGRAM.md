@@ -506,7 +506,7 @@ Track in your team:
 
 **Related Documentation:**
 - [CI/CD Test Behavior Guide](./CI_CD_TEST_BEHAVIOR.md)
-- [Monitoring (how to run, profiles)](../infra/MONITORING_README.md)
+- [Monitoring (conceptual guide)](PRODUCTION_MONITORING.md)
 - [Production monitoring strategy](./PRODUCTION_MONITORING.md)
 - [Development Workflow](./development-workflow.md)
 

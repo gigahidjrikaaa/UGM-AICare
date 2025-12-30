@@ -1,10 +1,13 @@
-from typing import AsyncGenerator
+from __future__ import annotations
+
+from typing import AsyncGenerator, Optional
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base
 import os
 from dotenv import load_dotenv
 import logging
+from urllib.parse import parse_qs, urlparse
 
 # Load environment variables from .env file
 load_dotenv()
@@ -15,6 +18,40 @@ logger = logging.getLogger(__name__)
 
 # Determine the database URL from environment variables (should be using Dockerized setup)
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./aika.db")
+
+
+def _parse_bool_env(var_name: str) -> Optional[bool]:
+    raw = os.getenv(var_name)
+    if raw is None:
+        return None
+    raw = raw.strip().lower()
+    if raw in {"1", "true", "t", "yes", "y", "on"}:
+        return True
+    if raw in {"0", "false", "f", "no", "n", "off"}:
+        return False
+    raise ValueError(f"Invalid boolean for {var_name}: {raw!r}")
+
+
+def _ssl_required_from_database_url(database_url: str) -> Optional[bool]:
+    """Infer SSL preference from DATABASE_URL query string.
+
+    NeonDB and many managed Postgres providers require SSL. They typically provide
+    connection strings with sslmode=require (or verify-*).
+    """
+    try:
+        query = urlparse(database_url).query
+        if not query:
+            return None
+        sslmode = (parse_qs(query).get("sslmode", [None])[0] or "").strip().lower()
+        if not sslmode:
+            return None
+        if sslmode in {"require", "verify-ca", "verify-full"}:
+            return True
+        if sslmode in {"disable"}:
+            return False
+        return None
+    except Exception:
+        return None
 
 # Ensure we're using asyncpg for PostgreSQL connections
 if DATABASE_URL.startswith("postgresql://"):
@@ -27,6 +64,20 @@ elif DATABASE_URL.startswith("postgresql+psycopg://"):
 # Create async engine with optimal asyncpg configuration
 if DATABASE_URL.startswith("postgresql+asyncpg://"):
     # Use PostgreSQL with asyncpg - optimized for high performance
+    db_ssl = _parse_bool_env("DB_SSL")
+    if db_ssl is None:
+        db_ssl = _ssl_required_from_database_url(DATABASE_URL)
+
+    connect_args = {
+        "server_settings": {
+            "jit": "off",  # Disable JIT for better compatibility
+            "application_name": "ugm_aicare",  # Identify our application in pg_stat_activity
+        },
+        "command_timeout": 60,  # Timeout for individual commands
+    }
+    if db_ssl is not None:
+        connect_args["ssl"] = db_ssl
+
     async_engine = create_async_engine(
         DATABASE_URL,
         echo=False,  # Set to True for SQL logging
@@ -37,14 +88,7 @@ if DATABASE_URL.startswith("postgresql+asyncpg://"):
         pool_pre_ping=True,     # Validate connections before use
         pool_recycle=3600,      # Recycle connections every hour
         # Connection arguments for asyncpg
-        connect_args={
-            "server_settings": {
-                "jit": "off",                    # Disable JIT for better compatibility
-                "application_name": "ugm_aicare", # Identify our application in pg_stat_activity
-            },
-            "command_timeout": 60,     # Timeout for individual commands
-            "ssl": False,
-        }
+        connect_args=connect_args,
     )
 else:
     # Use SQLite with aiosqlite for development/testing

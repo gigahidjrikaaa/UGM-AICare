@@ -22,6 +22,7 @@ We've implemented a robust account initialization system with three layers:
 The application automatically creates admin/counselor accounts on startup via `app/services/admin_bootstrap.py`. This runs during the FastAPI lifespan startup.
 
 **When it runs:**
+
 - Every time the backend starts
 - Checks if accounts exist
 - Creates them if missing
@@ -34,6 +35,7 @@ A dedicated Python script for manual account initialization with verification.
 **Location:** `backend/scripts/init_production_accounts.py`
 
 **Features:**
+
 - Creates or updates admin account
 - Creates or updates counselor account
 - Verifies email encryption/decryption works
@@ -41,6 +43,7 @@ A dedicated Python script for manual account initialization with verification.
 - Provides detailed logging and diagnostics
 
 **Usage:**
+
 ```bash
 cd backend
 
@@ -54,11 +57,10 @@ chmod +x scripts/init_accounts.sh
 
 ### Layer 3: Deployment Integration
 
-The initialization script is automatically run during production deployment after database migrations.
-
-**Integrated into:** `infra/scripts/deploy.sh`
+Account initialization is typically handled by the backend startup bootstrap (Layer 1). If you need to force-update credentials (e.g., after changing `ENCRYPTION_KEY`, `ADMIN_PASSWORD`, or counselor credentials), run the manual script (Layer 2) after deployment.
 
 **When it runs:**
+
 - After Docker containers are started
 - After database migrations complete
 - Before health checks
@@ -93,6 +95,7 @@ print(key.decode())  # Use this as your ENCRYPTION_KEY
 ```
 
 Or via command line:
+
 ```bash
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
 ```
@@ -102,24 +105,27 @@ python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().d
 The initialization script includes built-in verification that checks:
 
 ### ✅ Account Creation/Update
+
 - Admin account exists in database
 - Counselor account exists in database
 - Accounts have correct roles
 - Accounts are active and email verified
 
 ### ✅ Email Encryption
+
 - Email is properly encrypted in database
 - Encrypted email can be decrypted back to original
 - Decrypted email matches the input email
 
 ### ✅ Password Hashing
+
 - Password is properly hashed with bcrypt
 - Plain password can be verified against hash
 - Hash verification passes
 
 ### Example Output
 
-```
+```text
 ==============================================================
 PRODUCTION ACCOUNTS INITIALIZATION
 ==============================================================
@@ -173,6 +179,7 @@ You can now login with:
 **Cause:** Account doesn't exist or password doesn't match
 
 **Solution:**
+
 ```bash
 # Run initialization script manually
 cd backend
@@ -184,6 +191,7 @@ python scripts/init_production_accounts.py
 **Cause:** `ENCRYPTION_KEY` not set or invalid
 
 **Solution:**
+
 ```bash
 # Generate new key
 python -c "from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())"
@@ -200,9 +208,10 @@ python scripts/init_production_accounts.py
 **Cause:** `DATABASE_URL` incorrect or database not accessible
 
 **Solution:**
+
 ```bash
 # Test database connection
-docker compose -f infra/compose/docker-compose.prod.yml exec backend \
+docker compose --env-file .env -f docker-compose.base.yml -f docker-compose.prod.yml exec backend \
   python -c "from sqlalchemy import create_engine; engine = create_engine('$DATABASE_URL'); print('Connection OK')"
 
 # Check if DATABASE_URL is set
@@ -214,6 +223,7 @@ grep DATABASE_URL .env
 **Cause:** Email encryption key may have changed
 
 **Solution:**
+
 ```bash
 # Force update of existing accounts
 # The script will update email and password with current ENCRYPTION_KEY
@@ -245,16 +255,17 @@ git pull origin main
 cat .env | grep -E "ADMIN_EMAIL|ADMIN_PASSWORD|COUNSELOR_EMAIL|COUNSELOR_PASSWORD|ENCRYPTION_KEY"
 
 # 3. Run deployment script (includes account initialization)
-./infra/scripts/deploy.sh $(git rev-parse HEAD)
+./deploy-prod.sh deploy
 
 # Or initialize accounts manually after deployment:
-docker compose -f infra/compose/docker-compose.prod.yml exec backend \
+docker compose --env-file .env -f docker-compose.base.yml -f docker-compose.prod.yml exec backend \
   python scripts/init_production_accounts.py
 ```
 
 ## Security Best Practices
 
 ### 1. Strong Passwords
+
 ```bash
 # Generate strong passwords (20+ characters)
 openssl rand -base64 32
@@ -267,6 +278,7 @@ COUNSELOR_PASSWORD=$(openssl rand -base64 32)
 ### 2. Secure Environment Variables
 
 **Never commit secrets to git:**
+
 ```bash
 # Ensure .env is in .gitignore
 echo ".env" >> .gitignore
@@ -289,10 +301,11 @@ python scripts/init_production_accounts.py
 ### 4. Audit Logging
 
 Account creation/updates are logged:
+
 ```bash
 # Check backend logs
-docker compose -f infra/compose/docker-compose.prod.yml logs backend | grep "Admin account"
-docker compose -f infra/compose/docker-compose.prod.yml logs backend | grep "Counselor account"
+docker compose --env-file .env -f docker-compose.base.yml -f docker-compose.prod.yml logs backend | grep "Admin account"
+docker compose --env-file .env -f docker-compose.base.yml -f docker-compose.prod.yml logs backend | grep "Counselor account"
 ```
 
 ## Related Files
@@ -301,7 +314,7 @@ docker compose -f infra/compose/docker-compose.prod.yml logs backend | grep "Cou
 - **Shell Wrapper:** `backend/scripts/init_accounts.sh`
 - **Bootstrap Service:** `backend/app/services/admin_bootstrap.py`
 - **Database Init:** `backend/app/database/__init__.py`
-- **Deployment Script:** `infra/scripts/deploy.sh`
+- **Deployment Script:** `deploy-prod.sh`
 - **Auth Route:** `backend/app/routes/auth.py`
 
 ## API Testing
@@ -348,7 +361,7 @@ SELECT email FROM users WHERE role = 'admin' LIMIT 1;
 
 ```bash
 # Watch for account initialization during startup
-docker compose -f infra/compose/docker-compose.prod.yml logs -f backend | grep -E "admin|counselor"
+docker compose --env-file .env -f docker-compose.base.yml -f docker-compose.prod.yml logs -f backend | grep -E "admin|counselor"
 
 # Expected logs:
 # "Admin account already present (by role or email); skipping bootstrap."
@@ -359,7 +372,7 @@ docker compose -f infra/compose/docker-compose.prod.yml logs -f backend | grep -
 ## FAQ
 
 **Q: Do I need to run the script every deployment?**  
-A: No, the deployment script (`deploy.sh`) automatically runs it for you.
+A: Not necessarily. The backend bootstrap runs on startup. If you change account-related environment variables and need to apply them to existing records, run `python scripts/init_production_accounts.py` (Layer 2).
 
 **Q: What if I change the admin password in .env?**  
 A: Run `python scripts/init_production_accounts.py` to update the database with the new password.

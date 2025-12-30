@@ -35,15 +35,12 @@ fi
 
 # Critical variables that MUST be set
 CRITICAL_VARS=(
-  "POSTGRES_PASSWORD"
+  "DATABASE_URL"
   "JWT_SECRET_KEY"
   "EMAIL_ENCRYPTION_KEY"
   "INTERNAL_API_KEY"
   "NEXTAUTH_SECRET"
   "GOOGLE_GENAI_API_KEY"
-  "REDIS_PASSWORD"
-  "MINIO_ACCESS_KEY"
-  "MINIO_SECRET_KEY"
   "ADMIN_PASSWORD"
 )
 
@@ -55,9 +52,14 @@ IMPORTANT_VARS=(
   "GRAFANA_ADMIN_PASSWORD"
   "LANGFUSE_SECRET"
   "LANGFUSE_SALT"
-  "DATABASE_URL"
   "NEXTAUTH_URL"
   "NEXT_PUBLIC_API_URL"
+  "REDIS_URL"
+  "REDIS_HOST"
+  "REDIS_PORT"
+  "MINIO_ENDPOINT"
+  "MINIO_ACCESS_KEY"
+  "MINIO_SECRET_KEY"
 )
 
 # Variables that should NOT contain default/example values
@@ -173,13 +175,43 @@ if grep -q "^NEXTAUTH_URL=" "$ENV_FILE"; then
 fi
 
 # Check Redis configuration
-if grep -q "^REDIS_HOST=" "$ENV_FILE"; then
-  REDIS_HOST=$(grep "^REDIS_HOST=" "$ENV_FILE" | cut -d'=' -f2-)
-  if [ -z "$REDIS_HOST" ]; then
-    echo -e "${RED}❌ ERROR: REDIS_HOST is empty!${NC}"
-    ERRORS=$((ERRORS + 1))
+REDIS_URL_VALUE=$(grep -E "^REDIS_URL=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- || true)
+REDIS_HOST_VALUE=$(grep -E "^REDIS_HOST=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- || true)
+REDIS_PORT_VALUE=$(grep -E "^REDIS_PORT=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- || true)
+
+if [ -n "$REDIS_URL_VALUE" ]; then
+  if echo "$REDIS_URL_VALUE" | grep -Eq '^rediss?://'; then
+    echo -e "${GREEN}✓ REDIS_URL format looks correct${NC}"
   else
-    echo -e "${GREEN}✓ REDIS_HOST is set: $REDIS_HOST${NC}"
+    echo -e "${YELLOW}⚠ WARNING: REDIS_URL should start with redis:// or rediss://${NC}"
+    WARNINGS=$((WARNINGS + 1))
+  fi
+else
+  # Fallback to host/port config
+  if [ -z "$REDIS_HOST_VALUE" ] || [ -z "$REDIS_PORT_VALUE" ]; then
+    echo -e "${YELLOW}⚠ WARNING: Redis is not configured (set REDIS_URL or REDIS_HOST/REDIS_PORT)${NC}"
+    WARNINGS=$((WARNINGS + 1))
+  else
+    if echo "$REDIS_HOST_VALUE" | grep -q ':'; then
+      echo -e "${RED}❌ ERROR: REDIS_HOST must not include a port (no ':port')${NC}"
+      ERRORS=$((ERRORS + 1))
+    else
+      echo -e "${GREEN}✓ REDIS_HOST/REDIS_PORT are set${NC}"
+    fi
+  fi
+fi
+
+# Check MinIO configuration (optional): if endpoint is set, keys should be set.
+MINIO_ENDPOINT_VALUE=$(grep -E "^MINIO_ENDPOINT=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- || true)
+MINIO_ACCESS_KEY_VALUE=$(grep -E "^MINIO_ACCESS_KEY=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- || true)
+MINIO_SECRET_KEY_VALUE=$(grep -E "^MINIO_SECRET_KEY=" "$ENV_FILE" 2>/dev/null | cut -d'=' -f2- || true)
+
+if [ -n "$MINIO_ENDPOINT_VALUE" ]; then
+  if [ -z "$MINIO_ACCESS_KEY_VALUE" ] || [ -z "$MINIO_SECRET_KEY_VALUE" ]; then
+    echo -e "${YELLOW}⚠ WARNING: MINIO_ENDPOINT is set but MINIO_ACCESS_KEY/MINIO_SECRET_KEY are missing${NC}"
+    WARNINGS=$((WARNINGS + 1))
+  else
+    echo -e "${GREEN}✓ MinIO credentials are set${NC}"
   fi
 fi
 

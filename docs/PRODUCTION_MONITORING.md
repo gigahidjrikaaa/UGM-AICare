@@ -1,15 +1,15 @@
 # Production Monitoring Guide for UGM-AICare
 
-This document is a conceptual guide (logging/metrics/alerting design). For operational commands (how to run ELK/Prometheus/Grafana/Langfuse), use the profile-based Compose runbook in `infra/MONITORING_README.md`.
+This document is a conceptual guide (logging/metrics/alerting design). Operational commands for running a bundled ELK/Prometheus/Grafana/Langfuse stack are not included here because the previous Compose-based infra stack has been removed from this repository.
 
 ## Table of Contents
 
-1. [Logging Strategy](#logging-strategy)
-2. [Performance Monitoring](#performance-monitoring)
-3. [Infrastructure Setup](#infrastructure-setup)
-4. [Alerting System](#alerting-system)
-5. [Dashboard Setup](#dashboard-setup)
-6. [Mental Health Specific Metrics](#mental-health-specific-metrics)
+1. [Logging Strategy](#1-logging-strategy)
+2. [Performance Monitoring](#2-performance-monitoring)
+3. [Infrastructure Setup](#3-infrastructure-setup)
+4. [Alerting System](#4-alerting-system)
+5. [Dashboard Setup](#5-dashboard-setup)
+6. [Mental Health Specific Metrics](#6-mental-health-specific-metrics)
 
 ---
 
@@ -175,7 +175,7 @@ configure_logging(log_level=LOG_LEVEL)
 
 #### **Step 2: Deploy ELK Stack**
 
-Operational note: the ELK stack is implemented via Compose profiles in `infra/compose/docker-compose.*.yml`.
+Operational note: a Compose-based ELK stack previously existed in this repository, but it has been removed.
 
 ```yaml
 version: '3.8'
@@ -246,7 +246,7 @@ networks:
     driver: bridge
 ```
 
-Create `infra/docker/filebeat/filebeat.yml`:
+Create the corresponding Filebeat configuration in your observability stack (path is illustrative), e.g. `filebeat/filebeat.yml`:
 
 ```yaml
 filebeat.inputs:
@@ -265,7 +265,7 @@ output.logstash:
   hosts: ["logstash:5000"]
 ```
 
-Create `infra/docker/logstash/pipeline/logstash.conf`:
+Create the corresponding Logstash pipeline configuration in your observability stack (path is illustrative), e.g. `logstash/pipeline/logstash.conf`:
 
 ```conf
 input {
@@ -314,8 +314,7 @@ output {
 #### **Step 3: Start ELK Stack**
 
 ```bash
-cd infra/docker
-docker compose -f infra/compose/docker-compose.dev.yml --profile elk up -d
+Follow your observability stack's deployment procedure to bring up Elasticsearch/Logstash/Kibana.
 ```
 
 Access Kibana at: `http://localhost:5601`
@@ -638,7 +637,7 @@ class SafetyTriageAgent:
 
 #### **Deploy Prometheus + Grafana:**
 
-Operational note: the monitoring stack is implemented via Compose profiles in `infra/compose/docker-compose.*.yml`.
+Operational note: a Compose-based monitoring stack previously existed in this repository, but it has been removed.
 
 ```yaml
 version: '3.8'
@@ -707,7 +706,7 @@ networks:
     driver: bridge
 ```
 
-Create `infra/docker/prometheus/prometheus.yml`:
+Create the corresponding Prometheus configuration in your observability stack (path is illustrative), e.g. `prometheus/prometheus.yml`:
 
 ```yaml
 global:
@@ -752,7 +751,7 @@ rule_files:
 
 ### **Production Deployment Architecture**
 
-```
+```text
                            ┌─────────────────┐
                            │   Load Balancer │
                            │     (Nginx)     │
@@ -836,7 +835,7 @@ services:
       POSTGRES_PASSWORD: ${DB_PASSWORD}
     volumes:
       - postgres-data:/var/lib/postgresql/data
-      - ./infra/scripts/init-replication.sh:/docker-entrypoint-initdb.d/init-replication.sh
+      # (Optional) If you use DB init scripts, mount them here.
     networks:
       - prod-network
 
@@ -882,7 +881,7 @@ networks:
 
 ### **Prometheus Alert Rules**
 
-Create `infra/docker/prometheus/alert_rules.yml`:
+Create the corresponding Prometheus alert rules in your observability stack (path is illustrative), e.g. `prometheus/alert_rules.yml`:
 
 ```yaml
 groups:
@@ -962,7 +961,7 @@ groups:
 
 ### **Alert Manager Configuration**
 
-Create `infra/docker/alertmanager/alertmanager.yml`:
+Create the corresponding Alertmanager configuration in your observability stack (path is illustrative), e.g. `alertmanager/alertmanager.yml`:
 
 ```yaml
 global:
@@ -1023,7 +1022,7 @@ inhibit_rules:
 
 ### **Grafana Dashboard JSON**
 
-Save this as `infra/docker/grafana/dashboards/ugm-aicare-overview.json`:
+Save this as a Grafana dashboard JSON in your observability stack (path is illustrative), e.g. `grafana/dashboards/ugm-aicare-overview.json`:
 
 ```json
 {
@@ -1208,7 +1207,7 @@ curl 'http://localhost:9090/api/v1/query?query=agent_processing_time_seconds'
 
 ### **Kibana Log Queries**
 
-```
+```text
 # Find all errors
 level: ERROR
 

@@ -6,17 +6,10 @@ def check_env():
     Checks for the presence of all required environment variables for the backend.
     Logs warnings for missing or empty variables.
     """
+    # Core requirements for the backend to boot.
     required_env_vars = [
-        # Database
+        # Database (managed service or local): SQLAlchemy async URL.
         "DATABASE_URL",
-        "POSTGRES_USER",
-        "POSTGRES_PASSWORD",
-        "POSTGRES_DB",
-
-        # Redis (Optional/Mocked)
-        # "REDIS_HOST",
-        # "REDIS_PORT",
-        # Optional: "REDIS_DB", "REDIS_USERNAME", "REDIS_PASSWORD"
 
         # Auth/JWT
         "JWT_SECRET_KEY",
@@ -29,36 +22,50 @@ def check_env():
         "FRONTEND_URL",
         "BACKEND_URL",
 
-        # Email
-        "EMAIL_USERNAME",
-        "EMAIL_PASSWORD",
-        "EMAIL_SMTP_SERVER",
-        "EMAIL_SMTP_PORT",
-
-    # LLM/AI
-    "GOOGLE_GENAI_API_KEY",
-
-        # Blockchain
-        "EDU_TESTNET_RPC_URL",
-        "NFT_CONTRACT_ADDRESS",
-        "BACKEND_MINTER_PRIVATE_KEY",
-
-        # Twitter
-        "TWITTER_BEARER_TOKEN",
-        "TWITTER_API_KEY",
-        "TWITTER_API_SECRET",
-        "TWITTER_ACCESS_TOKEN",
-        "TWITTER_ACCESS_SECRET",
-
         # Encryption
         "EMAIL_ENCRYPTION_KEY",
 
         # App
         "APP_ENV",
         "PORT",
+
+        # LLM/AI (required for most AI features)
+        "GOOGLE_GENAI_API_KEY",
     ]
 
-    print("--- Backend Environment Variable Check ---")
+    # Optional features (only required if you use the corresponding integrations/routes).
+    optional_env_vars = [
+        # Neon/managed Postgres hint (optional, DATABASE_URL can include sslmode=require)
+        "DB_SSL",
+
+        # Redis (optional; if not configured, backend will fall back to MockRedis)
+        "REDIS_URL",
+        "REDIS_HOST",
+        "REDIS_PORT",
+        "REDIS_DB",
+        "REDIS_USERNAME",
+        "REDIS_PASSWORD",
+        "REDIS_SSL",
+
+        # Celery (only required if you run Celery workers)
+        "CELERY_BROKER_URL",
+        "CELERY_RESULT_BACKEND",
+
+        # Object storage (MinIO / S3-compatible)
+        "MINIO_ENDPOINT",
+        "MINIO_ACCESS_KEY",
+        "MINIO_SECRET_KEY",
+        "MINIO_BUCKET",
+        "MINIO_SECURE",
+
+        # Email sending (only required if you send emails)
+        "EMAIL_USERNAME",
+        "EMAIL_PASSWORD",
+        "EMAIL_SMTP_SERVER",
+        "EMAIL_SMTP_PORT",
+    ]
+
+    print("--- Backend Environment Variable Check (Required) ---")
     for var in required_env_vars:
         value = os.environ.get(var)
         if value is None:
@@ -70,4 +77,18 @@ def check_env():
                 print(f"ENV CHECK: {var} is SET to: \"{value}\"")
             else:
                 print(f"ENV CHECK: {var} is SET (value hidden for security).")
+
+    print("--- Backend Environment Variable Check (Optional) ---")
+    for var in optional_env_vars:
+        value = os.environ.get(var)
+        if value is None:
+            continue
+        if value == "":
+            logging.warning(f"ENV CHECK: {var} is set but EMPTY STRING.")
+            continue
+        if var in ["REDIS_URL", "REDIS_HOST", "REDIS_PORT", "MINIO_ENDPOINT", "MINIO_BUCKET"]:
+            print(f"ENV CHECK: {var} is SET to: \"{value}\"")
+        else:
+            print(f"ENV CHECK: {var} is SET (value hidden for security).")
+
     print("--- End Backend Environment Variable Check ---")

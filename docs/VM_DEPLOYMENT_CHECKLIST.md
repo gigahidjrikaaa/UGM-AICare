@@ -17,31 +17,21 @@ This document lists all files that are `.gitignore`d but **required** on the pro
 ```bash
 # Database (Required for docker compose)
 DATABASE_URL=postgresql+asyncpg://user:password@host:port/dbname
-POSTGRES_DB=your_database_name
-POSTGRES_USER=your_db_username
-POSTGRES_PASSWORD=your_db_password
+
+# Optional: managed Postgres providers may require SSL
+# DB_SSL=true
 
 # Security
 JWT_SECRET_KEY=your-secret-key-here
 EMAIL_ENCRYPTION_KEY=your-encryption-key-here
+INTERNAL_API_KEY=your-internal-api-key
+NEXTAUTH_SECRET=your-nextauth-secret
 
 # LLM API
-GEMINI_API_KEY=your-gemini-api-key
+GOOGLE_GENAI_API_KEY=your-gemini-api-key
 
 # Redis
-REDIS_HOST=localhost
-REDIS_PORT=6379
-REDIS_PASSWORD=optional-redis-password
-
-# JWT Secret (Required - generate with: openssl rand -hex 32)
-JWT_SECRET_KEY=your-jwt-secret-key-here
-
-# Email Encryption Key (Required - generate with: openssl rand -hex 32)
-EMAIL_ENCRYPTION_KEY=your-email-encryption-key-here
-
-# Gemini API (Required for AI functionality)
-GEMINI_API_KEY=your-gemini-api-key-here
-GOOGLE_GENAI_API_KEY=your-gemini-api-key-here  # Same as above, different name
+REDIS_URL=redis://default:password@host:port/0
 
 # Google OAuth (Required for authentication)
 GOOGLE_CLIENT_ID=your-google-client-id
@@ -181,26 +171,7 @@ scp backend/alembic.ini deployuser@your_vm:/path/to/UGM-AICare/backend/
 
 ## 📋 Optional Files (May Be Needed)
 
-### 4. `docker-compose.override.yml` (Infra)
-**Location:** `UGM-AICare/infra/compose/docker-compose.override.yml`  
-**Purpose:** Local overrides for docker compose (ports, volumes, etc.)  
-**Required if:** You need custom port mappings or configurations  
-
-**Example:**
-```yaml
-services:
-  backend:
-    ports:
-      - "8001:8000"  # Map to different host port
-  
-  frontend:
-    ports:
-      - "4001:3000"  # Map to different host port
-```
-
----
-
-### 5. `logs/` Directory (Backend)
+### 4. `logs/` Directory (Backend)
 **Location:** `UGM-AICare/backend/logs/`  
 **Purpose:** Application logs  
 **Auto-created:** Yes, but ensure write permissions  
@@ -213,7 +184,7 @@ chmod 755 /path/to/UGM-AICare/backend/logs
 
 ---
 
-### 6. ONNX Models (Backend)
+### 5. ONNX Models (Backend)
 **Location:** `UGM-AICare/backend/models/onnx/`  
 **Purpose:** ML models for emotion detection  
 **Auto-downloaded:** Yes, during Docker build from HuggingFace  
@@ -299,8 +270,8 @@ echo "✅ Created backend/logs/"
 
 # 4. Verify permissions
 echo "🔐 Verifying permissions..."
-chmod +x infra/scripts/*.sh
 chmod +x scripts/*.sh
+chmod +x deploy-prod.sh
 
 echo ""
 echo "✅ Setup complete!"
@@ -309,7 +280,7 @@ echo "⚠️  IMPORTANT: Edit .env file with your actual credentials:"
 echo "    nano .env"
 echo ""
 echo "Then you can run deployment:"
-echo "    ./infra/scripts/deploy.sh <commit-sha>"
+echo "    ./deploy-prod.sh deploy"
 ```
 
 ---
@@ -376,7 +347,7 @@ format = %(levelname)-5.5s [%(name)s] %(message)s
 datefmt = %H:%M:%S
 EOF
 
-# 4. Create .env (or it will be created by deploy.sh from GitHub secret)
+# 4. Create .env (or it will be created by the CI/CD workflow from GitHub secret)
 # If you want to create manually:
 cp env.example .env
 nano .env  # Edit with actual values
@@ -385,8 +356,8 @@ nano .env  # Edit with actual values
 mkdir -p backend/logs
 
 # 6. Make scripts executable
-chmod +x infra/scripts/*.sh
 chmod +x scripts/*.sh
+chmod +x deploy-prod.sh
 
 # 7. Verify setup
 echo "✅ Checking required files..."
@@ -404,11 +375,11 @@ echo "🚀 VM is ready for deployment!"
 
 | File | Location | Required? | Auto-created? | How to create |
 |------|----------|-----------|---------------|---------------|
-| `.env` | `UGM-AICare/.env` | ✅ Yes | ✅ Yes (by deploy.sh) | From `ENV_FILE_PRODUCTION` secret |
+| `.env` | `UGM-AICare/.env` | ✅ Yes | ✅ Yes (by CI/CD) | From `ENV_FILE_PRODUCTION` secret |
 | `alembic.ini` | `backend/alembic.ini` | ✅ Yes | ❌ No | **Manually create** (see above) |
 | `alembic_supa.ini` | `backend/alembic_supa.ini` | 🟡 Optional | ❌ No | Copy from local if needed |
 | `logs/` | `backend/logs/` | 🟡 Optional | ✅ Yes (by app) | `mkdir -p backend/logs` |
-| `docker-compose.override.yml` | `infra/compose/` | 🟡 Optional | ❌ No | Create if custom config needed |
+| `docker-compose.override.yml` | Project root | 🟡 Optional | ❌ No | Create if custom config needed |
 
 ---
 
@@ -422,16 +393,12 @@ echo "🚀 VM is ready for deployment!"
 **Cause:** Migrations being run before Docker containers are started  
 **Fix:** This has been fixed in the deployment script - migrations now run inside the Docker container after services start. Update your deployment scripts by pulling latest changes.
 
-### Error: "The \"POSTGRES_DB\" variable is not set"
+### Error: "DATABASE_URL is not set"
 **Cause:** Required environment variables missing from `.env` file  
 **Fix:** Ensure your `.env` file contains all required variables:
-- `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` (for database)
+- `DATABASE_URL` (for database)
 - `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` (for OAuth)
 - `GIT_SHA` is auto-set by deployment script
-
-### Error: "env file .../infra/compose/.env not found"
-**Cause:** This error is expected and can be ignored - the deployment script passes `.env` via `--env-file` flag  
-**Fix:** No action needed if deployment succeeds. If it fails, ensure `.env` exists in project root.
 
 ### Error: "SOME_VAR: command not found" during .env loading
 **Cause:** Malformed `.env` file with lines missing `=` sign or values  
@@ -453,7 +420,7 @@ echo "🚀 VM is ready for deployment!"
 **Cause:** Critical environment variables not passed to backend container  
 **Fix:** Ensure `.env` contains:
 - `JWT_SECRET_KEY` (generate with: `openssl rand -hex 32`)
-- `GEMINI_API_KEY`
+- `GOOGLE_GENAI_API_KEY`
 - `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
 
 These variables MUST be in the `.env` file for docker compose to substitute them into the container.
@@ -477,10 +444,10 @@ git pull origin main  # Get latest Dockerfile
 
 ### Error: "connection to server at localhost, port 5432 failed" (Alembic)
 **Cause:** Migration script overriding container's DATABASE_URL with host's DATABASE_URL  
-**Fix:** Updated migrate.sh to use container's existing DATABASE_URL (points to 'db' service, not localhost)
+**Fix:** Ensure your `.env` `DATABASE_URL` points to the correct database host for the VM (managed DB hostname, not localhost).
 ```bash
-git pull origin main  # Get latest migrate.sh
-./infra/scripts/deploy.sh  # Redeploy
+git pull origin main
+./deploy-prod.sh deploy
 ```
 
 **Why this happens:**  
@@ -492,7 +459,6 @@ git pull origin main  # Get latest migrate.sh
 
 ## 📚 Related Documentation
 
-- [Infrastructure Deployment Guide](./infra/README.md)
 - [Environment Variables Reference](../env.example)
 - [Migration Scripts](../scripts/run_migrations.sh)
 - [CI/CD Pipeline](./.github/workflows/ci.yml)
