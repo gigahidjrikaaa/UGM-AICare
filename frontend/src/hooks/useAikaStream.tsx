@@ -1,5 +1,6 @@
 // src/hooks/useAikaStream.tsx
 import { useState, useCallback, useRef } from 'react';
+import { getSession } from 'next-auth/react';
 
 interface StreamEvent {
   type: 'thinking' | 'status' | 'agent' | 'intervention_plan' | 'appointment' | 'agent_activity' | 'complete' | 'error';
@@ -70,10 +71,9 @@ export function useAikaStream() {
     abortControllerRef.current = new AbortController();
 
     try {
-      const token = localStorage.getItem('token');
-      if (!token) {
-        throw new Error('Not authenticated');
-      }
+      const session = await getSession();
+      const token = session?.accessToken || localStorage.getItem('token');
+      if (!token) throw new Error('Not authenticated');
 
       const apiOrigin = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
       const endpoint = apiOrigin ? `${apiOrigin}/api/v1/aika/stream` : '/api/v1/aika/stream';
@@ -84,6 +84,7 @@ export function useAikaStream() {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`,
         },
+        credentials: 'include',
         body: JSON.stringify({
           message,
           conversation_history: conversationHistory,

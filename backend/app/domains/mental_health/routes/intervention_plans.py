@@ -47,14 +47,20 @@ async def get_user_intervention_plans(
     
     total = await InterventionPlanService.get_active_plan_count(db, current_user.id)
     
-    # DEBUG: Log what we're returning
-    logger.info(f"📋 Intervention Plans API - User: {current_user.id}, Active Only: {active_only}")
-    logger.info(f"📋 Returning {len(plans)} plans (total count: {total})")
+    # DEBUG: Log what we're returning (avoid emoji for Windows console compatibility)
+    logger.info("Intervention Plans API - User: %s, Active Only: %s", current_user.id, active_only)
+    logger.info("Returning %s plans (total count: %s)", len(plans), total)
     if plans:
         for plan in plans:
-            logger.info(f"  - Plan ID {plan.id}: user_id={plan.user_id}, is_active={plan.is_active}, status={plan.status}")
+            logger.info(
+                "  - Plan ID %s: user_id=%s, is_active=%s, status=%s",
+                plan.id,
+                plan.user_id,
+                plan.is_active,
+                plan.status,
+            )
     else:
-        logger.warning(f"⚠️ No plans found for user {current_user.id} (active_only={active_only})")
+        logger.warning("No plans found for user %s (active_only=%s)", current_user.id, active_only)
     
     return InterventionPlanListResponse(
         plans=plans,

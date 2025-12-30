@@ -71,6 +71,48 @@ run_local_no_reload() {
   local backend_port="${BACKEND_EXTERNAL_PORT:-22001}"
   local frontend_port="${FRONTEND_EXTERNAL_PORT:-22000}"
 
+  # Use localhost (not 127.0.0.1) so browser cookies can be shared across ports.
+  local backend_origin="http://localhost:${backend_port}"
+  local frontend_origin="http://localhost:${frontend_port}"
+
+  rewrite_local_url() {
+    local value="${1:-}"
+    local fallback="${2:-}"
+
+    if [[ -z "$value" ]]; then
+      echo "$fallback"
+      return 0
+    fi
+
+    # If the URL was meant for Docker networking, rewrite it for local runs.
+    if [[ "$value" == *"://backend"* || "$value" == *"://frontend"* ]]; then
+      echo "$fallback"
+      return 0
+    fi
+
+    echo "$value"
+  }
+
+  export INTERNAL_API_URL
+  INTERNAL_API_URL="$(rewrite_local_url "${INTERNAL_API_URL:-}" "$backend_origin")"
+
+  export NEXT_PUBLIC_API_URL
+  NEXT_PUBLIC_API_URL="$(rewrite_local_url "${NEXT_PUBLIC_API_URL:-}" "$backend_origin")"
+
+  export NEXT_PUBLIC_BACKEND_BASE
+  NEXT_PUBLIC_BACKEND_BASE="$(rewrite_local_url "${NEXT_PUBLIC_BACKEND_BASE:-}" "$backend_origin")"
+
+  export BACKEND_URL
+  BACKEND_URL="$(rewrite_local_url "${BACKEND_URL:-}" "$backend_origin")"
+
+  export NEXTAUTH_URL
+  NEXTAUTH_URL="$(rewrite_local_url "${NEXTAUTH_URL:-}" "$frontend_origin")"
+
+  # Local dev uses plain HTTP, so cookies must not be marked as Secure.
+  # Backend auth uses these to configure Set-Cookie flags.
+  export COOKIE_SECURE="${COOKIE_SECURE:-false}"
+  export COOKIE_SAMESITE="${COOKIE_SAMESITE:-lax}"
+
   local python_bin
   if ! python_bin="$(resolve_python)"; then
     echo "❌ ERROR: Python not found. Install Python 3 and ensure it's on PATH." >&2

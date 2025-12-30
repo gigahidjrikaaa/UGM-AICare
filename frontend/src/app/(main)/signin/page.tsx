@@ -131,7 +131,7 @@ export default function SignIn() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] flex relative pt-24">
+    <div className="min-h-screen bg-linear-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] flex relative pt-24">
       {/* Particle Background */}
       <div className="absolute inset-0 z-0">
         <ParticleBackground 
@@ -155,9 +155,9 @@ export default function SignIn() {
         <div className="flex flex-col justify-center items-center px-6 py-4 relative z-10 w-full">
           {/* Brand Header */}
           <div className="text-center mb-5">
-            <div className="mx-auto w-18 h-18 bg-gradient-to-br from-[#FFCA40] to-[#FFD700] rounded-2xl flex items-center justify-center mb-3 shadow-2xl">
+            <div className="mx-auto w-18 h-18 bg-linear-to-br from-[#FFCA40] to-[#FFD700] rounded-2xl flex items-center justify-center mb-3 shadow-2xl">
               <Image
-                src="/images/logo.png"
+                src="/aicare_logo.png"
                 alt="UGM-AICare"
                 width={36}
                 height={36}
@@ -224,9 +224,9 @@ export default function SignIn() {
         >
           {/* Mobile Logo - Only visible on mobile */}
           <div className="text-center mb-4 lg:hidden">
-            <div className="mx-auto w-12 h-12 bg-gradient-to-br from-[#FFCA40] to-[#FFD700] rounded-xl flex items-center justify-center mb-2 shadow-lg">
+            <div className="mx-auto w-12 h-12 bg-linear-to-br from-[#FFCA40] to-[#FFD700] rounded-xl flex items-center justify-center mb-2 shadow-lg">
               <Image
-                src="/images/logo.png"
+                src="/aicare_logo.png"
                 alt="UGM-AICare"
                 width={24}
                 height={24}
@@ -255,7 +255,7 @@ export default function SignIn() {
               animate={{ opacity: 1, y: 0 }}
               className="bg-red-500/15 border border-red-500/30 text-red-300 p-3 rounded-xl mb-4 flex items-center backdrop-blur-sm"
             >
-              <FiAlertCircle className="mr-2 flex-shrink-0 w-4 h-4" />
+              <FiAlertCircle className="mr-2 shrink-0 w-4 h-4" />
               <span className="text-sm">{error}</span>
             </motion.div>
           )}
@@ -321,7 +321,7 @@ export default function SignIn() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex items-center justify-center px-4 py-3 bg-gradient-to-r from-[#FFCA40] to-[#FFD700] text-[#001D58] font-semibold rounded-xl hover:from-[#FFD700] hover:to-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40] focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed group shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
+              className="w-full flex items-center justify-center px-4 py-3 bg-linear-to-r from-[#FFCA40] to-[#FFD700] text-[#001D58] font-semibold rounded-xl hover:from-[#FFD700] hover:to-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40] focus:ring-offset-2 focus:ring-offset-transparent transition-all duration-300 disabled:opacity-70 disabled:cursor-not-allowed group shadow-lg hover:shadow-xl transform hover:-translate-y-0.5"
             >
               {isLoading ? (
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-[#001D58]"></div>
@@ -342,7 +342,7 @@ export default function SignIn() {
                 <div className="w-full border-t border-white/20" />
               </div>
               <div className="relative flex justify-center text-sm">
-                <span className="px-3 bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white/60 text-xs">or continue with</span>
+                <span className="px-3 bg-linear-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white/60 text-xs">or continue with</span>
               </div>
             </div>
 

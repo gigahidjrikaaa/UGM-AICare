@@ -1,4 +1,5 @@
 import logging
+import os
 import uuid
 from datetime import datetime
 from typing import Optional
@@ -108,6 +109,34 @@ def build_token_payload(user: User) -> dict[str, str]:
     return payload
 
 
+def _bool_env(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _cookie_flags() -> tuple[bool, str]:
+    """Cookie flags tuned by env vars.
+
+    Defaults are production-safe (Secure + SameSite=None). Local dev should set:
+    - COOKIE_SECURE=false
+    - COOKIE_SAMESITE=lax
+    """
+
+    secure = _bool_env("COOKIE_SECURE", True)
+    samesite = (os.getenv("COOKIE_SAMESITE") or ("none" if secure else "lax")).strip().lower()
+    if samesite not in {"lax", "strict", "none"}:
+        samesite = "none" if secure else "lax"
+
+    # Browsers reject SameSite=None cookies unless Secure is also set.
+    if samesite == "none" and not secure:
+        logger.warning("COOKIE_SAMESITE=none requires COOKIE_SECURE=true; falling back to samesite=lax")
+        samesite = "lax"
+
+    return secure, samesite
+
+
 @router.post("/oauth/token", response_model=Token)
 async def exchange_oauth_token(
     payload: OAuthTokenRequest,
@@ -199,12 +228,13 @@ async def exchange_oauth_token(
         ),
     }
     # Set cookie for browser-based access (HttpOnly, secure configurable)
+    cookie_secure, cookie_samesite = _cookie_flags()
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=cookie_secure,
+        samesite=cookie_samesite,
         max_age=60*60*24,
         path="/",
     )
@@ -283,12 +313,13 @@ async def login_for_access_token(
         "token_type": "bearer",
         "user": serialize_user(user, fallback_email=request.email),
     }
+    cookie_secure, cookie_samesite = _cookie_flags()
     response.set_cookie(
         key="access_token",
         value=access_token,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=cookie_secure,
+        samesite=cookie_samesite,
         max_age=60*60*24,
         path="/",
     )

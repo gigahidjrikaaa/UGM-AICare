@@ -119,7 +119,9 @@ export function useAika(options: UseAikaOptions = {}) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          ...(session?.accessToken ? { Authorization: `Bearer ${session.accessToken}` } : {}),
         },
+        credentials: 'include',
         body: JSON.stringify(requestBody),
       });
 
