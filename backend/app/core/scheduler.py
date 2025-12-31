@@ -24,7 +24,6 @@ from sqlalchemy.orm import joinedload
 from app.database import AsyncSessionLocal
 from app.models import User
 from app.domains.mental_health.models.assessments import UserScreeningProfile
-from app.utils.security_utils import decrypt_data
 from app.utils.email_utils import send_email
 from app.domains.mental_health.services.insights_service import InsightsService
 from datetime import datetime, timedelta, date
@@ -252,14 +251,11 @@ async def send_proactive_checkins() -> None:
                 
                 eligible_count += 1
                 
-                # Decrypt email
+                # Get email (stored as plaintext, encryption removed for performance)
                 if not user.email:
                     continue
                     
-                decrypted_email = decrypt_data(user.email)
-                if not decrypted_email:
-                    logger.error(f"Scheduler: Failed to decrypt email for user {user.id}")
-                    continue
+                user_email = user.email
                 
                 # Get personalized message
                 user_name = user.name or user.preferred_name or 'Teman UGM'
@@ -272,7 +268,7 @@ async def send_proactive_checkins() -> None:
                 
                 # Send email
                 try:
-                    send_email(recipient_email=decrypted_email, subject=subject, html_content=html_body)
+                    send_email(recipient_email=user_email, subject=subject, html_content=html_body)
                     
                     # Update check-in tracking
                     user.last_checkin_sent_at = now
@@ -556,10 +552,7 @@ async def trigger_immediate_checkin(user_id: int, reason: str = "manual") -> boo
                 logger.error(f"Scheduler: User {user_id} has no email")
                 return False
             
-            decrypted_email = decrypt_data(user.email)
-            if not decrypted_email:
-                logger.error(f"Scheduler: Failed to decrypt email for user {user_id}")
-                return False
+            user_email = user.email  # Stored as plaintext (encryption removed for performance)
             
             # Get screening data
             risk_level = profile.overall_risk if profile else "none"
@@ -577,7 +570,7 @@ async def trigger_immediate_checkin(user_id: int, reason: str = "manual") -> boo
             )
             
             # Send email
-            send_email(recipient_email=decrypted_email, subject=subject, html_content=html_body)
+            send_email(recipient_email=user_email, subject=subject, html_content=html_body)
             
             # Update tracking
             user.last_checkin_sent_at = datetime.now()

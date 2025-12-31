@@ -10,23 +10,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User  # Core model
 from app.domains.mental_health.models import Appointment, JournalEntry, UserSummary
-from app.utils.security_utils import decrypt_data
 from app.core.cache import cached, get_cache_service
 from app.core.settings import settings
 
 _CACHE_TTL = timedelta(minutes=5)
 _context_cache: Dict[int, Tuple[str, datetime]] = {}
 _cache_lock = asyncio.Lock()
-
-
-def _safe_decrypt(value: Optional[str]) -> Optional[str]:
-    """Decrypt an encrypted field, returning None on failure."""
-    if not value:
-        return None
-    try:
-        return decrypt_data(value)
-    except Exception:
-        return None
 
 
 @cached(key_prefix="user_summary", ttl=settings.cache_user_summary_ttl)
@@ -142,7 +131,7 @@ async def _compute_personal_context(db: AsyncSession, user: User) -> str:
     """
     profile_lines: List[str] = []
 
-    name = _safe_decrypt(user.name) or _safe_decrypt(user.first_name)
+    name = user.name or user.first_name
     if name:
         profile_lines.append(f"Nama panggilan: {name}")
 

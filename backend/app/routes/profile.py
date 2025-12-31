@@ -47,7 +47,6 @@ from app.schemas.user import (
     UserStatsResponse,
 )
 from app.schemas.ai_memory import AIMemoryFactResponse
-from app.utils.security_utils import decrypt_data, encrypt_data
 from app.domains.mental_health.services.user_stats_service import UserStatsService
 from pydantic import BaseModel, Field
 from typing import Optional
@@ -96,35 +95,12 @@ UNLEASH_THE_WORDS_BADGE_ID = 7
 BESTIES_BADGE_ID = 8
 
 
-def _safe_decrypt(value: str | None) -> str | None:
-    if not value:
-        return None
-    decrypted = decrypt_data(value)
-    return decrypted or value
-
-
-def _decrypt_required(value: str) -> str:
-    decrypted = decrypt_data(value)
-    return decrypted or ""
-
-
 def _normalize_optional_string(value: str | None) -> str | None:
+    """Normalize and clean optional string values."""
     if value is None:
         return None
     cleaned = value.strip()
     return cleaned or None
-
-
-def _encrypt_optional(value: str | None) -> str | None:
-    if value is None:
-        return None
-    encrypted = encrypt_data(value)
-    if encrypted is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to secure profile data.",
-        )
-    return encrypted
 
 
 def _calculate_age(dob: date | None) -> int | None:
@@ -283,16 +259,16 @@ async def get_profile_overview(
     user = await _load_user_with_profile(current_user.id, db)
 
     # Email always from User table (core auth)
-    email = _safe_decrypt(user.email) or user.email
+    email = user.email
     
     # Phone numbers - read from UserProfile with fallback to legacy User columns
     phone = (
-        _safe_decrypt(user.profile.phone) if user.profile and user.profile.phone
-        else _safe_decrypt(user.phone)
+        user.profile.phone if user.profile and user.profile.phone
+        else user.phone
     )
     alternate_phone = (
-        _safe_decrypt(user.profile.alternate_phone) if user.profile and user.profile.alternate_phone
-        else _safe_decrypt(user.alternate_phone)
+        user.profile.alternate_phone if user.profile and user.profile.alternate_phone
+        else user.alternate_phone
     )
 
     # Emergency contact - read from UserEmergencyContact table with fallback to legacy User columns
@@ -301,18 +277,18 @@ async def get_profile_overview(
         # Use first emergency contact from normalized table
         primary_contact = user.emergency_contacts[0]
         emergency_contact = EmergencyContact(
-            name=_safe_decrypt(primary_contact.full_name),
-            relationship=_safe_decrypt(primary_contact.relationship_to_user),
-            phone=_safe_decrypt(primary_contact.phone),
-            email=_safe_decrypt(primary_contact.email),
+            name=primary_contact.full_name,
+            relationship=primary_contact.relationship_to_user,
+            phone=primary_contact.phone,
+            email=primary_contact.email,
         )
     else:
         # Fallback to legacy User columns
         legacy_emergency_contact = EmergencyContact(
-            name=_safe_decrypt(user.emergency_contact_name),
-            relationship=_safe_decrypt(user.emergency_contact_relationship),
-            phone=_safe_decrypt(user.emergency_contact_phone),
-            email=_safe_decrypt(user.emergency_contact_email),
+            name=user.emergency_contact_name,
+            relationship=user.emergency_contact_relationship,
+            phone=user.emergency_contact_phone,
+            email=user.emergency_contact_email,
         )
         if any([legacy_emergency_contact.name, legacy_emergency_contact.relationship, 
                 legacy_emergency_contact.phone, legacy_emergency_contact.email]):
@@ -320,49 +296,51 @@ async def get_profile_overview(
 
     # Name fields - read from UserProfile with fallback to legacy User columns
     first_name = (
-        _safe_decrypt(user.profile.first_name) if user.profile and user.profile.first_name
-        else _safe_decrypt(user.first_name)
+        user.profile.first_name if user.profile and user.profile.first_name
+        else user.first_name
     )
     last_name = (
-        _safe_decrypt(user.profile.last_name) if user.profile and user.profile.last_name
-        else _safe_decrypt(user.last_name)
+        user.profile.last_name if user.profile and user.profile.last_name
+        else user.last_name
     )
     full_name_parts = [first_name, last_name]
-    full_name = " ".join([part for part in full_name_parts if part]) or _safe_decrypt(user.name)
+    full_name = " ".join([part for part in full_name_parts if part]) or user.name
     
     preferred_name = (
-        _safe_decrypt(user.profile.preferred_name) if user.profile and user.profile.preferred_name
-        else _safe_decrypt(user.preferred_name)
+        user.profile.preferred_name if user.profile and user.profile.preferred_name
+        else user.preferred_name
     )
 
     # Profile header - read from UserProfile with fallback to legacy User columns
     pronouns = (
-        _safe_decrypt(user.profile.pronouns) if user.profile and user.profile.pronouns
-        else _safe_decrypt(user.pronouns)
+        user.profile.pronouns if user.profile and user.profile.pronouns
+        else user.pronouns
     )
     city = (
-        _safe_decrypt(user.profile.city) if user.profile and user.profile.city
-        else _safe_decrypt(user.city)
+        user.profile.city if user.profile and user.profile.city
+        else user.city
     )
     university = (
-        _safe_decrypt(user.profile.university) if user.profile and user.profile.university
-        else _safe_decrypt(user.university)
+        user.profile.university if user.profile and user.profile.university
+        else user.university
     )
     major = (
-        _safe_decrypt(user.profile.major) if user.profile and user.profile.major
-        else _safe_decrypt(user.major)
+        user.profile.major if user.profile and user.profile.major
+        else user.major
     )
-    year_of_study = (
-        user.profile.year_of_study if user.profile and user.profile.year_of_study
-        else _safe_decrypt(user.year_of_study)
+    # year_of_study can be Integer (UserProfile) or String (User) - normalize to string
+    year_of_study_raw = (
+        user.profile.year_of_study if user.profile and user.profile.year_of_study is not None
+        else user.year_of_study
     )
+    year_of_study = str(year_of_study_raw) if year_of_study_raw is not None else None
     date_of_birth = (
         user.profile.date_of_birth if user.profile
         else user.date_of_birth
     )
     profile_photo_url = (
-        _safe_decrypt(user.profile.profile_photo_url) if user.profile and user.profile.profile_photo_url
-        else _safe_decrypt(user.profile_photo_url)
+        user.profile.profile_photo_url if user.profile and user.profile.profile_photo_url
+        else user.profile_photo_url
     )
 
     header = ProfileHeaderSummary(
@@ -397,18 +375,18 @@ async def get_profile_overview(
     )
 
     safety = SafetyAndClinicalBasics(
-        risk_level=_safe_decrypt(user.risk_level),
-        clinical_summary=_safe_decrypt(user.clinical_summary),
-        primary_concerns=_safe_decrypt(user.primary_concerns),
-        safety_plan_notes=_safe_decrypt(user.safety_plan_notes),
+        risk_level=user.risk_level,
+        clinical_summary=user.clinical_summary,
+        primary_concerns=user.primary_concerns,
+        safety_plan_notes=user.safety_plan_notes,
     )
 
     therapy = TherapyAssignment(
-        current_therapist_name=_safe_decrypt(user.current_therapist_name),
-        current_therapist_contact=_safe_decrypt(user.current_therapist_contact),
-        therapy_modality=_safe_decrypt(user.therapy_modality),
-        therapy_frequency=_safe_decrypt(user.therapy_frequency),
-        therapy_notes=_safe_decrypt(user.therapy_notes),
+        current_therapist_name=user.current_therapist_name,
+        current_therapist_contact=user.current_therapist_contact,
+        therapy_modality=user.therapy_modality,
+        therapy_frequency=user.therapy_frequency,
+        therapy_notes=user.therapy_notes,
     )
 
     # Consent settings - read from UserPreferences with fallback to legacy User columns
@@ -427,25 +405,22 @@ async def get_profile_overview(
 
     # Localization - read from UserPreferences with fallback to legacy User columns
     preferred_language = (
-        _safe_decrypt(user.preferences.preferred_language) if user.preferences and user.preferences.preferred_language
-        else _safe_decrypt(user.preferred_language) or "id"
-    )
+        user.preferences.preferred_language if user.preferences and user.preferences.preferred_language
+        else user.preferred_language
+    ) or "id"
     preferred_timezone = (
-        _safe_decrypt(user.preferences.preferred_timezone) if user.preferences and user.preferences.preferred_timezone
-        else _safe_decrypt(user.preferred_timezone) or "Asia/Jakarta"
-    )
+        user.preferences.preferred_timezone if user.preferences and user.preferences.preferred_timezone
+        else user.preferred_timezone
+    ) or "Asia/Jakarta"
+    # UserPreferences uses 'accessibility_notes', User uses 'accessibility_needs'
     accessibility_needs = (
-        _safe_decrypt(user.preferences.accessibility_needs) if user.preferences and user.preferences.accessibility_needs
-        else _safe_decrypt(user.accessibility_needs)
+        user.preferences.accessibility_notes if user.preferences and user.preferences.accessibility_notes
+        else user.accessibility_needs
     )
-    communication_preferences = (
-        _safe_decrypt(user.preferences.communication_preferences) if user.preferences and user.preferences.communication_preferences
-        else _safe_decrypt(user.communication_preferences)
-    )
-    interface_preferences = (
-        _safe_decrypt(user.preferences.interface_preferences) if user.preferences and user.preferences.interface_preferences
-        else _safe_decrypt(user.interface_preferences)
-    )
+    # communication_preferences and interface_preferences only exist on legacy User model
+    # (not yet migrated to UserPreferences table)
+    communication_preferences = user.communication_preferences
+    interface_preferences = user.interface_preferences
     
     localization = LocalizationAndAccessibility(
         preferred_language=preferred_language,
@@ -465,7 +440,7 @@ async def get_profile_overview(
         timeline=timeline,
         consent=consent,
         localization=localization,
-        aicare_team_notes=_safe_decrypt(user.aicare_team_notes),
+        aicare_team_notes=user.aicare_team_notes,
     )
 
 
@@ -510,7 +485,10 @@ async def update_profile_overview(
         "city", "university", "major", "year_of_study"
     }
     preference_fields = {
-        "preferred_language", "preferred_timezone", "accessibility_needs",
+        "preferred_language", "preferred_timezone", "accessibility_needs"
+    }
+    # Fields only on legacy User table (not yet migrated to normalized tables)
+    legacy_preference_fields = {
         "communication_preferences", "interface_preferences"
     }
     emergency_contact_fields = {
@@ -542,19 +520,14 @@ async def update_profile_overview(
                     updated = True
                 
                 normalized = _normalize_optional_string(data.get(field))
-                if normalized is None:
-                    setattr(user.profile, field, None)
-                    # Dual-write to legacy User column for backward compatibility
-                    if hasattr(user, field):
-                        setattr(user, field, None)
-                else:
-                    setattr(user.profile, field, _encrypt_optional(normalized))
-                    # Dual-write to legacy User column for backward compatibility
-                    if hasattr(user, field):
-                        setattr(user, field, _encrypt_optional(normalized))
+                setattr(user.profile, field, normalized)
+                # Dual-write to legacy User column for backward compatibility
+                if hasattr(user, field):
+                    setattr(user, field, normalized)
                 updated = True
 
         # Update UserPreferences fields
+        # Note: 'accessibility_needs' from API maps to 'accessibility_notes' in UserPreferences
         for field in preference_fields:
             if field in data:
                 # Create preferences if they don't exist
@@ -570,16 +543,20 @@ async def update_profile_overview(
                     updated = True
                 
                 normalized = _normalize_optional_string(data.get(field))
-                if normalized is None:
-                    setattr(user.preferences, field, None)
-                    # Dual-write to legacy User column for backward compatibility
-                    if hasattr(user, field):
-                        setattr(user, field, None)
-                else:
-                    setattr(user.preferences, field, _encrypt_optional(normalized))
-                    # Dual-write to legacy User column for backward compatibility
-                    if hasattr(user, field):
-                        setattr(user, field, _encrypt_optional(normalized))
+                # Map accessibility_needs to accessibility_notes for UserPreferences
+                prefs_field = "accessibility_notes" if field == "accessibility_needs" else field
+                
+                setattr(user.preferences, prefs_field, normalized)
+                # Dual-write to legacy User column for backward compatibility
+                if hasattr(user, field):
+                    setattr(user, field, normalized)
+                updated = True
+
+        # Update legacy-only preference fields (not yet migrated to UserPreferences)
+        for field in legacy_preference_fields:
+            if field in data:
+                normalized = _normalize_optional_string(data.get(field))
+                setattr(user, field, normalized)
                 updated = True
 
         # Update emergency contact in UserEmergencyContact table
@@ -602,26 +579,20 @@ async def update_profile_overview(
                 primary_contact = user.emergency_contacts[0]
                 for field, value in normalized_emergency.items():
                     normalized_value = _normalize_optional_string(value)
-                    if normalized_value is None:
-                        setattr(primary_contact, field, None)
-                    else:
-                        setattr(primary_contact, field, _encrypt_optional(normalized_value))
+                    setattr(primary_contact, field, normalized_value)
             else:
                 # Create new emergency contact
                 new_contact = UserEmergencyContact(user_id=user.id)
                 for field, value in normalized_emergency.items():
                     normalized_value = _normalize_optional_string(value)
                     if normalized_value is not None:
-                        setattr(new_contact, field, _encrypt_optional(normalized_value))
+                        setattr(new_contact, field, normalized_value)
                 db.add(new_contact)
             
             # Dual-write to legacy User columns for backward compatibility
             for legacy_field, value in emergency_data.items():
                 normalized_value = _normalize_optional_string(value)
-                if normalized_value is None:
-                    setattr(user, legacy_field, None)
-                else:
-                    setattr(user, legacy_field, _encrypt_optional(normalized_value))
+                setattr(user, legacy_field, normalized_value)
             updated = True
 
         # Update consent settings (append to UserConsentLedger for audit trail)
@@ -651,10 +622,7 @@ async def update_profile_overview(
         for field in legacy_user_fields:
             if field in data:
                 normalized = _normalize_optional_string(data.get(field))
-                if normalized is None:
-                    setattr(user, field, None)
-                else:
-                    setattr(user, field, _encrypt_optional(normalized))
+                setattr(user, field, normalized)
                 updated = True
 
         if updated:
@@ -713,7 +681,7 @@ async def list_ai_memory_facts(
     return [
         AIMemoryFactResponse(
             id=fact.id,
-            fact=_decrypt_required(fact.fact_encrypted),
+            fact=fact.fact_encrypted or "",  # Column stores plaintext now (encryption removed)
             category=fact.category,
             source=fact.source,
             created_at=fact.created_at,
@@ -915,20 +883,20 @@ async def import_simaster_data(
             first_name = name_parts[0]
             last_name = name_parts[1] if len(name_parts) > 1 else ""
             
-            user.profile.first_name = encrypt_data(first_name)
-            user.profile.last_name = encrypt_data(last_name)
-            user.name = encrypt_data(payload.name)
+            user.profile.first_name = first_name
+            user.profile.last_name = last_name
+            user.name = payload.name
             updated_fields.append("name")
         
         if payload.faculty:
             # Store faculty - could be in university field or a new field
             # For now, append to university or store separately
-            user.profile.faculty = encrypt_data(payload.faculty)
+            user.profile.faculty = payload.faculty
             updated_fields.append("faculty")
         
         if payload.major:
-            user.profile.major = encrypt_data(payload.major)
-            user.major = encrypt_data(payload.major)  # Legacy field
+            user.profile.major = payload.major
+            user.major = payload.major  # Legacy field
             updated_fields.append("major")
         
         if payload.year:
@@ -949,8 +917,8 @@ async def import_simaster_data(
             updated_fields.append("photo_url")
         
         # Set university as UGM since we're importing from SIMASTER
-        user.profile.university = encrypt_data("Universitas Gadjah Mada")
-        user.university = encrypt_data("Universitas Gadjah Mada")
+        user.profile.university = "Universitas Gadjah Mada"
+        user.university = "Universitas Gadjah Mada"
         if "university" not in updated_fields:
             updated_fields.append("university")
         

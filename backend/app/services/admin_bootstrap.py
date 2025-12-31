@@ -7,7 +7,6 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User
-from app.utils.security_utils import encrypt_data
 
 logger = logging.getLogger(__name__)
 
@@ -16,16 +15,6 @@ _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def _hash_password(password: str) -> str:
     return _pwd_context.hash(password)
-
-
-def _maybe_encrypt(value: str | None) -> str | None:
-    if value is None:
-        return None
-    encrypted = encrypt_data(value)
-    if encrypted is None:
-        logger.error("Failed to encrypt value for admin bootstrap; aborting creation.")
-        raise ValueError("Failed to encrypt admin credential")
-    return encrypted
 
 
 async def ensure_default_admin(db: AsyncSession) -> None:
@@ -42,13 +31,9 @@ async def ensure_default_admin(db: AsyncSession) -> None:
     existing_admin_by_role = result_existing_role.scalar_one_or_none()
 
     # Check if account already exists with this email (regardless of role)
-    encrypted_email = _maybe_encrypt(admin_email)
-    if encrypted_email:
-        stmt_existing_email = select(User).where(User.email == encrypted_email).limit(1)
-        result_existing_email = await db.execute(stmt_existing_email)
-        existing_admin_by_email = result_existing_email.scalar_one_or_none()
-    else:
-        existing_admin_by_email = None
+    stmt_existing_email = select(User).where(User.email == admin_email).limit(1)
+    result_existing_email = await db.execute(stmt_existing_email)
+    existing_admin_by_email = result_existing_email.scalar_one_or_none()
 
     if existing_admin_by_role or existing_admin_by_email:
         logger.info("Admin account already present (by role or email); skipping bootstrap.")
@@ -60,20 +45,15 @@ async def ensure_default_admin(db: AsyncSession) -> None:
         logger.warning("ADMIN_PASSWORD not set; cannot create default admin user.")
         return
 
-    try:
-        encrypted_name = _maybe_encrypt("Administrator")
-    except ValueError:
-        return
-
     password_hash = _hash_password(admin_password)
 
     admin_user = User(
-        email=encrypted_email,
+        email=admin_email,
         password_hash=password_hash,
         role="admin",
         is_active=True,
         email_verified=True,
-        name=encrypted_name,
+        name="Administrator",
         created_at=datetime.utcnow(),
         last_login=None,
     )
@@ -102,13 +82,9 @@ async def ensure_default_counselor(db: AsyncSession) -> None:
     existing_counselor_by_role = result_existing_role.scalar_one_or_none()
 
     # Check if account already exists with this email (regardless of role)
-    encrypted_email = _maybe_encrypt(counselor_email)
-    if encrypted_email:
-        stmt_existing_email = select(User).where(User.email == encrypted_email).limit(1)
-        result_existing_email = await db.execute(stmt_existing_email)
-        existing_counselor_by_email = result_existing_email.scalar_one_or_none()
-    else:
-        existing_counselor_by_email = None
+    stmt_existing_email = select(User).where(User.email == counselor_email).limit(1)
+    result_existing_email = await db.execute(stmt_existing_email)
+    existing_counselor_by_email = result_existing_email.scalar_one_or_none()
 
     if existing_counselor_by_role or existing_counselor_by_email:
         logger.info("Counselor account already present (by role or email); skipping bootstrap.")
@@ -121,20 +97,15 @@ async def ensure_default_counselor(db: AsyncSession) -> None:
         logger.warning("COUNSELOR_PASSWORD not set; cannot create default counselor user.")
         return
 
-    try:
-        encrypted_name = _maybe_encrypt(counselor_name)
-    except ValueError:
-        return
-
     password_hash = _hash_password(counselor_password)
 
     counselor_user = User(
-        email=encrypted_email,
+        email=counselor_email,
         password_hash=password_hash,
         role="counselor",
         is_active=True,
         email_verified=True,
-        name=encrypted_name,
+        name=counselor_name,
         created_at=datetime.utcnow(),
         last_login=None,
     )

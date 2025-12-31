@@ -19,7 +19,7 @@ export default function SignInUGM() {
   useEffect(() => {
     // Redirect if already authenticated
     if (status === "authenticated") {
-      router.push("/aika");
+      router.push("/dashboard");
     }
   }, [status, router]);
 

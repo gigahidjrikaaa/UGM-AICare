@@ -10,7 +10,6 @@ from app.database import get_async_db
 from app.schemas.internal import UserInternalResponse, UserSyncPayload, UserSyncResponse
 from app.models import User
 from app.services.user_service import async_get_or_create_user # Import the user service function
-from app.utils.security_utils import decrypt_data, encrypt_data #! For email decryption ONLY if needed
 import os
 import re
 import logging

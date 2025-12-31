@@ -36,7 +36,7 @@ export default function AboutAikaPage() {
             Meet <span className="text-[#FFCA40]">Aika</span>
           </h1>
           <p className="text-xl text-white/80 max-w-3xl mx-auto">
-            Your AI-powered mental health companion, available 24/7
+            Your AI-powered mental health companion, designed to support you around the clock
           </p>
         </motion.div>
 

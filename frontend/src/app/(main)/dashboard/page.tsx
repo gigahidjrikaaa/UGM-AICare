@@ -62,7 +62,7 @@ const quickActions: QuickAction[] = [
 
 function StatCard({ label, value, icon }: StatCardProps) {
   return (
-    <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-[#00153a]/20 backdrop-blur">
+    <div className="flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.03] p-4 shadow-lg shadow-[#00153a]/20 backdrop-blur-sm">
       <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#FFCA40]/15 text-[#FFCA40]">
         {icon}
       </span>
@@ -78,7 +78,7 @@ function QuickActionCard({ action }: { action: QuickAction }) {
   return (
     <Link
       href={action.href}
-      className="group flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-white/5 p-4 transition hover:border-[#FFCA40] hover:bg-[#FFCA40]/10"
+      className="group flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-sm transition hover:border-[#FFCA40] hover:bg-[#FFCA40]/10"
     >
       <div className="flex items-center gap-3">
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-[#FFCA40]">
@@ -259,7 +259,7 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen text-white">
       <div className="mx-auto max-w-6xl px-4 pt-24 pb-12 space-y-10">
-        <header className="rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur">
+        <header className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 shadow-2xl backdrop-blur-md">
           <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_320px]">
             <div className="space-y-6">
               <p className="text-xs uppercase tracking-wide text-white/60">Welcome back</p>
@@ -307,7 +307,7 @@ export default function DashboardPage() {
 
         <section className="grid gap-6 lg:grid-cols-9">
           <div className="space-y-6 lg:col-span-5">
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-xl backdrop-blur-md">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-semibold">Recent activity</h2>
@@ -329,7 +329,7 @@ export default function DashboardPage() {
                   timelineEntries.map((entry, index) => (
                     <div
                       key={`${entry.kind}-${entry.timestamp}-${index}`}
-                      className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/5 p-4"
+                      className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4 backdrop-blur-sm"
                     >
                       <span className="mt-1 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#FFCA40]/15 text-[#FFCA40]">
                         <FiClock className="h-5 w-5" />
@@ -354,7 +354,7 @@ export default function DashboardPage() {
           </div>
 
           <aside className="space-y-6 lg:col-span-4">
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-xl backdrop-blur-md">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold">Upcoming appointments</h2>
                 <Link
@@ -382,7 +382,7 @@ export default function DashboardPage() {
                   upcomingAppointments.map((entry, index) => (
                     <div
                       key={`${entry.timestamp}-${index}`}
-                      className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/5 p-4"
+                      className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4 backdrop-blur-sm"
                     >
                       <span className="mt-1 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#FFCA40]/15 text-[#FFCA40]">
                         <FiCalendar className="h-5 w-5" />
@@ -400,7 +400,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-xl backdrop-blur-md">
               <h2 className="text-xl font-semibold">Achievements</h2>
               <p className="mt-2 text-sm text-white/60">
                 {badgeCount != null
@@ -419,7 +419,7 @@ export default function DashboardPage() {
               </Link>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/5 p-6 shadow-xl backdrop-blur">
+            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-xl backdrop-blur-md">
               <h2 className="text-xl font-semibold">Focus for today</h2>
               <p className="mt-2 text-sm text-white/60">
                 {profile?.safety.primary_concerns

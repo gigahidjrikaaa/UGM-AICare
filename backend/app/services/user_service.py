@@ -6,7 +6,6 @@ from typing import Optional
 import logging
 
 from app.models import User # Import User model
-from app.utils.security_utils import encrypt_data, decrypt_data # Import encryption utilities
 
 logger = logging.getLogger(__name__)
 
@@ -14,7 +13,6 @@ async def async_get_or_create_user(db: AsyncSession, google_sub: str, plain_emai
     """
     Asynchronously finds a user by google_sub or email, or creates a new one.
     If a user exists with the email but not the google_sub, it links them.
-    Encrypts email upon creation or if updating a NULL email field.
     """
     logger.info(f"ASYNC_SERVICE: Attempting to get/create user for sub: {google_sub[:10]}")
     
@@ -28,24 +26,14 @@ async def async_get_or_create_user(db: AsyncSession, google_sub: str, plain_emai
         logger.info(f"Found user by google_sub: {user.id}")
         # If user found by sub, but email is not set, try to set it
         if not user.email and plain_email:
-            encrypted_email_str = encrypt_data(plain_email)
-            if encrypted_email_str:
-                setattr(user, 'email', encrypted_email_str)
-                db.add(user)
-                needs_commit = True
-            else:
-                logger.error(f"Failed to encrypt email for existing user {user.id}. Email remains NULL.")
+            setattr(user, 'email', plain_email)
+            db.add(user)
+            needs_commit = True
     else:
         logger.info(f"User not found by google_sub. Checking by email: {plain_email}")
         # 2. If not found by sub, try by email
         if plain_email:
-            encrypted_email_str = encrypt_data(plain_email)
-            if not encrypted_email_str:
-                logger.error(f"Failed to encrypt email for lookup. Cannot proceed with email check.")
-                # This case is problematic, as we can't check the DB for an unencrypted email.
-                # For now, we assume encryption always works. A more robust solution might be needed.
-            
-            stmt_email = select(User).where(User.email == encrypted_email_str)
+            stmt_email = select(User).where(User.email == plain_email)
             result_email = await db.execute(stmt_email)
             user_by_email = result_email.scalar_one_or_none()
 
@@ -62,7 +50,7 @@ async def async_get_or_create_user(db: AsyncSession, google_sub: str, plain_emai
                 try:
                     user = User(
                         google_sub=google_sub,
-                        email=encrypted_email_str,
+                        email=plain_email,
                     )
                     db.add(user)
                     needs_commit = True

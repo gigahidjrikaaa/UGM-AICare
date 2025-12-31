@@ -15,7 +15,6 @@ from app.auth_utils import create_access_token, decrypt_and_validate_token
 from app.database import get_async_db
 from app.models import User
 from app.services.user_service import async_get_user_by_plain_email
-from app.utils.security_utils import encrypt_data, decrypt_data
 
 logger = logging.getLogger(__name__)
 
@@ -89,13 +88,10 @@ def serialize_user(
     fallback_name: Optional[str] = None,
 ) -> dict:
     """Return a safe representation of the user for API responses."""
-    decrypted_email = decrypt_data(user.email) if user.email else None
-    decrypted_name = decrypt_data(user.name) if user.name else None
-
     return {
         "id": str(user.id),
-        "email": decrypted_email or fallback_email,
-        "name": decrypted_name or fallback_name,
+        "email": user.email or fallback_email,
+        "name": user.name or fallback_name,
         "role": user.role,
         "google_sub": user.google_sub,
         "allow_email_checkins": user.allow_email_checkins,
@@ -157,7 +153,7 @@ async def exchange_oauth_token(
             detail="Missing provider account id",
         )
 
-    encrypted_email = encrypt_data(payload.email) if payload.email else None
+    encrypted_email = payload.email
 
     stmt = select(User).where(User.google_sub == provider_account_id)
     result = await db.execute(stmt)
@@ -174,7 +170,7 @@ async def exchange_oauth_token(
             user = User(
                 google_sub=provider_account_id,
                 email=encrypted_email,
-                name=encrypt_data(payload.name) if payload.name else None,
+                name=payload.name,
                 role=role,
                 is_active=True,
                 email_verified=True,
@@ -191,9 +187,8 @@ async def exchange_oauth_token(
                 user.email = encrypted_email
                 updated = True
             if payload.name:
-                enc_name = encrypt_data(payload.name)
-                if enc_name and user.name != enc_name:
-                    user.name = enc_name
+                if user.name != payload.name:
+                    user.name = payload.name
                     updated = True
             if not user.is_active:
                 user.is_active = True
@@ -257,15 +252,7 @@ async def login_for_access_token(
 ) -> dict:
     logger.info("Login attempt for: %s", request.email)
 
-    encrypted_email = encrypt_data(request.email)
-    if not encrypted_email:
-        logger.error("Login error for %s: Failed to encrypt email.", request.email)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during login",
-        )
-
-    stmt = select(User).where(User.email == encrypted_email)
+    stmt = select(User).where(User.email == request.email)
     result = await db.execute(stmt)
     user = result.scalar_one_or_none()
 
@@ -334,14 +321,7 @@ async def register_user(
     try:
         logger.info("User registration attempt for: %s", request.email)
 
-        encrypted_email = encrypt_data(request.email)
-        if not encrypted_email:
-            raise HTTPException(
-                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Could not process email.",
-            )
-
-        stmt = select(User).where(User.email == encrypted_email)
+        stmt = select(User).where(User.email == request.email)
         result = await db.execute(stmt)
         existing_user = result.scalar_one_or_none()
 
@@ -365,19 +345,19 @@ async def register_user(
 
         # Create core User record (auth only)
         new_user = User(
-            name=encrypt_data(request.name),
-            email=encrypted_email,
+            name=request.name,
+            email=request.email,
             password_hash=hashed_password,
             role="user",
             # Keep legacy fields for backward compatibility during migration
-            first_name=encrypt_data(request.firstName) if request.firstName else None,
-            last_name=encrypt_data(request.lastName) if request.lastName else None,
-            phone=encrypt_data(request.phone) if request.phone else None,
+            first_name=request.firstName,
+            last_name=request.lastName,
+            phone=request.phone,
             date_of_birth=date_of_birth,
-            gender=encrypt_data(request.gender) if request.gender else None,
-            city=encrypt_data(request.city) if request.city else None,
-            university=encrypt_data(request.university) if request.university else None,
-            major=encrypt_data(request.major) if request.major else None,
+            gender=request.gender,
+            city=request.city,
+            university=request.university,
+            major=request.major,
             year_of_study=request.yearOfStudy,
             allow_email_checkins=request.allowEmailCheckins,
             check_in_code=uuid.uuid4().hex,
@@ -390,15 +370,15 @@ async def register_user(
         from app.models import UserProfile
         user_profile = UserProfile(
             user_id=new_user.id,
-            first_name=encrypt_data(request.firstName) if request.firstName else None,
-            last_name=encrypt_data(request.lastName) if request.lastName else None,
-            phone=encrypt_data(request.phone) if request.phone else None,
+            first_name=request.firstName,
+            last_name=request.lastName,
+            phone=request.phone,
             date_of_birth=date_of_birth,
-            gender=encrypt_data(request.gender) if request.gender else None,
-            city=encrypt_data(request.city) if request.city else None,
+            gender=request.gender,
+            city=request.city,
             country="Indonesia",  # Default for UGM
-            university=encrypt_data(request.university) if request.university else None,
-            major=encrypt_data(request.major) if request.major else None,
+            university=request.university,
+            major=request.major,
             year_of_study=int(request.yearOfStudy) if request.yearOfStudy and request.yearOfStudy.isdigit() else None,
         )
         db.add(user_profile)
@@ -527,13 +507,10 @@ async def validate_reset_token(
                 "message": "Reset token has expired"
             }
             
-        from app.utils.security_utils import decrypt_data
-        email = decrypt_data(user.email) if user.email else None
-            
         return {
             "valid": True,
             "message": "Token is valid",
-            "email": email
+            "email": user.email
         }
         
     except HTTPException:

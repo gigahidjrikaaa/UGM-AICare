@@ -10,7 +10,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 
 from app.database import async_engine
 from app.models.user import User
-from app.utils.security_utils import encrypt_data
 from app.services.user_service import async_get_user_by_plain_email
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -31,8 +30,8 @@ async def seed_research_users():
         if not eval_user:
             print(f"Creating user: {eval_user_email}")
             eval_user = User(
-                email=encrypt_data(eval_user_email),
-                name=encrypt_data("Evaluation User"),
+                email=eval_user_email,
+                name="Evaluation User",
                 role="admin", # Changed to admin
                 is_active=True,
                 email_verified=True,
@@ -46,12 +45,6 @@ async def seed_research_users():
             # Update to admin and set password if exists
             eval_user.role = "admin"
             eval_user.password_hash = password_hash
-            # Ensure email/name are encrypted if they were plain text
-            if eval_user.email == eval_user_email:
-                 eval_user.email = encrypt_data(eval_user_email)
-            if eval_user.name == "Evaluation User":
-                 eval_user.name = encrypt_data("Evaluation User")
-            
             session.add(eval_user)
             await session.commit()
             print(f"Updated Evaluation User (ID: {eval_user.id}) to ADMIN and reset password.")
@@ -63,8 +56,8 @@ async def seed_research_users():
         if not privacy_user:
             print(f"Creating user: {privacy_user_email}")
             privacy_user = User(
-                email=encrypt_data(privacy_user_email),
-                name=encrypt_data("Privacy Test User"),
+                email=privacy_user_email,
+                name="Privacy Test User",
                 role="user",
                 is_active=True,
                 email_verified=True,
@@ -76,12 +69,6 @@ async def seed_research_users():
             print(f"Created Privacy Test User with ID: {privacy_user.id}")
         else:
             privacy_user.password_hash = password_hash
-            # Ensure email/name are encrypted if they were plain text
-            if privacy_user.email == privacy_user_email:
-                 privacy_user.email = encrypt_data(privacy_user_email)
-            if privacy_user.name == "Privacy Test User":
-                 privacy_user.name = encrypt_data("Privacy Test User")
-
             session.add(privacy_user)
             await session.commit()
             print(f"Privacy Test User already exists with ID: {privacy_user.id}. Password reset.")

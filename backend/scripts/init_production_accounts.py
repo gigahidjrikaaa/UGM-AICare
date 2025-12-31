@@ -3,7 +3,7 @@
 Initialize Production Admin and Counselor Accounts
 
 This script ensures that admin and counselor accounts are properly created
-in the production database with correct email encryption and password hashing.
+in the production database with correct password hashing.
 
 Usage:
     python scripts/init_production_accounts.py
@@ -15,7 +15,6 @@ Environment Variables Required:
     - COUNSELOR_PASSWORD: Counselor account password
     - COUNSELOR_NAME: Counselor display name (optional)
     - DATABASE_URL: PostgreSQL connection string
-    - ENCRYPTION_KEY: Fernet encryption key for email encryption
 """
 
 import asyncio
@@ -33,7 +32,6 @@ from sqlalchemy.orm import sessionmaker
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from app.models import User
-from app.utils.security_utils import encrypt_data, decrypt_data
 
 logging.basicConfig(
     level=logging.INFO,
@@ -64,13 +62,8 @@ async def create_or_update_admin(db: AsyncSession) -> User:
 
     logger.info(f"Processing admin account for email: {admin_email}")
 
-    # Encrypt email
-    encrypted_email = encrypt_data(admin_email)
-    if not encrypted_email:
-        raise ValueError("Failed to encrypt admin email")
-
-    # Check if admin already exists (by encrypted email)
-    stmt = select(User).where(User.email == encrypted_email)
+    # Check if admin already exists (by email)
+    stmt = select(User).where(User.email == admin_email)
     result = await db.execute(stmt)
     existing_admin = result.scalar_one_or_none()
 
@@ -80,7 +73,6 @@ async def create_or_update_admin(db: AsyncSession) -> User:
     admin_by_role = result_role.scalar_one_or_none()
 
     password_hash = hash_password(admin_password)
-    encrypted_name = encrypt_data("Administrator")
 
     if existing_admin:
         logger.info("Admin account exists, updating password and ensuring active status...")
@@ -102,11 +94,11 @@ async def create_or_update_admin(db: AsyncSession) -> User:
 
     elif admin_by_role:
         logger.info("Admin exists by role, updating email and password...")
-        admin_by_role.email = encrypted_email
+        admin_by_role.email = admin_email
         admin_by_role.password_hash = password_hash
         admin_by_role.is_active = True
         admin_by_role.email_verified = True
-        admin_by_role.name = encrypted_name
+        admin_by_role.name = "Administrator"
         db.add(admin_by_role)
         await db.commit()
         await db.refresh(admin_by_role)
@@ -122,12 +114,12 @@ async def create_or_update_admin(db: AsyncSession) -> User:
     else:
         logger.info("Creating new admin account...")
         admin_user = User(
-            email=encrypted_email,
+            email=admin_email,
             password_hash=password_hash,
             role="admin",
             is_active=True,
             email_verified=True,
-            name=encrypted_name,
+            name="Administrator",
             created_at=datetime.utcnow(),
             last_login=None,
         )
@@ -155,13 +147,8 @@ async def create_or_update_counselor(db: AsyncSession) -> User:
 
     logger.info(f"Processing counselor account for email: {counselor_email}")
 
-    # Encrypt email
-    encrypted_email = encrypt_data(counselor_email)
-    if not encrypted_email:
-        raise ValueError("Failed to encrypt counselor email")
-
-    # Check if counselor already exists (by encrypted email)
-    stmt = select(User).where(User.email == encrypted_email)
+    # Check if counselor already exists (by email)
+    stmt = select(User).where(User.email == counselor_email)
     result = await db.execute(stmt)
     existing_counselor = result.scalar_one_or_none()
 
@@ -171,7 +158,6 @@ async def create_or_update_counselor(db: AsyncSession) -> User:
     counselor_by_role = result_role.scalar_one_or_none()
 
     password_hash = hash_password(counselor_password)
-    encrypted_name = encrypt_data(counselor_name)
 
     if existing_counselor:
         logger.info("Counselor account exists, updating password and ensuring active status...")
@@ -179,7 +165,7 @@ async def create_or_update_counselor(db: AsyncSession) -> User:
         existing_counselor.is_active = True
         existing_counselor.email_verified = True
         existing_counselor.role = "counselor"
-        existing_counselor.name = encrypted_name
+        existing_counselor.name = counselor_name
         db.add(existing_counselor)
         await db.commit()
         await db.refresh(existing_counselor)
@@ -194,11 +180,11 @@ async def create_or_update_counselor(db: AsyncSession) -> User:
 
     elif counselor_by_role:
         logger.info("Counselor exists by role, updating email and password...")
-        counselor_by_role.email = encrypted_email
+        counselor_by_role.email = counselor_email
         counselor_by_role.password_hash = password_hash
         counselor_by_role.is_active = True
         counselor_by_role.email_verified = True
-        counselor_by_role.name = encrypted_name
+        counselor_by_role.name = counselor_name
         db.add(counselor_by_role)
         await db.commit()
         await db.refresh(counselor_by_role)
@@ -214,12 +200,12 @@ async def create_or_update_counselor(db: AsyncSession) -> User:
     else:
         logger.info("Creating new counselor account...")
         counselor_user = User(
-            email=encrypted_email,
+            email=counselor_email,
             password_hash=password_hash,
             role="counselor",
             is_active=True,
             email_verified=True,
-            name=encrypted_name,
+            name=counselor_name,
             created_at=datetime.utcnow(),
             last_login=None,
         )
@@ -249,8 +235,7 @@ async def verify_accounts(db: AsyncSession):
 
     # Verify admin
     if admin_email:
-        encrypted_admin_email = encrypt_data(admin_email)
-        stmt = select(User).where(User.email == encrypted_admin_email)
+        stmt = select(User).where(User.email == admin_email)
         result = await db.execute(stmt)
         admin = result.scalar_one_or_none()
 
@@ -260,15 +245,7 @@ async def verify_accounts(db: AsyncSession):
             logger.info(f"   - Role: {admin.role}")
             logger.info(f"   - Active: {admin.is_active}")
             logger.info(f"   - Email verified: {admin.email_verified}")
-            
-            # Try to decrypt and verify email
-            decrypted_email = decrypt_data(admin.email)
-            if decrypted_email == admin_email:
-                logger.info(f"   - Email encryption/decryption: ✅ Working")
-            else:
-                logger.error(f"   - Email encryption/decryption: ❌ Failed")
-                logger.error(f"     Expected: {admin_email}")
-                logger.error(f"     Got: {decrypted_email}")
+            logger.info(f"   - Email: {admin.email}")
             
             # Verify password
             if admin.password_hash and verify_password(admin_password, admin.password_hash):
@@ -280,8 +257,7 @@ async def verify_accounts(db: AsyncSession):
 
     # Verify counselor
     if counselor_email:
-        encrypted_counselor_email = encrypt_data(counselor_email)
-        stmt = select(User).where(User.email == encrypted_counselor_email)
+        stmt = select(User).where(User.email == counselor_email)
         result = await db.execute(stmt)
         counselor = result.scalar_one_or_none()
 
@@ -291,15 +267,7 @@ async def verify_accounts(db: AsyncSession):
             logger.info(f"   - Role: {counselor.role}")
             logger.info(f"   - Active: {counselor.is_active}")
             logger.info(f"   - Email verified: {counselor.email_verified}")
-            
-            # Try to decrypt and verify email
-            decrypted_email = decrypt_data(counselor.email)
-            if decrypted_email == counselor_email:
-                logger.info(f"   - Email encryption/decryption: ✅ Working")
-            else:
-                logger.error(f"   - Email encryption/decryption: ❌ Failed")
-                logger.error(f"     Expected: {counselor_email}")
-                logger.error(f"     Got: {decrypted_email}")
+            logger.info(f"   - Email: {counselor.email}")
             
             # Verify password
             if counselor.password_hash and verify_password(counselor_password, counselor.password_hash):
@@ -321,7 +289,6 @@ async def main():
     # Check required environment variables
     required_vars = [
         "DATABASE_URL",
-        "ENCRYPTION_KEY",
         "ADMIN_EMAIL",
         "ADMIN_PASSWORD",
         "COUNSELOR_EMAIL",

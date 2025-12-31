@@ -3,12 +3,59 @@ Structured logging configuration for production monitoring.
 
 This module provides JSON-formatted logging for easy parsing by ELK stack.
 """
+import io
 import logging
 import json
+import os
 import sys
 from datetime import datetime
 from typing import Any, Dict, Optional
 import traceback
+
+
+class UnicodeStreamHandler(logging.StreamHandler):
+    """
+    A StreamHandler that properly handles Unicode characters on Windows.
+    
+    Windows console (cp1252) can't display emojis, so this handler either:
+    1. Uses UTF-8 encoding when the stream supports it
+    2. Strips problematic characters when UTF-8 isn't available
+    """
+    
+    def __init__(self, stream=None):
+        # On Windows, wrap stdout with UTF-8 encoding if possible
+        if stream is None:
+            stream = sys.stdout
+        
+        # Try to reconfigure stdout for UTF-8 on Windows
+        if sys.platform == "win32" and hasattr(stream, "reconfigure"):
+            try:
+                stream.reconfigure(encoding="utf-8", errors="replace")
+            except (AttributeError, OSError):
+                pass
+        
+        super().__init__(stream)
+    
+    def emit(self, record):
+        """Emit a record, handling Unicode errors gracefully."""
+        try:
+            msg = self.format(record)
+            stream = self.stream
+            
+            # Try to write with error handling
+            try:
+                stream.write(msg + self.terminator)
+                self.flush()
+            except UnicodeEncodeError:
+                # Fallback: replace unencodable characters
+                safe_msg = msg.encode("ascii", errors="replace").decode("ascii")
+                stream.write(safe_msg + self.terminator)
+                self.flush()
+                
+        except RecursionError:
+            raise
+        except Exception:
+            self.handleError(record)
 
 
 class JSONFormatter(logging.Formatter):
@@ -115,8 +162,8 @@ def configure_logging(
             datefmt='%Y-%m-%d %H:%M:%S'
         )
     
-    # Console handler (stdout for Docker)
-    console_handler = logging.StreamHandler(sys.stdout)
+    # Console handler with Unicode support (especially for Windows)
+    console_handler = UnicodeStreamHandler(sys.stdout)
     console_handler.setFormatter(formatter)
     
     handlers = [console_handler]

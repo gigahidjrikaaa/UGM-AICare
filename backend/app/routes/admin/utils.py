@@ -12,31 +12,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import User, UserBadge  # Core models
 from app.domains.mental_health.models import Conversation, JournalEntry
 from app.schemas.admin import UserStats
-from app.utils.security_utils import decrypt_data
 
 logger = logging.getLogger(__name__)
 
 
-def decrypt_user_field(encrypted_value: Optional[str]) -> Optional[str]:
-    """Safely decrypt a user field, returning original value on failure."""
-    if not encrypted_value:
-        return None
-    try:
-        return decrypt_data(encrypted_value)
-    except Exception as exc:
-        logger.warning("Failed to decrypt field: %s", exc)
-        return encrypted_value
+def decrypt_user_field(value: Optional[str]) -> Optional[str]:
+    """Return field value as-is (encryption removed for performance)."""
+    return value
 
 
-def decrypt_user_email(encrypted_email: Optional[str]) -> Optional[str]:
-    """Safely decrypt an email address, returning a placeholder on failure."""
-    if not encrypted_email:
-        return None
-    try:
-        return decrypt_data(encrypted_email)
-    except Exception as exc:  # pragma: no cover - defensive
-        logger.warning("Failed to decrypt email: %s", exc)
-        return "[Encrypted]"
+def decrypt_user_email(email: Optional[str]) -> Optional[str]:
+    """Return email value as-is (encryption removed for performance)."""
+    return email
 
 
 def hash_user_id(user_id: int) -> str:

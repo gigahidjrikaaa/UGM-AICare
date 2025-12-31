@@ -264,16 +264,15 @@ class CampaignExecutionService:
         """
         try:
             from app.utils.email_utils import send_email
-            from app.utils.security_utils import decrypt_data
             from app.core.settings import get_settings
             
             settings = get_settings()
             frontend_url = settings.frontend_url
             
-            # Decrypt user email (emails are encrypted in database)
-            user_email = decrypt_data(user.email)
+            # Get user email (stored as plaintext, encryption removed for performance)
+            user_email = user.email
             if not user_email:
-                logger.error(f"Failed to decrypt email for user {user.id}")
+                logger.error(f"No email found for user {user.id}")
                 return False
             
             # Get user's name for personalization
@@ -432,8 +431,6 @@ class CampaignExecutionService:
         """
         users = await CampaignExecutionService._get_target_audience(db, target_criteria)
         
-        from app.utils.security_utils import decrypt_data
-        
         total_count = len(users)
         preview_users = users[:limit]
         
@@ -447,9 +444,9 @@ class CampaignExecutionService:
                         user.preferred_name or 
                         user.name or 
                         (f"{user.first_name} {user.last_name}".strip() if user.first_name or user.last_name else None) or
-                        (decrypt_data(user.email) or user.email).split("@")[0]
+                        (user.email or "").split("@")[0]
                     ),
-                    "email": decrypt_data(user.email) or user.email,  # Decrypt for display
+                    "email": user.email or "",  # Plaintext (encryption removed)
                 }
                 for user in preview_users
             ],

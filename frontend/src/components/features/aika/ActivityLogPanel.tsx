@@ -90,6 +90,34 @@ interface ActivityLogItemProps {
   isLatest: boolean;
 }
 
+// Helper to extract readable reasoning from details
+function extractReasoning(details: Record<string, any> | undefined): { reasoning: string | null; keyInfo: Record<string, any> } {
+  if (!details) return { reasoning: null, keyInfo: {} };
+  
+  const keyInfo: Record<string, any> = {};
+  let reasoning: string | null = null;
+  
+  // Extract specific meaningful fields
+  if (details.reasoning) reasoning = details.reasoning;
+  if (details.reason) reasoning = details.reason;
+  if (details.decision) keyInfo.decision = details.decision;
+  if (details.risk_level) keyInfo.risk_level = details.risk_level;
+  if (details.risk_score) keyInfo.risk_score = details.risk_score;
+  if (details.risk_factors && Array.isArray(details.risk_factors)) {
+    keyInfo.risk_factors = details.risk_factors;
+  }
+  if (details.severity) keyInfo.severity = details.severity;
+  if (details.intent) keyInfo.intent = details.intent;
+  if (details.intervention_type) keyInfo.intervention_type = details.intervention_type;
+  if (details.case_id) keyInfo.case_id = details.case_id;
+  if (details.model) keyInfo.model = details.model;
+  if (details.purpose) keyInfo.purpose = details.purpose;
+  if (details.error) keyInfo.error = details.error;
+  if (details.agents_invoked) keyInfo.agents_invoked = details.agents_invoked;
+  
+  return { reasoning, keyInfo };
+}
+
 function ActivityLogItem({ activity, isLatest }: ActivityLogItemProps) {
   const [expanded, setExpanded] = useState(false);
   const hasDetails = activity.details && Object.keys(activity.details).length > 0;
@@ -97,70 +125,141 @@ function ActivityLogItem({ activity, isLatest }: ActivityLogItemProps) {
   const config = EVENT_CONFIG[activity.activity_type];
   const IconComponent = config.icon;
   const agentColor = AGENT_COLORS[activity.agent] || 'bg-gray-500/20 text-gray-400 border-gray-500/30';
+  
+  const { reasoning, keyInfo } = extractReasoning(activity.details);
+  const hasKeyInfo = Object.keys(keyInfo).length > 0;
 
   return (
     <motion.div
-      initial={{ opacity: 0, x: -20 }}
+      initial={{ opacity: 0, x: -10 }}
       animate={{ opacity: 1, x: 0 }}
-      className={`rounded-lg border border-white/10 bg-white/5 p-3 ${
-        isLatest ? 'ring-2 ring-ugm-gold/30' : ''
-      }`}
+      className={`rounded-xl border border-white/10 bg-white/[0.03] backdrop-blur-sm p-3 ${
+        isLatest ? 'ring-1 ring-ugm-gold/40' : ''
+      } ${activity.activity_type === 'agent_error' ? 'border-red-500/30 bg-red-500/5' : ''}`}
     >
-      <div className="flex items-start gap-3">
+      <div className="flex items-start gap-2.5">
         {/* Icon */}
-        <div className={`mt-0.5 ${config.color}`}>
-          <IconComponent className="h-4 w-4" />
+        <div className={`mt-0.5 shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${
+          activity.activity_type === 'agent_error' ? 'bg-red-500/20' : 'bg-white/10'
+        }`}>
+          <IconComponent className={`h-3.5 w-3.5 ${config.color}`} />
         </div>
 
         {/* Content */}
         <div className="flex-1 min-w-0">
-          {/* Header */}
-          <div className="flex items-start justify-between gap-2 mb-1">
-            <div className="flex items-center gap-2 flex-wrap">
+          {/* Header Row */}
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <div className="flex items-center gap-1.5 flex-wrap">
               {/* Agent Badge */}
-              <span
-                className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium border ${agentColor}`}
-              >
+              <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium border ${agentColor}`}>
                 {activity.agent}
               </span>
 
-              {/* Event Type */}
-              <span className="text-xs text-white/60">{activity.activity_type}</span>
-
               {/* Duration */}
               {activity.duration_ms !== null && activity.duration_ms !== undefined && (
-                <span className="inline-flex items-center gap-1 text-xs text-white/40">
-                  <Clock className="h-3 w-3" />
+                <span className="inline-flex items-center gap-0.5 text-[10px] text-white/40">
+                  <Clock className="h-2.5 w-2.5" />
                   {formatDuration(activity.duration_ms)}
                 </span>
               )}
             </div>
 
             {/* Timestamp */}
-            <span className="text-xs text-white/40 whitespace-nowrap">
+            <span className="text-[10px] text-white/30 whitespace-nowrap">
               {formatTime(activity.timestamp)}
             </span>
           </div>
 
           {/* Message */}
-          <p className="text-sm text-white/80 mb-1">{activity.message}</p>
+          <p className="text-sm text-white/80">{activity.message}</p>
 
-          {/* Details Toggle */}
+          {/* Key Info Pills - Show important info inline */}
+          {hasKeyInfo && (
+            <div className="flex flex-wrap gap-1 mt-1.5">
+              {keyInfo.risk_level && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                  keyInfo.risk_level === 'critical' ? 'bg-red-500/20 text-red-400' :
+                  keyInfo.risk_level === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                  keyInfo.risk_level === 'moderate' || keyInfo.risk_level === 'medium' ? 'bg-yellow-500/20 text-yellow-400' :
+                  'bg-green-500/20 text-green-400'
+                }`}>
+                  Risk: {keyInfo.risk_level}
+                </span>
+              )}
+              {keyInfo.severity && (
+                <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${
+                  keyInfo.severity === 'critical' ? 'bg-red-500/20 text-red-400' :
+                  keyInfo.severity === 'high' ? 'bg-orange-500/20 text-orange-400' :
+                  'bg-blue-500/20 text-blue-400'
+                }`}>
+                  Severity: {keyInfo.severity}
+                </span>
+              )}
+              {keyInfo.intent && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-purple-500/20 text-purple-400">
+                  Intent: {keyInfo.intent}
+                </span>
+              )}
+              {keyInfo.decision && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-cyan-500/20 text-cyan-400">
+                  → {keyInfo.decision}
+                </span>
+              )}
+              {keyInfo.model && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-indigo-500/20 text-indigo-400">
+                  {keyInfo.model}
+                </span>
+              )}
+              {keyInfo.agents_invoked && Array.isArray(keyInfo.agents_invoked) && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-ugm-gold/20 text-ugm-gold">
+                  Agents: {keyInfo.agents_invoked.join(', ')}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Reasoning - Always show if available */}
+          {reasoning && (
+            <div className="mt-2 text-xs text-white/60 italic bg-white/5 rounded-lg px-2.5 py-2 border-l-2 border-ugm-gold/50">
+              💭 {reasoning}
+            </div>
+          )}
+
+          {/* Risk Factors - Show as list */}
+          {keyInfo.risk_factors && keyInfo.risk_factors.length > 0 && (
+            <div className="mt-2 text-xs text-white/50">
+              <span className="text-white/40">Risk factors:</span>
+              <ul className="mt-0.5 space-y-0.5 pl-3">
+                {keyInfo.risk_factors.map((factor: string, idx: number) => (
+                  <li key={idx} className="list-disc">{factor}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+
+          {/* Error Display */}
+          {keyInfo.error && (
+            <div className="mt-2 text-xs text-red-400 bg-red-500/10 rounded-lg px-2.5 py-2 border-l-2 border-red-500/50">
+              ⚠️ {keyInfo.error}
+            </div>
+          )}
+
+          {/* Raw Details Toggle */}
           {hasDetails && (
             <button
               onClick={() => setExpanded(!expanded)}
-              className="flex items-center gap-1 text-xs text-ugm-gold/70 hover:text-ugm-gold transition-colors"
+              className="flex items-center gap-1 text-[10px] text-white/40 hover:text-white/60 transition-colors mt-2"
             >
               {expanded ? (
                 <ChevronDown className="h-3 w-3" />
               ) : (
                 <ChevronRight className="h-3 w-3" />
               )}
-              Details
+              Raw data
             </button>
           )}
 
-          {/* Expanded Details */}
+          {/* Expanded Raw Details */}
           <AnimatePresence>
             {expanded && hasDetails && (
               <motion.div
@@ -169,7 +268,7 @@ function ActivityLogItem({ activity, isLatest }: ActivityLogItemProps) {
                 exit={{ height: 0, opacity: 0 }}
                 className="mt-2 overflow-hidden"
               >
-                <pre className="text-xs bg-black/20 rounded p-2 overflow-x-auto text-white/60 font-mono">
+                <pre className="text-[10px] bg-black/30 rounded-lg p-2 overflow-x-auto text-white/50 font-mono">
                   {JSON.stringify(activity.details, null, 2)}
                 </pre>
               </motion.div>

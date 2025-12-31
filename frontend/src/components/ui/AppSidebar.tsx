@@ -5,6 +5,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useSession } from 'next-auth/react';
+import { useAccount } from 'wagmi';
+import { ConnectButton } from '@rainbow-me/rainbowkit';
 import {
   BsChatDots, 
   BsCalendar, 
@@ -19,7 +21,55 @@ import {
   FiZap,
   HiX
 } from '@/icons';
-import AccountLinker from '@/components/AccountLinker';
+import { FiLink, FiCheckCircle } from 'react-icons/fi';
+
+// Compact Wallet Section Component for Sidebar
+function CompactWalletSection() {
+  const { data: session } = useSession();
+  const { address } = useAccount();
+  const linkedAddress = session?.user?.wallet_address;
+  
+  const shortAddress = linkedAddress 
+    ? `${linkedAddress.slice(0, 6)}...${linkedAddress.slice(-4)}`
+    : address
+    ? `${address.slice(0, 6)}...${address.slice(-4)}`
+    : null;
+
+  return (
+    <div className="rounded-lg bg-white/5 border border-white/10 p-3">
+      <div className="flex items-center gap-2 mb-2">
+        <FiLink className="w-4 h-4 text-[#FFCA40]" />
+        <span className="text-xs font-medium text-white/70">Wallet</span>
+        {linkedAddress && (
+          <span className="ml-auto flex items-center gap-1 text-[10px] text-emerald-400">
+            <FiCheckCircle className="w-3 h-3" />
+            Linked
+          </span>
+        )}
+      </div>
+      
+      {linkedAddress ? (
+        <div className="flex items-center justify-between bg-white/5 rounded-md px-2 py-1.5">
+          <code className="text-xs text-white/60 font-mono">{shortAddress}</code>
+        </div>
+      ) : (
+        <div className="flex justify-center">
+          <ConnectButton.Custom>
+            {({ openConnectModal, connectModalOpen }) => (
+              <button
+                onClick={openConnectModal}
+                disabled={connectModalOpen}
+                className="w-full text-xs font-medium py-2 px-3 rounded-md bg-[#FFCA40]/10 text-[#FFCA40] border border-[#FFCA40]/20 hover:bg-[#FFCA40]/20 hover:border-[#FFCA40]/40 transition-all disabled:opacity-50"
+              >
+                Connect Wallet
+              </button>
+            )}
+          </ConnectButton.Custom>
+        </div>
+      )}
+    </div>
+  );
+}
 
 // Interface for navigation items, adding optional admin flag
 interface NavItem {
@@ -132,78 +182,33 @@ export default function AppSidebar({ isOpen, onClose, onOpenFeedback }: AppSideb
               </ul>
             </nav>
 
-            {/* Feedback Button - Visually Appealing */}
-            {onOpenFeedback && (
-              <div className="px-4 pb-3">
+            {/* Bottom Actions - Compact & Modern */}
+            <div className="px-3 pb-4 space-y-2 mt-auto border-t border-white/10 pt-3">
+              {/* Feedback Button - Minimal */}
+              {onOpenFeedback && (
                 <motion.button
                   onClick={() => {
                     onOpenFeedback();
-                    onClose(); // Close sidebar when opening feedback
+                    onClose();
                   }}
-                  className="w-full relative overflow-hidden group"
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
+                  className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-gradient-to-r from-[#FFCA40]/10 to-[#FFCA40]/5 border border-[#FFCA40]/20 hover:border-[#FFCA40]/40 hover:bg-[#FFCA40]/15 transition-all duration-200 group"
+                  whileHover={{ scale: 1.01 }}
+                  whileTap={{ scale: 0.99 }}
                 >
-                  {/* Gradient Background with Animation */}
-                  <div className="absolute inset-0 bg-gradient-to-r from-[#FFCA40] via-[#FFE08C] to-[#FFCA40] bg-[length:200%_100%] [background-position:0%_50%] group-hover:animate-shimmer" />
-                  
-                  {/* Button Content */}
-                  <div className="relative flex items-center justify-center gap-3 px-4 py-3 rounded-lg">
-                    {/* Icon with pulse animation */}
-                    <motion.span
-                      className="text-2xl"
-                      animate={{ 
-                        scale: [1, 1.2, 1],
-                      }}
-                      transition={{ 
-                        repeat: Infinity, 
-                        duration: 2,
-                        ease: "easeInOut"
-                      }}
-                    >
-                      💬
-                    </motion.span>
-                    
-                    {/* Text */}
-                    <div className="flex flex-col items-start">
-                      <span className="text-[#001D58] font-semibold text-sm">
-                        Share Feedback
-                      </span>
-                      <span className="text-[#001D58]/70 text-xs">
-                        Help us improve
-                      </span>
-                    </div>
-                    
-                    {/* Arrow Icon */}
-                    <motion.span 
-                      className="ml-auto text-[#001D58]"
-                      initial={{ x: 0 }}
-                      whileHover={{ x: 3 }}
-                      transition={{ duration: 0.2 }}
-                    >
-                      →
-                    </motion.span>
-                  </div>
-                  
-                  {/* Shine effect overlay */}
-                  <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
-                    initial={{ x: '-100%' }}
-                    animate={{ x: '200%' }}
-                    transition={{
-                      repeat: Infinity,
-                      duration: 3,
-                      ease: "linear",
-                      repeatDelay: 2
-                    }}
-                  />
+                  <span className="flex items-center justify-center w-8 h-8 rounded-lg bg-[#FFCA40]/20 text-[#FFCA40]">
+                    💬
+                  </span>
+                  <span className="text-sm font-medium text-white/90 group-hover:text-white">
+                    Share Feedback
+                  </span>
+                  <span className="ml-auto text-white/40 group-hover:text-[#FFCA40] transition-colors">
+                    →
+                  </span>
                 </motion.button>
-              </div>
-            )}
+              )}
 
-            {/* Account Linker (optional, place where needed) */}
-            <div className="p-4 border-t border-white/10 mt-auto">
-              <AccountLinker />
+              {/* Wallet Connection - Compact */}
+              <CompactWalletSection />
             </div>
 
           </motion.div>

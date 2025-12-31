@@ -81,25 +81,31 @@ function HeaderBar({
   isLoading = false,
 }: HeaderBarProps) {
   return (
-    <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/5 backdrop-blur-sm">
-      <div className="flex items-center gap-4">
+    <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/[0.03] backdrop-blur-md">
+      {/* Left: Avatar & Title */}
+      <div className="flex items-center gap-3">
         <div className="relative">
-          <AikaAvatar />
-          <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 rounded-full border-2 border-[#001D58]" />
+          <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-ugm-gold/50 shadow-lg">
+            <Image src="/aika-human.jpeg" alt="Aika" width={36} height={36} className="object-cover w-full h-full" />
+          </div>
+          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-[#001D58]" />
         </div>
         <div>
-          <h1 className="text-lg font-bold tracking-wide text-white flex items-center gap-2">
-            Aika Chat
-            <AikaPoweredBadge />
+          <h1 className="text-base font-semibold text-white flex items-center gap-2">
+            Aika
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-ugm-gold/20 text-ugm-gold border border-ugm-gold/30">
+              AI
+            </span>
           </h1>
-          <p className="text-xs text-white/60 font-medium">
-            AI Mental Health Assistant
+          <p className="text-[11px] text-white/50">
+            Mental Health Assistant
           </p>
         </div>
       </div>
 
-      <div className="flex items-center gap-3">
-        {/* Model Selector - Cleaner look */}
+      {/* Right: Controls */}
+      <div className="flex items-center gap-2">
+        {/* Model Selector - Compact */}
         <div className="hidden sm:block">
           <ModelSelector
             selectedModel={selectedModel}
@@ -108,46 +114,39 @@ function HeaderBar({
           />
         </div>
 
-        <div className="h-6 w-px bg-white/10 mx-1" />
-
-        {/* Tools Group */}
-        <div className="flex items-center gap-1 bg-white/5 rounded-lg p-1 border border-white/10">
-          {/* Plans button */}
+        {/* Tool Buttons */}
+        <div className="flex items-center gap-0.5 bg-white/[0.03] rounded-lg p-0.5 border border-white/10">
           <button
             type="button"
             onClick={onOpenPlans}
-            className="relative h-8 w-8 inline-flex items-center justify-center rounded-md hover:bg-white/10 text-white/70 hover:text-white transition-colors"
+            className="relative h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-white/10 text-white/60 hover:text-white transition-colors"
             aria-label="View intervention plans"
             title="Intervention Plans"
           >
-            <ListChecks className="h-4 w-4" />
+            <ListChecks className="h-3.5 w-3.5" />
             {activePlansCount > 0 && (
-              <span className="absolute top-1.5 right-1.5 h-2 w-2 bg-red-500 rounded-full ring-2 ring-[#001D58]" />
+              <span className="absolute top-1 right-1 h-1.5 w-1.5 bg-red-500 rounded-full" />
             )}
           </button>
 
-          {/* Activity log toggle button */}
           <button
             type="button"
             onClick={onToggleActivityLog}
-            className={`h-8 w-8 inline-flex items-center justify-center rounded-md transition-colors ${showActivityLog ? 'bg-white/10 text-[#FFCA40]' : 'hover:bg-white/10 text-white/70 hover:text-white'
-              }`}
+            className={`h-7 w-7 inline-flex items-center justify-center rounded-md transition-colors ${showActivityLog ? 'bg-white/10 text-ugm-gold' : 'hover:bg-white/10 text-white/60 hover:text-white'}`}
             aria-label="Toggle activity log"
             title="Agent Activity"
           >
-            <Activity className="h-4 w-4" />
+            <Activity className="h-3.5 w-3.5" />
           </button>
 
-          {/* Metadata toggle button */}
           <button
             type="button"
             onClick={onOpenMetadata}
-            className={`h-8 w-8 inline-flex items-center justify-center rounded-md transition-colors ${showMetadata ? 'bg-white/10 text-purple-400' : 'hover:bg-white/10 text-white/70 hover:text-white'
-              }`}
+            className={`h-7 w-7 inline-flex items-center justify-center rounded-md transition-colors ${showMetadata ? 'bg-white/10 text-purple-400' : 'hover:bg-white/10 text-white/60 hover:text-white'}`}
             aria-label="Toggle metadata display"
             title="Technical Details"
           >
-            <Info className="h-4 w-4" />
+            <Info className="h-3.5 w-3.5" />
           </button>
         </div>
       </div>
@@ -196,9 +195,139 @@ export default function AikaEnhancedPage() {
     maxLogs: 100,
   });
 
+  // Track processed metadata to prevent duplicate logging
+  const processedMetadataRef = useRef<string | null>(null);
+  const lastMessageCountRef = useRef<number>(0);
+  const hasLoggedGreetingRef = useRef<boolean>(false);
+
+  // Log initial greeting when component mounts
+  useEffect(() => {
+    if (!hasLoggedGreetingRef.current && messages.length > 0) {
+      const firstMessage = messages[0];
+      if (firstMessage.role === 'assistant') {
+        addActivity({
+          timestamp: new Date().toISOString(),
+          activity_type: 'agent_complete',
+          agent: 'Aika',
+          message: 'Aika initialized and ready',
+          duration_ms: null,
+          details: { event: 'greeting', content_preview: firstMessage.content.substring(0, 50) + '...' }
+        });
+        hasLoggedGreetingRef.current = true;
+      }
+    }
+  }, [messages, addActivity]);
+
+  // Log when user sends a message or error occurs (detect new messages)
+  useEffect(() => {
+    if (messages.length > lastMessageCountRef.current) {
+      const newMessages = messages.slice(lastMessageCountRef.current);
+      newMessages.forEach((msg) => {
+        if (msg.role === 'user') {
+          addActivity({
+            timestamp: msg.created_at || new Date().toISOString(),
+            activity_type: 'info',
+            agent: 'Aika',
+            message: `User message received: "${msg.content.substring(0, 40)}${msg.content.length > 40 ? '...' : ''}"`,
+            duration_ms: null,
+            details: { event: 'user_message', message_id: msg.id }
+          });
+        }
+        // Detect error messages
+        if (msg.role === 'assistant' && msg.isError) {
+          addActivity({
+            timestamp: msg.created_at || new Date().toISOString(),
+            activity_type: 'agent_error',
+            agent: 'Aika',
+            message: `Error occurred: ${msg.content}`,
+            duration_ms: null,
+            details: { event: 'error_response', message_id: msg.id, error_content: msg.content }
+          });
+        }
+      });
+    }
+    lastMessageCountRef.current = messages.length;
+  }, [messages, addActivity]);
+
+  // Log when loading state changes (agent processing start/end)
+  const prevLoadingRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (isLoading && !prevLoadingRef.current) {
+      // Processing started
+      addActivity({
+        timestamp: new Date().toISOString(),
+        activity_type: 'agent_start',
+        agent: 'Aika',
+        message: 'Processing request...',
+        duration_ms: null,
+        details: { event: 'processing_start' }
+      });
+    }
+    prevLoadingRef.current = isLoading;
+  }, [isLoading, addActivity]);
+
+  // Log active agents when they change
+  const prevActiveAgentsRef = useRef<string[]>([]);
+  useEffect(() => {
+    if (activeAgents.length > 0) {
+      const newAgents = activeAgents.filter(a => !prevActiveAgentsRef.current.includes(a));
+      newAgents.forEach((agent) => {
+        addActivity({
+          timestamp: new Date().toISOString(),
+          activity_type: 'agent_start',
+          agent: agent,
+          message: `${agent} agent activated`,
+          duration_ms: null,
+          details: { event: 'agent_activated' }
+        });
+      });
+    }
+    prevActiveAgentsRef.current = activeAgents;
+  }, [activeAgents, addActivity]);
+
+  // Log errors when they occur
+  useEffect(() => {
+    if (error) {
+      addActivity({
+        timestamp: new Date().toISOString(),
+        activity_type: 'agent_error',
+        agent: 'Aika',
+        message: `Error: ${error}`,
+        duration_ms: null,
+        details: { event: 'error', error: error }
+      });
+    }
+  }, [error, addActivity]);
+
   // Effect to ingest activity logs from metadata
   useEffect(() => {
     if (lastMetadata?.activity_logs && Array.isArray(lastMetadata.activity_logs)) {
+      // Create a unique identifier for this metadata to prevent duplicate logging
+      const metadataId = JSON.stringify({
+        agents: lastMetadata.agents_invoked,
+        time: lastMetadata.processing_time_ms,
+        logsCount: lastMetadata.activity_logs.length
+      });
+
+      if (processedMetadataRef.current === metadataId) {
+        return; // Already processed this metadata
+      }
+      processedMetadataRef.current = metadataId;
+
+      // Log response completion first
+      addActivity({
+        timestamp: new Date().toISOString(),
+        activity_type: 'agent_complete',
+        agent: 'Aika',
+        message: `Response generated in ${lastMetadata.processing_time_ms}ms`,
+        duration_ms: lastMetadata.processing_time_ms,
+        details: {
+          event: 'response_complete',
+          agents_invoked: lastMetadata.agents_invoked,
+          risk_level: lastMetadata.risk_assessment?.risk_level
+        }
+      });
+
       // Sort by start time to ensure chronological order
       const sortedLogs = [...lastMetadata.activity_logs].sort((a: any, b: any) =>
         new Date(a.started_at).getTime() - new Date(b.started_at).getTime()
@@ -225,6 +354,45 @@ export default function AikaEnhancedPage() {
           details: log
         });
       });
+
+      // Log risk assessment if present
+      if (lastMetadata.risk_assessment && lastMetadata.risk_assessment.risk_level !== 'low') {
+        addActivity({
+          timestamp: new Date().toISOString(),
+          activity_type: 'risk_assessment',
+          agent: 'Aika',
+          message: `Risk level detected: ${lastMetadata.risk_assessment.risk_level.toUpperCase()}`,
+          duration_ms: null,
+          details: lastMetadata.risk_assessment
+        });
+      }
+
+      // Log escalation if triggered
+      if (lastMetadata.escalation_triggered && lastMetadata.case_id) {
+        addActivity({
+          timestamp: new Date().toISOString(),
+          activity_type: 'case_created',
+          agent: 'CMA',
+          message: `Case escalated: ${lastMetadata.case_id}`,
+          duration_ms: null,
+          details: { case_id: lastMetadata.case_id, escalation_triggered: true }
+        });
+      }
+
+      // Log if any intervention-related actions were taken
+      const interventionActions = lastMetadata.actions_taken?.filter(
+        action => action.includes('intervention') || action.includes('plan')
+      );
+      if (interventionActions && interventionActions.length > 0) {
+        addActivity({
+          timestamp: new Date().toISOString(),
+          activity_type: 'intervention_created',
+          agent: 'IA',
+          message: `Intervention actions: ${interventionActions.join(', ')}`,
+          duration_ms: null,
+          details: { actions: interventionActions }
+        });
+      }
     }
   }, [lastMetadata, addActivity]);
 

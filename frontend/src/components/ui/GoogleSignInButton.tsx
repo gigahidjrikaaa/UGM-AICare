@@ -17,7 +17,7 @@ export default function GoogleSignInButton({ className = "" }: GoogleSignInButto
   const handleSignIn = async () => {
     setIsLoading(true);
     try {
-      await signIn("google", { callbackUrl: "/aika" });
+      await signIn("google", { callbackUrl: "/dashboard" });
     } catch (error) {
       console.error("Error signing in:", error);
     } finally {
@@ -33,7 +33,7 @@ export default function GoogleSignInButton({ className = "" }: GoogleSignInButto
       // Clear any existing authentication state before proceeding
       await signOut({ redirect: false });
       await signIn("google", { 
-        callbackUrl: "/aika",
+        callbackUrl: "/dashboard",
         authorizationParams: {
           prompt: "select_account"
         }

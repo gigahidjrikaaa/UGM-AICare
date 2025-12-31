@@ -23,7 +23,6 @@ from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User, UserAIMemoryFact
-from app.utils.security_utils import decrypt_data, encrypt_data
 
 logger = logging.getLogger(__name__)
 
@@ -41,18 +40,6 @@ def _normalize_fact_text(text: str) -> str:
 
 def _hash_fact(user_id: int, normalized_fact_text: str) -> str:
     return hashlib.sha256(f"{user_id}:{normalized_fact_text}".encode("utf-8")).hexdigest()
-
-
-def _safe_encrypt(plaintext: str) -> Optional[str]:
-    encrypted = encrypt_data(plaintext)
-    return encrypted
-
-
-def _safe_decrypt(ciphertext: str) -> Optional[str]:
-    try:
-        return decrypt_data(ciphertext)
-    except Exception:
-        return None
 
 
 _FACT_PATTERNS: list[tuple[str, str, re.Pattern[str]]] = [
@@ -127,9 +114,6 @@ async def upsert_facts(
     for fact in facts:
         normalized = _normalize_fact_text(fact.text)
         fact_hash = _hash_fact(user_id, normalized)
-        encrypted = _safe_encrypt(fact.text)
-        if not encrypted:
-            continue
 
         # Postgres fast-path: ON CONFLICT DO UPDATE to bump updated_at.
         try:
@@ -137,7 +121,7 @@ async def upsert_facts(
                 insert(UserAIMemoryFact)
                 .values(
                     user_id=user_id,
-                    fact_encrypted=encrypted,
+                    fact_encrypted=fact.text,  # No longer encrypted, kept column name for compatibility
                     fact_hash=fact_hash,
                     category=fact.category,
                     source=source,
@@ -171,7 +155,7 @@ async def upsert_facts(
                 db.add(
                     UserAIMemoryFact(
                         user_id=user_id,
-                        fact_encrypted=encrypted,
+                        fact_encrypted=fact.text,  # No longer encrypted
                         fact_hash=fact_hash,
                         category=fact.category,
                         source=source,
@@ -219,16 +203,16 @@ async def list_user_facts(db: AsyncSession, user_id: int, limit: int = 50) -> Li
 
 
 async def list_user_fact_texts_for_agent(db: AsyncSession, user: User, limit: int = 20) -> List[str]:
-    """Return decrypted facts only if consent_ai_memory is enabled."""
+    """Return fact texts only if consent_ai_memory is enabled."""
     if not getattr(user, "consent_ai_memory", False):
         return []
 
     rows = await list_user_facts(db, user.id, limit=limit)
     texts: List[str] = []
     for row in rows:
-        decrypted = _safe_decrypt(row.fact_encrypted)
-        if decrypted:
-            texts.append(decrypted)
+        # fact_encrypted column now stores plaintext (encryption removed for performance)
+        if row.fact_encrypted:
+            texts.append(row.fact_encrypted)
     return texts
 
 

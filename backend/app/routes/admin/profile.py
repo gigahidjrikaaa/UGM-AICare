@@ -15,49 +15,27 @@ from app.schemas.admin.profile import (
     AdminProfileUpdateRequest,
 )
 from app.services.user_service import async_get_user_by_plain_email
-from app.utils.security_utils import decrypt_data, encrypt_data
 
 router = APIRouter(prefix="/profile", tags=["Admin - Profile"])
 
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 
-def _decrypt(value: str | None) -> str | None:
-    if not value:
-        return None
-    decrypted = decrypt_data(value)
-    return decrypted or value
-
-
-def _encrypt_or_400(value: str | None) -> str | None:
-    if value is None:
-        return None
-    encrypted = encrypt_data(value)
-    if encrypted is None:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Failed to secure profile data. Please contact support.",
-        )
-    return encrypted
-
-
 def _serialize_admin(user: User) -> AdminProfileResponse:
-    email_plain = _decrypt(user.email)
-    if not email_plain:
-        email_plain = user.email or ""
+    email_plain = user.email or ""
     if "@" not in email_plain:
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Stored admin email address is unreadable. Please contact support.",
+            detail="Stored admin email address is invalid. Please contact support.",
         )
 
     return AdminProfileResponse(
         id=user.id,
         email=email_plain,
-        name=_decrypt(user.name),
-        first_name=_decrypt(user.first_name),
-        last_name=_decrypt(user.last_name),
-        phone=_decrypt(user.phone),
+        name=user.name,
+        first_name=user.first_name,
+        last_name=user.last_name,
+        phone=user.phone,
         allow_email_checkins=user.allow_email_checkins,
         created_at=user.created_at,
         updated_at=user.updated_at,
@@ -77,15 +55,15 @@ async def update_admin_profile(
 ) -> AdminProfileResponse:
     has_changes = False
 
-    current_email_plain = _decrypt(current_admin.email) or ""
-    if payload.email and payload.email.lower() != current_email_plain.lower():
+    current_email = current_admin.email or ""
+    if payload.email and payload.email.lower() != current_email.lower():
         existing = await async_get_user_by_plain_email(db, payload.email)
         if existing and existing.id != current_admin.id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail="Email address is already associated with another account.",
             )
-        current_admin.email = _encrypt_or_400(payload.email)
+        current_admin.email = payload.email
         has_changes = True
 
     for field_name, new_value in (
@@ -95,9 +73,8 @@ async def update_admin_profile(
         ("phone", payload.phone),
     ):
         if new_value is not None:
-            encrypted_value = _encrypt_or_400(new_value)
-            if getattr(current_admin, field_name) != encrypted_value:
-                setattr(current_admin, field_name, encrypted_value)
+            if getattr(current_admin, field_name) != new_value:
+                setattr(current_admin, field_name, new_value)
                 has_changes = True
 
     if payload.allow_email_checkins is not None and current_admin.allow_email_checkins != payload.allow_email_checkins:

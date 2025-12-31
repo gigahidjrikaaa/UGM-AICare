@@ -17,10 +17,10 @@ const partners = [
 ];
 
 const stats = [
-  { value: "2000+", label: "Active Users" },
   { value: "24/7", label: "Availability" },
   { value: "<2s", label: "Response Time" },
-  { value: "4.8★", label: "User Rating" }
+  { value: "100%", label: "Private & Secure" },
+  { value: "Free", label: "For UGM Students" }
 ];
 
 export default function TrustSection() {

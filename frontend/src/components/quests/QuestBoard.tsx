@@ -58,7 +58,7 @@ function QuestCard({
   const canComplete = quest.status === "active" && !isCompleting;
 
   return (
-    <div className="flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-white/5 p-4 shadow-lg shadow-[#00153a]/15 transition hover:border-[#FFCA40]/40">
+    <div className="flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-4 shadow-lg shadow-[#00153a]/15 backdrop-blur-sm transition hover:border-[#FFCA40]/40">
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-2 text-sm font-semibold text-white">

@@ -79,16 +79,16 @@ export default function TestimonialsSection() {
           className="text-center mb-16"
         >
           <div className="inline-block px-4 py-2 bg-[#FFCA40]/10 rounded-full border border-[#FFCA40]/30 mb-4">
-            <span className="text-[#FFCA40] font-semibold text-sm">STUDENT TESTIMONIALS</span>
+            <span className="text-[#FFCA40] font-semibold text-sm">USE CASE SCENARIOS</span>
           </div>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6">
-            Real Stories from{' '}
+            How Aika Can{' '}
             <span className="bg-gradient-to-r from-[#FFCA40] to-[#FFD770] bg-clip-text text-transparent">
-              UGM Students
+              Help You
             </span>
           </h2>
           <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-            Thousands of UGM students have found support through Aika. Here are some of their experiences.
+            See how Aika could help UGM students navigate their mental health journey.
           </p>
         </motion.div>
 
@@ -147,7 +147,7 @@ export default function TestimonialsSection() {
           className="text-center mt-12"
         >
           <p className="text-gray-400 mb-4">
-            Join thousands of students who have already started their wellness journey.
+            Ready to start your wellness journey? Aika is here to support you.
           </p>
         </motion.div>
       </div>

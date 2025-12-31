@@ -76,7 +76,7 @@ export default function HeroSection() {
                 <FaStar className="text-[#FFCA40]" />
               </motion.div>
               <span className="text-white font-medium text-sm">
-                Trusted by <span className="text-[#FFCA40] font-bold">2000+ UGM Students</span>
+                Built for <span className="text-[#FFCA40] font-bold">UGM Students</span>
               </span>
             </motion.div>
             
@@ -138,16 +138,16 @@ export default function HeroSection() {
               className="grid grid-cols-3 gap-4 max-w-lg mx-auto lg:mx-0"
             >
               <div className="text-center lg:text-left">
-                <div className="text-3xl font-bold text-[#FFCA40]">2000+</div>
-                <div className="text-sm text-gray-400">UGM Students</div>
+                <div className="text-3xl font-bold text-[#FFCA40]">24/7</div>
+                <div className="text-sm text-gray-400">Availability</div>
               </div>
               <div className="text-center lg:text-left">
                 <div className="text-3xl font-bold text-[#FFCA40]">{'<2s'}</div>
                 <div className="text-sm text-gray-400">Response Time</div>
               </div>
               <div className="text-center lg:text-left">
-                <div className="text-3xl font-bold text-[#FFCA40]">4.8★</div>
-                <div className="text-sm text-gray-400">User Rating</div>
+                <div className="text-3xl font-bold text-[#FFCA40]">100%</div>
+                <div className="text-sm text-gray-400">Private & Secure</div>
               </div>
             </motion.div>
             

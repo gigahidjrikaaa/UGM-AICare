@@ -39,7 +39,7 @@ export default function FinalCTASection() {
 
           {/* Content */}
           <div className="relative z-10">
-            {/* Urgency Badge */}
+            {/* Availability Badge */}
             <motion.div
               initial={{ scale: 0 }}
               whileInView={{ scale: 1 }}
@@ -51,10 +51,10 @@ export default function FinalCTASection() {
                 animate={{ scale: [1, 1.2, 1] }}
                 transition={{ duration: 2, repeat: Infinity }}
               >
-                🔥
+                💫
               </motion.span>
               <span className="text-white font-semibold">
-                <span className="text-[#FFCA40]">500+ students</span> helped this week
+                <span className="text-[#FFCA40]">Available 24/7</span> whenever you need support
               </span>
             </motion.div>
 

@@ -89,14 +89,9 @@ async def create_password_reset_token(db: AsyncSession, email: str) -> bool:
         bool: True if token was created and email sent, False otherwise
     """
     try:
-        from app.utils.security_utils import encrypt_data
-        
-        # Encrypt the email to search for user (emails are stored encrypted)
-        encrypted_email = encrypt_data(email)
-        
-        # Find user by encrypted email
+        # Find user by email (emails are stored as plaintext, encryption removed for performance)
         result = await db.execute(
-            select(User).where(User.email == encrypted_email)
+            select(User).where(User.email == email)
         )
         user = result.scalar_one_or_none()
         

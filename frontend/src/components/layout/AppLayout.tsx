@@ -3,12 +3,11 @@
 
 import React, { useState } from 'react';
 import { useSession } from 'next-auth/react';
-import { usePathname } from 'next/navigation';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'react-hot-toast';
 import Header from '@/components/ui/Header';
 import AppSidebar from '@/components/ui/AppSidebar';
-import Footer from '@/components/ui/Footer';
+import FooterWrapper from '@/components/ui/FooterWrapper';
 import FeedbackForm from '@/components/features/feedback/FeedBackForm';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import { cn } from '@/lib/utils';
@@ -33,29 +32,20 @@ const AppLoadingIndicator = () => (
 
 export default function AppLayout({ children }: AppLayoutProps) {
   const { status } = useSession();
-  const pathname = usePathname();
   const [isSidebarOpen, setSidebarOpen] = useState(false);
-  const [isFeedbackOpen, setFeedbackOpen] = useState(false); // Add feedback modal state
+  const [isFeedbackOpen, setFeedbackOpen] = useState(false);
   const isGrammarlyActive = useIsGrammarlyActive();
-
-  // Pages that don't need Footer (full-screen experiences like chat where footer would interfere)
-  const fullScreenPages = ['/aika'];
-  const isFullScreenPage = fullScreenPages.includes(pathname);
 
   const toggleSidebar = () => {
     setSidebarOpen(!isSidebarOpen);
   };
-
-  
 
   if (status === 'loading' || isGrammarlyActive) {
     return <AppLoadingIndicator />;
   }
 
   return (
-    // Use a relative container to position fixed elements relative to it if needed,
-    // but for sidebar/feedback button, positioning relative to viewport is fine.
-    <div className="flex h-screen overflow-hidden bg-linear-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a]"> {/* Add gradient background */}
+    <div className="flex h-screen overflow-hidden bg-linear-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a]">
 
       {/* Particle Background - absolute positioned, behind everything */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none z-0">
@@ -74,10 +64,9 @@ export default function AppLayout({ children }: AppLayoutProps) {
       )}
 
       {/* Main content area wrapper */}
-      {/* Apply conditional blur and pointer-events here */}
       <div
         className={cn(
-            "flex-1 flex flex-col overflow-hidden transition-filter duration-300 relative z-10", // Added z-10 to be above particles
+            "flex-1 flex flex-col overflow-hidden transition-filter duration-300 relative z-10",
             isSidebarOpen ? "blur-sm pointer-events-none" : ""
         )}
         >
@@ -86,18 +75,16 @@ export default function AppLayout({ children }: AppLayoutProps) {
           <Header onToggleSidebar={toggleSidebar}/>
         </NoSsr>
 
-        {/* Content area - no padding, content flows naturally behind glassmorphic header */}
+        {/* Content area */}
         <main id="app-scroll-container" className="grow relative overflow-auto">
             <div className="min-h-screen">
               {children}
             </div>
             
-            {/* Footer - placed inside main so it appears after scrolling to bottom */}
-            {!isFullScreenPage && (
-              <NoSsr>
-                <Footer />
-              </NoSsr>
-            )}
+            {/* Footer - Smart wrapper handles which footer (or none) to show */}
+            <NoSsr>
+              <FooterWrapper />
+            </NoSsr>
         </main>
       </div>
 

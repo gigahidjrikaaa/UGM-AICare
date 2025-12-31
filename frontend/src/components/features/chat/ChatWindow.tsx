@@ -28,7 +28,7 @@ export function ChatWindow({
   onCardSelect,
 }: ChatWindowProps) {
   return (
-    <div ref={chatContainerRef} className="flex-1 overflow-y-auto bg-transparent space-y-4 px-1 pb-4 pt-3 sm:px-3 md:px-5">
+    <div ref={chatContainerRef} className="flex-1 overflow-y-auto bg-transparent space-y-2 px-2 pb-4 pt-2 sm:px-4 md:px-6">
       {messages.map((msg) => (
         <div key={msg.id} className="flex flex-col">
           <MessageBubble
@@ -39,8 +39,8 @@ export function ChatWindow({
 
           {/* Render Interactive Cards based on Tool Calls */}
           {msg.role === 'assistant' && msg.metadata?.tool_calls && Array.isArray(msg.metadata.tool_calls) && (
-            <div className="mt-2 w-full overflow-x-auto pb-2 custom-scrollbar pl-10">
-              <div className="flex gap-3 px-1">
+            <div className="mt-2 w-full overflow-x-auto pb-2 custom-scrollbar pl-9">
+              <div className="flex gap-2 px-1">
                 {msg.metadata.tool_calls.map((tool: any, idx: number) => {
                   // Check for get_available_counselors result
                   if (tool.tool_name === 'get_available_counselors' && tool.result?.counselors) {

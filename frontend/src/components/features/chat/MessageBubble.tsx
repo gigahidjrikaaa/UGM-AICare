@@ -43,6 +43,7 @@ export function MessageBubble({ message, onCancelAppointment, onRescheduleAppoin
 
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
+  const isError = message.isError;
 
   if (isSystem) {
     return (
@@ -58,21 +59,21 @@ export function MessageBubble({ message, onCancelAppointment, onRescheduleAppoin
   }
 
   const bubbleVariants: Variants = {
-    hidden: { opacity: 0, y: 10 },
-    visible: { opacity: 1, y: 0, transition: { duration: 0.3, ease: "easeOut" } },
+    hidden: { opacity: 0, y: 8 },
+    visible: { opacity: 1, y: 0, transition: { duration: 0.25, ease: "easeOut" } },
   };
 
   const renderAvatar = () => {
     if (isUser) {
       return (
-        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-ugm-gold flex items-center justify-center text-ugm-blue-dark font-semibold text-xs border-2 border-white/30 shadow-sm self-start mt-1">
+        <div className="shrink-0 w-7 h-7 rounded-full bg-ugm-gold flex items-center justify-center text-ugm-blue-dark font-semibold text-[10px] shadow-sm">
           Me
         </div>
       );
     }
     return (
-      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-ugm-blue flex items-center justify-center overflow-hidden border-2 border-white/30 shadow-sm self-start mt-1">
-        <Image src="/aika-human.jpeg" alt="Aika" width={32} height={32} className="object-cover w-full h-full" />
+      <div className="shrink-0 w-7 h-7 rounded-full overflow-hidden shadow-sm border border-white/20">
+        <Image src="/aika-human.jpeg" alt="Aika" width={28} height={28} className="object-cover w-full h-full" />
       </div>
     );
   };
@@ -84,7 +85,7 @@ export function MessageBubble({ message, onCancelAppointment, onRescheduleAppoin
           {message.toolIndicator ? (
             <AikaThinkingCompact message={message.toolIndicator} />
           ) : (
-            <div className="flex items-center justify-start h-full px-3.5 py-2.5 text-ugm-blue-dark">
+            <div className="flex items-center justify-start h-full px-3 py-2 text-ugm-blue-dark">
               <LoadingDots text="Aika sedang mengetik..." />
             </div>
           )}
@@ -94,9 +95,9 @@ export function MessageBubble({ message, onCancelAppointment, onRescheduleAppoin
     return (
       <div className={cn(
         'prose prose-sm max-w-none prose-p:m-0 prose-li:m-0 prose-ul:m-0 prose-ol:m-0',
-        isUser ? 'prose-invert' : 'text-ugm-blue-dark',
+        isUser ? 'prose-invert' : isError ? 'text-red-200' : 'text-white/90',
         'prose-a:font-medium prose-a:transition-colors',
-        isUser ? 'prose-a:text-ugm-gold hover:prose-a:text-ugm-gold/80' : 'prose-a:text-ugm-blue-dark hover:prose-a:text-ugm-blue/80 prose-a:underline'
+        isUser ? 'prose-a:text-ugm-gold hover:prose-a:text-ugm-gold/80' : 'prose-a:text-ugm-gold hover:prose-a:text-ugm-gold/80'
       )}>
         <ReactMarkdown
           components={{
@@ -111,7 +112,7 @@ export function MessageBubble({ message, onCancelAppointment, onRescheduleAppoin
 
   return (
     <motion.div
-      className={cn('flex items-end gap-2 my-2', isUser ? 'justify-end' : 'justify-start')}
+      className={cn('flex items-start gap-2 my-1.5', isUser ? 'justify-end' : 'justify-start')}
       variants={bubbleVariants}
       initial="hidden"
       animate="visible"
@@ -119,12 +120,13 @@ export function MessageBubble({ message, onCancelAppointment, onRescheduleAppoin
       {!isUser && renderAvatar()}
       <div className={cn('flex flex-col', isUser ? 'items-end' : 'items-start')}>
         <div className={cn(
-          'px-3.5 py-2.5 rounded-xl max-w-xs md:max-w-md lg:max-w-lg shadow-md text-sm relative',
-          'min-h-[44px]',
+          'px-3 py-2 rounded-2xl max-w-xs md:max-w-md lg:max-w-lg text-sm relative',
           isUser
-            ? 'bg-ugm-blue text-white rounded-br-none'
-            : 'bg-white/90 backdrop-blur-sm text-ugm-blue-dark rounded-bl-none border border-gray-200/50',
-          message.isLoading && 'p-0 bg-white/70 backdrop-blur-sm w-[150px]'
+            ? 'bg-ugm-blue text-white rounded-br-sm'
+            : isError 
+              ? 'bg-red-500/20 backdrop-blur-sm text-red-200 rounded-bl-sm border border-red-500/30'
+              : 'bg-white/10 backdrop-blur-sm text-white/90 rounded-bl-sm border border-white/10',
+          message.isLoading && 'p-0 bg-white/10 backdrop-blur-sm w-[140px]'
         )}>
           {renderBubbleContent()}
         </div>
@@ -156,8 +158,8 @@ export function MessageBubble({ message, onCancelAppointment, onRescheduleAppoin
         
         {!message.isLoading && (
           <div className={cn(
-            'mt-1 text-[10px]',
-            isUser ? 'text-gray-400/90 mr-1' : 'text-gray-500/90 ml-1'
+            'mt-0.5 text-[10px]',
+            isUser ? 'text-white/40 mr-1' : 'text-white/40 ml-1'
           )}>
             {format(message.timestamp, 'HH:mm', { locale: id })}
           </div>
