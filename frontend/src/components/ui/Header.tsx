@@ -137,6 +137,10 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
                   <div className="relative">
                     <button
                       onClick={toggleProfile}
+                      aria-haspopup="menu"
+                      aria-expanded={isProfileOpen}
+                      aria-controls="profile-menu"
+                      aria-label="Open profile menu"
                       className={`relative w-9 h-9 rounded-full overflow-hidden border-2 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/50 ${isProfileOpen ? "border-[#FFCA40]" : "border-white/20 hover:border-white/40"
                         }`}
                     >
@@ -151,6 +155,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
                     <ProfileDropdown
                       user={session.user}
                       isOpen={isProfileOpen}
+                      wellness={wellness}
                       onClose={() => setIsProfileOpen(false)}
                       onSignOut={handleSignOut}
                     />

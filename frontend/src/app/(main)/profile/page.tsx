@@ -37,6 +37,7 @@ import GlobalSkeleton from "@/components/ui/GlobalSkeleton";
 import ParticleBackground from "@/components/ui/ParticleBackground";
 import EarnedBadgesDisplay from "@/components/ui/EarnedBadgesDisplay";
 import WalletLinkButton from "@/components/ui/WalletLinkButton";
+import { useWellnessState } from "@/hooks/useQuests";
 import apiClient, {
   deleteUserAIMemoryFact,
   fetchUserAIMemoryFacts,
@@ -257,6 +258,8 @@ const buildUpdatePayload = (state: ProfileFormState): UserProfileOverviewUpdate 
 export default function ProfilePage() {
   const { data: session, status } = useSession();
   const router = useRouter();
+
+  const { data: wellness } = useWellnessState();
 
   const [profile, setProfile] = useState<UserProfileOverviewResponse | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
@@ -495,7 +498,27 @@ export default function ProfilePage() {
   const headerMetrics = useMemo(() => {
     if (!profile)
       return [] as Array<{ label: string; value: string; icon: React.JSX.Element }>;
+
+    const wellnessMetrics: Array<{ label: string; value: string; icon: React.JSX.Element }> = [
+      {
+        label: "JOY",
+        value: wellness ? `${wellness.joy_balance}` : "—",
+        icon: <FiAward className="h-4 w-4" />,
+      },
+      {
+        label: "CARE",
+        value: wellness ? `${wellness.care_balance}` : "—",
+        icon: <FiUsers className="h-4 w-4" />,
+      },
+      {
+        label: "Harmony",
+        value: wellness ? `${wellness.harmony_score}` : "—",
+        icon: <FiGlobe className="h-4 w-4" />,
+      },
+    ];
+
     return [
+      ...wellnessMetrics,
       {
         label: "Current Streak",
         value: `${profile.header.current_streak} days`,
@@ -506,13 +529,8 @@ export default function ProfilePage() {
         value: `${profile.header.longest_streak} days`,
         icon: <FiActivity className="h-4 w-4" />,
       },
-      {
-        label: "Sentiment",
-        value: profile.header.sentiment_score.toFixed(2),
-        icon: <FiShield className="h-4 w-4" />,
-      },
     ];
-  }, [profile]);
+  }, [profile, wellness]);
 
   if (status === "loading" || profileLoading) {
     return (
