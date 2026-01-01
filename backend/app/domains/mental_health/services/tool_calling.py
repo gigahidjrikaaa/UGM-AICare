@@ -118,8 +118,8 @@ async def generate_with_tools(
             
             # For non-streaming mode
             else:
-                # Get full response object for tool calling
-                response_obj = await llm.generate_gemini_response(
+                # Get full response object for tool calling (with automatic fallback on rate limits)
+                response_obj = await llm.generate_gemini_response_with_fallback(
                     history=conversation_history,
                     model=model_name,
                     max_tokens=request.max_tokens,
@@ -315,8 +315,8 @@ async def _generate_streaming_with_tools(
     # to check if there's a function call, then stream the final response
     
     try:
-        # First, get the response to check for function calls
-        response_obj = await llm.generate_gemini_response(
+        # First, get the response to check for function calls (with automatic fallback on rate limits)
+        response_obj = await llm.generate_gemini_response_with_fallback(
             history=conversation_history,
             model=model_name,
             max_tokens=request.max_tokens,

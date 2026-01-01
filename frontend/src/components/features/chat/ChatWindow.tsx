@@ -1,5 +1,5 @@
 // src/components/features/chat/ChatWindow.tsx
-import React from "react";
+import React, { useEffect, useRef } from "react";
 import { Message } from "@/types/chat";
 import { MessageBubble } from "./MessageBubble";
 
@@ -27,15 +27,35 @@ export function ChatWindow({
   activeAgents = [],
   onCardSelect,
 }: ChatWindowProps) {
+  const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Auto-scroll to bottom when messages change or loading state changes
+  useEffect(() => {
+    const scrollToBottom = () => {
+      if (bottomRef.current) {
+        bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      }
+    };
+    // Small delay to ensure DOM is updated
+    const timeoutId = setTimeout(scrollToBottom, 50);
+    return () => clearTimeout(timeoutId);
+  }, [messages, isLoading]);
+
   return (
     <div ref={chatContainerRef} className="flex-1 overflow-y-auto bg-transparent space-y-2 px-2 pb-4 pt-2 sm:px-4 md:px-6">
-      {messages.map((msg) => (
-        <div key={msg.id} className="flex flex-col">
-          <MessageBubble
-            message={msg}
-            onCancelAppointment={onCancelAppointment}
-            onRescheduleAppointment={onRescheduleAppointment}
-          />
+      {messages.map((msg, index) => {
+        // Determine if this is the last bubble in a continuation group
+        const nextMsg = messages[index + 1];
+        const isLastInGroup = !nextMsg || !nextMsg.isContinuation || nextMsg.role !== msg.role;
+        
+        return (
+          <div key={msg.id} className="flex flex-col">
+            <MessageBubble
+              message={msg}
+              isLastInGroup={isLastInGroup}
+              onCancelAppointment={onCancelAppointment}
+              onRescheduleAppointment={onRescheduleAppointment}
+            />
 
           {/* Render Interactive Cards based on Tool Calls */}
           {msg.role === 'assistant' && msg.metadata?.tool_calls && Array.isArray(msg.metadata.tool_calls) && (
@@ -68,7 +88,8 @@ export function ChatWindow({
             </div>
           )}
         </div>
-      ))}
+        );
+      })}
 
       {/* Loading Indicator inside Chat Window */}
       {isLoading && (
@@ -76,6 +97,9 @@ export function ChatWindow({
           <AikaLoadingBubble activeAgents={activeAgents} />
         </div>
       )}
+      
+      {/* Scroll anchor for auto-scroll */}
+      <div ref={bottomRef} className="h-1" />
     </div>
   );
 }

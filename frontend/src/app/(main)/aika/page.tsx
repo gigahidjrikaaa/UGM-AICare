@@ -16,34 +16,31 @@
 
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Info, Settings, ClipboardList, ListChecks, Activity } from 'lucide-react';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { useAikaChat } from '@/hooks/useAikaChat';
+import { useAikaChat, type ToolActivityLog } from '@/hooks/useAikaChat';
 import { ChatWindow } from '@/components/features/chat/ChatWindow';
 import { ChatInput } from '@/components/features/chat/ChatInput';
 import { AIKA_MEMORY_NOTE } from '@/constants/chat';
-import { InterventionPlansSidebar } from '@/components/features/chat/InterventionPlansSidebar';
 import { useInterventionPlans } from '@/hooks/useInterventionPlans';
 import { AikaLoadingBubble } from '@/components/features/aika/AikaLoadingBubble';
 import {
   AgentActivityBadge,
   RiskLevelIndicator,
   EscalationNotification,
-  MetadataDisplay,
   AikaAvatar,
   AikaPoweredBadge,
 } from '@/components/features/aika/AikaComponents';
-import { ActivityLogPanel, ActivityIndicator } from '@/components/features/aika/ActivityLogPanel';
+import { ActivityLogPanel, ActivityIndicator, type ViewMode } from '@/components/features/aika/ActivityLogPanel';
 import { useActivityLog } from '@/hooks/useActivityLog';
 import { ModelSelector } from '@/components/features/aika/ModelSelector';
 
 // Loading Component
 const LoadingIndicator = () => (
-  <div className="h-screen w-screen flex items-center justify-center bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white">
+  <div className="h-screen w-screen flex items-center justify-center bg-linear-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white">
     <div className="text-center">
       <div className="inline-block w-16 h-16 relative">
         <div className="animate-spin rounded-full h-16 w-16 border-b-2 border-[#FFCA40]"></div>
@@ -58,30 +55,18 @@ const LoadingIndicator = () => (
 
 // Header Bar Component
 interface HeaderBarProps {
-  onOpenMetadata: () => void;
-  onOpenPlans: () => void;
-  onToggleActivityLog: () => void;
-  activePlansCount: number;
-  showMetadata: boolean;
-  showActivityLog: boolean;
   selectedModel: string;
   onModelChange: (model: string) => void;
   isLoading?: boolean;
 }
 
 function HeaderBar({
-  onOpenMetadata,
-  onOpenPlans,
-  onToggleActivityLog,
-  activePlansCount,
-  showMetadata,
-  showActivityLog,
   selectedModel,
   onModelChange,
   isLoading = false,
 }: HeaderBarProps) {
   return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/[0.03] backdrop-blur-md">
+    <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/3 backdrop-blur-md">
       {/* Left: Avatar & Title */}
       <div className="flex items-center gap-3">
         <div className="relative">
@@ -113,42 +98,6 @@ function HeaderBar({
             disabled={isLoading}
           />
         </div>
-
-        {/* Tool Buttons */}
-        <div className="flex items-center gap-0.5 bg-white/[0.03] rounded-lg p-0.5 border border-white/10">
-          <button
-            type="button"
-            onClick={onOpenPlans}
-            className="relative h-7 w-7 inline-flex items-center justify-center rounded-md hover:bg-white/10 text-white/60 hover:text-white transition-colors"
-            aria-label="View intervention plans"
-            title="Intervention Plans"
-          >
-            <ListChecks className="h-3.5 w-3.5" />
-            {activePlansCount > 0 && (
-              <span className="absolute top-1 right-1 h-1.5 w-1.5 bg-red-500 rounded-full" />
-            )}
-          </button>
-
-          <button
-            type="button"
-            onClick={onToggleActivityLog}
-            className={`h-7 w-7 inline-flex items-center justify-center rounded-md transition-colors ${showActivityLog ? 'bg-white/10 text-ugm-gold' : 'hover:bg-white/10 text-white/60 hover:text-white'}`}
-            aria-label="Toggle activity log"
-            title="Agent Activity"
-          >
-            <Activity className="h-3.5 w-3.5" />
-          </button>
-
-          <button
-            type="button"
-            onClick={onOpenMetadata}
-            className={`h-7 w-7 inline-flex items-center justify-center rounded-md transition-colors ${showMetadata ? 'bg-white/10 text-purple-400' : 'hover:bg-white/10 text-white/60 hover:text-white'}`}
-            aria-label="Toggle metadata display"
-            title="Technical Details"
-          >
-            <Info className="h-3.5 w-3.5" />
-          </button>
-        </div>
       </div>
     </div>
   );
@@ -158,14 +107,85 @@ export default function AikaEnhancedPage() {
   const [mounted, setMounted] = useState(false);
   const { status } = useSession();
   const router = useRouter();
-  const [showMetadata, setShowMetadata] = useState(false);
-  const [showActivityLog, setShowActivityLog] = useState(false);
-  const [isPlansOpen, setIsPlansOpen] = useState(false);
   const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  
+  // Track floating panel view modes for layout adjustment
+  const [activityLogViewMode, setActivityLogViewMode] = useState<ViewMode>('minimized');
+
+  // Calculate left margin based on activity log state
+  // Activity log is always visible on desktop (lg+), hidden on mobile
+  // Margin = panel width + left offset (1rem) + gap (0.5rem)
+  // Panel widths: minimized=4rem (64px), compact=20rem (320px), expanded=24rem/26.25rem (384px/420px)
+  const getLeftMargin = () => {
+    // On mobile/tablet, no margin needed (panels overlay)
+    // On desktop (lg+), apply margin based on view mode
+    switch (activityLogViewMode) {
+      case 'expanded': return 'lg:ml-[25.5rem] xl:ml-[28rem]';
+      case 'compact': return 'lg:ml-[21.5rem]';
+      case 'minimized': return 'lg:ml-[5.5rem]';
+      default: return 'lg:ml-[5.5rem]';
+    }
+  };
 
   // Fetch intervention plans
-  const { data: plansData, refetch: refetchPlans } = useInterventionPlans(true);
+  const {
+    data: plansData,
+    isLoading: interventionPlansLoading,
+    error: interventionPlansError,
+    refetch: refetchPlans,
+  } = useInterventionPlans(true);
+
+  // Activity logging - must be declared before useAikaChat to pass addActivity
+  const {
+    activities,
+    latestActivity,
+    isReceiving,
+    addActivity,
+  } = useActivityLog({
+    enabled: true,
+    maxLogs: 100,
+  });
+
+  // Handler to convert tool activity logs to activity log format
+  const handleToolActivity = useCallback((toolActivity: ToolActivityLog) => {
+    // Map tool event types to activity types
+    const activityTypeMap: Record<string, 'tool_start' | 'tool_end' | 'tool_use' | 'info'> = {
+      'tool_start': 'tool_start',
+      'tool_end': 'tool_end',
+      'tool_use': 'tool_use',
+      'status': 'info',
+    };
+
+    const activityType = activityTypeMap[toolActivity.type] || 'info';
+    
+    // Build message based on event type
+    let message = '';
+    if (toolActivity.type === 'tool_start' && toolActivity.tools?.length) {
+      message = `Starting tools: ${toolActivity.tools.join(', ')}`;
+    } else if (toolActivity.type === 'tool_end' && toolActivity.tool) {
+      message = `Tool completed: ${toolActivity.tool}`;
+    } else if (toolActivity.type === 'tool_use' && toolActivity.tool) {
+      message = `Using tool: ${toolActivity.tool}`;
+    } else if (toolActivity.message) {
+      message = toolActivity.message;
+    } else {
+      message = `Tool event: ${toolActivity.type}`;
+    }
+
+    addActivity({
+      timestamp: toolActivity.timestamp,
+      activity_type: activityType,
+      agent: 'Aika',
+      message,
+      duration_ms: null,
+      details: {
+        event: toolActivity.type,
+        tool: toolActivity.tool,
+        tools: toolActivity.tools,
+      }
+    });
+  }, [addActivity]);
 
   // Use the Aika chat hook
   const {
@@ -182,17 +202,7 @@ export default function AikaEnhancedPage() {
     showAgentActivity: true,
     showRiskIndicators: true,
     preferredModel: selectedModel,
-  });
-
-  // Activity logging
-  const {
-    activities,
-    latestActivity,
-    isReceiving,
-    addActivity,
-  } = useActivityLog({
-    enabled: true,
-    maxLogs: 100,
+    onToolActivity: handleToolActivity,
   });
 
   // Track processed metadata to prevent duplicate logging
@@ -218,7 +228,7 @@ export default function AikaEnhancedPage() {
     }
   }, [messages, addActivity]);
 
-  // Log when user sends a message or error occurs (detect new messages)
+  // Log when user sends a message or Aika responds (detect new messages)
   useEffect(() => {
     if (messages.length > lastMessageCountRef.current) {
       const newMessages = messages.slice(lastMessageCountRef.current);
@@ -231,6 +241,22 @@ export default function AikaEnhancedPage() {
             message: `User message received: "${msg.content.substring(0, 40)}${msg.content.length > 40 ? '...' : ''}"`,
             duration_ms: null,
             details: { event: 'user_message', message_id: msg.id }
+          });
+        }
+        // Log Aika's response (non-error assistant messages after greeting)
+        if (msg.role === 'assistant' && !msg.isError && hasLoggedGreetingRef.current) {
+          addActivity({
+            timestamp: msg.created_at || new Date().toISOString(),
+            activity_type: 'agent_complete',
+            agent: 'Aika',
+            message: `Aika responded: "${msg.content.substring(0, 60)}${msg.content.length > 60 ? '...' : ''}"`,
+            duration_ms: null,
+            details: { 
+              event: 'aika_response', 
+              message_id: msg.id,
+              content_length: msg.content.length,
+              content_preview: msg.content.substring(0, 150) + (msg.content.length > 150 ? '...' : '')
+            }
           });
         }
         // Detect error messages
@@ -417,18 +443,12 @@ export default function AikaEnhancedPage() {
   return (
     <>
       {/* Content area - Fixed positioning to avoid navbar clash */}
-      <div className="fixed inset-0 top-[72px] md:top-[80px] w-full text-white flex flex-col p-2 md:p-4 lg:p-6 gap-4">
-        {/* Main Layout Container */}
-        <div className="w-full max-w-7xl mx-auto flex-1 flex gap-4 overflow-hidden">
-          {/* Chat Panel */}
-          <div className={`${showActivityLog ? 'lg:w-2/3' : 'w-full'} flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden transition-all duration-300 min-h-0`}>
+      <div className="fixed inset-0 top-[72px] md:top-20 w-full text-white flex flex-col p-2 md:p-4 lg:p-6 gap-4">
+        {/* Main Layout Container - Adjusts margins based on floating panel states */}
+        <div className={`w-full max-w-7xl mx-auto flex-1 flex gap-4 overflow-hidden transition-all duration-300 min-w-0 ${getLeftMargin()}`}>
+          {/* Chat Panel - Full width now since activity log is floating */}
+          <div className="w-full min-w-0 flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden transition-all duration-300 min-h-0">
             <HeaderBar
-              onOpenMetadata={() => setShowMetadata(!showMetadata)}
-              onToggleActivityLog={() => setShowActivityLog(!showActivityLog)}
-              onOpenPlans={() => setIsPlansOpen(true)}
-              activePlansCount={plansData?.total || 0}
-              showMetadata={showMetadata}
-              showActivityLog={showActivityLog}
               selectedModel={selectedModel}
               onModelChange={setSelectedModel}
               isLoading={isLoading}
@@ -463,7 +483,6 @@ export default function AikaEnhancedPage() {
                   {lastMetadata.escalation_triggered && lastMetadata.case_id && (
                     <EscalationNotification caseId={lastMetadata.case_id} />
                   )}
-                  {showMetadata && <MetadataDisplay metadata={lastMetadata} />}
                 </div>
               )}
 
@@ -493,37 +512,28 @@ export default function AikaEnhancedPage() {
               </div>
             </div>
           </div>
-
-          {/* Activity Log Panel */}
-          {showActivityLog && (
-            <motion.div
-              initial={{ opacity: 0, x: 20 }}
-              animate={{ opacity: 1, x: 0 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="hidden lg:flex lg:w-1/3 flex-col min-h-0 overflow-hidden"
-            >
-              <ActivityLogPanel
-                activities={activities}
-                isOpen={showActivityLog}
-                onClose={() => setShowActivityLog(false)}
-                maxHeight="100%"
-              />
-            </motion.div>
-          )}
         </div>
 
-        {/* Intervention Plans Sidebar */}
-        <InterventionPlansSidebar
-          isOpen={isPlansOpen}
-          onClose={() => setIsPlansOpen(false)}
-        />
+        {/* Activity Log Panel - Floating on the left, always visible on desktop */}
+        <div className="hidden lg:block">
+          <ActivityLogPanel
+            activities={activities}
+            metadata={lastMetadata ?? null}
+            interventionPlans={plansData}
+            interventionPlansLoading={interventionPlansLoading}
+            interventionPlansError={interventionPlansError}
+            onRefreshInterventionPlans={refetchPlans}
+            alwaysVisible={true}
+            onViewModeChange={setActivityLogViewMode}
+          />
+        </div>
 
         {/* Footer credit */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          className="flex-shrink-0 py-2 text-center text-xs text-gray-300/70"
+          className="shrink-0 py-2 text-center text-xs text-gray-300/70"
         >
           <p>Disclaimer: Aika adalah AI dan bukan pengganti profesional medis.</p>
           <p className="mt-1">Built with ❤️ by UGM AICare Team • Powered by LangGraph</p>

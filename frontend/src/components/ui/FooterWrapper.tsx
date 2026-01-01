@@ -22,7 +22,6 @@ export default function FooterWrapper() {
     '/carequest',
     '/admin',
     '/counselor',
-    '/aika-monitor',
   ];
 
   // Check if current path starts with any no-footer prefix

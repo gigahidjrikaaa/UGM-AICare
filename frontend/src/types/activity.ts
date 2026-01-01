@@ -15,6 +15,9 @@ export type ActivityType =
   | 'intervention_created'
   | 'case_created'
   | 'llm_call'
+  | 'tool_start'
+  | 'tool_end'
+  | 'tool_use'
   | 'info'
   | 'warning';
 

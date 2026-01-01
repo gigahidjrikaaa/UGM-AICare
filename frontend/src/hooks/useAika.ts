@@ -57,11 +57,20 @@ export interface AikaRequest {
   preferred_model?: string;
 }
 
+export interface ToolEvent {
+  type: 'tool_start' | 'tool_end' | 'tool_use';
+  tool?: string;
+  tools?: string[];
+  timestamp: string;
+}
+
 interface UseAikaOptions {
   onAgentActivity?: (agents: string[]) => void;
   onRiskDetected?: (assessment: AikaRiskAssessment) => void;
   onEscalation?: (caseId: string) => void;
   onPartialResponse?: (text: string) => void;
+  onToolEvent?: (event: ToolEvent) => void;
+  onStatusUpdate?: (message: string) => void;
   showToasts?: boolean;
 }
 
@@ -76,6 +85,8 @@ export function useAika(options: UseAikaOptions = {}) {
     onRiskDetected,
     onEscalation,
     onPartialResponse,
+    onToolEvent,
+    onStatusUpdate,
     showToasts = true,
   } = options;
 
@@ -151,37 +162,94 @@ export function useAika(options: UseAikaOptions = {}) {
         buffer = lines.pop() || '';
 
         for (const line of lines) {
-          if (line.startsWith('event: ')) {
-            const [eventLine, dataLine] = line.split('\n');
-            const eventType = eventLine.replace('event: ', '').trim();
-            const dataStr = dataLine?.replace('data: ', '').trim();
-
+          // Backend sends: data: {"type": "...", ...}
+          if (line.startsWith('data: ')) {
+            const dataStr = line.replace('data: ', '').trim();
             if (!dataStr) continue;
 
             try {
               const data = JSON.parse(dataStr);
+              const eventType = data.type;
 
-              if (eventType === 'agent_start') {
+              if (eventType === 'agent') {
+                // Agent invocation
                 const agentName = data.agent;
                 invokedAgents.add(agentName);
                 if (onAgentActivity) {
                   onAgentActivity(Array.from(invokedAgents));
                 }
-              } else if (eventType === 'agent_update') {
-                // Handle granular updates
-                if (data.status === 'partial_response' && onPartialResponse) {
+              } else if (eventType === 'tool_start') {
+                // Tool starting - can be used for UI feedback
+                console.log('🔧 Tool Start:', data.tool);
+                if (onToolEvent) {
+                  onToolEvent({ type: 'tool_start', tool: data.tool, timestamp: new Date().toISOString() });
+                }
+              } else if (eventType === 'tool_end') {
+                // Tool completed
+                console.log('✅ Tool End:', data.tool);
+                if (onToolEvent) {
+                  onToolEvent({ type: 'tool_end', tool: data.tool, timestamp: new Date().toISOString() });
+                }
+              } else if (eventType === 'tool_use') {
+                // Multiple tools being used
+                console.log('🔧 Tool Use:', data.tools);
+                if (onToolEvent) {
+                  onToolEvent({ type: 'tool_use', tools: data.tools, timestamp: new Date().toISOString() });
+                }
+              } else if (eventType === 'partial_response') {
+                // Streaming partial response - for real-time updates
+                if (onPartialResponse) {
                   onPartialResponse(data.text);
                 }
-              } else if (eventType === 'final_response') {
+              } else if (eventType === 'status') {
+                // Node status update - can be used for UI
+                console.log('🔄 Status:', data.message);
+                if (onStatusUpdate) {
+                  onStatusUpdate(data.message);
+                }
+              } else if (eventType === 'thinking') {
+                // Thinking indicator
+                console.log('🤔 Thinking:', data.message);
+                if (onStatusUpdate) {
+                  onStatusUpdate(`Thinking: ${data.message}`);
+                }
+              } else if (eventType === 'agent_activity') {
+                // Agent activity data with risk assessment
+                console.log('📊 Agent Activity:', data.data);
+              } else if (eventType === 'intervention_plan') {
+                // Intervention plan created
+                console.log('📋 Intervention Plan:', data.data);
+              } else if (eventType === 'appointment') {
+                // Appointment scheduled
+                console.log('📅 Appointment:', data.data);
+              } else if (eventType === 'complete') {
+                // Final response with metadata
                 finalResponse = data.response;
-              } else if (eventType === 'metadata') {
-                finalMetadata = data;
-                setLastMetadata(data);
+                if (data.metadata) {
+                  // Build full metadata from complete event + agent_activity
+                  finalMetadata = {
+                    session_id: data.metadata.session_id || '',
+                    user_role: 'user',
+                    intent: data.metadata.intent || 'unknown',
+                    agents_invoked: data.metadata.agents_invoked || Array.from(invokedAgents),
+                    actions_taken: data.metadata.actions_taken || [],
+                    processing_time_ms: data.metadata.processing_time_ms || 0,
+                    escalation_triggered: data.metadata.escalation_triggered || false,
+                    case_id: data.metadata.case_id,
+                    activity_logs: data.metadata.activity_logs,
+                  };
+                  setLastMetadata(finalMetadata);
+                }
               } else if (eventType === 'error') {
-                throw new Error(data.message);
+                throw new Error(data.message || data.error || 'Unknown error');
               }
             } catch (e) {
-              console.error('Error parsing SSE data:', e);
+              // Only log if it's a real parsing error, not an intentional throw
+              if (e instanceof SyntaxError) {
+                console.error('Error parsing SSE data:', e, 'Raw line:', line);
+              } else {
+                throw e; // Re-throw intentional errors
+              }
             }
           }
         }

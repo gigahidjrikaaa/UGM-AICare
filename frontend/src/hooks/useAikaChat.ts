@@ -8,21 +8,33 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { v4 as uuidv4 } from 'uuid';
-import { useAika, type AikaMessage, type AikaMetadata } from './useAika';
+import { useAika, type AikaMessage, type AikaMetadata, type ToolEvent } from './useAika';
 import type { Message } from '@/types/chat';
+
+// Activity log entry type for tool/API tracking
+export interface ToolActivityLog {
+  id: string;
+  type: 'tool_start' | 'tool_end' | 'tool_use' | 'status';
+  tool?: string;
+  tools?: string[];
+  message?: string;
+  timestamp: string;
+}
 
 interface UseAikaChatOptions {
   sessionId: string;
   showAgentActivity?: boolean;
   showRiskIndicators?: boolean;
   preferredModel?: string;
+  onToolActivity?: (activity: ToolActivityLog) => void;
 }
 
 export function useAikaChat({ 
   sessionId, 
   showAgentActivity = true, 
   showRiskIndicators = true,
-  preferredModel 
+  preferredModel,
+  onToolActivity 
 }: UseAikaChatOptions) {
   const { data: session } = useSession();
   const [messages, setMessages] = useState<Message[]>([]);
@@ -32,6 +44,87 @@ export function useAikaChat({
   const lastConversationIdRef = useRef<string | null>(null);
   const [lastMetadata, setLastMetadata] = useState<AikaMetadata | null>(null);
 
+  // Track streaming state for multi-bubble support
+  const streamingBufferRef = useRef<string>('');
+  const currentBubbleIdRef = useRef<string | null>(null);
+  const bubbleCountRef = useRef<number>(0);
+
+  /**
+   * Split content into logical sections for multiple message bubbles.
+   * This creates a more natural, conversational feel.
+   */
+  const splitContentIntoSections = (content: string): string[] => {
+    const sections: string[] = [];
+    
+    // Normalize line endings
+    const normalizedContent = content.replace(/\r\n/g, '\n');
+    
+    // Multiple patterns to detect section breaks:
+    // 1. Double newline followed by bold header: **Header** or **Header:**
+    // 2. Double newline followed by heading: ## Header or ### Header
+    // 3. Double newline followed by numbered list item that looks like a section: 1. **Item**
+    const sectionPatterns = [
+      /\n\n(?=\*\*[^*\n]+\*\*:?\s*\n)/g,  // **Bold Header** or **Bold Header:**
+      /\n\n(?=##+ )/g,                      // Markdown headings
+      /\n\n(?=\d+\.\s+\*\*)/g,              // Numbered items with bold
+    ];
+    
+    // Try splitting with each pattern
+    let parts = [normalizedContent];
+    for (const pattern of sectionPatterns) {
+      if (parts.length === 1) {
+        const split = parts[0].split(pattern);
+        if (split.length > 1) {
+          parts = split;
+          break;
+        }
+      }
+    }
+    
+    // If still no split occurred, try splitting by double newlines for very long content
+    if (parts.length === 1 && normalizedContent.length > 400) {
+      // Split on double newlines, but keep related content together
+      const paragraphs = normalizedContent.split(/\n\n+/);
+      let currentChunk = '';
+      
+      for (const para of paragraphs) {
+        const trimmedPara = para.trim();
+        if (!trimmedPara) continue;
+        
+        // Check if this paragraph is a header/title (bold text at start)
+        const isHeader = /^\*\*[^*]+\*\*/.test(trimmedPara) || /^##+ /.test(trimmedPara);
+        
+        // Start a new section if:
+        // 1. Current chunk is getting long (>350 chars) and this is a header
+        // 2. Current chunk is very long (>500 chars)
+        if ((currentChunk.length > 350 && isHeader) || currentChunk.length > 500) {
+          if (currentChunk.trim()) {
+            sections.push(currentChunk.trim());
+          }
+          currentChunk = trimmedPara;
+        } else {
+          currentChunk = currentChunk ? currentChunk + '\n\n' + trimmedPara : trimmedPara;
+        }
+      }
+      
+      if (currentChunk.trim()) {
+        sections.push(currentChunk.trim());
+      }
+    } else {
+      // Process the parts from pattern splitting
+      for (const part of parts) {
+        const trimmed = part.trim();
+        if (trimmed) {
+          sections.push(trimmed);
+        }
+      }
+    }
+    
+    // If no splitting occurred, return original content
+    return sections.length > 0 ? sections : [normalizedContent];
+  };
+
+  // Simplified streaming - just accumulate content in a single bubble during streaming
   const {
     sendMessage: sendToAika,
     loading: aikaLoading,
@@ -50,11 +143,36 @@ export function useAikaChat({
     onEscalation: (caseId) => {
       console.log('🚨 Case escalated:', caseId);
     },
+    onToolEvent: (event) => {
+      // Forward tool events to parent component for activity logging
+      if (onToolActivity) {
+        onToolActivity({
+          id: uuidv4(),
+          type: event.type,
+          tool: event.tool,
+          tools: event.tools,
+          timestamp: event.timestamp,
+        });
+      }
+    },
+    onStatusUpdate: (message) => {
+      // Forward status updates as activity logs
+      if (onToolActivity) {
+        onToolActivity({
+          id: uuidv4(),
+          type: 'status',
+          message: message,
+          timestamp: new Date().toISOString(),
+        });
+      }
+    },
     onPartialResponse: (text) => {
-      setIsLoading(false); // Stop showing generic loading indicator
+      setIsLoading(false);
+      
+      // Simple streaming: just accumulate in a single bubble
       setMessages((prev) => {
         const lastMsg = prev[prev.length - 1];
-        if (lastMsg.role === 'assistant' && lastMsg.isStreaming) {
+        if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
           return prev.map((m, i) => 
             i === prev.length - 1 ? { ...m, content: m.content + text } : m
           );
@@ -166,42 +284,56 @@ export function useAikaChat({
         // Store metadata for UI display
         setLastMetadata(aikaResponse.metadata);
 
-        // Update or Add assistant response
+        // Reset bubble tracking
+        bubbleCountRef.current = 0;
+        currentBubbleIdRef.current = null;
+
+        // Update or Add assistant response - split into multiple bubbles
         setMessages((prev) => {
           const streamingMsgIndex = prev.findIndex(m => m.isStreaming);
           
           if (streamingMsgIndex !== -1) {
-            // Streaming message exists - finalize it with metadata
-            // The streaming content is already complete, just mark it as done
-            const streamingMsg = prev[streamingMsgIndex];
+            // Get the streamed content and split it into sections
+            const streamedContent = prev[streamingMsgIndex].content;
+            const sections = splitContentIntoSections(streamedContent);
             
-            const finalMessage: Message = {
-              ...streamingMsg,
-              id: uuidv4(), // Finalize ID
-              // Use the streamed content as-is, don't append aikaResponse.response
-              // since it was already streamed via onPartialResponse
-              content: streamingMsg.content,
-              isStreaming: false,
-              aikaMetadata: aikaResponse.metadata,
-            };
+            // Remove the streaming message and add split messages
+            const beforeStreaming = prev.slice(0, streamingMsgIndex);
+            const afterStreaming = prev.slice(streamingMsgIndex + 1);
             
-            const newMessages = [...prev];
-            newMessages[streamingMsgIndex] = finalMessage;
-            return newMessages;
-          } else {
-            // No streaming happened, add new message with full response
-            const assistantMessage: Message = {
+            const newMessages: Message[] = sections.map((section, idx) => ({
               id: uuidv4(),
-              role: 'assistant',
-              content: aikaResponse.response,
+              role: 'assistant' as const,
+              content: section,
               timestamp: new Date(),
               session_id: sessionId,
               conversation_id: activeConversationId,
               created_at: new Date().toISOString(),
               updated_at: new Date().toISOString(),
-              aikaMetadata: aikaResponse.metadata,
-            };
-            return [...prev, assistantMessage];
+              isStreaming: false,
+              isContinuation: idx > 0, // Mark all but first as continuation
+              aikaMetadata: idx === sections.length - 1 ? aikaResponse.metadata : undefined, // Only last gets metadata
+            }));
+            
+            return [...beforeStreaming, ...newMessages, ...afterStreaming];
+          } else {
+            // No streaming happened, split the full response
+            const sections = splitContentIntoSections(aikaResponse.response);
+            
+            const newMessages: Message[] = sections.map((section, idx) => ({
+              id: uuidv4(),
+              role: 'assistant' as const,
+              content: section,
+              timestamp: new Date(),
+              session_id: sessionId,
+              conversation_id: activeConversationId,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              isContinuation: idx > 0,
+              aikaMetadata: idx === sections.length - 1 ? aikaResponse.metadata : undefined,
+            }));
+            
+            return [...prev, ...newMessages];
           }
         });
       } catch (error) {

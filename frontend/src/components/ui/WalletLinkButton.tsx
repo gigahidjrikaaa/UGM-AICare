@@ -138,12 +138,12 @@ export default function WalletLinkButton() {
           {isLinking ? (
             <>
               <FiLoader className="h-4 w-4 animate-spin" />
-              <span>Linking...</span>
+              <span>Connecting...</span>
             </>
           ) : (
             <>
               <FiLink className="h-4 w-4" />
-              <span>Link Digital Identity</span>
+              <span>Connect with Open Campus ID</span>
             </>
           )}
         </button>
@@ -153,7 +153,7 @@ export default function WalletLinkButton() {
       {linkedAddress && isCurrentWalletLinked && (
         <div className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-2 text-sm text-emerald-200">
           <FiCheckCircle className="h-4 w-4" />
-          <span className="hidden sm:inline">Wallet:</span>
+          <span className="hidden sm:inline">Open Campus ID:</span>
           <code className="font-mono text-xs">{shortAddress}</code>
         </div>
       )}
@@ -161,7 +161,7 @@ export default function WalletLinkButton() {
       {/* Warning - Connected to different wallet than linked */}
       {linkedAddress && isConnected && !isCurrentWalletLinked && (
         <div className="text-xs text-yellow-400/80">
-          ℹ️ Connected wallet differs from linked wallet ({shortAddress})
+          ℹ️ Connected wallet differs from your Open Campus ID ({shortAddress})
         </div>
       )}
     </div>

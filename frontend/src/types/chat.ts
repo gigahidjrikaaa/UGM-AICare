@@ -64,6 +64,7 @@ export interface Message {
   appointment?: Appointment; // Scheduling confirmation
   isError?: boolean; // For error messages
   isStreaming?: boolean; // For streaming messages
+  isContinuation?: boolean; // For multi-bubble responses (continuation of previous message)
   agentActivity?: {
     // Agent Activity Log for transparency
     execution_path: string[]; // ["aika_decision", "sta_subgraph", "tca_subgraph", "synthesize_response"]

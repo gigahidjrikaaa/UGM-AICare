@@ -1,166 +1,354 @@
 /**
- * Sidebar component to display all TCA-generated intervention plans
- * Shows in /aika page as a toggleable side panel
- * Enhanced with UGM design system colors and improved UX
+ * Floating Panel component for TCA-generated intervention plans
+ * Redesigned as a compact, minimizable floating card
+ * Now includes a permanently visible minimized version
  */
 
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronRight, Sparkles, RefreshCw, AlertCircle } from 'lucide-react';
+import {
+  ChevronRight,
+  ChevronLeft,
+  Sparkles,
+  RefreshCw,
+  AlertCircle,
+  X,
+  ListChecks,
+  Lightbulb,
+  Minimize2,
+  Maximize2,
+} from 'lucide-react';
 import { useInterventionPlans } from '@/hooks/useInterventionPlans';
 import { PlanCard } from '@/components/resources/PlanCard';
 
+export type PanelViewMode = 'expanded' | 'compact' | 'minimized';
+
 interface InterventionPlansSidebarProps {
-  isOpen: boolean;
-  onClose: () => void;
+  /** Whether the panel is visible at all (controls permanent display) */
+  alwaysVisible?: boolean;
+  /** Legacy prop - if true AND alwaysVisible is false, shows the panel */
+  isOpen?: boolean;
+  onClose?: () => void;
+  onViewModeChange?: (mode: PanelViewMode) => void;
 }
 
 export const InterventionPlansSidebar: React.FC<InterventionPlansSidebarProps> = ({
-  isOpen,
+  alwaysVisible = false,
+  isOpen = false,
   onClose,
+  onViewModeChange,
 }) => {
-  const { data, isLoading, error, refetch } = useInterventionPlans(true); // activeOnly = true
+  const { data, isLoading, error, refetch } = useInterventionPlans(true);
+  const [viewModeInternal, setViewModeInternal] = useState<PanelViewMode>('minimized');
+
+  // Wrapper to notify parent of view mode changes
+  const setViewMode = (mode: PanelViewMode) => {
+    setViewModeInternal(mode);
+    onViewModeChange?.(mode);
+  };
+  const viewMode = viewModeInternal;
 
   const activePlans = data?.plans || [];
   const totalPlans = data?.total || 0;
 
+  // If alwaysVisible, show the panel. Otherwise, use isOpen prop
+  const shouldShow = alwaysVisible || isOpen;
+
+  const toggleViewMode = () => {
+    if (viewMode === 'minimized') setViewMode('compact');
+    else if (viewMode === 'compact') setViewMode('expanded');
+    else setViewMode('compact');
+  };
+
+  const handleClose = () => {
+    if (alwaysVisible) {
+      // For always-visible mode, just minimize instead of closing
+      setViewMode('minimized');
+    } else {
+      onClose?.();
+    }
+  };
+
+  // Calculate overall progress across all plans
+  const overallProgress = activePlans.length > 0
+    ? Math.round(
+        activePlans.reduce((sum, p) => sum + (p.completion_tracking?.completion_percentage || 0), 0) /
+          activePlans.length
+      )
+    : 0;
+
+  // Get width based on view mode
+  const getWidth = () => {
+    switch (viewMode) {
+      case 'minimized':
+        return 'w-16';
+      case 'compact':
+        return 'w-80';
+      case 'expanded':
+        return 'w-96 lg:w-[420px]';
+      default:
+        return 'w-80';
+    }
+  };
+
   return (
     <AnimatePresence>
-      {isOpen && (
+      {shouldShow && (
         <>
-          {/* Backdrop - Click to close (mobile/tablet) */}
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.2 }}
-            className="fixed inset-0 bg-ugm-blue/20 backdrop-blur-sm z-[69] lg:hidden"
-            onClick={onClose}
-            aria-hidden="true"
-          />
+          {/* Backdrop - Only on mobile for expanded mode */}
+          {viewMode === 'expanded' && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              transition={{ duration: 0.2 }}
+              className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-[69] lg:hidden"
+              onClick={() => setViewMode('compact')}
+              aria-hidden="true"
+            />
+          )}
 
-          {/* Sidebar Panel - Enhanced with UGM colors and higher z-index */}
+          {/* Floating Panel */}
           <motion.aside
-            initial={{ x: '100%' }}
-            animate={{ x: 0 }}
-            exit={{ x: '100%' }}
-            transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-            className="fixed top-0 right-0 h-full w-full sm:w-[400px] lg:w-[420px] bg-white/95 backdrop-blur-xl border-l-2 border-ugm-blue/20 shadow-2xl z-[70] flex flex-col"
+            layout
+            initial={{ x: 100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 100, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className={`fixed right-4 top-24 bottom-24 ${getWidth()} bg-gradient-to-b from-[#0a1628]/95 to-[#0d1d35]/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl shadow-black/30 z-[70] flex flex-col overflow-hidden transition-all duration-300`}
           >
-            {/* Close Button - Side Mounted with improved styling */}
-            <button
-              onClick={onClose}
-              className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-full bg-white/95 backdrop-blur-xl border-2 border-r-0 border-ugm-blue/20 rounded-l-xl shadow-xl hover:bg-white hover:border-ugm-blue/40 transition-all duration-200 p-3.5 text-ugm-blue hover:text-ugm-blue-dark group z-[70]"
-              aria-label="Close plans sidebar"
-            >
-              <ChevronRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
-            </button>
-            
-            {/* Header - Enhanced with UGM gradient */}
-            <div className="bg-gradient-to-br from-ugm-blue via-ugm-blue to-ugm-blue-light px-6 py-5 relative overflow-hidden">
-              {/* Decorative elements */}
-              <div className="absolute top-0 right-0 w-40 h-40 bg-ugm-gold/10 rounded-full blur-3xl" />
-              <div className="absolute -bottom-8 -left-8 w-32 h-32 bg-white/5 rounded-full blur-2xl" />
-              
-              <div className="relative z-10 flex items-center gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-ugm-gold to-ugm-gold-light flex items-center justify-center shadow-xl flex-shrink-0">
-                  <Sparkles className="w-7 h-7 text-ugm-blue" />
-                </div>
-                <div className="flex-1">
-                  <h2 className="text-xl font-bold text-white">Rencana Saya</h2>
-                  <p className="text-sm text-white/90">
-                    {totalPlans} {totalPlans === 1 ? 'rencana' : 'rencana'} dari Aika
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            {/* Info Banner - Updated colors */}
-            <div className="px-6 py-4 bg-gradient-to-r from-blue-50 to-purple-50 border-b-2 border-ugm-blue/10">
-              <p className="text-xs text-ugm-blue-dark leading-relaxed">
-                💙 <strong className="font-bold">Rencana Support Coach:</strong> Langkah-langkah aksi yang dibuat saat Aika mendeteksi kamu butuh dukungan ekstra. Selesaikan langkah-langkah untuk melacak progresmu!
-              </p>
-            </div>
-
-            {/* Content */}
-            <div className="flex-1 overflow-y-auto px-6 py-5 space-y-4 bg-gradient-to-b from-gray-50/50 to-white">
-              {/* Loading State */}
-              {isLoading && (
-                <div className="flex flex-col items-center justify-center py-16 text-ugm-blue">
-                  <motion.div
-                    animate={{ rotate: 360 }}
-                    transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
-                  >
-                    <RefreshCw className="w-10 h-10 mb-4" />
-                  </motion.div>
-                  <p className="text-sm font-semibold">Memuat rencana...</p>
-                </div>
-              )}
-
-              {/* Error State */}
-              {error && !isLoading && (
-                <div className="flex flex-col items-center justify-center py-16 text-center">
-                  <div className="w-16 h-16 rounded-full bg-red-50 flex items-center justify-center mb-4">
-                    <AlertCircle className="w-8 h-8 text-red-500" />
+            {/* Minimized View */}
+            {viewMode === 'minimized' ? (
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="flex flex-col items-center justify-center h-full gap-4 p-2"
+              >
+                <button
+                  onClick={() => setViewMode('compact')}
+                  className="w-12 h-12 rounded-xl bg-ugm-gold/10 flex items-center justify-center hover:bg-ugm-gold/20 transition-colors group"
+                  title="Buka Rencana Intervensi"
+                >
+                  <ListChecks className="w-5 h-5 text-ugm-gold group-hover:scale-110 transition-transform" />
+                </button>
+                
+                {totalPlans > 0 && (
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-xs font-bold text-ugm-gold">{totalPlans}</span>
+                    <span className="text-[9px] text-white/40">Aktif</span>
                   </div>
-                  <p className="text-sm text-ugm-blue-dark font-bold mb-2">
-                    Gagal memuat rencana
-                  </p>
-                  <p className="text-xs text-gray-600 mb-5 px-4">
-                    {error.message || 'Terjadi kesalahan. Silakan coba lagi.'}
-                  </p>
+                )}
+                
+                {/* Mini Progress Ring */}
+                {totalPlans > 0 && (
+                  <div className="relative w-10 h-10">
+                    <svg className="w-10 h-10 -rotate-90">
+                      <circle
+                        cx="20"
+                        cy="20"
+                        r="16"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        fill="none"
+                        className="text-white/10"
+                      />
+                      <circle
+                        cx="20"
+                        cy="20"
+                        r="16"
+                        stroke="currentColor"
+                        strokeWidth="3"
+                        fill="none"
+                        strokeDasharray={`${overallProgress} 100`}
+                        strokeLinecap="round"
+                        className="text-ugm-gold"
+                      />
+                    </svg>
+                    <span className="absolute inset-0 flex items-center justify-center text-[10px] font-bold text-white/60">
+                      {overallProgress}%
+                    </span>
+                  </div>
+                )}
+
+                {/* Only show close button if not always visible */}
+                {!alwaysVisible && (
                   <button
-                    onClick={() => refetch()}
-                    className="px-5 py-2.5 bg-gradient-to-r from-ugm-blue to-ugm-blue-light text-white text-sm font-semibold rounded-xl hover:shadow-lg transition-all shadow-md"
+                    onClick={handleClose}
+                    className="w-8 h-8 rounded-lg flex items-center justify-center text-white/30 hover:text-white/60 hover:bg-white/5 transition-colors mt-auto"
+                    title="Tutup"
                   >
-                    Coba Lagi
+                    <X className="w-4 h-4" />
                   </button>
-                </div>
-              )}
-
-              {/* Empty State */}
-              {!isLoading && !error && activePlans.length === 0 && (
-                <div className="flex flex-col items-center justify-center py-20 text-center px-6">
-                  <div className="w-24 h-24 rounded-2xl bg-gradient-to-br from-ugm-blue/10 to-ugm-gold/10 flex items-center justify-center mb-5 shadow-lg">
-                    <Sparkles className="w-12 h-12 text-ugm-blue" />
+                )}
+              </motion.div>
+            ) : (
+              <>
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/[0.02] shrink-0">
+                  <div className="flex items-center gap-2.5">
+                    <div className="w-8 h-8 rounded-lg bg-ugm-gold/10 flex items-center justify-center">
+                      <ListChecks className="w-4 h-4 text-ugm-gold" />
+                    </div>
+                    <div>
+                      <h2 className="text-xs font-semibold text-white">Rencana Intervensi</h2>
+                      <p className="text-[10px] text-white/40">{totalPlans} rencana aktif</p>
+                    </div>
                   </div>
-                  <h3 className="text-lg font-bold text-ugm-blue-dark mb-3">
-                    Belum Ada Rencana Aktif
-                  </h3>
-                  <p className="text-sm text-gray-600 leading-relaxed max-w-sm mb-6">
-                    Saat kamu berbagi momen stres atau distres dengan Aika, dia akan membuat rencana dukungan personal di sini untuk membantumu.
-                  </p>
-                  <div className="p-4 bg-gradient-to-br from-amber-50 to-orange-50 rounded-xl border-2 border-amber-200/60 shadow-sm">
-                    <p className="text-xs text-amber-900 leading-relaxed">
-                      💡 <strong className="font-bold">Tips:</strong> Coba katakan &quot;Aku stress dengan skripsi&quot; atau &quot;Aku merasa cemas hari ini&quot; untuk memicu rencana!
+
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => refetch()}
+                      disabled={isLoading}
+                      className="p-1.5 rounded-lg text-white/40 hover:text-white/60 hover:bg-white/5 transition-colors disabled:opacity-50"
+                      title="Refresh"
+                    >
+                      <RefreshCw className={`h-3 w-3 ${isLoading ? 'animate-spin' : ''}`} />
+                    </button>
+                    <button
+                      onClick={toggleViewMode}
+                      className="p-1.5 rounded-lg text-white/40 hover:text-white/60 hover:bg-white/5 transition-colors"
+                      title={viewMode === 'expanded' ? 'Kompak' : 'Perbesar'}
+                    >
+                      {viewMode === 'expanded' ? (
+                        <Minimize2 className="h-3 w-3" />
+                      ) : (
+                        <Maximize2 className="h-3 w-3" />
+                      )}
+                    </button>
+                    <button
+                      onClick={() => setViewMode('minimized')}
+                      className="p-1.5 rounded-lg text-white/40 hover:text-white/60 hover:bg-white/5 transition-colors"
+                      title="Sembunyikan"
+                    >
+                      <ChevronRight className="h-3 w-3" />
+                    </button>
+                    {!alwaysVisible && (
+                      <button
+                        onClick={handleClose}
+                        className="p-1.5 rounded-lg text-white/40 hover:text-red-400/60 hover:bg-red-500/5 transition-colors"
+                        title="Tutup"
+                      >
+                        <X className="h-3 w-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Overall Progress Bar - Compact summary */}
+                {totalPlans > 0 && viewMode === 'compact' && (
+                  <div className="px-4 py-2 border-b border-white/5 bg-ugm-gold/5">
+                    <div className="flex items-center justify-between mb-1.5">
+                      <span className="text-[10px] text-white/50">Progress Keseluruhan</span>
+                      <span className="text-[10px] font-bold text-ugm-gold">{overallProgress}%</span>
+                    </div>
+                    <div className="h-1 bg-white/10 rounded-full overflow-hidden">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${overallProgress}%` }}
+                        transition={{ duration: 0.5, ease: 'easeOut' }}
+                        className="h-full bg-gradient-to-r from-ugm-gold to-ugm-gold-light rounded-full"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {/* Content */}
+                <div className="flex-1 overflow-y-auto px-3 py-3 space-y-2.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+                  {/* Loading State */}
+                  {isLoading && (
+                    <div className="flex flex-col items-center justify-center py-12">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
+                        className="mb-3"
+                      >
+                        <div className="w-10 h-10 rounded-xl bg-ugm-gold/10 flex items-center justify-center">
+                          <RefreshCw className="w-5 h-5 text-ugm-gold" />
+                        </div>
+                      </motion.div>
+                      <p className="text-xs text-white/50">Memuat rencana...</p>
+                    </div>
+                  )}
+
+                  {/* Error State */}
+                  {error && !isLoading && (
+                    <div className="flex flex-col items-center justify-center py-12 text-center">
+                      <div className="w-12 h-12 rounded-xl bg-red-500/10 flex items-center justify-center mb-3">
+                        <AlertCircle className="w-5 h-5 text-red-400" />
+                      </div>
+                      <p className="text-xs text-white/70 font-medium mb-1">Gagal memuat</p>
+                      <p className="text-[10px] text-white/40 mb-4 px-4">
+                        {error.message || 'Silakan coba lagi.'}
+                      </p>
+                      <button
+                        onClick={() => refetch()}
+                        className="px-3 py-1.5 bg-ugm-gold/10 border border-ugm-gold/30 text-ugm-gold text-[10px] font-medium rounded-lg hover:bg-ugm-gold/20 transition-all"
+                      >
+                        Coba Lagi
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Empty State */}
+                  {!isLoading && !error && activePlans.length === 0 && (
+                    <div className="flex flex-col items-center justify-center py-10 text-center px-2">
+                      <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center mb-4">
+                        <Sparkles className="w-6 h-6 text-white/20" />
+                      </div>
+                      <h3 className="text-xs font-medium text-white/60 mb-1.5">
+                        Belum Ada Rencana
+                      </h3>
+                      <p className="text-[10px] text-white/40 leading-relaxed mb-4">
+                        Aika akan membuat rencana dukungan saat kamu butuh bantuan ekstra.
+                      </p>
+                      <div className="p-2.5 bg-ugm-gold/5 rounded-lg border border-ugm-gold/20">
+                        <div className="flex items-start gap-2">
+                          <Lightbulb className="w-3.5 h-3.5 text-ugm-gold shrink-0 mt-0.5" />
+                          <p className="text-[9px] text-white/50 leading-relaxed text-left">
+                            Coba katakan{' '}
+                            <span className="text-ugm-gold">&ldquo;Aku stress&rdquo;</span> ke Aika!
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Plans List */}
+                  {!isLoading && !error && activePlans.length > 0 && (
+                    <div className="space-y-2.5">
+                      <AnimatePresence mode="popLayout">
+                        {activePlans.map((plan, index) => (
+                          <motion.div
+                            key={plan.id}
+                            initial={{ opacity: 0, y: 10 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, scale: 0.95 }}
+                            transition={{ delay: index * 0.05 }}
+                          >
+                            <PlanCard
+                              plan={plan}
+                              onUpdate={() => refetch()}
+                              compact={viewMode === 'compact'}
+                            />
+                          </motion.div>
+                        ))}
+                      </AnimatePresence>
+                    </div>
+                  )}
+                </div>
+
+                {/* Footer Hint */}
+                {totalPlans > 0 && viewMode === 'compact' && (
+                  <div className="px-3 py-2 border-t border-white/5 bg-white/[0.01]">
+                    <p className="text-[9px] text-white/30 text-center">
+                      Klik <Maximize2 className="w-2.5 h-2.5 inline mx-0.5" /> untuk detail lengkap
                     </p>
                   </div>
-                </div>
-              )}
-
-              {/* Plans List */}
-              {!isLoading && !error && activePlans.length > 0 && (
-                <>
-                  {activePlans.map((plan) => (
-                    <PlanCard key={plan.id} plan={plan} onUpdate={() => refetch()} />
-                  ))}
-                </>
-              )}
-            </div>
-
-            {/* Footer - Enhanced with UGM colors */}
-            <div className="px-6 py-4 border-t-2 border-ugm-blue/10 bg-gradient-to-r from-gray-50 to-blue-50/30">
-              <button
-                onClick={() => refetch()}
-                disabled={isLoading}
-                className="w-full px-4 py-3 bg-white border-2 border-ugm-blue/30 rounded-xl text-sm font-semibold text-ugm-blue hover:bg-ugm-blue hover:text-white transition-all disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2.5 shadow-sm hover:shadow-md"
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                Refresh Rencana
-              </button>
-            </div>
+                )}
+              </>
+            )}
           </motion.aside>
         </>
       )}

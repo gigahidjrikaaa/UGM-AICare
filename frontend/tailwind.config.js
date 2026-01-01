@@ -37,7 +37,7 @@ module.exports = {
         'pulse-slow': 'pulse 3s ease-in-out infinite',
         'border-spin': 'borderSpin 3s linear infinite',
         'lightning-border': 'lightningBorder 2s linear infinite',
-        'shimmer': 'shimmer 2s ease-in-out infinite',
+        'shimmer': 'shimmer 1.5s ease-in-out infinite',
       },
       keyframes: {
         // Simplified keyframes for better performance
@@ -61,9 +61,8 @@ module.exports = {
           '50%': { '--angle': '180deg' }
         },
         shimmer: {
-          '0%': { backgroundPosition: '0% 50%' },
-          '50%': { backgroundPosition: '100% 50%' },
-          '100%': { backgroundPosition: '0% 50%' }
+          '0%': { transform: 'translateX(-100%)' },
+          '100%': { transform: 'translateX(100%)' }
         }
       },
     },

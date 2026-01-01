@@ -7,6 +7,7 @@ import json
 import asyncio
 import hashlib
 import logging
+import uuid
 from datetime import datetime
 from typing import AsyncGenerator, Dict, Any
 
@@ -17,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_async_db
 from app.dependencies import get_current_active_user
 from app.models import User
+from app.domains.mental_health.models import Conversation
 from app.domains.mental_health.schemas.chat import AikaRequest
 from app.agents.aika_orchestrator_graph import create_aika_agent_with_checkpointing
 from app.core.rate_limiter import check_rate_limit_dependency
@@ -115,6 +117,7 @@ async def stream_aika_execution(
         sent_agents = set()
         current_node = None
         start_time = datetime.now()
+        final_state = {}  # Accumulate final state from streaming
         
         # Use astream to get progressive updates
         async for event in aika_agent.astream(initial_state, config):  # type: ignore
@@ -123,6 +126,10 @@ async def stream_aika_execution(
                 # Skip __start__ and __end__ nodes
                 if node_name.startswith("__"):
                     continue
+                
+                # Merge node_state into final_state (accumulate results)
+                if isinstance(node_state, dict):
+                    final_state.update(node_state)
                 
                 # Send status update for new node
                 if node_name != current_node and node_name in AGENT_STATUS_MESSAGES:
@@ -150,8 +157,8 @@ async def stream_aika_execution(
                             yield f"data: {json.dumps(agent_data)}\n\n"
                             await asyncio.sleep(0.05)
         
-        # Get final result
-        result = await aika_agent.ainvoke(initial_state, config)  # type: ignore
+        # Use accumulated state from astream instead of calling ainvoke again
+        result = final_state
 
         # Best-effort memory write (consent-gated)
         await remember_from_user_message(db, current_user, request.message, source="conversation")
@@ -251,14 +258,32 @@ async def stream_aika_execution(
         
         # Send final complete message
         final_response = result.get("final_response", "Maaf, terjadi kesalahan.")
+        session_id = result.get('session_id', request.session_id) or f"sess_{current_user.id}_{int(datetime.now().timestamp())}"
         metadata_dict = {
-            'session_id': result.get('session_id', request.session_id),
+            'session_id': session_id,
             'execution_id': execution_id,  # Return execution_id for evaluation
             'agents_invoked': result.get('agents_invoked', []),
             'response_source': result.get('response_source', 'unknown'),
             'processing_time_ms': processing_time_ms,
         }
         yield f"data: {json.dumps({'type': 'complete', 'response': final_response, 'metadata': metadata_dict})}\n\n"
+        
+        # Save conversation to database
+        try:
+            conversation_entry = Conversation(
+                user_id=current_user.id,
+                session_id=session_id,
+                conversation_id=str(uuid.uuid4()),
+                message=request.message,
+                response=final_response,
+                timestamp=datetime.now()
+            )
+            db.add(conversation_entry)
+            await db.commit()
+            logger.debug(f"💾 Saved conversation to database for user {current_user.id}")
+        except Exception as save_error:
+            logger.error(f"Failed to save conversation: {save_error}")
+            # Don't fail the request if DB save fails
         
         execution_tracker.complete_execution(execution_id, success=True)
 

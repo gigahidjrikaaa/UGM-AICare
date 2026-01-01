@@ -61,7 +61,6 @@ const navGroups = [
   {
     label: 'Development Tools',
     items: [
-      { name: 'Dev Playground', icon: <FiTarget size={18} />, href: '/admin/testing' },
       { name: 'Database Viewer', icon: <FiDatabase size={18} />, href: '/admin/database' },
     ]
   }

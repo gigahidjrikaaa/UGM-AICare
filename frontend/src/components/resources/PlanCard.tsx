@@ -1,6 +1,6 @@
 /**
  * Component to display an individual intervention plan
- * Enhanced with UGM design system colors and improved UX
+ * Redesigned with dark theme to match InterventionPlansSidebar
  */
 
 'use client';
@@ -14,9 +14,10 @@ import styles from './PlanCard.module.css';
 interface PlanCardProps {
   plan: InterventionPlanRecord;
   onUpdate?: () => void;
+  compact?: boolean;
 }
 
-export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate }) => {
+export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate, compact = false }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const { completeStep, isLoading: isCompletingStep } = useCompleteStep();
   const { archivePlan, isLoading: isArchiving } = useArchivePlan();
@@ -59,122 +60,179 @@ export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate }) => {
     });
   };
 
-  return (
-    <div className="bg-white/95 backdrop-blur-sm rounded-2xl shadow-lg border-2 border-ugm-blue/20 p-6 hover:shadow-xl hover:border-ugm-blue/40 transition-all">
-      {/* Header */}
-      <div className="flex items-start justify-between mb-5">
-        <div className="flex-1 flex items-start gap-3">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-ugm-blue to-ugm-blue-light flex items-center justify-center shadow-md flex-shrink-0">
-            <Sparkles className="w-6 h-6 text-white" />
+  // Compact view for minimized sidebar
+  if (compact) {
+    return (
+      <div className="bg-white/[0.03] backdrop-blur-sm rounded-lg border border-white/10 p-3 hover:bg-white/[0.05] transition-all group">
+        <div className="flex items-center gap-2.5">
+          {/* Progress Ring */}
+          <div className="relative w-10 h-10 shrink-0">
+            <svg className="w-10 h-10 -rotate-90">
+              <circle
+                cx="20"
+                cy="20"
+                r="16"
+                stroke="currentColor"
+                strokeWidth="3"
+                fill="none"
+                className="text-white/10"
+              />
+              <circle
+                cx="20"
+                cy="20"
+                r="16"
+                stroke="currentColor"
+                strokeWidth="3"
+                fill="none"
+                strokeDasharray={`${completionPercentage} 100`}
+                strokeLinecap="round"
+                className="text-ugm-gold"
+              />
+            </svg>
+            <span className="absolute inset-0 flex items-center justify-center text-[9px] font-bold text-white/60">
+              {completionPercentage}%
+            </span>
           </div>
-          <div className="flex-1">
-            <h3 className="text-base font-bold text-ugm-blue-dark mb-2">
+          
+          {/* Content */}
+          <div className="flex-1 min-w-0">
+            <h3 className="text-[11px] font-medium text-white/80 truncate leading-tight mb-0.5">
               {plan.plan_title || 'Rencana Intervensi'}
             </h3>
-            <div className="flex items-center gap-3 text-sm text-gray-600">
-              <span className="flex items-center gap-1.5">
-                <Calendar className="w-4 h-4" />
-                {formatDate(plan.created_at)}
+            <div className="flex items-center gap-1.5">
+              <span className="text-[9px] text-white/40">
+                {completedSteps}/{totalSteps} langkah
               </span>
-              <span className="px-2.5 py-1 bg-gradient-to-r from-ugm-gold/20 to-ugm-gold-light/20 text-ugm-blue-dark rounded-full text-xs font-bold border border-ugm-gold/30">
-                {plan.status}
+              <span className="w-1 h-1 rounded-full bg-white/20" />
+              <span className="text-[9px] text-white/30">
+                {formatDate(plan.created_at)}
               </span>
             </div>
           </div>
-        </div>
-        <button
-          onClick={handleArchive}
-          disabled={isArchiving}
-          className="text-gray-400 hover:text-red-500 transition-colors p-2.5 rounded-xl hover:bg-red-50 disabled:opacity-50 group"
-          title="Arsipkan rencana"
-        >
-          <Archive className="w-5 h-5 group-hover:scale-110 transition-transform" />
-        </button>
-      </div>
-
-      {/* Enhanced Progress Bar */}
-      <div className="mb-5">
-        <div className="flex items-center justify-between mb-3">
-          <span className="text-sm font-bold text-ugm-blue-dark">
-            Progress: {completedSteps}/{totalSteps} langkah
-          </span>
-          <span className="text-base font-bold text-ugm-gold">
-            {completionPercentage}%
-          </span>
-        </div>
-        <div className="w-full bg-gray-100 rounded-full h-3 overflow-hidden border border-gray-200">
-          <div
-            className={`bg-gradient-to-r from-ugm-gold via-ugm-gold-light to-ugm-gold h-3 rounded-full ${styles.progressBar} ${progressClass} relative overflow-hidden`}
+          
+          {/* Quick Actions */}
+          <button
+            onClick={handleArchive}
+            disabled={isArchiving}
+            className="opacity-0 group-hover:opacity-100 text-white/30 hover:text-red-400 transition-all p-1 rounded hover:bg-red-500/10 disabled:opacity-50"
+            title="Arsipkan"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent animate-pulse" />
+            <Archive className="w-3 h-3" />
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white/[0.03] backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden hover:bg-white/[0.05] transition-all">
+      {/* Header */}
+      <div className="p-4">
+        <div className="flex items-start justify-between mb-3">
+          <div className="flex-1 flex items-start gap-3">
+            <div className="w-9 h-9 rounded-lg bg-ugm-gold/10 flex items-center justify-center shrink-0">
+              <Sparkles className="w-4 h-4 text-ugm-gold" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <h3 className="text-sm font-medium text-white/90 mb-1.5 leading-tight">
+                {plan.plan_title || 'Rencana Intervensi'}
+              </h3>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="flex items-center gap-1 text-[10px] text-white/40">
+                  <Calendar className="w-3 h-3" />
+                  {formatDate(plan.created_at)}
+                </span>
+                <span className="px-2 py-0.5 bg-ugm-gold/10 text-ugm-gold rounded-full text-[10px] font-medium border border-ugm-gold/20">
+                  {plan.status}
+                </span>
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={handleArchive}
+            disabled={isArchiving}
+            className="text-white/30 hover:text-red-400 transition-colors p-1.5 rounded-lg hover:bg-red-500/10 disabled:opacity-50"
+            title="Arsipkan rencana"
+          >
+            <Archive className="w-4 h-4" />
+          </button>
+        </div>
+
+        {/* Progress Bar */}
+        <div className="space-y-1.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] font-medium text-white/50">
+              {completedSteps}/{totalSteps} langkah
+            </span>
+            <span className="text-[10px] font-bold text-ugm-gold">
+              {completionPercentage}%
+            </span>
+          </div>
+          <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
+            <div
+              className={`bg-gradient-to-r from-ugm-gold to-ugm-gold-light h-1.5 rounded-full ${styles.progressBar} ${progressClass}`}
+            />
           </div>
         </div>
       </div>
 
       {/* Expandable Steps */}
-      <div className="border-t-2 border-ugm-blue/10 pt-5">
+      <div className="border-t border-white/10">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center justify-between w-full text-left mb-4 hover:bg-ugm-blue/5 -mx-2 px-2 py-2 rounded-xl transition-colors group"
+          className="flex items-center justify-between w-full text-left px-4 py-2.5 hover:bg-white/[0.02] transition-colors"
         >
-          <span className="text-sm font-bold text-ugm-blue flex items-center gap-2">
-            <div className="w-7 h-7 rounded-lg bg-ugm-blue/10 flex items-center justify-center group-hover:bg-ugm-blue/20 transition-colors">
-              <Sparkles className="w-4 h-4 text-ugm-blue" />
-            </div>
-            {isExpanded ? 'Sembunyikan' : 'Tampilkan'} Langkah-Langkah
+          <span className="text-[11px] font-medium text-white/50 flex items-center gap-1.5">
+            {isExpanded ? 'Sembunyikan' : 'Tampilkan'} Langkah
           </span>
-          {isExpanded ? <ChevronUp className="w-5 h-5 text-ugm-blue" /> : <ChevronDown className="w-5 h-5 text-ugm-blue" />}
+          {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-white/40" /> : <ChevronDown className="w-3.5 h-3.5 text-white/40" />}
         </button>
 
         {isExpanded && (
-          <div className="space-y-3">
+          <div className="px-4 pb-4 space-y-2">
             {plan.plan_data?.plan_steps?.map((step, index) => {
               const isCompleted = plan.completion_tracking?.completed_steps?.includes(index) || false;
               
               return (
                 <div
                   key={index}
-                  className={`flex items-start gap-4 p-4 rounded-xl transition-all group ${
+                  className={`flex items-start gap-3 p-3 rounded-lg transition-all ${
                     isCompleted 
-                      ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300/60 shadow-sm' 
-                      : 'bg-white border-2 border-gray-200 hover:border-ugm-blue/50 hover:shadow-md'
+                      ? 'bg-emerald-500/10 border border-emerald-500/20' 
+                      : 'bg-white/[0.02] border border-white/5 hover:border-white/10'
                   }`}
                 >
                   <button
                     onClick={() => handleStepToggle(index, isCompleted)}
                     disabled={isCompletingStep}
-                    className="flex-shrink-0 mt-0.5 disabled:opacity-50 transition-transform group-hover:scale-110 focus:outline-none focus:ring-2 focus:ring-ugm-gold rounded-full"
+                    className="shrink-0 mt-0.5 disabled:opacity-50 transition-transform hover:scale-110"
                   >
                     {isCompleted ? (
-                      <CheckCircle2 className="w-7 h-7 text-green-600 drop-shadow-sm" />
+                      <CheckCircle2 className="w-5 h-5 text-emerald-400" />
                     ) : (
-                      <Circle className="w-7 h-7 text-gray-400 group-hover:text-ugm-blue transition-colors" />
+                      <Circle className="w-5 h-5 text-white/30 hover:text-white/50" />
                     )}
                   </button>
-                  <div className="flex-1 min-w-0">
-                    <p
-                      className={`text-sm font-semibold leading-relaxed ${
-                        isCompleted ? 'text-gray-500 line-through' : 'text-ugm-blue-dark'
-                      }`}
-                    >
-                      {step.description}
-                    </p>
-                  </div>
+                  <p className={`text-xs leading-relaxed ${
+                    isCompleted ? 'text-white/40 line-through' : 'text-white/70'
+                  }`}>
+                    {step.description}
+                  </p>
                 </div>
               );
             })}
 
             {/* Next Check-in */}
             {plan.plan_data?.next_check_in && (
-              <div className="mt-5 p-4 bg-gradient-to-br from-blue-50 to-purple-50 rounded-xl border-2 border-blue-200/60 shadow-sm">
-                <h4 className="text-sm font-bold text-ugm-blue-dark mb-2 flex items-center gap-2">
-                  <Clock className="w-4 h-4" />
+              <div className="mt-3 p-3 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                <h4 className="text-[10px] font-medium text-purple-400 mb-1 flex items-center gap-1.5">
+                  <Clock className="w-3 h-3" />
                   Check-in Berikutnya
                 </h4>
-                <p className="text-sm text-ugm-blue mb-1 font-semibold">
+                <p className="text-xs text-white/70">
                   {plan.plan_data.next_check_in.timeframe}
                 </p>
-                <p className="text-xs text-gray-700">
+                <p className="text-[10px] text-white/40 mt-0.5">
                   {plan.plan_data.next_check_in.method}
                 </p>
               </div>
@@ -182,20 +240,18 @@ export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate }) => {
 
             {/* Resources */}
             {plan.plan_data?.resource_cards && plan.plan_data.resource_cards.length > 0 && (
-              <div className="mt-5">
-                <h4 className="text-sm font-bold text-ugm-blue-dark mb-3 flex items-center gap-2">
-                  <div className="w-7 h-7 rounded-lg bg-ugm-blue/10 flex items-center justify-center">
-                    <BookOpen className="w-4 h-4 text-ugm-gold" />
-                  </div>
-                  Sumber yang Direkomendasikan
+              <div className="mt-3">
+                <h4 className="text-[10px] font-medium text-white/50 mb-2 flex items-center gap-1.5">
+                  <BookOpen className="w-3 h-3" />
+                  Sumber Direkomendasikan
                 </h4>
-                <div className="space-y-3">
+                <div className="space-y-2">
                   {plan.plan_data.resource_cards.map((resource, idx) => (
-                    <div key={idx} className="p-4 bg-gradient-to-br from-purple-50 to-pink-50 rounded-xl border-2 border-purple-200/60 shadow-sm hover:shadow-md transition-shadow">
-                      <p className="text-sm font-bold text-purple-900 mb-2">
+                    <div key={idx} className="p-2.5 bg-white/[0.02] rounded-lg border border-white/5">
+                      <p className="text-xs font-medium text-white/70 mb-1">
                         {resource.title}
                       </p>
-                      <p className="text-xs text-purple-700 leading-relaxed">
+                      <p className="text-[10px] text-white/40 leading-relaxed">
                         {resource.description}
                       </p>
                     </div>

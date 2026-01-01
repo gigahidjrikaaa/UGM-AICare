@@ -466,8 +466,8 @@ want to die, mau mati, ingin mati, etc.
             
             # If agents not needed, store direct response
             if not state["needs_agents"]:
-                # Get preferred model from state
-                preferred_model = state.get("preferred_model") or "gemini-2.0-flash"
+                # Get preferred model from state (use same default as decision node)
+                preferred_model = state.get("preferred_model") or DEFAULT_GEMINI_MODEL
                 
                 # ================================================================
                 # SCREENING AWARENESS: Enhance prompt with natural probing guidance
@@ -689,13 +689,14 @@ async def trigger_sta_conversation_analysis_background(
             f"conversation_id={conversation_id}, user_id={user_id}"
         )
         
-        # Perform deep analysis
+        # Perform deep analysis (use same default model as decision node)
+        from app.core.llm import DEFAULT_GEMINI_MODEL as _STA_DEFAULT_MODEL
         assessment = await analyze_conversation_risk(
             conversation_history=state.get("conversation_history", []),
             current_message=state.get("message", ""),
             user_context=state.get("personal_context") or {},
             conversation_start_time=start_timestamp or time.time(),
-            preferred_model=state.get("preferred_model") or "gemini-2.0-flash"
+            preferred_model=state.get("preferred_model") or _STA_DEFAULT_MODEL
         )
         
         assessment_record = None

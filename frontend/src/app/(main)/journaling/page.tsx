@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { motion } from 'framer-motion';
 import ChatHistoryViewer from '@/components/features/journaling/ChatHistoryViewer'; // Create this component
 import DailyJournal from '@/components/features/journaling/DailyJournal';       // Create this component
-import AikaPageSkeleton from '@/components/ui/GlobalSkeleton'; 
+import { JournalingPageSkeleton } from '@/components/ui/GlobalSkeleton'; 
 import ActivityCalendar from '@/components/features/journaling/ActivityCalendar'; // <<< Import Calendar
 import StreakDisplay from '@/components/features/journaling/StreakDisplay';
 import apiClient from '@/services/api'; // Import API client
@@ -202,7 +202,7 @@ export default function JournalingPage() {
 
             {/* Tab Content - flex-grow helps it take remaining vertical space if parent is flex-col */}
             <div className="flex-grow"> 
-                <Suspense fallback={<AikaPageSkeleton />}>
+                <Suspense fallback={<JournalingPageSkeleton />}>
                     {activeTab === 'daily' && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} >
                             <DailyJournal 

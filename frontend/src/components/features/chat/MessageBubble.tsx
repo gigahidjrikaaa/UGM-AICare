@@ -17,33 +17,47 @@ import { AikaThinkingCompact } from './AikaThinkingIndicator';
 
 interface MessageBubbleProps {
   message: Message;
+  isLastInGroup?: boolean; // True if this is the last bubble in a continuation group
   onCancelAppointment?: (appointmentId: number, reason: string) => Promise<void>;
   onRescheduleAppointment?: (appointmentId: number, newDateTime: string) => Promise<void>;
 }
 
-export function MessageBubble({ message, onCancelAppointment, onRescheduleAppointment }: MessageBubbleProps) {
+// Preload audio files for instant playback
+const audioCache: { [key: string]: HTMLAudioElement } = {};
+if (typeof window !== 'undefined') {
+  audioCache.user = new Audio('/sounds/message_bubble_user.mp3');
+  audioCache.aika = new Audio('/sounds/message_bubble_aika.mp3');
+  // Preload the audio
+  audioCache.user.load();
+  audioCache.aika.load();
+}
+
+export function MessageBubble({ message, isLastInGroup = true, onCancelAppointment, onRescheduleAppointment }: MessageBubbleProps) {
   const messageSoundsEnabled = useLiveTalkStore((state) => state.messageSoundsEnabled);
+  const hasPlayedRef = React.useRef(false);
 
   useEffect(() => {
-    if (!message.isLoading && messageSoundsEnabled) {
-      const audio = new Audio(
-        message.role === 'user'
-          ? '/sounds/message_bubble_user.mp3'
-          : '/sounds/message_bubble_aika.mp3'
-      );
-      audio.play().catch(error => {
-        if (error.name === 'NotAllowedError') {
-          console.warn("Audio auto-play blocked by browser. User interaction required.");
-        } else {
-          console.error("Audio play failed:", error);
-        }
-      });
+    // Only play sound once per message and when not loading
+    if (!message.isLoading && messageSoundsEnabled && !hasPlayedRef.current && !message.isContinuation) {
+      hasPlayedRef.current = true;
+      const cachedAudio = message.role === 'user' ? audioCache.user : audioCache.aika;
+      if (cachedAudio) {
+        // Clone the audio to allow overlapping sounds
+        const audio = cachedAudio.cloneNode() as HTMLAudioElement;
+        audio.volume = 0.5;
+        audio.play().catch(error => {
+          if (error.name !== 'NotAllowedError') {
+            console.error("Audio play failed:", error);
+          }
+        });
+      }
     }
-  }, [message.isLoading, message.role, messageSoundsEnabled]);
+  }, [message.isLoading, message.role, messageSoundsEnabled, message.isContinuation]);
 
   const isUser = message.role === 'user';
   const isSystem = message.role === 'system';
   const isError = message.isError;
+  const isContinuation = message.isContinuation;
 
   if (isSystem) {
     return (
@@ -94,14 +108,47 @@ export function MessageBubble({ message, onCancelAppointment, onRescheduleAppoin
     }
     return (
       <div className={cn(
-        'prose prose-sm max-w-none prose-p:m-0 prose-li:m-0 prose-ul:m-0 prose-ol:m-0',
+        // Enhanced prose styling for better readability
+        'prose prose-sm max-w-none',
+        // Paragraph spacing
+        'prose-p:my-1.5 prose-p:leading-relaxed',
+        // List styling - better spacing and bullets
+        'prose-ul:my-2 prose-ul:pl-4 prose-ul:space-y-1',
+        'prose-ol:my-2 prose-ol:pl-4 prose-ol:space-y-1',
+        'prose-li:my-0.5 prose-li:leading-relaxed',
+        // Headers styling
+        'prose-headings:font-semibold prose-headings:text-ugm-gold prose-headings:mt-3 prose-headings:mb-1.5',
+        'prose-h1:text-base prose-h2:text-sm prose-h3:text-sm',
+        // Strong/Bold styling
+        'prose-strong:text-ugm-gold prose-strong:font-semibold',
+        // Code/Pre styling
+        'prose-code:text-ugm-gold/90 prose-code:bg-white/5 prose-code:px-1 prose-code:rounded prose-code:text-xs',
+        // Blockquote styling
+        'prose-blockquote:border-l-2 prose-blockquote:border-ugm-gold/50 prose-blockquote:pl-3 prose-blockquote:italic prose-blockquote:text-white/70',
+        // Text colors
         isUser ? 'prose-invert' : isError ? 'text-red-200' : 'text-white/90',
-        'prose-a:font-medium prose-a:transition-colors',
+        // Link styling
+        'prose-a:font-medium prose-a:transition-colors prose-a:underline prose-a:underline-offset-2',
         isUser ? 'prose-a:text-ugm-gold hover:prose-a:text-ugm-gold/80' : 'prose-a:text-ugm-gold hover:prose-a:text-ugm-gold/80'
       )}>
         <ReactMarkdown
           components={{
-            a: ({ ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" />
+            a: ({ ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" className="break-all" />,
+            // Enhanced heading rendering
+            h1: ({ children, ...props }) => <h2 {...props} className="text-base font-semibold text-ugm-gold mt-3 mb-1.5">{children}</h2>,
+            h2: ({ children, ...props }) => <h3 {...props} className="text-sm font-semibold text-ugm-gold mt-2.5 mb-1">{children}</h3>,
+            h3: ({ children, ...props }) => <h4 {...props} className="text-sm font-medium text-ugm-gold/90 mt-2 mb-1">{children}</h4>,
+            // Better list rendering
+            ul: ({ children, ...props }) => <ul {...props} className="my-2 pl-4 space-y-1 list-disc marker:text-ugm-gold/60">{children}</ul>,
+            ol: ({ children, ...props }) => <ol {...props} className="my-2 pl-4 space-y-1 list-decimal marker:text-ugm-gold/60">{children}</ol>,
+            li: ({ children, ...props }) => <li {...props} className="my-0.5 leading-relaxed">{children}</li>,
+            // Paragraph with proper spacing
+            p: ({ children, ...props }) => <p {...props} className="my-1.5 leading-relaxed">{children}</p>,
+            // Better strong/emphasis
+            strong: ({ children, ...props }) => <strong {...props} className="font-semibold text-ugm-gold">{children}</strong>,
+            em: ({ children, ...props }) => <em {...props} className="italic text-white/80">{children}</em>,
+            // Horizontal rule as section divider
+            hr: ({ ...props }) => <hr {...props} className="my-3 border-white/10" />,
           }}
         >
           {message.content}
@@ -112,12 +159,22 @@ export function MessageBubble({ message, onCancelAppointment, onRescheduleAppoin
 
   return (
     <motion.div
-      className={cn('flex items-start gap-2 my-1.5', isUser ? 'justify-end' : 'justify-start')}
+      className={cn(
+        'flex items-start gap-2',
+        // Reduced margin for continuation bubbles to make them look connected
+        isContinuation ? 'my-0.5' : 'my-1.5',
+        isUser ? 'justify-end' : 'justify-start'
+      )}
       variants={bubbleVariants}
       initial="hidden"
       animate="visible"
     >
-      {!isUser && renderAvatar()}
+      {/* Avatar - hidden for continuation bubbles, placeholder space maintained */}
+      {!isUser && (
+        isContinuation 
+          ? <div className="shrink-0 w-7 h-7" /> // Placeholder to maintain alignment
+          : renderAvatar()
+      )}
       <div className={cn('flex flex-col', isUser ? 'items-end' : 'items-start')}>
         <div className={cn(
           'px-3 py-2 rounded-2xl max-w-xs md:max-w-md lg:max-w-lg text-sm relative',
@@ -125,7 +182,9 @@ export function MessageBubble({ message, onCancelAppointment, onRescheduleAppoin
             ? 'bg-ugm-blue text-white rounded-br-sm'
             : isError 
               ? 'bg-red-500/20 backdrop-blur-sm text-red-200 rounded-bl-sm border border-red-500/30'
-              : 'bg-white/10 backdrop-blur-sm text-white/90 rounded-bl-sm border border-white/10',
+              : 'bg-white/10 backdrop-blur-sm text-white/90 border border-white/10',
+          // Adjust rounding for continuation bubbles
+          !isUser && isContinuation ? 'rounded-tl-lg rounded-bl-sm' : !isUser && 'rounded-bl-sm',
           message.isLoading && 'p-0 bg-white/10 backdrop-blur-sm w-[140px]'
         )}>
           {renderBubbleContent()}
@@ -156,7 +215,8 @@ export function MessageBubble({ message, onCancelAppointment, onRescheduleAppoin
           </div>
         )}
         
-        {!message.isLoading && (
+        {/* Timestamp - only show on the last bubble of a continuation group */}
+        {!message.isLoading && isLastInGroup && (
           <div className={cn(
             'mt-0.5 text-[10px]',
             isUser ? 'text-white/40 mr-1' : 'text-white/40 ml-1'

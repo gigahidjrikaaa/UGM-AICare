@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Brain, AlertTriangle, CheckCircle, Activity } from 'lucide-react';
+import { Brain, AlertTriangle, CheckCircle, Activity, Cpu } from 'lucide-react';
 import type { AikaRiskAssessment, AikaMetadata } from '@/hooks/useAika';
 
 /**
@@ -217,6 +217,7 @@ export function AikaPoweredBadge() {
 /**
  * Metadata Display
  * Shows detailed metadata from Aika response (for debugging/admin)
+ * Enhanced with cleaner, more organized presentation
  */
 interface MetadataDisplayProps {
   metadata: AikaMetadata;
@@ -224,25 +225,68 @@ interface MetadataDisplayProps {
 
 export function MetadataDisplay({ metadata }: MetadataDisplayProps) {
   return (
-    <motion.details
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="text-xs text-white/50 bg-white/5 rounded-lg border border-white/10 p-3 mt-2"
+    <motion.div
+      initial={{ opacity: 0, y: -5 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="text-xs bg-gradient-to-br from-purple-500/10 to-indigo-500/10 rounded-xl border border-purple-500/20 p-4 mt-2"
     >
-      <summary className="cursor-pointer hover:text-white/70 transition-colors">
-        Response Metadata
-      </summary>
-      <div className="mt-2 space-y-1 font-mono">
-        <div>Session: {metadata.session_id}</div>
-        <div>Role: {metadata.user_role}</div>
-        <div>Intent: {metadata.intent}</div>
-        <div>Agents: {metadata.agents_invoked.join(', ')}</div>
-        <div>Actions: {metadata.actions_taken.join(', ')}</div>
-        <div>Processing: {metadata.processing_time_ms}ms</div>
-        {metadata.escalation_triggered && (
-          <div className="text-teal-400">✓ Escalated (Case: {metadata.case_id})</div>
-        )}
+      {/* Header */}
+      <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10">
+        <Cpu className="h-4 w-4 text-purple-400" />
+        <span className="font-semibold text-white/80">Technical Details</span>
+        <span className="ml-auto text-[10px] text-white/40 font-mono">
+          {metadata.processing_time_ms}ms
+        </span>
       </div>
-    </motion.details>
+      
+      {/* Content Grid */}
+      <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+        <div className="text-white/40">Session</div>
+        <div className="text-white/70 font-mono text-[10px] truncate" title={metadata.session_id}>
+          {metadata.session_id.slice(0, 20)}...
+        </div>
+        
+        <div className="text-white/40">User Role</div>
+        <div className="text-white/70 capitalize">{metadata.user_role}</div>
+        
+        <div className="text-white/40">Intent</div>
+        <div className="text-white/70">{metadata.intent}</div>
+        
+        <div className="text-white/40">Agents</div>
+        <div className="flex flex-wrap gap-1">
+          {metadata.agents_invoked.length > 0 ? (
+            metadata.agents_invoked.map((agent) => (
+              <span key={agent} className="px-1.5 py-0.5 rounded bg-ugm-gold/20 text-ugm-gold text-[10px] font-medium">
+                {agent}
+              </span>
+            ))
+          ) : (
+            <span className="text-white/40">None</span>
+          )}
+        </div>
+        
+        <div className="text-white/40">Actions</div>
+        <div className="flex flex-wrap gap-1">
+          {metadata.actions_taken.length > 0 ? (
+            metadata.actions_taken.map((action, i) => (
+              <span key={i} className="px-1.5 py-0.5 rounded bg-cyan-500/20 text-cyan-400 text-[10px]">
+                {action}
+              </span>
+            ))
+          ) : (
+            <span className="text-white/40">None</span>
+          )}
+        </div>
+      </div>
+      
+      {/* Escalation info if triggered */}
+      {metadata.escalation_triggered && (
+        <div className="mt-3 pt-2 border-t border-white/10 flex items-center gap-2">
+          <AlertTriangle className="h-3.5 w-3.5 text-red-400" />
+          <span className="text-red-400 font-medium">Escalated</span>
+          <span className="text-white/50 font-mono text-[10px]">Case: {metadata.case_id}</span>
+        </div>
+      )}
+    </motion.div>
   );
 }

@@ -12,6 +12,7 @@
 
 # testing
 /coverage
+.dev-pids
 
 # next.js
 /.next/
