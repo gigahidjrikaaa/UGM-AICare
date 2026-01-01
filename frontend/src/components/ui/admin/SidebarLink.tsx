@@ -25,7 +25,7 @@ export default function SidebarLink({ href, icon, label }: SidebarLinkProps) {
             : 'text-white/70 hover:bg-white/5 hover:text-white'
         }`}
       >
-        <span className={`mr-3 flex-shrink-0 ${isActive ? 'text-[#FFCA40]' : 'text-white/60 group-hover:text-white/80'}`}>
+        <span className={`mr-3 shrink-0 ${isActive ? 'text-[#FFCA40]' : 'text-white/60 group-hover:text-white/80'}`}>
           {icon}
         </span>
         <span className="truncate">{label}</span>

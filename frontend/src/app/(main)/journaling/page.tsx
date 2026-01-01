@@ -112,7 +112,7 @@ export default function JournalingPage() {
     };
 
     return (
-        <div className="bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white pt-24 pb-6 px-4 md:px-6 flex flex-col flex-1">
+        <div className="bg-linear-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 text-white pt-24 pb-6 px-4 md:px-6 flex flex-col flex-1">
             <h1 className="text-2xl font-bold mb-4 sm:mb-6"> {/* Adjusted margin */}
                 <span className="text-[#FFCA40]">Aika</span> Journal
             </h1>
@@ -120,7 +120,7 @@ export default function JournalingPage() {
             {/* Two-column layout for Calendar and Descriptions */}
             <div className="flex flex-col md:flex-row gap-4 lg:gap-8 mb-4 sm:mb-6 items-center md:items-start">
                 {/* Left Column: Calendar */}
-                <div className="w-full md:w-1/2 md:flex-shrink-0"> {/* Calendar column takes its content's width on md+ */}
+                <div className="w-full md:w-1/2 md:shrink-0"> {/* Calendar column takes its content's width on md+ */}
                     <div className="max-w-full mx-auto md:mx-0"> {/* Ensures calendar is centered on mobile, left-aligned on md+ */}
                         <ActivityCalendar
                             currentMonth={currentMonth}
@@ -201,7 +201,7 @@ export default function JournalingPage() {
             </div>
 
             {/* Tab Content - flex-grow helps it take remaining vertical space if parent is flex-col */}
-            <div className="flex-grow"> 
+            <div className="grow"> 
                 <Suspense fallback={<JournalingPageSkeleton />}>
                     {activeTab === 'daily' && (
                         <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} >

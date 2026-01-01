@@ -58,7 +58,7 @@ function QuestCard({
   const canComplete = quest.status === "active" && !isCompleting;
 
   return (
-    <div className="flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-4 shadow-lg shadow-[#00153a]/15 backdrop-blur-sm transition hover:border-[#FFCA40]/40">
+    <div className="flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-white/3 p-4 shadow-lg shadow-[#00153a]/15 backdrop-blur-sm transition hover:border-[#FFCA40]/40">
       <div className="space-y-3">
         <div className="flex items-center justify-between gap-2">
           <span className="flex items-center gap-2 text-sm font-semibold text-white">
@@ -93,7 +93,7 @@ function QuestCard({
       <button
         disabled={!canComplete}
         onClick={() => onComplete(quest.id)}
-        className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-gradient-to-r from-[#FFCA40] to-[#FFD55C] px-4 py-2 text-sm font-semibold text-[#001D58] shadow-lg shadow-[#FFCA40]/25 transition hover:shadow-[#FFCA40]/40 disabled:cursor-not-allowed disabled:opacity-40"
+        className="mt-6 inline-flex items-center justify-center gap-2 rounded-xl bg-linear-to-r from-[#FFCA40] to-[#FFD55C] px-4 py-2 text-sm font-semibold text-[#001D58] shadow-lg shadow-[#FFCA40]/25 transition hover:shadow-[#FFCA40]/40 disabled:cursor-not-allowed disabled:opacity-40"
       >
         <FiCheckCircle className="h-4 w-4" />
         {quest.status === "completed" ? "Quest Selesai" : isCompleting ? "Memproses..." : "Selesaikan Quest"}
@@ -164,7 +164,7 @@ export default function QuestBoard({ className }: QuestBoardProps) {
 
   return (
     <section
-      className={`rounded-3xl border border-white/10 bg-gradient-to-br from-[#001d58]/70 via-[#0a2a6e]/60 to-[#173a7a]/70 p-6 backdrop-blur ${className ?? ""}`}
+      className={`rounded-3xl border border-white/10 bg-linear-to-br from-[#001d58]/70 via-[#0a2a6e]/60 to-[#173a7a]/70 p-6 backdrop-blur ${className ?? ""}`}
     >
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>

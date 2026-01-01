@@ -29,8 +29,8 @@ const SpectrogramBubble: React.FC<SpectrogramBubbleProps> = ({ isActive, data })
         isActive ? 'shadow-[0_32px_80px_rgba(46,118,255,0.35)]' : ''
       }`}
     >
-      <div className="absolute inset-0 bg-gradient-to-br from-[#1e2b5f]/55 via-slate-900/60 to-[#0f172a]/80" aria-hidden="true" />
-      <div className="absolute inset-x-4 bottom-2 h-24 rounded-2xl bg-gradient-to-t from-ugm-gold/10 via-transparent to-transparent blur-xl" aria-hidden="true" />
+      <div className="absolute inset-0 bg-linear-to-br from-[#1e2b5f]/55 via-slate-900/60 to-[#0f172a]/80" aria-hidden="true" />
+      <div className="absolute inset-x-4 bottom-2 h-24 rounded-2xl bg-linear-to-t from-ugm-gold/10 via-transparent to-transparent blur-xl" aria-hidden="true" />
       <div className="relative z-10 flex h-full w-full items-end justify-center gap-[6px]">
         {bars.map((value, index) => {
           const height = Math.max(MIN_BAR_HEIGHT, value * 100);
@@ -38,7 +38,7 @@ const SpectrogramBubble: React.FC<SpectrogramBubbleProps> = ({ isActive, data })
           return (
             <span
               key={`${index}-${value}`}
-              className="flex-1 rounded-full bg-gradient-to-t from-ugm-gold/15 via-ugm-gold/35 to-white/90 transition-[height,opacity,filter] duration-150 ease-out"
+              className="flex-1 rounded-full bg-linear-to-t from-ugm-gold/15 via-ugm-gold/35 to-white/90 transition-[height,opacity,filter] duration-150 ease-out"
               style={{
                 height: `${height}%`,
                 opacity,

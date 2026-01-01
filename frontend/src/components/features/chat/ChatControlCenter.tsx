@@ -137,7 +137,7 @@ export function ChatControlCenter({
       {isOpen && (
         <motion.div
           key="chat-control-center"
-          className="fixed inset-0 z-[95] flex items-center justify-center p-4"
+          className="fixed inset-0 z-95 flex items-center justify-center p-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -171,7 +171,7 @@ export function ChatControlCenter({
               </div>
               <button
                 onClick={onClose}
-                className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-white/10 text-white/70 transition hover:bg-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ugm-gold/60"
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-white/10 text-white/70 transition hover:bg-white/20 hover:text-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ugm-gold/60"
                 aria-label="Tutup pusat kontrol"
               >
                 <FiX size={20} />
@@ -219,7 +219,7 @@ export function ChatControlCenter({
                   <label className="flex cursor-pointer items-start gap-3 rounded-lg border border-white/10 bg-white/5 p-4 transition hover:border-ugm-gold/40 hover:bg-white/8">
                     <input
                       type="checkbox"
-                      className="mt-1 h-4 w-4 flex-shrink-0 accent-ugm-gold"
+                      className="mt-1 h-4 w-4 shrink-0 accent-ugm-gold"
                       checked={interruptOnEnter}
                       onChange={(event) => onToggleInterrupt(event.target.checked)}
                     />
@@ -242,11 +242,11 @@ export function ChatControlCenter({
                     <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-4 transition hover:border-ugm-gold/40 hover:bg-white/8">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 flex-shrink-0 accent-ugm-gold"
+                        className="h-4 w-4 shrink-0 accent-ugm-gold"
                         checked={messageSoundsEnabled}
                         onChange={(event) => setMessageSoundsEnabled(event.target.checked)}
                       />
-                      <FiVolume2 className="h-5 w-5 flex-shrink-0 text-ugm-gold" />
+                      <FiVolume2 className="h-5 w-5 shrink-0 text-ugm-gold" />
                       <div className="flex-1">
                         <span className="block text-sm font-medium text-white">Suara pesan</span>
                         <span className="mt-0.5 block text-xs text-white/60">Bunyi notifikasi saat pesan baru</span>
@@ -256,11 +256,11 @@ export function ChatControlCenter({
                     <label className="flex cursor-pointer items-center gap-3 rounded-lg border border-white/10 bg-white/5 p-4 transition hover:border-ugm-gold/40 hover:bg-white/8">
                       <input
                         type="checkbox"
-                        className="h-4 w-4 flex-shrink-0 accent-ugm-gold"
+                        className="h-4 w-4 shrink-0 accent-ugm-gold"
                         checked={ttsEnabled}
                         onChange={(event) => setTtsEnabled(event.target.checked)}
                       />
-                      <FiMic className="h-5 w-5 flex-shrink-0 text-ugm-gold" />
+                      <FiMic className="h-5 w-5 shrink-0 text-ugm-gold" />
                       <div className="flex-1">
                         <span className="block text-sm font-medium text-white">Balasan suara (TTS)</span>
                         <span className="mt-0.5 block text-xs text-white/60">Dengarkan balasan Aika secara langsung</span>

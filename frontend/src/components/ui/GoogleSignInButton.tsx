@@ -54,7 +54,7 @@ export default function GoogleSignInButton({ className = "" }: GoogleSignInButto
           whileTap={{ scale: 0.97 }}
           disabled={isLoading}
           onClick={handleSignIn}
-          className="flex items-center justify-center gap-2 bg-[#FFCA40] text-[#001D58] px-8 py-3 rounded-l-full font-bold text-lg shadow-lg hover:shadow-xl transition-all flex-grow"
+          className="flex items-center justify-center gap-2 bg-[#FFCA40] text-[#001D58] px-8 py-3 rounded-l-full font-bold text-lg shadow-lg hover:shadow-xl transition-all grow"
         >
           {isLoading ? (
             <div className="w-5 h-5 border-2 border-[#001D58] border-t-transparent rounded-full animate-spin" />

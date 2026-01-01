@@ -66,7 +66,7 @@ function StreakCard({
   const isCurrent = type === "current";
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-4 shadow-lg backdrop-blur-sm transition-all duration-300 hover:border-[#FFCA40]/30 hover:bg-white/[0.05]">
+    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/3 p-4 shadow-lg backdrop-blur-sm transition-all duration-300 hover:border-[#FFCA40]/30 hover:bg-white/5">
       <div className="flex items-center gap-4">
         <span
           className={`inline-flex h-12 w-12 items-center justify-center rounded-xl text-2xl ${
@@ -124,7 +124,7 @@ function WellnessTrendCard({ score }: { score: number }) {
   const colors = colorMap[mood.color];
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-4 shadow-lg backdrop-blur-sm transition-all duration-300 hover:border-[#FFCA40]/30 hover:bg-white/[0.05]">
+    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/3 p-4 shadow-lg backdrop-blur-sm transition-all duration-300 hover:border-[#FFCA40]/30 hover:bg-white/5">
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <p className="text-xs uppercase tracking-wide text-white/60">Wellness Trend</p>
@@ -154,7 +154,7 @@ function BadgesCard({ count }: { count: number | null }) {
   const displayCount = count ?? 0;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/[0.03] p-4 shadow-lg backdrop-blur-sm transition-all duration-300 hover:border-[#FFCA40]/30 hover:bg-white/[0.05]">
+    <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/3 p-4 shadow-lg backdrop-blur-sm transition-all duration-300 hover:border-[#FFCA40]/30 hover:bg-white/5">
       <div className="flex items-center gap-4">
         <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#FFCA40]/20 text-2xl shadow-lg shadow-[#FFCA40]/10">
           🎖️
@@ -179,7 +179,7 @@ function QuickActionCard({ action }: { action: QuickAction }) {
   return (
     <Link
       href={action.href}
-      className="group flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-white/[0.03] p-4 backdrop-blur-sm transition hover:border-[#FFCA40] hover:bg-[#FFCA40]/10"
+      className="group flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-white/3 p-4 backdrop-blur-sm transition hover:border-[#FFCA40] hover:bg-[#FFCA40]/10"
     >
       <div className="flex items-center gap-3">
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-[#FFCA40]">
@@ -328,10 +328,10 @@ export default function DashboardPage() {
       <div className="mx-auto max-w-6xl px-4 pt-24 pb-12 space-y-10">
         {/* Aika CTA Card - Prominent call to action */}
         <Link href="/aika" className="block">
-          <div className="group relative overflow-hidden rounded-3xl bg-gradient-to-r from-teal-500 via-cyan-500 to-blue-500 p-6 shadow-2xl transition-all duration-300 hover:scale-[1.01] hover:shadow-cyan-500/30">
+          <div className="group relative overflow-hidden rounded-3xl bg-linear-to-r from-teal-500 via-cyan-500 to-blue-500 p-6 shadow-2xl transition-all duration-300 hover:scale-[1.01] hover:shadow-cyan-500/30">
             <div className="flex items-center gap-6">
               {/* Aika Avatar */}
-              <div className="relative flex-shrink-0">
+              <div className="relative shrink-0">
                 <div className="h-20 w-20 overflow-hidden rounded-full border-4 border-white/30 shadow-xl">
                   <Image
                     src="/aika-avatar.png"
@@ -383,7 +383,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Header section with greeting and wallet */}
-        <header className="rounded-3xl border border-white/10 bg-white/[0.03] p-8 shadow-2xl backdrop-blur-md">
+        <header className="rounded-3xl border border-white/10 bg-white/3 p-8 shadow-2xl backdrop-blur-md">
           <div className="space-y-6">
             <p className="text-xs uppercase tracking-wide text-white/60">Welcome back</p>
             <h1 className="text-3xl font-semibold text-white">Ready for your next check-in, {firstName}?</h1>
@@ -404,7 +404,7 @@ export default function DashboardPage() {
                 </span>
               </Link>
             </div>
-            <div className="mt-4 flex items-center gap-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4">
+            <div className="mt-4 flex items-center gap-4 rounded-2xl border border-white/10 bg-white/2 p-4">
               <div className="flex-1">
                 <p className="text-sm font-medium text-white">Open Campus ID</p>
                 <p className="mt-1 text-xs text-white/60">Connect your Web3 identity to earn CARE tokens</p>
@@ -423,8 +423,8 @@ export default function DashboardPage() {
         </section>
 
         <section className="grid gap-6 lg:grid-cols-9">
-          <div className="space-y-6 lg:col-span-5">
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-xl backdrop-blur-md">
+            <div className="space-y-6 lg:col-span-5">
+            <div className="rounded-3xl border border-white/10 bg-white/3 p-6 shadow-xl backdrop-blur-md">
               <div className="flex items-center justify-between">
                 <div>
                   <h2 className="text-xl font-semibold">Recent activity</h2>
@@ -446,9 +446,9 @@ export default function DashboardPage() {
                   timelineEntries.map((entry, index) => (
                     <div
                       key={`${entry.kind}-${entry.timestamp}-${index}`}
-                      className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4 backdrop-blur-sm"
+                      className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/2 p-4 backdrop-blur-sm"
                     >
-                      <span className="mt-1 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#FFCA40]/15 text-[#FFCA40]">
+                      <span className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#FFCA40]/15 text-[#FFCA40]">
                         <FiClock className="h-5 w-5" />
                       </span>
                       <div className="min-w-0 flex-1">
@@ -471,7 +471,7 @@ export default function DashboardPage() {
           </div>
 
           <aside className="space-y-6 lg:col-span-4">
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-xl backdrop-blur-md">
+            <div className="rounded-3xl border border-white/10 bg-white/3 p-6 shadow-xl backdrop-blur-md">
               <div className="flex items-center justify-between">
                 <h2 className="text-xl font-semibold">Upcoming appointments</h2>
                 <Link
@@ -499,9 +499,9 @@ export default function DashboardPage() {
                   upcomingAppointments.map((entry, index) => (
                     <div
                       key={`${entry.timestamp}-${index}`}
-                      className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/[0.02] p-4 backdrop-blur-sm"
+                      className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/2 p-4 backdrop-blur-sm"
                     >
-                      <span className="mt-1 inline-flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-xl bg-[#FFCA40]/15 text-[#FFCA40]">
+                      <span className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#FFCA40]/15 text-[#FFCA40]">
                         <FiCalendar className="h-5 w-5" />
                       </span>
                       <div className="min-w-0 flex-1">
@@ -517,7 +517,7 @@ export default function DashboardPage() {
               </div>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-xl backdrop-blur-md">
+            <div className="rounded-3xl border border-white/10 bg-white/3 p-6 shadow-xl backdrop-blur-md">
               <h2 className="text-xl font-semibold">Achievements</h2>
               <p className="mt-2 text-sm text-white/60">
                 {badgeCount != null
@@ -536,7 +536,7 @@ export default function DashboardPage() {
               </Link>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6 shadow-xl backdrop-blur-md">
+            <div className="rounded-3xl border border-white/10 bg-white/3 p-6 shadow-xl backdrop-blur-md">
               <h2 className="text-xl font-semibold">Focus for today</h2>
               <p className="mt-2 text-sm text-white/60">
                 {profile?.safety.primary_concerns

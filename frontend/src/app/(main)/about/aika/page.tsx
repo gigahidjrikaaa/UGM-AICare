@@ -9,7 +9,7 @@ import ParticleBackground from '@/components/ui/ParticleBackground';
 
 export default function AboutAikaPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] pt-24 pb-10 px-4 sm:px-6 relative">
+    <div className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F] pt-24 pb-10 px-4 sm:px-6 relative">
       <div className="absolute inset-0 z-0 opacity-40">
         <ParticleBackground count={60} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={0.8} />
       </div>
@@ -221,7 +221,7 @@ export default function AboutAikaPage() {
                 transition={{ delay: 0.5 + idx * 0.1 }}
                 className="flex gap-6 items-start"
               >
-                <div className="flex-shrink-0 w-12 h-12 bg-gradient-to-br from-[#FFCA40] to-[#FFB700] rounded-full flex items-center justify-center text-[#001D58] font-bold text-lg">
+                <div className="shrink-0 w-12 h-12 bg-linear-to-br from-[#FFCA40] to-[#FFB700] rounded-full flex items-center justify-center text-[#001D58] font-bold text-lg">
                   {step.step}
                 </div>
                 <div className="flex-1">
@@ -238,7 +238,7 @@ export default function AboutAikaPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
-          className="bg-gradient-to-r from-[#FFCA40]/20 to-[#FFB700]/20 backdrop-blur-xl rounded-2xl p-8 border border-[#FFCA40]/30 mb-12 text-center"
+          className="bg-linear-to-r from-[#FFCA40]/20 to-[#FFB700]/20 backdrop-blur-xl rounded-2xl p-8 border border-[#FFCA40]/30 mb-12 text-center"
         >
           <div className="flex items-center justify-center gap-3 mb-4">
             <FiClock className="text-[#FFCA40] text-3xl" />
@@ -265,7 +265,7 @@ export default function AboutAikaPage() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.98 }}
-                className="px-10 py-4 bg-gradient-to-r from-[#FFCA40] to-[#FFB700] text-[#001D58] rounded-full font-bold text-lg shadow-2xl shadow-[#FFCA40]/50"
+                className="px-10 py-4 bg-linear-to-r from-[#FFCA40] to-[#FFB700] text-[#001D58] rounded-full font-bold text-lg shadow-2xl shadow-[#FFCA40]/50"
               >
                 Start Chatting Now
               </motion.button>

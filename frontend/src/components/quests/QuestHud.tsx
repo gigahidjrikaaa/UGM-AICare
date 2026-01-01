@@ -48,7 +48,7 @@ export default function QuestHud({ className }: QuestHudProps) {
   return (
     <div
       className={cn(
-        "mx-4 mb-4 flex flex-col gap-3 rounded-2xl border border-white/10 bg-gradient-to-r from-white/10 via-white/5 to-transparent p-4 text-sm text-white shadow-lg shadow-[#00153a]/25 backdrop-blur md:flex-row md:items-center md:justify-between",
+        "mx-4 mb-4 flex flex-col gap-3 rounded-2xl border border-white/10 bg-linear-to-r from-white/10 via-white/5 to-transparent p-4 text-sm text-white shadow-lg shadow-[#00153a]/25 backdrop-blur md:flex-row md:items-center md:justify-between",
         className,
       )}
       role="status"

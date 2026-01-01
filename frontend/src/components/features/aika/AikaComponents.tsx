@@ -144,7 +144,7 @@ export function EscalationNotification({ caseId, onDismiss }: EscalationNotifica
       className="bg-teal-500/10 border border-teal-500/30 rounded-lg p-4 space-y-2"
     >
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 mt-0.5">
+        <div className="shrink-0 mt-0.5">
           <CheckCircle className="h-5 w-5 text-teal-500" />
         </div>
         <div className="flex-1 space-y-1">
@@ -182,7 +182,7 @@ export function AikaAvatar() {
     <motion.div
       initial={{ scale: 0 }}
       animate={{ scale: 1 }}
-      className="relative flex-shrink-0 w-8 h-8 rounded-full bg-gradient-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg"
+      className="relative shrink-0 w-8 h-8 rounded-full bg-linear-to-br from-purple-500 to-blue-500 flex items-center justify-center shadow-lg"
     >
       <Brain className="h-4 w-4 text-white" />
       <motion.div
@@ -228,7 +228,7 @@ export function MetadataDisplay({ metadata }: MetadataDisplayProps) {
     <motion.div
       initial={{ opacity: 0, y: -5 }}
       animate={{ opacity: 1, y: 0 }}
-      className="text-xs bg-gradient-to-br from-purple-500/10 to-indigo-500/10 rounded-xl border border-purple-500/20 p-4 mt-2"
+      className="text-xs bg-linear-to-br from-purple-500/10 to-indigo-500/10 rounded-xl border border-purple-500/20 p-4 mt-2"
     >
       {/* Header */}
       <div className="flex items-center gap-2 mb-3 pb-2 border-b border-white/10">

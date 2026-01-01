@@ -111,7 +111,7 @@ export function AppointmentCard({ appointment, onCancel, onReschedule }: Appoint
       className="mt-4 bg-white/95 backdrop-blur-xl border-2 border-ugm-blue/20 rounded-2xl overflow-hidden shadow-2xl hover:shadow-ugm-blue/20"
     >
       {/* Enhanced Header with Gradient */}
-      <div className="bg-gradient-to-br from-ugm-blue via-ugm-blue to-ugm-blue-light p-5 relative overflow-hidden">
+      <div className="bg-linear-to-br from-ugm-blue via-ugm-blue to-ugm-blue-light p-5 relative overflow-hidden">
         {/* Decorative elements */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-ugm-gold/10 rounded-full blur-3xl" />
         <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-white/5 rounded-full blur-2xl" />
@@ -119,7 +119,7 @@ export function AppointmentCard({ appointment, onCancel, onReschedule }: Appoint
         <div className="relative z-10">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3 flex-1">
-              <div className="p-3 bg-gradient-to-br from-ugm-gold to-ugm-gold-light rounded-2xl shadow-xl flex-shrink-0">
+              <div className="p-3 bg-linear-to-br from-ugm-gold to-ugm-gold-light rounded-2xl shadow-xl shrink-0">
                 <Calendar className="w-6 h-6 text-ugm-blue" />
               </div>
               <div className="flex-1">

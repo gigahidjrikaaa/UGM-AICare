@@ -72,7 +72,7 @@ const AnimatedAika = () => {
         ease: "easeInOut"
       }}
     >
-      <div className="h-40 w-40 rounded-full bg-gradient-to-br from-[#FFCA40] to-[#FF8C00] flex items-center justify-center shadow-xl">
+      <div className="h-40 w-40 rounded-full bg-linear-to-br from-[#FFCA40] to-[#FF8C00] flex items-center justify-center shadow-xl">
         <motion.div
           key={expression}
           initial={{ scale: 0.8, opacity: 0 }}
@@ -197,7 +197,7 @@ export default function NotFound() {
   if (!mounted) return null;
 
   return (
-    <main className="min-h-screen bg-gradient-to-br from-[#001D58] via-[#00308F] to-[#1e3a8a] flex flex-col relative overflow-hidden">
+    <main className="min-h-screen bg-linear-to-br from-[#001D58] via-[#00308F] to-[#1e3a8a] flex flex-col relative overflow-hidden">
       <FloatingParticles />
       
       {/* Animated background elements */}
@@ -241,7 +241,7 @@ export default function NotFound() {
           >
             {/* Animated border glow */}
             <motion.div
-              className="absolute inset-0 bg-gradient-to-r from-[#FFCA40]/20 via-purple-500/20 to-[#FFCA40]/20 rounded-3xl"
+              className="absolute inset-0 bg-linear-to-r from-[#FFCA40]/20 via-purple-500/20 to-[#FFCA40]/20 rounded-3xl"
               animate={{
                 background: [
                   'linear-gradient(90deg, rgba(255,202,64,0.2) 0%, rgba(168,85,247,0.2) 50%, rgba(255,202,64,0.2) 100%)',
@@ -256,7 +256,7 @@ export default function NotFound() {
             />
             
             {/* Aika Character Section */}
-            <div className="bg-gradient-to-r from-[#001545] to-[#173a7a] p-8 flex justify-center relative">
+            <div className="bg-linear-to-r from-[#001545] to-[#173a7a] p-8 flex justify-center relative">
               <AnimatedAika />
               
               {/* Magic sparkles */}
@@ -327,7 +327,7 @@ export default function NotFound() {
                       boxShadow: "0 10px 30px rgba(255, 202, 64, 0.3)"
                     }}
                     whileTap={{ scale: 0.95 }}
-                    className="px-8 py-3 bg-gradient-to-r from-[#FFCA40] to-[#FF8C00] text-[#001D58] rounded-full font-bold flex items-center justify-center w-full sm:w-auto transition-all duration-300 group"
+                    className="px-8 py-3 bg-linear-to-r from-[#FFCA40] to-[#FF8C00] text-[#001D58] rounded-full font-bold flex items-center justify-center w-full sm:w-auto transition-all duration-300 group"
                   >
                     <FaArrowLeft className="mr-2 group-hover:-translate-x-1 transition-transform" />
                     Back to Home

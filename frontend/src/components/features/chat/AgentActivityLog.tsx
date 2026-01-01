@@ -75,7 +75,7 @@ export function AgentActivityLog({ agentActivity }: AgentActivityLogProps) {
   };
 
   return (
-    <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-br from-slate-800/50 to-slate-900/50 shadow-lg backdrop-blur-sm">
+    <div className="mb-4 overflow-hidden rounded-2xl border border-white/10 bg-linear-to-br from-slate-800/50 to-slate-900/50 shadow-lg backdrop-blur-sm">
       {/* Header - Always Visible */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
@@ -111,7 +111,7 @@ export function AgentActivityLog({ agentActivity }: AgentActivityLogProps) {
             </div>
           </div>
         </div>
-        <div className="flex-shrink-0">
+        <div className="shrink-0">
           {isExpanded ? (
             <ChevronUp className="h-5 w-5 text-white/60" />
           ) : (

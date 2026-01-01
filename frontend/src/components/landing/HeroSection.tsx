@@ -8,7 +8,7 @@ import ParticleBackground from '@/components/ui/ParticleBackground';
 
 export default function HeroSection() {
   return (
-    <section className="relative min-h-screen flex items-center overflow-hidden bg-gradient-to-br from-[#000B1F] via-[#001D58] to-[#002A7A]">
+    <section className="relative min-h-screen flex items-center overflow-hidden bg-linear-to-br from-[#000B1F] via-[#001D58] to-[#002A7A]">
       {/* Background Image with Overlay */}
       <div className="absolute inset-0 z-0">
         <Image
@@ -18,7 +18,7 @@ export default function HeroSection() {
           className="object-cover opacity-20"
           priority
         />
-        <div className="absolute inset-0 bg-gradient-to-br from-[#000B1F]/90 via-[#001D58]/80 to-[#002A7A]/90" />
+        <div className="absolute inset-0 bg-linear-to-br from-[#000B1F]/90 via-[#001D58]/80 to-[#002A7A]/90" />
       </div>
 
       {/* Animated Background */}
@@ -67,7 +67,7 @@ export default function HeroSection() {
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               transition={{ duration: 0.6, delay: 0.1 }}
-              className="inline-flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-[#FFCA40]/20 to-[#FFB700]/20 backdrop-blur-xl rounded-full border border-[#FFCA40]/30 shadow-lg"
+              className="inline-flex items-center gap-2 px-5 py-2.5 bg-linear-to-r from-[#FFCA40]/20 to-[#FFB700]/20 backdrop-blur-xl rounded-full border border-[#FFCA40]/30 shadow-lg"
             >
               <motion.div
                 animate={{ rotate: [0, 360] }}
@@ -91,14 +91,14 @@ export default function HeroSection() {
                 Feeling Stressed?
                 <br />
                 <span className="relative inline-block mt-2">
-                  <span className="relative z-10 bg-gradient-to-r from-[#FFCA40] via-[#FFD770] to-[#FFCA40] bg-clip-text text-transparent">
+                  <span className="relative z-10 bg-linear-to-r from-[#FFCA40] via-[#FFD770] to-[#FFCA40] bg-clip-text text-transparent">
                     Chat with Aika
                   </span>
                   <motion.span
                     initial={{ scaleX: 0 }}
                     animate={{ scaleX: 1 }}
                     transition={{ duration: 0.8, delay: 1, ease: "easeOut" }}
-                    className="absolute bottom-0 left-0 right-0 h-3 bg-gradient-to-r from-[#FFCA40]/30 to-[#FFB700]/30 blur-sm origin-left"
+                    className="absolute bottom-0 left-0 right-0 h-3 bg-linear-to-r from-[#FFCA40]/30 to-[#FFB700]/30 blur-sm origin-left"
                   />
                 </span>
               </motion.h1>
@@ -165,7 +165,7 @@ export default function HeroSection() {
                     boxShadow: "0 20px 60px rgba(255, 202, 64, 0.5)" 
                   }}
                   whileTap={{ scale: 0.98 }}
-                  className="group relative px-10 py-5 bg-gradient-to-r from-[#FFCA40] via-[#FFD770] to-[#FFB700] text-[#001D58] rounded-full font-bold text-xl flex items-center justify-center shadow-2xl transition-all w-full sm:w-auto overflow-hidden"
+                  className="group relative px-10 py-5 bg-linear-to-r from-[#FFCA40] via-[#FFD770] to-[#FFB700] text-[#001D58] rounded-full font-bold text-xl flex items-center justify-center shadow-2xl transition-all w-full sm:w-auto overflow-hidden"
                 >
                   <span className="relative z-10 flex items-center gap-3">
                     Start Chatting – It&apos;s Free
@@ -177,7 +177,7 @@ export default function HeroSection() {
                     </motion.span>
                   </span>
                   <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-[#FFB700] to-[#FFCA40]"
+                    className="absolute inset-0 bg-linear-to-r from-[#FFB700] to-[#FFCA40]"
                     initial={{ x: "-100%" }}
                     whileHover={{ x: "0%" }}
                     transition={{ duration: 0.3 }}
@@ -234,7 +234,7 @@ export default function HeroSection() {
             <div className="relative">
               {/* Glow Effect */}
               <motion.div
-                className="absolute -inset-4 bg-gradient-to-r from-[#FFCA40]/20 via-[#6A98F0]/20 to-[#FF6B9D]/20 rounded-3xl blur-2xl"
+                className="absolute -inset-4 bg-linear-to-r from-[#FFCA40]/20 via-[#6A98F0]/20 to-[#FF6B9D]/20 rounded-3xl blur-2xl"
                 animate={{ 
                   opacity: [0.3, 0.5, 0.3],
                   scale: [1, 1.02, 1]
@@ -243,7 +243,7 @@ export default function HeroSection() {
               />
               
               {/* Chat Interface Preview */}
-              <div className="relative bg-gradient-to-br from-[#0a1628] to-[#001D58] rounded-3xl overflow-hidden shadow-2xl border border-white/10">
+              <div className="relative bg-linear-to-br from-[#0a1628] to-[#001D58] rounded-3xl overflow-hidden shadow-2xl border border-white/10">
                 {/* Chat Header */}
                 <div className="bg-white/5 backdrop-blur-sm px-6 py-4 border-b border-white/10 flex items-center gap-4">
                   <div className="relative">
@@ -275,7 +275,7 @@ export default function HeroSection() {
                     transition={{ delay: 1.5 }}
                     className="flex gap-3"
                   >
-                    <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full overflow-hidden shrink-0">
                       <Image
                         src="/aika-human.jpeg"
                         alt="Aika"
@@ -312,7 +312,7 @@ export default function HeroSection() {
                     transition={{ delay: 2.5 }}
                     className="flex gap-3"
                   >
-                    <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full overflow-hidden shrink-0">
                       <Image
                         src="/aika-human.jpeg"
                         alt="Aika"
@@ -335,7 +335,7 @@ export default function HeroSection() {
                     transition={{ delay: 3 }}
                     className="flex gap-3"
                   >
-                    <div className="w-8 h-8 rounded-full overflow-hidden flex-shrink-0">
+                    <div className="w-8 h-8 rounded-full overflow-hidden shrink-0">
                       <Image
                         src="/aika-human.jpeg"
                         alt="Aika"

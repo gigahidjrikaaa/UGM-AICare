@@ -34,7 +34,12 @@ from app.database import get_async_db
 from app.dependencies import get_current_active_user
 from app.models import User  # Core model
 from app.domains.mental_health.models import Conversation, UserSummary
-from app.domains.mental_health.schemas.chat import ConversationHistoryItem, AikaRequest, AikaResponse
+from app.domains.mental_health.schemas.chat import (
+    AikaRequest,
+    AikaResponse,
+    ChatRequest,
+    ConversationHistoryItem,
+)
 # Note: Integrating with LangGraph AikaOrchestrator for chat processing
 from app.domains.mental_health.services.personal_context import (
     build_user_personal_context,
@@ -48,8 +53,7 @@ from app.services.ai_memory_facts_service import (
     remember_from_user_message,
 )
 
-from dataclasses import dataclass
-from typing import Optional, List, Dict, Any
+from dataclasses import dataclass, field
 
 
 @dataclass
@@ -58,15 +62,13 @@ class ChatProcessingResult:
     response_text: str
     provider_used: str = "google"
     model_used: str = "gemini_google"  # ✅ Fixed: Valid model name
-    final_history: List[ConversationHistoryItem] = None
+    final_history: List[ConversationHistoryItem] = field(default_factory=list)
 
     module_completed_id: Optional[int] = None
     intervention_plan: Optional[Dict[str, Any]] = None
     metadata: Optional[Dict[str, Any]] = None
     
-    def __post_init__(self):
-        if self.final_history is None:
-            self.final_history = []
+
 
 
 async def process_chat_event(*args, **kwargs):
@@ -99,6 +101,12 @@ async def process_chat_message(
         activity_callback: Optional callback for real-time activity streaming (WebSocket)
     """
     try:
+        if request.message is None:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="'message' is required for chat message processing.",
+            )
+
         # Determine user role for routing
         user_role = "user"  # Default to student
         if hasattr(current_user, 'role'):
@@ -108,21 +116,15 @@ async def process_chat_message(
                 user_role = "counselor"
         
         # Convert history to Aika format
-        conversation_history = []
+        conversation_history: List[Dict[str, str]] = []
         if request.history:
             for i, item in enumerate(request.history):
                 # Skip the last message if it matches the current request message
                 # This prevents double-input since frontend might send optimistic history
-                if i == len(request.history) - 1 and item.content == request.message:
+                if i == len(request.history) - 1 and item.get("content") == request.message:
                     continue
-                    
-                if isinstance(item, dict):
-                    conversation_history.append(item)
-                else:
-                    conversation_history.append({
-                        "role": item.role,
-                        "content": item.content,
-                    })
+
+                conversation_history.append(item)
         
         # ============================================================================
         # ✨ NEW ARCHITECTURE: Direct LangGraph Invocation (Nov 2025)

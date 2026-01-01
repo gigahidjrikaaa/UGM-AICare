@@ -24,7 +24,7 @@ export default function SignInUGM() {
   }, [status, router]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col relative pt-24">
+    <div className="min-h-screen bg-linear-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex flex-col relative pt-24">
       {/* Particle Background */}
       <div className="absolute inset-0 z-0">
         <ParticleBackground 

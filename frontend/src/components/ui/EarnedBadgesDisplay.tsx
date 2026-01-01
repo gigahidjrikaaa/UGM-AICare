@@ -251,7 +251,7 @@ export default function EarnedBadgesDisplay() {
               <InteractiveBadgeCard
                 className={`relative flex h-full flex-col rounded-2xl border p-6 transition duration-200 ${
                   isEarned
-                    ? "border-[#FFCA40]/50 bg-gradient-to-br from-[#FFCA40]/15 via-white/10 to-white/5 hover:border-[#FFCA40]/80 hover:shadow-[0_0_25px_rgba(255,202,64,0.35)]"
+                    ? "border-[#FFCA40]/50 bg-linear-to-br from-[#FFCA40]/15 via-white/10 to-white/5 hover:border-[#FFCA40]/80 hover:shadow-[0_0_25px_rgba(255,202,64,0.35)]"
                     : "border-white/10 bg-white/5 opacity-80"
                 }`}
                 href={isEarned ? explorerUrl : undefined}
@@ -266,7 +266,7 @@ export default function EarnedBadgesDisplay() {
               key={badgeId}
               className={`relative flex h-full flex-col rounded-2xl border p-6 transition duration-200 ${
                 isEarned
-                  ? "border-[#FFCA40]/50 bg-gradient-to-br from-[#FFCA40]/15 via-white/10 to-white/5 hover:border-[#FFCA40]/80 hover:shadow-[0_0_25px_rgba(255,202,64,0.35)]"
+                  ? "border-[#FFCA40]/50 bg-linear-to-br from-[#FFCA40]/15 via-white/10 to-white/5 hover:border-[#FFCA40]/80 hover:shadow-[0_0_25px_rgba(255,202,64,0.35)]"
                   : "border-white/10 bg-white/5 opacity-80"
               }`}
               href={isEarned ? explorerUrl : undefined}

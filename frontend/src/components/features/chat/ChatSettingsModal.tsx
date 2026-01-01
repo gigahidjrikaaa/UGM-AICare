@@ -26,7 +26,7 @@ const ChatSettingsModal = ({ isOpen, onClose, interruptOnEnter, onToggleInterrup
       {isOpen && (
         <motion.div
           key="chat-settings"
-          className="fixed inset-0 z-[90] flex items-center justify-center px-4"
+          className="fixed inset-0 z-90 flex items-center justify-center px-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -55,7 +55,7 @@ const ChatSettingsModal = ({ isOpen, onClose, interruptOnEnter, onToggleInterrup
               <button
                 type="button"
                 onClick={onClose}
-                className="text-white/60 hover:text-white rounded-full p-1 focus-visible:outline focus-visible:outline-2 focus-visible:outline-ugm-gold/60"
+                className="text-white/60 hover:text-white rounded-full p-1 focus-visible:outline focus-visible:outline-ugm-gold/60"
                 aria-label="Tutup"
               >
                 <FiX size={18} />

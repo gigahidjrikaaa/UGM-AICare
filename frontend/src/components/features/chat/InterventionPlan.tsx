@@ -48,7 +48,7 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
       className="mt-4 bg-white/95 backdrop-blur-xl border-2 border-ugm-blue/20 rounded-2xl overflow-hidden shadow-2xl hover:shadow-ugm-blue/20"
     >
       {/* Enhanced Header with Gradient */}
-      <div className="bg-gradient-to-br from-ugm-blue via-ugm-blue to-ugm-blue-light p-5 relative overflow-hidden">
+      <div className="bg-linear-to-br from-ugm-blue via-ugm-blue to-ugm-blue-light p-5 relative overflow-hidden">
         {/* Decorative elements */}
         <div className="absolute top-0 right-0 w-32 h-32 bg-ugm-gold/10 rounded-full blur-3xl" />
         <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-white/5 rounded-full blur-2xl" />
@@ -56,7 +56,7 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
         <div className="relative z-10">
           <div className="flex items-start justify-between gap-3">
             <div className="flex items-start gap-3 flex-1">
-              <div className="p-3 bg-gradient-to-br from-ugm-gold to-ugm-gold-light rounded-2xl shadow-xl flex-shrink-0">
+              <div className="p-3 bg-linear-to-br from-ugm-gold to-ugm-gold-light rounded-2xl shadow-xl shrink-0">
                 <Sparkles className="w-6 h-6 text-ugm-blue" />
               </div>
               <div className="flex-1">
@@ -73,7 +73,7 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
             </div>
             <button
               onClick={() => setIsExpanded(!isExpanded)}
-              className="p-2 hover:bg-white/10 rounded-xl transition-all hover:scale-105 flex-shrink-0"
+              className="p-2 hover:bg-white/10 rounded-xl transition-all hover:scale-105 shrink-0"
               aria-label={isExpanded ? 'Tutup rencana' : 'Buka rencana'}
             >
               {isExpanded ? (
@@ -93,7 +93,7 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
               </div>
               <div className="h-3 bg-white/15 rounded-full overflow-hidden backdrop-blur-sm border border-white/20">
                 <motion.div
-                  className="h-full bg-gradient-to-r from-ugm-gold via-ugm-gold-light to-ugm-gold rounded-full shadow-lg relative overflow-hidden"
+                  className="h-full bg-linear-to-r from-ugm-gold via-ugm-gold-light to-ugm-gold rounded-full shadow-lg relative overflow-hidden"
                   initial={{ width: 0 }}
                   animate={{ width: `${progressPercent}%` }}
                   transition={{ duration: 0.6, ease: 'easeOut' }}
@@ -101,7 +101,7 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
                   <motion.div
                     animate={{ x: ['0%', '100%'] }}
                     transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
-                    className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent"
+                    className="absolute inset-0 bg-linear-to-r from-transparent via-white/30 to-transparent"
                     style={{ width: '50%' }}
                   />
                 </motion.div>
@@ -119,7 +119,7 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.3 }}
-            className="bg-gradient-to-b from-gray-50/50 to-white"
+            className="bg-linear-to-b from-gray-50/50 to-white"
           >
             {/* Plan Steps */}
             {plan.plan_steps.length > 0 && (
@@ -141,12 +141,12 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
                       className={cn(
                         'flex items-start gap-4 p-4 rounded-xl border-2 transition-all cursor-pointer group',
                         isCompleted
-                          ? 'bg-gradient-to-r from-green-50 to-emerald-50 border-green-300/60 shadow-sm'
+                          ? 'bg-linear-to-r from-green-50 to-emerald-50 border-green-300/60 shadow-sm'
                           : 'bg-white border-gray-200 hover:border-ugm-blue/50 hover:shadow-md'
                       )}
                       onClick={() => toggleStep(step.id)}
                     >
-                      <div className="flex-shrink-0 mt-0.5 transition-transform group-hover:scale-110">
+                      <div className="shrink-0 mt-0.5 transition-transform group-hover:scale-110">
                         {isCompleted ? (
                           <CheckCircle2 className="w-6 h-6 text-green-600 drop-shadow-sm" />
                         ) : (
@@ -203,10 +203,10 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
                       >
                         <Link
                           href={`/activities?play=${card.activity_id}`}
-                          className="block p-4 rounded-xl border-2 bg-gradient-to-br from-emerald-50 to-teal-50 border-emerald-300/60 hover:border-emerald-400 hover:shadow-lg transition-all cursor-pointer group"
+                          className="block p-4 rounded-xl border-2 bg-linear-to-br from-emerald-50 to-teal-50 border-emerald-300/60 hover:border-emerald-400 hover:shadow-lg transition-all cursor-pointer group"
                         >
                           <div className="flex items-start gap-3">
-                            <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
+                            <div className="shrink-0 w-10 h-10 rounded-xl bg-linear-to-br from-emerald-500 to-teal-500 flex items-center justify-center shadow-md group-hover:scale-110 transition-transform">
                               <Play className="w-5 h-5 text-white" />
                             </div>
                             <div className="flex-1 min-w-0">
@@ -259,7 +259,7 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
                           </p>
                         </div>
                         {card.url && (
-                          <ExternalLink className="w-4 h-4 text-ugm-blue flex-shrink-0 mt-0.5 group-hover:text-ugm-gold transition-colors" />
+                          <ExternalLink className="w-4 h-4 text-ugm-blue shrink-0 mt-0.5 group-hover:text-ugm-gold transition-colors" />
                         )}
                       </div>
                     </motion.a>
@@ -271,7 +271,7 @@ export function InterventionPlan({ plan }: InterventionPlanProps) {
             {/* Next Check-in */}
             {plan.next_check_in && (
               <div className="px-5 pb-5">
-                <div className="p-4 bg-gradient-to-br from-blue-50 to-purple-50 border-2 border-blue-200/60 rounded-xl shadow-sm">
+                <div className="p-4 bg-linear-to-br from-blue-50 to-purple-50 border-2 border-blue-200/60 rounded-xl shadow-sm">
                   <p className="text-sm text-ugm-blue-dark leading-relaxed">
                     <span className="font-bold">Check-in berikutnya:</span>{' '}
                     {new Date(plan.next_check_in).toLocaleString('id-ID', {

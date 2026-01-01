@@ -220,7 +220,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmitSuccess })
     // --- Modern UI Rendering ---
     return (
         // Modal Container (assuming parent provides overlay)
-        <div className="p-4 sm:p-6 bg-gradient-to-br from-gray-800 via-gray-900 to-black text-white rounded-xl shadow-2xl w-full border border-gray-700 relative overflow-hidden">
+        <div className="p-4 sm:p-6 bg-linear-to-br from-gray-800 via-gray-900 to-black text-white rounded-xl shadow-2xl w-full border border-gray-700 relative overflow-hidden">
              {/* Close Button */}
              <button onClick={onClose} className="absolute top-3 right-3 text-gray-500 hover:text-white transition-colors z-10" aria-label="Close feedback form">
                   <FiXCircle size={24} />
@@ -238,7 +238,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmitSuccess })
                  </div>
                  <div className="w-full bg-gray-700 rounded-full h-1.5">
                      <motion.div
-                         className="bg-gradient-to-r from-blue-500 to-teal-400 h-1.5 rounded-full"
+                         className="bg-linear-to-r from-blue-500 to-teal-400 h-1.5 rounded-full"
                          initial={{ width: 0 }}
                          animate={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }}
                          transition={{ duration: 0.5, ease: "easeInOut" }}
@@ -247,7 +247,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmitSuccess })
             </div>
 
             {/* Animated Question Area */}
-            <div className="relative min-h-[18rem] sm:min-h-[16rem] md:min-h-[15rem] overflow-hidden">
+            <div className="relative min-h-72 sm:min-h-64 md:min-h-60 overflow-hidden">
                  <AnimatePresence initial={false} custom={direction}>
                      <motion.div
                          key={currentStep} // Key change triggers animation
@@ -325,7 +325,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmitSuccess })
                                             key={`nps-${score}`}
                                             type="button"
                                             onClick={() => handleAnswerChange(currentQuestion.id, score as NpsValue)}
-                                            className={`flex items-center justify-center h-8 w-8 border rounded-md text-xs font-medium transition-all duration-150 ${answers.nps === score ? 'bg-gradient-to-r from-teal-400 to-blue-500 text-white border-teal-400 shadow-lg scale-110' : 'bg-gray-700 border-gray-600 hover:bg-gray-600 hover:border-gray-500'}`}
+                                            className={`flex items-center justify-center h-8 w-8 border rounded-md text-xs font-medium transition-all duration-150 ${answers.nps === score ? 'bg-linear-to-r from-teal-400 to-blue-500 text-white border-teal-400 shadow-lg scale-110' : 'bg-gray-700 border-gray-600 hover:bg-gray-600 hover:border-gray-500'}`}
                                             whileHover={{ scale: 1.1 }}
                                             whileTap={{ scale: 0.9 }}
                                             disabled={isLoading}
@@ -374,7 +374,7 @@ const FeedbackForm: React.FC<FeedbackFormProps> = ({ onClose, onSubmitSuccess })
                 <motion.button
                     type="button" // Change type to button, handle submission via onClick logic
                     onClick={handleNext} // Always call handleNext
-                    className="px-5 py-2 bg-gradient-to-r from-[#FFCA40] to-[#ffb700] text-[#001D58] font-bold rounded-lg transition shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed text-sm flex items-center"
+                    className="px-5 py-2 bg-linear-to-r from-[#FFCA40] to-[#ffb700] text-[#001D58] font-bold rounded-lg transition shadow-md hover:shadow-lg disabled:opacity-60 disabled:cursor-not-allowed text-sm flex items-center"
                     disabled={isLoading} // Only disable based on loading state now
                     whileHover={{ scale: 1.05 }}
                     whileTap={{ scale: 0.95 }}

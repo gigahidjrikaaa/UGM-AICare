@@ -104,7 +104,7 @@ export const InterventionPlansSidebar: React.FC<InterventionPlansSidebarProps> =
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.2 }}
-              className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-[69] lg:hidden"
+              className="fixed inset-0 bg-black/30 backdrop-blur-[2px] z-69 lg:hidden"
               onClick={() => setViewMode('compact')}
               aria-hidden="true"
             />
@@ -117,7 +117,7 @@ export const InterventionPlansSidebar: React.FC<InterventionPlansSidebarProps> =
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: 100, opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className={`fixed right-4 top-24 bottom-24 ${getWidth()} bg-gradient-to-b from-[#0a1628]/95 to-[#0d1d35]/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl shadow-black/30 z-[70] flex flex-col overflow-hidden transition-all duration-300`}
+            className={`fixed right-4 top-24 bottom-24 ${getWidth()} bg-linear-to-b from-[#0a1628]/95 to-[#0d1d35]/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl shadow-black/30 z-70 flex flex-col overflow-hidden transition-all duration-300`}
           >
             {/* Minimized View */}
             {viewMode === 'minimized' ? (
@@ -186,7 +186,7 @@ export const InterventionPlansSidebar: React.FC<InterventionPlansSidebarProps> =
             ) : (
               <>
                 {/* Header */}
-                <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/[0.02] shrink-0">
+                <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/2 shrink-0">
                   <div className="flex items-center gap-2.5">
                     <div className="w-8 h-8 rounded-lg bg-ugm-gold/10 flex items-center justify-center">
                       <ListChecks className="w-4 h-4 text-ugm-gold" />
@@ -248,7 +248,7 @@ export const InterventionPlansSidebar: React.FC<InterventionPlansSidebarProps> =
                         initial={{ width: 0 }}
                         animate={{ width: `${overallProgress}%` }}
                         transition={{ duration: 0.5, ease: 'easeOut' }}
-                        className="h-full bg-gradient-to-r from-ugm-gold to-ugm-gold-light rounded-full"
+                        className="h-full bg-linear-to-r from-ugm-gold to-ugm-gold-light rounded-full"
                       />
                     </div>
                   </div>
@@ -341,7 +341,7 @@ export const InterventionPlansSidebar: React.FC<InterventionPlansSidebarProps> =
 
                 {/* Footer Hint */}
                 {totalPlans > 0 && viewMode === 'compact' && (
-                  <div className="px-3 py-2 border-t border-white/5 bg-white/[0.01]">
+                  <div className="px-3 py-2 border-t border-white/5 bg-white/1">
                     <p className="text-[9px] text-white/30 text-center">
                       Klik <Maximize2 className="w-2.5 h-2.5 inline mx-0.5" /> untuk detail lengkap
                     </p>

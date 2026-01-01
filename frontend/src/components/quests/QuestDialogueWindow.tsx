@@ -27,14 +27,14 @@ export default function QuestDialogueWindow({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3, ease: "easeOut" }}
       className={cn(
-        "relative overflow-hidden rounded-3xl border border-white/15 bg-gradient-to-br from-[#0A1C3A]/95 via-[#13294B]/90 to-[#0A1C3A]/95 shadow-[0_12px_35px_rgba(3,12,36,0.45)]",
-        "before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_top,_rgba(255,202,64,0.25),_transparent_55%)] before:opacity-80",
+        "relative overflow-hidden rounded-3xl border border-white/15 bg-linear-to-br from-[#0A1C3A]/95 via-[#13294B]/90 to-[#0A1C3A]/95 shadow-[0_12px_35px_rgba(3,12,36,0.45)]",
+        "before:absolute before:inset-0 before:bg-[radial-gradient(circle_at_top,rgba(255,202,64,0.25),transparent_55%)] before:opacity-80",
         className,
       )}
     >
       <div className="relative z-10 flex flex-col gap-4 p-5 md:flex-row md:items-start">
         <div className="flex items-start gap-4">
-          <div className="relative h-20 w-20 flex-shrink-0 overflow-hidden rounded-2xl border border-white/20 shadow-lg shadow-black/40 md:h-24 md:w-24">
+          <div className="relative h-20 w-20 shrink-0 overflow-hidden rounded-2xl border border-white/20 shadow-lg shadow-black/40 md:h-24 md:w-24">
             <Image
               src={avatarSrc}
               alt={title}
@@ -66,8 +66,8 @@ export default function QuestDialogueWindow({
         </div>
       </div>
 
-      <div className="absolute inset-x-6 bottom-5 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent" />
-      <div className="absolute inset-x-6 bottom-3 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+      <div className="absolute inset-x-6 bottom-5 h-px bg-linear-to-r from-transparent via-white/20 to-transparent" />
+      <div className="absolute inset-x-6 bottom-3 h-px bg-linear-to-r from-transparent via-white/10 to-transparent" />
     </motion.div>
   );
 }

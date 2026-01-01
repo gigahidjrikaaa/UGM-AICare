@@ -119,7 +119,7 @@ export function ChatInput({
   const actionDisabled = actionIsCancel ? false : !inputValue.trim();
 
   return (
-    <div className="w-full flex-shrink-0">
+    <div className="w-full shrink-0">
       <div className="flex flex-col gap-3">
         {/* Responsive unified input container */}
         <div className="flex items-end gap-2 sm:gap-3 rounded-full border border-white/20 bg-white/10 px-3 sm:px-4 py-2 sm:py-3 shadow-lg backdrop-blur-xl transition-all duration-300">
@@ -129,7 +129,7 @@ export function ChatInput({
             onClick={() => setShowModules((prev) => !prev)}
             disabled={isLoading || !isStandardMode}
             className={cn(
-              "flex h-8 w-8 sm:h-10 sm:w-10 flex-shrink-0 items-center justify-center rounded-full transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40",
+              "flex h-8 w-8 sm:h-10 sm:w-10 shrink-0 items-center justify-center rounded-full transition-all duration-200 disabled:cursor-not-allowed disabled:opacity-40",
               showModules 
                 ? "bg-ugm-gold/20 text-ugm-gold" 
                 : "bg-transparent text-white/70 hover:bg-white/15 hover:text-white"
@@ -163,7 +163,7 @@ export function ChatInput({
           </div>
 
           {/* Action buttons - responsive */}
-          <div className="flex flex-shrink-0 items-center gap-1 sm:gap-2">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <button
               type="button"
               onClick={toggleLiveTalk}

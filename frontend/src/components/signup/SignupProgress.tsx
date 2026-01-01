@@ -26,7 +26,7 @@ export default function SignupProgress({
               width: `${(currentStep / totalSteps) * 100}%` 
             }}
             transition={{ duration: 0.4, ease: "easeInOut" }}
-            className="h-full bg-gradient-to-r from-[#FFCA40] to-[#FFD700]"
+            className="h-full bg-linear-to-r from-[#FFCA40] to-[#FFD700]"
           />
         </div>
 

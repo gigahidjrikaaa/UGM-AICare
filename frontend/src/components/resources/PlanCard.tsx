@@ -63,7 +63,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate, compact = fa
   // Compact view for minimized sidebar
   if (compact) {
     return (
-      <div className="bg-white/[0.03] backdrop-blur-sm rounded-lg border border-white/10 p-3 hover:bg-white/[0.05] transition-all group">
+      <div className="bg-white/3 backdrop-blur-sm rounded-lg border border-white/10 p-3 hover:bg-white/5 transition-all group">
         <div className="flex items-center gap-2.5">
           {/* Progress Ring */}
           <div className="relative w-10 h-10 shrink-0">
@@ -125,7 +125,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate, compact = fa
   }
 
   return (
-    <div className="bg-white/[0.03] backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden hover:bg-white/[0.05] transition-all">
+    <div className="bg-white/3 backdrop-blur-sm rounded-xl border border-white/10 overflow-hidden hover:bg-white/5 transition-all">
       {/* Header */}
       <div className="p-4">
         <div className="flex items-start justify-between mb-3">
@@ -170,7 +170,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate, compact = fa
           </div>
           <div className="w-full bg-white/10 rounded-full h-1.5 overflow-hidden">
             <div
-              className={`bg-gradient-to-r from-ugm-gold to-ugm-gold-light h-1.5 rounded-full ${styles.progressBar} ${progressClass}`}
+              className={`bg-linear-to-r from-ugm-gold to-ugm-gold-light h-1.5 rounded-full ${styles.progressBar} ${progressClass}`}
             />
           </div>
         </div>
@@ -180,7 +180,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate, compact = fa
       <div className="border-t border-white/10">
         <button
           onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center justify-between w-full text-left px-4 py-2.5 hover:bg-white/[0.02] transition-colors"
+          className="flex items-center justify-between w-full text-left px-4 py-2.5 hover:bg-white/2 transition-colors"
         >
           <span className="text-[11px] font-medium text-white/50 flex items-center gap-1.5">
             {isExpanded ? 'Sembunyikan' : 'Tampilkan'} Langkah
@@ -199,7 +199,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate, compact = fa
                   className={`flex items-start gap-3 p-3 rounded-lg transition-all ${
                     isCompleted 
                       ? 'bg-emerald-500/10 border border-emerald-500/20' 
-                      : 'bg-white/[0.02] border border-white/5 hover:border-white/10'
+                      : 'bg-white/2 border border-white/5 hover:border-white/10'
                   }`}
                 >
                   <button
@@ -247,7 +247,7 @@ export const PlanCard: React.FC<PlanCardProps> = ({ plan, onUpdate, compact = fa
                 </h4>
                 <div className="space-y-2">
                   {plan.plan_data.resource_cards.map((resource, idx) => (
-                    <div key={idx} className="p-2.5 bg-white/[0.02] rounded-lg border border-white/5">
+                    <div key={idx} className="p-2.5 bg-white/2 rounded-lg border border-white/5">
                       <p className="text-xs font-medium text-white/70 mb-1">
                         {resource.title}
                       </p>

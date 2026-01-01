@@ -135,7 +135,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
       {isOpen && (
         <motion.div
           key="audio-settings"
-          className="fixed inset-0 z-[95] flex items-center justify-center px-4"
+          className="fixed inset-0 z-95 flex items-center justify-center px-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
@@ -270,7 +270,7 @@ const SettingsModal = ({ isOpen, onClose }: SettingsModalProps) => {
       {showEnvModal && (
         <motion.div
           key="env-check"
-          className="fixed inset-0 z-[100] flex items-center justify-center px-4"
+          className="fixed inset-0 z-100 flex items-center justify-center px-4"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}

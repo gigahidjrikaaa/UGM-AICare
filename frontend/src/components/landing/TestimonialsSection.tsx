@@ -62,7 +62,7 @@ const testimonials = [
 
 export default function TestimonialsSection() {
   return (
-    <section className="py-24 bg-gradient-to-b from-[#000B1F] to-[#001D58] relative overflow-hidden">
+    <section className="py-24 bg-linear-to-b from-[#000B1F] to-[#001D58] relative overflow-hidden">
       {/* Background Decoration */}
       <div className="absolute inset-0 opacity-5">
         <div className="absolute top-20 left-10 w-72 h-72 bg-[#FFCA40] rounded-full blur-3xl" />
@@ -83,7 +83,7 @@ export default function TestimonialsSection() {
           </div>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6">
             How Aika Can{' '}
-            <span className="bg-gradient-to-r from-[#FFCA40] to-[#FFD770] bg-clip-text text-transparent">
+            <span className="bg-linear-to-r from-[#FFCA40] to-[#FFD770] bg-clip-text text-transparent">
               Help You
             </span>
           </h2>
@@ -118,14 +118,14 @@ export default function TestimonialsSection() {
                 </div>
 
                 {/* Testimonial Text */}
-                <p className="text-white/80 text-sm leading-relaxed mb-6 flex-grow">
+                <p className="text-white/80 text-sm leading-relaxed mb-6 grow">
                   &ldquo;{testimonial.text}&rdquo;
                 </p>
 
                 {/* Author Info */}
                 <div className="flex items-center gap-3 pt-4 border-t border-white/10">
                   {/* Avatar */}
-                  <div className="w-10 h-10 rounded-full bg-gradient-to-br from-[#FFCA40] to-[#FFB700] flex items-center justify-center text-[#001D58] font-bold text-sm">
+                  <div className="w-10 h-10 rounded-full bg-linear-to-br from-[#FFCA40] to-[#FFB700] flex items-center justify-center text-[#001D58] font-bold text-sm">
                     {testimonial.avatar}
                   </div>
                   <div>

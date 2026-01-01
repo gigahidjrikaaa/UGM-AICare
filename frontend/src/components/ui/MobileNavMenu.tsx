@@ -96,14 +96,14 @@ export default function MobileNavMenu({ isOpen, onClose }: MobileNavMenuProps) {
                       <span className="flex items-center w-full relative">
                         {/* Background gradient */}
                         <motion.div
-                          className="absolute inset-0 bg-gradient-to-r from-white/5 to-white/8 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300"
+                          className="absolute inset-0 bg-linear-to-r from-white/5 to-white/8 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300"
                           whileHover={{ 
                             boxShadow: "0 0 20px rgba(255,202,64,0.15), inset 0 1px 0 rgba(255,255,255,0.05)"
                           }}
                         />
                         {/* Icon */}
                         <motion.span 
-                          className="mr-4 flex-shrink-0 text-white/60 group-hover:text-[#FFCA40] transition-colors duration-300 relative z-10"
+                          className="mr-4 shrink-0 text-white/60 group-hover:text-[#FFCA40] transition-colors duration-300 relative z-10"
                           whileHover={{ scale: 1.2 }}
                         >
                           {item.icon}

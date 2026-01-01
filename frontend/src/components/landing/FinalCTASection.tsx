@@ -6,7 +6,7 @@ import { FaArrowRight } from '@/icons';
 
 export default function FinalCTASection() {
   return (
-    <section className="py-32 bg-gradient-to-b from-[#000B1F] via-[#001D58] to-[#002A7A] relative overflow-hidden">
+    <section className="py-32 bg-linear-to-b from-[#000B1F] via-[#001D58] to-[#002A7A] relative overflow-hidden">
       {/* Background Effects */}
       <div className="absolute inset-0">
         <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#FFCA40] rounded-full blur-[150px] opacity-20" />
@@ -19,7 +19,7 @@ export default function FinalCTASection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.8 }}
-          className="bg-gradient-to-br from-[#FFCA40]/20 via-[#FFD770]/10 to-[#FFB700]/20 backdrop-blur-xl rounded-[3rem] p-12 sm:p-16 border-2 border-[#FFCA40]/30 shadow-2xl text-center relative overflow-hidden"
+          className="bg-linear-to-br from-[#FFCA40]/20 via-[#FFD770]/10 to-[#FFB700]/20 backdrop-blur-xl rounded-[3rem] p-12 sm:p-16 border-2 border-[#FFCA40]/30 shadow-2xl text-center relative overflow-hidden"
         >
           {/* Animated Background Pattern */}
           <div className="absolute inset-0 opacity-10">
@@ -45,7 +45,7 @@ export default function FinalCTASection() {
               whileInView={{ scale: 1 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: 0.2, type: "spring" }}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-[#FF6B9D]/20 to-[#FF8FAB]/20 backdrop-blur-sm rounded-full border border-[#FF6B9D]/30 mb-8"
+              className="inline-flex items-center gap-2 px-6 py-3 bg-linear-to-r from-[#FF6B9D]/20 to-[#FF8FAB]/20 backdrop-blur-sm rounded-full border border-[#FF6B9D]/30 mb-8"
             >
               <motion.span
                 animate={{ scale: [1, 1.2, 1] }}
@@ -67,7 +67,7 @@ export default function FinalCTASection() {
               className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6 leading-tight"
             >
               You Are Not Alone.<br />
-              <span className="bg-gradient-to-r from-[#FFCA40] via-[#FFD770] to-[#FFCA40] bg-clip-text text-transparent">
+              <span className="bg-linear-to-r from-[#FFCA40] via-[#FFD770] to-[#FFCA40] bg-clip-text text-transparent">
                 Start Your Journey Today.
               </span>
             </motion.h2>
@@ -99,7 +99,7 @@ export default function FinalCTASection() {
                     boxShadow: "0 25px 70px rgba(255, 202, 64, 0.6)" 
                   }}
                   whileTap={{ scale: 0.98 }}
-                  className="group relative px-16 py-6 bg-gradient-to-r from-[#FFCA40] via-[#FFD770] to-[#FFB700] text-[#001D58] rounded-full font-bold text-2xl flex items-center justify-center shadow-2xl transition-all overflow-hidden"
+                  className="group relative px-16 py-6 bg-linear-to-r from-[#FFCA40] via-[#FFD770] to-[#FFB700] text-[#001D58] rounded-full font-bold text-2xl flex items-center justify-center shadow-2xl transition-all overflow-hidden"
                 >
                   <span className="relative z-10 flex items-center gap-3">
                     Start Chatting Now
@@ -111,7 +111,7 @@ export default function FinalCTASection() {
                     </motion.span>
                   </span>
                   <motion.div
-                    className="absolute inset-0 bg-gradient-to-r from-[#FFB700] to-[#FFCA40]"
+                    className="absolute inset-0 bg-linear-to-r from-[#FFB700] to-[#FFCA40]"
                     initial={{ x: "-100%" }}
                     whileHover={{ x: "0%" }}
                     transition={{ duration: 0.4 }}
@@ -162,7 +162,7 @@ export default function FinalCTASection() {
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.7 }}
-          className="mt-12 bg-gradient-to-r from-[#FF6B9D]/10 to-[#FF8FAB]/10 backdrop-blur-xl rounded-3xl p-8 border border-[#FF6B9D]/30"
+          className="mt-12 bg-linear-to-r from-[#FF6B9D]/10 to-[#FF8FAB]/10 backdrop-blur-xl rounded-3xl p-8 border border-[#FF6B9D]/30"
         >
           <div className="text-center">
             <h3 className="text-xl font-bold text-white mb-4">
@@ -209,7 +209,7 @@ export default function FinalCTASection() {
           <motion.button
             whileHover={{ scale: 1.1 }}
             whileTap={{ scale: 0.95 }}
-            className="px-6 py-4 bg-gradient-to-r from-[#FF6B9D] to-[#FF8FAB] text-white rounded-full font-bold shadow-2xl flex items-center gap-2 group"
+            className="px-6 py-4 bg-linear-to-r from-[#FF6B9D] to-[#FF8FAB] text-white rounded-full font-bold shadow-2xl flex items-center gap-2 group"
           >
             <motion.span
               animate={{ scale: [1, 1.3, 1] }}

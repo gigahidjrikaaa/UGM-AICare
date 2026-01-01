@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 // Shimmer animation component for realistic loading effect
 const Shimmer = ({ className = "" }: { className?: string }) => (
   <div className={`relative overflow-hidden ${className}`}>
-    <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-gradient-to-r from-transparent via-white/10 to-transparent" />
+    <div className="absolute inset-0 -translate-x-full animate-[shimmer_1.5s_infinite] bg-linear-to-r from-transparent via-white/10 to-transparent" />
   </div>
 );
 
@@ -59,7 +59,7 @@ function DefaultPageSkeleton() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex-grow min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F]"
+      className="grow min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F]"
     >
       <div className="h-[80vh] flex items-center justify-center px-4">
         <div className="max-w-4xl mx-auto text-center w-full">
@@ -83,7 +83,7 @@ function AikaPageSkeleton() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex-grow bg-gradient-to-b from-[#001D58] to-[#00308F] min-h-screen"
+      className="grow bg-linear-to-b from-[#001D58] to-[#00308F] min-h-screen"
     >
       {/* Header area */}
       <div className="pt-20 pb-4 px-4">
@@ -131,7 +131,7 @@ function AikaPageSkeleton() {
       </div>
 
       {/* Input area */}
-      <div className="fixed bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-[#00308F] to-transparent">
+      <div className="fixed bottom-0 left-0 right-0 p-4 bg-linear-to-t from-[#00308F] to-transparent">
         <div className="max-w-4xl mx-auto">
           <SkeletonBox className="h-12 sm:h-14 w-full rounded-xl" />
         </div>
@@ -145,7 +145,7 @@ function AdminPageSkeleton() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="flex-grow bg-[#001D58] min-h-screen p-4 sm:p-6"
+      className="grow bg-[#001D58] min-h-screen p-4 sm:p-6"
     >
       <div className="max-w-7xl mx-auto pt-16 sm:pt-20">
         {/* Header */}
@@ -191,11 +191,11 @@ function DashboardPageSkeleton() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F]"
+      className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F]"
     >
       <div className="max-w-6xl mx-auto px-4 pt-20 sm:pt-24 pb-12 space-y-6 sm:space-y-10">
         {/* Welcome card */}
-        <div className="rounded-2xl sm:rounded-3xl border border-white/10 bg-white/[0.03] p-4 sm:p-8">
+        <div className="rounded-2xl sm:rounded-3xl border border-white/10 bg-white/3 p-4 sm:p-8">
           <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
             <div className="space-y-4 sm:space-y-6">
               <SkeletonText width="w-24" className="h-3" />
@@ -209,7 +209,7 @@ function DashboardPageSkeleton() {
             {/* Stats cards */}
             <div className="grid grid-cols-2 gap-3 sm:gap-4">
               {[...Array(4)].map((_, i) => (
-                <div key={i} className="bg-white/[0.03] rounded-xl sm:rounded-2xl p-3 sm:p-4">
+                <div key={i} className="bg-white/3 rounded-xl sm:rounded-2xl p-3 sm:p-4">
                   <SkeletonCircle className="h-10 w-10 sm:h-12 sm:w-12 mb-2" />
                   <SkeletonText width="w-16" className="h-3 mb-1" />
                   <SkeletonText width="w-12" className="h-5" />
@@ -238,7 +238,7 @@ function AppointmentsPageSkeleton() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] pt-20 sm:pt-24 pb-10 px-4 sm:px-6"
+      className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F] pt-20 sm:pt-24 pb-10 px-4 sm:px-6"
     >
       <div className="max-w-7xl mx-auto">
         {/* Header */}
@@ -291,7 +291,7 @@ function ResourcesPageSkeleton() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] pt-20 sm:pt-24 pb-10 px-4 sm:px-6"
+      className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F] pt-20 sm:pt-24 pb-10 px-4 sm:px-6"
     >
       <div className="max-w-6xl mx-auto">
         {/* Header */}
@@ -337,7 +337,7 @@ function ProfilePageSkeleton() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] pt-20 sm:pt-24 pb-10 px-4 sm:px-6"
+      className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F] pt-20 sm:pt-24 pb-10 px-4 sm:px-6"
     >
       <div className="max-w-4xl mx-auto">
         {/* Profile header */}
@@ -381,7 +381,7 @@ function JournalingPageSkeleton() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] pt-20 sm:pt-24 pb-10 px-4 sm:px-6"
+      className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F] pt-20 sm:pt-24 pb-10 px-4 sm:px-6"
     >
       <div className="max-w-4xl mx-auto">
         {/* Header */}
@@ -420,7 +420,7 @@ function CaretokenPageSkeleton() {
     <motion.div
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
-      className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] pt-20 sm:pt-24 pb-10 px-4 sm:px-6"
+      className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F] pt-20 sm:pt-24 pb-10 px-4 sm:px-6"
     >
       <div className="max-w-6xl mx-auto">
         {/* Header */}

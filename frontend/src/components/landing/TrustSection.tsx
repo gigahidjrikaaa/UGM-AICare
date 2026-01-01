@@ -25,7 +25,7 @@ const stats = [
 
 export default function TrustSection() {
   return (
-    <section className="py-16 bg-gradient-to-b from-[#001D58] to-[#000B1F] relative overflow-hidden">
+    <section className="py-16 bg-linear-to-b from-[#001D58] to-[#000B1F] relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Trust Badge */}
         <motion.div
@@ -66,7 +66,7 @@ export default function TrustSection() {
         </motion.div>
 
         {/* Divider */}
-        <div className="w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent my-12" />
+        <div className="w-full h-px bg-linear-to-r from-transparent via-white/20 to-transparent my-12" />
 
         {/* Stats Row */}
         <motion.div
@@ -86,7 +86,7 @@ export default function TrustSection() {
               className="text-center"
             >
               <motion.div
-                className="text-4xl md:text-5xl font-black bg-gradient-to-r from-[#FFCA40] to-[#FFD770] bg-clip-text text-transparent mb-2"
+                className="text-4xl md:text-5xl font-black bg-linear-to-r from-[#FFCA40] to-[#FFD770] bg-clip-text text-transparent mb-2"
                 whileHover={{ scale: 1.1 }}
                 transition={{ type: "spring", stiffness: 300 }}
               >

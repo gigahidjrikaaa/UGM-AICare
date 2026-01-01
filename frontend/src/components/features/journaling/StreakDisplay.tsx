@@ -36,11 +36,11 @@ export default function StreakDisplay({ currentStreak, longestStreak, isLoading 
             {/* Current Streak */}
             {currentStreak > 0 && (
                 <div
-                    className="flex items-center bg-gradient-to-r from-orange-500 via-red-500 to-yellow-500 text-white px-3 py-1 rounded-full shadow-md text-xs sm:text-sm font-medium"
+                    className="flex items-center bg-linear-to-r from-orange-500 via-red-500 to-yellow-500 text-white px-3 py-1 rounded-full shadow-md text-xs sm:text-sm font-medium"
                     title={`Current activity streak: ${currentStreak} days`}
                     aria-label={`Current activity streak: ${currentStreak} days`}
                  >
-                    <FiActivity className="mr-1 sm:mr-1.5 flex-shrink-0" />
+                    <FiActivity className="mr-1 sm:mr-1.5 shrink-0" />
                     <span>{currentStreak}-Day Streak!</span>
                 </div>
             )}
@@ -49,22 +49,22 @@ export default function StreakDisplay({ currentStreak, longestStreak, isLoading 
              {/* Show longest only if it's greater than 0 and different from current */}
             {longestStreak > 0 && longestStreak !== currentStreak && (
                  <div
-                    className="flex items-center bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-3 py-1 rounded-full shadow-md text-xs sm:text-sm font-medium"
+                    className="flex items-center bg-linear-to-r from-purple-500 to-indigo-500 text-white px-3 py-1 rounded-full shadow-md text-xs sm:text-sm font-medium"
                     title={`Longest streak: ${longestStreak} days`}
                     aria-label={`Longest streak achieved: ${longestStreak} days`}
                  >
-                     <FiAward className="mr-1 sm:mr-1.5 flex-shrink-0" />
+                     <FiAward className="mr-1 sm:mr-1.5 shrink-0" />
                      <span>Longest: {longestStreak} Days</span>
                  </div>
             )}
              {/* Show if longest IS the current streak (and > 0) */}
              {longestStreak > 0 && longestStreak === currentStreak && (
                  <div
-                    className="flex items-center bg-gradient-to-r from-purple-500 to-indigo-500 text-white px-3 py-1 rounded-full shadow-md text-xs sm:text-sm font-medium"
+                    className="flex items-center bg-linear-to-r from-purple-500 to-indigo-500 text-white px-3 py-1 rounded-full shadow-md text-xs sm:text-sm font-medium"
                     title={`Current streak matches longest: ${longestStreak} days`}
                     aria-label={`Current streak matches longest streak: ${longestStreak} days`}
                     >
-                     <FiAward className="mr-1 sm:mr-1.5 flex-shrink-0" />
+                     <FiAward className="mr-1 sm:mr-1.5 shrink-0" />
                      <span>Record Streak!</span>
                  </div>
             )}

@@ -43,7 +43,7 @@ export default function CounselorHeader() {
 
         {/* User Info */}
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-[#FFCA40] to-[#FFD55C] rounded-full flex items-center justify-center font-semibold text-[#001d58]">
+          <div className="w-10 h-10 bg-linear-to-br from-[#FFCA40] to-[#FFD55C] rounded-full flex items-center justify-center font-semibold text-[#001d58]">
             {session?.user?.name?.charAt(0) || 'C'}
           </div>
         </div>
