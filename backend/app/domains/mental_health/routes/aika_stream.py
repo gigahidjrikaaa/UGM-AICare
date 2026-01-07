@@ -341,19 +341,51 @@ async def stream_aika_execution(
         # Send final complete message
         final_response = result.get("final_response", "Maaf, terjadi kesalahan.")
         session_id = result.get('session_id', request.session_id) or f"sess_{current_user.id}_{int(datetime.now().timestamp())}"
+
+        llm_stats = get_stats()
+
+        # Best-effort extraction of tool usage from the graph state.
+        # Some tool-calling paths append entries with a `tool_calls` field.
+        tools_used: list[str] = []
+        try:
+            conversation_history = result.get("conversation_history") or []
+            if isinstance(conversation_history, list):
+                for item in conversation_history:
+                    if not isinstance(item, dict):
+                        continue
+                    tool_calls = item.get("tool_calls")
+                    if isinstance(tool_calls, list):
+                        for call in tool_calls:
+                            if isinstance(call, dict) and isinstance(call.get("tool_name"), str):
+                                tools_used.append(call["tool_name"])
+            # De-duplicate while preserving order
+            tools_used = list(dict.fromkeys(tools_used))
+        except Exception:
+            tools_used = []
+
         metadata_dict = {
             'session_id': session_id,
             'execution_id': execution_id,  # Return execution_id for evaluation
             'request_id': request_id,
+            'user_role': request.role,
+            'intent': result.get('intent', 'unknown'),
             'agents_invoked': result.get('agents_invoked', []),
+            'actions_taken': result.get('actions_taken', []),
             'response_source': result.get('response_source', 'unknown'),
             'processing_time_ms': processing_time_ms,
+            'risk_assessment': result.get('sta_risk_assessment'),
+            'escalation_triggered': bool(result.get('escalation_triggered', False)),
+            'case_id': result.get('case_id'),
+            'activity_logs': result.get('activity_logs'),
+            'llm_prompt_id': prompt_id,
+            'llm_request_count': llm_stats.total_requests,
+            'llm_requests_by_model': llm_stats.requests_by_model,
+            'tools_used': tools_used,
         }
         yield f"data: {json.dumps({'type': 'complete', 'response': final_response, 'metadata': metadata_dict})}\n\n"
         
         # Save conversation to database
         try:
-            llm_stats = get_stats()
             conversation_entry = Conversation(
                 user_id=current_user.id,
                 session_id=session_id,

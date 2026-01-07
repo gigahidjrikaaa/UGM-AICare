@@ -224,6 +224,12 @@ interface MetadataDisplayProps {
 }
 
 export function MetadataDisplay({ metadata }: MetadataDisplayProps) {
+  const hasMonitoring =
+    typeof metadata.llm_request_count === 'number' ||
+    (metadata.llm_requests_by_model && Object.keys(metadata.llm_requests_by_model).length > 0) ||
+    (metadata.tools_used && metadata.tools_used.length > 0) ||
+    typeof metadata.llm_prompt_id === 'string';
+
   return (
     <motion.div
       initial={{ opacity: 0, y: -5 }}
@@ -277,6 +283,56 @@ export function MetadataDisplay({ metadata }: MetadataDisplayProps) {
             <span className="text-white/40">None</span>
           )}
         </div>
+
+        {hasMonitoring && (
+          <>
+            <div className="col-span-2 mt-1 pt-2 border-t border-white/10" />
+
+            <div className="text-white/40">LLM Requests</div>
+            <div className="text-white/70">
+              {typeof metadata.llm_request_count === 'number' ? metadata.llm_request_count : '—'}
+            </div>
+
+            <div className="text-white/40">Requests by Model</div>
+            <div className="text-white/70">
+              {metadata.llm_requests_by_model && Object.keys(metadata.llm_requests_by_model).length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {Object.entries(metadata.llm_requests_by_model).map(([model, count]) => (
+                    <span
+                      key={model}
+                      className="px-1.5 py-0.5 rounded bg-white/10 text-white/80 text-[10px] font-mono"
+                      title={model}
+                    >
+                      {model}: {count}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-white/40">—</span>
+              )}
+            </div>
+
+            <div className="text-white/40">Tools Used</div>
+            <div className="text-white/70">
+              {metadata.tools_used && metadata.tools_used.length > 0 ? (
+                <div className="flex flex-wrap gap-1">
+                  {metadata.tools_used.map((tool) => (
+                    <span key={tool} className="px-1.5 py-0.5 rounded bg-emerald-500/15 text-emerald-300 text-[10px]">
+                      {tool}
+                    </span>
+                  ))}
+                </div>
+              ) : (
+                <span className="text-white/40">—</span>
+              )}
+            </div>
+
+            <div className="text-white/40">Prompt ID</div>
+            <div className="text-white/70 font-mono text-[10px] truncate" title={metadata.llm_prompt_id}>
+              {metadata.llm_prompt_id ? `${metadata.llm_prompt_id.slice(0, 20)}...` : '—'}
+            </div>
+          </>
+        )}
       </div>
       
       {/* Escalation info if triggered */}

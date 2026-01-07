@@ -311,26 +311,36 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
         # Convert to string for storage (Case.assigned_to is String type)
         assigned_counsellor_id_str = str(assigned_counsellor_id)
         
-        # Step 4: Create CaseAssignment record
-        assignment = CaseAssignment(
-            case_id=case_id,
-            assigned_to=assigned_counsellor_id_str,
-            assigned_by=None,  # System auto-assignment (no user)
-            assigned_at=datetime.now(),
-            reassignment_reason=None,  # First assignment, not a reassignment
-            previous_assignee=None
-        )
-        db.add(assignment)
-        await db.flush()  # Get assignment.id
-        
-        # Step 5: Update Case with assignment
-        case = await db.get(Case, case_id)
-        if case:
-            case.assigned_to = assigned_counsellor_id_str  # type: ignore[assignment]
-            case.status = CaseStatusEnum.in_progress  # type: ignore[assignment]
-            case.updated_at = datetime.now()  # type: ignore[assignment]
-            db.add(case)
-            await db.flush()
+        # Step 4-5: Create CaseAssignment + update Case inside a savepoint.
+        # This prevents a single FK issue from poisoning the whole request session.
+        async with db.begin_nested():
+            # Ensure corresponding agent_users row exists.
+            # Case.assigned_to references agent_users.id, but we store psychologist.id as str.
+            from app.models.agent_user import AgentUser, AgentRoleEnum
+
+            agent_user = await db.get(AgentUser, assigned_counsellor_id_str)
+            if agent_user is None:
+                db.add(AgentUser(id=assigned_counsellor_id_str, role=AgentRoleEnum.counselor))
+                await db.flush()
+
+            assignment = CaseAssignment(
+                case_id=case_id,
+                assigned_to=assigned_counsellor_id_str,
+                assigned_by=None,  # System auto-assignment (no user)
+                assigned_at=datetime.now(),
+                reassignment_reason=None,  # First assignment, not a reassignment
+                previous_assignee=None,
+            )
+            db.add(assignment)
+            await db.flush()  # Get assignment.id
+
+            case = await db.get(Case, case_id)
+            if case:
+                case.assigned_to = assigned_counsellor_id_str  # type: ignore[assignment]
+                case.status = CaseStatusEnum.in_progress  # type: ignore[assignment]
+                case.updated_at = datetime.now()  # type: ignore[assignment]
+                db.add(case)
+                await db.flush()
         
         # Update state
         state["assigned_to"] = assigned_counsellor_id_str
@@ -364,6 +374,14 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
         errors.append(error_msg)
         state["errors"] = errors
         logger.error(error_msg, exc_info=True)
+
+        # If an error happened after a flush attempt, the session may be in a
+        # failed transaction state. Best-effort rollback keeps the outer request
+        # usable (e.g., for saving the final conversation).
+        try:
+            await db.rollback()
+        except Exception:
+            pass
         
         if execution_id:
             execution_tracker.fail_node(execution_id, "cma::auto_assign", str(e))

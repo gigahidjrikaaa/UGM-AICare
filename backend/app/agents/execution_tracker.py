@@ -25,6 +25,45 @@ from app.models import (
 )
 from app.database import AsyncSessionLocal
 
+
+async def _ensure_langgraph_execution_row(
+    db: AsyncSession,
+    *,
+    execution_id: str,
+    graph_name: Optional[str],
+    agent_name: Optional[str],
+    agent_run_id: Optional[int],
+    started_at: Optional[datetime],
+    input_data: Optional[Dict],
+) -> None:
+    """Ensure parent `langgraph_executions` row exists.
+
+    Persistence happens via background tasks. In practice, a node can be persisted
+    before the execution-start task commits, which would violate the FK from
+    `langgraph_node_executions.execution_id` to `langgraph_executions.execution_id`.
+
+    This helper removes that race by creating the execution row on-demand.
+    """
+
+    existing = await db.execute(
+        select(LangGraphExecution).where(LangGraphExecution.execution_id == execution_id)
+    )
+    if existing.scalar_one_or_none() is not None:
+        return
+
+    db_execution = LangGraphExecution(
+        execution_id=execution_id,
+        agent_run_id=agent_run_id,
+        graph_name=graph_name,
+        started_at=started_at or datetime.now(),
+        status="running",
+        input_data=input_data,
+        execution_context={"agent_name": agent_name} if agent_name else None,
+    )
+    db.add(db_execution)
+    # Flush within the caller's transaction so dependent inserts can proceed.
+    await db.flush()
+
 class ExecutionStateTracker:
     """Tracks execution state of LangGraph agents in real-time with database persistence."""
     
@@ -344,6 +383,17 @@ class ExecutionStateTracker:
         """Persist node execution to database."""
         try:
             async with AsyncSessionLocal() as db:
+                state = self._active_executions.get(execution_id)
+                await _ensure_langgraph_execution_row(
+                    db,
+                    execution_id=execution_id,
+                    graph_name=(state.graph_id if state else None),
+                    agent_name=(str(state.metrics.get("agent_name")) if state and isinstance(state.metrics, dict) and state.metrics.get("agent_name") else None),
+                    agent_run_id=None,
+                    started_at=(state.started_at if state else None),
+                    input_data=input_data if status == "running" else None,
+                )
+
                 db_node = LangGraphNodeExecution(
                     execution_id=execution_id,
                     node_id=node_id,
@@ -369,6 +419,16 @@ class ExecutionStateTracker:
         """Persist edge execution to database."""
         try:
             async with AsyncSessionLocal() as db:
+                state = self._active_executions.get(execution_id)
+                await _ensure_langgraph_execution_row(
+                    db,
+                    execution_id=execution_id,
+                    graph_name=(state.graph_id if state else None),
+                    agent_name=(str(state.metrics.get("agent_name")) if state and isinstance(state.metrics, dict) and state.metrics.get("agent_name") else None),
+                    agent_run_id=None,
+                    started_at=(state.started_at if state else None),
+                    input_data=None,
+                )
                 db_edge = LangGraphEdgeExecution(
                     execution_id=execution_id,
                     edge_id=edge_id,
@@ -390,6 +450,16 @@ class ExecutionStateTracker:
         """Persist performance metric to database."""
         try:
             async with AsyncSessionLocal() as db:
+                state = self._active_executions.get(execution_id)
+                await _ensure_langgraph_execution_row(
+                    db,
+                    execution_id=execution_id,
+                    graph_name=(state.graph_id if state else None),
+                    agent_name=(str(state.metrics.get("agent_name")) if state and isinstance(state.metrics, dict) and state.metrics.get("agent_name") else None),
+                    agent_run_id=None,
+                    started_at=(state.started_at if state else None),
+                    input_data=None,
+                )
                 db_metric = LangGraphPerformanceMetric(
                     execution_id=execution_id,
                     metric_name=metric_name,
@@ -412,6 +482,17 @@ class ExecutionStateTracker:
         """Create an alert for performance issues or failures."""
         try:
             async with AsyncSessionLocal() as db:
+                if execution_id:
+                    state = self._active_executions.get(execution_id)
+                    await _ensure_langgraph_execution_row(
+                        db,
+                        execution_id=execution_id,
+                        graph_name=(state.graph_id if state else None),
+                        agent_name=(str(state.metrics.get("agent_name")) if state and isinstance(state.metrics, dict) and state.metrics.get("agent_name") else None),
+                        agent_run_id=None,
+                        started_at=(state.started_at if state else None),
+                        input_data=None,
+                    )
                 alert = LangGraphAlert(
                     execution_id=execution_id,
                     alert_type=alert_type,

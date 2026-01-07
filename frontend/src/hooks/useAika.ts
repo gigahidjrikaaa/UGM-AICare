@@ -40,6 +40,12 @@ export interface AikaMetadata {
   escalation_triggered: boolean;
   case_id?: string;  // If case was created
   activity_logs?: any[]; // Detailed execution logs from LangGraph
+
+  // Monitoring: per-user-prompt LLM usage (includes tool-call followups)
+  llm_prompt_id?: string;
+  llm_request_count?: number;
+  llm_requests_by_model?: Record<string, number>;
+  tools_used?: string[];
 }
 
 export interface AikaResponse {
@@ -123,8 +129,11 @@ export function useAika(options: UseAikaOptions = {}) {
         role,
         message,
         conversation_history: conversationHistory.slice(-10), // Last 10 messages
-        preferred_model: preferredModel,
       };
+
+      if (preferredModel && preferredModel.trim().length > 0) {
+        requestBody.preferred_model = preferredModel;
+      }
 
       const response = await fetch(endpoint, {
         method: 'POST',
@@ -229,14 +238,20 @@ export function useAika(options: UseAikaOptions = {}) {
                   // Build full metadata from complete event + agent_activity
                   finalMetadata = {
                     session_id: data.metadata.session_id || '',
-                    user_role: 'user',
+                    user_role: data.metadata.user_role || 'user',
                     intent: data.metadata.intent || 'unknown',
                     agents_invoked: data.metadata.agents_invoked || Array.from(invokedAgents),
                     actions_taken: data.metadata.actions_taken || [],
                     processing_time_ms: data.metadata.processing_time_ms || 0,
+                    risk_assessment: data.metadata.risk_assessment,
                     escalation_triggered: data.metadata.escalation_triggered || false,
                     case_id: data.metadata.case_id,
                     activity_logs: data.metadata.activity_logs,
+
+                    llm_prompt_id: data.metadata.llm_prompt_id,
+                    llm_request_count: data.metadata.llm_request_count,
+                    llm_requests_by_model: data.metadata.llm_requests_by_model,
+                    tools_used: data.metadata.tools_used,
                   };
                   setLastMetadata(finalMetadata);
                 }

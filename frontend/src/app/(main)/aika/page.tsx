@@ -36,7 +36,6 @@ import {
 } from '@/components/features/aika/AikaComponents';
 import { ActivityLogPanel, ActivityIndicator, type ViewMode } from '@/components/features/aika/ActivityLogPanel';
 import { useActivityLog } from '@/hooks/useActivityLog';
-import { ModelSelector } from '@/components/features/aika/ModelSelector';
 
 // Loading Component
 const LoadingIndicator = () => (
@@ -54,17 +53,7 @@ const LoadingIndicator = () => (
 );
 
 // Header Bar Component
-interface HeaderBarProps {
-  selectedModel: string;
-  onModelChange: (model: string) => void;
-  isLoading?: boolean;
-}
-
-function HeaderBar({
-  selectedModel,
-  onModelChange,
-  isLoading = false,
-}: HeaderBarProps) {
+function HeaderBar() {
   return (
     <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/3 backdrop-blur-md">
       {/* Left: Avatar & Title */}
@@ -87,18 +76,6 @@ function HeaderBar({
           </p>
         </div>
       </div>
-
-      {/* Right: Controls */}
-      <div className="flex items-center gap-2">
-        {/* Model Selector - Compact */}
-        <div className="hidden sm:block">
-          <ModelSelector
-            selectedModel={selectedModel}
-            onModelChange={onModelChange}
-            disabled={isLoading}
-          />
-        </div>
-      </div>
     </div>
   );
 }
@@ -107,7 +84,6 @@ export default function AikaEnhancedPage() {
   const [mounted, setMounted] = useState(false);
   const { status } = useSession();
   const router = useRouter();
-  const [selectedModel, setSelectedModel] = useState('gemini-2.5-flash');
   const chatContainerRef = useRef<HTMLDivElement>(null);
   
   // Track floating panel view modes for layout adjustment
@@ -201,7 +177,6 @@ export default function AikaEnhancedPage() {
     sessionId: 'aika-session-' + new Date().getTime(),
     showAgentActivity: true,
     showRiskIndicators: true,
-    preferredModel: selectedModel,
     onToolActivity: handleToolActivity,
   });
 
@@ -448,11 +423,7 @@ export default function AikaEnhancedPage() {
         <div className={`w-full max-w-7xl mx-auto flex-1 flex gap-4 overflow-hidden transition-all duration-300 min-w-0 ${getLeftMargin()}`}>
           {/* Chat Panel - Full width now since activity log is floating */}
           <div className="w-full min-w-0 flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden transition-all duration-300 min-h-0">
-            <HeaderBar
-              selectedModel={selectedModel}
-              onModelChange={setSelectedModel}
-              isLoading={isLoading}
-            />
+            <HeaderBar />
 
             <div className="flex-1 overflow-hidden flex flex-col">
               {/* Agent Activity Indicator */}
