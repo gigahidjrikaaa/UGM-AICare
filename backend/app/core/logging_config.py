@@ -99,6 +99,18 @@ class JSONFormatter(logging.Formatter):
             log_data["user_role"] = record.user_role
         if hasattr(record, "session_id"):
             log_data["session_id"] = record.session_id
+
+        # LLM prompt context
+        if hasattr(record, "prompt_id"):
+            log_data["prompt_id"] = record.prompt_id
+        if hasattr(record, "llm_call_index"):
+            log_data["llm_call_index"] = record.llm_call_index
+        if hasattr(record, "llm_model"):
+            log_data["llm_model"] = record.llm_model
+        if hasattr(record, "llm_phase"):
+            log_data["llm_phase"] = record.llm_phase
+        if hasattr(record, "llm_has_tools"):
+            log_data["llm_has_tools"] = record.llm_has_tools
         
         # Agent context
         if hasattr(record, "agent"):

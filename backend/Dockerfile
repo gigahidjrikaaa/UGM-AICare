@@ -1,3 +1,5 @@
+# syntax=docker/dockerfile:1.6
+
 # backend/Dockerfile
 # Multi-stage build for a more efficient and secure container
 
@@ -7,7 +9,10 @@ FROM python:3.11-slim-bookworm AS builder
 WORKDIR /app
 
 # Install essential build tools (no Rust needed for binary wheels)
-RUN apt-get update && \
+ARG DEBIAN_FRONTEND=noninteractive
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get -o Acquire::Retries=3 update && \
     apt-get install -y --no-install-recommends gcc python3-dev libpq-dev build-essential && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
@@ -36,7 +41,10 @@ ENV PYTHONDONTWRITEBYTECODE=1
 ENV PYTHONUNBUFFERED=1
 
 # Install runtime system dependencies, including dos2unix and curl (for health checks)
-RUN apt-get update && \
+ARG DEBIAN_FRONTEND=noninteractive
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get -o Acquire::Retries=3 update && \
     apt-get install -y --no-install-recommends \
         libpq5 \
         dos2unix \

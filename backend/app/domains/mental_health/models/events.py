@@ -15,6 +15,10 @@ class AgentNameEnum(str, enum.Enum):
     TCA = "TCA"
     CMA = "CMA"
     IA = "IA"
+    # Aika orchestrator and subgraphs used by the streaming endpoint
+    AIKA = "AIKA"
+    SCA = "SCA"
+    SDA = "SDA"
 
 
 class Event(Base):
@@ -29,6 +33,7 @@ class Event(Base):
     risk_flag = Column(SmallInteger, nullable=True)
     step = Column(String, nullable=False)
     resource_id = Column(String, nullable=True)
+    trace_id = Column(String, nullable=True, index=True)
     latency_ms = Column(Integer, nullable=True)
     tokens_in = Column(Integer, nullable=True)
     tokens_out = Column(Integer, nullable=True)

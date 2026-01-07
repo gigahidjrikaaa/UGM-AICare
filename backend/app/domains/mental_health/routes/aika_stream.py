@@ -11,7 +11,7 @@ import uuid
 from datetime import datetime
 from typing import AsyncGenerator, Dict, Any
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -25,6 +25,9 @@ from app.core.rate_limiter import check_rate_limit_dependency
 from app.agents.execution_tracker import execution_tracker
 from app.core.langgraph_checkpointer import get_langgraph_checkpointer
 from app.services.ai_memory_facts_service import list_user_fact_texts_for_agent, remember_from_user_message
+from app.core.events import AgentEvent, emit_agent_event
+from app.domains.mental_health.models import AgentNameEnum
+from app.core.llm_request_tracking import get_stats, prompt_context
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +53,8 @@ AGENT_NAMES = {
 async def stream_aika_execution(
     request: AikaRequest,
     current_user: User,
-    db: AsyncSession
+    db: AsyncSession,
+    request_id: str | None,
 ) -> AsyncGenerator[str, None]:
     """
     Stream progressive updates during Aika agent execution.
@@ -65,6 +69,8 @@ async def stream_aika_execution(
     - type: 'error' - Error occurred
     """
     execution_id = None
+    prompt_id = str(uuid.uuid4())
+    tracking_cm = None
     try:
         # Initial thinking indicator
         thinking_data = {'type': 'thinking', 'message': 'Memproses...'}
@@ -92,11 +98,21 @@ async def stream_aika_execution(
                 "remembered_facts": remembered_facts,
             },
             "execution_id": execution_id,  # Inject execution_id for tracking
+            "request_id": request_id,
             "execution_path": [],
             "agents_invoked": [],
             "errors": [],
             "preferred_model": request.preferred_model,  # Pass user's preferred model
         }
+
+        # Track outbound Gemini requests for this single user prompt.
+        tracking_cm = prompt_context(
+            prompt_id=prompt_id,
+            user_id=current_user.id,
+            session_id=initial_state["session_id"],
+            execution_id=execution_id,
+        )
+        tracking_cm.__enter__()
         
         logger.info(f"🌊 Starting streaming execution for user {current_user.id} with model: {request.preferred_model or 'default'} (exec_id={execution_id})")
         
@@ -116,8 +132,28 @@ async def stream_aika_execution(
         # Track what we've already sent
         sent_agents = set()
         current_node = None
+        current_node_started = None
         start_time = datetime.now()
         final_state = {}  # Accumulate final state from streaming
+
+        # Emit a single "run started" event for correlation in DB
+        try:
+            await emit_agent_event(
+                AgentEvent(
+                    agent=AgentNameEnum.AIKA,
+                    step="run_started",
+                    payload={
+                        "user_hash": user_hash,
+                        "session_id": initial_state["session_id"],
+                        "intent": "aika_stream",
+                        "resource_id": execution_id,
+                        "trace_id": request_id,
+                    },
+                    ts=datetime.utcnow(),
+                )
+            )
+        except Exception as e:
+            logger.warning(f"Failed to persist run_started event: {e}")
         
         # Use astream to get progressive updates
         async for event in aika_agent.astream(initial_state, config):  # type: ignore
@@ -133,7 +169,46 @@ async def stream_aika_execution(
                 
                 # Send status update for new node
                 if node_name != current_node and node_name in AGENT_STATUS_MESSAGES:
+                    # Close previous node timing (best-effort)
+                    if current_node and current_node_started and execution_id:
+                        try:
+                            execution_tracker.complete_node(execution_id, current_node)
+                        except Exception:
+                            pass
+
                     current_node = node_name
+                    current_node_started = node_name
+
+                    # Start node timing in tracker
+                    try:
+                        execution_tracker.start_node(
+                            execution_id,
+                            node_name,
+                            agent_id="aika",
+                            input_data={"status": "started"},
+                            node_type="graph_node",
+                        )
+                    except Exception:
+                        pass
+
+                    # Persist node_started event (safe summary)
+                    try:
+                        await emit_agent_event(
+                            AgentEvent(
+                                agent=AgentNameEnum.AIKA,
+                                step=f"node_started::{node_name}",
+                                payload={
+                                    "user_hash": user_hash,
+                                    "session_id": initial_state["session_id"],
+                                    "resource_id": execution_id,
+                                    "trace_id": request_id,
+                                },
+                                ts=datetime.utcnow(),
+                            )
+                        )
+                    except Exception:
+                        pass
+
                     status_data = {
                         'type': 'status',
                         'node': node_name,
@@ -164,6 +239,13 @@ async def stream_aika_execution(
         await remember_from_user_message(db, current_user, request.message, source="conversation")
         
         processing_time_ms = (datetime.now() - start_time).total_seconds() * 1000
+
+        # Close last node timing if we have one
+        if current_node and execution_id:
+            try:
+                execution_tracker.complete_node(execution_id, current_node)
+            except Exception:
+                pass
         
         # Send intervention plan if available (check both old and new keys)
         intervention_plan = result.get("sca_intervention_plan") or result.get("intervention_plan")
@@ -262,6 +344,7 @@ async def stream_aika_execution(
         metadata_dict = {
             'session_id': session_id,
             'execution_id': execution_id,  # Return execution_id for evaluation
+            'request_id': request_id,
             'agents_invoked': result.get('agents_invoked', []),
             'response_source': result.get('response_source', 'unknown'),
             'processing_time_ms': processing_time_ms,
@@ -270,13 +353,17 @@ async def stream_aika_execution(
         
         # Save conversation to database
         try:
+            llm_stats = get_stats()
             conversation_entry = Conversation(
                 user_id=current_user.id,
                 session_id=session_id,
                 conversation_id=str(uuid.uuid4()),
                 message=request.message,
                 response=final_response,
-                timestamp=datetime.now()
+                timestamp=datetime.now(),
+                llm_prompt_id=prompt_id,
+                llm_request_count=llm_stats.total_requests,
+                llm_requests_by_model=llm_stats.requests_by_model,
             )
             db.add(conversation_entry)
             await db.commit()
@@ -286,6 +373,26 @@ async def stream_aika_execution(
             # Don't fail the request if DB save fails
         
         execution_tracker.complete_execution(execution_id, success=True)
+
+        # Persist completion event with latency and outcome (redacted)
+        try:
+            await emit_agent_event(
+                AgentEvent(
+                    agent=AgentNameEnum.AIKA,
+                    step="run_completed",
+                    payload={
+                        "user_hash": user_hash,
+                        "session_id": session_id,
+                        "resource_id": execution_id,
+                        "trace_id": request_id,
+                        "latency_ms": int(processing_time_ms),
+                        "outcome": result.get("response_source", "unknown"),
+                    },
+                    ts=datetime.utcnow(),
+                )
+            )
+        except Exception:
+            pass
 
         logger.info(
             f"✅ Streaming complete: user={current_user.id}, "
@@ -307,10 +414,15 @@ async def stream_aika_execution(
         }
         yield f"data: {json.dumps(error_data)}\n\n"
 
+    finally:
+        if tracking_cm is not None:
+            tracking_cm.__exit__(None, None, None)
+
 
 @router.post("/aika", dependencies=[Depends(check_rate_limit_dependency)])
 async def aika_stream_endpoint(
     request: AikaRequest,
+    http_request: Request,
     current_user: User = Depends(get_current_active_user),
     db: AsyncSession = Depends(get_async_db),
 ):
@@ -329,13 +441,16 @@ async def aika_stream_endpoint(
     """
     logger.info(f"📡 Streaming request from user {current_user.id}: {request.message[:50]}...")
     
+    request_id = getattr(http_request.state, "request_id", None)
+
     return StreamingResponse(
-        stream_aika_execution(request, current_user, db),
+        stream_aika_execution(request, current_user, db, request_id),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
             "X-Accel-Buffering": "no",  # Disable nginx buffering
             "Access-Control-Allow-Origin": "*",  # CORS for SSE
+            "X-Request-ID": request_id or "",
         }
     )

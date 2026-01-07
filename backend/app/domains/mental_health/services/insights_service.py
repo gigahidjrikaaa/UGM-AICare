@@ -19,13 +19,15 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models import InsightsReport  # Core infrastructure model
 from app.domains.mental_health.models import TriageAssessment
 from app.services.event_bus import publish_event, EventType
+from app.core import llm
 
 logger = logging.getLogger(__name__)
 
 K_ANONYMITY_THRESHOLD = 5
 
-# Gemini model for insights generation - use Flash for cost efficiency
-INSIGHTS_GEMINI_MODEL = "gemini-2.5-flash"
+# Gemini model for insights generation
+# Use Pro where it matters (admin-facing analysis and recommendations).
+INSIGHTS_GEMINI_MODEL = llm.GEMINI_PRO_MODEL
 
 class InsightsService:
     """Service for generating and managing IA insights reports.
@@ -290,11 +292,14 @@ Generate a comprehensive analysis in JSON format with three components:
 ```"""
         
         try:
-            response = client.models.generate_content(
+            response_text = await llm.generate_gemini_response_with_fallback(
+                history=[{"role": "user", "content": prompt}],
                 model=INSIGHTS_GEMINI_MODEL,
-                contents=prompt,
+                max_tokens=2048,
+                temperature=0.2,
+                system_prompt=None,
+                json_mode=True,
             )
-            response_text = response.text.strip()
             
             # Extract JSON from response
             if "```json" in response_text:

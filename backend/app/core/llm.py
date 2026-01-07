@@ -14,6 +14,7 @@ from typing import List, Dict, Literal, Optional, Tuple
 
 # Langfuse Tracing
 from app.core.langfuse_config import trace_llm_call
+from app.core import llm_request_tracking
 
 # Load environment variables
 load_dotenv(find_dotenv())
@@ -36,21 +37,20 @@ for i in range(2, 6):
 
 logger.info(f"Loaded {len(GEMINI_API_KEYS)} Gemini API keys for rotation.")
 
-# Gemini 2.5 models for different use cases
-DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"  # Default for general use (GA - Stable)
-GEMINI_LITE_MODEL = "gemini-2.5-flash-lite-preview-09-2025"  # For high-volume conversational
-GEMINI_FLASH_MODEL = "gemini-2.5-flash"  # For STA and SCA agents
-GEMINI_PRO_MODEL = "gemini-2.5-pro"  # For Insights Agent (advanced reasoning)
+# Gemini models for different use cases
+# NOTE: These are constrained to models confirmed usable in your AI Studio project.
+DEFAULT_GEMINI_MODEL = "gemini-3-flash-preview"  # Default for general use
+GEMINI_LITE_MODEL = "gemini-2.5-flash-lite"  # For high-volume conversational
+GEMINI_FLASH_MODEL = "gemini-3-flash-preview"  # For most agent tasks
+GEMINI_PRO_MODEL = "gemini-3-pro-preview"  # For advanced reasoning (use where it matters)
 
 # Fallback chain for Gemini models (in order of preference)
-# Based on availability, quota limits, and performance
+# Keep this list limited to models you can actually call; otherwise the chain may abort early.
 GEMINI_FALLBACK_CHAIN = [
-    "gemini-2.5-flash",                          # 1. Primary: Latest stable (GA - Jun 2025)
-    "gemini-2.5-flash-preview-09-2025",          # 2. Preview: Latest preview version
-    "gemini-2.5-flash-lite-preview-09-2025",     # 3. Lite Preview: Lower cost, fast
-    "gemini-2.0-flash",                          # 4. Stable 2.0: Production-ready (Feb 2025)
-    "gemini-2.0-flash-lite",                     # 5. Lite 2.0: Cost-efficient (Feb 2025)
-    # Note: Gemma 3 is for local inference only, not available via Gemini API
+    "gemini-3-flash-preview",
+    "gemini-2.5-flash",
+    "gemini-2.5-flash-lite",
+    "gemini-2.5-flash-preview-09-2025",
 ]
 
 DEFAULT_GEMMA_LOCAL_MODEL = "gemma-3-12b-it-gguf"  # Local inference via Ollama/vLLM
@@ -232,6 +232,38 @@ def _convert_tool_schemas_for_new_sdk(tool_wrappers: List[Dict[str, Any]]) -> Li
     return result
 
 
+def _normalize_tools_for_generate_config(tools: Optional[List[Any]]) -> Optional[List[types.Tool]]:
+    if not tools:
+        return None
+    if isinstance(tools[0], types.Tool):
+        return cast(List[types.Tool], tools)
+    return _convert_tool_schemas_for_new_sdk(tools)
+
+
+def _is_invalid_model_error(status_code: int, error_msg: str) -> bool:
+    """Best-effort detection for "model not available / not found" errors.
+
+    We treat these as a signal to try the next fallback model (not a hard failure),
+    because AI Studio projects can have per-model allowlists.
+    """
+    msg = (error_msg or "").lower()
+    if status_code == 404:
+        return True
+
+    # Some SDKs return 400 for invalid model names.
+    if status_code == 400:
+        keywords = [
+            "model",
+            "not found",
+            "not supported",
+            "invalid model",
+            "unknown model",
+        ]
+        return any(k in msg for k in keywords)
+
+    return any(k in msg for k in ["model not found", "not supported", "unknown model", "not_found"])
+
+
 
 # --- Gemini API Function (Async) - Migrated to new SDK ---
 @trace_llm_call("gemini-genai-sdk")
@@ -269,8 +301,20 @@ async def generate_gemini_response(
         Generated response text, or full response object if return_full_response=True
     """
     try:
+        call_index = llm_request_tracking.increment_request(model=model)
         client = get_gemini_client()
-        logger.info(f"Sending request to Gemini API (Model: {model}, Tools: {bool(tools)}, JSON: {json_mode})")
+        logger.info(
+            f"Sending request to Gemini API (Model: {model}, Tools: {bool(tools)}, JSON: {json_mode})",
+            extra={
+                "user_id": llm_request_tracking.get_user_id(),
+                "session_id": llm_request_tracking.get_session_id(),
+                "prompt_id": llm_request_tracking.get_prompt_id(),
+                "llm_call_index": call_index,
+                "llm_model": model,
+                "llm_phase": "generate_gemini_response",
+                "llm_has_tools": bool(tools),
+            },
+        )
         if system_prompt:
             logger.info(f"🤖 System prompt applied: {system_prompt[:100]}...")
 
@@ -295,33 +339,29 @@ async def generate_gemini_response(
             config.system_instruction = system_prompt
         
         # Add tools if provided
-        if tools:
-            # Check if tools are already in new SDK format (types.Tool)
-            if tools and isinstance(tools[0], types.Tool):
-                config.tools = tools
-                logger.debug(f"Using {len(tools)} pre-converted tool(s) for this request")
-            else:
-                converted_tools = _convert_tool_schemas_for_new_sdk(tools)
-                config.tools = converted_tools
-                logger.debug(f"Enabled {len(tools)} tool(s) for this request")
+        normalized_tools = _normalize_tools_for_generate_config(tools)
+        if normalized_tools:
+            config.tools = normalized_tools
+            logger.debug(f"Enabled {len(normalized_tools)} tool(s) for this request")
         
         # Add safety settings
+        # Note: Use enum values to satisfy typing (Pylance).
         config.safety_settings = [
             types.SafetySetting(
-                category='HARM_CATEGORY_HARASSMENT',
-                threshold='BLOCK_MEDIUM_AND_ABOVE'
+                category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+                threshold=types.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
             ),
             types.SafetySetting(
-                category='HARM_CATEGORY_HATE_SPEECH',
-                threshold='BLOCK_MEDIUM_AND_ABOVE'
+                category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                threshold=types.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
             ),
             types.SafetySetting(
-                category='HARM_CATEGORY_SEXUALLY_EXPLICIT',
-                threshold='BLOCK_MEDIUM_AND_ABOVE'
+                category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                threshold=types.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
             ),
             types.SafetySetting(
-                category='HARM_CATEGORY_DANGEROUS_CONTENT',
-                threshold='BLOCK_MEDIUM_AND_ABOVE'
+                category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                threshold=types.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
             ),
         ]
 
@@ -332,7 +372,7 @@ async def generate_gemini_response(
             None,
             lambda: client.models.generate_content(
                 model=model,
-                contents=contents,
+                contents=cast(Any, contents),
                 config=config
             )
         )
@@ -391,6 +431,154 @@ async def generate_gemini_response(
         logger.error(f"Error calling Gemini API: {e}", exc_info=True)
         # Don't return error message here - let fallback handler decide
         raise
+
+
+@trace_llm_call("gemini-genai-sdk-content")
+async def generate_gemini_content(
+    *,
+    contents: List[types.Content],
+    model: str,
+    config: types.GenerateContentConfig,
+    return_full_response: bool = False,
+) -> str | Any:
+    """Generate a response using pre-built Content objects.
+
+    This is used by the tool-calling loop, where we must send structured
+    function_call and function_response parts back to Gemini.
+    """
+    try:
+        call_index = llm_request_tracking.increment_request(model=model)
+        client = get_gemini_client()
+        loop = asyncio.get_running_loop()
+
+        logger.info(
+            "Sending request to Gemini API (contents mode)",
+            extra={
+                "user_id": llm_request_tracking.get_user_id(),
+                "session_id": llm_request_tracking.get_session_id(),
+                "prompt_id": llm_request_tracking.get_prompt_id(),
+                "llm_call_index": call_index,
+                "llm_model": model,
+                "llm_phase": "generate_gemini_content",
+                "llm_has_tools": bool(getattr(config, "tools", None)),
+            },
+        )
+
+        response = await loop.run_in_executor(
+            None,
+            lambda: client.models.generate_content(
+                model=model,
+                contents=cast(Any, contents),
+                config=config,
+            ),
+        )
+
+        if return_full_response:
+            return response
+
+        if hasattr(response, "text") and response.text:
+            return response.text.strip()
+
+        return "Error: Received an empty or invalid response from Gemini."
+    except Exception as e:
+        logger.error(f"Error calling Gemini API (contents): {e}", exc_info=True)
+        raise
+
+
+@trace_llm_call("gemini-fallback-chain-content")
+async def generate_gemini_content_with_fallback(
+    *,
+    contents: List[types.Content],
+    model: str = DEFAULT_GEMINI_MODEL,
+    config: Optional[types.GenerateContentConfig] = None,
+    return_full_response: bool = False,
+) -> str | Any:
+    """Generate Gemini response with automatic fallback, using pre-built contents."""
+    from google.genai.errors import ClientError, ServerError
+    import re
+
+    if config is None:
+        config = types.GenerateContentConfig(max_output_tokens=2048, temperature=0.7)
+
+    models_to_try = [model] + [m for m in GEMINI_FALLBACK_CHAIN if m != model]
+    last_error: Exception | None = None
+
+    for idx, current_model in enumerate(models_to_try):
+        max_retries_per_model = max(3, len(GEMINI_API_KEYS))
+
+        for retry_attempt in range(max_retries_per_model):
+            try:
+                logger.info(
+                    f"🔄 Attempting Gemini request with model: {current_model} "
+                    f"(model_idx={idx}, retry={retry_attempt}, contents_mode=True)"
+                )
+
+                response = await generate_gemini_content(
+                    contents=contents,
+                    model=current_model,
+                    config=config,
+                    return_full_response=return_full_response,
+                )
+
+                if idx > 0 or retry_attempt > 0:
+                    logger.warning(f"✅ Fallback/Retry successful! Used model: {current_model}")
+                return response
+
+            except (ClientError, ServerError) as e:
+                last_error = e
+                error_code = getattr(e, "status_code", 0)
+                error_msg = str(e)
+
+                if _is_invalid_model_error(error_code, error_msg):
+                    logger.warning(
+                        f"⚠️ Model {current_model} not available (code={error_code}). "
+                        "Skipping to next fallback model..."
+                    )
+                    break
+
+                should_fallback = (
+                    error_code == 429
+                    or error_code == 503
+                    or "RESOURCE_EXHAUSTED" in error_msg
+                    or "overloaded" in error_msg.lower()
+                )
+
+                if should_fallback:
+                    if len(GEMINI_API_KEYS) > 1 and retry_attempt < len(GEMINI_API_KEYS) - 1:
+                        logger.warning("🔑 Rate limit hit. Rotating API Key and retrying immediately...")
+                        get_gemini_client(force_rotate=True)
+                        continue
+
+                    delay_match = re.search(r"retry in (\d+(\.\d+)?)s", error_msg)
+                    if delay_match and retry_attempt < max_retries_per_model - 1:
+                        delay_seconds = min(float(delay_match.group(1)), 60.0)
+                        logger.warning(
+                            f"⏳ Rate limit hit. Sleeping for {delay_seconds:.2f}s before retrying same model..."
+                        )
+                        await asyncio.sleep(delay_seconds + 1.0)
+                        continue
+
+                    if idx < len(models_to_try) - 1:
+                        logger.warning(
+                            f"⚠️ Model {current_model} unavailable (code={error_code}). "
+                            f"Trying fallback model {models_to_try[idx + 1]}..."
+                        )
+                        break
+
+                    raise
+
+                logger.error(f"❌ Unexpected error with model {current_model}: {e}")
+                raise
+
+            except Exception as e:
+                last_error = e
+                logger.error(f"❌ Unexpected error with model {current_model}: {e}")
+                raise
+
+    logger.error(f"❌ All fallback models exhausted. Last error: {last_error}")
+    if last_error:
+        raise last_error
+    raise Exception("All Gemini models failed with unknown error")
 
 
 @trace_llm_call("gemini-fallback-chain")
@@ -457,6 +645,13 @@ async def generate_gemini_response_with_fallback(
                 error_code = getattr(e, 'status_code', 0)
                 error_msg = str(e)
                 
+                if _is_invalid_model_error(error_code, error_msg):
+                    logger.warning(
+                        f"⚠️ Model {current_model} not available (code={error_code}). "
+                        "Skipping to next fallback model..."
+                    )
+                    break
+
                 # Check if this is a quota/rate limit error (429) or overload (503)
                 should_fallback = (
                     error_code == 429 or  # RESOURCE_EXHAUSTED
@@ -546,7 +741,21 @@ async def stream_gemini_response(
         Response text chunks
     """
     try:
+        call_index = llm_request_tracking.increment_request(model=model)
         client = get_gemini_client()
+
+        logger.info(
+            "Sending streaming request to Gemini API",
+            extra={
+                "user_id": llm_request_tracking.get_user_id(),
+                "session_id": llm_request_tracking.get_session_id(),
+                "prompt_id": llm_request_tracking.get_prompt_id(),
+                "llm_call_index": call_index,
+                "llm_model": model,
+                "llm_phase": "stream_gemini_response",
+                "llm_has_tools": bool(tools),
+            },
+        )
 
         if not history or history[-1]["role"] != "user":
             yield "Error: Conversation history must end with a user message."
@@ -565,34 +774,29 @@ async def stream_gemini_response(
         if system_prompt:
             config.system_instruction = system_prompt
         
-        # Add tools if provided
-        if tools:
-            # Check if tools are already in new SDK format (types.Tool)
-            if tools and isinstance(tools[0], types.Tool):
-                config.tools = tools
-                logger.debug(f"Using {len(tools)} pre-converted tool(s) for streaming request")
-            else:
-                converted_tools = _convert_tool_schemas_for_new_sdk(tools)
-                config.tools = converted_tools
-                logger.debug(f"Enabled {len(tools)} tool(s) for streaming request")
+        normalized_tools = _normalize_tools_for_generate_config(tools)
+        if normalized_tools:
+            config.tools = normalized_tools
+            logger.debug(f"Enabled {len(normalized_tools)} tool(s) for streaming request")
 
         # Add safety settings
+        # Note: Use enum values to satisfy typing (Pylance).
         config.safety_settings = [
             types.SafetySetting(
-                category='HARM_CATEGORY_HARASSMENT',
-                threshold='BLOCK_MEDIUM_AND_ABOVE'
+                category=types.HarmCategory.HARM_CATEGORY_HARASSMENT,
+                threshold=types.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
             ),
             types.SafetySetting(
-                category='HARM_CATEGORY_HATE_SPEECH',
-                threshold='BLOCK_MEDIUM_AND_ABOVE'
+                category=types.HarmCategory.HARM_CATEGORY_HATE_SPEECH,
+                threshold=types.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
             ),
             types.SafetySetting(
-                category='HARM_CATEGORY_SEXUALLY_EXPLICIT',
-                threshold='BLOCK_MEDIUM_AND_ABOVE'
+                category=types.HarmCategory.HARM_CATEGORY_SEXUALLY_EXPLICIT,
+                threshold=types.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
             ),
             types.SafetySetting(
-                category='HARM_CATEGORY_DANGEROUS_CONTENT',
-                threshold='BLOCK_MEDIUM_AND_ABOVE'
+                category=types.HarmCategory.HARM_CATEGORY_DANGEROUS_CONTENT,
+                threshold=types.HarmBlockThreshold.BLOCK_MEDIUM_AND_ABOVE,
             ),
         ]
 
@@ -600,7 +804,7 @@ async def stream_gemini_response(
         # The new SDK's generate_content_stream returns a synchronous generator
         stream = client.models.generate_content_stream(
             model=model,
-            contents=contents,
+            contents=cast(Any, contents),
             config=config
         )
 

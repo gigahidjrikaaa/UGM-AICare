@@ -281,16 +281,42 @@ async def login_for_access_token(
     user.last_login = datetime.utcnow()
     db.add(user)
 
-    try:
-        await db.commit()
-        await db.refresh(user)
-    except Exception as exc:
-        await db.rollback()
-        logger.exception("Failed to finalize login for %s", request.email)
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Internal server error during login",
-        ) from exc
+    # Retry commit with exponential backoff for transient connection issues
+    max_retries = 3
+    retry_delay = 0.5
+    last_exception = None
+    
+    for attempt in range(max_retries):
+        try:
+            await db.commit()
+            await db.refresh(user)
+            break  # Success
+        except Exception as exc:
+            last_exception = exc
+            await db.rollback()
+            
+            # Check if it's a connection-related error that we should retry
+            exc_str = str(exc).lower()
+            is_retryable = any([
+                "connection" in exc_str,
+                "timeout" in exc_str,
+                "closed" in exc_str,
+            ])
+            
+            if attempt < max_retries - 1 and is_retryable:
+                logger.warning(
+                    "Login commit failed (attempt %d/%d) for %s: %s. Retrying...",
+                    attempt + 1, max_retries, request.email, exc
+                )
+                await asyncio.sleep(retry_delay)
+                retry_delay *= 2  # Exponential backoff
+            else:
+                # Final attempt failed or non-retryable error
+                logger.exception("Failed to finalize login for %s", request.email)
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Internal server error during login",
+                ) from exc
 
     access_token = create_access_token(build_token_payload(user))
 

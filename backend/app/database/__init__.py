@@ -117,7 +117,8 @@ if DATABASE_URL.startswith("postgresql+asyncpg://"):
             "jit": "off",  # Disable JIT for better compatibility
             "application_name": "ugm_aicare",  # Identify our application in pg_stat_activity
         },
-        "command_timeout": 60,  # Timeout for individual commands
+        "command_timeout": 120,  # Timeout for individual commands (increased for eval workload)
+        "timeout": 30,  # Connection establishment timeout
     }
     if db_ssl is not None:
         connect_args["ssl"] = db_ssl
@@ -130,7 +131,8 @@ if DATABASE_URL.startswith("postgresql+asyncpg://"):
         pool_size=20,           # Number of connections to maintain in the pool
         max_overflow=10,        # Additional connections beyond pool_size
         pool_pre_ping=True,     # Validate connections before use
-        pool_recycle=3600,      # Recycle connections every hour
+        pool_recycle=1800,      # Recycle connections every 30 min (reduced from 1 hour)
+        pool_timeout=30,        # Timeout for getting a connection from the pool
         # Connection arguments for asyncpg
         connect_args=connect_args,
     )

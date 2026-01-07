@@ -10,7 +10,8 @@ import json
 import logging
 from typing import Any, Dict, List, Optional
 
-from app.core.llm import generate_gemini_response
+from app.core import llm
+from app.core.llm import generate_gemini_response_with_fallback
 from app.agents.tca.schemas import PlanStep, ResourceCard
 
 logger = logging.getLogger(__name__)
@@ -310,10 +311,10 @@ async def generate_personalized_plan(
         
         logger.debug(f"User prompt: {user_prompt[:200]}...")
         
-        # Call Gemini API - Using Gemini 2.5 Pro for TCA (Complex Reasoning)
-        response_text = await generate_gemini_response(
+        # Call Gemini API - Use Gemini Pro for TCA (complex reasoning) with fallback on quota/rate limits
+        response_text = await generate_gemini_response_with_fallback(
             history=[{"role": "user", "content": user_prompt}],
-            model="gemini-2.5-pro",  # Gemini 2.5 Pro for Support Coach Agent
+            model=getattr(llm, "GEMINI_PRO_MODEL", "gemini-3-pro-preview"),
             max_tokens=2048,
             temperature=0.7,  # Balance between creativity and consistency
             system_prompt=system_prompt,

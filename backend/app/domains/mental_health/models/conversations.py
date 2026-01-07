@@ -1,7 +1,7 @@
 """Conversation and user summary models."""
 
 from typing import Optional, List, TYPE_CHECKING
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, JSON
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 from datetime import datetime
@@ -20,6 +20,11 @@ class Conversation(Base):
     message: Mapped[str] = mapped_column(Text, nullable=False)
     response: Mapped[str] = mapped_column(Text, nullable=False)
     timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+    # Per-user-prompt LLM accounting (includes tool-call followups)
+    llm_prompt_id: Mapped[Optional[str]] = mapped_column(String, nullable=True)
+    llm_request_count: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
+    llm_requests_by_model: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
     # Relationships - use string references to avoid circular imports
     user: Mapped["User"] = relationship("User", back_populates="conversations")

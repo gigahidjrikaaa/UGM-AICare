@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, cast, AsyncGenerator
 import hashlib
+from uuid import uuid4
 
 from fastapi import (
     APIRouter,
@@ -29,6 +30,7 @@ from app.agents.execution_tracker import execution_tracker
 # ✅ REMOVED: Legacy AikaOrchestrator - Now using unified orchestrator only
 from app.agents.aika_orchestrator_graph import create_aika_agent_with_checkpointing  # ✨ Direct LangGraph invocation
 from app.core import llm
+from app.core.llm_request_tracking import get_stats, prompt_context
 from app.core.rate_limiter import check_rate_limit_dependency, get_rate_limiter
 from app.database import get_async_db
 from app.dependencies import get_current_active_user
@@ -137,8 +139,14 @@ async def process_chat_message(
         # - Better execution tracking and debugging
         # ============================================================================
         
+        prompt_id = str(uuid4())
         logger.info(
-            f"🤖 Invoking Aika Agent (LangGraph) for user {current_user.id}, role={user_role}"
+            f"🤖 Invoking Aika Agent (LangGraph) for user {current_user.id}, role={user_role}",
+            extra={
+                "user_id": current_user.id,
+                "session_id": session_id,
+                "prompt_id": prompt_id,
+            },
         )
         
         # Create Aika agent with app-lifetime checkpointing (Postgres when available)
@@ -165,14 +173,17 @@ async def process_chat_message(
         }
         
         # Invoke Aika agent directly (no wrapper needed - the graph IS the agent)
-        result = await aika_agent.ainvoke(
-            initial_state,
-            config={
-                "configurable": {
-                    "thread_id": f"user_{current_user.id}_session_{session_id}"
+        llm_stats = None
+        with prompt_context(prompt_id=prompt_id, user_id=current_user.id, session_id=session_id):
+            result = await aika_agent.ainvoke(
+                initial_state,
+                config={
+                    "configurable": {
+                        "thread_id": f"user_{current_user.id}_session_{session_id}"
+                    }
                 }
-            }
-        )
+            )
+            llm_stats = get_stats()
         
         # Extract final response from LangGraph state
         final_response = result.get("final_response", "Maaf, terjadi kesalahan.")
@@ -216,13 +227,19 @@ async def process_chat_message(
             "risk_score": result.get("sta_risk_assessment", {}).get("risk_score") or result.get("risk_score"),
         }
 
+        # Attach per-user-prompt LLM request totals (includes tool-call followups).
+        if llm_stats is not None:
+            metadata["llm_request_count"] = llm_stats.total_requests
+            metadata["llm_requests_by_model"] = llm_stats.requests_by_model
+        metadata["llm_prompt_id"] = prompt_id
+
         # Best-effort memory write (consent-gated)
         await remember_from_user_message(db, current_user, request.message, source="conversation")
 
         return ChatProcessingResult(
             response_text=final_response,
             provider_used="aika-langgraph",
-            model_used="gemini-2.0-flash-exp",
+            model_used=getattr(llm, "DEFAULT_GEMINI_MODEL", "gemini-2.5-flash"),
             final_history=history_items,
             module_completed_id=None,
             intervention_plan=result.get("intervention_plan"),

@@ -23,6 +23,8 @@ import json
 import logging
 from typing import Any, Callable, Dict, List, Optional
 
+from uuid import uuid4
+
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # New SDK imports
@@ -41,6 +43,7 @@ from app.agents.aika.tools import execute_tool_call, get_aika_tools
 from app.agents.execution_tracker import execution_tracker
 from app.core import llm
 from app.domains.mental_health.schemas.chat import ChatRequest
+from app.core.llm_request_tracking import get_prompt_id, prompt_context
 
 logger = logging.getLogger(__name__)
 
@@ -92,32 +95,43 @@ async def generate_with_tools(
     # Get available tools
     tools = get_aika_tools()
     logger.info(f"Tool calling enabled with {len(tools)} tool(s) available")
+
+    # Defensive: if this function is used outside the LangGraph chat entrypoint,
+    # we still want per-prompt request counting.
+    local_prompt_cm = None
+    if get_prompt_id() is None:
+        local_prompt_cm = prompt_context(
+            prompt_id=str(uuid4()),
+            user_id=user_id,
+            execution_id=execution_id,
+        )
+        local_prompt_cm.__enter__()
     
-    while iterations < max_tool_iterations:
-        iterations += 1
-        logger.info(f"Tool calling iteration {iterations}/{max_tool_iterations}")
-        
-        try:
-            # For streaming mode
-            if stream_callback:
-                response_text = await _generate_streaming_with_tools(
-                    conversation_history=conversation_history,
-                    system_prompt=system_prompt,
-                    request=request,
-                    model_name=model_name,
-                    tools=tools,
-                    db=db,
-                    user_id=user_id,
-                    stream_callback=stream_callback,
-                    execution_id=execution_id,
-                )
-                # Note: Gemini's streaming mode with tools is complex
-                # For now, we return after first iteration for streaming
-                logger.info("Streaming response completed")
-                return response_text, tool_calls_executed
-            
-            # For non-streaming mode
-            else:
+    try:
+        while iterations < max_tool_iterations:
+            iterations += 1
+            logger.info(f"Tool calling iteration {iterations}/{max_tool_iterations}")
+
+            try:
+                # For streaming mode
+                if stream_callback:
+                    response_text = await _generate_streaming_with_tools(
+                        conversation_history=conversation_history,
+                        system_prompt=system_prompt,
+                        request=request,
+                        model_name=model_name,
+                        tools=tools,
+                        db=db,
+                        user_id=user_id,
+                        stream_callback=stream_callback,
+                        execution_id=execution_id,
+                    )
+                    # Note: Gemini's streaming mode with tools is complex
+                    # For now, we return after first iteration for streaming
+                    logger.info("Streaming response completed")
+                    return response_text, tool_calls_executed
+
+                # For non-streaming mode (default)
                 # Get full response object for tool calling (with automatic fallback on rate limits)
                 response_obj = await llm.generate_gemini_response_with_fallback(
                     history=conversation_history,
@@ -218,16 +232,17 @@ async def generate_with_tools(
                 
                 # Make another API call with the updated contents to get final response
                 logger.info(f"Sending tool results back to LLM (iteration {iterations})")
-                client = llm.get_gemini_client()
-                final_response_obj = await client.aio.models.generate_content(
-                    model=model_name,
+                normalized_tools = llm._normalize_tools_for_generate_config(tools)
+                final_response_obj = await llm.generate_gemini_content_with_fallback(
                     contents=contents,
+                    model=model_name,
                     config=types.GenerateContentConfig(
                         temperature=request.temperature,
                         max_output_tokens=request.max_tokens,
                         system_instruction=system_prompt if system_prompt else None,
-                        tools=tools,  # Keep tools available for nested calls
-                    )
+                        tools=normalized_tools,
+                    ),
+                    return_full_response=True,
                 )
                 
                 # Check if there are more function calls (nested tool calling)
@@ -264,21 +279,24 @@ async def generate_with_tools(
                         
                     return response_text, tool_calls_executed
                 
-        except Exception as e:
-            logger.error(f"Error in tool calling iteration {iterations}: {e}", exc_info=True)
-            if iterations == 1:
-                raise
-            else:
-                error_msg = f"Tool calling encountered an error: {str(e)}"
-                return error_msg, tool_calls_executed
+            except Exception as e:
+                logger.error(f"Error in tool calling iteration {iterations}: {e}", exc_info=True)
+                if iterations == 1:
+                    raise
+                else:
+                    error_msg = f"Tool calling encountered an error: {str(e)}"
+                    return error_msg, tool_calls_executed
     
-    # Reached max iterations
-    logger.warning(f"Reached max tool calling iterations ({max_tool_iterations})")
-    final_msg = (
-        "I've gathered information but need to stop here. "
-        "The information I found might help answer your question."
-    )
-    return final_msg, tool_calls_executed
+        # Reached max iterations
+        logger.warning(f"Reached max tool calling iterations ({max_tool_iterations})")
+        final_msg = (
+            "I've gathered information but need to stop here. "
+            "The information I found might help answer your question."
+        )
+        return final_msg, tool_calls_executed
+    finally:
+        if local_prompt_cm is not None:
+            local_prompt_cm.__exit__(None, None, None)
 
 
 async def _generate_streaming_with_tools(
@@ -407,15 +425,15 @@ async def _generate_streaming_with_tools(
             
             # Make API call to get final response (non-streaming for now after tool execution)
             # Streaming after tool execution is complex and may not work well
-            client = llm.get_gemini_client()
-            final_response_obj = await client.aio.models.generate_content(
-                model=model_name,
+            final_response_obj = await llm.generate_gemini_content_with_fallback(
                 contents=contents,
+                model=model_name,
                 config=types.GenerateContentConfig(
                     temperature=request.temperature,
                     max_output_tokens=request.max_tokens,
                     system_instruction=system_prompt if system_prompt else None,
-                )
+                ),
+                return_full_response=True,
             )
             
             # Extract final text

@@ -56,16 +56,17 @@ async def emit_agent_event(event: AgentEvent) -> None:
             user_hash=_require_user_hash(event.payload),
             session_id=event.payload.get("session_id"),
             agent=event.agent,
-            intent=event.payload.get("intent"),
+            intent=_coerce_optional_str(event.payload.get("intent"), max_len=128),
             risk_flag=_coerce_optional_int(event.payload.get("risk_flag")),
             step=event.step,
             resource_id=event.payload.get("resource_id"),
+            trace_id=_coerce_optional_str(event.payload.get("trace_id"), max_len=128),
             latency_ms=_coerce_optional_int(event.payload.get("latency_ms")),
             tokens_in=_coerce_optional_int(event.payload.get("tokens_in")),
             tokens_out=_coerce_optional_int(event.payload.get("tokens_out")),
             cost_cents=_coerce_optional_int(event.payload.get("cost_cents")),
-            outcome=event.payload.get("outcome"),
-            consent_scope=event.payload.get("consent_scope"),
+            outcome=_coerce_optional_str(event.payload.get("outcome"), max_len=512, redact=True),
+            consent_scope=_coerce_optional_str(event.payload.get("consent_scope"), max_len=128),
         )
         session.add(record)
         await session.commit()
@@ -120,3 +121,17 @@ def _coerce_optional_int(value: Any) -> Optional[int]:
     if isinstance(value, str) and value.isdigit():
         return int(value)
     return None
+
+
+def _coerce_optional_str(value: Any, *, max_len: int, redact: bool = False) -> Optional[str]:
+    if value in (None, ""):
+        return None
+    text = str(value)
+    if redact:
+        text = prelog_redact(text)
+    text = text.strip()
+    if not text:
+        return None
+    if len(text) > max_len:
+        return text[:max_len]
+    return text

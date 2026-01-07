@@ -67,6 +67,9 @@ from app.core.memory import get_redis_client
 from prometheus_client import make_asgi_app
 from prometheus_fastapi_instrumentator import Instrumentator
 
+from app.middleware.performance import PerformanceTrackingMiddleware
+from app.middleware.request_context import RequestContextMiddleware
+
 load_dotenv(find_dotenv())
 
 # This call is being moved to the lifespan event handler to avoid race conditions.
@@ -150,6 +153,27 @@ app = FastAPI(
     lifespan=lifespan, # Use the async context manager for startup/shutdown
     docs_url=None, # Disable default Swagger UI to use Scalar
     redoc_url=None, # Disable ReDoc
+)
+
+# ============================================
+# REQUEST CONTEXT + PERFORMANCE MIDDLEWARE
+# ============================================
+
+# Propagate a per-request correlation id (X-Request-ID)
+app.add_middleware(RequestContextMiddleware)
+
+# Track endpoint performance (adds X-Response-Time and in-memory analytics)
+app.add_middleware(
+    PerformanceTrackingMiddleware,
+    exclude_paths=[
+        "/docs",
+        "/redoc",
+        "/openapi.json",
+        "/health",
+        "/favicon.ico",
+        "/metrics",
+        "/metrics/fastapi",
+    ],
 )
 
 # ============================================

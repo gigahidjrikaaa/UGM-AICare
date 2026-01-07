@@ -3,6 +3,11 @@
 
 providers = ["node"]
 
+[variables]
+# Ensure production runtime defaults in the final image
+NODE_ENV = "production"
+NEXT_TELEMETRY_DISABLED = "1"
+
 [phases.install]
 cmds = [
   "npm ci"
@@ -16,4 +21,4 @@ cmds = [
 
 [start]
 # Coolify sets PORT automatically.
-cmd = "npx next start -H 0.0.0.0 -p ${PORT:-3000}"
+cmd = "npm run start -- -H 0.0.0.0 -p ${PORT:-3000}"

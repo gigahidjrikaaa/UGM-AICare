@@ -44,6 +44,10 @@ def iter_sse_events(lines: Iterable[str]) -> Iterator[SSEEvent]:
             continue
 
         if line.startswith("event:"):
+            # Flush previous event before starting a new one
+            out = flush()
+            if out is not None:
+                yield out
             event_name = line[len("event:") :].strip() or "message"
             continue
 

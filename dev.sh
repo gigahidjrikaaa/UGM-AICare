@@ -25,6 +25,14 @@ log_ok()    { echo -e "\033[0;32m[OK]\033[0m    $*"; }
 log_warn()  { echo -e "\033[0;33m[WARN]\033[0m  $*" >&2; }
 log_error() { echo -e "\033[0;31m[ERROR]\033[0m $*" >&2; }
 
+is_windows_shell() {
+  [[ "${OSTYPE:-}" == "msys" || "${OSTYPE:-}" == "cygwin" || "${OSTYPE:-}" == "win32" ]]
+}
+
+has_cmd() {
+  command -v "$1" >/dev/null 2>&1
+}
+
 load_env() {
   local env_file="$PROJECT_DIR/.env"
   if [[ -f "$env_file" ]]; then
@@ -386,6 +394,92 @@ run_separate_terminals() {
   local frontend_port="$3"
   
   log_info "Starting servers in separate terminals..."
+
+  # Prefer Windows Terminal (wt) when available.
+  if is_windows_shell && (has_cmd wt.exe || has_cmd wt); then
+    local backend_script
+    local frontend_script
+    backend_script=$(mktemp --suffix=.sh)
+    frontend_script=$(mktemp --suffix=.sh)
+
+    local venv_activate=""
+    if [[ -f "$PROJECT_DIR/../.venv/Scripts/activate" ]]; then
+      venv_activate="$PROJECT_DIR/../.venv/Scripts/activate"
+    elif [[ -f "$PROJECT_DIR/.venv/Scripts/activate" ]]; then
+      venv_activate="$PROJECT_DIR/.venv/Scripts/activate"
+    elif [[ -f "$PROJECT_DIR/backend/.venv/Scripts/activate" ]]; then
+      venv_activate="$PROJECT_DIR/backend/.venv/Scripts/activate"
+    fi
+
+    cat > "$backend_script" <<EOF
+#!/usr/bin/env bash
+cd "$PROJECT_DIR/backend"
+export PYTHONUTF8=1
+export PYTHONIOENCODING=utf-8
+chcp.com 65001 2>/dev/null || true
+
+cleanup() {
+  echo ""
+  echo "Shutting down backend..."
+  pkill -P \$\$ 2>/dev/null || true
+  exit 0
+}
+trap cleanup EXIT INT TERM HUP
+
+if [[ -f "$venv_activate" ]]; then
+  source "$venv_activate"
+  echo "✓ Virtual environment activated"
+fi
+
+echo ""
+echo "🔧 UGM-AICare Backend Server"
+echo "=============================="
+echo "URL: http://localhost:${backend_port}"
+echo ""
+python -m uvicorn app.main:app --host 127.0.0.1 --port "$backend_port" --reload
+EOF
+
+    cat > "$frontend_script" <<EOF
+#!/usr/bin/env bash
+cd "$PROJECT_DIR/frontend"
+chcp.com 65001 2>/dev/null || true
+
+cleanup() {
+  echo ""
+  echo "Shutting down frontend..."
+  pkill -P \$\$ 2>/dev/null || true
+  exit 0
+}
+trap cleanup EXIT INT TERM HUP
+
+echo "🎨 UGM-AICare Frontend Server"
+echo "=============================="
+echo "URL: http://localhost:${frontend_port}"
+echo ""
+npm run dev -- -p "$frontend_port"
+EOF
+
+    chmod +x "$backend_script" "$frontend_script"
+
+    # Best-effort: open in Windows Terminal. This assumes `bash` is available in PATH (Git Bash / MSYS).
+    local wt_cmd=("wt.exe")
+    has_cmd wt && wt_cmd=("wt")
+
+    "${wt_cmd[@]}" -w 0 \
+      new-tab --title "UGM-AICare Backend" bash "$backend_script" \; \
+      split-pane -H bash "$frontend_script" &
+
+    BACKEND_PID=$!
+    FRONTEND_PID=""
+    save_pids
+
+    echo ""
+    log_ok "Opened backend + frontend in Windows Terminal panes."
+    log_info "To stop them: close the panes/windows, or run ./dev.sh stop"
+
+    (sleep 10 && rm -f "$backend_script" "$frontend_script") &
+    return 0
+  fi
   
   # On Windows (Git Bash/MSYS2), use mintty
   if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
@@ -534,22 +628,26 @@ show_help() {
   cat << 'EOF'
 UGM-AICare Development Script
 
-Usage: ./dev.sh <command>
+Usage: ./dev.sh <command> [args]
 
-Primary Commands:
-  local              Run backend + frontend locally with hot reload
-  local --separate   Open separate terminal windows (Windows only)
-  stop               Stop all running dev servers
-  prod               Start production Docker containers
+Main Commands:
+  local                    Start backend + frontend locally (unified terminal)
+  local --separate          Start backend + frontend in separate terminals (Windows Terminal if available)
+  stop                     Stop all local dev servers started by this script
 
-Docker Commands:
-  up            Start dev Docker containers
-  down          Stop Docker containers  
-  logs [svc]    Follow container logs
-  build         Build Docker images
-  restart       Restart containers
-  status        Show container status
-  clean         Stop + remove all containers and volumes
+  docker dev <action>       Manage Docker development environment
+  docker prod <action>      Manage Docker production environment
+
+Docker Actions (for both dev/prod):
+  up [--build] [svc...]     Start containers
+  down [args...]            Stop containers
+  restart [svc...]          Restart containers
+  pause [svc...]            Pause containers
+  unpause [svc...]          Unpause containers
+  rebuild [svc...]          Rebuild images and recreate containers
+  logs [svc]                Follow logs
+  ps                        Show container status
+  clean                     Down + remove volumes/orphans
 
 Features:
   ✓ Automatic cleanup on Ctrl+C
@@ -563,8 +661,66 @@ Examples:
   ./dev.sh local          # Start local dev servers
   ./dev.sh local --separate  # Separate terminals (Windows)
   ./dev.sh stop           # Stop all servers
-  ./dev.sh logs backend   # View backend logs
+  ./dev.sh docker dev up  # Start Docker dev
+  ./dev.sh docker prod up --build  # Start Docker prod
+  ./dev.sh docker dev pause backend
 EOF
+}
+
+docker_env_action() {
+  local env_name="$1"; shift
+  local action="${1:-}"; shift || true
+
+  ensure_docker
+
+  local dc_fn=""
+  case "$env_name" in
+    dev)  dc_fn="dc_dev" ;;
+    prod) dc_fn="dc_prod" ;;
+    *)
+      log_error "Unknown docker environment: $env_name (expected dev|prod)"
+      exit 2
+      ;;
+  esac
+
+  case "$action" in
+    up)
+      "$dc_fn" up -d "$@"
+      ;;
+    down)
+      "$dc_fn" down "$@"
+      ;;
+    restart)
+      "$dc_fn" restart "$@"
+      ;;
+    pause)
+      "$dc_fn" pause "$@"
+      ;;
+    unpause)
+      "$dc_fn" unpause "$@"
+      ;;
+    rebuild)
+      # Force recreate to ensure the new image is used.
+      "$dc_fn" up -d --build --force-recreate "$@"
+      ;;
+    logs)
+      "$dc_fn" logs -f "$@"
+      ;;
+    ps|status)
+      "$dc_fn" ps "$@"
+      ;;
+    clean)
+      "$dc_fn" down -v --remove-orphans
+      ;;
+    help|--help|-h|"")
+      show_help
+      ;;
+    *)
+      log_error "Unknown docker action: $action"
+      echo "Run: ./dev.sh help" >&2
+      exit 2
+      ;;
+  esac
 }
 
 cmd="${1:-help}"
@@ -578,26 +734,27 @@ case "$cmd" in
   stop)
     stop_servers
     ;;
+  docker)
+    docker_env_action "${1:-}" "${2:-}" "${@:3}"
+    ;;
+
+  # Convenience aliases
+  dev)
+    docker_env_action dev "${1:-up}" "${@:2}"
+    ;;
   prod)
-    ensure_docker
-    echo "🚀 Starting PRODUCTION Docker containers..."
-    dc_prod up -d --build "$@"
-    echo ""
-    dc_prod ps
+    docker_env_action prod "${1:-up}" "${@:2}"
     ;;
 
   # Docker dev commands  
   up)
-    ensure_docker
-    echo "🚀 Starting DEV Docker containers..."
-    dc_dev up -d "$@"
+    docker_env_action dev up "$@"
     ;;
   down)
-    ensure_docker
-    dc_dev down "$@"
-    dc_prod down 2>/dev/null || true
+    docker_env_action dev down "$@"
     ;;
   logs)
+    # Backward-compatible: prefer dev logs; fall back to prod.
     ensure_docker
     dc_dev logs -f "$@" 2>/dev/null || dc_prod logs -f "$@"
     ;;
@@ -606,8 +763,7 @@ case "$cmd" in
     dc_dev build "$@"
     ;;
   restart)
-    ensure_docker
-    dc_dev restart "$@"
+    docker_env_action dev restart "$@"
     ;;
   status)
     ensure_docker
@@ -618,8 +774,9 @@ case "$cmd" in
     dc_prod ps 2>/dev/null || true
     ;;
   clean)
+    # Backward-compatible: clean both envs.
     ensure_docker
-    echo "🧹 Cleaning up all containers..."
+    echo "🧹 Cleaning up all containers (dev + prod)..."
     dc_dev down -v --remove-orphans 2>/dev/null || true
     dc_prod down -v --remove-orphans 2>/dev/null || true
     ;;
