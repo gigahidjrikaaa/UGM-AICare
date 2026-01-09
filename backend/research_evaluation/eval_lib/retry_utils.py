@@ -9,6 +9,14 @@ from typing import Any, Callable, Optional, TypeVar
 T = TypeVar("T")
 
 
+class NonRetriableError(Exception):
+    """Raised to indicate a failure that should not be retried.
+
+    This is useful for quota exhaustion, invalid inputs, or other deterministic
+    errors where retries would waste time and may produce noisy logs.
+    """
+
+
 @dataclass(frozen=True)
 class RetryConfig:
     attempts: int = 3
@@ -40,6 +48,10 @@ def retry_sync(
         try:
             return fn(attempt), attempt, None
         except BaseException as exc:  # noqa: BLE001 - notebook ergonomics
+            if isinstance(exc, NonRetriableError):
+                if on_error:
+                    on_error(attempt, exc)
+                raise
             last_exc = exc
             if on_error:
                 on_error(attempt, exc)

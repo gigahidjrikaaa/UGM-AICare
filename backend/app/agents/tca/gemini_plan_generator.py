@@ -17,6 +17,15 @@ from app.agents.tca.schemas import PlanStep, ResourceCard
 logger = logging.getLogger(__name__)
 
 
+async def generate_gemini_response(**kwargs: Any) -> str:
+    """Generate a Gemini response.
+
+    This thin wrapper exists so unit tests can monkeypatch a stable symbol
+    without needing to reach into lower-level LLM plumbing.
+    """
+    return await generate_gemini_response_with_fallback(**kwargs)
+
+
 # System prompts for different plan types
 CALM_DOWN_SYSTEM_PROMPT = """Kamu adalah coach kesehatan mental yang expert dalam manajemen anxiety dan panic. Peran kamu adalah bantuin user untuk calm down ketika mereka experiencing anxiety, panic, atau stress yang overwhelming.
 
@@ -312,7 +321,7 @@ async def generate_personalized_plan(
         logger.debug(f"User prompt: {user_prompt[:200]}...")
         
         # Call Gemini API - Use Gemini Pro for TCA (complex reasoning) with fallback on quota/rate limits
-        response_text = await generate_gemini_response_with_fallback(
+        response_text = await generate_gemini_response(
             history=[{"role": "user", "content": user_prompt}],
             model=getattr(llm, "GEMINI_PRO_MODEL", "gemini-3-pro-preview"),
             max_tokens=2048,

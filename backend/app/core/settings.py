@@ -87,9 +87,9 @@ class Settings(BaseSettings):
     
     # Application Settings
     app_env: str = Field("development", alias="APP_ENV")
-    port: int = Field(8000, alias="PORT")
+    port: int = Field(22001, alias="PORT")
     frontend_url: str = Field("http://localhost:4000", alias="FRONTEND_URL")
-    backend_url: str = Field("http://localhost:8000", alias="BACKEND_URL")
+    backend_url: str = Field("http://localhost:22001", alias="BACKEND_URL")
     
     # JWT Configuration
     jwt_secret_key: str = Field(..., alias="JWT_SECRET_KEY")

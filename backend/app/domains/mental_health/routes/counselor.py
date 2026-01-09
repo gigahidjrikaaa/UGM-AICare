@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -15,10 +15,13 @@ from app.domains.mental_health.models import (
     Appointment,
     Case,
     CaseStatusEnum,
+    Conversation,
 )
+from app.domains.mental_health.models.assessments import UserScreeningProfile, TriageAssessment
 from app.models.user import User
 from app.domains.mental_health.schemas.appointments import AppointmentWithUser
 from app.agents.cma.schemas import SDACase, SDAListCasesResponse
+from app.core.redaction import prelog_redact
 from app.schemas.counselor import (
     CounselorAvailabilityToggle,
     CounselorDashboardStats,
@@ -27,6 +30,91 @@ from app.schemas.counselor import (
 )
 
 router = APIRouter(prefix="/counselor", tags=["Counselor"])
+
+
+@router.get("/cases/{case_id}/assessments")
+async def get_case_assessments(
+    case_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+):
+    """Return risk assessment transparency for a counselor case.
+
+    This endpoint is designed for explainability and review:
+    - It returns risk score/level, factors, and redacted diagnostic notes.
+    - It intentionally avoids returning raw conversation text.
+    """
+    profile_query = select(CounselorProfile).where(CounselorProfile.user_id == current_user.id)
+    profile = (await db.execute(profile_query)).scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Counselor profile not found")
+
+    case = (await db.execute(select(Case).where(Case.id == case_id))).scalar_one_or_none()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    if case.assigned_to != str(profile.id):
+        raise HTTPException(status_code=403, detail="Not authorized for this case")
+
+    user_id: int | None = None
+    if case.session_id:
+        user_id = (
+            await db.execute(
+                select(Conversation.user_id)
+                .where(Conversation.session_id == case.session_id)
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+
+    screening: dict | None = None
+    triage_payload: list[dict] = []
+
+    if user_id:
+        screening_row = (
+            await db.execute(select(UserScreeningProfile).where(UserScreeningProfile.user_id == user_id))
+        ).scalar_one_or_none()
+        if screening_row:
+            screening = {
+                "overall_risk": screening_row.overall_risk,
+                "requires_attention": screening_row.requires_attention,
+                "primary_concerns": (screening_row.profile_data or {}).get("primary_concerns", []),
+                "protective_factors": (screening_row.profile_data or {}).get("protective_factors", []),
+                "updated_at": screening_row.updated_at.isoformat() if screening_row.updated_at else None,
+            }
+
+        triage_rows = (
+            await db.execute(
+                select(TriageAssessment)
+                .where(TriageAssessment.user_id == user_id)
+                .order_by(TriageAssessment.created_at.desc())
+                .limit(10)
+            )
+        ).scalars().all()
+        for t in triage_rows:
+            assessment_data = t.assessment_data or {}
+            diagnostic_notes = assessment_data.get("diagnostic_notes")
+            triage_payload.append(
+                {
+                    "id": t.id,
+                    "risk_score": t.risk_score,
+                    "confidence_score": t.confidence_score,
+                    "severity_level": t.severity_level,
+                    "recommended_action": t.recommended_action,
+                    "intent": assessment_data.get("intent"),
+                    "next_step": assessment_data.get("next_step"),
+                    "risk_factors": t.risk_factors,
+                    "diagnostic_notes_redacted": prelog_redact(str(diagnostic_notes)) if diagnostic_notes else None,
+                    "created_at": t.created_at.isoformat() if t.created_at else None,
+                }
+            )
+
+    return {
+        "case_id": str(case.id),
+        "session_id": case.session_id,
+        "user_hash": case.user_hash,
+        "screening_profile": screening,
+        "triage_assessments": triage_payload,
+    }
 
 
 async def require_counselor(current_user: User = Depends(get_current_active_user)) -> User:
@@ -333,6 +421,34 @@ async def get_my_cases(
     
     result = await db.execute(query)
     cases = result.scalars().all()
+
+    # Preload user contact info for these cases.
+    conversation_ids = {c.conversation_id for c in cases if getattr(c, "conversation_id", None)}
+    session_ids = {c.session_id for c in cases if getattr(c, "session_id", None)}
+
+    conversation_user_by_id: dict[int, int] = {}
+    conversation_user_by_session: dict[str, int] = {}
+    if conversation_ids or session_ids:
+        conv_stmt = select(Conversation.id, Conversation.user_id, Conversation.session_id)
+        filters = []
+        if conversation_ids:
+            filters.append(Conversation.id.in_(conversation_ids))
+        if session_ids:
+            filters.append(Conversation.session_id.in_(session_ids))
+        conv_stmt = conv_stmt.where(or_(*filters))
+        conv_rows = (await db.execute(conv_stmt)).all()
+        for conv_id, user_id, sess_id in conv_rows:
+            conversation_user_by_id[int(conv_id)] = int(user_id)
+            if sess_id:
+                conversation_user_by_session[str(sess_id)] = int(user_id)
+
+    user_ids: set[int] = set(conversation_user_by_id.values()) | set(conversation_user_by_session.values())
+    users_by_id: dict[int, User] = {}
+    if user_ids:
+        user_rows = (
+            await db.execute(select(User).where(User.id.in_(user_ids)))
+        ).scalars().all()
+        users_by_id = {u.id: u for u in user_rows}
     
     # Convert to schema
     from typing import cast
@@ -348,6 +464,17 @@ async def get_my_cases(
             status_val = "closed"
         severity_val = case.severity.value if isinstance(case.severity, CaseSeverityEnum) else "low"
         
+        linked_user_id: int | None = None
+        if case.conversation_id and int(case.conversation_id) in conversation_user_by_id:
+            linked_user_id = conversation_user_by_id[int(case.conversation_id)]
+        elif case.session_id and str(case.session_id) in conversation_user_by_session:
+            linked_user_id = conversation_user_by_session[str(case.session_id)]
+
+        user_obj: User | None = users_by_id.get(linked_user_id) if linked_user_id else None
+        user_phone = None
+        if user_obj:
+            user_phone = user_obj.phone or user_obj.alternate_phone
+
         payload.append(SDACase(
             id=str(case.id),
             created_at=created_at,
@@ -359,6 +486,9 @@ async def get_my_cases(
             session_id=str(case.session_id) if case.session_id else None,
             summary_redacted=str(case.summary_redacted) if case.summary_redacted else None,
             sla_breach_at=cast(datetime | None, case.sla_breach_at),
+            user_email=user_obj.email if user_obj else None,
+            user_phone=user_phone,
+            telegram_username=getattr(user_obj, "telegram_username", None) if user_obj else None,
         ))
     
     return SDAListCasesResponse(cases=payload)

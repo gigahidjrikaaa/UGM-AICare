@@ -3,10 +3,12 @@ from __future__ import annotations
 
 import logging
 import secrets
+import uuid
 from datetime import datetime, timedelta
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from passlib.context import CryptContext
 from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import noload
@@ -15,9 +17,14 @@ from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.models import User, UserBadge  # Core models
 from app.domains.mental_health.models import Appointment, Conversation, JournalEntry
+from app.models.user_audit_log import UserAuditLog
 from app.models.agent_user import AgentUser
 from app.schemas.admin import (
     AgentUserSummary,
+    AdminCreateUserRequest,
+    AdminCreateUserResponse,
+    AdminUpdateUserRequest,
+    AdminUserLogItem,
     UserDetailResponse,
     UserListItem,
     UsersResponse,
@@ -27,6 +34,24 @@ from .utils import decrypt_user_email, get_user_stats, build_avatar_url, decrypt
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Admin - Users"])
+
+_pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
+
+
+def _normalize_role(role: str) -> str:
+    return (role or "").strip().lower()
+
+
+def _ensure_admin_only(admin_user: User) -> None:
+    if _normalize_role(getattr(admin_user, "role", "")) != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required",
+        )
+
+
+def _hash_password(password: str) -> str:
+    return _pwd_context.hash(password)
 
 
 @router.get("/agent-users", response_model=List[AgentUserSummary])
@@ -53,6 +78,72 @@ async def list_agent_users(
     result = await db.execute(stmt)
     agents = result.scalars().all()
     return [AgentUserSummary.model_validate(agent) for agent in agents]
+
+
+@router.post("/users", response_model=AdminCreateUserResponse, status_code=status.HTTP_201_CREATED)
+async def create_user(
+    payload: AdminCreateUserRequest,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user),
+) -> AdminCreateUserResponse:
+    """Create a new user (user/counselor/admin) for manual provisioning."""
+    _ensure_admin_only(admin_user)
+
+    requested_role = _normalize_role(payload.role)
+    if requested_role not in {"user", "counselor", "admin"}:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid role. Allowed: user, counselor, admin",
+        )
+
+    email_normalized = payload.email.strip().lower()
+    existing = (
+        await db.execute(select(User).where(func.lower(User.email) == email_normalized).limit(1))
+    ).scalar_one_or_none()
+    if existing:
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail="A user with this email already exists",
+        )
+
+    temp_password: Optional[str] = None
+    if payload.password:
+        password_hash = _hash_password(payload.password)
+    else:
+        temp_password = secrets.token_urlsafe(12)
+        password_hash = _hash_password(temp_password)
+
+    user = User(
+        email=email_normalized,
+        name=payload.name,
+        role=requested_role,
+        password_hash=password_hash,
+        is_active=payload.is_active,
+        email_verified=payload.email_verified,
+        allow_email_checkins=payload.allow_email_checkins,
+        created_at=datetime.utcnow(),
+        last_login=None,
+        check_in_code=uuid.uuid4().hex,
+    )
+
+    db.add(user)
+    try:
+        await db.commit()
+        await db.refresh(user)
+    except Exception as exc:
+        await db.rollback()
+        logger.exception("Failed to create user")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to create user",
+        ) from exc
+
+    return AdminCreateUserResponse(
+        user_id=user.id,
+        email=user.email,
+        role=user.role,
+        temporary_password=temp_password,
+    )
 
 
 @router.get("/users", response_model=UsersResponse)
@@ -250,10 +341,42 @@ async def get_user_detail(
     )
 
 
+@router.get("/users/{user_id}/logs", response_model=List[AdminUserLogItem])
+async def get_user_logs(
+    user_id: int,
+    limit: int = Query(50, ge=1, le=200),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user),
+) -> List[AdminUserLogItem]:
+    """Return audit log entries performed by a given user (best-effort)."""
+    _ensure_admin_only(admin_user)
+
+    # Ensure user exists
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    stmt = (
+        select(UserAuditLog)
+        .where(UserAuditLog.changed_by_user_id == user_id)
+        .order_by(UserAuditLog.timestamp.desc())
+        .limit(limit)
+    )
+    rows = (await db.execute(stmt)).scalars().all()
+    out: List[AdminUserLogItem] = []
+    for row in rows:
+        activity = f"{row.action} {row.table_name}"
+        if row.change_reason:
+            activity = f"{activity}: {row.change_reason}"
+        out.append(AdminUserLogItem(timestamp=row.timestamp, activity=activity))
+    return out
+
+
 @router.put("/users/{user_id}/email-checkins")
 async def update_user_email_checkins(
     user_id: int,
-    allow_email_checkins: bool,
+    enabled: bool = Query(..., alias="enabled"),
+    allow_email_checkins: Optional[bool] = Query(None, alias="allow_email_checkins"),
     db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user),
 ):
@@ -265,10 +388,12 @@ async def update_user_email_checkins(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    user.allow_email_checkins = allow_email_checkins
+    # Accept either `enabled` or legacy `allow_email_checkins`.
+    resolved = enabled if allow_email_checkins is None else allow_email_checkins
+    user.allow_email_checkins = resolved
     await db.commit()
     await db.refresh(user)
-    return {"user_id": user_id, "allow_email_checkins": allow_email_checkins}
+    return {"user_id": user_id, "allow_email_checkins": resolved}
 
 
 @router.put("/users/{user_id}/status")
@@ -303,27 +428,104 @@ async def update_user_role(
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
-    user.role = role
+    requested_role = _normalize_role(role)
+    if requested_role == "admin":
+        _ensure_admin_only(admin_user)
+    user.role = requested_role
     await db.commit()
     await db.refresh(user)
-    return {"user_id": user_id, "role": role}
+    return {"user_id": user_id, "role": requested_role}
+
+
+@router.put("/users/{user_id}")
+async def update_user(
+    user_id: int,
+    payload: AdminUpdateUserRequest,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user),
+):
+    """Update basic user fields used by the admin panel."""
+    _ensure_admin_only(admin_user)
+
+    user = await db.get(User, user_id)
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    if payload.email is not None:
+        email_normalized = payload.email.strip().lower()
+        existing = (
+            await db.execute(
+                select(User)
+                .where(func.lower(User.email) == email_normalized)
+                .where(User.id != user_id)
+                .limit(1)
+            )
+        ).scalar_one_or_none()
+        if existing:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A different user with this email already exists",
+            )
+        user.email = email_normalized
+
+    if payload.name is not None:
+        user.name = payload.name
+    if payload.phone is not None:
+        user.phone = payload.phone
+    if payload.wallet_address is not None:
+        user.wallet_address = payload.wallet_address
+    if payload.allow_email_checkins is not None:
+        user.allow_email_checkins = payload.allow_email_checkins
+    if payload.is_active is not None:
+        user.is_active = payload.is_active
+    if payload.date_of_birth is not None:
+        user.date_of_birth = payload.date_of_birth
+
+    if payload.role is not None:
+        requested_role = _normalize_role(payload.role)
+        if requested_role == "admin":
+            _ensure_admin_only(admin_user)
+        user.role = requested_role
+
+    user.updated_at = datetime.utcnow()
+    db.add(user)
+    try:
+        await db.commit()
+        await db.refresh(user)
+    except Exception as exc:
+        await db.rollback()
+        logger.exception("Failed to update user %s", user_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to update user",
+        ) from exc
+
+    return {"message": "User updated", "user_id": user_id}
 
 
 @router.delete("/users/{user_id}")
 async def delete_user(
     user_id: int,
+    permanent: bool = Query(False, description="Permanently delete (default: soft deactivate)"),
     db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user),
 ):
-    """Delete a user and related data."""
-    logger.info("Admin %s deleting user %s", admin_user.id, user_id)
+    """Delete or deactivate a user."""
+    _ensure_admin_only(admin_user)
+    logger.info("Admin %s deleting user %s (permanent=%s)", admin_user.id, user_id, permanent)
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
+    if not permanent:
+        user.is_active = False
+        await db.commit()
+        await db.refresh(user)
+        return {"message": f"User {user_id} deactivated", "user_id": user_id}
+
     await db.delete(user)
     await db.commit()
-    return {"message": f"User {user_id} deleted"}
+    return {"message": f"User {user_id} deleted", "user_id": user_id}
 
 
 @router.post("/users/{user_id}/reset-password")
@@ -352,6 +554,21 @@ async def reset_user_password(
         )
 
     reset_token = secrets.token_urlsafe(32)
+    # Persist token + expiry so the normal reset flow can validate it.
+    user.password_reset_token = reset_token
+    user.password_reset_expires = datetime.utcnow() + timedelta(hours=1)
+    db.add(user)
+    try:
+        await db.commit()
+        await db.refresh(user)
+    except Exception as exc:
+        await db.rollback()
+        logger.exception("Failed to persist reset token for user %s", user_id)
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to generate reset token",
+        ) from exc
+
     logger.info("Password reset token generated for user %s", user_id)
     return {
         "message": f"Password reset token generated for user {user_id}",

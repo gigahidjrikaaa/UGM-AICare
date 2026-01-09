@@ -2,9 +2,12 @@
 from __future__ import annotations
 
 from datetime import date, datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, EmailStr, Field
+
+
+UserRole = Literal["user", "counselor", "admin", "therapist", "guest"]
 
 
 class UserListItem(BaseModel):
@@ -31,6 +34,45 @@ class UserListItem(BaseModel):
     last_login: Optional[datetime] = None
 
     model_config = ConfigDict(from_attributes=True)
+
+
+class AdminCreateUserRequest(BaseModel):
+    email: EmailStr
+    name: Optional[str] = None
+    role: UserRole = "user"
+    password: Optional[str] = Field(default=None, min_length=8)
+    is_active: bool = True
+    email_verified: bool = True
+    allow_email_checkins: bool = True
+
+    model_config = ConfigDict(extra="ignore")
+
+
+class AdminCreateUserResponse(BaseModel):
+    user_id: int
+    email: str
+    role: str
+    temporary_password: Optional[str] = None
+
+
+class AdminUpdateUserRequest(BaseModel):
+    email: Optional[EmailStr] = None
+    name: Optional[str] = None
+    phone: Optional[str] = None
+    wallet_address: Optional[str] = None
+    allow_email_checkins: Optional[bool] = None
+    is_active: Optional[bool] = None
+    role: Optional[UserRole] = None
+    date_of_birth: Optional[date] = None
+
+    # The frontend currently sends additional optional fields (e.g., specialization).
+    # We ignore unknown keys to avoid breaking admin UX.
+    model_config = ConfigDict(extra="ignore")
+
+
+class AdminUserLogItem(BaseModel):
+    timestamp: datetime
+    activity: str
 
 
 class UserStats(BaseModel):

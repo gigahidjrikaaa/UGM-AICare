@@ -85,6 +85,15 @@ export default function UserManagementPage() {
   const [showFilters, setShowFilters] = useState(false);
   const [userLogs, setUserLogs] = useState<UserLog[]>([]); // State for user logs
 
+  const [showCreateUser, setShowCreateUser] = useState(false);
+  const [createUserForm, setCreateUserForm] = useState({
+    email: '',
+    name: '',
+    role: 'user',
+    password: '',
+  });
+  const [createUserTempPassword, setCreateUserTempPassword] = useState<string | null>(null);
+
   // Fetch user logs
   const fetchUserLogs = useCallback(async (userId: number) => {
     try {
@@ -97,9 +106,13 @@ export default function UserManagementPage() {
   }, []);
 
   useEffect(() => {
-    if (selectedUser && selectedUser.role === 'admin') {
-      fetchUserLogs(selectedUser.id);
+    if (!selectedUser) {
+      setUserLogs([]);
+      return;
     }
+
+    setUserLogs([]);
+    fetchUserLogs(selectedUser.id);
   }, [selectedUser, fetchUserLogs]);
 
   // Fetch users data
@@ -369,6 +382,59 @@ export default function UserManagementPage() {
     }
   };
 
+  const handleCreateUserChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value } = e.target;
+    setCreateUserForm(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleCreateUser = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const email = createUserForm.email.trim();
+    if (!email) {
+      toast.error('Email is required');
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setCreateUserTempPassword(null);
+      const payload = {
+        email,
+        name: createUserForm.name.trim() || undefined,
+        role: createUserForm.role,
+        password: createUserForm.password.trim() || undefined,
+      };
+
+      const result = await apiCall<{ temporary_password?: string; user_id: number }>(
+        '/api/v1/admin/users',
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      toast.success('User created');
+
+      if (result.temporary_password) {
+        setCreateUserTempPassword(result.temporary_password);
+      }
+
+      setCreateUserForm({ email: '', name: '', role: 'user', password: '' });
+      setShowCreateUser(Boolean(result.temporary_password));
+      setCurrentPage(1);
+      await fetchUsers();
+    } catch (error) {
+      console.error('Error creating user:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to create user');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -381,6 +447,16 @@ export default function UserManagementPage() {
           <p className="text-gray-400 mt-1">Manage and monitor platform users</p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={() => setShowCreateUser(v => !v)}
+            className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+              showCreateUser
+                ? 'bg-[#FFCA40] text-black'
+                : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+            }`}
+          >
+            Create User
+          </button>
           <button
             onClick={() => setShowFilters(!showFilters)}
             className={`inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
@@ -409,6 +485,124 @@ export default function UserManagementPage() {
           </button>
         </div>
       </div>
+
+      {showCreateUser && (
+        <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-6">
+          <h2 className="text-lg font-semibold text-white mb-4">Create a new user</h2>
+          <form onSubmit={handleCreateUser} className="grid grid-cols-1 md:grid-cols-4 gap-4">
+            <div className="md:col-span-2">
+              <label className="block text-sm text-gray-300 mb-1" htmlFor="create-email">
+                Email
+              </label>
+              <input
+                id="create-email"
+                name="email"
+                type="email"
+                value={createUserForm.email}
+                onChange={handleCreateUserChange}
+                className="w-full px-3 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/30"
+                placeholder="user@ugm.ac.id"
+                autoComplete="off"
+                required
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-300 mb-1" htmlFor="create-name">
+                Name (optional)
+              </label>
+              <input
+                id="create-name"
+                name="name"
+                type="text"
+                value={createUserForm.name}
+                onChange={handleCreateUserChange}
+                className="w-full px-3 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/30"
+                placeholder="Full name"
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm text-gray-300 mb-1" htmlFor="create-role">
+                Role
+              </label>
+              <select
+                id="create-role"
+                name="role"
+                value={createUserForm.role}
+                onChange={handleCreateUserChange}
+                className="w-full px-3 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/30"
+              >
+                <option value="user">User</option>
+                <option value="counselor">Counselor</option>
+                <option value="admin">Admin</option>
+              </select>
+            </div>
+
+            <div className="md:col-span-3">
+              <label className="block text-sm text-gray-300 mb-1" htmlFor="create-password">
+                Password (optional)
+              </label>
+              <input
+                id="create-password"
+                name="password"
+                type="text"
+                value={createUserForm.password}
+                onChange={handleCreateUserChange}
+                className="w-full px-3 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:outline-none focus:ring-2 focus:ring-white/30"
+                placeholder="Leave blank to auto-generate"
+                autoComplete="off"
+              />
+              <p className="text-xs text-gray-400 mt-1">
+                If left blank, the system generates a temporary password (shown once).
+              </p>
+            </div>
+
+            <div className="md:col-span-1 flex items-end gap-2">
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full inline-flex justify-center items-center px-4 py-2 bg-[#FFCA40] hover:bg-[#ffda63] text-black rounded-lg text-sm font-medium transition-colors disabled:opacity-50"
+              >
+                Create
+              </button>
+            </div>
+          </form>
+
+          {createUserTempPassword && (
+            <div className="mt-4 bg-white/5 rounded-lg border border-white/20 p-4">
+              <h3 className="text-sm font-medium text-white">Temporary password</h3>
+              <p className="text-xs text-gray-400 mt-1">
+                Shown once. Copy and share securely with the user.
+              </p>
+              <div className="mt-3 flex flex-col sm:flex-row gap-2">
+                <input
+                  type="text"
+                  value={createUserTempPassword}
+                  readOnly
+                  aria-label="Temporary password"
+                  className="flex-1 px-3 py-2 rounded-lg bg-white/10 text-white border border-white/20 focus:outline-none"
+                />
+                <button
+                  type="button"
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(createUserTempPassword);
+                      toast.success('Copied');
+                    } catch (error) {
+                      console.error('Error copying temporary password:', error);
+                      toast.error('Failed to copy');
+                    }
+                  }}
+                  className="inline-flex justify-center items-center px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg text-sm font-medium transition-colors border border-white/20"
+                >
+                  Copy
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Statistics Cards */}
       {stats && (

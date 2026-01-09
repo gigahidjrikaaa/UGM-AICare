@@ -62,3 +62,25 @@ async def test_analyze_conversation_risk_parses_json(monkeypatch: pytest.MonkeyP
     assert result.screening is not None
     assert result.screening.anxiety is not None
     assert result.screening.anxiety.score == 0.3
+
+
+@pytest.mark.asyncio
+async def test_analyze_conversation_risk_rejects_empty_llm_response(monkeypatch: pytest.MonkeyPatch) -> None:
+    from app.agents.sta.conversation_analyzer import analyze_conversation_risk
+
+    async def fake_generate_response_with_fallback(**_kwargs):
+        return None
+
+    monkeypatch.setattr(
+        "app.agents.sta.conversation_analyzer.generate_gemini_response_with_fallback",
+        fake_generate_response_with_fallback,
+    )
+
+    with pytest.raises(ValueError, match="empty response"):
+        await analyze_conversation_risk(
+            conversation_history=[
+                {"role": "user", "content": "hi"},
+                {"role": "assistant", "content": "hello"},
+            ],
+            current_message="bye",
+        )

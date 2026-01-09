@@ -20,6 +20,9 @@ class SDACase(BaseModel):
     session_id: Optional[str] = None
     summary_redacted: Optional[str] = None
     sla_breach_at: Optional[datetime] = None
+    user_email: Optional[str] = None
+    user_phone: Optional[str] = None
+    telegram_username: Optional[str] = None
 
 
 class SDAListCasesResponse(BaseModel):

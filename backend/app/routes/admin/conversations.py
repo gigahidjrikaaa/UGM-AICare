@@ -461,13 +461,19 @@ async def trigger_conversation_assessment(
     sanitized_history = [{"role": entry["role"], "content": entry["content"]} for entry in context_history]
     conversation_start = conversations[0].timestamp.timestamp() if conversations[0].timestamp else None
 
-    assessment = await analyze_conversation_risk(
-        conversation_history=sanitized_history,
-        current_message=current_message,
-        user_context={},
-        conversation_start_time=conversation_start,
-        preferred_model=payload.preferred_model,
-    )
+    try:
+        assessment = await analyze_conversation_risk(
+            conversation_history=sanitized_history,
+            current_message=current_message,
+            user_context={},
+            conversation_start_time=conversation_start,
+            preferred_model=payload.preferred_model,
+        )
+    except ValueError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=f"STA assessment failed: {exc}",
+        ) from exc
 
     record = await upsert_conversation_assessment(
         db,

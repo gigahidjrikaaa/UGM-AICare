@@ -16,7 +16,7 @@ RUN npm ci
 COPY . .
 
 # Expose the port Next.js runs on
-EXPOSE 3000
+EXPOSE 22000
 
 # Default command for development (runs dev server)
 CMD ["npm", "run", "dev:docker"]
@@ -73,7 +73,7 @@ COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 
 # Expose the port Next.js runs on
-EXPOSE 3000
+EXPOSE 22000
 
 # Set user to non-root (good practice)
 USER node

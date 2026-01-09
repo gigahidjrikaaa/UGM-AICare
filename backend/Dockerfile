@@ -80,8 +80,8 @@ RUN mkdir -p /app/alembic/versions && \
 USER appuser
 
 # Expose the port the app runs on
-EXPOSE 8000
+EXPOSE 22001
 
 # Set the command to start the application.
 # Using shell form to allow environment variable expansion for WORKERS_PER_CORE.
-CMD exec gunicorn -k uvicorn.workers.UvicornWorker app.main:app --workers ${WORKERS_PER_CORE:-4} --worker-tmp-dir /dev/shm --bind 0.0.0.0:8000
+CMD exec gunicorn -k uvicorn.workers.UvicornWorker app.main:app --workers ${WORKERS_PER_CORE:-4} --worker-tmp-dir /dev/shm --bind 0.0.0.0:${PORT:-22001}

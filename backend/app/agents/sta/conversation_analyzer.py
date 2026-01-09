@@ -192,6 +192,12 @@ NOTES:
             temperature=0.2,  # Low temp for consistent clinical analysis
             max_tokens=4096
         )
+
+        if not isinstance(response_text, str) or not response_text.strip():
+            raise ValueError("STA analyzer received an empty response from the LLM")
+
+        if response_text.lstrip().startswith("Error:"):
+            raise ValueError(f"STA analyzer LLM error: {response_text}")
         
         # Clean markdown code blocks if present
         response_text = re.sub(r'^```json\s*', '', response_text.strip())

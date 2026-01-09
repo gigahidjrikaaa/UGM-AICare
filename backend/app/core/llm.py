@@ -3,6 +3,7 @@
 import os
 import httpx
 import asyncio
+import re
 from typing import Any, AsyncIterator, cast
 
 # NEW SDK imports
@@ -264,6 +265,64 @@ def _is_invalid_model_error(status_code: int, error_msg: str) -> bool:
     return any(k in msg for k in ["model not found", "not supported", "unknown model", "not_found"])
 
 
+def _current_gemini_key_fingerprint() -> tuple[int, str]:
+    """Return (index, last4) for the currently-selected Gemini API key.
+
+    This is for log attribution only; it never returns the full key.
+    """
+
+    global _current_key_index
+    idx = int(_current_key_index)
+    try:
+        key = GEMINI_API_KEYS[idx]
+    except Exception:
+        return idx, "????"
+    key_str = str(key or "")
+    return idx, (key_str[-4:] if len(key_str) >= 4 else "????")
+
+
+def _parse_retry_after_s(error_msg: str) -> float | None:
+    """Best-effort parse for SDK messages like: "Please retry in 45.63s"."""
+
+    msg = error_msg or ""
+    match = re.search(r"retry in (\d+(?:\.\d+)?)s", msg)
+    if not match:
+        return None
+    try:
+        return float(match.group(1))
+    except ValueError:
+        return None
+
+
+def _is_resource_exhausted_error(status_code: int, error_msg: str) -> bool:
+    msg = (error_msg or "")
+    return status_code == 429 or "RESOURCE_EXHAUSTED" in msg
+
+
+class GeminiResourceExhaustedError(RuntimeError):
+    """Raised when Gemini returns RESOURCE_EXHAUSTED and we cannot recover.
+
+    This exception carries safe attribution (model name and API key fingerprint)
+    so upstream code can log once and clients (e.g. notebook evaluators) can
+    pause/resume.
+    """
+
+    def __init__(
+        self,
+        *,
+        model: str,
+        api_key_index: int,
+        api_key_last4: str,
+        retry_after_s: float | None,
+        message: str,
+    ) -> None:
+        super().__init__(message)
+        self.model = model
+        self.api_key_index = api_key_index
+        self.api_key_last4 = api_key_last4
+        self.retry_after_s = retry_after_s
+
+
 
 # --- Gemini API Function (Async) - Migrated to new SDK ---
 @trace_llm_call("gemini-genai-sdk")
@@ -388,6 +447,23 @@ async def generate_gemini_response(
             
             # If we get here, response.text is None or empty, or doesn't exist
             logger.warning(f"Gemini response text is missing or empty.")
+
+            # Try to provide a more specific error when available.
+            if hasattr(response, 'prompt_feedback') and response.prompt_feedback:
+                if hasattr(response.prompt_feedback, 'block_reason') and response.prompt_feedback.block_reason:
+                    reason = str(response.prompt_feedback.block_reason)
+                    logger.warning(f"Gemini request blocked. Reason: {reason}")
+                    return f"Error: Request blocked by safety filters ({reason}). Please rephrase your prompt."
+
+            if response.candidates and len(response.candidates) > 0:
+                candidate = response.candidates[0]
+                if hasattr(candidate, 'finish_reason') and candidate.finish_reason:
+                    reason = str(candidate.finish_reason)
+                    if reason != 'STOP':
+                        logger.warning(f"Gemini generation stopped unexpectedly. Reason: {reason}")
+                        return f"Error: Generation stopped ({reason})."
+
+            return "Error: Received an empty or invalid response from Gemini."
             
         except (ValueError, AttributeError) as e:
             # Check if this is a function call (not an error)
@@ -428,6 +504,17 @@ async def generate_gemini_response(
         logger.error(f"ValueError calling Gemini API: {e}")
         return f"Error: Invalid configuration or request. {e}"
     except Exception as e:
+        # Let fallback handlers decide what to do, but avoid noisy tracebacks
+        # for expected SDK client/server errors (e.g., 429 RESOURCE_EXHAUSTED).
+        try:
+            from google.genai.errors import ClientError, ServerError
+
+            if isinstance(e, (ClientError, ServerError)):
+                raise
+        except Exception:
+            # If imports fail for any reason, fall through to logging.
+            pass
+
         logger.error(f"Error calling Gemini API: {e}", exc_info=True)
         # Don't return error message here - let fallback handler decide
         raise
@@ -481,6 +568,14 @@ async def generate_gemini_content(
 
         return "Error: Received an empty or invalid response from Gemini."
     except Exception as e:
+        try:
+            from google.genai.errors import ClientError, ServerError
+
+            if isinstance(e, (ClientError, ServerError)):
+                raise
+        except Exception:
+            pass
+
         logger.error(f"Error calling Gemini API (contents): {e}", exc_info=True)
         raise
 
@@ -495,13 +590,15 @@ async def generate_gemini_content_with_fallback(
 ) -> str | Any:
     """Generate Gemini response with automatic fallback, using pre-built contents."""
     from google.genai.errors import ClientError, ServerError
-    import re
 
     if config is None:
         config = types.GenerateContentConfig(max_output_tokens=2048, temperature=0.7)
 
     models_to_try = [model] + [m for m in GEMINI_FALLBACK_CHAIN if m != model]
     last_error: Exception | None = None
+    last_error_model: str | None = None
+    last_error_key: tuple[int, str] | None = None
+    last_error_retry_after_s: float | None = None
 
     for idx, current_model in enumerate(models_to_try):
         max_retries_per_model = max(3, len(GEMINI_API_KEYS))
@@ -526,6 +623,9 @@ async def generate_gemini_content_with_fallback(
 
             except (ClientError, ServerError) as e:
                 last_error = e
+                last_error_model = current_model
+                last_error_key = _current_gemini_key_fingerprint()
+                last_error_retry_after_s = _parse_retry_after_s(str(e))
                 error_code = getattr(e, "status_code", 0)
                 error_msg = str(e)
 
@@ -544,8 +644,18 @@ async def generate_gemini_content_with_fallback(
                 )
 
                 if should_fallback:
+                    key_idx, key_last4 = _current_gemini_key_fingerprint()
+                    logger.warning(
+                        "Gemini request throttled/quota-limited: model=%s code=%s key_idx=%s key_last4=%s retry=%s/%s contents_mode=True",
+                        current_model,
+                        error_code,
+                        key_idx,
+                        key_last4,
+                        retry_attempt,
+                        max_retries_per_model,
+                    )
                     if len(GEMINI_API_KEYS) > 1 and retry_attempt < len(GEMINI_API_KEYS) - 1:
-                        logger.warning("🔑 Rate limit hit. Rotating API Key and retrying immediately...")
+                        logger.warning("🔑 Rotating Gemini API key and retrying immediately...")
                         get_gemini_client(force_rotate=True)
                         continue
 
@@ -576,7 +686,18 @@ async def generate_gemini_content_with_fallback(
                 raise
 
     logger.error(f"❌ All fallback models exhausted. Last error: {last_error}")
-    if last_error:
+    if last_error is not None and last_error_model is not None and last_error_key is not None:
+        error_code = getattr(last_error, "status_code", 0)
+        error_msg = str(last_error)
+        if _is_resource_exhausted_error(int(error_code), error_msg):
+            key_idx, key_last4 = last_error_key
+            raise GeminiResourceExhaustedError(
+                model=last_error_model,
+                api_key_index=key_idx,
+                api_key_last4=key_last4,
+                retry_after_s=last_error_retry_after_s,
+                message=error_msg,
+            ) from last_error
         raise last_error
     raise Exception("All Gemini models failed with unknown error")
 
@@ -608,13 +729,15 @@ async def generate_gemini_response_with_fallback(
         Generated response or raises exception if all models fail
     """
     from google.genai.errors import ClientError, ServerError
-    import re
     import asyncio
     
     # Build model list: requested model + fallback chain (deduplicated)
     models_to_try = [model] + [m for m in GEMINI_FALLBACK_CHAIN if m != model]
     
-    last_error = None
+    last_error: Exception | None = None
+    last_error_model: str | None = None
+    last_error_key: tuple[int, str] | None = None
+    last_error_retry_after_s: float | None = None
     for idx, current_model in enumerate(models_to_try):
         # Retry loop for the SAME model if we get a rate limit with a suggested delay
         # We'll try up to 3 times per model, OR enough times to cycle through all keys
@@ -642,6 +765,9 @@ async def generate_gemini_response_with_fallback(
                 
             except (ClientError, ServerError) as e:
                 last_error = e # Capture error immediately to ensure it's preserved if loop exits
+                last_error_model = current_model
+                last_error_key = _current_gemini_key_fingerprint()
+                last_error_retry_after_s = _parse_retry_after_s(str(e))
                 error_code = getattr(e, 'status_code', 0)
                 error_msg = str(e)
                 
@@ -661,13 +787,23 @@ async def generate_gemini_response_with_fallback(
                 )
                 
                 if should_fallback:
+                    key_idx, key_last4 = _current_gemini_key_fingerprint()
+                    logger.warning(
+                        "Gemini request throttled/quota-limited: model=%s code=%s key_idx=%s key_last4=%s retry=%s/%s",
+                        current_model,
+                        error_code,
+                        key_idx,
+                        key_last4,
+                        retry_attempt,
+                        max_retries_per_model,
+                    )
                     # KEY ROTATION STRATEGY
                     # If we have multiple keys, try rotating first before waiting or changing models
                     if len(GEMINI_API_KEYS) > 1:
                         # We can try rotating keys up to N times (where N is number of keys)
                         # We use a simple heuristic: if we haven't tried all keys for this model attempt yet
                         if retry_attempt < len(GEMINI_API_KEYS) - 1:
-                            logger.warning(f"🔑 Rate limit hit (429). Rotating API Key and retrying immediately...")
+                            logger.warning("🔑 Rotating Gemini API key and retrying immediately...")
                             get_gemini_client(force_rotate=True)
                             continue
 
@@ -706,10 +842,23 @@ async def generate_gemini_response_with_fallback(
     
     # All models failed
     logger.error(f"❌ All fallback models exhausted. Last error: {last_error}")
-    if last_error:
+
+    if last_error is not None and last_error_model is not None and last_error_key is not None:
+        error_code = getattr(last_error, "status_code", 0)
+        error_msg = str(last_error)
+        if _is_resource_exhausted_error(int(error_code), error_msg):
+            key_idx, key_last4 = last_error_key
+            raise GeminiResourceExhaustedError(
+                model=last_error_model,
+                api_key_index=key_idx,
+                api_key_last4=key_last4,
+                retry_after_s=last_error_retry_after_s,
+                message=error_msg,
+            ) from last_error
+
         raise last_error
-    else:
-        raise Exception("All Gemini models failed with unknown error")
+
+    raise Exception("All Gemini models failed with unknown error")
 
 
 
@@ -835,6 +984,31 @@ async def stream_gemini_response(
                 yield fallback
 
     except Exception as exc:
+        try:
+            from google.genai.errors import ClientError, ServerError
+
+            if isinstance(exc, (ClientError, ServerError)):
+                error_code = getattr(exc, "status_code", 0)
+                error_msg = str(exc)
+                if _is_resource_exhausted_error(int(error_code), error_msg):
+                    key_idx, key_last4 = _current_gemini_key_fingerprint()
+                    logger.debug(
+                        "Gemini streaming quota exhausted: model=%s code=%s key_idx=%s key_last4=%s",
+                        model,
+                        error_code,
+                        key_idx,
+                        key_last4,
+                    )
+                    raise GeminiResourceExhaustedError(
+                        model=model,
+                        api_key_index=key_idx,
+                        api_key_last4=key_last4,
+                        retry_after_s=_parse_retry_after_s(error_msg),
+                        message=error_msg,
+                    ) from exc
+        except Exception:
+            pass
+
         logger.error("Error streaming from Gemini API: %s", exc, exc_info=True)
         yield f"Error: An unexpected error occurred with Gemini API. {exc}"
 

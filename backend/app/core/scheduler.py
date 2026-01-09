@@ -25,6 +25,11 @@ from app.database import AsyncSessionLocal
 from app.models import User
 from app.domains.mental_health.models.assessments import UserScreeningProfile
 from app.utils.email_utils import send_email
+from app.domains.mental_health.services.proactive_checkins import (
+    queue_checkin_execution,
+    proactive_checkins_require_review,
+    build_checkin_message,
+)
 from app.domains.mental_health.services.insights_service import InsightsService
 from datetime import datetime, timedelta, date
 import random
@@ -67,111 +72,21 @@ MIN_HOURS_BETWEEN_CHECKINS = 48  # At least 48 hours between check-ins
 
 def get_personalized_message(
     user_name: str,
-    primary_concerns: List[str],
     risk_level: str,
-    app_url: str
+    primary_concerns: list[str],
+    app_url: str,
 ) -> tuple[str, str]:
-    """Generate personalized check-in message based on user's screening profile.
-    
-    Args:
-        user_name: User's display name
-        primary_concerns: List of primary concern dimensions from screening
-        risk_level: Overall risk level from screening profile
-        app_url: Application URL for links
-        
-    Returns:
-        tuple: (subject, html_body)
+    """Build a conservative check-in email message.
+
+    This delegates to the shared template in `proactive_checkins` to avoid
+    embedding raw conversation content.
     """
-    # Concern-specific messages
-    concern_messages: Dict[str, List[str]] = {
-        "depression": [
-            f"Halo {user_name}, Aika cuma mau mampir sebentar. Aku tau kadang semuanya terasa berat. Kalau mau cerita, aku di sini ya.",
-            f"Hey {user_name}, hope you're doing okay. Kalau lagi nggak semangat atau merasa down, it's okay to talk about it. Aku ada di sini.",
-        ],
-        "anxiety": [
-            f"Hai {user_name}, Aika di sini. Kalau pikiranmu lagi racing atau merasa overwhelmed, kamu nggak sendirian. Mau ngobrol?",
-            f"Hey {user_name}, just checking in. Kalau lagi banyak yang dikhawatirkan, sometimes it helps to talk it out. I'm here.",
-        ],
-        "sleep": [
-            f"Halo {user_name}, gimana tidurnya belakangan ini? Aku tau susah tidur itu menyebalkan. Kalau mau share, aku siap dengerin.",
-            f"Hey {user_name}, Aika mampir sebentar. Kalau malam-malam susah tidur atau gelisah, feel free to chat. Sometimes it helps.",
-        ],
-        "academic": [
-            f"Hai {user_name}, gimana kuliahnya? Aku tau tekanan akademik bisa overwhelming. Kalau butuh teman curhat, aku di sini.",
-            f"Hey {user_name}, Aika checking in. Skripsi/tugas kadang bikin stress, I get it. Mau cerita? No judgment here.",
-        ],
-        "social": [
-            f"Halo {user_name}, udah lama kita nggak ngobrol. Kalau lagi merasa sendirian atau butuh teman bicara, aku selalu ada.",
-            f"Hey {user_name}, just wanted to reach out. Sometimes we all feel a bit isolated. I'm here if you want to talk.",
-        ],
-        "self_worth": [
-            f"Hai {user_name}, Aika mau remind you that you matter. Kalau lagi nggak yakin sama diri sendiri, let's talk about it.",
-            f"Hey {user_name}, just checking in. You're doing better than you think. Kalau mau cerita, I'm here to listen.",
-        ],
-        "stress": [
-            f"Halo {user_name}, gimana kabarnya? Aku tau kamu mungkin lagi banyak tekanan. Kalau mau vent atau sekadar ngobrol, aku di sini.",
-            f"Hey {user_name}, Aika here. Stress can pile up quickly. Mau share what's on your mind? No pressure.",
-        ],
-    }
-    
-    # Default messages for general check-in
-    default_messages = [
-        f"Halo {user_name}, Aika cuma mau mampir sebentar nih. Gimana kabarmu beberapa hari ini? Kalau mau cerita atau sekadar ngobrol, aku ada di sini ya.",
-        f"Hai {user_name}, hope you're doing okay! Udah beberapa hari kita nggak ngobrol, kalau ada yang ingin dibagikan, jangan ragu ya. Salam, Aika.",
-        f"Hey {user_name}, it's Aika! Just checking in. Remember, taking small moments for yourself matters. Kalau butuh teman bicara, feel free to chat!",
-    ]
-    
-    # Risk-specific urgent messages
-    urgent_messages = [
-        f"Hai {user_name}, Aika di sini. Aku cuma mau ngecek keadaanmu. Gimana perasaanmu hari ini? Kalau ada yang berat, cerita aja ya.",
-        f"Hey {user_name}, I've been thinking about you. Just wanted to check in - how are you really doing? I'm here to listen.",
-    ]
-    
-    # Select message based on concerns and risk
-    if risk_level in ("critical", "severe"):
-        message = random.choice(urgent_messages)
-        subject = f"Aika thinking of you, {user_name} 💙"
-    elif primary_concerns:
-        # Get message for the first (most significant) concern
-        primary = primary_concerns[0] if primary_concerns else None
-        if primary and primary in concern_messages:
-            message = random.choice(concern_messages[primary])
-            subject = f"Hey {user_name}, Aika mampir sebentar"
-        else:
-            message = random.choice(default_messages)
-            subject = random.choice([
-                f"Sekadar menyapa dari Aika, {user_name}!",
-                "Checking in - Gimana kabarmu?",
-                "Aika mampir sebentar :)",
-            ])
-    else:
-        message = random.choice(default_messages)
-        subject = random.choice([
-            f"Sekadar menyapa dari Aika, {user_name}!",
-            "Checking in - Gimana kabarmu?",
-            "Aika mampir sebentar :)",
-        ])
-    
-    # Build HTML body
-    html_body = f"""
-    <html>
-    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
-        <p style="font-size: 16px; line-height: 1.6; color: #333;">{message}</p>
-        <p style="margin-top: 24px;">
-            <a href="{app_url}/aika" style="background-color: #4F46E5; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; display: inline-block;">
-                Ngobrol sama Aika
-            </a>
-        </p>
-        <hr style="margin-top: 32px; border: none; border-top: 1px solid #eee;">
-        <p style="font-size: 12px; color: #999; margin-top: 16px;">
-            Kamu menerima email ini karena mengaktifkan fitur check-in Aika. 
-            Kamu bisa menonaktifkannya di <a href="{app_url}/settings" style="color: #666;">halaman pengaturan</a>.
-        </p>
-    </body>
-    </html>
-    """
-    
-    return subject, html_body
+    return build_checkin_message(
+        user_name=user_name,
+        risk_level=risk_level,
+        primary_concerns=primary_concerns or [],
+        app_url=app_url,
+    )
 
 
 # =============================================================================
@@ -192,6 +107,9 @@ async def send_proactive_checkins() -> None:
     async with AsyncSessionLocal() as db:
         try:
             app_url = os.getenv('NEXTAUTH_URL', 'http://localhost:4000')
+            require_review = proactive_checkins_require_review(
+                os.getenv("PROACTIVE_CHECKINS_REQUIRE_REVIEW")
+            )
             today = date.today()
             now = datetime.now()
             
@@ -266,19 +184,35 @@ async def send_proactive_checkins() -> None:
                     app_url=app_url
                 )
                 
-                # Send email
+                # Send email (or queue for human review)
                 try:
-                    send_email(recipient_email=user_email, subject=subject, html_content=html_body)
+                    if require_review:
+                        await queue_checkin_execution(
+                            db=db,
+                            user=user,
+                            screening_profile=screening_profile,
+                            now=now,
+                            app_url=app_url,
+                            risk_level=risk_level,
+                            primary_concerns=primary_concerns,
+                        )
+                        logger.info(
+                            f"Scheduler: Check-in queued for user {user.id} "
+                            f"(risk={risk_level}, concerns={primary_concerns[:2]})"
+                        )
+                    else:
+                        send_email(recipient_email=user_email, subject=subject, html_content=html_body)
+                        logger.info(
+                            f"Scheduler: Check-in sent to user {user.id} "
+                            f"(risk={risk_level}, concerns={primary_concerns[:2]})"
+                        )
                     
                     # Update check-in tracking
                     user.last_checkin_sent_at = now
                     user.checkin_count = (user.checkin_count or 0) + 1
                     
                     sent_count += 1
-                    logger.info(
-                        f"Scheduler: Check-in sent to user {user.id} "
-                        f"(risk={risk_level}, concerns={primary_concerns[:2]}, count={user.checkin_count})"
-                    )
+                    
                     
                     # Rate limit to avoid email service issues
                     await asyncio.sleep(1)

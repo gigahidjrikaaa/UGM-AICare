@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import toast from "react-hot-toast";
 import {
-    FiClipboard, FiUser, FiCheckCircle, FiBell, FiChevronDown, FiChevronUp, FiBarChart2, FiList, FiUsers
+    FiClipboard, FiUser, FiCheckCircle, FiBell, FiChevronDown, FiChevronUp, FiBarChart2, FiList, FiUsers, FiRefreshCw
 } from "react-icons/fi";
 import { AnalyticsOverview } from "./components/AnalyticsOverview";
 import { CBTModuleUsage } from "./components/CBTModuleUsage";
@@ -39,12 +39,34 @@ interface InterventionPlan {
     };
 }
 
+interface InterventionExecution {
+    id: number;
+    campaign_id: number;
+    user_id: number;
+    status: string;
+    scheduled_at: string;
+    executed_at: string | null;
+    delivery_method: string | null;
+    notes: string | null;
+    engagement_score: number | null;
+    is_manual: boolean;
+    user_name: string | null;
+    user_email: string | null;
+    campaign_title: string | null;
+    priority: string | null;
+    plan_preview: Record<string, unknown> | null;
+}
+
 export default function InterventionPlansPage() {
-    const [activeTab, setActiveTab] = useState<'dashboard' | 'plans' | 'users'>('dashboard');
+    const [activeTab, setActiveTab] = useState<'dashboard' | 'queue' | 'plans' | 'users'>('dashboard');
     const [plans, setPlans] = useState<InterventionPlan[]>([]);
     const [loading, setLoading] = useState(true);
     const [expandedPlanId, setExpandedPlanId] = useState<number | null>(null);
     const [notifying, setNotifying] = useState<number | null>(null);
+
+    const [executions, setExecutions] = useState<InterventionExecution[]>([]);
+    const [executionsLoading, setExecutionsLoading] = useState(false);
+    const [executionActioning, setExecutionActioning] = useState<number | null>(null);
 
     // Analytics hook
     const { analytics, loading: analyticsLoading } = useAnalytics(30);
@@ -53,7 +75,93 @@ export default function InterventionPlansPage() {
         if (activeTab === 'plans') {
             loadPlans();
         }
+        if (activeTab === 'queue') {
+            loadExecutions();
+        }
     }, [activeTab]);
+
+    const loadExecutions = async () => {
+        try {
+            setExecutionsLoading(true);
+            const params = new URLSearchParams({ limit: '50' });
+            const response = await fetch(apiUrl(`/api/v1/admin/interventions/executions?${params.toString()}`), {
+                credentials: 'include',
+            });
+            if (!response.ok) throw new Error('Failed to load executions');
+            const data = await response.json();
+            const items = (data.items || []) as InterventionExecution[];
+            setExecutions(items.filter((it) => it.status === 'pending_review' || it.status === 'approved'));
+        } catch (error) {
+            console.error('Error:', error);
+            toast.error('Failed to load review queue');
+        } finally {
+            setExecutionsLoading(false);
+        }
+    };
+
+    const approveExecution = async (executionId: number) => {
+        const note = prompt('Optional approval note (leave blank to skip):') ?? '';
+        setExecutionActioning(executionId);
+        try {
+            const params = new URLSearchParams();
+            if (note.trim()) params.set('note', note.trim());
+            const url = apiUrl(`/api/v1/admin/interventions/executions/${executionId}/approve${params.toString() ? `?${params.toString()}` : ''}`);
+            const response = await fetch(url, {
+                method: 'POST',
+                credentials: 'include',
+            });
+            if (!response.ok) throw new Error('Failed to approve execution');
+            toast.success('Execution approved');
+            await loadExecutions();
+        } catch (error) {
+            console.error('Error:', error);
+            toast.error('Failed to approve execution');
+        } finally {
+            setExecutionActioning(null);
+        }
+    };
+
+    const rejectExecution = async (executionId: number) => {
+        const reason = prompt('Rejection reason (required):');
+        if (!reason || !reason.trim()) return;
+
+        setExecutionActioning(executionId);
+        try {
+            const params = new URLSearchParams({ reason: reason.trim() });
+            const response = await fetch(apiUrl(`/api/v1/admin/interventions/executions/${executionId}/reject?${params.toString()}`), {
+                method: 'POST',
+                credentials: 'include',
+            });
+            if (!response.ok) throw new Error('Failed to reject execution');
+            toast.success('Execution rejected');
+            await loadExecutions();
+        } catch (error) {
+            console.error('Error:', error);
+            toast.error('Failed to reject execution');
+        } finally {
+            setExecutionActioning(null);
+        }
+    };
+
+    const sendExecution = async (executionId: number) => {
+        if (!confirm('Send this message now?')) return;
+
+        setExecutionActioning(executionId);
+        try {
+            const response = await fetch(apiUrl(`/api/v1/admin/interventions/executions/${executionId}/send`), {
+                method: 'POST',
+                credentials: 'include',
+            });
+            if (!response.ok) throw new Error('Failed to send execution');
+            toast.success('Execution sent');
+            await loadExecutions();
+        } catch (error) {
+            console.error('Error:', error);
+            toast.error('Failed to send execution');
+        } finally {
+            setExecutionActioning(null);
+        }
+    };
 
     const loadPlans = async () => {
         try {
@@ -135,6 +243,15 @@ export default function InterventionPlansPage() {
                             <FiBarChart2 /> Dashboard
                         </button>
                         <button
+                            onClick={() => setActiveTab('queue')}
+                            className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'queue'
+                                ? 'bg-[#FFCA40] text-black'
+                                : 'text-white/60 hover:text-white hover:bg-white/5'
+                                }`}
+                        >
+                            <FiCheckCircle /> Review Queue
+                        </button>
+                        <button
                             onClick={() => setActiveTab('plans')}
                             className={`px-4 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-2 ${activeTab === 'plans'
                                 ? 'bg-[#FFCA40] text-black'
@@ -174,6 +291,86 @@ export default function InterventionPlansPage() {
             {activeTab === 'users' && (
                 <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                     <UserProgressTable />
+                </div>
+            )}
+
+            {activeTab === 'queue' && (
+                <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg overflow-hidden animate-in fade-in slide-in-from-bottom-4 duration-500">
+                    <div className="p-4 border-b border-white/10 flex items-center justify-between">
+                        <div>
+                            <div className="text-white font-semibold">Review Queue</div>
+                            <div className="text-sm text-white/60">Approve first, then send. Rejected items will not be sent.</div>
+                        </div>
+                        <button
+                            onClick={loadExecutions}
+                            className="px-3 py-2 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-sm text-white/70 hover:text-white transition-colors flex items-center gap-2"
+                        >
+                            <FiRefreshCw className={executionsLoading ? 'animate-spin' : ''} /> Refresh
+                        </button>
+                    </div>
+
+                    {executionsLoading ? (
+                        <div className="p-8 text-center text-white/60">Loading review queue...</div>
+                    ) : executions.length === 0 ? (
+                        <div className="p-8 text-center text-white/60">No pending executions.</div>
+                    ) : (
+                        <div className="divide-y divide-white/10">
+                            {executions.map((ex) => (
+                                <div key={ex.id} className="p-4 hover:bg-white/5 transition-colors">
+                                    <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3">
+                                        <div className="min-w-0">
+                                            <div className="text-white font-semibold truncate">
+                                                {ex.campaign_title || 'Campaign'}
+                                                <span className="text-white/40 font-normal"> #{ex.id}</span>
+                                            </div>
+                                            <div className="text-sm text-white/60 flex flex-wrap items-center gap-2">
+                                                <span>User: {ex.user_name || `#${ex.user_id}`}</span>
+                                                <span className="w-1 h-1 rounded-full bg-white/30" />
+                                                <span>{ex.user_email || 'No email'}</span>
+                                                <span className="w-1 h-1 rounded-full bg-white/30" />
+                                                <span>Scheduled: {new Date(ex.scheduled_at).toLocaleString()}</span>
+                                            </div>
+                                            {ex.notes && (
+                                                <div className="mt-2 text-sm text-white/70">
+                                                    <span className="text-white/40">Notes: </span>{ex.notes}
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <div className="flex items-center gap-2 self-start lg:self-center">
+                                            <span className="px-2 py-1 rounded text-xs bg-yellow-500/20 text-yellow-300 border border-yellow-500/30">
+                                                {ex.status}
+                                            </span>
+                                            <button
+                                                onClick={() => approveExecution(ex.id)}
+                                                disabled={executionActioning === ex.id || ex.status !== 'pending_review'}
+                                                className="px-3 py-2 rounded-md bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 text-sm font-medium text-[#FFCA40] disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                title="Approve (required before send)"
+                                            >
+                                                Approve
+                                            </button>
+                                            <button
+                                                onClick={() => rejectExecution(ex.id)}
+                                                disabled={executionActioning === ex.id || ex.status !== 'pending_review'}
+                                                className="px-3 py-2 rounded-md bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 text-sm font-medium text-red-300 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                title="Reject"
+                                            >
+                                                Reject
+                                            </button>
+                                            <button
+                                                onClick={() => sendExecution(ex.id)}
+                                                disabled={executionActioning === ex.id || ex.status !== 'approved'}
+                                                className="px-3 py-2 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-medium text-white/80 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                                                title="Send (requires approval)"
+                                            >
+                                                Send
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
                 </div>
             )}
 

@@ -10,7 +10,7 @@ services:
   backend:
     container_name: ugm_aicare_backend_preprod
     ports:
-      - "${BACKEND_EXTERNAL_PORT:-22001}:8000"
+      - "${BACKEND_EXTERNAL_PORT:-22001}:22001"
     deploy:
       resources:
         limits:
@@ -18,6 +18,7 @@ services:
         reservations:
           memory: 1G
     environment:
+      PORT: 22001
       ADMIN_EMAIL: ${ADMIN_EMAIL}
       ADMIN_PASSWORD: ${ADMIN_PASSWORD}
       COUNSELOR_EMAIL: ${COUNSELOR_EMAIL}
@@ -25,7 +26,7 @@ services:
       COUNSELOR_NAME: ${COUNSELOR_NAME:-Main Counselor}
       FRONTEND_URL: ${FRONTEND_URL}
       BACKEND_URL: ${BACKEND_URL}
-      ALLOWED_ORIGINS: "https://aicare.ina17.com,http://localhost:22000,http://127.0.0.1:22000,http://localhost:3000,http://127.0.0.1:3000,http://frontend:3000,http://backend:8000"
+      ALLOWED_ORIGINS: "https://aicare.ina17.com,http://localhost:22000,http://127.0.0.1:22000,http://localhost:22001,http://127.0.0.1:22001,http://frontend:22000,http://backend:22001"
       APP_ENV: production
       LANGFUSE_ENABLED: "false"
       LANGFUSE_HOST: "http://langfuse-server:3000"
@@ -42,7 +43,7 @@ services:
     build:
       target: production
     ports:
-      - "${FRONTEND_EXTERNAL_PORT:-22000}:3000"
+      - "${FRONTEND_EXTERNAL_PORT:-22000}:22000"
     deploy:
       resources:
         limits:
@@ -51,6 +52,7 @@ services:
           memory: 2G
     environment:
       NODE_ENV: production
+      PORT: 22000
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET}
     restart: unless-stopped

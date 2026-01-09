@@ -298,7 +298,7 @@ jobs:
               fi
               
               # Try Python-based health check (works without curl)
-              if docker compose -f docker-compose.base.yml -f docker-compose.prod.yml --env-file "$(pwd)/.env" exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=5).read()" > /dev/null 2>&1; then
+              if docker compose -f docker-compose.base.yml -f docker-compose.prod.yml --env-file "$(pwd)/.env" exec -T backend python -c "import urllib.request; urllib.request.urlopen('http://localhost:22001/health', timeout=5).read()" > /dev/null 2>&1; then
                 echo "✅ Backend is healthy (attempt $i/20)"
                 BACKEND_READY=true
                 break

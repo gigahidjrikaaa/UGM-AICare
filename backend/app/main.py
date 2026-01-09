@@ -202,12 +202,12 @@ else:
     origins = [
         "http://localhost:4000",
         "http://127.0.0.1:4000", 
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "http://localhost:8000",
-        "http://127.0.0.1:8000",
+        "http://localhost:22000",
+        "http://127.0.0.1:22000",
+        "http://localhost:22001",
+        "http://127.0.0.1:22001",
         "http://frontend:4000",  # Docker internal
-        "http://backend:8000",    # Docker internal
+        "http://backend:22001",    # Docker internal
         "https://aicare.ina17.com",
         "https://api.aicare.ina17.com"
     ]
@@ -295,7 +295,7 @@ async def scalar_html():
         openapi_url=app.openapi_url,
         title=app.title,
         servers=[
-            {"url": "http://localhost:8000", "description": "Local Development"},
+            {"url": "http://localhost:22001", "description": "Local Development"},
             {"url": "https://api.aicare.ina17.com", "description": "Production"},
         ]
     )

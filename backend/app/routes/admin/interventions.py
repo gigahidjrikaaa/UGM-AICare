@@ -1,8 +1,13 @@
-"""Proactive Outreach (Interventions) admin endpoints."""
+"""Proactive Outreach (Interventions) admin endpoints.
+
+This module is intentionally conservative:
+- Human review can be enforced for outbound check-ins.
+- Admins can inspect and approve/reject queued executions.
+"""
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List
+from typing import Any, List, Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import desc, func, select
@@ -11,10 +16,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.domains.mental_health.models import CampaignExecution, InterventionCampaign
+from app.domains.mental_health.services.proactive_checkins import send_checkin_execution, CHECKIN_CAMPAIGN_TYPE
 from app.schemas.admin.interventions import (
     InterventionCampaignCreate,
     InterventionCampaignListResponse,
     InterventionCampaignResponse,
+    InterventionExecutionListResponse,
+    InterventionExecutionResponse,
 )
 
 
@@ -97,6 +105,179 @@ async def create_campaign(
 from app.domains.mental_health.models.interventions import InterventionPlanRecord
 from app.models.user import User
 from app.schemas.admin.interventions import InterventionPlanListResponse, InterventionPlanResponse
+
+
+def _to_execution_response(
+    row: CampaignExecution,
+    user: Optional[User],
+    campaign: Optional[InterventionCampaign],
+) -> InterventionExecutionResponse:
+    trigger: dict[str, Any] = row.trigger_data or {}
+    plan_preview: dict[str, Any] | None = None
+    if campaign and campaign.campaign_type == CHECKIN_CAMPAIGN_TYPE:
+        # Surface only safe, review-oriented metadata.
+        plan_preview = {
+            "type": trigger.get("type"),
+            "risk_level": trigger.get("risk_level"),
+            "primary_concerns": trigger.get("primary_concerns"),
+            "subject_preview": trigger.get("subject_preview"),
+            "template_version": trigger.get("template_version"),
+        }
+
+    return InterventionExecutionResponse(
+        id=row.id,
+        campaign_id=row.campaign_id,
+        user_id=row.user_id,
+        status=row.status,
+        scheduled_at=row.scheduled_at,
+        executed_at=row.executed_at,
+        delivery_method=row.delivery_method,
+        notes=row.notes,
+        engagement_score=row.engagement_score,
+        is_manual=row.is_manual,
+        user_name=user.name if user else None,
+        user_email=user.email if user else None,
+        campaign_title=campaign.title if campaign else None,
+        priority=campaign.priority if campaign else None,
+        plan_preview=plan_preview,
+    )
+
+
+@router.get("/executions", response_model=InterventionExecutionListResponse)
+async def list_executions(
+    status_filter: Optional[str] = Query(None, alias="status"),
+    skip: int = Query(0, ge=0),
+    limit: int = Query(20, ge=1, le=100),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user=Depends(get_admin_user),
+) -> InterventionExecutionListResponse:
+    stmt = select(CampaignExecution).order_by(desc(CampaignExecution.scheduled_at))
+    if status_filter:
+        stmt = stmt.where(CampaignExecution.status == status_filter)
+
+    total_stmt = select(func.count()).select_from(CampaignExecution)
+    if status_filter:
+        total_stmt = total_stmt.where(CampaignExecution.status == status_filter)
+
+    rows = (
+        await db.execute(stmt.offset(skip).limit(limit))
+    ).scalars().all()
+    total = int((await db.execute(total_stmt)).scalar() or 0)
+
+    # Batch-load related data.
+    campaign_ids = {r.campaign_id for r in rows}
+    user_ids = {r.user_id for r in rows}
+    campaigns = {}
+    users = {}
+    if campaign_ids:
+        campaign_rows = (
+            await db.execute(select(InterventionCampaign).where(InterventionCampaign.id.in_(campaign_ids)))
+        ).scalars().all()
+        campaigns = {c.id: c for c in campaign_rows}
+    if user_ids:
+        user_rows = (
+            await db.execute(select(User).where(User.id.in_(user_ids)))
+        ).scalars().all()
+        users = {u.id: u for u in user_rows}
+
+    items = [
+        _to_execution_response(r, users.get(r.user_id), campaigns.get(r.campaign_id))
+        for r in rows
+    ]
+    return InterventionExecutionListResponse(items=items, total=total)
+
+
+@router.post("/executions/{execution_id}/approve")
+async def approve_execution(
+    execution_id: int,
+    note: Optional[str] = None,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user=Depends(get_admin_user),
+) -> dict:
+    row = (
+        await db.execute(select(CampaignExecution).where(CampaignExecution.id == execution_id))
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    trigger = row.trigger_data or {}
+    trigger["review"] = {
+        "decision": "approved",
+        "by_user_id": getattr(admin_user, "id", None),
+        "at": datetime.utcnow().isoformat(),
+        "note": note,
+    }
+    row.trigger_data = trigger
+    row.status = "approved"
+    row.notes = note or row.notes
+    row.updated_at = datetime.utcnow()
+    await db.commit()
+    return {"status": "ok"}
+
+
+@router.post("/executions/{execution_id}/reject")
+async def reject_execution(
+    execution_id: int,
+    reason: str,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user=Depends(get_admin_user),
+) -> dict:
+    row = (
+        await db.execute(select(CampaignExecution).where(CampaignExecution.id == execution_id))
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    trigger = row.trigger_data or {}
+    trigger["review"] = {
+        "decision": "rejected",
+        "by_user_id": getattr(admin_user, "id", None),
+        "at": datetime.utcnow().isoformat(),
+        "note": reason,
+    }
+    row.trigger_data = trigger
+    row.status = "rejected"
+    row.notes = reason
+    row.updated_at = datetime.utcnow()
+    await db.commit()
+    return {"status": "ok"}
+
+
+@router.post("/executions/{execution_id}/send")
+async def send_execution(
+    execution_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user=Depends(get_admin_user),
+) -> dict:
+    row = (
+        await db.execute(select(CampaignExecution).where(CampaignExecution.id == execution_id))
+    ).scalar_one_or_none()
+    if not row:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    if row.status not in {"approved", "pending_review"}:
+        raise HTTPException(status_code=400, detail="Execution not in a sendable state")
+
+    campaign = (
+        await db.execute(select(InterventionCampaign).where(InterventionCampaign.id == row.campaign_id))
+    ).scalar_one_or_none()
+    if not campaign:
+        raise HTTPException(status_code=404, detail="Campaign not found")
+
+    if campaign.campaign_type != CHECKIN_CAMPAIGN_TYPE:
+        raise HTTPException(status_code=400, detail="Unsupported campaign type for send")
+
+    try:
+        now = datetime.utcnow()
+        await send_checkin_execution(db=db, execution=row, now=now)
+        await db.commit()
+        return {"status": "ok"}
+    except Exception as exc:
+        row.status = "failed"
+        row.error_message = str(exc)
+        row.updated_at = datetime.utcnow()
+        await db.commit()
+        raise HTTPException(status_code=500, detail="Failed to send execution")
 
 @router.get("/plans", response_model=InterventionPlanListResponse)
 async def list_intervention_plans(

@@ -167,3 +167,29 @@ def extract_first_metadata_dict(lines: Iterable[str]) -> Optional[dict[str, Any]
             return normalize_metadata_dict(parsed)
 
     return None
+
+
+def extract_first_error_dict(lines: Iterable[str]) -> Optional[dict[str, Any]]:
+    """Extract the first structured error payload from an SSE stream.
+
+    The backend streaming endpoint emits JSON wrapper payloads, including errors:
+      data: {"type": "error", "message": "...", "error": "...", ...}
+
+    We keep this separate from metadata parsing so callers can decide how to
+    handle failures (retry, pause/resume, etc.).
+    """
+
+    for event in iter_sse_events(lines):
+        if event.event == "error":
+            parsed = try_parse_json(event.data)
+            if parsed is not None:
+                return parsed
+
+        parsed = try_parse_json(event.data)
+        if parsed is None:
+            continue
+
+        if parsed.get("type") == "error":
+            return parsed
+
+    return None

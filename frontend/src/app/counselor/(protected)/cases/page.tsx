@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Fragment } from 'react';
 import {
   FiClock,
   FiUser,
@@ -10,6 +10,9 @@ import {
   FiEdit,
   FiRefreshCw,
   FiAlertTriangle,
+  FiMail,
+  FiPhone,
+  FiSend,
 } from 'react-icons/fi';
 import apiClient from '@/services/api';
 
@@ -23,6 +26,9 @@ interface Case {
   assigned_to?: string;
   summary_redacted?: string;
   sla_breach_at?: string;
+  user_email?: string;
+  user_phone?: string;
+  telegram_username?: string;
 }
 
 interface CaseStats {
@@ -32,6 +38,31 @@ interface CaseStats {
   closed_cases: number;
   critical_cases: number;
   high_priority_cases: number;
+}
+
+interface CaseAssessmentsResponse {
+  case_id: string;
+  session_id: string | null;
+  user_hash: string;
+  screening_profile: {
+    overall_risk: string;
+    requires_attention: boolean;
+    primary_concerns: string[];
+    protective_factors: string[];
+    updated_at: string | null;
+  } | null;
+  triage_assessments: Array<{
+    id: number;
+    risk_score: number;
+    confidence_score: number;
+    severity_level: string;
+    recommended_action: string | null;
+    intent: string | null;
+    next_step: string | null;
+    risk_factors: string[] | null;
+    diagnostic_notes_redacted: string | null;
+    created_at: string | null;
+  }>;
 }
 
 const severityColors = {
@@ -55,6 +86,9 @@ export default function CounselorCasesPage() {
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
+  const [expandedCaseId, setExpandedCaseId] = useState<string | null>(null);
+  const [assessmentsByCaseId, setAssessmentsByCaseId] = useState<Record<string, CaseAssessmentsResponse | null>>({});
+  const [loadingAssessments, setLoadingAssessments] = useState<string | null>(null);
 
   useEffect(() => {
     loadCases();
@@ -98,6 +132,61 @@ export default function CounselorCasesPage() {
     const severityMatch = filterSeverity === 'all' || c.severity === filterSeverity;
     return statusMatch && severityMatch;
   });
+
+  const toggleCaseDetails = async (caseId: string) => {
+    if (expandedCaseId === caseId) {
+      setExpandedCaseId(null);
+      return;
+    }
+
+    setExpandedCaseId(caseId);
+    if (assessmentsByCaseId[caseId] !== undefined) return;
+
+    setLoadingAssessments(caseId);
+    try {
+      const response = await apiClient.get<CaseAssessmentsResponse>(`/counselor/cases/${caseId}/assessments`);
+      setAssessmentsByCaseId((prev) => ({ ...prev, [caseId]: response.data }));
+    } catch (err) {
+      console.error('Failed to load case assessments:', err);
+      setAssessmentsByCaseId((prev) => ({ ...prev, [caseId]: null }));
+    } finally {
+      setLoadingAssessments(null);
+    }
+  };
+
+  const normalizePhoneForWhatsApp = (phoneRaw: string) => {
+    // wa.me expects digits only, ideally E.164 without plus.
+    const digits = phoneRaw.replace(/\D/g, '');
+    return digits;
+  };
+
+  const normalizeTelegramUsername = (usernameRaw: string) => {
+    const trimmed = usernameRaw.trim();
+    if (!trimmed) return '';
+    return trimmed.startsWith('@') ? trimmed.slice(1) : trimmed;
+  };
+
+  const openWhatsApp = (caseItem: Case) => {
+    const phone = caseItem.user_phone;
+    if (!phone) return;
+    const waPhone = normalizePhoneForWhatsApp(phone);
+    if (!waPhone) return;
+    window.open(`https://wa.me/${encodeURIComponent(waPhone)}`, '_blank', 'noopener,noreferrer');
+  };
+
+  const openEmail = (caseItem: Case) => {
+    const email = caseItem.user_email;
+    if (!email) return;
+    window.location.href = `mailto:${encodeURIComponent(email)}`;
+  };
+
+  const openTelegram = (caseItem: Case) => {
+    const username = caseItem.telegram_username;
+    if (!username) return;
+    const normalized = normalizeTelegramUsername(username);
+    if (!normalized) return;
+    window.open(`https://t.me/${encodeURIComponent(normalized)}`, '_blank', 'noopener,noreferrer');
+  };
 
   if (loading) {
     return (
@@ -237,9 +326,9 @@ export default function CounselorCasesPage() {
                 </tr>
               ) : (
                 filteredCases.map((caseItem) => (
+                  <Fragment key={caseItem.id}>
                   <tr 
-                    key={caseItem.id}
-                    className="hover:bg-white/5 transition-colors cursor-pointer"
+                    className="hover:bg-white/5 transition-colors"
                   >
                     <td className="px-4 py-4 whitespace-nowrap">
                       <span className="text-sm font-mono text-white/90">{caseItem.id.substring(0, 8)}...</span>
@@ -281,19 +370,140 @@ export default function CounselorCasesPage() {
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-2">
+                        <button
+                          onClick={() => openWhatsApp(caseItem)}
+                          disabled={!caseItem.user_phone}
+                          className="px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-xs text-white/70 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                          title={caseItem.user_phone ? 'Contact via WhatsApp' : 'No phone number on file'}
+                        >
+                          <FiPhone className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => openEmail(caseItem)}
+                          disabled={!caseItem.user_email}
+                          className="px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-xs text-white/70 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                          title={caseItem.user_email ? 'Contact via Email' : 'No email on file'}
+                        >
+                          <FiMail className="w-3 h-3" />
+                        </button>
+                        <button
+                          onClick={() => openTelegram(caseItem)}
+                          disabled={!caseItem.telegram_username}
+                          className="px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-xs text-white/70 hover:text-white transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                          title={caseItem.telegram_username ? 'Contact via Telegram' : 'No Telegram username on file'}
+                        >
+                          <FiSend className="w-3 h-3" />
+                        </button>
                         <button 
                           className="px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-xs text-white/70 hover:text-white transition-all"
                           title="Edit case"
                         >
                           <FiEdit className="w-3 h-3" />
                         </button>
-                        <button className="px-3 py-1 bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 rounded text-xs font-medium text-[#FFCA40] transition-all flex items-center gap-1">
+                        <button
+                          onClick={() => toggleCaseDetails(caseItem.id)}
+                          className="px-3 py-1 bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 rounded text-xs font-medium text-[#FFCA40] transition-all flex items-center gap-1"
+                          title="View risk assessment transparency"
+                        >
                           <FiEye className="w-3 h-3" />
                           View
                         </button>
                       </div>
                     </td>
                   </tr>
+                  {expandedCaseId === caseItem.id && (
+                    <tr key={`${caseItem.id}-details`} className="bg-black/20">
+                      <td colSpan={8} className="px-4 py-4">
+                        {loadingAssessments === caseItem.id ? (
+                          <div className="text-sm text-white/60 flex items-center gap-2">
+                            <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-[#FFCA40]"></div>
+                            Loading risk assessment…
+                          </div>
+                        ) : assessmentsByCaseId[caseItem.id] ? (
+                          <div className="space-y-4">
+                            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                              <div className="text-xs text-white/60 mb-2">Case summary (redacted)</div>
+                              <div className="text-sm text-white/80 whitespace-pre-wrap">
+                                {caseItem.summary_redacted || 'No summary available.'}
+                              </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                              <div className="text-xs text-white/60 mb-2">Screening profile (aggregated)</div>
+                              {assessmentsByCaseId[caseItem.id]?.screening_profile ? (
+                                <div className="space-y-2">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm text-white/70">Overall risk</span>
+                                    <span className="text-sm font-semibold text-white">
+                                      {assessmentsByCaseId[caseItem.id]?.screening_profile?.overall_risk}
+                                    </span>
+                                  </div>
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm text-white/70">Requires attention</span>
+                                    <span className="text-sm text-white">
+                                      {assessmentsByCaseId[caseItem.id]?.screening_profile?.requires_attention ? 'Yes' : 'No'}
+                                    </span>
+                                  </div>
+                                  <div className="text-sm text-white/70">
+                                    <div className="text-xs text-white/50">Primary concerns</div>
+                                    <div className="text-white/80">
+                                      {(assessmentsByCaseId[caseItem.id]?.screening_profile?.primary_concerns || []).slice(0, 6).join(', ') || '—'}
+                                    </div>
+                                  </div>
+                                  <div className="text-sm text-white/70">
+                                    <div className="text-xs text-white/50">Protective factors</div>
+                                    <div className="text-white/80">
+                                      {(assessmentsByCaseId[caseItem.id]?.screening_profile?.protective_factors || []).slice(0, 6).join(', ') || '—'}
+                                    </div>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="text-sm text-white/60">No screening profile found.</div>
+                              )}
+                            </div>
+
+                            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                              <div className="text-xs text-white/60 mb-2">Recent triage assessments (STA)</div>
+                              {(assessmentsByCaseId[caseItem.id]?.triage_assessments || []).length === 0 ? (
+                                <div className="text-sm text-white/60">No triage assessments available.</div>
+                              ) : (
+                                <div className="space-y-3">
+                                  {assessmentsByCaseId[caseItem.id]?.triage_assessments.slice(0, 3).map((t) => (
+                                    <div key={t.id} className="bg-black/20 border border-white/10 rounded-lg p-3">
+                                      <div className="flex items-center justify-between gap-2">
+                                        <div className="text-sm text-white font-semibold">
+                                          {t.severity_level} (score {t.risk_score.toFixed(2)})
+                                        </div>
+                                        <div className="text-xs text-white/50">
+                                          {t.created_at ? formatDate(t.created_at) : ''}
+                                        </div>
+                                      </div>
+                                      <div className="text-xs text-white/60 mt-1">
+                                        intent: {t.intent || '—'} | next: {t.next_step || '—'} | action: {t.recommended_action || '—'}
+                                      </div>
+                                      <div className="text-xs text-white/60 mt-2">
+                                        factors: {(t.risk_factors || []).slice(0, 4).join(' | ') || '—'}
+                                      </div>
+                                      {t.diagnostic_notes_redacted && (
+                                        <div className="text-xs text-white/60 mt-2">
+                                          notes: <span className="text-white/80">{t.diagnostic_notes_redacted}</span>
+                                        </div>
+                                      )}
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-red-300">Failed to load risk assessment details.</div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </Fragment>
                 ))
               )}
             </tbody>

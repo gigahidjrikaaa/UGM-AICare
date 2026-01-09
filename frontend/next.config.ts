@@ -152,7 +152,7 @@ const nextConfig = {
     }
 
     // INTERNAL_API_URL is set in docker-compose for container-to-container communication
-    const backendUrl = process.env.INTERNAL_API_URL || process.env.BACKEND_URL || 'http://backend:8000';
+    const backendUrl = process.env.INTERNAL_API_URL || process.env.BACKEND_URL || 'http://backend:22001';
     return [
       {
         source: '/api/v1/:path*',

@@ -11,7 +11,7 @@ import { authOptions } from '@/lib/auth';
 
 // For server-side API routes in Docker, use internal Docker network name
 // For local development outside Docker, use localhost
-const BACKEND_URL = process.env.INTERNAL_API_URL || 'http://backend:8000';
+const BACKEND_URL = process.env.INTERNAL_API_URL || 'http://backend:22001';
 
 export async function POST(request: NextRequest) {
   try {

@@ -28,6 +28,7 @@ from app.services.ai_memory_facts_service import list_user_fact_texts_for_agent,
 from app.core.events import AgentEvent, emit_agent_event
 from app.domains.mental_health.models import AgentNameEnum
 from app.core.llm_request_tracking import get_stats, prompt_context
+from app.core.llm import GeminiResourceExhaustedError
 
 logger = logging.getLogger(__name__)
 
@@ -325,11 +326,26 @@ async def stream_aika_execution(
             "response_source": result.get("response_source", "unknown"),
             "processing_time_ms": processing_time_ms,
         }
-        
-        # Add risk assessment if available
-        if result.get("sta_risk_assessment"):
-            agent_activity["risk_level"] = result["sta_risk_assessment"].get("risk_level", "unknown")
-            agent_activity["risk_score"] = result["sta_risk_assessment"].get("risk_score", 0.0)
+
+        # Add risk info when available.
+        # Note: the orchestrator graph often stores STA output under `severity` / `risk_score`,
+        # while older callers used `sta_risk_assessment`.
+        sta_ra = result.get("sta_risk_assessment")
+        risk_level = None
+        risk_score = None
+        if isinstance(sta_ra, dict):
+            risk_level = sta_ra.get("risk_level")
+            risk_score = sta_ra.get("risk_score")
+
+        if not risk_level:
+            risk_level = result.get("severity")
+        if risk_level is not None:
+            agent_activity["risk_level"] = risk_level
+
+        if risk_score is None:
+            risk_score = result.get("risk_score")
+        if risk_score is not None:
+            agent_activity["risk_score"] = risk_score
         
         activity_data = {
             'type': 'agent_activity',
@@ -373,6 +389,9 @@ async def stream_aika_execution(
             'actions_taken': result.get('actions_taken', []),
             'response_source': result.get('response_source', 'unknown'),
             'processing_time_ms': processing_time_ms,
+            # Stable testing fields: prefer explicit risk_level/risk_score when available.
+            'risk_level': (result.get('sta_risk_assessment') or {}).get('risk_level') if isinstance(result.get('sta_risk_assessment'), dict) else None,
+            'risk_score': (result.get('sta_risk_assessment') or {}).get('risk_score') if isinstance(result.get('sta_risk_assessment'), dict) else None,
             'risk_assessment': result.get('sta_risk_assessment'),
             'escalation_triggered': bool(result.get('escalation_triggered', False)),
             'case_id': result.get('case_id'),
@@ -382,6 +401,10 @@ async def stream_aika_execution(
             'llm_requests_by_model': llm_stats.requests_by_model,
             'tools_used': tools_used,
         }
+        if not metadata_dict.get('risk_level'):
+            metadata_dict['risk_level'] = result.get('severity')
+        if metadata_dict.get('risk_score') is None:
+            metadata_dict['risk_score'] = result.get('risk_score')
         yield f"data: {json.dumps({'type': 'complete', 'response': final_response, 'metadata': metadata_dict})}\n\n"
         
         # Save conversation to database
@@ -435,6 +458,31 @@ async def stream_aika_execution(
         if execution_id:
             execution_tracker.complete_execution(execution_id, success=False)
         raise
+    except GeminiResourceExhaustedError as exc:
+        if execution_id:
+            execution_tracker.complete_execution(execution_id, success=False)
+
+        logger.warning(
+            "Gemini quota exhausted during /aika stream: user=%s exec_id=%s model=%s key_idx=%s key_last4=%s retry_after_s=%s",
+            current_user.id,
+            execution_id,
+            getattr(exc, "model", None),
+            getattr(exc, "api_key_index", None),
+            getattr(exc, "api_key_last4", None),
+            getattr(exc, "retry_after_s", None),
+        )
+
+        error_data: dict[str, Any] = {
+            "type": "error",
+            "code": "RESOURCE_EXHAUSTED",
+            "message": "LLM quota exhausted. Please retry later.",
+            "provider": "gemini",
+            "model": getattr(exc, "model", None),
+            "api_key_index": getattr(exc, "api_key_index", None),
+            "api_key_last4": getattr(exc, "api_key_last4", None),
+            "retry_after_s": getattr(exc, "retry_after_s", None),
+        }
+        yield f"data: {json.dumps(error_data)}\n\n"
     except Exception as exc:
         if execution_id:
             execution_tracker.complete_execution(execution_id, success=False)
