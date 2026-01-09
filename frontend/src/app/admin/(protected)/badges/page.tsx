@@ -1,0 +1,527 @@
+'use client';
+
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import Image from 'next/image';
+import toast from 'react-hot-toast';
+
+import { Button } from '@/components/ui/Button';
+import Input from '@/components/ui/Input';
+import { Textarea } from '@/components/ui/TextArea';
+import { useI18n } from '@/i18n/I18nProvider';
+import { getIpfsUrl } from '@/lib/badgeConstants';
+import { adminBadgesApi } from '@/services/adminBadgesApi';
+import type { BadgeIssuance, BadgeTemplate } from '@/types/admin/badges';
+
+function formatTimestamp(ts?: string | null): string {
+  if (!ts) return '-';
+  const d = new Date(ts);
+  if (Number.isNaN(d.getTime())) return '-';
+  return d.toLocaleString();
+}
+
+export default function AdminBadgesPage() {
+  const { t } = useI18n();
+
+  const [templates, setTemplates] = useState<BadgeTemplate[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
+
+  const [activeTemplate, setActiveTemplate] = useState<BadgeTemplate | null>(null);
+
+  const [issuances, setIssuances] = useState<BadgeIssuance[]>([]);
+  const [isIssuancesOpen, setIsIssuancesOpen] = useState(false);
+
+  const [isMintOpen, setIsMintOpen] = useState(false);
+  const [mintUserId, setMintUserId] = useState('');
+  const [mintAmount, setMintAmount] = useState('1');
+
+  const [isEditOpen, setIsEditOpen] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+
+  const [newTokenId, setNewTokenId] = useState('');
+  const [newName, setNewName] = useState('');
+  const [newDescription, setNewDescription] = useState('');
+
+  const fileInputs = useRef<Record<number, HTMLInputElement | null>>({});
+
+  const refresh = useCallback(async () => {
+    setIsLoading(true);
+    try {
+      const rows = await adminBadgesApi.listTemplates();
+      setTemplates(rows);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`${t('admin.badges.load_failed', 'Failed to load badges')}: ${msg}`);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [t]);
+
+  useEffect(() => {
+    void refresh();
+  }, [refresh]);
+
+  const canCreate = useMemo(() => {
+    const tokenId = Number.parseInt(newTokenId, 10);
+    return Number.isFinite(tokenId) && tokenId >= 0 && newName.trim().length > 0;
+  }, [newTokenId, newName]);
+
+  const onCreate = useCallback(async () => {
+    const tokenId = Number.parseInt(newTokenId, 10);
+    if (!Number.isFinite(tokenId) || tokenId < 0) {
+      toast.error(t('admin.badges.invalid_token_id', 'Invalid token id'));
+      return;
+    }
+    if (!newName.trim()) {
+      toast.error(t('admin.badges.invalid_name', 'Name is required'));
+      return;
+    }
+    try {
+      await adminBadgesApi.createTemplate({
+        token_id: tokenId,
+        name: newName.trim(),
+        description: newDescription.trim() || undefined,
+      });
+      toast.success(t('admin.badges.created', 'Badge draft created'));
+      setNewTokenId('');
+      setNewName('');
+      setNewDescription('');
+      await refresh();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`${t('admin.badges.create_failed', 'Create failed')}: ${msg}`);
+    }
+  }, [newTokenId, newName, newDescription, refresh, t]);
+
+  const requestUpload = useCallback((templateId: number) => {
+    fileInputs.current[templateId]?.click();
+  }, []);
+
+  const onUpload = useCallback(
+    async (template: BadgeTemplate, file: File | null) => {
+      if (!file) return;
+      try {
+        await adminBadgesApi.uploadImage(template.id, file);
+        toast.success(t('admin.badges.image_uploaded', 'Image uploaded'));
+        await refresh();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        toast.error(`${t('admin.badges.upload_failed', 'Upload failed')}: ${msg}`);
+      }
+    },
+    [refresh, t]
+  );
+
+  const onPublish = useCallback(
+    async (template: BadgeTemplate) => {
+      try {
+        const res = await adminBadgesApi.publish(template.id);
+        const tx = res.set_token_uri_tx_hash;
+        toast.success(
+          tx
+            ? `${t('admin.badges.published', 'Published')} (tx: ${tx.slice(0, 10)}...)`
+            : t('admin.badges.published', 'Published')
+        );
+        await refresh();
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        toast.error(`${t('admin.badges.publish_failed', 'Publish failed')}: ${msg}`);
+      }
+    },
+    [refresh, t]
+  );
+
+  const openMint = useCallback((template: BadgeTemplate) => {
+    setActiveTemplate(template);
+    setMintUserId('');
+    setMintAmount('1');
+    setIsMintOpen(true);
+  }, []);
+
+  const openEdit = useCallback((template: BadgeTemplate) => {
+    setActiveTemplate(template);
+    setEditName(template.name);
+    setEditDescription(template.description ?? '');
+    setIsEditOpen(true);
+  }, []);
+
+  const submitEdit = useCallback(async () => {
+    if (!activeTemplate) return;
+    if (!editName.trim()) {
+      toast.error(t('admin.badges.invalid_name', 'Name is required'));
+      return;
+    }
+    try {
+      await adminBadgesApi.updateTemplate(activeTemplate.id, {
+        name: editName.trim(),
+        description: editDescription.trim() ? editDescription.trim() : null,
+      });
+      toast.success(t('admin.badges.updated', 'Badge updated'));
+      setIsEditOpen(false);
+      await refresh();
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`${t('admin.badges.update_failed', 'Update failed')}: ${msg}`);
+    }
+  }, [activeTemplate, editDescription, editName, refresh, t]);
+
+  const submitMint = useCallback(async () => {
+    if (!activeTemplate) return;
+    const userId = Number.parseInt(mintUserId, 10);
+    const amount = Number.parseInt(mintAmount, 10);
+    if (!Number.isFinite(userId) || userId <= 0) {
+      toast.error(t('admin.badges.invalid_user_id', 'Invalid user id'));
+      return;
+    }
+    if (!Number.isFinite(amount) || amount <= 0) {
+      toast.error(t('admin.badges.invalid_amount', 'Invalid amount'));
+      return;
+    }
+    try {
+      const issuance = await adminBadgesApi.mint(activeTemplate.id, { user_id: userId, amount });
+      toast.success(
+        issuance.tx_hash
+          ? `${t('admin.badges.mint_sent', 'Mint sent')} (tx: ${issuance.tx_hash.slice(0, 10)}...)`
+          : t('admin.badges.mint_sent', 'Mint sent')
+      );
+      setIsMintOpen(false);
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : String(e);
+      toast.error(`${t('admin.badges.mint_failed', 'Mint failed')}: ${msg}`);
+    }
+  }, [activeTemplate, mintAmount, mintUserId, t]);
+
+  const openIssuances = useCallback(
+    async (template: BadgeTemplate) => {
+      setActiveTemplate(template);
+      setIsIssuancesOpen(true);
+      setIssuances([]);
+      try {
+        const res = await adminBadgesApi.listIssuances(template.id);
+        setIssuances(res.issuances);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : String(e);
+        toast.error(`${t('admin.badges.issuances_failed', 'Failed to load issuances')}: ${msg}`);
+      }
+    },
+    [t]
+  );
+
+  return (
+    <div className="space-y-6">
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-semibold text-white">{t('admin.badges.title', 'EDU Chain Badges')}</h1>
+          <p className="text-sm text-white/60">
+            {t(
+              'admin.badges.subtitle',
+              'Create drafts, upload images to IPFS (Pinata), publish immutable metadata, and mint to users'
+            )}
+          </p>
+        </div>
+        <Button onClick={refresh} disabled={isLoading}>
+          {isLoading ? t('admin.badges.loading', 'Loading...') : t('admin.badges.refresh', 'Refresh')}
+        </Button>
+      </div>
+
+      <section className="rounded-lg border border-white/10 bg-white/5 p-4">
+        <h2 className="text-lg font-medium text-white">{t('admin.badges.create_title', 'Create badge draft')}</h2>
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+          <Input
+            name="token_id"
+            label={t('admin.badges.token_id', 'Token ID')}
+            value={newTokenId}
+            onChange={(e) => setNewTokenId(e.target.value)}
+            placeholder={t('admin.badges.token_id', 'Token ID')}
+            aria-label={t('admin.badges.token_id', 'Token ID')}
+            className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white"
+          />
+          <Input
+            name="name"
+            label={t('admin.badges.name', 'Name')}
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder={t('admin.badges.name', 'Name')}
+            aria-label={t('admin.badges.name', 'Name')}
+            className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white"
+          />
+          <Button onClick={onCreate} disabled={!canCreate}>
+            {t('admin.badges.create', 'Create')}
+          </Button>
+        </div>
+        <div className="mt-3">
+          <Textarea
+            value={newDescription}
+            onChange={(e) => setNewDescription(e.target.value)}
+            placeholder={t('admin.badges.description', 'Description (optional)')}
+            aria-label={t('admin.badges.description', 'Description (optional)')}
+          />
+        </div>
+      </section>
+
+      <section className="rounded-lg border border-white/10 bg-white/5">
+        <div className="border-b border-white/10 p-4">
+          <h2 className="text-lg font-medium text-white">{t('admin.badges.list_title', 'Badge templates')}</h2>
+        </div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-sm">
+            <thead className="text-white/70">
+              <tr className="border-b border-white/10">
+                <th className="p-3">{t('admin.badges.col.token_id', 'Token')}</th>
+                <th className="p-3">{t('admin.badges.col.name', 'Name')}</th>
+                <th className="p-3">{t('admin.badges.col.status', 'Status')}</th>
+                <th className="p-3">{t('admin.badges.col.image', 'Image')}</th>
+                <th className="p-3">{t('admin.badges.col.metadata', 'Metadata')}</th>
+                <th className="p-3">{t('admin.badges.col.actions', 'Actions')}</th>
+              </tr>
+            </thead>
+            <tbody className="text-white/80">
+              {templates.length === 0 ? (
+                <tr>
+                  <td className="p-4" colSpan={6}>
+                    {t('admin.badges.empty', 'No badge templates yet.')}
+                  </td>
+                </tr>
+              ) : (
+                templates.map((tpl) => {
+                  const imageUrl = tpl.image_uri ? getIpfsUrl(tpl.image_uri) : null;
+                  return (
+                    <tr key={tpl.id} className="border-b border-white/5">
+                      <td className="p-3">{tpl.token_id}</td>
+                      <td className="p-3">
+                        <div className="font-medium text-white">{tpl.name}</div>
+                        {tpl.description ? (
+                          <div className="line-clamp-2 text-xs text-white/60">{tpl.description}</div>
+                        ) : null}
+                      </td>
+                      <td className="p-3">
+                        <div className="text-xs text-white/70">{tpl.status}</div>
+                        {tpl.published_at ? (
+                          <div className="text-[11px] text-white/50">{formatTimestamp(tpl.published_at)}</div>
+                        ) : null}
+                      </td>
+                      <td className="p-3">
+                        {imageUrl ? (
+                          <div className="relative h-12 w-12 overflow-hidden rounded-md border border-white/10">
+                            <Image src={imageUrl} alt={tpl.name} fill sizes="48px" className="object-cover" />
+                          </div>
+                        ) : (
+                          <span className="text-xs text-white/40">-</span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        {tpl.metadata_uri ? (
+                          <a
+                            className="text-xs text-sky-300 hover:underline"
+                            href={getIpfsUrl(tpl.metadata_uri)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {t('admin.badges.view', 'View')}
+                          </a>
+                        ) : (
+                          <span className="text-xs text-white/40">-</span>
+                        )}
+                      </td>
+                      <td className="p-3">
+                        <div className="flex flex-wrap gap-2">
+                          {tpl.status === 'DRAFT' ? (
+                            <>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                ref={(el) => {
+                                  fileInputs.current[tpl.id] = el;
+                                }}
+                                onChange={(e) => onUpload(tpl, e.target.files?.[0] ?? null)}
+                              />
+                              <Button variant="secondary" onClick={() => openEdit(tpl)}>
+                                {t('admin.badges.edit', 'Edit')}
+                              </Button>
+                              <Button variant="secondary" onClick={() => requestUpload(tpl.id)}>
+                                {t('admin.badges.upload', 'Upload image')}
+                              </Button>
+                              <Button onClick={() => onPublish(tpl)} disabled={!tpl.image_uri}>
+                                {t('admin.badges.publish', 'Publish')}
+                              </Button>
+                            </>
+                          ) : null}
+
+                          {tpl.status === 'PUBLISHED' ? (
+                            <>
+                              <Button onClick={() => openMint(tpl)}>{t('admin.badges.mint', 'Mint')}</Button>
+                              <Button variant="secondary" onClick={() => openIssuances(tpl)}>
+                                {t('admin.badges.issuances', 'Issuances')}
+                              </Button>
+                            </>
+                          ) : null}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {isMintOpen && activeTemplate ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setIsMintOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-lg border border-white/10 bg-[#000c24] p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-medium text-white">{t('admin.badges.mint_title', 'Mint badge')}</h3>
+            <p className="mt-1 text-sm text-white/60">
+              {activeTemplate.name} (token {activeTemplate.token_id})
+            </p>
+            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <Input
+                name="user_id"
+                label={t('admin.badges.user_id', 'User ID')}
+                value={mintUserId}
+                onChange={(e) => setMintUserId(e.target.value)}
+                placeholder={t('admin.badges.user_id', 'User ID')}
+                aria-label={t('admin.badges.user_id', 'User ID')}
+                className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white"
+              />
+              <Input
+                name="amount"
+                label={t('admin.badges.amount', 'Amount')}
+                value={mintAmount}
+                onChange={(e) => setMintAmount(e.target.value)}
+                placeholder={t('admin.badges.amount', 'Amount')}
+                aria-label={t('admin.badges.amount', 'Amount')}
+                className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white"
+              />
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setIsMintOpen(false)}>
+                {t('admin.badges.cancel', 'Cancel')}
+              </Button>
+              <Button onClick={submitMint}>{t('admin.badges.mint', 'Mint')}</Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isEditOpen && activeTemplate ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setIsEditOpen(false)}
+        >
+          <div
+            className="w-full max-w-lg rounded-lg border border-white/10 bg-[#000c24] p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-medium text-white">{t('admin.badges.edit_title', 'Edit badge draft')}</h3>
+            <p className="mt-1 text-sm text-white/60">token {activeTemplate.token_id}</p>
+
+            <div className="mt-4 space-y-3">
+              <Input
+                name="edit_name"
+                label={t('admin.badges.name', 'Name')}
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white"
+              />
+              <Textarea
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder={t('admin.badges.description', 'Description (optional)')}
+                aria-label={t('admin.badges.description', 'Description (optional)')}
+              />
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <Button variant="secondary" onClick={() => setIsEditOpen(false)}>
+                {t('admin.badges.cancel', 'Cancel')}
+              </Button>
+              <Button onClick={submitEdit}>{t('admin.badges.save', 'Save')}</Button>
+            </div>
+          </div>
+        </div>
+      ) : null}
+
+      {isIssuancesOpen && activeTemplate ? (
+        <div
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setIsIssuancesOpen(false)}
+        >
+          <div
+            className="w-full max-w-3xl rounded-lg border border-white/10 bg-[#000c24] p-4"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="text-lg font-medium text-white">{t('admin.badges.issuances_title', 'Issuances')}</h3>
+                <p className="mt-1 text-sm text-white/60">
+                  {activeTemplate.name} (token {activeTemplate.token_id})
+                </p>
+              </div>
+              <Button variant="secondary" onClick={() => setIsIssuancesOpen(false)}>
+                {t('admin.badges.close', 'Close')}
+              </Button>
+            </div>
+
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="text-white/70">
+                  <tr className="border-b border-white/10">
+                    <th className="p-2">{t('admin.badges.col.user_id', 'User')}</th>
+                    <th className="p-2">{t('admin.badges.col.wallet', 'Wallet')}</th>
+                    <th className="p-2">{t('admin.badges.col.amount', 'Amount')}</th>
+                    <th className="p-2">{t('admin.badges.col.tx', 'Tx')}</th>
+                    <th className="p-2">{t('admin.badges.col.status', 'Status')}</th>
+                    <th className="p-2">{t('admin.badges.col.time', 'Time')}</th>
+                  </tr>
+                </thead>
+                <tbody className="text-white/80">
+                  {issuances.length === 0 ? (
+                    <tr>
+                      <td className="p-3" colSpan={6}>
+                        {t('admin.badges.no_issuances', 'No issuances yet.')}
+                      </td>
+                    </tr>
+                  ) : (
+                    issuances.map((i) => (
+                      <tr key={i.id} className="border-b border-white/5">
+                        <td className="p-2">{i.user_id}</td>
+                        <td className="p-2">
+                          <span className="text-xs">{i.wallet_address}</span>
+                        </td>
+                        <td className="p-2">{i.amount}</td>
+                        <td className="p-2">
+                          {i.tx_hash ? (
+                            <span className="text-xs">{i.tx_hash.slice(0, 12)}…</span>
+                          ) : (
+                            <span className="text-xs text-white/40">-</span>
+                          )}
+                        </td>
+                        <td className="p-2">{i.status}</td>
+                        <td className="p-2">
+                          <span className="text-xs">{formatTimestamp(i.created_at)}</span>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </div>
+  );
+}

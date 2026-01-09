@@ -69,6 +69,7 @@ from prometheus_fastapi_instrumentator import Instrumentator
 
 from app.middleware.performance import PerformanceTrackingMiddleware
 from app.middleware.request_context import RequestContextMiddleware
+from app.middleware.user_activity import UserActivityMiddleware
 
 load_dotenv(find_dotenv())
 
@@ -161,6 +162,10 @@ app = FastAPI(
 
 # Propagate a per-request correlation id (X-Request-ID)
 app.add_middleware(RequestContextMiddleware)
+
+# Record daily activity rows for retention analytics.
+# This relies on auth dependencies setting request.state.user_id.
+app.add_middleware(UserActivityMiddleware)
 
 # Track endpoint performance (adds X-Response-Time and in-memory analytics)
 app.add_middleware(

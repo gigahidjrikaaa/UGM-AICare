@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth_utils import create_access_token, decrypt_and_validate_token
 from app.database import get_async_db
 from app.models import User
+from app.services.user_normalization import allow_email_checkins as allow_email_checkins_for_user
 from app.services.user_service import async_get_user_by_plain_email
 
 logger = logging.getLogger(__name__)
@@ -94,7 +95,7 @@ def serialize_user(
         "name": user.name or fallback_name,
         "role": user.role,
         "google_sub": user.google_sub,
-        "allow_email_checkins": user.allow_email_checkins,
+        "allow_email_checkins": bool(allow_email_checkins_for_user(user)),
     }
 
 

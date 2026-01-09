@@ -135,6 +135,10 @@ class UserClinicalRecord(Base):
         String(100),
         comment="e.g., 'weekly', 'biweekly', 'monthly'"
     )
+    therapy_notes = Column(
+        Text,
+        comment="Non-sensitive therapy notes / context (avoid detailed clinical transcripts)"
+    )
     therapy_start_date = Column(Date)
     therapy_end_date = Column(Date)
     

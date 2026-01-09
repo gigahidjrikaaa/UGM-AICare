@@ -163,6 +163,56 @@ def mint_nft_badge(recipient_address: str, badge_id: int, amount: int = 1) -> Op
         logger.error("❌ EDU Chain Web3 setup incomplete. Cannot mint badge.")
         return None
 
+
+def set_token_uri(badge_id: int, token_uri: str) -> Optional[str]:
+    """Set a specific token URI for a badge id.
+
+    Note:
+    - This requires DEFAULT_ADMIN_ROLE on the contract.
+    - Intended to be used once per badge id to keep metadata effectively immutable.
+    """
+
+    if not contract or not w3 or not minter_account:
+        logger.error("❌ EDU Chain Web3 setup incomplete. Cannot set token URI.")
+        return None
+
+    try:
+        nonce = w3.eth.get_transaction_count(minter_account.address)
+        current_gas_price = w3.eth.gas_price
+
+        try:
+            estimated_gas = contract.functions.setTokenUri(
+                int(badge_id),
+                str(token_uri),
+            ).estimate_gas({
+                'from': minter_account.address,
+                'nonce': nonce,
+            })
+            gas_limit = int(estimated_gas * 1.2)
+        except Exception as estimate_error:
+            logger.error(f"⚠️  Gas estimation failed for setTokenUri: {estimate_error}. Falling back to default limit.")
+            gas_limit = 300000
+
+        txn_data = contract.functions.setTokenUri(
+            int(badge_id),
+            str(token_uri),
+        ).build_transaction({
+            'chainId': w3.eth.chain_id,
+            'gas': gas_limit,
+            'gasPrice': current_gas_price,
+            'nonce': nonce,
+            'from': minter_account.address,
+        })
+
+        signed_txn = w3.eth.account.sign_transaction(txn_data, private_key=MINTER_PRIVATE_KEY)
+        txn_hash = w3.eth.send_raw_transaction(signed_txn.raw_transaction)
+        hex_hash = txn_hash.hex()
+        logger.info(f"✅ setTokenUri transaction sent: {hex_hash}")
+        return hex_hash
+    except Exception as e:
+        logger.error(f"❌ Error setting token URI for badge_id={badge_id}: {e}", exc_info=True)
+        return None
+
     try:
         logger.info(f"🎨 Attempting to mint badge ID {badge_id} for recipient {recipient_address}")
         recipient_checksum = Web3.to_checksum_address(recipient_address)

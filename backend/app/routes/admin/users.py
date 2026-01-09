@@ -11,11 +11,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from passlib.context import CryptContext
 from sqlalchemy import asc, desc, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import noload
+from sqlalchemy.orm import selectinload
 
 from app.database import get_async_db
 from app.dependencies import get_admin_user
-from app.models import User, UserBadge  # Core models
+from app.models import User, UserBadge, UserClinicalRecord, UserPreferences, UserProfile  # Core models
 from app.domains.mental_health.models import Appointment, Conversation, JournalEntry
 from app.models.user_audit_log import UserAuditLog
 from app.models.agent_user import AgentUser
@@ -30,6 +30,11 @@ from app.schemas.admin import (
     UsersResponse,
 )
 from .utils import decrypt_user_email, get_user_stats, build_avatar_url, decrypt_user_field
+from app.services.user_normalization import allow_email_checkins as allow_email_checkins_for_user
+from app.services.user_normalization import check_in_code as check_in_code_for_user
+from app.services.user_normalization import clinical_snapshot
+from app.services.user_normalization import ensure_user_normalized_tables
+from app.services.user_normalization import set_checkins_opt_in
 
 logger = logging.getLogger(__name__)
 
@@ -177,7 +182,12 @@ async def get_users(
         .outerjoin(Conversation, User.id == Conversation.user_id)
         .outerjoin(UserBadge, User.id == UserBadge.user_id)
         .outerjoin(Appointment, User.id == Appointment.user_id)
-        .options(noload(User.profile), noload(User.preferences), noload(User.clinical_record))
+        .outerjoin(UserProfile, User.id == UserProfile.user_id)
+        .options(
+            selectinload(User.profile),
+            selectinload(User.preferences),
+            selectinload(User.clinical_record),
+        )
         .group_by(User.id)
     )
 
@@ -189,7 +199,7 @@ async def get_users(
 
     if active_only:
         thirty_days_ago = datetime.now().date() - timedelta(days=30)
-        base_query = base_query.filter(User.last_activity_date >= thirty_days_ago)
+        base_query = base_query.filter(func.coalesce(UserProfile.last_activity_date, User.last_activity_date) >= thirty_days_ago)
 
     count_query = select(func.count()).select_from(base_query.subquery())
     total_count = (await db.execute(count_query)).scalar() or 0
@@ -207,7 +217,7 @@ async def get_users(
         email_plain = decrypt_user_email(user_obj.email)
         avatar_url = build_avatar_url(email_plain, user_obj.id)
         # Ensure last_activity_date is a Python date or None
-        lad = user_obj.last_activity_date
+        lad = (user_obj.profile.last_activity_date if user_obj.profile else None) or user_obj.last_activity_date
         import datetime as dt
         if lad is not None and not isinstance(lad, dt.date):
             try:
@@ -223,16 +233,16 @@ async def get_users(
                 email=email_plain,
                 google_sub=user_obj.google_sub,
                 wallet_address=user_obj.wallet_address,
-                sentiment_score=user_obj.sentiment_score,
-                current_streak=user_obj.current_streak,
-                longest_streak=user_obj.longest_streak,
+                sentiment_score=(user_obj.profile.sentiment_score if user_obj.profile else user_obj.sentiment_score),
+                current_streak=(user_obj.profile.current_streak if user_obj.profile else user_obj.current_streak),
+                longest_streak=(user_obj.profile.longest_streak if user_obj.profile else user_obj.longest_streak),
                 last_activity_date=lad,
-                allow_email_checkins=user_obj.allow_email_checkins,
+                allow_email_checkins=allow_email_checkins_for_user(user_obj),
                 role=getattr(user_obj, "role", "user"),
                 is_active=user_obj.is_active,
                 created_at=user_obj.created_at,
                 avatar_url=avatar_url,
-                check_in_code=user_obj.check_in_code,
+                check_in_code=check_in_code_for_user(user_obj) or user_obj.check_in_code,
                 total_journal_entries=journal_count or 0,
                 total_conversations=conversation_count or 0,
                 total_badges=badge_count or 0,
@@ -253,9 +263,22 @@ async def get_user_detail(
 ):
     """Retrieve full details for a single user."""
     logger.info("Admin %s requesting user detail %s", admin_user.id, user_id)
-    user = await db.get(User, user_id)
+    user = (
+        await db.execute(
+            select(User)
+            .options(
+                selectinload(User.profile),
+                selectinload(User.preferences),
+                selectinload(User.clinical_record),
+                selectinload(User.emergency_contacts),
+            )
+            .where(User.id == user_id)
+        )
+    ).scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    await ensure_user_normalized_tables(db, user)
 
     email_plain = decrypt_user_email(user.email)
     avatar_url = build_avatar_url(email_plain, user.id, size=192)
@@ -283,7 +306,7 @@ async def get_user_detail(
         await db.execute(select(Appointment).filter(Appointment.user_id == user_id))
     ).scalars().all()
 
-    lad = user.last_activity_date
+    lad = (user.profile.last_activity_date if user.profile else None) or user.last_activity_date
     import datetime as dt
     if lad is not None and not isinstance(lad, dt.date):
         try:
@@ -293,47 +316,51 @@ async def get_user_detail(
                 lad = dt.date.fromisoformat(str(lad))
         except Exception:
             lad = None
+    clinical = clinical_snapshot(user)
+
+    emergency_contact = user.emergency_contacts[0] if user.emergency_contacts else None
+
     return UserDetailResponse(
         id=user.id,
         email=email_plain,
         google_sub=user.google_sub,
         wallet_address=user.wallet_address,
-        sentiment_score=user.sentiment_score,
-        current_streak=user.current_streak,
-        longest_streak=user.longest_streak,
+        sentiment_score=(user.profile.sentiment_score if user.profile else user.sentiment_score),
+        current_streak=(user.profile.current_streak if user.profile else user.current_streak),
+        longest_streak=(user.profile.longest_streak if user.profile else user.longest_streak),
         last_activity_date=lad,
-        allow_email_checkins=user.allow_email_checkins,
+        allow_email_checkins=allow_email_checkins_for_user(user),
         role=user.role,
         is_active=user.is_active,
         created_at=user.created_at,
         avatar_url=avatar_url,
-        check_in_code=user.check_in_code,
-        preferred_name=decrypt_user_field(user.preferred_name),
-        pronouns=decrypt_user_field(user.pronouns),
-        alternate_phone=decrypt_user_field(user.alternate_phone),
-        emergency_contact_name=decrypt_user_field(user.emergency_contact_name),
-        emergency_contact_relationship=decrypt_user_field(user.emergency_contact_relationship),
-        emergency_contact_phone=decrypt_user_field(user.emergency_contact_phone),
-        emergency_contact_email=decrypt_user_field(user.emergency_contact_email),
-        risk_level=decrypt_user_field(user.risk_level),
-        clinical_summary=decrypt_user_field(user.clinical_summary),
-        primary_concerns=decrypt_user_field(user.primary_concerns),
-        safety_plan_notes=decrypt_user_field(user.safety_plan_notes),
-        current_therapist_name=decrypt_user_field(user.current_therapist_name),
-        current_therapist_contact=decrypt_user_field(user.current_therapist_contact),
-        therapy_modality=decrypt_user_field(user.therapy_modality),
-        therapy_frequency=decrypt_user_field(user.therapy_frequency),
-        therapy_notes=decrypt_user_field(user.therapy_notes),
+        check_in_code=check_in_code_for_user(user) or user.check_in_code,
+        preferred_name=decrypt_user_field(user.profile.preferred_name if user.profile else None),
+        pronouns=decrypt_user_field(user.profile.pronouns if user.profile else None),
+        alternate_phone=decrypt_user_field(user.profile.alternate_phone if user.profile else None),
+        emergency_contact_name=decrypt_user_field(emergency_contact.full_name if emergency_contact else None),
+        emergency_contact_relationship=decrypt_user_field(emergency_contact.relationship_to_user if emergency_contact else None),
+        emergency_contact_phone=decrypt_user_field(emergency_contact.phone if emergency_contact else None),
+        emergency_contact_email=decrypt_user_field(emergency_contact.email if emergency_contact else None),
+        risk_level=decrypt_user_field(clinical.risk_level),
+        clinical_summary=decrypt_user_field(clinical.clinical_summary),
+        primary_concerns=decrypt_user_field(clinical.primary_concerns),
+        safety_plan_notes=decrypt_user_field(clinical.safety_plan_notes),
+        current_therapist_name=decrypt_user_field(user.clinical_record.external_therapist_name if user.clinical_record else None),
+        current_therapist_contact=decrypt_user_field(user.clinical_record.external_therapist_contact if user.clinical_record else None),
+        therapy_modality=decrypt_user_field(user.clinical_record.therapy_modality if user.clinical_record else None),
+        therapy_frequency=decrypt_user_field(user.clinical_record.therapy_frequency if user.clinical_record else None),
+        therapy_notes=decrypt_user_field(getattr(user.clinical_record, "therapy_notes", None) if user.clinical_record else None),
         consent_data_sharing=user.consent_data_sharing,
         consent_research=user.consent_research,
         consent_emergency_contact=user.consent_emergency_contact,
         consent_marketing=user.consent_marketing,
-        preferred_language=decrypt_user_field(user.preferred_language),
-        preferred_timezone=decrypt_user_field(user.preferred_timezone),
-        accessibility_needs=decrypt_user_field(user.accessibility_needs),
-        communication_preferences=decrypt_user_field(user.communication_preferences),
-        interface_preferences=decrypt_user_field(user.interface_preferences),
-        aicare_team_notes=decrypt_user_field(user.aicare_team_notes),
+        preferred_language=decrypt_user_field(user.preferences.preferred_language if user.preferences else None),
+        preferred_timezone=decrypt_user_field(user.preferences.preferred_timezone if user.preferences else None),
+        accessibility_needs=decrypt_user_field(user.preferences.accessibility_notes if user.preferences else None),
+        communication_preferences=decrypt_user_field(user.preferences.communication_preferences if user.preferences else None),
+        interface_preferences=decrypt_user_field(user.preferences.interface_preferences if user.preferences else None),
+        aicare_team_notes=decrypt_user_field(user.clinical_record.aicare_team_notes if user.clinical_record else None),
         journal_entries=[j.__dict__ for j in journals],
         recent_conversations=[c.__dict__ for c in conversations],
         badges=[b.__dict__ for b in badges],
@@ -384,13 +411,23 @@ async def update_user_email_checkins(
     logger.info(
         "Admin %s updating email check-ins for user %s", admin_user.id, user_id
     )
-    user = await db.get(User, user_id)
+    user = (
+        await db.execute(
+            select(User)
+            .options(selectinload(User.preferences))
+            .where(User.id == user_id)
+        )
+    ).scalar_one_or_none()
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
 
     # Accept either `enabled` or legacy `allow_email_checkins`.
     resolved = enabled if allow_email_checkins is None else allow_email_checkins
-    user.allow_email_checkins = resolved
+    await ensure_user_normalized_tables(db, user)
+    await set_checkins_opt_in(db, user=user, allow=bool(resolved))
+
+    # Keep legacy users.allow_email_checkins in sync during migration window.
+    user.allow_email_checkins = bool(resolved)
     await db.commit()
     await db.refresh(user)
     return {"user_id": user_id, "allow_email_checkins": resolved}
@@ -447,9 +484,21 @@ async def update_user(
     """Update basic user fields used by the admin panel."""
     _ensure_admin_only(admin_user)
 
+    # Prefer AsyncSession.get() for compatibility with unit tests and for efficiency.
     user = await db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="User not found")
+
+    needs_normalization = any(
+        value is not None
+        for value in (
+            payload.phone,
+            payload.allow_email_checkins,
+            payload.date_of_birth,
+        )
+    )
+    if needs_normalization:
+        await ensure_user_normalized_tables(db, user)
 
     if payload.email is not None:
         email_normalized = payload.email.strip().lower()
@@ -471,15 +520,27 @@ async def update_user(
     if payload.name is not None:
         user.name = payload.name
     if payload.phone is not None:
-        user.phone = payload.phone
+        if user.profile is None:
+            user.profile = UserProfile(user_id=user.id, country="Indonesia")
+            db.add(user.profile)
+        user.profile.phone = payload.phone
+        # Keep legacy users.phone in sync during migration window.
+        if hasattr(user, "phone"):
+            user.phone = payload.phone
     if payload.wallet_address is not None:
         user.wallet_address = payload.wallet_address
     if payload.allow_email_checkins is not None:
-        user.allow_email_checkins = payload.allow_email_checkins
+        await set_checkins_opt_in(db, user=user, allow=bool(payload.allow_email_checkins))
+        user.allow_email_checkins = bool(payload.allow_email_checkins)
     if payload.is_active is not None:
         user.is_active = payload.is_active
     if payload.date_of_birth is not None:
-        user.date_of_birth = payload.date_of_birth
+        if user.profile is None:
+            user.profile = UserProfile(user_id=user.id, country="Indonesia")
+            db.add(user.profile)
+        user.profile.date_of_birth = payload.date_of_birth
+        if hasattr(user, "date_of_birth"):
+            user.date_of_birth = payload.date_of_birth
 
     if payload.role is not None:
         requested_role = _normalize_role(payload.role)

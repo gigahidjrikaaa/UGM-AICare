@@ -2,6 +2,7 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import func, select
+from sqlalchemy.orm import selectinload
 from pydantic import BaseModel, Field
 from datetime import date, timedelta, datetime, time
 from typing import Dict, List, Set, Optional, Any, cast # Import Any and cast
@@ -13,6 +14,7 @@ from app.domains.mental_health.models import JournalEntry, Conversation, UserSum
 from app.domains.mental_health.schemas.summary import LatestSummaryResponse, ActivitySummaryResponse, ActivityData, GreetingHookRequest, GreetingHookResponse
 from app.schemas.user import EarnedBadgeInfo
 from app.dependencies import get_current_active_user
+from app.services.user_normalization import ensure_user_normalized_tables
 import logging
 import os
 
@@ -96,21 +98,33 @@ async def get_activity_summary(
         conv_dates_this_month = {d for d in all_conv_dates if isinstance(d, date) and start_date <= d <= end_date_of_month}
         all_activity_dates_this_month = journal_dates_this_month.union(conv_dates_this_month)
 
+        # Load normalized profile for canonical streak storage
+        user_for_calc = (
+            await db.execute(
+                select(User)
+                .options(selectinload(User.profile))
+                .where(User.id == current_user.id)
+            )
+        ).scalar_one()
+        await ensure_user_normalized_tables(db, user_for_calc)
+
+        profile = user_for_calc.profile
+
         # Streak Calculation
         today = date.today()
         yesterday = today - timedelta(days=1)
         activity_today = today in all_activity_dates_ever
 
-        # Explicitly cast attributes from current_user to help Pylance
-        _cs_any = cast(Any, current_user.current_streak)
+        # Explicitly cast attributes from profile to help Pylance
+        _cs_any = cast(Any, profile.current_streak if profile else None)
         _cs_opt_int: Optional[int] = _cs_any
         current_db_streak_val: int = _cs_opt_int if _cs_opt_int is not None else 0
 
-        _ls_any = cast(Any, current_user.longest_streak)
+        _ls_any = cast(Any, profile.longest_streak if profile else None)
         _ls_opt_int: Optional[int] = _ls_any
         longest_db_streak_val: int = _ls_opt_int if _ls_opt_int is not None else 0
 
-        _lad_any = cast(Any, current_user.last_activity_date)
+        _lad_any = cast(Any, profile.last_activity_date if profile else None)
         last_activity_db_val: Optional[date] = _lad_any
 
         new_streak_val = current_db_streak_val
@@ -131,21 +145,33 @@ async def get_activity_summary(
         if (new_streak_val != current_db_streak_val or
             new_longest_streak_val != longest_db_streak_val or
             new_last_activity_val != last_activity_db_val):
-            
-            # Cast current_user to Any before attribute assignment to satisfy Pylance
-            user_for_update = cast(Any, current_user)
-            user_for_update.current_streak = new_streak_val
-            user_for_update.longest_streak = new_longest_streak_val
-            user_for_update.last_activity_date = new_last_activity_val
+
+            if profile:
+                profile.current_streak = new_streak_val
+                profile.longest_streak = new_longest_streak_val
+                profile.last_activity_date = new_last_activity_val
+
+            # Keep legacy columns in sync during migration window.
+            user_any = cast(Any, user_for_calc)
+            user_any.current_streak = new_streak_val
+            user_any.longest_streak = new_longest_streak_val
+            user_any.last_activity_date = new_last_activity_val
             
             try:
-                db.add(current_user) # Add the original current_user object
+                db.add(user_for_calc)
+                if profile:
+                    db.add(profile)
                 await db.commit()
-                await db.refresh(current_user)
-                logger.info(f"User {current_user.id} streak data updated: Current={new_streak_val}, Longest={new_longest_streak_val}, LastActivity={new_last_activity_val}")
+                await db.refresh(user_for_calc)
+                if profile:
+                    await db.refresh(profile)
+                logger.info(
+                    f"User {user_for_calc.id} streak data updated: "
+                    f"Current={new_streak_val}, Longest={new_longest_streak_val}, LastActivity={new_last_activity_val}"
+                )
             except Exception as e:
                 await db.rollback()
-                logger.error(f"Database error saving user streak update for user {current_user.id}: {e}", exc_info=True)
+                logger.error(f"Database error saving user streak update for user {user_for_calc.id}: {e}", exc_info=True)
 
         summary_data: Dict[str, ActivityData] = {}
         # Iterate through all days of the queried month to ensure all days are present in summary
@@ -160,8 +186,8 @@ async def get_activity_summary(
 
 
         # For Pydantic model instantiation, ensure the values are Python types
-        final_current_streak = cast(Optional[int], current_user.current_streak)
-        final_longest_streak = cast(Optional[int], current_user.longest_streak)
+        final_current_streak = cast(Optional[int], profile.current_streak if profile else None)
+        final_longest_streak = cast(Optional[int], profile.longest_streak if profile else None)
 
         return ActivitySummaryResponse(
             summary=summary_data,

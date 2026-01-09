@@ -64,6 +64,10 @@ class UserProfile(Base):
     # =====================================================================
     phone = Column(String(20))
     alternate_phone = Column(String(20))
+    telegram_username = Column(
+        String(100),
+        comment="Telegram username without '@' (e.g., 'john_doe')",
+    )
     
     # =====================================================================
     # DEMOGRAPHICS

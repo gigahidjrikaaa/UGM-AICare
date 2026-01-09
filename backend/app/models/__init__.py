@@ -36,12 +36,16 @@ from .user_consent_ledger import UserConsentLedger
 from .user_audit_log import UserAuditLog
 from .user_session import UserSession
 from .user_ai_memory_fact import UserAIMemoryFact
+from .user_activity import UserDailyActivity, UserEvent, RetentionCohortDaily
 
 # Revenue reporting - imported directly from models file to avoid loading blockchain dependencies
 from app.domains.finance.models import RevenueReport, RevenueApproval, ReportStatus
 
 # Social features
 from .social import Tweet, UserBadge
+
+# EDU Chain badge templates (admin-managed)
+from .badges import BadgeTemplate, BadgeIssuance
 
 # Clinical scheduling
 from .scheduling import TherapistSchedule, FlaggedSession
@@ -86,6 +90,11 @@ __all__ = [
 
     # AI Memory
     "UserAIMemoryFact",
+
+    # Activity & Retention
+    "UserDailyActivity",
+    "UserEvent",
+    "RetentionCohortDaily",
     
     # Revenue Models (Shared)
     "RevenueReport",
@@ -95,6 +104,10 @@ __all__ = [
     # Social Models
     "Tweet",
     "UserBadge",
+
+    # Badge Template Management
+    "BadgeTemplate",
+    "BadgeIssuance",
     
     # Scheduling Models
     "TherapistSchedule",

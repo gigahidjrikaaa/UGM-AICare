@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, or_, func
 from sqlalchemy.orm import joinedload
 from app.database import AsyncSessionLocal
-from app.models import User
+from app.models import User, UserPreferences, UserProfile
 from app.domains.mental_health.models.assessments import UserScreeningProfile
 from app.utils.email_utils import send_email
 from app.domains.mental_health.services.proactive_checkins import (
@@ -30,6 +30,8 @@ from app.domains.mental_health.services.proactive_checkins import (
     proactive_checkins_require_review,
     build_checkin_message,
 )
+from app.services.user_normalization import current_risk_level as current_risk_level_for_user
+from app.services.user_normalization import display_name as display_name_for_user
 from app.domains.mental_health.services.insights_service import InsightsService
 from datetime import datetime, timedelta, date
 import random
@@ -117,8 +119,15 @@ async def send_proactive_checkins() -> None:
             stmt = (
                 select(User, UserScreeningProfile)
                 .outerjoin(UserScreeningProfile, User.id == UserScreeningProfile.user_id)
+                .outerjoin(UserPreferences, User.id == UserPreferences.user_id)
+                .outerjoin(UserProfile, User.id == UserProfile.user_id)
+                .options(
+                    joinedload(User.profile),
+                    joinedload(User.preferences),
+                    joinedload(User.clinical_record),
+                )
                 .where(
-                    User.allow_email_checkins == True,
+                    func.coalesce(UserPreferences.allow_email_checkins, User.allow_email_checkins, True) == True,
                     User.email != None,
                     User.is_active == True,
                 )
@@ -139,16 +148,16 @@ async def send_proactive_checkins() -> None:
                     if screening_profile.profile_data:
                         primary_concerns = screening_profile.profile_data.get("primary_concerns", [])
                 
-                # Also check user's risk_level field as fallback
-                if risk_level == "none" and user.risk_level:
-                    risk_level = user.risk_level
+                # Also check user's clinical record as fallback during migration
+                if risk_level == "none":
+                    risk_level = current_risk_level_for_user(user) or "none"
                 
                 # Get threshold for this risk level
                 threshold_days = RISK_INACTIVITY_THRESHOLDS.get(risk_level, 5)
                 threshold_date = today - timedelta(days=threshold_days)
                 
                 # Check if user is inactive enough to warrant check-in
-                last_activity = user.last_activity_date
+                last_activity = user.profile.last_activity_date if user.profile else getattr(user, "last_activity_date", None)
                 if last_activity is None:
                     # User has never been active, check based on account creation
                     if user.created_at:
@@ -176,7 +185,7 @@ async def send_proactive_checkins() -> None:
                 user_email = user.email
                 
                 # Get personalized message
-                user_name = user.name or user.preferred_name or 'Teman UGM'
+                user_name = display_name_for_user(user)
                 subject, html_body = get_personalized_message(
                     user_name=user_name,
                     primary_concerns=primary_concerns,

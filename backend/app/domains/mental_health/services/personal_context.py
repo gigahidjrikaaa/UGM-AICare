@@ -12,6 +12,10 @@ from app.models import User  # Core model
 from app.domains.mental_health.models import Appointment, JournalEntry, UserSummary
 from app.core.cache import cached, get_cache_service
 from app.core.settings import settings
+from app.services.user_normalization import (
+    allow_email_checkins as allow_email_checkins_for_user,
+    display_name as display_name_for_user,
+)
 
 _CACHE_TTL = timedelta(minutes=5)
 _context_cache: Dict[int, Tuple[str, datetime]] = {}
@@ -131,30 +135,54 @@ async def _compute_personal_context(db: AsyncSession, user: User) -> str:
     """
     profile_lines: List[str] = []
 
-    name = user.name or user.first_name
+    name = display_name_for_user(user)
     if name:
         profile_lines.append(f"Nama panggilan: {name}")
 
-    if user.university:
-        profile_lines.append(f"Universitas: {user.university}")
-    if user.major:
-        profile_lines.append(f"Program studi: {user.major}")
-    if user.year_of_study:
-        profile_lines.append(f"Tahun studi: {user.year_of_study}")
+    profile = getattr(user, "profile", None)
+    university = getattr(profile, "university", None) if profile is not None else None
+    major = getattr(profile, "major", None) if profile is not None else None
+    year_of_study = getattr(profile, "year_of_study", None) if profile is not None else None
 
-    if user.current_streak:
-        profile_lines.append(f"Streak jurnal aktif: {user.current_streak} hari")
-    if user.longest_streak:
-        profile_lines.append(f"Streak terpanjang: {user.longest_streak} hari")
+    if university is None:
+        university = getattr(user, "university", None)
+    if major is None:
+        major = getattr(user, "major", None)
+    if year_of_study is None:
+        year_of_study = getattr(user, "year_of_study", None)
 
-    if user.sentiment_score is not None:
-        score_pct = round(user.sentiment_score * 100)
+    if university:
+        profile_lines.append(f"Universitas: {university}")
+    if major:
+        profile_lines.append(f"Program studi: {major}")
+    if year_of_study:
+        profile_lines.append(f"Tahun studi: {year_of_study}")
+
+    current_streak = getattr(profile, "current_streak", None) if profile is not None else None
+    if current_streak is None:
+        current_streak = getattr(user, "current_streak", 0)
+
+    longest_streak = getattr(profile, "longest_streak", None) if profile is not None else None
+    if longest_streak is None:
+        longest_streak = getattr(user, "longest_streak", 0)
+
+    if current_streak:
+        profile_lines.append(f"Streak jurnal aktif: {int(current_streak)} hari")
+    if longest_streak:
+        profile_lines.append(f"Streak terpanjang: {int(longest_streak)} hari")
+
+    sentiment_score = getattr(profile, "sentiment_score", None) if profile is not None else None
+    if sentiment_score is None:
+        sentiment_score = getattr(user, "sentiment_score", None)
+    if sentiment_score is not None:
+        score_pct = round(float(sentiment_score) * 100)
         profile_lines.append(f"Skor sentimen rata-rata: {score_pct}%")
 
-    if user.allow_email_checkins is not None:
-        profile_lines.append(
-            "Pengguna mengizinkan check-in email" if user.allow_email_checkins else "Pengguna memilih tidak menerima check-in email"
-        )
+    profile_lines.append(
+        "Pengguna mengizinkan check-in email"
+        if allow_email_checkins_for_user(user)
+        else "Pengguna memilih tidak menerima check-in email"
+    )
 
     # Get a lightweight summary instead of detailed content
     # (Tools can fetch detailed summaries when needed)

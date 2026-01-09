@@ -19,6 +19,7 @@ from app.models import (
     User, 
     UserBadge,
     UserProfile,
+    UserClinicalRecord,
     UserPreferences,
     UserEmergencyContact,
     UserConsentLedger,
@@ -48,6 +49,13 @@ from app.schemas.user import (
 )
 from app.schemas.ai_memory import AIMemoryFactResponse
 from app.domains.mental_health.services.user_stats_service import UserStatsService
+from app.services.user_normalization import (
+    allow_email_checkins as allow_email_checkins_for_user,
+    check_in_code as get_check_in_code,
+    clinical_snapshot,
+    ensure_user_normalized_tables,
+    set_checkins_opt_in,
+)
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -112,10 +120,20 @@ def _calculate_age(dob: date | None) -> int | None:
 
 
 async def _ensure_check_in_code(user: User, db: AsyncSession) -> None:
-    if user.check_in_code:
-        return
-    user.check_in_code = uuid.uuid4().hex
-    db.add(user)
+    await ensure_user_normalized_tables(db, user)
+
+    code = get_check_in_code(user)
+    if not code:
+        code = uuid.uuid4().hex
+        if user.preferences:
+            user.preferences.check_in_code = code
+            db.add(user.preferences)
+
+    # Keep legacy users.check_in_code in sync during the migration window.
+    if getattr(user, "check_in_code", None) != code:
+        user.check_in_code = code
+        db.add(user)
+
     await db.commit()
 
 
@@ -126,13 +144,13 @@ async def _load_user_with_profile(user_id: int, db: AsyncSession) -> User:
         .options(
             joinedload(User.profile),
             joinedload(User.preferences),
+            selectinload(User.clinical_record),
             selectinload(User.emergency_contacts),
         )
         .where(User.id == user_id)
     )
     result = await db.execute(stmt)
     return result.unique().scalar_one()
-    await db.refresh(user)
 
 
 def _build_avatar_url(full_name: str | None, check_in_code: str) -> str:
@@ -258,18 +276,19 @@ async def get_profile_overview(
     # Load user with normalized tables
     user = await _load_user_with_profile(current_user.id, db)
 
+    # Best-effort backfill from legacy -> normalized so we can read canonical fields.
+    # Do not fail the request if normalization writes fail.
+    try:
+        await ensure_user_normalized_tables(db, user)
+        await db.commit()
+    except Exception:  # pragma: no cover - defensive migration shim
+        await db.rollback()
+
     # Email always from User table (core auth)
     email = user.email
-    
-    # Phone numbers - read from UserProfile with fallback to legacy User columns
-    phone = (
-        user.profile.phone if user.profile and user.profile.phone
-        else user.phone
-    )
-    alternate_phone = (
-        user.profile.alternate_phone if user.profile and user.profile.alternate_phone
-        else user.alternate_phone
-    )
+
+    phone = user.profile.phone if user.profile else None
+    alternate_phone = user.profile.alternate_phone if user.profile else None
 
     # Emergency contact - read from UserEmergencyContact table with fallback to legacy User columns
     emergency_contact = None
@@ -294,54 +313,25 @@ async def get_profile_overview(
                 legacy_emergency_contact.phone, legacy_emergency_contact.email]):
             emergency_contact = legacy_emergency_contact
 
-    # Name fields - read from UserProfile with fallback to legacy User columns
-    first_name = (
-        user.profile.first_name if user.profile and user.profile.first_name
-        else user.first_name
-    )
-    last_name = (
-        user.profile.last_name if user.profile and user.profile.last_name
-        else user.last_name
-    )
+    # Name fields (canonical: UserProfile)
+    first_name = user.profile.first_name if user.profile else None
+    last_name = user.profile.last_name if user.profile else None
     full_name_parts = [first_name, last_name]
     full_name = " ".join([part for part in full_name_parts if part]) or user.name
-    
-    preferred_name = (
-        user.profile.preferred_name if user.profile and user.profile.preferred_name
-        else user.preferred_name
-    )
 
-    # Profile header - read from UserProfile with fallback to legacy User columns
-    pronouns = (
-        user.profile.pronouns if user.profile and user.profile.pronouns
-        else user.pronouns
-    )
-    city = (
-        user.profile.city if user.profile and user.profile.city
-        else user.city
-    )
-    university = (
-        user.profile.university if user.profile and user.profile.university
-        else user.university
-    )
-    major = (
-        user.profile.major if user.profile and user.profile.major
-        else user.major
-    )
-    # year_of_study can be Integer (UserProfile) or String (User) - normalize to string
-    year_of_study_raw = (
-        user.profile.year_of_study if user.profile and user.profile.year_of_study is not None
-        else user.year_of_study
-    )
-    year_of_study = str(year_of_study_raw) if year_of_study_raw is not None else None
-    date_of_birth = (
-        user.profile.date_of_birth if user.profile
-        else user.date_of_birth
-    )
-    profile_photo_url = (
-        user.profile.profile_photo_url if user.profile and user.profile.profile_photo_url
-        else user.profile_photo_url
-    )
+    preferred_name = user.profile.preferred_name if user.profile else None
+
+    # Profile header (canonical: UserProfile)
+    pronouns = user.profile.pronouns if user.profile else None
+    city = user.profile.city if user.profile else None
+    university = user.profile.university if user.profile else None
+    major = user.profile.major if user.profile else None
+
+    year_of_study = str(user.profile.year_of_study) if (user.profile and user.profile.year_of_study is not None) else None
+    date_of_birth = user.profile.date_of_birth if user.profile else None
+    profile_photo_url = user.profile.profile_photo_url if user.profile else None
+
+    normalized_check_in_code = get_check_in_code(user) or ""
 
     header = ProfileHeaderSummary(
         user_id=user.id,
@@ -352,19 +342,19 @@ async def get_profile_overview(
         wallet_address=user.wallet_address,
         google_sub=user.google_sub,
         avatar_url=profile_photo_url
-        or _build_avatar_url(preferred_name or full_name, user.check_in_code or str(user.id)),
+        or _build_avatar_url(preferred_name or full_name, normalized_check_in_code or str(user.id)),
         date_of_birth=cast(date, date_of_birth) if date_of_birth else None,
         age=_calculate_age(cast(date, date_of_birth) if date_of_birth else None),
-        sentiment_score=user.sentiment_score,
-        current_streak=user.current_streak,
-        longest_streak=user.longest_streak,
-        last_activity_date=cast(date, user.last_activity_date) if user.last_activity_date else None,
+        sentiment_score=(user.profile.sentiment_score if user.profile else user.sentiment_score) or 0.0,
+        current_streak=(user.profile.current_streak if user.profile else user.current_streak) or 0,
+        longest_streak=(user.profile.longest_streak if user.profile else user.longest_streak) or 0,
+        last_activity_date=(cast(date, user.profile.last_activity_date) if (user.profile and user.profile.last_activity_date) else None),
         city=city,
         university=university,
         major=major,
         year_of_study=year_of_study,
         created_at=user.created_at,
-        check_in_code=user.check_in_code or "",
+        check_in_code=normalized_check_in_code,
     )
 
     contact = ContactInfo(
@@ -374,26 +364,23 @@ async def get_profile_overview(
         emergency_contact=emergency_contact,
     )
 
+    clinical = clinical_snapshot(user)
     safety = SafetyAndClinicalBasics(
-        risk_level=user.risk_level,
-        clinical_summary=user.clinical_summary,
-        primary_concerns=user.primary_concerns,
-        safety_plan_notes=user.safety_plan_notes,
+        risk_level=clinical.risk_level,
+        clinical_summary=clinical.clinical_summary,
+        primary_concerns=clinical.primary_concerns,
+        safety_plan_notes=clinical.safety_plan_notes,
     )
 
     therapy = TherapyAssignment(
-        current_therapist_name=user.current_therapist_name,
-        current_therapist_contact=user.current_therapist_contact,
-        therapy_modality=user.therapy_modality,
-        therapy_frequency=user.therapy_frequency,
-        therapy_notes=user.therapy_notes,
+        current_therapist_name=(user.clinical_record.external_therapist_name if user.clinical_record else None),
+        current_therapist_contact=(user.clinical_record.external_therapist_contact if user.clinical_record else None),
+        therapy_modality=(user.clinical_record.therapy_modality if user.clinical_record else None),
+        therapy_frequency=(user.clinical_record.therapy_frequency if user.clinical_record else None),
+        therapy_notes=(getattr(user.clinical_record, "therapy_notes", None) if user.clinical_record else None),
     )
 
-    # Consent settings - read from UserPreferences with fallback to legacy User columns
-    allow_email_checkins = (
-        user.preferences.allow_email_checkins if user.preferences and user.preferences.allow_email_checkins is not None
-        else user.allow_email_checkins
-    )
+    allow_email_checkins = allow_email_checkins_for_user(user)
     consent = ConsentAndPrivacySettings(
         allow_email_checkins=allow_email_checkins,
         consent_data_sharing=user.consent_data_sharing,
@@ -403,24 +390,11 @@ async def get_profile_overview(
         consent_ai_memory=getattr(user, "consent_ai_memory", False),
     )
 
-    # Localization - read from UserPreferences with fallback to legacy User columns
-    preferred_language = (
-        user.preferences.preferred_language if user.preferences and user.preferences.preferred_language
-        else user.preferred_language
-    ) or "id"
-    preferred_timezone = (
-        user.preferences.preferred_timezone if user.preferences and user.preferences.preferred_timezone
-        else user.preferred_timezone
-    ) or "Asia/Jakarta"
-    # UserPreferences uses 'accessibility_notes', User uses 'accessibility_needs'
-    accessibility_needs = (
-        user.preferences.accessibility_notes if user.preferences and user.preferences.accessibility_notes
-        else user.accessibility_needs
-    )
-    # communication_preferences and interface_preferences only exist on legacy User model
-    # (not yet migrated to UserPreferences table)
-    communication_preferences = user.communication_preferences
-    interface_preferences = user.interface_preferences
+    preferred_language = (user.preferences.preferred_language if user.preferences else None) or "id"
+    preferred_timezone = (user.preferences.preferred_timezone if user.preferences else None) or "Asia/Jakarta"
+    accessibility_needs = user.preferences.accessibility_notes if user.preferences else None
+    communication_preferences = user.preferences.communication_preferences if user.preferences else None
+    interface_preferences = user.preferences.interface_preferences if user.preferences else None
     
     localization = LocalizationAndAccessibility(
         preferred_language=preferred_language,
@@ -440,7 +414,7 @@ async def get_profile_overview(
         timeline=timeline,
         consent=consent,
         localization=localization,
-        aicare_team_notes=user.aicare_team_notes,
+        aicare_team_notes=(user.clinical_record.aicare_team_notes if user.clinical_record else None),
     )
 
 
@@ -479,17 +453,20 @@ async def update_profile_overview(
     # Load user with normalized tables
     user = await _load_user_with_profile(current_user.id, db)
 
+    # Ensure 1:1 normalized rows exist so writes target the canonical tables.
+    await ensure_user_normalized_tables(db, user)
+
     # Define which fields belong to which tables
     profile_fields = {
         "preferred_name", "pronouns", "profile_photo_url", "phone", "alternate_phone",
         "city", "university", "major", "year_of_study"
     }
     preference_fields = {
-        "preferred_language", "preferred_timezone", "accessibility_needs"
-    }
-    # Fields only on legacy User table (not yet migrated to normalized tables)
-    legacy_preference_fields = {
-        "communication_preferences", "interface_preferences"
+        "preferred_language",
+        "preferred_timezone",
+        "accessibility_needs",
+        "communication_preferences",
+        "interface_preferences",
     }
     emergency_contact_fields = {
         "emergency_contact_name", "emergency_contact_relationship",
@@ -500,11 +477,16 @@ async def update_profile_overview(
         "consent_emergency_contact", "consent_marketing",
         "consent_ai_memory",
     }
-    # Legacy User table fields (for backward compatibility)
-    legacy_user_fields = {
-        "risk_level", "clinical_summary", "primary_concerns", "safety_plan_notes",
-        "current_therapist_name", "current_therapist_contact", "therapy_modality",
-        "therapy_frequency", "therapy_notes"
+    clinical_fields = {
+        "risk_level",
+        "clinical_summary",
+        "primary_concerns",
+        "safety_plan_notes",
+        "current_therapist_name",
+        "current_therapist_contact",
+        "therapy_modality",
+        "therapy_frequency",
+        "therapy_notes",
     }
 
     updated = False
@@ -518,12 +500,23 @@ async def update_profile_overview(
                     user.profile = UserProfile(user_id=user.id, country="Indonesia")
                     db.add(user.profile)
                     updated = True
-                
-                normalized = _normalize_optional_string(data.get(field))
-                setattr(user.profile, field, normalized)
-                # Dual-write to legacy User column for backward compatibility
-                if hasattr(user, field):
-                    setattr(user, field, normalized)
+
+                if field == "year_of_study":
+                    raw_value = data.get(field)
+                    try:
+                        normalized_int = int(str(raw_value).strip()) if raw_value is not None else None
+                    except Exception:
+                        normalized_int = None
+                    user.profile.year_of_study = normalized_int
+                    # Keep legacy users.year_of_study in sync during the migration window.
+                    if hasattr(user, "year_of_study"):
+                        user.year_of_study = str(normalized_int) if normalized_int is not None else None
+                else:
+                    normalized = _normalize_optional_string(data.get(field))
+                    setattr(user.profile, field, normalized)
+                    # Dual-write to legacy User column for backward compatibility
+                    if hasattr(user, field):
+                        setattr(user, field, normalized)
                 updated = True
 
         # Update UserPreferences fields
@@ -541,22 +534,17 @@ async def update_profile_overview(
                     )
                     db.add(user.preferences)
                     updated = True
-                
+
                 normalized = _normalize_optional_string(data.get(field))
                 # Map accessibility_needs to accessibility_notes for UserPreferences
                 prefs_field = "accessibility_notes" if field == "accessibility_needs" else field
-                
                 setattr(user.preferences, prefs_field, normalized)
                 # Dual-write to legacy User column for backward compatibility
-                if hasattr(user, field):
+                # (communication/interface blobs live on users historically)
+                if prefs_field == "accessibility_notes" and hasattr(user, "accessibility_needs"):
+                    user.accessibility_needs = normalized
+                elif hasattr(user, field):
                     setattr(user, field, normalized)
-                updated = True
-
-        # Update legacy-only preference fields (not yet migrated to UserPreferences)
-        for field in legacy_preference_fields:
-            if field in data:
-                normalized = _normalize_optional_string(data.get(field))
-                setattr(user, field, normalized)
                 updated = True
 
         # Update emergency contact in UserEmergencyContact table
@@ -618,11 +606,71 @@ async def update_profile_overview(
                 db.add(consent_entry)
                 updated = True
 
-        # Update legacy User table fields (clinical/therapy data - not yet normalized)
-        for field in legacy_user_fields:
-            if field in data:
-                normalized = _normalize_optional_string(data.get(field))
-                setattr(user, field, normalized)
+        # Update clinical/therapy fields in UserClinicalRecord (canonical)
+        clinical_data = {k: data.get(k) for k in clinical_fields if k in data}
+        if clinical_data:
+            if not user.clinical_record:
+                user.clinical_record = UserClinicalRecord(user_id=user.id)
+                db.add(user.clinical_record)
+                updated = True
+
+            if "risk_level" in clinical_data:
+                user.clinical_record.current_risk_level = _normalize_optional_string(clinical_data.get("risk_level"))
+                # Keep legacy users.risk_level in sync during migration window.
+                if hasattr(user, "risk_level"):
+                    user.risk_level = user.clinical_record.current_risk_level
+                updated = True
+
+            if "clinical_summary" in clinical_data:
+                user.clinical_record.clinical_summary = _normalize_optional_string(clinical_data.get("clinical_summary"))
+                if hasattr(user, "clinical_summary"):
+                    user.clinical_summary = user.clinical_record.clinical_summary
+                updated = True
+
+            if "primary_concerns" in clinical_data:
+                raw = _normalize_optional_string(clinical_data.get("primary_concerns"))
+                if raw is None:
+                    user.clinical_record.primary_concerns = None
+                else:
+                    parts = [p.strip() for p in raw.replace("\n", ",").split(",")]
+                    user.clinical_record.primary_concerns = [p for p in parts if p]
+                if hasattr(user, "primary_concerns"):
+                    user.primary_concerns = raw
+                updated = True
+
+            if "safety_plan_notes" in clinical_data:
+                user.clinical_record.safety_plan_notes = _normalize_optional_string(clinical_data.get("safety_plan_notes"))
+                if hasattr(user, "safety_plan_notes"):
+                    user.safety_plan_notes = user.clinical_record.safety_plan_notes
+                updated = True
+
+            # Map legacy “current therapist” fields -> external therapist columns
+            if "current_therapist_name" in clinical_data:
+                user.clinical_record.external_therapist_name = _normalize_optional_string(clinical_data.get("current_therapist_name"))
+                if hasattr(user, "current_therapist_name"):
+                    user.current_therapist_name = user.clinical_record.external_therapist_name
+                updated = True
+            if "current_therapist_contact" in clinical_data:
+                user.clinical_record.external_therapist_contact = _normalize_optional_string(clinical_data.get("current_therapist_contact"))
+                if hasattr(user, "current_therapist_contact"):
+                    user.current_therapist_contact = user.clinical_record.external_therapist_contact
+                updated = True
+
+            if "therapy_modality" in clinical_data:
+                user.clinical_record.therapy_modality = _normalize_optional_string(clinical_data.get("therapy_modality"))
+                if hasattr(user, "therapy_modality"):
+                    user.therapy_modality = user.clinical_record.therapy_modality
+                updated = True
+            if "therapy_frequency" in clinical_data:
+                user.clinical_record.therapy_frequency = _normalize_optional_string(clinical_data.get("therapy_frequency"))
+                if hasattr(user, "therapy_frequency"):
+                    user.therapy_frequency = user.clinical_record.therapy_frequency
+                updated = True
+            if "therapy_notes" in clinical_data:
+                therapy_notes = _normalize_optional_string(clinical_data.get("therapy_notes"))
+                setattr(user.clinical_record, "therapy_notes", therapy_notes)
+                if hasattr(user, "therapy_notes"):
+                    user.therapy_notes = therapy_notes
                 updated = True
 
         if updated:
@@ -652,17 +700,23 @@ async def update_checkin_settings(
     current_user: User = Depends(get_current_active_user),
 ) -> CheckinSettingsResponse:
     logger.info("Updating check-in settings for user %s to %s", current_user.id, settings.allow_email_checkins)
-    current_user.allow_email_checkins = settings.allow_email_checkins
+    user = await _load_user_with_profile(current_user.id, db)
+
+    await set_checkins_opt_in(db, user=user, allow=settings.allow_email_checkins)
+
+    # Keep legacy users.allow_email_checkins in sync during the migration window.
+    if hasattr(user, "allow_email_checkins"):
+        user.allow_email_checkins = settings.allow_email_checkins
     try:
-        db.add(current_user)
+        db.add(user)
         await db.commit()
-        await db.refresh(current_user)
+        await db.refresh(user)
     except Exception as exc:  # pragma: no cover - defensive logging
         await db.rollback()
         logger.error("Failed to update check-in settings for user %s", current_user.id, exc_info=True)
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to update settings") from exc
 
-    return CheckinSettingsResponse(allow_email_checkins=current_user.allow_email_checkins)
+    return CheckinSettingsResponse(allow_email_checkins=allow_email_checkins_for_user(user))
 
 
 @router.get("/ai-memory/facts", response_model=List[AIMemoryFactResponse])

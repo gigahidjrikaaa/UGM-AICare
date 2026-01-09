@@ -1,6 +1,7 @@
 # backend/app/dependencies.py (Modified)
 import logging
-from fastapi import Depends, HTTPException, Header, status, Cookie  # type: ignore
+import hashlib
+from fastapi import Depends, HTTPException, Header, status, Cookie, Request  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models import User
@@ -59,6 +60,7 @@ def get_token_from_request(
 async def get_current_active_user(
     token: str = Depends(get_token_from_request),
     db: AsyncSession = Depends(get_async_db),
+    request: Request = None,  # type: ignore[assignment]
 ) -> User:
     """Dependency to return the authenticated and active user for a valid JWT."""
     payload = decrypt_and_validate_token(token)
@@ -106,6 +108,21 @@ async def get_current_active_user(
             payload.google_sub,
             user.google_sub,
         )
+
+    # Expose request-scoped context for non-DI layers (e.g., middleware).
+    # Never store raw tokens; use a deterministic hash.
+    if request is not None:
+        try:
+            request.state.user_id = int(user.id)
+            request.state.session_id = hashlib.sha256(token.encode("utf-8")).hexdigest()
+            prefs = getattr(user, "preferences", None)
+            analytics_allowed = getattr(prefs, "allow_analytics_tracking", None)
+            if analytics_allowed is None:
+                analytics_allowed = True
+            request.state.analytics_allowed = bool(analytics_allowed)
+        except Exception:
+            # Non-fatal; auth should still succeed.
+            pass
 
     return user
 

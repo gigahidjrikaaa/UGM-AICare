@@ -26,6 +26,7 @@ import {
   FiZap,
   FiDatabase,
   FiEye,
+  FiAward,
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink'; // Assuming SidebarLink component exists
 
@@ -55,6 +56,8 @@ const navGroups = [
       { name: 'Intervention Plans', icon: <FiClipboard size={18} />, href: '/admin/interventions' },
       { name: 'Quest Templates', icon: <FiZap size={18} />, href: '/admin/quests' },
       { name: 'Insights Analytics', icon: <FiTrendingUp size={18} />, href: '/admin/insights' },
+      { name: 'Retention Analytics', icon: <FiTarget size={18} />, href: '/admin/retention' },
+      { name: 'EDU Badges', icon: <FiAward size={18} />, href: '/admin/badges' },
       { name: 'LangGraph Monitoring', icon: <FiActivity size={18} />, href: '/admin/langgraph' },
     ]
   },

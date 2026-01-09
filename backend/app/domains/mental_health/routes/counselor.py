@@ -32,6 +32,13 @@ from app.schemas.counselor import (
 router = APIRouter(prefix="/counselor", tags=["Counselor"])
 
 
+async def require_counselor(current_user: User = Depends(get_current_active_user)) -> User:
+    """Ensure the current user has counselor access."""
+    if current_user.role not in {"counselor", "admin"}:
+        raise HTTPException(status_code=403, detail="Counselor access required")
+    return current_user
+
+
 @router.get("/cases/{case_id}/assessments")
 async def get_case_assessments(
     case_id: str,
@@ -115,13 +122,6 @@ async def get_case_assessments(
         "screening_profile": screening,
         "triage_assessments": triage_payload,
     }
-
-
-async def require_counselor(current_user: User = Depends(get_current_active_user)) -> User:
-    """Ensure the current user has counselor access."""
-    if current_user.role not in {"counselor", "admin"}:
-        raise HTTPException(status_code=403, detail="Counselor access required")
-    return current_user
 
 
 async def get_counselor_profile(user: User, db: AsyncSession) -> CounselorProfile:
@@ -446,7 +446,11 @@ async def get_my_cases(
     users_by_id: dict[int, User] = {}
     if user_ids:
         user_rows = (
-            await db.execute(select(User).where(User.id.in_(user_ids)))
+            await db.execute(
+                select(User)
+                .options(joinedload(User.profile))
+                .where(User.id.in_(user_ids))
+            )
         ).scalars().all()
         users_by_id = {u.id: u for u in user_rows}
     
@@ -473,7 +477,10 @@ async def get_my_cases(
         user_obj: User | None = users_by_id.get(linked_user_id) if linked_user_id else None
         user_phone = None
         if user_obj:
-            user_phone = user_obj.phone or user_obj.alternate_phone
+            if user_obj.profile:
+                user_phone = user_obj.profile.phone or user_obj.profile.alternate_phone
+            else:
+                user_phone = user_obj.phone or user_obj.alternate_phone
 
         payload.append(SDACase(
             id=str(case.id),
@@ -488,7 +495,7 @@ async def get_my_cases(
             sla_breach_at=cast(datetime | None, case.sla_breach_at),
             user_email=user_obj.email if user_obj else None,
             user_phone=user_phone,
-            telegram_username=getattr(user_obj, "telegram_username", None) if user_obj else None,
+            telegram_username=(user_obj.profile.telegram_username if (user_obj and user_obj.profile) else None),
         ))
     
     return SDAListCasesResponse(cases=payload)

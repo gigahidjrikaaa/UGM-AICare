@@ -10,6 +10,7 @@ from app.domains.mental_health.models.interventions import CampaignExecution, In
 from app.models.user import User
 from app.domains.mental_health.models.assessments import UserScreeningProfile
 from app.utils.email_utils import send_email
+from app.services.user_normalization import display_name as display_name_for_user
 
 CHECKIN_CAMPAIGN_TYPE = "proactive_checkin_email"
 CHECKIN_DELIVERY_METHOD = "email"
@@ -137,7 +138,7 @@ async def queue_checkin_execution(
     campaign = await get_or_create_checkin_campaign(db)
 
     subject, _ = build_checkin_message(
-        user_name=user.name or user.preferred_name or "UGM friend",
+        user_name=display_name_for_user(user),
         primary_concerns=primary_concerns,
         risk_level=risk_level,
         app_url=app_url,
@@ -191,7 +192,7 @@ async def send_checkin_execution(
     if not isinstance(primary_concerns, list):
         primary_concerns = []
 
-    user_name = user.name or user.preferred_name or "UGM friend"
+    user_name = display_name_for_user(user)
     subject, html_body = build_checkin_message(
         user_name=user_name,
         primary_concerns=[str(x) for x in primary_concerns],

@@ -3,12 +3,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Security, status, Body # type: ignore
 from fastapi.security import APIKeyHeader # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 from sqlalchemy import select
 from typing import Optional, List, Tuple
 
 from app.database import get_async_db
 from app.schemas.internal import UserInternalResponse, UserSyncPayload, UserSyncResponse
 from app.models import User
+from app.services.user_normalization import allow_email_checkins as allow_email_checkins_for_user
 from app.services.user_service import async_get_or_create_user # Import the user service function
 import os
 import re
@@ -70,7 +72,11 @@ async def get_user_by_google_sub(google_sub: str, db: AsyncSession = Depends(get
     Requires X-Internal-API-Key header.
     """
     logger.info(f"Internal API: Fetching user by sub: {google_sub}")
-    result = await db.execute(select(User).filter(User.google_sub == google_sub))
+    result = await db.execute(
+        select(User)
+        .options(selectinload(User.preferences))
+        .filter(User.google_sub == google_sub)
+    )
     db_user = result.scalar_one_or_none()
     if not db_user: # type: ignore
         print(f"Internal API: User not found for sub: {google_sub}")
@@ -89,7 +95,7 @@ async def get_user_by_google_sub(google_sub: str, db: AsyncSession = Depends(get
         email=str(db_user.email) if db_user.email is not None else None,  # Convert Column to str for proper typing
         wallet_address=str(db_user.wallet_address) if db_user.wallet_address is not None else None,
         role=None,
-        allow_email_checkins=bool(db_user.allow_email_checkins),
+        allow_email_checkins=bool(allow_email_checkins_for_user(db_user)),
     )
 
 # --- POST Endpoint for User Sync ---

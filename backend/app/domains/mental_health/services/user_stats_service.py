@@ -14,6 +14,7 @@ from app.models import User  # Core model
 from app.domains.mental_health.models import JournalEntry, Conversation
 from app.domains.mental_health.models.assessments import TriageAssessment
 from app.schemas.user import UserStatsResponse
+from app.services.user_normalization import ensure_user_normalized_tables
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,16 @@ class UserStatsService:
             sentiment_score = await self._calculate_sentiment_score(user.id)
             
             # 3. Update user model
+            await ensure_user_normalized_tables(self.db, user)
+
+            if user.profile:
+                user.profile.current_streak = current_streak
+                user.profile.longest_streak = longest_streak
+                user.profile.last_activity_date = last_activity
+                user.profile.sentiment_score = sentiment_score
+                self.db.add(user.profile)
+
+            # Keep legacy columns in sync during migration window.
             user_any = cast(Any, user)
             user_any.current_streak = current_streak
             user_any.longest_streak = longest_streak
@@ -56,6 +67,8 @@ class UserStatsService:
             self.db.add(user)
             await self.db.commit()
             await self.db.refresh(user)
+            if user.profile:
+                await self.db.refresh(user.profile)
             
             logger.info(
                 f"User {user.id} stats updated: "

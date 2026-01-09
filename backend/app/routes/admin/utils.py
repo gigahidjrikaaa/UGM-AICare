@@ -9,7 +9,7 @@ from typing import Optional
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models import User, UserBadge  # Core models
+from app.models import User, UserBadge, UserProfile  # Core models
 from app.domains.mental_health.models import Conversation, JournalEntry
 from app.schemas.admin import UserStats
 
@@ -51,16 +51,27 @@ async def get_user_stats(db: AsyncSession) -> UserStats:
 
     total_users = (await db.execute(select(func.count(User.id)))).scalar() or 0
     active_30d = (
-        await db.execute(select(func.count(User.id)).filter(User.last_activity_date >= month_ago))
+        await db.execute(
+            select(func.count(User.id))
+            .outerjoin(UserProfile, User.id == UserProfile.user_id)
+            .filter(func.coalesce(UserProfile.last_activity_date, User.last_activity_date) >= month_ago)
+        )
     ).scalar() or 0
     active_7d = (
-        await db.execute(select(func.count(User.id)).filter(User.last_activity_date >= week_ago))
+        await db.execute(
+            select(func.count(User.id))
+            .outerjoin(UserProfile, User.id == UserProfile.user_id)
+            .filter(func.coalesce(UserProfile.last_activity_date, User.last_activity_date) >= week_ago)
+        )
     ).scalar() or 0
     new_today = (
         await db.execute(select(func.count(User.id)).filter(func.date(User.created_at) == today))
     ).scalar() or 0
     avg_sentiment = (
-        await db.execute(select(func.avg(User.sentiment_score)))
+        await db.execute(
+            select(func.avg(func.coalesce(UserProfile.sentiment_score, User.sentiment_score)))
+            .outerjoin(UserProfile, User.id == UserProfile.user_id)
+        )
     ).scalar() or 0
     total_journals = (
         await db.execute(select(func.count(JournalEntry.id)))

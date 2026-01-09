@@ -126,6 +126,16 @@ class UserPreferences(Base):
         String(50),
         comment="Custom color scheme (future feature)"
     )
+
+    # Legacy free-text blobs (kept for backward compatibility with existing UI)
+    communication_preferences = Column(
+        Text,
+        comment="User communication preferences (free text; migrated from users.communication_preferences)"
+    )
+    interface_preferences = Column(
+        Text,
+        comment="User interface preferences (free text; migrated from users.interface_preferences)"
+    )
     
     # =====================================================================
     # ACCESSIBILITY (Best Practice: Inclusive design)

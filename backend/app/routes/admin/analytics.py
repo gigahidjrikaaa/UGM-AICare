@@ -7,13 +7,14 @@ Provides metrics and analytics for:
 """
 
 from typing import List, Optional
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_, desc, case
 
 from app.database import get_async_db
 from app.core.auth import require_role
+from app.models import RetentionCohortDaily, UserDailyActivity
 from app.models.user import User
 from app.domains.mental_health.models.interventions import InterventionPlanRecord
 from pydantic import BaseModel, Field
@@ -68,6 +69,42 @@ class UserProgress(BaseModel):
     avg_completion_percentage: float
     last_plan_created: datetime
     engagement_score: float = Field(description="0-100 score based on activity")
+
+
+class ActiveUsersSummary(BaseModel):
+    """Top-level active user counters."""
+
+    dau: int = Field(description="Daily active users (unique users today)")
+    wau: int = Field(description="Weekly active users (unique users last 7 days, inclusive)")
+    mau: int = Field(description="Monthly active users (unique users last 30 days, inclusive)")
+    as_of: date
+
+
+class DailyActiveUsersPoint(BaseModel):
+    activity_date: date
+    active_users: int
+    total_requests: int
+
+
+class DailyActiveUsersSeries(BaseModel):
+    days: int
+    generated_at: datetime
+    points: List[DailyActiveUsersPoint]
+
+
+class CohortRetentionPoint(BaseModel):
+    cohort_date: date
+    day_n: int
+    cohort_size: int
+    retained_users: int
+    retention_rate: float
+
+
+class CohortRetentionSeries(BaseModel):
+    cohort_days: int
+    day_n_values: List[int]
+    generated_at: datetime
+    points: List[CohortRetentionPoint]
 
 
 # ============================================================================
@@ -375,3 +412,139 @@ async def get_user_progress_summary(
         ))
     
     return progress_list
+
+
+# ============================================================================
+# RETENTION / ACTIVITY ANALYTICS
+# ============================================================================
+
+
+@router.get("/retention/active", response_model=ActiveUsersSummary)
+async def get_active_users_summary(
+    current_user: User = Depends(require_role(["admin"])),
+    db: AsyncSession = Depends(get_async_db),
+) -> ActiveUsersSummary:
+    """Return DAU/WAU/MAU based on `user_daily_activity`."""
+
+    today = date.today()
+
+    dau = (
+        await db.execute(
+            select(func.count())
+            .select_from(UserDailyActivity)
+            .where(UserDailyActivity.activity_date == today)
+        )
+    ).scalar() or 0
+
+    wau_start = today - timedelta(days=6)
+    wau = (
+        await db.execute(
+            select(func.count(func.distinct(UserDailyActivity.user_id)))
+            .select_from(UserDailyActivity)
+            .where(UserDailyActivity.activity_date >= wau_start)
+            .where(UserDailyActivity.activity_date <= today)
+        )
+    ).scalar() or 0
+
+    mau_start = today - timedelta(days=29)
+    mau = (
+        await db.execute(
+            select(func.count(func.distinct(UserDailyActivity.user_id)))
+            .select_from(UserDailyActivity)
+            .where(UserDailyActivity.activity_date >= mau_start)
+            .where(UserDailyActivity.activity_date <= today)
+        )
+    ).scalar() or 0
+
+    return ActiveUsersSummary(dau=int(dau), wau=int(wau), mau=int(mau), as_of=today)
+
+
+@router.get("/retention/dau", response_model=DailyActiveUsersSeries)
+async def get_daily_active_users_series(
+    days: int = Query(30, ge=1, le=365, description="How many trailing days to return"),
+    current_user: User = Depends(require_role(["admin"])),
+    db: AsyncSession = Depends(get_async_db),
+) -> DailyActiveUsersSeries:
+    """Return daily active users time series."""
+
+    today = date.today()
+    start = today - timedelta(days=days - 1)
+
+    rows = (
+        await db.execute(
+            select(
+                UserDailyActivity.activity_date,
+                func.count().label("active_users"),
+                func.coalesce(func.sum(UserDailyActivity.request_count), 0).label("total_requests"),
+            )
+            .where(UserDailyActivity.activity_date >= start)
+            .where(UserDailyActivity.activity_date <= today)
+            .group_by(UserDailyActivity.activity_date)
+            .order_by(UserDailyActivity.activity_date.asc())
+        )
+    ).all()
+
+    points = [
+        DailyActiveUsersPoint(
+            activity_date=row[0],
+            active_users=int(row[1] or 0),
+            total_requests=int(row[2] or 0),
+        )
+        for row in rows
+    ]
+
+    return DailyActiveUsersSeries(days=days, generated_at=datetime.utcnow(), points=points)
+
+
+@router.get("/retention/cohorts", response_model=CohortRetentionSeries)
+async def get_cohort_retention(
+    cohort_days: int = Query(30, ge=1, le=365, description="How many cohort start dates to include"),
+    day_n_values: List[int] = Query([1, 7, 30], description="Retention day offsets"),
+    current_user: User = Depends(require_role(["admin"])),
+    db: AsyncSession = Depends(get_async_db),
+) -> CohortRetentionSeries:
+    """Return cohort retention points from precomputed `retention_cohort_daily`."""
+
+    today = date.today()
+    start = today - timedelta(days=cohort_days - 1)
+
+    normalized_day_ns = sorted({int(x) for x in day_n_values if int(x) >= 0})
+    if not normalized_day_ns:
+        normalized_day_ns = [1, 7, 30]
+
+    rows = (
+        await db.execute(
+            select(
+                RetentionCohortDaily.cohort_date,
+                RetentionCohortDaily.day_n,
+                RetentionCohortDaily.cohort_size,
+                RetentionCohortDaily.retained_users,
+            )
+            .where(RetentionCohortDaily.cohort_date >= start)
+            .where(RetentionCohortDaily.cohort_date <= today)
+            .where(RetentionCohortDaily.day_n.in_(normalized_day_ns))
+            .order_by(RetentionCohortDaily.cohort_date.asc(), RetentionCohortDaily.day_n.asc())
+        )
+    ).all()
+
+    points: List[CohortRetentionPoint] = []
+    for cohort_date, day_n, cohort_size, retained_users in rows:
+        denom = int(cohort_size or 0)
+        retained = int(retained_users or 0)
+        rate = (retained / denom) if denom > 0 else 0.0
+        points.append(
+            CohortRetentionPoint(
+                cohort_date=cohort_date,
+                day_n=int(day_n),
+                cohort_size=denom,
+                retained_users=retained,
+                retention_rate=rate,
+            )
+        )
+
+    return CohortRetentionSeries(
+        cohort_days=cohort_days,
+        day_n_values=normalized_day_ns,
+        generated_at=datetime.utcnow(),
+        points=points,
+    )

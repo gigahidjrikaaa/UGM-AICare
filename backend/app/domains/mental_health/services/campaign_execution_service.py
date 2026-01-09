@@ -15,6 +15,8 @@ from app.models.campaign import SCACampaignExecution
 from app.domains.mental_health.models import Case
 from app.models.user import User
 from app.domains.mental_health.services.campaign_service import CampaignService
+from app.services.user_normalization import current_risk_level as current_risk_level_for_user
+from app.services.user_normalization import display_name as display_name_for_user
 
 logger = logging.getLogger(__name__)
 
@@ -276,30 +278,28 @@ class CampaignExecutionService:
                 return False
             
             # Get user's name for personalization
-            # User model has first_name, last_name, name, and preferred_name fields
-            user_name = (
-                user.preferred_name or 
-                user.name or 
-                (f"{user.first_name} {user.last_name}".strip() if user.first_name or user.last_name else None) or
-                user_email.split("@")[0]
-            )
+            user_name = display_name_for_user(user) or user_email.split("@")[0]
             
             # Get user's profile data for personalization
             # Note: Cases use user_hash for privacy, can't directly link to user.id
             case_count = 0
-            risk_score = user.risk_level or "N/A"
+            risk_score = current_risk_level_for_user(user) or "N/A"
             days_inactive = 0
             
             # Calculate days since last activity with proper type handling
-            if user.last_activity_date:
+            last_activity_date = getattr(user, "last_activity_date", None)
+            if getattr(user, "profile", None) is not None:
+                last_activity_date = user.profile.last_activity_date or last_activity_date
+
+            if last_activity_date:
                 from datetime import datetime as DateTimeType
                 today = date.today()
                 # Ensure last_activity_date is a date object
-                if isinstance(user.last_activity_date, date):
-                    days_inactive = (today - user.last_activity_date).days
-                elif isinstance(user.last_activity_date, DateTimeType):
+                if isinstance(last_activity_date, date):
+                    days_inactive = (today - last_activity_date).days
+                elif isinstance(last_activity_date, DateTimeType):
                     # Handle datetime objects - use .date() method
-                    last_activity = user.last_activity_date.date()  # datetime to date
+                    last_activity = last_activity_date.date()  # datetime to date
                     days_inactive = (today - last_activity).days
                 else:
                     # Fallback if unexpected type
