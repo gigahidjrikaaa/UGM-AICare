@@ -1,16 +1,24 @@
+# syntax=docker/dockerfile:1.6
+
 # frontend/Dockerfile
 
+# Pin Node major version for reproducible builds across stages.
+ARG NODE_IMAGE=node:20-bookworm-slim
+
 # 1. Development Stage ('development')
-# Use an official Node.js image. Check your required Node version (e.g., 18, 20)
-FROM node:slim as development
+FROM ${NODE_IMAGE} as development
 
 # Set working directory
 WORKDIR /app
 
+# Disable Next telemetry
+ENV NEXT_TELEMETRY_DISABLED=1
+
 # Copy package.json and lock file
-COPY package.json package-lock.json* ./
+COPY package.json package-lock.json ./
 # Install dependencies using npm ci (clean install based on lock file)
-RUN npm ci
+RUN --mount=type=cache,target=/root/.npm \
+	npm ci --no-audit --no-fund
 
 # Copy the rest of the application code
 COPY . .
@@ -27,16 +35,19 @@ CMD ["npm", "run", "dev:docker"]
 
 # 2. Production Build Stage ('builder')
 # Use the development stage as a base or start fresh
-FROM node:slim as builder
+FROM ${NODE_IMAGE} as builder
 
 WORKDIR /app
 
-# Copy dependency manifests
-COPY package.json package-lock.json* ./
+# Disable Next telemetry
+ENV NEXT_TELEMETRY_DISABLED=1
 
-# Install production dependencies only
+# Copy dependency manifests
+COPY package.json package-lock.json ./
+
 # Clean install to ensure exact versions from package-lock.json
-RUN npm ci --prefer-offline --no-audit
+RUN --mount=type=cache,target=/root/.npm \
+	npm ci --prefer-offline --no-audit --no-fund
 
 # Copy the rest of the source code
 COPY . .
@@ -44,7 +55,7 @@ COPY . .
 # Set build-time environment variables
 # These will be baked into the static assets by Next.js
 ARG NEXT_PUBLIC_API_URL
-ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 # Add other NEXT_PUBLIC_ ARGs and ENVs here
 
 # Build the Next.js application
@@ -52,7 +63,6 @@ ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
 # Increase Node memory limit to prevent OOM during build
 ENV NODE_OPTIONS="--max-old-space-size=3072"
 RUN npm run build
-RUN echo "NEXT_PUBLIC_API_URL is $NEXT_PUBLIC_API_URL"
 
 
 # ---
@@ -60,12 +70,17 @@ RUN echo "NEXT_PUBLIC_API_URL is $NEXT_PUBLIC_API_URL"
 
 # 3. Production Runtime Stage ('production')
 # Use a minimal Node.js image for the final production image
-FROM node:slim as production
+FROM ${NODE_IMAGE} as production
 
 WORKDIR /app
 
 # Set environment for production
-ENV NODE_ENV production
+ENV NODE_ENV=production
+ENV NEXT_TELEMETRY_DISABLED=1
+
+# Sensible defaults for platform runtimes (Coolify will typically override PORT)
+ENV HOSTNAME=0.0.0.0
+ENV PORT=22000
 
 # Copy built artifacts from the 'builder' stage
 COPY --from=builder /app/public ./public

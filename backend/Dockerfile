@@ -8,6 +8,11 @@ FROM python:3.11-slim-bookworm AS builder
 
 WORKDIR /app
 
+# Conservative defaults for Python/pip in containers
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
+
 # Install essential build tools (no Rust needed for binary wheels)
 ARG DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
@@ -37,10 +42,15 @@ RUN groupadd -r appgroup && useradd --no-log-init -r -g appgroup -m -s /bin/bash
 WORKDIR /app
 
 # Set environment variables for Python
-ENV PYTHONDONTWRITEBYTECODE=1
-ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Install runtime system dependencies, including dos2unix and curl (for health checks)
+# Sensible default (platforms like Coolify typically override this)
+ENV PORT=22001
+
+# Install runtime system dependencies.
+# NOTE: postgresql-client is only needed if you exec into the container and run psql-based maintenance scripts.
 ARG DEBIAN_FRONTEND=noninteractive
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt,sharing=locked \
@@ -48,39 +58,58 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     apt-get install -y --no-install-recommends \
         libpq5 \
         dos2unix \
-        postgresql-client \
-        curl && \
+        postgresql-client && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
 # Copy pre-compiled wheels from the builder stage
 COPY --from=builder /app/wheels /wheels
 
-# Install Python dependencies from wheels
-RUN pip install --no-cache-dir /wheels/* && rm -rf /wheels \
-    && python -m spacy download xx_ent_wiki_sm || true \
-    && python -m spacy download en_core_web_sm || true
+# Copy requirements to guarantee deterministic installation from wheels
+COPY requirements.txt ./requirements.txt
+
+# Install Python dependencies strictly from wheels.
+RUN pip install --no-cache-dir --no-index --find-links=/wheels -r requirements.txt \
+    && rm -rf /wheels
+
+# Optional: download SpaCy models at build time (requires network access)
+ARG DOWNLOAD_SPACY_MODELS=0
+RUN if [ "$DOWNLOAD_SPACY_MODELS" = "1" ]; then \
+        python -m spacy download xx_ent_wiki_sm || true; \
+        python -m spacy download en_core_web_sm || true; \
+    fi
 
 # Copy the entire application code from the build context (./backend)
 COPY --chown=appuser:appgroup . .
 
 # Find, convert line endings, and set permissions for all shell scripts
-RUN find /app/scripts -name "*.sh" -exec dos2unix {} + -exec chmod +x {} +
+RUN if [ -d /app/scripts ]; then \
+        find /app/scripts -name "*.sh" -exec dos2unix {} + -exec chmod +x {} +; \
+    fi
 
 # Create and set permissions for the logs directory
 RUN mkdir -p /app/logs && \
     chown -R appuser:appgroup /app/logs && \
     chmod -R 750 /app/logs
 
-RUN mkdir -p /app/alembic/versions && \
-    chown -R appuser:appgroup /app/alembic/versions && \
-    chmod -R 750 /app/alembic/versions
+RUN if [ -d /app/alembic ]; then \
+        mkdir -p /app/alembic/versions && \
+        chown -R appuser:appgroup /app/alembic/versions && \
+        chmod -R 750 /app/alembic/versions; \
+    fi
 
 # Switch to the non-root user
 USER appuser
 
 # Expose the port the app runs on
 EXPOSE 22001
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+    CMD python -c "import os,sys,urllib.request; port=os.getenv('PORT','22001'); url=f'http://127.0.0.1:{port}/health';\
+try:\
+    urllib.request.urlopen(url, timeout=3).read();\
+except Exception:\
+    sys.exit(1)"
 
 # Set the command to start the application.
 # Using shell form to allow environment variable expansion for WORKERS_PER_CORE.

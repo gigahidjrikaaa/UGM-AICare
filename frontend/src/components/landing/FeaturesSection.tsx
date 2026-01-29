@@ -1,21 +1,21 @@
 "use client";
 
 import { motion } from 'framer-motion';
-import { 
-  FiMessageCircle, 
-  FiShield, 
-  FiUsers, 
-  FiActivity, 
-  FiBookOpen, 
-  FiAward,
-  FiTarget,
-  FiHeart
-} from '@/icons';
+import {
+  BadgeGlyph,
+  BridgeGlyph,
+  HeartPathGlyph,
+  MapGlyph,
+  NotebookGlyph,
+  ShieldWaveGlyph,
+  TargetGlyph,
+  ThreadGlyph
+} from '@/components/landing/CustomGlyphs';
 import { useI18n } from '@/i18n/I18nProvider';
 
 const features = [
   {
-    icon: FiMessageCircle,
+    icon: ThreadGlyph,
     titleKey: 'landing.features.f1.title',
     titleFallback: 'Talk it out',
     descriptionKey: 'landing.features.f1.desc',
@@ -23,7 +23,7 @@ const features = [
     color: "from-[#FFCA40] to-[#FFB700]"
   },
   {
-    icon: FiShield,
+    icon: ShieldWaveGlyph,
     titleKey: 'landing.features.f2.title',
     titleFallback: 'Safety prompts',
     descriptionKey: 'landing.features.f2.desc',
@@ -31,7 +31,7 @@ const features = [
     color: "from-[#FF6B9D] to-[#FF8FAB]"
   },
   {
-    icon: FiUsers,
+    icon: BridgeGlyph,
     titleKey: 'landing.features.f3.title',
     titleFallback: 'UGM support pathways',
     descriptionKey: 'landing.features.f3.desc',
@@ -39,7 +39,7 @@ const features = [
     color: "from-[#6A98F0] to-[#8AABF5]"
   },
   {
-    icon: FiActivity,
+    icon: NotebookGlyph,
     titleKey: 'landing.features.f4.title',
     titleFallback: 'Check-ins & journaling',
     descriptionKey: 'landing.features.f4.desc',
@@ -47,7 +47,7 @@ const features = [
     color: "from-[#4ADE80] to-[#6EE7A0]"
   },
   {
-    icon: FiBookOpen,
+    icon: MapGlyph,
     titleKey: 'landing.features.f5.title',
     titleFallback: 'Resources that match the moment',
     descriptionKey: 'landing.features.f5.desc',
@@ -55,7 +55,7 @@ const features = [
     color: "from-[#A78BFA] to-[#C4B5FD]"
   },
   {
-    icon: FiAward,
+    icon: BadgeGlyph,
     titleKey: 'landing.features.f6.title',
     titleFallback: 'Badges & small wins',
     descriptionKey: 'landing.features.f6.desc',
@@ -63,7 +63,7 @@ const features = [
     color: "from-[#F97316] to-[#FB923C]"
   },
   {
-    icon: FiTarget,
+    icon: TargetGlyph,
     titleKey: 'landing.features.f7.title',
     titleFallback: 'Goals you can keep',
     descriptionKey: 'landing.features.f7.desc',
@@ -71,7 +71,7 @@ const features = [
     color: "from-[#14B8A6] to-[#2DD4BF]"
   },
   {
-    icon: FiHeart,
+    icon: HeartPathGlyph,
     titleKey: 'landing.features.f8.title',
     titleFallback: 'Human support, when you want it',
     descriptionKey: 'landing.features.f8.desc',
@@ -119,7 +119,10 @@ export default function FeaturesSection() {
 
         {/* Features Grid */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-6">
-          {features.map((feature, index) => (
+          {features.map((feature, index) => {
+            const offsetClass = index % 2 === 1 ? "lg:translate-y-4" : "";
+
+            return (
             <motion.div
               key={index}
               initial={{ opacity: 0, y: 30 }}
@@ -127,21 +130,17 @@ export default function FeaturesSection() {
               viewport={{ once: true }}
               transition={{ duration: 0.5, delay: index * 0.1 }}
               whileHover={{ y: -8, transition: { duration: 0.2 } }}
-              className="group"
+              className={`group ${offsetClass}`}
             >
-              <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10 hover:border-white/20 transition-all h-full relative overflow-hidden">
-                {/* Gradient Overlay on Hover */}
-                <motion.div
-                  className={`absolute inset-0 bg-linear-to-br ${feature.color} opacity-0 group-hover:opacity-5 transition-opacity duration-300`}
-                />
+              <div className="bg-[#0B162E] rounded-[22px] p-6 border border-white/15 shadow-[0_16px_40px_rgba(0,0,0,0.4)] h-full relative overflow-hidden">
                 
                 {/* Icon */}
                 <motion.div
                   whileHover={{ rotate: -4, scale: 1.06 }}
                   transition={{ type: 'spring', stiffness: 280, damping: 18 }}
-                  className={`w-12 h-12 rounded-xl bg-linear-to-br ${feature.color} flex items-center justify-center mb-4 shadow-lg`}
+                  className="w-12 h-12 rounded-[14px] bg-[#0F2048] border border-white/20 flex items-center justify-center mb-4 shadow-[0_10px_30px_rgba(0,0,0,0.35)]"
                 >
-                  <feature.icon className="text-white text-xl" />
+                  <feature.icon className="text-[#FFCA40] w-5 h-5" />
                 </motion.div>
 
                 {/* Content */}
@@ -153,7 +152,8 @@ export default function FeaturesSection() {
                 </p>
               </div>
             </motion.div>
-          ))}
+          );
+          })}
         </div>
 
         {/* Bottom CTA */}

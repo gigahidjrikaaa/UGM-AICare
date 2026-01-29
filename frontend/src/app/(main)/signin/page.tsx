@@ -15,7 +15,6 @@ import {
   FiLogIn, 
   FiShield 
 } from "@/icons";
-import ParticleBackground from "@/components/ui/ParticleBackground";
 
 export default function SignIn() {
   const router = useRouter();
@@ -131,85 +130,86 @@ export default function SignIn() {
   };
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] flex relative pt-24">
-      {/* Particle Background */}
-      <div className="absolute inset-0 z-0">
-        <ParticleBackground 
-          count={80}
-          colors={["#FFCA40", "#6A98F0", "#ffffff"]}
-          minSize={2}
-          maxSize={8}
-          speed={1}
-        />
-      </div>
-
-      {/* Left Side - Tips and Mindful Messages */}
+    <div className="min-h-screen bg-transparent flex relative pt-24">
+      {/* Left Side - Mindful Journey Panel */}
       <div className="hidden lg:flex lg:w-1/2 relative overflow-hidden z-10">
-        {/* Background Pattern */}
-        <div className="absolute inset-0 opacity-10">
-          <div className="absolute top-20 left-20 w-32 h-32 rounded-full bg-[#FFCA40] blur-3xl"></div>
-          <div className="absolute bottom-20 right-20 w-40 h-40 rounded-full bg-[#FFCA40] blur-3xl"></div>
-          <div className="absolute top-1/3 right-1/4 w-24 h-24 rounded-full bg-white blur-2xl"></div>
-        </div>
-
-        <div className="flex flex-col justify-center items-center px-6 py-4 relative z-10 w-full">
+        <div className="flex flex-col justify-between px-12 py-12 w-full">
           {/* Brand Header */}
-          <div className="text-center mb-5">
-            <div className="mx-auto w-18 h-18 bg-linear-to-br from-[#FFCA40] to-[#FFD700] rounded-2xl flex items-center justify-center mb-3 shadow-2xl">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-2xl bg-[#FFCA40]/90 flex items-center justify-center shadow-[0_0_25px_rgba(255,202,64,0.25)]">
               <Image
                 src="/aicare_logo.png"
                 alt="UGM-AICare"
-                width={36}
-                height={36}
-                className="w-9 h-9"
+                width={28}
+                height={28}
+                className="w-7 h-7"
               />
             </div>
-            <h2 className="text-3xl font-bold text-white mb-1">UGM-AICare</h2>
-            <p className="text-white/70 text-base">Your Mental Health Companion</p>
+            <div>
+              <p className="text-xs uppercase tracking-[0.3em] text-white/50">UGM-AICare • Aika</p>
+              <h2 className="text-2xl font-bold text-white">Steady support, built for campus life</h2>
+            </div>
           </div>
 
-          {/* Rotating Tips */}
-          <motion.div
-            key={tipIndex}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            transition={{ duration: 0.8, ease: "easeOut" }}
-            className="bg-white/10 backdrop-blur-xl p-6 rounded-2xl border border-white/20 shadow-2xl max-w-lg w-full text-center"
-          >
-            <div className="text-4xl mb-3">{mentalHealthTips[tipIndex].icon}</div>
-            <h3 className="text-lg font-semibold text-white mb-3">{mentalHealthTips[tipIndex].title}</h3>
-            <p className="text-white/80 leading-relaxed text-sm">{mentalHealthTips[tipIndex].message}</p>
-          </motion.div>
+          {/* Focus Panel */}
+          <div className="mt-10 space-y-6">
+            <div className="rounded-3xl border border-white/10 bg-white/5 backdrop-blur-xl p-8 shadow-[0_25px_80px_rgba(0,0,0,0.35)]">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-white/10 flex items-center justify-center text-2xl">
+                  {mentalHealthTips[tipIndex].icon}
+                </div>
+                <div>
+                  <p className="text-xs text-white/60 uppercase tracking-widest">Daily Reflection</p>
+                  <h3 className="text-xl font-semibold text-white">{mentalHealthTips[tipIndex].title}</h3>
+                </div>
+              </div>
+              <motion.p
+                key={tipIndex}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
+                transition={{ duration: 0.6, ease: "easeOut" }}
+                className="text-white/80 text-base leading-relaxed mt-4"
+              >
+                “{mentalHealthTips[tipIndex].message}”
+              </motion.p>
 
-          {/* Tip Progress Indicators */}
-          <div className="flex space-x-2 mt-5">
-            {mentalHealthTips.map((_, index) => (
-              <button
-                key={index}
-                onClick={() => setTipIndex(index)}
-                aria-label={`View tip ${index + 1}: ${mentalHealthTips[index].title}`}
-                className={`w-3 h-3 rounded-full transition-all duration-300 ${
-                  index === tipIndex ? 'bg-[#FFCA40] scale-110' : 'bg-white/30 hover:bg-white/50'
-                }`}
-              />
-            ))}
+              <div className="flex gap-2 mt-6">
+                {mentalHealthTips.map((_, index) => (
+                  <button
+                    key={index}
+                    onClick={() => setTipIndex(index)}
+                    aria-label={`View tip ${index + 1}: ${mentalHealthTips[index].title}`}
+                    className={`h-1.5 rounded-full transition-all duration-300 ${
+                      index === tipIndex ? "w-8 bg-[#FFCA40]" : "w-2 bg-white/20 hover:bg-white/40"
+                    }`}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-3 gap-4">
+              {[
+                { label: "Active students", value: "2,1k" },
+                { label: "Check-ins", value: "Daily" },
+                { label: "Availability", value: "24/7" }
+              ].map((stat) => (
+                <div
+                  key={stat.label}
+                  className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-center backdrop-blur"
+                >
+                  <p className="text-lg font-bold text-white">{stat.value}</p>
+                  <p className="text-xs text-white/60 uppercase tracking-wider">{stat.label}</p>
+                </div>
+              ))}
+            </div>
           </div>
 
-          {/* Stats Section */}
-          <div className="grid grid-cols-3 gap-4 mt-6 w-full max-w-lg">
-            <div className="text-center p-3 bg-white/5 rounded-xl backdrop-blur-sm border border-white/10">
-              <div className="text-[#FFCA40] text-xl font-bold">24/7</div>
-              <div className="text-white/60 text-xs">AI Support</div>
-            </div>
-            <div className="text-center p-3 bg-white/5 rounded-xl backdrop-blur-sm border border-white/10">
-              <div className="text-[#FFCA40] text-xl font-bold">CBT</div>
-              <div className="text-white/60 text-xs">Therapy</div>
-            </div>
-            <div className="text-center p-3 bg-white/5 rounded-xl backdrop-blur-sm border border-white/10">
-              <div className="text-[#FFCA40] text-xl font-bold">Safe</div>
-              <div className="text-white/60 text-xs">& Secure</div>
-            </div>
+          {/* Trust Strip */}
+          <div className="flex items-center justify-between text-xs text-white/50">
+            <span>Confidential by design</span>
+            <span>UGM-aligned support</span>
+            <span>Guided coping tools</span>
           </div>
         </div>
       </div>

@@ -1,226 +1,75 @@
 "use client";
 
 import Link from 'next/link';
-import { motion, useReducedMotion } from 'framer-motion';
-import { FaArrowRight } from '@/icons';
+import { motion } from 'framer-motion';
+import { ArrowScribbleGlyph } from '@/components/landing/CustomGlyphs';
 import { useI18n } from '@/i18n/I18nProvider';
 
+// Replaced unstable 3D model with a high-quality SVG/CSS composition
+// This ensures reliable rendering and fits the "transparent/particles" theme better.
+
 export default function FinalCTASection() {
-  const shouldReduceMotion = useReducedMotion();
   const { t } = useI18n();
 
   return (
-    <section className="py-32 bg-linear-to-b from-[#000B1F] via-[#001D58] to-[#002A7A] relative overflow-hidden">
-      {/* Background Effects */}
-      <div className="absolute inset-0">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 bg-[#FFCA40] rounded-full blur-[150px] opacity-20" />
-      </div>
+    <section className="py-32 bg-transparent relative overflow-hidden">
+      
+      {/* Portal Glow Effect */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-white opacity-[0.02] blur-[100px] rounded-full pointer-events-none" />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        {/* Main CTA Card */}
+      <div className="max-w-4xl mx-auto px-6 relative z-10 text-center">
+        
         <motion.div
-          initial={{ opacity: 0, y: 50 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.8 }}
-          className="bg-linear-to-br from-[#FFCA40]/20 via-[#FFD770]/10 to-[#FFB700]/20 backdrop-blur-xl rounded-[3rem] p-12 sm:p-16 border-2 border-[#FFCA40]/30 shadow-2xl text-center relative overflow-hidden"
+            initial={{ opacity: 0, scale: 0.9 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            className="mb-12"
         >
-          {/* Animated Background Pattern */}
-          <div className="absolute inset-0 opacity-10">
-            <motion.div
-              className="absolute inset-0"
-              animate={{
-                backgroundImage: [
-                  'radial-gradient(circle at 20% 50%, rgba(255, 202, 64, 0.3) 0%, transparent 50%)',
-                  'radial-gradient(circle at 80% 50%, rgba(255, 202, 64, 0.3) 0%, transparent 50%)',
-                  'radial-gradient(circle at 50% 80%, rgba(255, 202, 64, 0.3) 0%, transparent 50%)',
-                  'radial-gradient(circle at 20% 50%, rgba(255, 202, 64, 0.3) 0%, transparent 50%)',
-                ]
-              }}
-              transition={{ duration: 10, repeat: Infinity }}
-            />
-          </div>
+             {/* Visual Icon Instead of 3D Model */}
+             <div className="w-32 h-32 mx-auto mb-8 relative flex items-center justify-center">
+                <div className="absolute inset-0 bg-[#FFCA40] blur-[40px] opacity-30 animate-pulse" />
+                <div className="relative z-10">
+                   <svg width="100" height="100" viewBox="0 0 24 24" fill="none" stroke="#FFCA40" strokeWidth="1" strokeLinecap="round" strokeLinejoin="round">
+                      <circle cx="12" cy="12" r="10" />
+                      <path d="M12 8v8" />
+                      <path d="M8 12h8" />
+                   </svg>
+                </div>
+             </div>
 
-          {/* Content */}
-          <div className="relative z-10">
-            {/* Eyebrow */}
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.2 }}
-              className="inline-flex items-center gap-2 text-sm uppercase tracking-widest text-white/70 mb-8"
-            >
-              <span className="text-[#FFCA40]">{t('landing.final.eyebrow_icon', '✦')}</span>
-              <span>{t('landing.final.eyebrow', 'Open anytime, at your pace')}</span>
-            </motion.div>
-
-            {/* Main Heading */}
-            <motion.h2
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.3 }}
-              className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6 leading-tight"
-            >
-              {t('landing.final.title_line1', 'You are not alone.')}
-              <br />
-              <span className="bg-linear-to-r from-[#FFCA40] via-[#FFD770] to-[#FFCA40] bg-clip-text text-transparent">
-                {t('landing.final.title_line2', 'Start with one message.')}
-              </span>
-            </motion.h2>
-
-            {/* Subtext */}
-            <motion.p
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.4 }}
-              className="text-xl sm:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto"
-            >
-              {t(
-                'landing.final.subtitle',
-                'If student life has been weighing on you, Aika can help you slow down, reflect, and choose a next step. When you want professional support, it can guide you toward campus resources.'
-              )}
-            </motion.p>
-
-            {/* Primary CTA Button */}
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.5 }}
-              className="flex flex-col sm:flex-row gap-4 justify-center items-center mb-8"
-            >
-              <Link href="/aika">
-                <motion.button
-                  whileHover={{ 
-                    scale: 1.05, 
-                    boxShadow: "0 25px 70px rgba(255, 202, 64, 0.6)" 
-                  }}
-                  whileTap={{ scale: 0.98 }}
-                  className="group relative px-16 py-6 bg-linear-to-r from-[#FFCA40] via-[#FFD770] to-[#FFB700] text-[#001D58] rounded-full font-bold text-2xl flex items-center justify-center shadow-2xl transition-all overflow-hidden"
-                >
-                  <span className="relative z-10 flex items-center gap-3">
-                    {t('landing.final.cta', 'Start a conversation')}
-                    <motion.span
-                      animate={shouldReduceMotion ? undefined : { x: [0, 8, 0] }}
-                      transition={shouldReduceMotion ? undefined : { repeat: Infinity, duration: 1.5 }}
-                    >
-                      <FaArrowRight />
-                    </motion.span>
-                  </span>
-                  <motion.div
-                    className="absolute inset-0 bg-linear-to-r from-[#FFB700] to-[#FFCA40]"
-                    initial={{ x: "-100%" }}
-                    whileHover={{ x: "0%" }}
-                    transition={{ duration: 0.4 }}
-                  />
-                </motion.button>
-              </Link>
-            </motion.div>
-
-            {/* Trust Signals */}
-            <motion.div
-              initial={{ opacity: 0 }}
-              whileInView={{ opacity: 1 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: 0.6 }}
-              className="flex flex-wrap items-center justify-center gap-8 text-sm text-gray-400"
-            >
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                </svg>
-                <span className="text-white font-medium">{t('landing.final.trust.no_signup', 'No sign-up required')}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                </svg>
-                <span className="text-white font-medium">{t('landing.final.trust.free', 'Free for eligible students')}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                </svg>
-                <span className="text-white font-medium">{t('landing.final.trust.privacy', 'Privacy-first')}</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                </svg>
-                <span className="text-white font-medium">{t('landing.final.trust.ugm', 'UGM-linked pathways')}</span>
-              </div>
-            </motion.div>
-          </div>
+             <h2 className="text-4xl lg:text-7xl font-bold text-white tracking-tight mb-8">
+               {t('landing.final.title', 'Ready to start?')}
+             </h2>
+             <p className="text-slate-400 text-xl max-w-2xl mx-auto mb-10 leading-relaxed">
+               {t('landing.final.subtitle', 'No forms. No waiting lists. Just a safe place to clear your mind.')}
+             </p>
+             
+             <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+                <Link href="/aika" className="group relative px-8 py-4 bg-white text-[#000B1F] rounded-full font-bold text-lg flex items-center justify-center hover:bg-slate-200 transition-colors w-full sm:w-auto">
+                   {t('landing.cta.primary', 'Chat with Aika')}
+                   <ArrowScribbleGlyph className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
+                </Link>
+                <Link href="/resources" className="px-8 py-4 bg-[#000B1F] border border-white/20 text-white rounded-full font-bold text-lg hover:bg-white/5 transition-colors w-full sm:w-auto">
+                   {t('landing.cta.secondary', 'Browse Resources')}
+                </Link>
+             </div>
         </motion.div>
 
-        {/* Emergency Resources Banner */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6, delay: 0.7 }}
-          className="mt-12 bg-linear-to-r from-[#FF6B9D]/10 to-[#FF8FAB]/10 backdrop-blur-xl rounded-3xl p-8 border border-[#FF6B9D]/30"
-        >
-          <div className="text-center">
-            <h3 className="text-xl font-bold text-white mb-4">
-              {t('landing.final.emergency.title', '🚨 In an emergency?')}
-            </h3>
-            <p className="text-gray-400 mb-6">
-              {t('landing.final.emergency.subtitle', 'If you or a friend are in crisis, contact these services:')}
-            </p>
-            <div className="grid sm:grid-cols-3 gap-4">
-              <a 
-                href="tel:+62274555555" 
-                className="px-6 py-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-all border border-white/20"
-              >
-                <div className="text-[#FF6B9D] font-bold text-lg mb-1">UGM Crisis Line</div>
-                <div className="text-white text-sm">(0274) 555-555</div>
-              </a>
-              <a 
-                href="tel:119" 
-                className="px-6 py-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-all border border-white/20"
-              >
-                <div className="text-[#FF6B9D] font-bold text-lg mb-1">SEJIWA</div>
-                <div className="text-white text-sm">Dial 119</div>
-              </a>
-              <a 
-                href="tel:112" 
-                className="px-6 py-4 bg-white/10 hover:bg-white/20 rounded-2xl transition-all border border-white/20"
-              >
-                <div className="text-[#FF6B9D] font-bold text-lg mb-1">Emergency</div>
-                <div className="text-white text-sm">Dial 112</div>
-              </a>
-            </div>
-          </div>
-        </motion.div>
-      </div>
+        <div className="pt-16 border-t border-white/5 grid grid-cols-2 md:grid-cols-4 gap-8">
+            {[
+                { label: 'Anonymous', value: '100%' },
+                { label: 'Available', value: '24/7' },
+                { label: 'Wait time', value: '0s' },
+                { label: 'Cost', value: 'Free' },
+            ].map((stat, idx) => (
+                <div key={idx}>
+                    <div className="text-2xl font-bold text-white mb-1">{stat.value}</div>
+                    <div className="text-slate-500 text-sm uppercase tracking-wider">{stat.label}</div>
+                </div>
+            ))}
+        </div>
 
-      {/* Floating Crisis Button */}
-      <motion.div
-        initial={{ opacity: 0, scale: 0 }}
-        animate={{ opacity: 1, scale: 1 }}
-        transition={{ delay: 1, type: "spring" }}
-        className="fixed bottom-8 right-8 z-50"
-      >
-        <Link href="/resources">
-          <motion.button
-            whileHover={{ scale: 1.1 }}
-            whileTap={{ scale: 0.95 }}
-            className="px-6 py-4 bg-linear-to-r from-[#FF6B9D] to-[#FF8FAB] text-white rounded-full font-bold shadow-2xl flex items-center gap-2 group"
-          >
-            <motion.span
-              animate={{ scale: [1, 1.3, 1] }}
-              transition={{ duration: 2, repeat: Infinity }}
-            >
-              🆘
-            </motion.span>
-            <span className="group-hover:mr-2 transition-all">Need Help Now?</span>
-          </motion.button>
-        </Link>
-      </motion.div>
+      </div>
     </section>
   );
 }

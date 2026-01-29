@@ -4,33 +4,33 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
-import { FiMessageCircle, FiClock, FiShield, FiHeart } from '@/icons';
+import { HeartPathGlyph, PulseGlyph, ShieldWaveGlyph, ThreadGlyph } from '@/components/landing/CustomGlyphs';
 import { useI18n } from '@/i18n/I18nProvider';
 
 const aikaFeatures = [
   {
-    icon: FiMessageCircle,
+    icon: ThreadGlyph,
     titleKey: 'landing.meet.features.f1.title',
     titleFallback: 'Thoughtful conversations',
     descriptionKey: 'landing.meet.features.f1.desc',
     descriptionFallback: 'Aika helps you reflect and put feelings into words, one question at a time.'
   },
   {
-    icon: FiClock,
+    icon: PulseGlyph,
     titleKey: 'landing.meet.features.f2.title',
     titleFallback: 'Open anytime',
     descriptionKey: 'landing.meet.features.f2.desc',
     descriptionFallback: 'No appointments needed. Start when you’re ready, pause when you’re not.'
   },
   {
-    icon: FiShield,
+    icon: ShieldWaveGlyph,
     titleKey: 'landing.meet.features.f3.title',
     titleFallback: 'Privacy-first',
     descriptionKey: 'landing.meet.features.f3.desc',
     descriptionFallback: 'You stay in control of what you share and when you share it.'
   },
   {
-    icon: FiHeart,
+    icon: HeartPathGlyph,
     titleKey: 'landing.meet.features.f4.title',
     titleFallback: 'Guided techniques',
     descriptionKey: 'landing.meet.features.f4.desc',
@@ -167,9 +167,9 @@ export default function MeetAikaSection() {
                   whileInView={{ opacity: 1, y: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: index * 0.1 }}
-                  className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:border-[#FFCA40]/30 transition-colors"
+                  className="bg-[#0B162E] rounded-[18px] p-4 border border-white/15 shadow-[0_10px_30px_rgba(0,0,0,0.35)] hover:border-[#FFCA40]/40 transition-colors"
                 >
-                  <feature.icon className="text-[#FFCA40] text-xl mb-2" />
+                  <feature.icon className="text-[#FFCA40] w-5 h-5 mb-3" />
                   <h3 className="text-white font-semibold mb-1">{t(feature.titleKey, feature.titleFallback)}</h3>
                   <p className="text-gray-400 text-sm">{t(feature.descriptionKey, feature.descriptionFallback)}</p>
                 </motion.div>

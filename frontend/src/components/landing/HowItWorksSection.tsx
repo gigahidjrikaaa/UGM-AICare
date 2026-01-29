@@ -1,227 +1,157 @@
 "use client";
 
 import { motion } from 'framer-motion';
-import Link from 'next/link';
-import { FaArrowRight } from '@/icons';
 import { useI18n } from '@/i18n/I18nProvider';
-
-const steps = [
-  {
-    number: "01",
-    emoji: "💬",
-    titleKey: 'landing.how.steps.s1.title',
-    titleFallback: 'Start a chat',
-    descriptionKey: 'landing.how.steps.s1.desc',
-    descriptionFallback: "Open Aika and write what's going on. You can keep it short, or say a lot."
-  },
-  {
-    number: "02",
-    emoji: "🤝",
-    titleKey: 'landing.how.steps.s2.title',
-    titleFallback: 'Find a next step',
-    descriptionKey: 'landing.how.steps.s2.desc',
-    descriptionFallback: 'Aika helps you name the problem, try a coping tool, and choose one small action.'
-  },
-  {
-    number: "03",
-    emoji: "👨‍⚕️",
-    titleKey: 'landing.how.steps.s3.title',
-    titleFallback: 'Reach out when ready',
-    descriptionKey: 'landing.how.steps.s3.desc',
-    descriptionFallback: 'If you want professional support, Aika can guide you toward UGM services and help you prepare.'
-  }
-];
+import { ArrowScribbleGlyph, CompassGlyph } from '@/components/landing/CustomGlyphs';
+import { StarburstGlyph } from '@/components/landing/CustomGlyphs';
 
 export default function HowItWorksSection() {
   const { t } = useI18n();
 
   return (
-    <section className="py-24 bg-linear-to-b from-[#000B1F] to-[#001D58] relative overflow-hidden">
-      {/* Background Decoration */}
-      <div className="absolute inset-0 opacity-5">
-        <div className="absolute top-1/3 right-0 w-96 h-96 bg-[#FFCA40] rounded-full blur-3xl" />
-        <div className="absolute bottom-1/3 left-0 w-96 h-96 bg-[#6A98F0] rounded-full blur-3xl" />
-      </div>
+    <section className="py-24 bg-transparent relative overflow-hidden">
+      {/* Background Glow */}
+      <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#FFCA40] opacity-[0.03] blur-[100px] rounded-full pointer-events-none" />
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
-        {/* Section Header */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="text-center mb-16"
-        >
-          <p className="text-white/60 text-sm uppercase tracking-widest mb-4">
-            {t('landing.how.eyebrow', 'How it works')}
-          </p>
-          <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6">
-            {t('landing.how.title_line1', 'Simple.')}
-            <br />
-            <span className="text-[#FFCA40]">{t('landing.how.title_line2', 'Three steps.')}</span>
-          </h2>
-          <p className="text-xl text-gray-400 max-w-2xl mx-auto mb-4">
-            {t('landing.how.subtitle', 'Start small. You can stop anytime, or keep going.')}
-          </p>
-          <p className="text-sm text-white/60">
-            {t('landing.how.note', 'No timers. No pressure. Just a conversation.')}
-          </p>
-        </motion.div>
-
-        {/* Steps */}
-        <div className="grid lg:grid-cols-3 gap-8 mb-16">
-          {steps.map((step, index) => (
-            <motion.div
-              key={index}
-              initial={{ opacity: 0, y: 50 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6, delay: index * 0.2 }}
-              className="relative"
-            >
-              {/* Connecting Line (Desktop) */}
-              {index < steps.length - 1 && (
-                <div className="hidden lg:block absolute top-1/3 left-full w-full h-0.5 bg-linear-to-r from-[#FFCA40] to-transparent -z-10" />
-              )}
-
-              {/* Card */}
-              <motion.div
-                whileHover={{ y: -10, scale: 1.05, transition: { duration: 0.3 } }}
-                className="bg-white/5 backdrop-blur-xl rounded-3xl p-8 border border-white/10 shadow-2xl h-full relative overflow-hidden group"
-              >
-                {/* Gradient Overlay on Hover */}
-                <motion.div
-                  className="absolute inset-0 bg-linear-to-br from-[#FFCA40]/10 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-300"
-                />
-
-                {/* Step Number */}
-                <div className="absolute top-8 right-8 text-6xl font-black text-white/5">
-                  {step.number}
-                </div>
-
-                {/* Emoji */}
-                <div className="text-6xl mb-4 relative z-10">
-                  {step.emoji}
-                </div>
-
-                {/* Title */}
-                <h3 className="text-2xl font-bold text-white mb-4 relative z-10">
-                  {t(step.titleKey, step.titleFallback)}
-                </h3>
-
-                {/* Description */}
-                <p className="text-gray-400 leading-relaxed relative z-10">
-                  {t(step.descriptionKey, step.descriptionFallback)}
-                </p>
-              </motion.div>
-            </motion.div>
-          ))}
+        
+        <div className="mb-20 text-center">
+           <h2 className="text-3xl lg:text-5xl font-bold text-white mb-6 leading-tight">
+             {t('landing.how.title', 'Intelligent Intervention Flow')}
+           </h2>
+           <p className="text-slate-400 text-lg max-w-2xl mx-auto">
+             {t('landing.how.subtitle', 'Unlike generic chatbots, Aika actively assesses risk and routes you to the right care.')}
+           </p>
         </div>
 
-        {/* Video Demonstration Placeholder */}
-        <motion.div
-          initial={{ opacity: 0, y: 30 }}
-          whileInView={{ opacity: 1, y: 0 }}
-          viewport={{ once: true }}
-          transition={{ duration: 0.6 }}
-          className="bg-linear-to-r from-[#001D58] to-[#002A7A] rounded-3xl p-12 border-2 border-[#FFCA40]/30 relative overflow-hidden"
-        >
-          {/* Background Pattern */}
-          <div className="absolute inset-0 opacity-5">
-            <div className="absolute inset-0 grid-pattern" />
-          </div>
+        <div className="grid lg:grid-cols-2 gap-12 items-start">
+            
+            {/* Left: The Generic Vs Aika Comparison */}
+            <div className="space-y-8">
+               <motion.div 
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  className="p-6 rounded-3xl border border-white/5 bg-white/5 backdrop-blur-sm grayscale opacity-60"
+               >
+                  <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Typical Chatbot</h3>
+                  <div className="space-y-3">
+                     <div className="bg-white/5 p-3 rounded-lg text-sm text-slate-400">"I am sad."</div>
+                     <div className="bg-[#000B1F] p-3 rounded-lg text-sm text-slate-500">"I am sorry to hear that." (Generic sympathy)</div>
+                     <div className="bg-[#000B1F] p-3 rounded-lg text-sm text-slate-500">"What do you want to talk about?" (Passive loop)</div>
+                  </div>
+               </motion.div>
 
-          <div className="relative z-10 grid lg:grid-cols-2 gap-12 items-center">
-            {/* Left: Video Placeholder */}
-            <div className="relative">
-              <div className="aspect-video rounded-2xl bg-linear-to-br from-[#000B1F] to-[#001D58] flex items-center justify-center relative overflow-hidden border-2 border-[#FFCA40]/20">
-                {/* Placeholder */}
-                <div className="text-center p-8">
-                  <motion.div
-                    animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ duration: 2, repeat: Infinity }}
-                    className="mb-4"
-                  >
-                    <div className="w-20 h-20 mx-auto rounded-full bg-[#FFCA40]/20 flex items-center justify-center">
-                      <svg className="w-10 h-10 text-[#FFCA40]" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M6.3 2.841A1.5 1.5 0 004 4.11V15.89a1.5 1.5 0 002.3 1.269l9.344-5.89a1.5 1.5 0 000-2.538L6.3 2.84z"/>
-                      </svg>
-                    </div>
-                  </motion.div>
-                  <h4 className="text-xl font-bold text-white mb-2">Watch Demo</h4>
-                  <p className="text-gray-400 text-sm">{t('landing.how.demo.subtitle', 'A short walkthrough is coming soon')}</p>
-                </div>
-
-                {/* Animated Border */}
-                <motion.div
-                  className="absolute inset-0 border-2 border-[#FFCA40]"
-                  animate={{ 
-                    borderRadius: ["10% 90% 80% 20% / 20% 10% 90% 80%", "90% 10% 20% 80% / 80% 90% 10% 20%", "10% 90% 80% 20% / 20% 10% 90% 80%"]
-                  }}
-                  transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-                  style={{ filter: "blur(10px)", opacity: 0.3 }}
-                />
-              </div>
+               <motion.div 
+                  initial={{ opacity: 0, x: -20 }}
+                  whileInView={{ opacity: 1, x: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: 0.2 }}
+                  className="p-8 rounded-3xl border border-[#FFCA40]/30 bg-[#021029] shadow-[0_0_40px_-10px_rgba(255,202,64,0.1)]"
+               >
+                  <h3 className="text-sm font-bold text-[#FFCA40] uppercase tracking-widest mb-6 flex items-center gap-2">
+                     <StarburstGlyph className="w-4 h-4" />
+                     The Aika Difference
+                  </h3>
+                  
+                  {/* Interactive Flow Diagram */}
+                  <div className="relative space-y-6">
+                     <div className="absolute left-4 top-4 bottom-4 w-0.5 bg-gradient-to-b from-[#FFCA40]/50 to-transparent" />
+                     
+                     {[{
+                        title: "1. Distress Detection",
+                        desc: "Analyzes clinical keywords (e.g., 'hopeless', 'overwhelmed') in real-time.",
+                        icon: StarburstGlyph
+                     }, {
+                         title: "2. Active Intervention",
+                         desc: "Immediately deploys CBT-based grounding tools to stabilize emotion.",
+                         icon: CompassGlyph
+                     }, {
+                         title: "3. Professional Handoff",
+                         desc: "Summarizes the session and securely forwards it to UGM Psychologists.",
+                         icon: ArrowScribbleGlyph
+                     }].map((step, idx) => (
+                        <div key={idx} className="relative flex gap-4">
+                           <div className="w-8 h-8 rounded-full bg-[#000B1F] border border-[#FFCA40] flex items-center justify-center shrink-0 z-10">
+                              <step.icon className="w-4 h-4 text-[#FFCA40]" />
+                           </div>
+                           <div>
+                              <h4 className="text-white font-bold">{step.title}</h4>
+                              <p className="text-sm text-slate-400 leading-relaxed">{step.desc}</p>
+                           </div>
+                        </div>
+                     ))}
+                  </div>
+               </motion.div>
             </div>
 
-            {/* Right: CTA */}
-            <div>
-              <h3 className="text-3xl font-bold text-white mb-6">
-                {t('landing.how.cta.title_line1', 'Ready to try it?')}
-                <br />
-                <span className="text-[#FFCA40]">{t('landing.how.cta.title_line2', 'Start whenever you want')}</span>
-              </h3>
-              
-              <div className="space-y-4 mb-8">
-                {[
-                  t('landing.how.cta.b1', '✓ No sign-up required'),
-                  t('landing.how.cta.b2', '✓ Privacy-first by design'),
-                  t('landing.how.cta.b3', '✓ Guided tools and reflections'),
-                  t('landing.how.cta.b4', '✓ Campus support pathways (UGM)'),
-                  t('landing.how.cta.b5', '✓ Open anytime')
-                ].map((item, index) => (
-                  <motion.div
-                    key={index}
-                    initial={{ opacity: 0, x: -20 }}
-                    whileInView={{ opacity: 1, x: 0 }}
-                    viewport={{ once: true }}
-                    transition={{ delay: index * 0.1 }}
-                    className="text-lg text-gray-300 flex items-center gap-3"
-                  >
-                    <span>{item}</span>
-                  </motion.div>
-                ))}
-              </div>
+            {/* Right: The Psychologist Dashboard View */}
+            <motion.div 
+               initial={{ opacity: 0, x: 20 }}
+               whileInView={{ opacity: 1, x: 0 }}
+               viewport={{ once: true }}
+               transition={{ delay: 0.4 }}
+               className="relative"
+            >
+               <div className="absolute inset-x-0 -top-20 -bottom-20 bg-gradient-to-r from-transparent via-[#FFCA40]/5 to-transparent blur-xl" />
+               
+               <div className="bg-[#0B162E] rounded-3xl border border-white/10 overflow-hidden shadow-2xl relative">
+                  {/* Fake UI Header */}
+                  <div className="bg-[#000B1F] p-4 border-b border-white/5 flex items-center justify-between">
+                     <div className="flex items-center gap-2">
+                        <div className="w-3 h-3 rounded-full bg-red-400" />
+                        <div className="w-3 h-3 rounded-full bg-yellow-400" />
+                        <div className="w-3 h-3 rounded-full bg-green-400" />
+                     </div>
+                     <div className="text-xs font-bold text-slate-500 tracking-widest uppercase">Psychologist Dashboard</div>
+                  </div>
 
-              <Link href="/aika">
-                <motion.button
-                  whileHover={{ 
-                    scale: 1.05, 
-                    boxShadow: "0 20px 60px rgba(255, 202, 64, 0.5)" 
-                  }}
-                  whileTap={{ scale: 0.98 }}
-                  className="group relative px-12 py-5 bg-linear-to-r from-[#FFCA40] via-[#FFD770] to-[#FFB700] text-[#001D58] rounded-full font-bold text-xl flex items-center justify-center shadow-2xl transition-all w-full sm:w-auto overflow-hidden"
-                >
-                  <span className="relative z-10 flex items-center gap-3">
-                    {t('landing.how.cta.button', 'Start a conversation')}
-                    <motion.span
-                      animate={{ x: [0, 5, 0] }}
-                      transition={{ repeat: Infinity, duration: 1.5 }}
-                    >
-                      <FaArrowRight />
-                    </motion.span>
-                  </span>
-                  <motion.div
-                    className="absolute inset-0 bg-linear-to-r from-[#FFB700] to-[#FFCA40]"
-                    initial={{ x: "-100%" }}
-                    whileHover={{ x: "0%" }}
-                    transition={{ duration: 0.3 }}
-                  />
-                </motion.button>
-              </Link>
-            </div>
-          </div>
-        </motion.div>
+                  {/* Body */}
+                  <div className="p-8 space-y-6">
+                     <div className="flex items-start justify-between">
+                        <div>
+                           <div className="text-2xl font-bold text-white mb-1">Student #8492</div>
+                           <div className="text-[#FFCA40] text-sm font-medium">⚠️ Priority: High Risk Detected</div>
+                        </div>
+                        <div className="px-3 py-1 bg-[#4ADE80]/10 text-[#4ADE80] rounded-full text-xs font-bold border border-[#4ADE80]/20">
+                           Awaiting Review
+                        </div>
+                     </div>
+
+                     <div className="bg-[#000B1F] rounded-xl p-4 border border-white/5">
+                        <div className="text-xs text-slate-500 uppercase mb-2">Aika Summary</div>
+                        <p className="text-slate-300 text-sm leading-relaxed">
+                           "User exhibited signs of <span className="text-white font-bold">acute academic anxiety</span> and mentioned <span className="text-white font-bold">sleep deprivation</span>. Initial grounding exercise (4-7-8 breathing) was completed but user requested human support."
+                        </p>
+                     </div>
+
+                     <div className="grid grid-cols-2 gap-4">
+                        <div className="p-4 bg-white/5 rounded-xl border border-white/5 text-center">
+                           <div className="text-2xl font-bold text-white mb-1">8/10</div>
+                           <div className="text-xs text-slate-400">Distress Level</div>
+                        </div>
+                        <div className="p-4 bg-white/5 rounded-xl border border-white/5 text-center">
+                           <div className="text-2xl font-bold text-white mb-1">CBT</div>
+                           <div className="text-xs text-slate-400">Intervention Type</div>
+                        </div>
+                     </div>
+
+                     <button className="w-full py-3 bg-[#FFCA40] hover:bg-[#FFD770] text-[#000B1F] font-bold rounded-xl transition-colors">
+                        Accept Case & Open Chat
+                     </button>
+                  </div>
+               </div>
+
+               {/* Caption */}
+               <div className="mt-4 text-center">
+                  <p className="text-sm text-slate-500">
+                     *Psychologists receive structured summaries, allowing for faster, informed care.
+                  </p>
+               </div>
+            </motion.div>
+
+        </div>
+
       </div>
     </section>
   );

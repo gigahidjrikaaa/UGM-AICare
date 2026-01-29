@@ -96,6 +96,12 @@ const nextConfig = {
         hostname: 'lh3.googleusercontent.com',
       },
       {
+        hostname: 'avatars.githubusercontent.com',
+      },
+      {
+        hostname: 'randomuser.me',
+      },
+      {
         hostname: 'cdn.sanity.io',
       },
       {
