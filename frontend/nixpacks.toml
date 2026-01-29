@@ -10,7 +10,7 @@ NEXT_TELEMETRY_DISABLED = "1"
 
 [phases.install]
 cmds = [
-  "npm install --no-audit --no-fund"
+  "npm ci"
 ]
 
 [phases.build]
