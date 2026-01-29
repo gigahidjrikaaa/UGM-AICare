@@ -2,6 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { FaStar } from '@/icons';
+import { useI18n } from '@/i18n/I18nProvider';
 
 const testimonials = [
   {
@@ -28,7 +29,7 @@ const testimonials = [
     year: "2023",
     avatar: "DK",
     rating: 5,
-    text: "First semester homesickness hit hard. Aika became my first outlet before I finally went to the campus psychologist. The response was literally 2 seconds.",
+    text: "First semester homesickness hit hard. Aika became my first outlet before I finally went to the campus psychologist. I felt heard right away.",
     tag: "🏠 Homesick"
   },
   {
@@ -61,6 +62,8 @@ const testimonials = [
 ];
 
 export default function TestimonialsSection() {
+  const { t } = useI18n();
+
   return (
     <section className="py-24 bg-linear-to-b from-[#000B1F] to-[#001D58] relative overflow-hidden">
       {/* Background Decoration */}
@@ -78,17 +81,17 @@ export default function TestimonialsSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <div className="inline-block px-4 py-2 bg-[#FFCA40]/10 rounded-full border border-[#FFCA40]/30 mb-4">
-            <span className="text-[#FFCA40] font-semibold text-sm">USE CASE SCENARIOS</span>
-          </div>
+          <p className="text-white/60 text-sm uppercase tracking-widest mb-4">
+            {t('landing.stories.eyebrow', 'Scenarios')}
+          </p>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6">
-            How Aika Can{' '}
+            {t('landing.stories.title_prefix', 'How Aika can')}{' '}
             <span className="bg-linear-to-r from-[#FFCA40] to-[#FFD770] bg-clip-text text-transparent">
-              Help You
+              {t('landing.stories.title_highlight', 'help')}
             </span>
           </h2>
           <p className="text-xl text-gray-400 max-w-2xl mx-auto">
-            See how Aika could help UGM students navigate their mental health journey.
+            {t('landing.stories.subtitle', 'Examples drawn from common student life moments.')}
           </p>
         </motion.div>
 
@@ -106,8 +109,10 @@ export default function TestimonialsSection() {
             >
               <div className="bg-white/5 backdrop-blur-xl rounded-2xl p-6 border border-white/10 shadow-xl h-full flex flex-col hover:border-[#FFCA40]/30 transition-colors">
                 {/* Tag */}
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-[#FFCA40]/10 rounded-full border border-[#FFCA40]/30 mb-4 self-start">
-                  <span className="text-[#FFCA40] text-sm font-semibold">{testimonial.tag}</span>
+                <div className="mb-4 self-start">
+                  <span className="pl-3 border-l-2 border-[#FFCA40]/60 text-[#FFCA40] text-xs font-semibold tracking-wide">
+                    {testimonial.tag}
+                  </span>
                 </div>
 
                 {/* Rating */}
@@ -147,7 +152,7 @@ export default function TestimonialsSection() {
           className="text-center mt-12"
         >
           <p className="text-gray-400 mb-4">
-            Ready to start your wellness journey? Aika is here to support you.
+            {t('landing.stories.footer', 'If any of this feels familiar, starting a conversation can help.')}
           </p>
         </motion.div>
       </div>

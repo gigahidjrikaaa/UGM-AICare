@@ -2,10 +2,13 @@
 
 import Image from 'next/image';
 import { motion } from 'framer-motion';
+import { useI18n } from '@/i18n/I18nProvider';
 
 export default function StatsBannerSection() {
+  const { t } = useI18n();
+
   return (
-    <section className="py-20 bg-gradient-to-r from-[#001D58] via-[#002A7A] to-[#001D58] relative overflow-hidden">
+    <section className="py-20 bg-linear-to-r from-[#001D58] via-[#002A7A] to-[#001D58] relative overflow-hidden">
       {/* Background Image */}
       <div className="absolute inset-0">
         <Image
@@ -14,7 +17,7 @@ export default function StatsBannerSection() {
           fill
           className="object-cover opacity-20"
         />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#001D58] via-[#001D58]/80 to-[#001D58]" />
+        <div className="absolute inset-0 bg-linear-to-r from-[#001D58] via-[#001D58]/80 to-[#001D58]" />
       </div>
 
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -26,11 +29,13 @@ export default function StatsBannerSection() {
           className="text-center mb-12"
         >
           <h2 className="text-3xl md:text-4xl font-bold text-white mb-4">
-            Mental Health Matters for Students
+            {t('landing.stats.title', 'Student life can be heavy')}
           </h2>
           <p className="text-gray-300 max-w-2xl mx-auto">
-            Indonesian university students face significant mental health challenges. 
-            UGM-AICare is here to bridge the gap between awareness and action.
+            {t(
+              'landing.stats.subtitle',
+              'Many students experience stress, anxiety, or burnout. If this sounds familiar, you are not alone.'
+            )}
           </p>
         </motion.div>
 
@@ -70,7 +75,7 @@ export default function StatsBannerSection() {
           className="text-center mt-12"
         >
           <p className="text-[#FFCA40] font-semibold text-lg">
-            You are not alone. Help is available 24/7.
+            {t('landing.stats.footer', 'If you need support, reaching out is a valid next step.')}
           </p>
         </motion.div>
       </div>

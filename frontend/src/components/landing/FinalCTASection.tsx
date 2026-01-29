@@ -1,15 +1,19 @@
 "use client";
 
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { FaArrowRight } from '@/icons';
+import { useI18n } from '@/i18n/I18nProvider';
 
 export default function FinalCTASection() {
+  const shouldReduceMotion = useReducedMotion();
+  const { t } = useI18n();
+
   return (
     <section className="py-32 bg-linear-to-b from-[#000B1F] via-[#001D58] to-[#002A7A] relative overflow-hidden">
       {/* Background Effects */}
       <div className="absolute inset-0">
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-[#FFCA40] rounded-full blur-[150px] opacity-20" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-150 h-150 bg-[#FFCA40] rounded-full blur-[150px] opacity-20" />
       </div>
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 relative z-10">
@@ -39,23 +43,16 @@ export default function FinalCTASection() {
 
           {/* Content */}
           <div className="relative z-10">
-            {/* Availability Badge */}
+            {/* Eyebrow */}
             <motion.div
-              initial={{ scale: 0 }}
-              whileInView={{ scale: 1 }}
+              initial={{ opacity: 0, y: 10 }}
+              whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              transition={{ duration: 0.5, delay: 0.2, type: "spring" }}
-              className="inline-flex items-center gap-2 px-6 py-3 bg-linear-to-r from-[#FF6B9D]/20 to-[#FF8FAB]/20 backdrop-blur-sm rounded-full border border-[#FF6B9D]/30 mb-8"
+              transition={{ duration: 0.6, delay: 0.2 }}
+              className="inline-flex items-center gap-2 text-sm uppercase tracking-widest text-white/70 mb-8"
             >
-              <motion.span
-                animate={{ scale: [1, 1.2, 1] }}
-                transition={{ duration: 2, repeat: Infinity }}
-              >
-                💫
-              </motion.span>
-              <span className="text-white font-semibold">
-                <span className="text-[#FFCA40]">Available 24/7</span> whenever you need support
-              </span>
+              <span className="text-[#FFCA40]">{t('landing.final.eyebrow_icon', '✦')}</span>
+              <span>{t('landing.final.eyebrow', 'Open anytime, at your pace')}</span>
             </motion.div>
 
             {/* Main Heading */}
@@ -66,9 +63,10 @@ export default function FinalCTASection() {
               transition={{ duration: 0.6, delay: 0.3 }}
               className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6 leading-tight"
             >
-              You Are Not Alone.<br />
+              {t('landing.final.title_line1', 'You are not alone.')}
+              <br />
               <span className="bg-linear-to-r from-[#FFCA40] via-[#FFD770] to-[#FFCA40] bg-clip-text text-transparent">
-                Start Your Journey Today.
+                {t('landing.final.title_line2', 'Start with one message.')}
               </span>
             </motion.h2>
 
@@ -80,8 +78,10 @@ export default function FinalCTASection() {
               transition={{ duration: 0.6, delay: 0.4 }}
               className="text-xl sm:text-2xl text-gray-300 mb-12 max-w-3xl mx-auto"
             >
-              Millions of students worldwide go through the same thing. But now, you have Aika. 
-              An AI companion available 24/7, empathetic, and evidence-based.
+              {t(
+                'landing.final.subtitle',
+                'If student life has been weighing on you, Aika can help you slow down, reflect, and choose a next step. When you want professional support, it can guide you toward campus resources.'
+              )}
             </motion.p>
 
             {/* Primary CTA Button */}
@@ -102,10 +102,10 @@ export default function FinalCTASection() {
                   className="group relative px-16 py-6 bg-linear-to-r from-[#FFCA40] via-[#FFD770] to-[#FFB700] text-[#001D58] rounded-full font-bold text-2xl flex items-center justify-center shadow-2xl transition-all overflow-hidden"
                 >
                   <span className="relative z-10 flex items-center gap-3">
-                    Start Chatting Now
+                    {t('landing.final.cta', 'Start a conversation')}
                     <motion.span
-                      animate={{ x: [0, 8, 0] }}
-                      transition={{ repeat: Infinity, duration: 1.5 }}
+                      animate={shouldReduceMotion ? undefined : { x: [0, 8, 0] }}
+                      transition={shouldReduceMotion ? undefined : { repeat: Infinity, duration: 1.5 }}
                     >
                       <FaArrowRight />
                     </motion.span>
@@ -132,25 +132,25 @@ export default function FinalCTASection() {
                 <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
                 </svg>
-                <span className="text-white font-medium">No Sign-up Required</span>
+                <span className="text-white font-medium">{t('landing.final.trust.no_signup', 'No sign-up required')}</span>
               </div>
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
                 </svg>
-                <span className="text-white font-medium">Free Forever</span>
+                <span className="text-white font-medium">{t('landing.final.trust.free', 'Free for eligible students')}</span>
               </div>
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
                 </svg>
-                <span className="text-white font-medium">100% Private & Secure</span>
+                <span className="text-white font-medium">{t('landing.final.trust.privacy', 'Privacy-first')}</span>
               </div>
               <div className="flex items-center gap-2">
                 <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
                   <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
                 </svg>
-                <span className="text-white font-medium">Response {'<2s'}</span>
+                <span className="text-white font-medium">{t('landing.final.trust.ugm', 'UGM-linked pathways')}</span>
               </div>
             </motion.div>
           </div>
@@ -166,10 +166,10 @@ export default function FinalCTASection() {
         >
           <div className="text-center">
             <h3 className="text-xl font-bold text-white mb-4">
-              🚨 In an Emergency?
+              {t('landing.final.emergency.title', '🚨 In an emergency?')}
             </h3>
             <p className="text-gray-400 mb-6">
-              If you or a friend are in crisis, contact these emergency services:
+              {t('landing.final.emergency.subtitle', 'If you or a friend are in crisis, contact these services:')}
             </p>
             <div className="grid sm:grid-cols-3 gap-4">
               <a 

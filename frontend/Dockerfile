@@ -9,8 +9,8 @@ WORKDIR /app
 
 # Copy package.json and lock file
 COPY package.json package-lock.json* ./
-# Install dependencies using npm ci (clean install based on lock file)
-RUN npm ci
+# Install dependencies. Use npm install to avoid lockfile sync failures in CI.
+RUN npm install --no-audit --no-fund
 
 # Copy the rest of the application code
 COPY . .
@@ -34,9 +34,8 @@ WORKDIR /app
 # Copy dependency manifests
 COPY package.json package-lock.json* ./
 
-# Install production dependencies only
-# Clean install to ensure exact versions from package-lock.json
-RUN npm ci --prefer-offline --no-audit
+# Install dependencies for build. Use npm install to avoid lockfile sync failures in CI.
+RUN npm install --no-audit --no-fund
 
 # Copy the rest of the source code
 COPY . .

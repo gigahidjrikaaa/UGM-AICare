@@ -95,7 +95,7 @@ export function ExecutionHistoryTable({ limit = 50 }: ExecutionHistoryTableProps
     return `${(ms / 1000).toFixed(2)}s`;
   };
 
-  const getGraphIcon = (graphName: string) => {
+  const getGraphIcon = (graphName?: string | null) => {
     const icons: Record<string, string> = {
       sta: '🛡️',
       tca: '🧠',
@@ -104,7 +104,9 @@ export function ExecutionHistoryTable({ limit = 50 }: ExecutionHistoryTableProps
       aika: '🤖',
       orchestrator: '🎯'
     };
-    return icons[graphName.toLowerCase()] || '📦';
+    const key = (graphName ?? '').toString().trim().toLowerCase();
+    if (!key) return '📦';
+    return icons[key] || '📦';
   };
 
   return (
@@ -353,7 +355,7 @@ export function ExecutionHistoryTable({ limit = 50 }: ExecutionHistoryTableProps
                             {/* Node Header */}
                             <div className="bg-white/5 px-4 py-3 flex items-center justify-between">
                               <div className="flex items-center gap-3">
-                                <span className="flex-shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">
+                                <span className="shrink-0 w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center text-xs font-bold">
                                   {index + 1}
                                 </span>
                                 <div>

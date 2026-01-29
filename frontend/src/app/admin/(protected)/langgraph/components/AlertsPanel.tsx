@@ -47,7 +47,7 @@ export function AlertsPanel() {
     }
   };
 
-  const getGraphIcon = (graphType: string) => {
+  const getGraphIcon = (graphType?: string | null) => {
     const icons: Record<string, string> = {
       sta: '🛡️',
       tca: '🧠',
@@ -56,7 +56,9 @@ export function AlertsPanel() {
       aika: '🤖',
       orchestrator: '🎯'
     };
-    return icons[graphType.toLowerCase()] || '📦';
+    const key = (graphType ?? '').toString().trim().toLowerCase();
+    if (!key) return '📦';
+    return icons[key] || '📦';
   };
 
   if (loadingAlerts) {
@@ -106,7 +108,7 @@ export function AlertsPanel() {
                 <div className="flex items-center gap-2">
                   <span className="text-lg">{getGraphIcon(alert.graph_type)}</span>
                   <span className="font-bold text-sm uppercase tracking-wider opacity-90">
-                    {alert.graph_type}
+                    {alert.graph_type || 'unknown'}
                   </span>
                 </div>
                 <span className="text-[10px] font-mono opacity-70">

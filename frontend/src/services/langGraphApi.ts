@@ -311,7 +311,7 @@ export interface PerformanceBottleneck {
 export interface SystemAlert {
   id: number;
   alert_type: string;
-  graph_type: string; // Added graph_type
+  graph_type?: string | null; // Backend may omit this for some alert types
   severity: 'info' | 'warning' | 'error' | 'critical';
   message: string;
   execution_id?: string;

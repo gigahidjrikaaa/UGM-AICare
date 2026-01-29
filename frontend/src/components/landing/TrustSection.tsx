@@ -2,6 +2,7 @@
 
 import Image from 'next/image';
 import { motion } from 'framer-motion';
+import { useI18n } from '@/i18n/I18nProvider';
 
 const partners = [
   {
@@ -17,13 +18,15 @@ const partners = [
 ];
 
 const stats = [
-  { value: "24/7", label: "Availability" },
-  { value: "<2s", label: "Response Time" },
-  { value: "100%", label: "Private & Secure" },
-  { value: "Free", label: "For UGM Students" }
+  { value: "24/7", labelKey: 'landing.trust.kpi.anytime', fallback: 'Open anytime' },
+  { value: "UGM", labelKey: 'landing.trust.kpi.ugm', fallback: 'Campus support pathways' },
+  { value: "Private", labelKey: 'landing.trust.kpi.private', fallback: 'Privacy-first' },
+  { value: "Free", labelKey: 'landing.trust.kpi.free', fallback: 'For UGM students' }
 ];
 
 export default function TrustSection() {
+  const { t } = useI18n();
+
   return (
     <section className="py-16 bg-linear-to-b from-[#001D58] to-[#000B1F] relative overflow-hidden">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -36,7 +39,7 @@ export default function TrustSection() {
           className="text-center mb-12"
         >
           <p className="text-gray-400 text-sm uppercase tracking-widest mb-8">
-            Trusted & Developed By
+            {t('landing.trust.title', 'Built with UGM')}
           </p>
           
           {/* Partner Logos */}
@@ -92,7 +95,7 @@ export default function TrustSection() {
               >
                 {stat.value}
               </motion.div>
-              <p className="text-gray-400 text-sm">{stat.label}</p>
+              <p className="text-gray-400 text-sm">{t(stat.labelKey, stat.fallback)}</p>
             </motion.div>
           ))}
         </motion.div>
@@ -103,12 +106,12 @@ export default function TrustSection() {
           whileInView={{ opacity: 1 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6, delay: 0.4 }}
-          className="flex flex-wrap items-center justify-center gap-4 mt-12"
+          className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-12"
         >
-          <SecurityBadge icon="🔒" text="End-to-End Encrypted" />
-          <SecurityBadge icon="🛡️" text="GDPR Compliant" />
-          <SecurityBadge icon="✓" text="UGM Verified" />
-          <SecurityBadge icon="🤝" text="Professional Support" />
+          <SecurityBadge icon="🔒" text={t('landing.trust.signal.encrypted', 'Encrypted in transit')} />
+          <SecurityBadge icon="🧾" text={t('landing.trust.signal.control', 'You control sharing')} />
+          <SecurityBadge icon="✓" text={t('landing.trust.signal.verified', 'UGM-linked pathways')} />
+          <SecurityBadge icon="🤝" text={t('landing.trust.signal.support', 'Escalation to support')} />
         </motion.div>
       </div>
     </section>
@@ -119,7 +122,7 @@ function SecurityBadge({ icon, text }: { icon: string; text: string }) {
   return (
     <motion.div
       whileHover={{ scale: 1.05 }}
-      className="inline-flex items-center gap-2 px-4 py-2 bg-white/5 backdrop-blur-sm rounded-full border border-white/10 text-sm text-gray-300"
+      className="flex items-center gap-3 px-4 py-3 bg-white/5 backdrop-blur-sm rounded-2xl border border-white/10 text-sm text-gray-300"
     >
       <span>{icon}</span>
       <span>{text}</span>

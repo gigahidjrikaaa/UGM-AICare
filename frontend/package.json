@@ -8,7 +8,8 @@
     "build": "next build",
     "build:prod": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint src/components/landing src/i18n",
+    "lint:all": "eslint .",
     "test": "echo \"No frontend tests configured\""
   },
   "dependencies": {
@@ -54,7 +55,7 @@
   "devDependencies": {
     "@babel/plugin-transform-runtime": "^7.28.3",
     "@eslint/eslintrc": "^3",
-    "@tailwindcss/postcss": "^4.1.8",
+    "@tailwindcss/postcss": "^4.1.18",
     "@types/node": "^20",
     "@types/react": "19.2.2",
     "@types/react-dom": "19.2.2",

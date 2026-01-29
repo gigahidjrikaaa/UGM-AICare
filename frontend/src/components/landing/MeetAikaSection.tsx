@@ -1,36 +1,49 @@
+
 "use client";
 
 import Image from 'next/image';
 import Link from 'next/link';
-import { motion } from 'framer-motion';
+import { motion, useReducedMotion } from 'framer-motion';
 import { FiMessageCircle, FiClock, FiShield, FiHeart } from '@/icons';
+import { useI18n } from '@/i18n/I18nProvider';
 
 const aikaFeatures = [
   {
     icon: FiMessageCircle,
-    title: "Empathetic Conversations",
-    description: "Aika uses advanced NLP to understand context, emotions, and provide thoughtful responses."
+    titleKey: 'landing.meet.features.f1.title',
+    titleFallback: 'Thoughtful conversations',
+    descriptionKey: 'landing.meet.features.f1.desc',
+    descriptionFallback: 'Aika helps you reflect and put feelings into words, one question at a time.'
   },
   {
     icon: FiClock,
-    title: "Available 24/7",
-    description: "No appointments needed. Aika is always here when you need someone to talk to."
+    titleKey: 'landing.meet.features.f2.title',
+    titleFallback: 'Open anytime',
+    descriptionKey: 'landing.meet.features.f2.desc',
+    descriptionFallback: 'No appointments needed. Start when you’re ready, pause when you’re not.'
   },
   {
     icon: FiShield,
-    title: "Complete Privacy",
-    description: "Your conversations are encrypted and confidential. Your data belongs to you."
+    titleKey: 'landing.meet.features.f3.title',
+    titleFallback: 'Privacy-first',
+    descriptionKey: 'landing.meet.features.f3.desc',
+    descriptionFallback: 'You stay in control of what you share and when you share it.'
   },
   {
     icon: FiHeart,
-    title: "Evidence-Based Support",
-    description: "Built on CBT principles and validated by mental health professionals."
+    titleKey: 'landing.meet.features.f4.title',
+    titleFallback: 'Guided techniques',
+    descriptionKey: 'landing.meet.features.f4.desc',
+    descriptionFallback: 'Exercises inspired by evidence-based approaches, designed for student life.'
   }
 ];
 
 export default function MeetAikaSection() {
+  const shouldReduceMotion = useReducedMotion();
+  const { t } = useI18n();
+
   return (
-    <section className="py-24 bg-gradient-to-b from-[#000B1F] to-[#001D58] relative overflow-hidden">
+    <section className="py-24 bg-linear-to-b from-[#000B1F] to-[#001D58] relative overflow-hidden">
       {/* Background Decoration */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-1/4 right-0 w-96 h-96 bg-[#FFCA40] rounded-full blur-3xl" />
@@ -51,12 +64,16 @@ export default function MeetAikaSection() {
             <div className="relative aspect-square max-w-md mx-auto">
               {/* Glow Effect */}
               <motion.div
-                className="absolute inset-0 bg-gradient-to-br from-[#FFCA40]/30 to-[#6A98F0]/30 rounded-full blur-3xl"
-                animate={{ 
-                  scale: [1, 1.1, 1],
-                  opacity: [0.3, 0.5, 0.3]
-                }}
-                transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+                className="absolute inset-0 bg-linear-to-br from-[#FFCA40]/30 to-[#6A98F0]/30 rounded-full blur-3xl"
+                animate={
+                  shouldReduceMotion
+                    ? undefined
+                    : {
+                        scale: [1, 1.08, 1],
+                        opacity: [0.3, 0.5, 0.3],
+                      }
+                }
+                transition={shouldReduceMotion ? undefined : { duration: 5, repeat: Infinity, ease: "easeInOut" }}
               />
               
               {/* Avatar Image */}
@@ -70,7 +87,7 @@ export default function MeetAikaSection() {
                 />
                 
                 {/* Overlay Gradient */}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#001D58]/80 via-transparent to-transparent" />
+                <div className="absolute inset-0 bg-linear-to-t from-[#001D58]/80 via-transparent to-transparent" />
                 
                 {/* Status Badge */}
                 <motion.div
@@ -83,13 +100,13 @@ export default function MeetAikaSection() {
                   <div className="bg-white/10 backdrop-blur-xl rounded-2xl p-4 border border-white/20">
                     <div className="flex items-center gap-3">
                       <motion.div
-                        animate={{ scale: [1, 1.2, 1] }}
-                        transition={{ duration: 2, repeat: Infinity }}
+                        animate={shouldReduceMotion ? undefined : { scale: [1, 1.2, 1] }}
+                        transition={shouldReduceMotion ? undefined : { duration: 2, repeat: Infinity }}
                         className="w-3 h-3 bg-[#4ADE80] rounded-full"
                       />
                       <div>
-                        <p className="text-white font-semibold">Aika is Online</p>
-                        <p className="text-gray-400 text-sm">Ready to chat with you</p>
+                        <p className="text-white font-semibold">{t('landing.meet.status.title', 'Aika is available')}</p>
+                        <p className="text-gray-400 text-sm">{t('landing.meet.status.subtitle', 'Ready when you are')}</p>
                       </div>
                     </div>
                   </div>
@@ -105,7 +122,10 @@ export default function MeetAikaSection() {
                 className="absolute -top-4 -right-4 bg-white rounded-2xl rounded-br-sm p-4 shadow-2xl max-w-xs"
               >
                 <p className="text-gray-800 text-sm">
-                  &quot;Hi there! I&apos;m Aika. I&apos;m here to listen and support you whenever you need someone to talk to. 💙&quot;
+                  {t(
+                    'landing.meet.bubble',
+                    '“Hi. If you want, we can unpack what’s been weighing on you.”'
+                  )}
                 </p>
               </motion.div>
             </div>
@@ -118,24 +138,24 @@ export default function MeetAikaSection() {
             viewport={{ once: true }}
             transition={{ duration: 0.8 }}
           >
-            {/* Badge */}
-            <div className="inline-block px-4 py-2 bg-[#FFCA40]/10 rounded-full border border-[#FFCA40]/30 mb-6">
-              <span className="text-[#FFCA40] font-semibold text-sm">MEET YOUR AI COMPANION</span>
-            </div>
+            <p className="text-white/60 text-sm uppercase tracking-widest mb-6">
+              {t('landing.meet.eyebrow', 'Meet Aika')}
+            </p>
 
             {/* Title */}
             <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6 leading-tight">
-              Say Hello to{' '}
-              <span className="bg-gradient-to-r from-[#FFCA40] via-[#FFD770] to-[#FFCA40] bg-clip-text text-transparent">
+              {t('landing.meet.title_prefix', 'Say hello to')}{' '}
+              <span className="bg-linear-to-r from-[#FFCA40] via-[#FFD770] to-[#FFCA40] bg-clip-text text-transparent">
                 Aika
               </span>
             </h2>
 
             {/* Description */}
             <p className="text-xl text-gray-300 mb-8 leading-relaxed">
-              Aika is your AI mental health companion, designed to provide empathetic, 
-              non-judgmental support whenever you need it. Built with advanced AI 
-              technology and validated by mental health professionals at UGM.
+              {t(
+                'landing.meet.description',
+                'Aika is a conversation partner designed around UGM student life. It can help you reflect, practice coping tools, and prepare to reach out for professional support when you want it.'
+              )}
             </p>
 
             {/* Features Grid */}
@@ -150,8 +170,8 @@ export default function MeetAikaSection() {
                   className="bg-white/5 backdrop-blur-sm rounded-xl p-4 border border-white/10 hover:border-[#FFCA40]/30 transition-colors"
                 >
                   <feature.icon className="text-[#FFCA40] text-xl mb-2" />
-                  <h3 className="text-white font-semibold mb-1">{feature.title}</h3>
-                  <p className="text-gray-400 text-sm">{feature.description}</p>
+                  <h3 className="text-white font-semibold mb-1">{t(feature.titleKey, feature.titleFallback)}</h3>
+                  <p className="text-gray-400 text-sm">{t(feature.descriptionKey, feature.descriptionFallback)}</p>
                 </motion.div>
               ))}
             </div>
@@ -161,9 +181,9 @@ export default function MeetAikaSection() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.98 }}
-                className="px-8 py-4 bg-gradient-to-r from-[#FFCA40] to-[#FFB700] text-[#001D58] rounded-full font-bold text-lg shadow-lg hover:shadow-[#FFCA40]/30 transition-shadow"
+                className="px-8 py-4 bg-linear-to-r from-[#FFCA40] to-[#FFB700] text-[#001D58] rounded-full font-bold text-lg shadow-lg hover:shadow-[#FFCA40]/30 transition-shadow"
               >
-                Start Chatting with Aika
+                {t('landing.meet.cta', 'Talk to Aika')}
               </motion.button>
             </Link>
           </motion.div>

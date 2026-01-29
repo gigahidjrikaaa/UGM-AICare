@@ -2,55 +2,61 @@
 
 import { motion } from 'framer-motion';
 import { FiCheckCircle, FiZap, FiHeart, FiUsers } from '@/icons';
+import { useI18n } from '@/i18n/I18nProvider';
 
 const benefits = [
   {
     icon: FiZap,
-    title: "Automatic Crisis Detection",
-    description: "Our AI instantly detects if you're in an emergency situation and provides immediate emergency resources within seconds.",
-    stat: "<1s",
-    statLabel: "Response Time",
+    titleKey: 'landing.benefits.card1.title',
+    titleFallback: 'Safety-minded support',
+    descriptionKey: 'landing.benefits.card1.desc',
+    descriptionFallback:
+      'If your messages suggest you may be in danger, Aika prioritizes safety: it can surface crisis resources and encourage reaching out to real people.',
     color: "from-[#FF6B9D] to-[#FF8FAB]",
     features: [
-      "Real-time crisis detection",
-      "UGM emergency hotline",
-      "Auto-connect to counselors",
-      "24/7 monitoring"
-    ]
+      { key: 'landing.benefits.card1.f1', fallback: 'Crisis resources when needed' },
+      { key: 'landing.benefits.card1.f2', fallback: 'Grounding prompts to stabilize' },
+      { key: 'landing.benefits.card1.f3', fallback: 'Encourages contacting support' },
+      { key: 'landing.benefits.card1.f4', fallback: 'Clear next-step options' },
+    ],
   },
   {
     icon: FiHeart,
-    title: "Personalized Action Plans",
-    description: "Everyone is different. Aika creates intervention plans tailored specifically to your situation and needs.",
-    stat: "100%",
-    statLabel: "Personalized",
+    titleKey: 'landing.benefits.card2.title',
+    titleFallback: 'Small steps, tailored to you',
+    descriptionKey: 'landing.benefits.card2.desc',
+    descriptionFallback:
+      'You can ask for practical coping techniques and a plan you can actually try today, not a generic list of advice.',
     color: "from-[#FFCA40] to-[#FFD770]",
     features: [
-      "CBT-based techniques",
-      "Step-by-step guidance",
-      "Progress tracking",
-      "Adaptive recommendations"
-    ]
+      { key: 'landing.benefits.card2.f1', fallback: 'CBT-inspired exercises' },
+      { key: 'landing.benefits.card2.f2', fallback: 'Step-by-step guidance' },
+      { key: 'landing.benefits.card2.f3', fallback: 'Journaling and reflections' },
+      { key: 'landing.benefits.card2.f4', fallback: 'Personal goals you can revisit' },
+    ],
   },
   {
     icon: FiUsers,
-    title: "Connect to UGM Counselors",
-    description: "Need professional help? Aika directly connects you to counselors at GMC, HPU, or UGM Psychology Faculty.",
-    stat: "24/7",
-    statLabel: "Available",
+    titleKey: 'landing.benefits.card3.title',
+    titleFallback: 'Bridge to campus support',
+    descriptionKey: 'landing.benefits.card3.desc',
+    descriptionFallback:
+      "When it's time to talk with a professional, Aika can guide you toward UGM services and help you prepare what to say.",
     color: "from-[#6A98F0] to-[#8AABF5]",
     features: [
-      "Direct booking to GMC",
-      "Integrated with HPU",
-      "Psychologist referrals",
-      "Automatic follow-ups"
-    ]
+      { key: 'landing.benefits.card3.f1', fallback: 'UGM service pathways (GMC/HPU)' },
+      { key: 'landing.benefits.card3.f2', fallback: 'Helps you summarize your situation' },
+      { key: 'landing.benefits.card3.f3', fallback: 'Encourages reaching out early' },
+      { key: 'landing.benefits.card3.f4', fallback: 'Optional, based on your needs' },
+    ],
   }
 ];
 
 export default function BenefitsSection() {
+  const { t } = useI18n();
+
   return (
-    <section className="py-24 bg-gradient-to-b from-[#001D58] via-[#002A7A] to-[#000B1F] relative overflow-hidden">
+    <section className="py-24 bg-linear-to-b from-[#001D58] via-[#002A7A] to-[#000B1F] relative overflow-hidden">
       {/* Background Decoration */}
       <div className="absolute inset-0 opacity-10">
         <div className="absolute top-1/4 left-0 w-96 h-96 bg-[#FFCA40] rounded-full blur-3xl" />
@@ -66,15 +72,19 @@ export default function BenefitsSection() {
           transition={{ duration: 0.6 }}
           className="text-center mb-16"
         >
-          <div className="inline-block px-4 py-2 bg-[#FFCA40]/10 rounded-full border border-[#FFCA40]/30 mb-4">
-            <span className="text-[#FFCA40] font-semibold text-sm">WHY CHOOSE AIKA?</span>
-          </div>
+          <p className="text-white/60 text-sm uppercase tracking-widest mb-4">
+            {t('landing.benefits.eyebrow', 'Why students use Aika')}
+          </p>
           <h2 className="text-4xl sm:text-5xl lg:text-6xl font-black text-white mb-6">
-            Not Just Another Chatbot,<br />
-            <span className="text-[#FFCA40]">A Complete System</span>
+            {t('landing.benefits.title_line1', 'Not a lecture.')}
+            <br />
+            <span className="text-[#FFCA40]">{t('landing.benefits.title_line2', 'A place to start.')}</span>
           </h2>
           <p className="text-xl text-gray-400 max-w-3xl mx-auto">
-            Aika offers three core advantages you won&apos;t find in other mental health chatbots.
+            {t(
+              'landing.benefits.subtitle',
+              'Designed for UGM students: practical support now, and a clear path to professional help when you want it.'
+            )}
           </p>
         </motion.div>
 
@@ -94,38 +104,28 @@ export default function BenefitsSection() {
               <div className="bg-white/5 backdrop-blur-xl rounded-3xl p-8 border border-white/10 shadow-2xl h-full relative overflow-hidden">
                 {/* Gradient Overlay on Hover */}
                 <motion.div
-                  className={`absolute inset-0 bg-gradient-to-br ${benefit.color} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}
+                  className={`absolute inset-0 bg-linear-to-br ${benefit.color} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}
                 />
 
                 {/* Icon */}
                 <div className="relative">
                   <motion.div
-                    whileHover={{ rotate: 360, scale: 1.1 }}
-                    transition={{ duration: 0.6 }}
-                    className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${benefit.color} flex items-center justify-center mb-6 shadow-lg`}
+                    whileHover={{ rotate: -6, scale: 1.06 }}
+                    transition={{ type: 'spring', stiffness: 280, damping: 18 }}
+                    className={`w-16 h-16 rounded-2xl bg-linear-to-br ${benefit.color} flex items-center justify-center mb-6 shadow-lg`}
                   >
                     <benefit.icon className="text-white text-2xl" />
                   </motion.div>
                 </div>
 
-                {/* Stat Badge */}
-                <div className="absolute top-8 right-8">
-                  <div className="bg-white/10 backdrop-blur-sm rounded-full px-4 py-2 border border-white/20">
-                    <div className={`text-2xl font-bold bg-gradient-to-r ${benefit.color} bg-clip-text text-transparent`}>
-                      {benefit.stat}
-                    </div>
-                    <div className="text-xs text-gray-400 text-center">{benefit.statLabel}</div>
-                  </div>
-                </div>
-
                 {/* Title */}
                 <h3 className="text-2xl font-bold text-white mb-4 relative">
-                  {benefit.title}
+                  {t(benefit.titleKey, benefit.titleFallback)}
                 </h3>
 
                 {/* Description */}
                 <p className="text-gray-400 leading-relaxed mb-6 relative">
-                  {benefit.description}
+                  {t(benefit.descriptionKey, benefit.descriptionFallback)}
                 </p>
 
                 {/* Features List */}
@@ -139,8 +139,8 @@ export default function BenefitsSection() {
                       transition={{ delay: index * 0.2 + featureIndex * 0.1 }}
                       className="flex items-center gap-3 text-sm text-gray-300"
                     >
-                      <FiCheckCircle className={`text-[#4ADE80] flex-shrink-0`} />
-                      <span>{feature}</span>
+                      <FiCheckCircle className={`text-[#4ADE80] shrink-0`} />
+                      <span>{t(feature.key, feature.fallback)}</span>
                     </motion.div>
                   ))}
                 </div>
@@ -149,93 +149,59 @@ export default function BenefitsSection() {
           ))}
         </div>
 
-        {/* Visual Comparison Card */}
+        {/* Expectations */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
           viewport={{ once: true }}
           transition={{ duration: 0.6 }}
-          className="bg-gradient-to-r from-[#FFCA40]/10 via-[#FFD770]/10 to-[#FFCA40]/10 backdrop-blur-xl rounded-3xl p-12 border border-[#FFCA40]/30"
+          className="bg-linear-to-r from-[#FFCA40]/10 via-[#FFD770]/10 to-[#FFCA40]/10 backdrop-blur-xl rounded-3xl p-12 border border-[#FFCA40]/30"
         >
           <div className="grid md:grid-cols-2 gap-12 items-center">
-            {/* Left: Placeholder Graphic */}
-            <div className="relative">
-              <div className="aspect-square rounded-2xl bg-gradient-to-br from-[#001D58] to-[#002A7A] flex items-center justify-center relative overflow-hidden border-2 border-[#FFCA40]/30">
-                {/* Placeholder for Infographic */}
-                <div className="text-center p-8">
-                  <motion.div
-                    animate={{ scale: [1, 1.1, 1] }}
-                    transition={{ duration: 3, repeat: Infinity }}
-                    className="mb-4"
-                  >
-                    <div className="w-24 h-24 mx-auto rounded-full bg-[#FFCA40]/20 flex items-center justify-center">
-                      <svg className="w-12 h-12 text-[#FFCA40]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                  </motion.div>
-                  <h4 className="text-xl font-bold text-white mb-2">System Architecture</h4>
-                  <p className="text-gray-400 text-sm">Infographic coming soon</p>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: Text Content */}
+            {/* Left: What you can expect */}
             <div>
               <h3 className="text-3xl font-bold text-white mb-6">
-                What Makes Aika<br />
-                <span className="text-[#FFCA40]">Different</span>
+                {t('landing.benefits.expectations.title', 'What to expect')}
               </h3>
-              
-              <div className="space-y-4">
-                <div className="flex items-start gap-4">
-                  <div className="w-8 h-8 rounded-full bg-[#4ADE80]/20 flex items-center justify-center flex-shrink-0 mt-1">
-                    <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="text-white font-semibold mb-1">Integrated with UGM Systems</h4>
-                    <p className="text-gray-400 text-sm">Directly connected to GMC, HPU, and campus mental health services.</p>
-                  </div>
-                </div>
 
-                <div className="flex items-start gap-4">
-                  <div className="w-8 h-8 rounded-full bg-[#4ADE80]/20 flex items-center justify-center flex-shrink-0 mt-1">
-                    <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="text-white font-semibold mb-1">Evidence-Based CBT</h4>
-                    <p className="text-gray-400 text-sm">All techniques provided by Aika are based on Cognitive Behavioral Therapy research.</p>
-                  </div>
-                </div>
+              <ul className="space-y-3 text-gray-300">
+                {[
+                  { key: 'landing.benefits.expectations.p1', fallback: 'A calm space to write what you feel, without judgment.' },
+                  { key: 'landing.benefits.expectations.p2', fallback: 'Practical coping tools you can try immediately.' },
+                  { key: 'landing.benefits.expectations.p3', fallback: 'A way to prepare for counseling (notes, goals, questions).' },
+                  { key: 'landing.benefits.expectations.p4', fallback: 'Crisis resources surfaced when safety is a concern.' },
+                ].map((item) => (
+                  <li key={item.key} className="flex items-start gap-3">
+                    <FiCheckCircle className="text-[#4ADE80] mt-0.5 shrink-0" />
+                    <span>{t(item.key, item.fallback)}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
 
-                <div className="flex items-start gap-4">
-                  <div className="w-8 h-8 rounded-full bg-[#4ADE80]/20 flex items-center justify-center flex-shrink-0 mt-1">
-                    <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="text-white font-semibold mb-1">Multi-Agent AI System</h4>
-                    <p className="text-gray-400 text-sm">Not just one AI, but 4 specialized agents working together to help you.</p>
-                  </div>
-                </div>
-
-                <div className="flex items-start gap-4">
-                  <div className="w-8 h-8 rounded-full bg-[#4ADE80]/20 flex items-center justify-center flex-shrink-0 mt-1">
-                    <svg className="w-5 h-5 text-[#4ADE80]" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd"/>
-                    </svg>
-                  </div>
-                  <div>
-                    <h4 className="text-white font-semibold mb-1">Privacy-First Design</h4>
-                    <p className="text-gray-400 text-sm">Your data is secure with differential privacy and end-to-end encryption.</p>
-                  </div>
-                </div>
-              </div>
+            {/* Right: What Aika is not */}
+            <div className="bg-white/5 border border-white/10 rounded-2xl p-6">
+              <h4 className="text-white font-semibold mb-3">
+                {t('landing.benefits.not_title', "What Aika isn't")}
+              </h4>
+              <ul className="space-y-3 text-sm text-gray-400">
+                {[
+                  { key: 'landing.benefits.not1', fallback: 'Not a substitute for medical or psychiatric care.' },
+                  { key: 'landing.benefits.not2', fallback: 'Not guaranteed to be accurate; always use your judgment.' },
+                  { key: 'landing.benefits.not3', fallback: 'Not a replacement for emergency services in life-threatening situations.' },
+                ].map((item) => (
+                  <li key={item.key} className="flex items-start gap-3">
+                    <span className="mt-0.5 text-white/30">•</span>
+                    <span>{t(item.key, item.fallback)}</span>
+                  </li>
+                ))}
+              </ul>
+              <p className="text-xs text-gray-500 mt-4">
+                {t(
+                  'landing.benefits.not_note',
+                  'If you are in immediate danger, contact emergency services (112) or the nearest health facility.'
+                )}
+              </p>
             </div>
           </div>
         </motion.div>
