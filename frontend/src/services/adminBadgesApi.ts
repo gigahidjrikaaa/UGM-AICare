@@ -9,9 +9,17 @@ import type {
   BadgeTemplateCreatePayload,
   BadgeTemplateListResponse,
   BadgeTemplateUpdatePayload,
+  ChainInfo,
+  ChainsListResponse,
 } from '@/types/admin/badges';
 
 export const adminBadgesApi = {
+  /** Fetch all supported chains with their readiness status. */
+  listChains: async (): Promise<ChainInfo[]> => {
+    const res = await apiCall<ChainsListResponse>('/api/v1/admin/badges/chains');
+    return res.chains;
+  },
+
   listTemplates: async (): Promise<BadgeTemplate[]> => {
     const res = await apiCall<BadgeTemplateListResponse>('/api/v1/admin/badges/templates');
     return res.templates;

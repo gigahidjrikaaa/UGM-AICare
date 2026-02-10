@@ -8,15 +8,16 @@ import { FiAward, FiExternalLink, FiHelpCircle, FiLoader, FiLock, FiRefreshCw } 
 import apiClient from "@/services/api";
 import InteractiveBadgeCard from "@/components/ui/InteractiveBadgeCard";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { badgeMetadataMap, getBadgeMeta, getIpfsUrl } from "@/lib/badgeConstants";
+import { badgeMetadataMap, getBadgeMeta, getChainShortName, getExplorerTxUrl, getIpfsUrl } from "@/lib/badgeConstants";
 
-const EDUCHAIN_TESTNET_EXPLORER_BASE_URL = "https://edu-chain-testnet.blockscout.com";
+const FALLBACK_CHAIN_ID = 656476; // EDU Chain Testnet (legacy badges)
 
 interface EarnedBadge {
   badge_id: number;
   awarded_at: string;
   transaction_hash: string;
   contract_address: string;
+  chain_id?: number; // May be absent for pre-migration badges
 }
 
 interface EarnedBadgeInfo {
@@ -24,6 +25,7 @@ interface EarnedBadgeInfo {
   awarded_at: string;
   transaction_hash: string;
   contract_address: string;
+  chain_id?: number;
 }
 
 interface SyncAchievementsResponse {
@@ -195,9 +197,11 @@ export default function EarnedBadgesDisplay() {
           const earnedBadge = earnedBadges[badgeId];
           const isEarned = Boolean(earnedBadge);
           const awardedDate = formatAwardDate(earnedBadge?.awarded_at);
+          const chainId = earnedBadge?.chain_id ?? FALLBACK_CHAIN_ID;
           const explorerUrl = earnedBadge?.transaction_hash
-            ? `${EDUCHAIN_TESTNET_EXPLORER_BASE_URL}/tx/${earnedBadge.transaction_hash}`
+            ? getExplorerTxUrl(chainId, earnedBadge.transaction_hash)
             : undefined;
+          const chainLabel = isEarned ? getChainShortName(chainId) : undefined;
 
           const tooltipTitle = meta.description || "";
 
@@ -234,6 +238,11 @@ export default function EarnedBadgesDisplay() {
                   <div className="inline-flex items-center gap-2 rounded-full border border-[#FFCA40]/40 bg-[#FFCA40]/10 px-3 py-1 text-[#FFCA40]">
                     <FiAward className="h-3.5 w-3.5" />
                     <span>{awardedDate ?? "Recently earned"}</span>
+                    {chainLabel && (
+                      <span className="rounded bg-white/10 px-1.5 py-0.5 text-[10px] font-semibold text-white/70">
+                        {chainLabel}
+                      </span>
+                    )}
                     {explorerUrl && <FiExternalLink className="h-3.5 w-3.5" />}
                   </div>
                 ) : (

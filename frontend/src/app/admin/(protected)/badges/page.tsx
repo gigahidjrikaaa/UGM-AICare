@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/TextArea';
 import { useI18n } from '@/i18n/I18nProvider';
 import { getIpfsUrl } from '@/lib/badgeConstants';
 import { adminBadgesApi } from '@/services/adminBadgesApi';
-import type { BadgeIssuance, BadgeTemplate } from '@/types/admin/badges';
+import type { BadgeIssuance, BadgeTemplate, ChainInfo } from '@/types/admin/badges';
 
 function formatTimestamp(ts?: string | null): string {
   if (!ts) return '-';
@@ -24,6 +24,10 @@ export default function AdminBadgesPage() {
 
   const [templates, setTemplates] = useState<BadgeTemplate[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+
+  // Multi-chain state
+  const [chains, setChains] = useState<ChainInfo[]>([]);
+  const [selectedChainId, setSelectedChainId] = useState<number | undefined>(undefined);
 
   const [activeTemplate, setActiveTemplate] = useState<BadgeTemplate | null>(null);
 
@@ -47,8 +51,12 @@ export default function AdminBadgesPage() {
   const refresh = useCallback(async () => {
     setIsLoading(true);
     try {
-      const rows = await adminBadgesApi.listTemplates();
+      const [rows, chainList] = await Promise.all([
+        adminBadgesApi.listTemplates(),
+        adminBadgesApi.listChains(),
+      ]);
       setTemplates(rows);
+      setChains(chainList);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       toast.error(`${t('admin.badges.load_failed', 'Failed to load badges')}: ${msg}`);
@@ -81,6 +89,7 @@ export default function AdminBadgesPage() {
         token_id: tokenId,
         name: newName.trim(),
         description: newDescription.trim() || undefined,
+        chain_id: selectedChainId,
       });
       toast.success(t('admin.badges.created', 'Badge draft created'));
       setNewTokenId('');
@@ -211,11 +220,11 @@ export default function AdminBadgesPage() {
     <div className="space-y-6">
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-semibold text-white">{t('admin.badges.title', 'EDU Chain Badges')}</h1>
+          <h1 className="text-2xl font-semibold text-white">{t('admin.badges.title', 'Multi-Chain Badges')}</h1>
           <p className="text-sm text-white/60">
             {t(
               'admin.badges.subtitle',
-              'Create drafts, upload images to IPFS (Pinata), publish immutable metadata, and mint to users'
+              'Create drafts, upload images to IPFS, publish metadata on-chain, and mint NFTs to users across multiple chains'
             )}
           </p>
         </div>
@@ -226,7 +235,7 @@ export default function AdminBadgesPage() {
 
       <section className="rounded-lg border border-white/10 bg-white/5 p-4">
         <h2 className="text-lg font-medium text-white">{t('admin.badges.create_title', 'Create badge draft')}</h2>
-        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-3">
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-4">
           <Input
             name="token_id"
             label={t('admin.badges.token_id', 'Token ID')}
@@ -245,9 +254,31 @@ export default function AdminBadgesPage() {
             aria-label={t('admin.badges.name', 'Name')}
             className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white"
           />
-          <Button onClick={onCreate} disabled={!canCreate}>
-            {t('admin.badges.create', 'Create')}
-          </Button>
+          {/* Chain selector */}
+          <div className="flex flex-col gap-1">
+            <label htmlFor="chain_select" className="text-xs font-medium text-white/70">
+              {t('admin.badges.chain', 'Chain')}
+            </label>
+            <select
+              id="chain_select"
+              value={selectedChainId ?? ''}
+              onChange={(e) => setSelectedChainId(e.target.value ? Number(e.target.value) : undefined)}
+              className="w-full rounded-lg border border-white/15 bg-white/8 px-3 py-2 text-sm text-white"
+              aria-label={t('admin.badges.chain', 'Chain')}
+            >
+              <option value="">{t('admin.badges.default_chain', 'Default (EDU Chain)')}</option>
+              {chains.map((c) => (
+                <option key={c.chain_id} value={c.chain_id} disabled={!c.is_ready}>
+                  {c.name} {c.is_testnet ? '(testnet)' : ''} {!c.is_ready ? '- not configured' : ''}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-end">
+            <Button onClick={onCreate} disabled={!canCreate} className="w-full">
+              {t('admin.badges.create', 'Create')}
+            </Button>
+          </div>
         </div>
         <div className="mt-3">
           <Textarea
@@ -268,6 +299,7 @@ export default function AdminBadgesPage() {
             <thead className="text-white/70">
               <tr className="border-b border-white/10">
                 <th className="p-3">{t('admin.badges.col.token_id', 'Token')}</th>
+                <th className="p-3">{t('admin.badges.col.chain', 'Chain')}</th>
                 <th className="p-3">{t('admin.badges.col.name', 'Name')}</th>
                 <th className="p-3">{t('admin.badges.col.status', 'Status')}</th>
                 <th className="p-3">{t('admin.badges.col.image', 'Image')}</th>
@@ -278,7 +310,7 @@ export default function AdminBadgesPage() {
             <tbody className="text-white/80">
               {templates.length === 0 ? (
                 <tr>
-                  <td className="p-4" colSpan={6}>
+                  <td className="p-4" colSpan={7}>
                     {t('admin.badges.empty', 'No badge templates yet.')}
                   </td>
                 </tr>
@@ -288,6 +320,11 @@ export default function AdminBadgesPage() {
                   return (
                     <tr key={tpl.id} className="border-b border-white/5">
                       <td className="p-3">{tpl.token_id}</td>
+                      <td className="p-3">
+                        <span className="inline-flex items-center gap-1 rounded-full border border-white/15 bg-white/5 px-2 py-0.5 text-[11px] font-medium text-white/80">
+                          {tpl.chain_short_name ?? `#${tpl.chain_id}`}
+                        </span>
+                      </td>
                       <td className="p-3">
                         <div className="font-medium text-white">{tpl.name}</div>
                         {tpl.description ? (
@@ -482,6 +519,7 @@ export default function AdminBadgesPage() {
                     <th className="p-2">{t('admin.badges.col.user_id', 'User')}</th>
                     <th className="p-2">{t('admin.badges.col.wallet', 'Wallet')}</th>
                     <th className="p-2">{t('admin.badges.col.amount', 'Amount')}</th>
+                    <th className="p-2">{t('admin.badges.col.chain', 'Chain')}</th>
                     <th className="p-2">{t('admin.badges.col.tx', 'Tx')}</th>
                     <th className="p-2">{t('admin.badges.col.status', 'Status')}</th>
                     <th className="p-2">{t('admin.badges.col.time', 'Time')}</th>
@@ -490,7 +528,7 @@ export default function AdminBadgesPage() {
                 <tbody className="text-white/80">
                   {issuances.length === 0 ? (
                     <tr>
-                      <td className="p-3" colSpan={6}>
+                      <td className="p-3" colSpan={7}>
                         {t('admin.badges.no_issuances', 'No issuances yet.')}
                       </td>
                     </tr>
@@ -503,8 +541,24 @@ export default function AdminBadgesPage() {
                         </td>
                         <td className="p-2">{i.amount}</td>
                         <td className="p-2">
+                          <span className="text-xs text-white/60">
+                            {chains.find((c) => c.chain_id === i.chain_id)?.short_name ?? `#${i.chain_id}`}
+                          </span>
+                        </td>
+                        <td className="p-2">
                           {i.tx_hash ? (
-                            <span className="text-xs">{i.tx_hash.slice(0, 12)}…</span>
+                            i.explorer_tx_url ? (
+                              <a
+                                className="text-xs text-sky-300 hover:underline"
+                                href={i.explorer_tx_url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {i.tx_hash.slice(0, 12)}...
+                              </a>
+                            ) : (
+                              <span className="text-xs">{i.tx_hash.slice(0, 12)}...</span>
+                            )
                           ) : (
                             <span className="text-xs text-white/40">-</span>
                           )}

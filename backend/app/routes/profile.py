@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import logging
-import os
 import uuid
 from datetime import date, datetime
 from typing import Any, Dict, List, Set, cast
@@ -12,7 +11,8 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from app.domains.blockchain import mint_nft_badge
+from app.domains.blockchain.nft.nft_client_factory import NFTClientFactory
+from app.domains.blockchain.nft.chain_registry import DEFAULT_BADGE_CHAIN_ID, get_chain_config
 from app.database import get_async_db
 from app.dependencies import get_current_active_user
 from app.models import (
@@ -794,18 +794,23 @@ async def sync_user_achievements(
         )
         awarded_badge_ids: Set[int] = {row[0] for row in awarded_badges_res.all()}
 
-        nft_contract_address = os.getenv("NFT_CONTRACT_ADDRESS")
+        # Use the multi-chain NFT client factory (defaults to EDU Chain)
+        chain_id = DEFAULT_BADGE_CHAIN_ID
+        cfg = get_chain_config(chain_id)
+        nft_contract_address = cfg.contract_address if cfg else None
         if not nft_contract_address:
-            logger.error("NFT_CONTRACT_ADDRESS not configured. Cannot mint badges.")
+            logger.error("NFT contract address not configured for chain %d. Cannot mint badges.", chain_id)
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Server configuration error prevents badge awarding.")
 
-        def attempt_mint(badge_id: int, reason: str) -> None:
+        factory = NFTClientFactory()
+
+        async def attempt_mint(badge_id: int, reason: str) -> None:
             nonlocal needs_db_update
             if badge_id in awarded_badge_ids:
                 return
             logger.info("User %s qualifies for badge %s (%s)", current_user.id, badge_id, reason)
             if current_user.wallet_address:
-                tx_hash = mint_nft_badge(current_user.wallet_address, badge_id)
+                tx_hash = await factory.mint_badge(chain_id, current_user.wallet_address, badge_id)
                 if tx_hash:
                     badges_to_add_to_db.append({"badge_id": badge_id, "tx_hash": tx_hash})
                     needs_db_update = True
@@ -815,17 +820,17 @@ async def sync_user_achievements(
                 logger.warning("User %s qualifies for badge %s but has no linked wallet", current_user.id, badge_id)
 
         if total_activity_days >= 1:
-            attempt_mint(LET_THERE_BE_BADGE_BADGE_ID, "First activity")
+            await attempt_mint(LET_THERE_BE_BADGE_BADGE_ID, "First activity")
         if total_activity_days >= 3:
-            attempt_mint(TRIPLE_THREAT_OF_THOUGHTS_BADGE_ID, "3 days of activity")
+            await attempt_mint(TRIPLE_THREAT_OF_THOUGHTS_BADGE_ID, "3 days of activity")
         if current_streak >= 7:
-            attempt_mint(SEVEN_DAYS_A_WEEK_BADGE_ID, "7-day streak")
+            await attempt_mint(SEVEN_DAYS_A_WEEK_BADGE_ID, "7-day streak")
         if current_streak >= 14:
-            attempt_mint(TWO_WEEKS_NOTICE_YOU_GAVE_TO_NEGATIVITY_BADGE_ID, "14-day streak")
+            await attempt_mint(TWO_WEEKS_NOTICE_YOU_GAVE_TO_NEGATIVITY_BADGE_ID, "14-day streak")
         if current_streak >= 30:
-            attempt_mint(FULL_MOON_POSITIVITY_BADGE_ID, "30-day streak")
+            await attempt_mint(FULL_MOON_POSITIVITY_BADGE_ID, "30-day streak")
         if journal_count >= 25:
-            attempt_mint(QUARTER_CENTURY_OF_JOURNALING_BADGE_ID, "25 journal entries")
+            await attempt_mint(QUARTER_CENTURY_OF_JOURNALING_BADGE_ID, "25 journal entries")
 
         if badges_to_add_to_db:
             current_time = datetime.now()
@@ -835,6 +840,7 @@ async def sync_user_achievements(
                     badge_id=badge_info["badge_id"],
                     contract_address=nft_contract_address,
                     transaction_hash=badge_info["tx_hash"],
+                    chain_id=chain_id,
                     awarded_at=current_time,
                 )
                 db.add(new_award)

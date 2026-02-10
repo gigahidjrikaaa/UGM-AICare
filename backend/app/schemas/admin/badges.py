@@ -6,7 +6,31 @@ from typing import List, Optional
 from pydantic import BaseModel, Field
 
 
+# ---------------------------------------------------------------------------
+# Chain info (returned by GET /chains)
+# ---------------------------------------------------------------------------
+
+class ChainInfoResponse(BaseModel):
+    """Describes a supported blockchain network for badge NFTs."""
+    chain_id: int
+    name: str
+    short_name: str
+    explorer_base_url: str
+    native_currency: str
+    is_testnet: bool
+    is_ready: bool  # True when the backend can sign txs on this chain
+
+
+class ChainsListResponse(BaseModel):
+    chains: List[ChainInfoResponse]
+
+
+# ---------------------------------------------------------------------------
+# Badge template schemas
+# ---------------------------------------------------------------------------
+
 class BadgeTemplateBase(BaseModel):
+    chain_id: int
     contract_address: str
     token_id: int
     name: str
@@ -23,6 +47,8 @@ class BadgeTemplateCreate(BaseModel):
     token_id: int = Field(..., ge=0)
     name: str = Field(..., min_length=1, max_length=120)
     description: Optional[str] = None
+    # Optional chain_id; defaults to EDU Chain Testnet (656476) on the server
+    chain_id: Optional[int] = None
 
 
 class BadgeTemplateUpdate(BaseModel):
@@ -32,16 +58,25 @@ class BadgeTemplateUpdate(BaseModel):
 
 class BadgeTemplateResponse(BadgeTemplateBase):
     id: int
+    # Additional chain metadata for the frontend
+    chain_name: Optional[str] = None
+    chain_short_name: Optional[str] = None
+    explorer_base_url: Optional[str] = None
 
 
 class BadgeTemplateListResponse(BaseModel):
     templates: List[BadgeTemplateResponse]
 
 
+# ---------------------------------------------------------------------------
+# Badge issuance schemas
+# ---------------------------------------------------------------------------
+
 class BadgeIssuanceResponse(BaseModel):
     id: int
     template_id: int
     user_id: int
+    chain_id: int
     wallet_address: str
     amount: int
     tx_hash: Optional[str] = None
@@ -49,6 +84,8 @@ class BadgeIssuanceResponse(BaseModel):
     error_reason: Optional[str] = None
     created_at: datetime
     updated_at: datetime
+    # Enriched explorer link for convenience
+    explorer_tx_url: Optional[str] = None
 
 
 class BadgeIssuanceListResponse(BaseModel):

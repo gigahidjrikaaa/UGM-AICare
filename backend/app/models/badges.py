@@ -1,11 +1,14 @@
-"""EDU Chain badge management models.
+"""Multi-chain badge management models.
 
 These tables support *admin-managed* badge templates (metadata + image CIDs)
-and a durable issuance/audit log for admin-controlled minting.
+and a durable issuance/audit log for admin-controlled minting across
+multiple EVM chains (EDU Chain, BNB Smart Chain, etc.).
 
 Design:
+- Each template is bound to a specific chain_id at creation time.
 - Metadata is treated as effectively immutable once published.
 - Minting is recorded as an issuance row to support retries/auditing.
+- chain_id defaults to 656476 (EDU Chain Testnet) for backward compatibility.
 """
 
 from __future__ import annotations
@@ -39,11 +42,18 @@ if TYPE_CHECKING:
 
 
 class BadgeTemplate(Base):
-    """Admin-managed definition for an ERC1155 badge (token id + immutable metadata)."""
+    """Admin-managed definition for an ERC1155 badge (token id + immutable metadata).
+
+    Each template is scoped to a single chain via ``chain_id``.
+    The same token_id can exist on different chains (separate deployments).
+    """
 
     __tablename__ = "badge_templates"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+
+    # Multi-chain: identifies which blockchain this template targets
+    chain_id: Mapped[int] = mapped_column(Integer, nullable=False, server_default="656476", index=True)
 
     contract_address: Mapped[str] = mapped_column(String(64), nullable=False, index=True)
     token_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
@@ -79,17 +89,26 @@ class BadgeTemplate(Base):
     )
 
     __table_args__ = (
-        UniqueConstraint("contract_address", "token_id", name="uq_badge_templates_contract_token"),
+        # A token_id is unique per chain + contract pair
+        UniqueConstraint("chain_id", "contract_address", "token_id", name="uq_badge_templates_chain_contract_token"),
         Index("ix_badge_templates_status", "status"),
+        Index("ix_badge_templates_chain_id", "chain_id"),
     )
 
 
 class BadgeIssuance(Base):
-    """Durable log of an attempted/successful mint of a badge to a user wallet."""
+    """Durable log of an attempted/successful mint of a badge to a user wallet.
+
+    The chain_id is denormalized from the template for efficient querying
+    and to preserve the chain context even if the template is later archived.
+    """
 
     __tablename__ = "badge_issuances"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+
+    # Denormalized chain_id for fast filtering without joining badge_templates
+    chain_id: Mapped[int] = mapped_column(Integer, nullable=False, server_default="656476", index=True)
 
     template_id: Mapped[int] = mapped_column(
         Integer,

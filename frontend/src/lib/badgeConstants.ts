@@ -176,3 +176,37 @@ export const getBadgeMeta = (badgeId: number): BadgeMeta => {
         description: 'An unknown achievement badge.'
     };
 };
+
+// ---------------------------------------------------------------------------
+// Multi-chain explorer mapping
+// ---------------------------------------------------------------------------
+
+/** Known chain ID to explorer base URL mapping. */
+export const CHAIN_EXPLORER_MAP: Record<number, string> = {
+    656476: 'https://edu-chain-testnet.blockscout.com',  // EDU Chain Testnet
+    97:     'https://testnet.bscscan.com',                // BNB Smart Chain Testnet
+    56:     'https://bscscan.com',                        // BNB Smart Chain Mainnet
+};
+
+/** Short display names per chain. */
+export const CHAIN_SHORT_NAME_MAP: Record<number, string> = {
+    656476: 'EDU',
+    97:     'BNB',
+    56:     'BNB',
+};
+
+/**
+ * Build a block-explorer transaction URL for a given chain + tx hash.
+ * Falls back to EDU Chain Testnet if the chain is unknown.
+ */
+export const getExplorerTxUrl = (chainId: number | undefined, txHash: string): string => {
+    const base = CHAIN_EXPLORER_MAP[chainId ?? 656476] ?? CHAIN_EXPLORER_MAP[656476];
+    return `${base}/tx/${txHash}`;
+};
+
+/**
+ * Get a short display name for a chain (e.g. "EDU", "BNB").
+ */
+export const getChainShortName = (chainId: number | undefined): string => {
+    return CHAIN_SHORT_NAME_MAP[chainId ?? 656476] ?? 'EVM';
+};

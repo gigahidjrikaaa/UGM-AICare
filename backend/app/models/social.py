@@ -21,16 +21,18 @@ class Tweet(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
 
 class UserBadge(Base):
-    """User achievements and badges."""
+    """User achievements and badges (multi-chain aware)."""
     __tablename__ = "user_badges"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
     badge_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
+    # Multi-chain: which blockchain this badge was minted on
+    chain_id: Mapped[int] = mapped_column(Integer, nullable=False, server_default="656476", index=True)
     contract_address: Mapped[str] = mapped_column(String, nullable=False, index=True)
     transaction_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
     awarded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
 
     user: Mapped["User"] = relationship("User")
 
-    __table_args__ = (UniqueConstraint('user_id', 'badge_id', name='_user_badge_uc'),)
+    __table_args__ = (UniqueConstraint('user_id', 'badge_id', 'chain_id', name='_user_badge_chain_uc'),)

@@ -1,64 +1,78 @@
 // blockchain/hardhat.config.ts
 import { HardhatUserConfig } from "hardhat/config";
 import "@nomicfoundation/hardhat-toolbox";
-import "dotenv/config"; // Import dotenv config
+import "dotenv/config";
 
-// Ensure environment variables are loaded
+// --- Environment Variables ---
 const eduTestnetRpcUrl = process.env.EDU_TESTNET_RPC_URL;
 const somniaMainnetRpcUrl = process.env.SOMNIA_MAINNET_RPC_URL;
 const somniaTestnetRpcUrl = process.env.SOMNIA_TESTNET_RPC_URL;
+const bscTestnetRpcUrl = process.env.BSC_TESTNET_RPC_URL;
+const bscMainnetRpcUrl = process.env.BSC_MAINNET_RPC_URL;
 const privateKey = process.env.TESTNET_PRIVATE_KEY;
 const mainnetPrivateKey = process.env.MAINNET_PRIVATE_KEY;
 
-if (!eduTestnetRpcUrl) {
-  console.warn("EDU_TESTNET_RPC_URL environment variable not set.");
-}
-if (!somniaMainnetRpcUrl) {
-  console.warn("SOMNIA_MAINNET_RPC_URL environment variable not set.");
-}
-if (!somniaTestnetRpcUrl) {
-  console.warn("SOMNIA_TESTNET_RPC_URL environment variable not set.");
-}
-if (!privateKey) {
-  console.warn("TESTNET_PRIVATE_KEY environment variable not set. Testnet deployments will fail.");
-}
-if (!mainnetPrivateKey) {
-  console.warn("MAINNET_PRIVATE_KEY environment variable not set. Mainnet deployments will fail.");
-}
+// Warn on missing keys so deployments fail fast with a clear message
+const warnIfMissing = (name: string, value: string | undefined) => {
+  if (!value) console.warn(`${name} environment variable not set.`);
+};
+
+warnIfMissing("EDU_TESTNET_RPC_URL", eduTestnetRpcUrl);
+warnIfMissing("SOMNIA_MAINNET_RPC_URL", somniaMainnetRpcUrl);
+warnIfMissing("SOMNIA_TESTNET_RPC_URL", somniaTestnetRpcUrl);
+warnIfMissing("BSC_TESTNET_RPC_URL", bscTestnetRpcUrl);
+warnIfMissing("BSC_MAINNET_RPC_URL", bscMainnetRpcUrl);
+warnIfMissing("TESTNET_PRIVATE_KEY", privateKey);
+warnIfMissing("MAINNET_PRIVATE_KEY", mainnetPrivateKey);
 
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.28", // Match your contract's pragma
+    version: "0.8.28",
     settings: {
       optimizer: {
         enabled: true,
         runs: 200,
       },
-      viaIR: true, // Enable IR-based compilation for complex contracts
+      viaIR: true,
     },
   },
   networks: {
-    hardhat: {
-      // Local development network configuration (optional)
+    hardhat: {},
+
+    // --- EDU Chain (Badge NFTs - original deployment) ---
+    eduTestnet: {
+      url: eduTestnetRpcUrl || "",
+      chainId: 656476,
+      accounts: privateKey ? [`0x${privateKey}`] : [],
     },
-    eduTestnet: { // Network configuration for EDUChain Testnet
-      url: eduTestnetRpcUrl || "", // Get URL from .env
-      chainId: 656476, // Chain ID for EDUChain Testnet
-      accounts: privateKey ? [`0x${privateKey}`] : [], // Use private key from .env
-    },
-    somniaMainnet: { // Network configuration for SOMNIA Mainnet
-      url: somniaMainnetRpcUrl || "https://api.infra.mainnet.somnia.network/", 
-      chainId: 5031, // Chain ID for SOMNIA Mainnet
+
+    // --- SOMNIA (CARE Token ecosystem) ---
+    somniaMainnet: {
+      url: somniaMainnetRpcUrl || "https://api.infra.mainnet.somnia.network/",
+      chainId: 5031,
       accounts: mainnetPrivateKey ? [`0x${mainnetPrivateKey}`] : [],
       gasPrice: "auto",
     },
-    somniaTestnet: { // Network configuration for SOMNIA Testnet (Shannon)
+    somniaTestnet: {
       url: somniaTestnetRpcUrl || "https://dream-rpc.somnia.network/",
-      chainId: 50312, // Chain ID for SOMNIA Testnet
+      chainId: 50312,
       accounts: privateKey ? [`0x${privateKey}`] : [],
       gasPrice: "auto",
     },
-    // Add other networks like EDUChain Mainnet later
+
+    // --- BNB Smart Chain (Badge NFTs - multi-chain expansion) ---
+    bscTestnet: {
+      url: bscTestnetRpcUrl || "https://data-seed-prebsc-1-s1.bnbchain.org:8545",
+      chainId: 97,
+      accounts: privateKey ? [`0x${privateKey}`] : [],
+      gasPrice: "auto",
+    },
+    bscMainnet: {
+      url: bscMainnetRpcUrl || "https://bsc-dataseed.bnbchain.org",
+      chainId: 56,
+      accounts: mainnetPrivateKey ? [`0x${mainnetPrivateKey}`] : [],
+      gasPrice: "auto",
+    },
   },
   // Optional: Add Etherscan verification config later
   // Note: SOMNIA uses its own explorer, verification may require custom setup
