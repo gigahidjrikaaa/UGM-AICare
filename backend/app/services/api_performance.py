@@ -9,6 +9,8 @@ from dataclasses import dataclass, asdict
 from collections import defaultdict, deque
 import statistics
 
+from app.core.memory import get_redis_client
+
 logger = logging.getLogger(__name__)
 
 @dataclass
@@ -74,6 +76,7 @@ class APIPerformanceService:
         # Start background tasks
         self._last_stats_update = datetime.utcnow()
         self._stats_update_interval = 60  # Update stats every minute
+        self._redis_ttl_seconds = 3600
     
     def record_request(
         self,
@@ -99,6 +102,47 @@ class APIPerformanceService:
         
         self.metrics_history.append(metric)
         self._update_endpoint_stats_if_needed()
+
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(self._record_redis_metrics(metric))
+        except RuntimeError:
+            pass
+
+    async def _record_redis_metrics(self, metric: RequestMetrics) -> None:
+        try:
+            redis = await get_redis_client()
+            if not hasattr(redis, "hincrby"):
+                return
+
+            key = f"perf:stats:{metric.method}:{metric.endpoint}"
+            await redis.hincrby(key, "count", 1)
+            await redis.hincrbyfloat(key, "total_ms", float(metric.duration_ms))
+
+            if 200 <= metric.status_code < 400:
+                await redis.hincrby(key, "success_count", 1)
+            else:
+                await redis.hincrby(key, "error_count", 1)
+
+            min_raw = await redis.hget(key, "min_ms")
+            max_raw = await redis.hget(key, "max_ms")
+
+            min_ms = float(min_raw) if min_raw is not None else float(metric.duration_ms)
+            max_ms = float(max_raw) if max_raw is not None else float(metric.duration_ms)
+
+            if float(metric.duration_ms) < min_ms:
+                min_ms = float(metric.duration_ms)
+            if float(metric.duration_ms) > max_ms:
+                max_ms = float(metric.duration_ms)
+
+            await redis.hset(key, mapping={
+                "min_ms": f"{min_ms}",
+                "max_ms": f"{max_ms}",
+                "last_updated": datetime.utcnow().isoformat(),
+            })
+            await redis.expire(key, self._redis_ttl_seconds)
+        except Exception as exc:
+            logger.debug("Redis metrics update failed: %s", exc)
     
     def _update_endpoint_stats_if_needed(self):
         """Update endpoint statistics if enough time has passed."""
@@ -302,6 +346,45 @@ class APIPerformanceService:
             "top_slow_endpoints": self._get_slowest_endpoints(5),
             "top_error_endpoints": self._get_highest_error_endpoints(5)
         }
+
+    async def get_redis_summary(self) -> Dict[str, Any]:
+        """Get a lightweight summary from Redis if available."""
+        try:
+            redis = await get_redis_client()
+            if not hasattr(redis, "keys"):
+                return {"status": "unavailable"}
+
+            keys = await redis.keys("perf:stats:*")
+            if not keys:
+                return {"status": "no_data"}
+
+            total_count = 0
+            total_ms = 0.0
+            total_success = 0
+            total_error = 0
+
+            for key in keys:
+                data = await redis.hgetall(key)
+                if not data:
+                    continue
+                total_count += int(float(data.get("count", 0)))
+                total_ms += float(data.get("total_ms", 0.0))
+                total_success += int(float(data.get("success_count", 0)))
+                total_error += int(float(data.get("error_count", 0)))
+
+            avg_ms = (total_ms / total_count) if total_count else 0.0
+            success_rate = (total_success / total_count) * 100 if total_count else 0.0
+            error_rate = (total_error / total_count) * 100 if total_count else 0.0
+
+            return {
+                "status": "ok",
+                "total_requests": total_count,
+                "avg_response_time_ms": round(avg_ms, 2),
+                "success_rate_pct": round(success_rate, 2),
+                "error_rate_pct": round(error_rate, 2),
+            }
+        except Exception as exc:
+            return {"status": "error", "error": str(exc)}
     
     def _get_slowest_endpoints(self, limit: int = 5) -> List[Dict]:
         """Get the slowest endpoints."""

@@ -1,0 +1,25 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: production
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+    env_file:
+      - .env.local
+    environment:
+      NODE_ENV: production
+      PORT: ${PORT:-22000}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
+      INTERNAL_API_URL: ${INTERNAL_API_URL}
+    ports:
+      - "${FRONTEND_EXTERNAL_PORT:-22000}:22000"
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:22000"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped

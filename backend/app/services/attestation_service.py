@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import AttestationRecord, AttestationStatusEnum, User  # Core models
 from app.domains.mental_health.models import QuestInstance
+from app.core.settings import settings
 from app.services.compliance_service import record_audit_event
 
 logger = logging.getLogger(__name__)
@@ -64,6 +65,15 @@ class AttestationService:
             entity_id=str(quest_instance.id) if quest_instance else None,
             extra_data={"record_id": record.id},
         )
+
+        if settings.celery_broker_url:
+            try:
+                from app.tasks.attestation_tasks import queue_attestation_job
+                queue_attestation_job.delay(record.id)
+            except Exception as exc:
+                logger.error("Failed to enqueue attestation job for %s: %s", record.id, exc, exc_info=True)
+        else:
+            logger.warning("CELERY_BROKER_URL is not set; attestation job will not be processed")
         return record
 
     async def mark_submitted(self, record: AttestationRecord) -> None:

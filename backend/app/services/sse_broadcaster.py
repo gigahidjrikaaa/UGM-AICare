@@ -7,13 +7,18 @@ connection lifecycle with heartbeat mechanism.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections import defaultdict
 from datetime import datetime
 from typing import Any, AsyncGenerator, Optional
 from uuid import UUID, uuid4
 
+from app.core.memory import get_redis_client
+
 logger = logging.getLogger(__name__)
+
+_INSTANCE_ID = str(uuid4())
 
 
 class SSEConnection:
@@ -92,6 +97,8 @@ class SSEBroadcaster:
         self.connections: dict[UUID, SSEConnection] = {}
         self.user_connections: dict[int, set[UUID]] = defaultdict(set)
         self._lock = asyncio.Lock()
+        self._redis_task: Optional[asyncio.Task] = None
+        self._redis_pubsub = None
     
     @classmethod
     def get_instance(cls) -> SSEBroadcaster:
@@ -124,6 +131,8 @@ class SSEBroadcaster:
             f"SSE connection established: {connection_id} for user {user_id}. "
             f"Total connections: {len(self.connections)}"
         )
+
+        await self._ensure_redis_listener()
         
         return connection
     
@@ -168,14 +177,23 @@ class SSEBroadcaster:
             'id': str(uuid4()),
             'type': event_type,
             'data': data,
-            'timestamp': datetime.utcnow().isoformat()
+            'timestamp': datetime.utcnow().isoformat(),
+            'user_id': user_id,
         }
         
+        sent_count = await self._broadcast_local(event, user_id=user_id)
+        await self._publish_redis(event)
+        return sent_count
+
+    async def _broadcast_local(
+        self,
+        event: dict[str, Any],
+        user_id: Optional[int] = None
+    ) -> int:
         sent_count = 0
-        
+
         async with self._lock:
             if user_id is not None:
-                # Send to specific user's connections
                 connection_ids = self.user_connections.get(user_id, set())
                 for conn_id in list(connection_ids):
                     connection = self.connections.get(conn_id)
@@ -185,22 +203,75 @@ class SSEBroadcaster:
                             sent_count += 1
                         except Exception as e:
                             logger.error(f"Error sending to connection {conn_id}: {e}")
-                            # Remove dead connection
                             await self.remove_connection(conn_id)
             else:
-                # Broadcast to all connections
                 for conn_id, connection in list(self.connections.items()):
                     try:
                         await connection.send(event)
                         sent_count += 1
                     except Exception as e:
                         logger.error(f"Error broadcasting to connection {conn_id}: {e}")
-                        # Remove dead connection
                         await self.remove_connection(conn_id)
-        
-        logger.debug(f"Broadcasted {event_type} to {sent_count} connections")
-        
+
+        logger.debug(f"Broadcasted {event.get('type')} to {sent_count} connections")
         return sent_count
+
+    async def _publish_redis(self, event: dict[str, Any]) -> None:
+        try:
+            redis_client = await get_redis_client()
+            if not hasattr(redis_client, "publish"):
+                return
+
+            payload = dict(event)
+            payload["instance_id"] = _INSTANCE_ID
+            await redis_client.publish("sse:events", json.dumps(payload))
+        except Exception as exc:
+            logger.warning("Redis publish failed for SSE event %s: %s", event.get("type"), exc)
+
+    async def _ensure_redis_listener(self) -> None:
+        if self._redis_task is not None:
+            return
+
+        try:
+            redis_client = await get_redis_client()
+            if not hasattr(redis_client, "pubsub"):
+                return
+            pubsub = redis_client.pubsub()
+            await pubsub.subscribe("sse:events")
+            self._redis_pubsub = pubsub
+            self._redis_task = asyncio.create_task(self._redis_listen())
+        except Exception as exc:
+            logger.warning("Redis pubsub not available for SSE: %s", exc)
+
+    async def _redis_listen(self) -> None:
+        pubsub = self._redis_pubsub
+        if pubsub is None:
+            return
+
+        try:
+            async for message in pubsub.listen():
+                if not message:
+                    continue
+                if message.get("type") != "message":
+                    continue
+
+                data = message.get("data")
+                if not data:
+                    continue
+                if isinstance(data, bytes):
+                    data = data.decode("utf-8")
+
+                try:
+                    payload = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+
+                if payload.get("instance_id") == _INSTANCE_ID:
+                    continue
+
+                await self._broadcast_local(payload, user_id=payload.get("user_id"))
+        except Exception as exc:
+            logger.warning("Redis SSE listener stopped: %s", exc)
     
     async def cleanup_dead_connections(self, max_idle_seconds: int = 300) -> int:
         """Clean up connections that haven't responded to pings.

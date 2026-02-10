@@ -390,12 +390,18 @@ async def redis_health_check():
         from app.core.cache import get_cache_service
         cache_service = get_cache_service()
         cache_stats = await cache_service.get_stats()
+
+        # Get API performance summary from Redis if available
+        from app.services.api_performance import get_performance_service
+        performance_service = get_performance_service()
+        performance_summary = await performance_service.get_redis_summary()
         
         return {
             "status": "healthy",
             "redis_status": "connected",
             "rate_limiter": rate_limiter_stats,
             "cache": cache_stats,
+            "api_performance": performance_summary,
         }
     except Exception as e:
         logger.error(f"Redis health check failed: {e}")

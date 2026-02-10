@@ -2,8 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional, Tuple
-import asyncio
+from typing import List, Optional
 
 from sqlalchemy import select, func, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,8 +17,11 @@ from app.services.user_normalization import (
 )
 
 _CACHE_TTL = timedelta(minutes=5)
-_context_cache: Dict[int, Tuple[str, datetime]] = {}
-_cache_lock = asyncio.Lock()
+_PERSONAL_CONTEXT_TTL_SECONDS = int(_CACHE_TTL.total_seconds())
+
+
+def _personal_context_cache_key(user_id: int) -> str:
+    return f"cache:personal_context:{user_id}"
 
 
 @cached(key_prefix="user_summary", ttl=settings.cache_user_summary_ttl)
@@ -96,30 +98,23 @@ async def _get_upcoming_appointment(db: AsyncSession, user_id: int) -> Optional[
 
 async def build_user_personal_context(db: AsyncSession, user: User) -> str:
     """Aggregate key information about the user to ground chatbot responses."""
+    cache = get_cache_service()
+    cache_key = _personal_context_cache_key(user.id)
 
-    now = datetime.utcnow()
-    async with _cache_lock:
-        cached = _context_cache.get(user.id)
-        if cached:
-            cached_value, cached_at = cached
-            if now - cached_at < _CACHE_TTL:
-                return cached_value
+    cached_value = await cache.get(cache_key)
+    if isinstance(cached_value, str) and cached_value:
+        return cached_value
 
     context = await _compute_personal_context(db, user)
-
-    async with _cache_lock:
-        _context_cache[user.id] = (context, now)
-
+    await cache.set(cache_key, context, ttl=_PERSONAL_CONTEXT_TTL_SECONDS)
     return context
 
 
 async def invalidate_user_personal_context(user_id: int) -> None:
-    """Invalidate user personal context cache (both in-memory and Redis)."""
-    # Clear in-memory cache
-    async with _cache_lock:
-        _context_cache.pop(user_id, None)
-    
-    # Clear Redis cache for user
+    """Invalidate user personal context cache in Redis."""
+    cache = get_cache_service()
+    await cache.delete(_personal_context_cache_key(user_id))
+
     from app.core.cache import invalidate_user_cache
     await invalidate_user_cache(user_id)
 

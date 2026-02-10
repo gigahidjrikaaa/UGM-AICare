@@ -1,20 +1,22 @@
-# docker-compose.base.yml
-# Shared service definitions - only application containers
-# Database, Redis, and S3 storage are managed services (external)
-# Individual environment files extend/override these settings
+version: "3.9"
 
 services:
-  #################
-  # Backend (FastAPI)
-  #################
   backend:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
+    # Cloud services required (set via Coolify env vars):
+    # - DATABASE_URL
+    # - REDIS_URL
+    # - CELERY_BROKER_URL
+    # - CELERY_RESULT_BACKEND
+    # - MINIO_ENDPOINT
+    # - MINIO_ACCESS_KEY
+    # - MINIO_SECRET_KEY
+    # - MINIO_BUCKET
     env_file:
       - .env
     environment:
-      # App Config
       PYTHONPATH: /app
       PORT: ${PORT:-22001}
       DATABASE_URL: ${DATABASE_URL}
@@ -25,6 +27,8 @@ services:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_BUCKET: ${MINIO_BUCKET}
+    ports:
+      - "${BACKEND_EXTERNAL_PORT:-22001}:22001"
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:22001/health"]
       interval: 30s
@@ -34,7 +38,7 @@ services:
 
   celery-worker:
     build:
-      context: ./backend
+      context: .
       dockerfile: Dockerfile
     env_file:
       - .env
@@ -50,29 +54,4 @@ services:
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
       MINIO_BUCKET: ${MINIO_BUCKET}
     command: ["celery", "-A", "app.core.celery_app.celery_app", "worker", "-l", "info"]
-    restart: unless-stopped
-
-  #################
-  # Frontend (Next.js)
-  #################
-  frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-    env_file:
-      - .env.local
-    environment:
-      NODE_ENV: production
-      PORT: ${PORT:-22000}
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-      INTERNAL_API_URL: ${INTERNAL_API_URL}
-    depends_on:
-      - backend
-    healthcheck:
-      test: ["CMD", "wget", "--spider", "-q", "http://localhost:22000"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
     restart: unless-stopped

@@ -7,14 +7,20 @@ Future: Can be replaced with Redis Pub/Sub for distributed systems.
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Callable, Coroutine
+from typing import Any, Callable, Coroutine, Optional
+from uuid import uuid4
+
+from app.core.memory import get_redis_client
 
 logger = logging.getLogger(__name__)
+
+_INSTANCE_ID = str(uuid4())
 
 
 class EventType(str, Enum):
@@ -70,6 +76,8 @@ class EventBus:
     def __init__(self) -> None:
         self._subscribers: dict[EventType, list[Callable[[Event], Coroutine[Any, Any, None]]]] = defaultdict(list)
         self._lock = asyncio.Lock()
+        self._redis_task: Optional[asyncio.Task] = None
+        self._redis_pubsub = None
         logger.info("EventBus initialized (in-memory mode)")
     
     async def subscribe(
@@ -86,6 +94,8 @@ class EventBus:
         async with self._lock:
             self._subscribers[event_type].append(handler)
             logger.info(f"Subscribed handler to {event_type.value}")
+
+        await self._ensure_redis_listener()
     
     async def publish(self, event: Event) -> None:
         """Publish an event to all subscribers.
@@ -93,28 +103,8 @@ class EventBus:
         Args:
             event: The event to publish
         """
-        handlers = self._subscribers.get(event.event_type, [])
-        
-        if not handlers:
-            logger.debug(f"No subscribers for event {event.event_type.value}")
-            return
-        
-        logger.info(
-            f"Publishing event {event.event_type.value} from {event.source_agent} "
-            f"to {len(handlers)} subscriber(s)"
-        )
-        
-        # Call all handlers concurrently
-        tasks = [handler(event) for handler in handlers]
-        results = await asyncio.gather(*tasks, return_exceptions=True)
-        
-        # Log any handler errors
-        for idx, result in enumerate(results):
-            if isinstance(result, Exception):
-                logger.error(
-                    f"Handler {idx} for {event.event_type.value} failed: {result}",
-                    exc_info=result
-                )
+        await self._dispatch_local(event)
+        await self._publish_redis(event)
     
     def unsubscribe(
         self,
@@ -135,6 +125,116 @@ class EventBus:
         """Clear all subscriptions (useful for testing)."""
         self._subscribers.clear()
         logger.info("Cleared all event subscriptions")
+
+    async def _dispatch_local(self, event: Event) -> None:
+        handlers = self._subscribers.get(event.event_type, [])
+
+        if not handlers:
+            logger.debug(f"No subscribers for event {event.event_type.value}")
+            return
+
+        logger.info(
+            f"Publishing event {event.event_type.value} from {event.source_agent} "
+            f"to {len(handlers)} subscriber(s)"
+        )
+
+        tasks = [handler(event) for handler in handlers]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        for idx, result in enumerate(results):
+            if isinstance(result, Exception):
+                logger.error(
+                    f"Handler {idx} for {event.event_type.value} failed: {result}",
+                    exc_info=result
+                )
+
+    async def _publish_redis(self, event: Event) -> None:
+        try:
+            redis_client = await get_redis_client()
+            if not hasattr(redis_client, "publish"):
+                return
+
+            payload = {
+                "event_id": str(uuid4()),
+                "event_type": event.event_type.value,
+                "timestamp": event.timestamp.isoformat(),
+                "source_agent": event.source_agent,
+                "data": event.data,
+                "correlation_id": event.correlation_id,
+                "instance_id": _INSTANCE_ID,
+            }
+            channel = f"events:{event.event_type.value}"
+            await redis_client.publish(channel, json.dumps(payload))
+        except Exception as exc:
+            logger.warning("Redis publish failed for %s: %s", event.event_type.value, exc)
+
+    async def _ensure_redis_listener(self) -> None:
+        if self._redis_task is not None:
+            return
+
+        try:
+            redis_client = await get_redis_client()
+            if not hasattr(redis_client, "pubsub"):
+                return
+            pubsub = redis_client.pubsub()
+            await pubsub.psubscribe("events:*")
+            self._redis_pubsub = pubsub
+            self._redis_task = asyncio.create_task(self._redis_listen())
+        except Exception as exc:
+            logger.warning("Redis pubsub not available: %s", exc)
+
+    async def _redis_listen(self) -> None:
+        pubsub = self._redis_pubsub
+        if pubsub is None:
+            return
+
+        try:
+            async for message in pubsub.listen():
+                if not message:
+                    continue
+                message_type = message.get("type")
+                if message_type not in {"message", "pmessage"}:
+                    continue
+
+                data = message.get("data")
+                if not data:
+                    continue
+                if isinstance(data, bytes):
+                    data = data.decode("utf-8")
+
+                try:
+                    payload = json.loads(data)
+                except json.JSONDecodeError:
+                    continue
+
+                if payload.get("instance_id") == _INSTANCE_ID:
+                    continue
+
+                event_type_raw = payload.get("event_type")
+                if not event_type_raw:
+                    continue
+
+                try:
+                    event_type = EventType(event_type_raw)
+                except ValueError:
+                    continue
+
+                timestamp_raw = payload.get("timestamp")
+                try:
+                    timestamp = datetime.fromisoformat(timestamp_raw) if timestamp_raw else datetime.utcnow()
+                except Exception:
+                    timestamp = datetime.utcnow()
+
+                event = Event(
+                    event_type=event_type,
+                    timestamp=timestamp,
+                    source_agent=payload.get("source_agent", "system"),
+                    data=payload.get("data", {}),
+                    correlation_id=payload.get("correlation_id"),
+                )
+                await self._dispatch_local(event)
+        except Exception as exc:
+            logger.warning("Redis pubsub listener stopped: %s", exc)
 
 
 # Global event bus instance
