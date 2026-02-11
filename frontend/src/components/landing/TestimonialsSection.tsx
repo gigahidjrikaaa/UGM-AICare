@@ -52,7 +52,7 @@ export default function TestimonialsSection() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: idx * 0.1 }}
-                className="bg-[#021029] p-8 rounded-3xl border border-white/5 flex flex-col items-start hover:border-white/10 transition-colors"
+                className="bg-[#021029]/70 backdrop-blur-md p-8 rounded-3xl border border-white/5 flex flex-col items-start hover:border-white/10 transition-colors"
              >
                 <div className="mb-6 flex items-center gap-2 px-3 py-1 rounded-full bg-[#FFCA40]/10 border border-[#FFCA40]/20 text-[#FFCA40] text-xs font-medium">
                    <StarburstGlyph className="w-3 h-3" />

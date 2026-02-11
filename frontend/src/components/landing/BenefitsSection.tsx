@@ -57,7 +57,7 @@ export default function BenefitsSection() {
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
-            className="md:col-span-8 lg:col-span-8 bg-[#021029] rounded-3xl p-8 border border-white/5 relative overflow-hidden group"
+            className="md:col-span-8 lg:col-span-8 bg-[#021029]/70 backdrop-blur-md rounded-3xl p-8 border border-white/5 relative overflow-hidden group"
           >
              <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity">
                 <CompassGlyph className="w-32 h-32 text-[#FFCA40]" />
@@ -89,7 +89,7 @@ export default function BenefitsSection() {
             whileInView={{ opacity: 1, y: 0 }}
             viewport={{ once: true }}
             transition={{ delay: 0.1 }}
-            className="md:col-span-4 lg:col-span-4 bg-[#021029] rounded-3xl border border-white/5 relative overflow-hidden min-h-[400px]"
+            className="md:col-span-4 lg:col-span-4 bg-[#021029]/70 backdrop-blur-md rounded-3xl border border-white/5 relative overflow-hidden min-h-[400px]"
           >
              <Image 
                src="https://images.unsplash.com/photo-1522202176988-66273c2fd55f?q=80&w=800&auto=format&fit=crop" 
@@ -97,7 +97,7 @@ export default function BenefitsSection() {
                fill 
                className="object-cover opacity-60 group-hover:opacity-80 transition-opacity" 
              />
-             <div className="absolute inset-0 bg-gradient-to-t from-[#021029] to-transparent" />
+             <div className="absolute inset-0 bg-gradient-to-t from-[#021029]/80 to-transparent" />
              <div className="absolute bottom-0 left-0 p-8">
                 <h3 className="text-xl font-bold text-white mb-2">{t('landing.benefits.side.title', 'Always there')}</h3>
                 <p className="text-slate-400 text-sm">{t('landing.benefits.side.desc', 'Support that fits into your schedule, 24/7.')}</p>
@@ -112,7 +112,7 @@ export default function BenefitsSection() {
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ delay: 0.2 + (idx * 0.1) }}
-              className={`${feature.span} bg-[#021029] rounded-3xl p-6 border border-white/5 hover:border-white/10 transition-colors`}
+              className={`${feature.span} bg-[#021029]/70 backdrop-blur-md rounded-3xl p-6 border border-white/5 hover:border-white/10 transition-colors`}
             >
                <feature.icon className="w-8 h-8 text-[#4ADE80] mb-4" />
                <h4 className="text-lg font-bold text-white mb-2">{t(feature.titleKey, feature.titleFallback)}</h4>

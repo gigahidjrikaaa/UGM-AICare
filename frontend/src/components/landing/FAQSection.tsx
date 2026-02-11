@@ -50,7 +50,7 @@ export default function FAQSection() {
              >
                 <Disclosure>
                   {({ open }) => (
-                    <div className={`bg-[#000B1F] rounded-2xl border ${open ? 'border-white/20' : 'border-white/5'} transition-colors overflow-hidden`}>
+                    <div className={`bg-[#000B1F]/70 backdrop-blur-md rounded-2xl border ${open ? 'border-white/20' : 'border-white/5'} transition-colors overflow-hidden`}>
                       <Disclosure.Button className="w-full px-6 py-5 flex items-center justify-between text-left">
                         <span className="text-white font-semibold">{t(faq.qKey, faq.qDefault)}</span>
                         <CaretGlyph className={`w-5 h-5 text-slate-400 transition-transform ${open ? 'rotate-180' : ''}`} />

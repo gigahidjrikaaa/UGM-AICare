@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Development helper script for UGM-AICare
-# Primary: ./dev.sh local  - Run backend + frontend locally (fast iteration)
-# Docker:  ./dev.sh prod   - Simulate production Docker deployment
+# Primary: ./run_dev.sh local  - Run backend + frontend locally (fast iteration)
+# Docker:  ./run_dev.sh prod   - Simulate production Docker deployment
 
 set -euo pipefail
 
@@ -33,16 +33,78 @@ has_cmd() {
   command -v "$1" >/dev/null 2>&1
 }
 
-load_env() {
-  local env_file="$PROJECT_DIR/.env"
-  if [[ -f "$env_file" ]]; then
-    set -a
-    # shellcheck disable=SC1090
-    source "$env_file"
-    set +a
-  else
-    log_warn ".env not found at $env_file"
+trim_ws() {
+  local value="$1"
+  value="${value#"${value%%[![:space:]]*}"}"
+  value="${value%"${value##*[![:space:]]}"}"
+  printf '%s' "$value"
+}
+
+parse_env_line() {
+  local line
+  line="$(trim_ws "$1")"
+  [[ -z "$line" || "${line:0:1}" == "#" ]] && return 1
+
+  if [[ "$line" == export* ]]; then
+    line="$(trim_ws "${line#export}")"
   fi
+
+  [[ "$line" != *"="* ]] && return 1
+
+  local key="${line%%=*}"
+  local value="${line#*=}"
+  key="$(trim_ws "$key")"
+  value="$(trim_ws "$value")"
+
+  if [[ "$value" == "\""*"\"" || "$value" == "'"*"'" ]]; then
+    value="${value:1:${#value}-2}"
+  else
+    value="${value%%#*}"
+    value="$(trim_ws "$value")"
+  fi
+
+  [[ -z "$key" ]] && return 1
+  printf '%s\n' "$key" "$value"
+}
+
+load_env_file() {
+  local env_file="$1"
+  if [[ -f "$env_file" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      local parsed
+      parsed="$(parse_env_line "$line")" || continue
+      local key
+      local value
+      key="${parsed%%$'\n'*}"
+      value="${parsed#*$'\n'}"
+      export "$key=$value"
+    done < "$env_file"
+  else
+    log_warn "Env file not found at $env_file"
+  fi
+}
+
+read_env_var() {
+  local env_file="$1"
+  local var_name="$2"
+  local default_value="$3"
+
+  if [[ -f "$env_file" ]]; then
+    while IFS= read -r line || [[ -n "$line" ]]; do
+      local parsed
+      parsed="$(parse_env_line "$line")" || continue
+      local key
+      local value
+      key="${parsed%%$'\n'*}"
+      value="${parsed#*$'\n'}"
+      if [[ "$key" == "$var_name" ]]; then
+        printf '%s' "$value"
+        return 0
+      fi
+    done < "$env_file"
+  fi
+
+  printf '%s' "$default_value"
 }
 
 ensure_docker() {
@@ -82,18 +144,18 @@ save_pids() {
 kill_process_tree() {
   local pid="$1"
   local name="${2:-process}"
-  
+
   if [[ -z "$pid" || "$pid" == "0" ]]; then
     return 0
   fi
-  
+
   # Check if process exists
   if ! kill -0 "$pid" 2>/dev/null; then
     return 0
   fi
-  
+
   log_info "Stopping $name (PID: $pid)..."
-  
+
   # On Windows (Git Bash/MSYS), use taskkill for reliable termination
   if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
     # First try graceful termination
@@ -106,13 +168,13 @@ kill_process_tree() {
   else
     # Unix: Send SIGTERM to process group
     kill -TERM "-$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null || true
-    
+
     # Wait briefly for graceful shutdown
     local timeout=5
     while kill -0 "$pid" 2>/dev/null && ((timeout-- > 0)); do
       sleep 1
     done
-    
+
     # Force kill if still running
     if kill -0 "$pid" 2>/dev/null; then
       log_warn "$name didn't stop gracefully, force killing..."
@@ -123,10 +185,11 @@ kill_process_tree() {
 
 kill_port_processes() {
   local port="$1"
-  
+
   if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
     # Windows: Use netstat + taskkill
-    local pids=$(netstat -ano 2>/dev/null | grep ":${port} " | grep "LISTENING" | awk '{print $5}' | sort -u | grep -v "^0$" || true)
+    local pids
+    pids=$(netstat -ano 2>/dev/null | grep ":${port} " | grep "LISTENING" | awk '{print $5}' | sort -u | grep -v "^0$" || true)
     for pid in $pids; do
       if [[ -n "$pid" && "$pid" != "0" ]]; then
         log_info "Killing process $pid on port $port"
@@ -149,28 +212,28 @@ cleanup_all() {
     return 0
   fi
   CLEANUP_DONE=true
-  
+
   echo ""
   log_info "Shutting down development servers..."
-  
+
   # Kill tracked processes
   if [[ -n "$BACKEND_PID" ]]; then
     kill_process_tree "$BACKEND_PID" "backend"
   fi
-  
+
   if [[ -n "$FRONTEND_PID" ]]; then
     kill_process_tree "$FRONTEND_PID" "frontend"
   fi
-  
+
   # Clean up PID file
   rm -f "$PID_FILE" 2>/dev/null || true
-  
+
   # Kill any orphaned processes on the ports (safety net)
   local backend_port="${BACKEND_EXTERNAL_PORT:-22001}"
   local frontend_port="${FRONTEND_EXTERNAL_PORT:-22000}"
   kill_port_processes "$backend_port"
   kill_port_processes "$frontend_port"
-  
+
   log_ok "Cleanup complete."
 }
 
@@ -179,16 +242,16 @@ cleanup_stale_processes() {
   if [[ -f "$PID_FILE" ]]; then
     log_info "Found PID file from previous run, cleaning up..."
     source "$PID_FILE" 2>/dev/null || true
-    
+
     if [[ -n "${BACKEND_PID:-}" ]]; then
       kill_process_tree "$BACKEND_PID" "stale backend" 2>/dev/null || true
     fi
     if [[ -n "${FRONTEND_PID:-}" ]]; then
       kill_process_tree "$FRONTEND_PID" "stale frontend" 2>/dev/null || true
     fi
-    
+
     rm -f "$PID_FILE"
-    
+
     # Reset our tracking
     BACKEND_PID=""
     FRONTEND_PID=""
@@ -206,7 +269,7 @@ setup_signal_handlers() {
   trap 'cleanup_all; exit 143' TERM     # kill command
   trap 'cleanup_all; exit 1' HUP        # Terminal closed
   trap 'cleanup_all; exit 1' PIPE       # Broken pipe
-  
+
   # Handle errors
   trap 'log_error "Script error on line $LINENO"; cleanup_all; exit 1' ERR
 }
@@ -220,9 +283,9 @@ wait_for_server() {
   local name="$2"
   local max_attempts="${3:-30}"
   local attempt=0
-  
+
   log_info "Waiting for $name to be ready..."
-  
+
   while ((attempt < max_attempts)); do
     if curl -s -o /dev/null -w "" "$url" 2>/dev/null; then
       log_ok "$name is ready at $url"
@@ -231,7 +294,7 @@ wait_for_server() {
     ((attempt++))
     sleep 1
   done
-  
+
   log_warn "$name health check timed out (may still be starting)"
   return 1
 }
@@ -240,14 +303,14 @@ monitor_processes() {
   # Monitor child processes and exit if either dies unexpectedly
   while true; do
     sleep 2
-    
+
     # Check if backend is still running
     if [[ -n "$BACKEND_PID" ]] && ! kill -0 "$BACKEND_PID" 2>/dev/null; then
       log_error "Backend process died unexpectedly!"
       cleanup_all
       exit 1
     fi
-    
+
     # Check if frontend is still running
     if [[ -n "$FRONTEND_PID" ]] && ! kill -0 "$FRONTEND_PID" 2>/dev/null; then
       log_error "Frontend process died unexpectedly!"
@@ -264,14 +327,18 @@ monitor_processes() {
 run_local() {
   # Set up signal handlers first
   setup_signal_handlers
-  
+
   # Clean up any stale processes from previous runs
   cleanup_stale_processes
-  
-  load_env
 
-  local backend_port="${BACKEND_EXTERNAL_PORT:-22001}"
-  local frontend_port="${FRONTEND_EXTERNAL_PORT:-22000}"
+  local backend_env_file="$PROJECT_DIR/backend/.env"
+  local frontend_env_file="$PROJECT_DIR/frontend/.env.local"
+
+  local backend_port
+  local frontend_port
+  backend_port="$(read_env_var "$backend_env_file" "PORT" "${BACKEND_EXTERNAL_PORT:-22001}")"
+  frontend_port="$(read_env_var "$frontend_env_file" "PORT" "${FRONTEND_EXTERNAL_PORT:-22000}")"
+
   local backend_origin="http://localhost:${backend_port}"
   local frontend_origin="http://localhost:${frontend_port}"
 
@@ -280,18 +347,6 @@ run_local() {
     local val="${1:-}" fallback="${2:-}"
     [[ -z "$val" || "$val" == *"://backend"* || "$val" == *"://frontend"* ]] && echo "$fallback" || echo "$val"
   }
-
-  export INTERNAL_API_URL="$(rewrite_url "${INTERNAL_API_URL:-}" "$backend_origin")"
-  export NEXT_PUBLIC_API_URL="$(rewrite_url "${NEXT_PUBLIC_API_URL:-}" "$backend_origin")"
-  export NEXT_PUBLIC_BACKEND_BASE="$(rewrite_url "${NEXT_PUBLIC_BACKEND_BASE:-}" "$backend_origin")"
-  export BACKEND_URL="$(rewrite_url "${BACKEND_URL:-}" "$backend_origin")"
-  export NEXTAUTH_URL="$(rewrite_url "${NEXTAUTH_URL:-}" "$frontend_origin")"
-  export COOKIE_SECURE="${COOKIE_SECURE:-false}"
-  export COOKIE_SAMESITE="${COOKIE_SAMESITE:-lax}"
-  
-  # Enable UTF-8 mode for Python (fixes emoji logging on Windows)
-  export PYTHONUTF8=1
-  export PYTHONIOENCODING=utf-8
 
   # Validate Python
   local python_bin
@@ -321,18 +376,18 @@ run_local() {
   log_info "Cleaning up any existing processes on ports ${backend_port} and ${frontend_port}..."
   kill_port_processes "$backend_port"
   kill_port_processes "$frontend_port"
-  
+
   # Brief pause to ensure ports are released
   sleep 1
 
   echo ""
   echo "┌─────────────────────────────────────────┐"
-  echo "│  🚀 LOCAL Development Mode             │"
+  echo "│  LOCAL Development Mode                 │"
   echo "├─────────────────────────────────────────┤"
   echo "│  Backend:  http://localhost:${backend_port}      │"
   echo "│  Frontend: http://localhost:${frontend_port}      │"
   echo "├─────────────────────────────────────────┤"
-  echo "│  Press Ctrl+C to stop all servers      │"
+  echo "│  Press Ctrl+C to stop all servers       │"
   echo "└─────────────────────────────────────────┘"
   echo ""
 
@@ -343,9 +398,9 @@ run_local() {
   fi
 
   if [[ "$use_separate_terminals" == "true" ]]; then
-    run_separate_terminals "$python_bin" "$backend_port" "$frontend_port"
+    run_separate_terminals "$python_bin" "$backend_port" "$frontend_port" "$backend_env_file" "$frontend_env_file" "$backend_origin" "$frontend_origin"
   else
-    run_inline "$python_bin" "$backend_port" "$frontend_port"
+    run_inline "$python_bin" "$backend_port" "$frontend_port" "$backend_env_file" "$frontend_env_file" "$backend_origin" "$frontend_origin"
   fi
 }
 
@@ -353,13 +408,31 @@ run_inline() {
   local python_bin="$1"
   local backend_port="$2"
   local frontend_port="$3"
-  
+  local backend_env_file="$4"
+  local frontend_env_file="$5"
+  local backend_origin="$6"
+  local frontend_origin="$7"
+
   log_info "Starting servers in current terminal..."
   echo ""
-  
+
   # Start backend in background with process group
   (
     cd "$PROJECT_DIR/backend"
+    load_env_file "$backend_env_file"
+    export INTERNAL_API_URL="$(rewrite_url "${INTERNAL_API_URL:-}" "$backend_origin")"
+    export NEXT_PUBLIC_API_URL="$(rewrite_url "${NEXT_PUBLIC_API_URL:-}" "$backend_origin")"
+    export NEXT_PUBLIC_BACKEND_BASE="$(rewrite_url "${NEXT_PUBLIC_BACKEND_BASE:-}" "$backend_origin")"
+    export BACKEND_URL="$(rewrite_url "${BACKEND_URL:-}" "$backend_origin")"
+    export FRONTEND_URL="$(rewrite_url "${FRONTEND_URL:-}" "$frontend_origin")"
+    export NEXTAUTH_URL="$(rewrite_url "${NEXTAUTH_URL:-}" "$frontend_origin")"
+    export COOKIE_SECURE="${COOKIE_SECURE:-false}"
+    export COOKIE_SAMESITE="${COOKIE_SAMESITE:-lax}"
+
+    # Enable UTF-8 mode for Python (fixes emoji logging on Windows)
+    export PYTHONUTF8=1
+    export PYTHONIOENCODING=utf-8
+
     exec "$python_bin" -m uvicorn app.main:app --host 127.0.0.1 --port "$backend_port" --reload
   ) &
   BACKEND_PID=$!
@@ -368,22 +441,29 @@ run_inline() {
   # Brief delay to let backend start binding
   sleep 2
 
-  # Start frontend in background with process group  
+  # Start frontend in background with process group
   (
     cd "$PROJECT_DIR/frontend"
+    load_env_file "$frontend_env_file"
+    export INTERNAL_API_URL="$(rewrite_url "${INTERNAL_API_URL:-}" "$backend_origin")"
+    export NEXT_PUBLIC_API_URL="$(rewrite_url "${NEXT_PUBLIC_API_URL:-}" "$backend_origin")"
+    export NEXT_PUBLIC_BACKEND_BASE="$(rewrite_url "${NEXT_PUBLIC_BACKEND_BASE:-}" "$backend_origin")"
+    export BACKEND_URL="$(rewrite_url "${BACKEND_URL:-}" "$backend_origin")"
+    export NEXTAUTH_URL="$(rewrite_url "${NEXTAUTH_URL:-}" "$frontend_origin")"
+
     exec npm run dev -- -p "$frontend_port"
   ) &
   FRONTEND_PID=$!
   log_ok "Frontend started (PID: $FRONTEND_PID)"
-  
+
   # Save PIDs for recovery
   save_pids
-  
+
   echo ""
   log_info "Both servers are starting..."
   log_info "Logs will appear below. Press Ctrl+C to stop."
   echo ""
-  
+
   # Monitor processes - this blocks until something goes wrong or we're interrupted
   monitor_processes
 }
@@ -392,7 +472,11 @@ run_separate_terminals() {
   local python_bin="$1"
   local backend_port="$2"
   local frontend_port="$3"
-  
+  local backend_env_file="$4"
+  local frontend_env_file="$5"
+  local backend_origin="$6"
+  local frontend_origin="$7"
+
   log_info "Starting servers in separate terminals..."
 
   # Prefer Windows Terminal (wt) when available.
@@ -426,13 +510,33 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM HUP
 
+if [[ -f "$backend_env_file" ]]; then
+  set -a
+  source "$backend_env_file"
+  set +a
+fi
+
+rewrite_url() {
+  local val="${1:-}" fallback="${2:-}"
+  [[ -z "$val" || "$val" == *"://backend"* || "$val" == *"://frontend"* ]] && echo "$fallback" || echo "$val"
+}
+
+export INTERNAL_API_URL="$(rewrite_url "${INTERNAL_API_URL:-}" "$backend_origin")"
+export NEXT_PUBLIC_API_URL="$(rewrite_url "${NEXT_PUBLIC_API_URL:-}" "$backend_origin")"
+export NEXT_PUBLIC_BACKEND_BASE="$(rewrite_url "${NEXT_PUBLIC_BACKEND_BASE:-}" "$backend_origin")"
+export BACKEND_URL="$(rewrite_url "${BACKEND_URL:-}" "$backend_origin")"
+export FRONTEND_URL="$(rewrite_url "${FRONTEND_URL:-}" "$frontend_origin")"
+export NEXTAUTH_URL="$(rewrite_url "${NEXTAUTH_URL:-}" "$frontend_origin")"
+export COOKIE_SECURE="${COOKIE_SECURE:-false}"
+export COOKIE_SAMESITE="${COOKIE_SAMESITE:-lax}"
+
 if [[ -f "$venv_activate" ]]; then
   source "$venv_activate"
-  echo "✓ Virtual environment activated"
+  echo "Virtual environment activated"
 fi
 
 echo ""
-echo "🔧 UGM-AICare Backend Server"
+echo "UGM-AICare Backend Server"
 echo "=============================="
 echo "URL: http://localhost:${backend_port}"
 echo ""
@@ -452,7 +556,24 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM HUP
 
-echo "🎨 UGM-AICare Frontend Server"
+if [[ -f "$frontend_env_file" ]]; then
+  set -a
+  source "$frontend_env_file"
+  set +a
+fi
+
+rewrite_url() {
+  local val="${1:-}" fallback="${2:-}"
+  [[ -z "$val" || "$val" == *"://backend"* || "$val" == *"://frontend"* ]] && echo "$fallback" || echo "$val"
+}
+
+export INTERNAL_API_URL="$(rewrite_url "${INTERNAL_API_URL:-}" "$backend_origin")"
+export NEXT_PUBLIC_API_URL="$(rewrite_url "${NEXT_PUBLIC_API_URL:-}" "$backend_origin")"
+export NEXT_PUBLIC_BACKEND_BASE="$(rewrite_url "${NEXT_PUBLIC_BACKEND_BASE:-}" "$backend_origin")"
+export BACKEND_URL="$(rewrite_url "${BACKEND_URL:-}" "$backend_origin")"
+export NEXTAUTH_URL="$(rewrite_url "${NEXTAUTH_URL:-}" "$frontend_origin")"
+
+echo "UGM-AICare Frontend Server"
 echo "=============================="
 echo "URL: http://localhost:${frontend_port}"
 echo ""
@@ -475,18 +596,20 @@ EOF
 
     echo ""
     log_ok "Opened backend + frontend in Windows Terminal panes."
-    log_info "To stop them: close the panes/windows, or run ./dev.sh stop"
+    log_info "To stop them: close the panes/windows, or run ./run_dev.sh stop"
 
     (sleep 10 && rm -f "$backend_script" "$frontend_script") &
     return 0
   fi
-  
+
   # On Windows (Git Bash/MSYS2), use mintty
   if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" ]]; then
     # Create temporary scripts for each process
-    local backend_script=$(mktemp --suffix=.sh)
-    local frontend_script=$(mktemp --suffix=.sh)
-    
+    local backend_script
+    local frontend_script
+    backend_script=$(mktemp --suffix=.sh)
+    frontend_script=$(mktemp --suffix=.sh)
+
     # Determine venv activation script path
     local venv_activate=""
     if [[ -f "$PROJECT_DIR/../.venv/Scripts/activate" ]]; then
@@ -496,7 +619,7 @@ EOF
     elif [[ -f "$PROJECT_DIR/backend/.venv/Scripts/activate" ]]; then
       venv_activate="$PROJECT_DIR/backend/.venv/Scripts/activate"
     fi
-    
+
     cat > "$backend_script" <<EOF
 #!/usr/bin/env bash
 cd "$PROJECT_DIR/backend"
@@ -512,19 +635,39 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM HUP
 
+if [[ -f "$backend_env_file" ]]; then
+  set -a
+  source "$backend_env_file"
+  set +a
+fi
+
+rewrite_url() {
+  local val="${1:-}" fallback="${2:-}"
+  [[ -z "$val" || "$val" == *"://backend"* || "$val" == *"://frontend"* ]] && echo "$fallback" || echo "$val"
+}
+
+export INTERNAL_API_URL="$(rewrite_url "${INTERNAL_API_URL:-}" "$backend_origin")"
+export NEXT_PUBLIC_API_URL="$(rewrite_url "${NEXT_PUBLIC_API_URL:-}" "$backend_origin")"
+export NEXT_PUBLIC_BACKEND_BASE="$(rewrite_url "${NEXT_PUBLIC_BACKEND_BASE:-}" "$backend_origin")"
+export BACKEND_URL="$(rewrite_url "${BACKEND_URL:-}" "$backend_origin")"
+export FRONTEND_URL="$(rewrite_url "${FRONTEND_URL:-}" "$frontend_origin")"
+export NEXTAUTH_URL="$(rewrite_url "${NEXTAUTH_URL:-}" "$frontend_origin")"
+export COOKIE_SECURE="${COOKIE_SECURE:-false}"
+export COOKIE_SAMESITE="${COOKIE_SAMESITE:-lax}"
+
 if [[ -f "$venv_activate" ]]; then
   source "$venv_activate"
-  echo "✓ Virtual environment activated"
+  echo "Virtual environment activated"
 fi
 
 echo ""
-echo "🔧 UGM-AICare Backend Server"
+echo "UGM-AICare Backend Server"
 echo "=============================="
 echo "URL: http://localhost:${backend_port}"
 echo ""
 python -m uvicorn app.main:app --host 127.0.0.1 --port "$backend_port" --reload
 EOF
-    
+
     cat > "$frontend_script" <<EOF
 #!/usr/bin/env bash
 cd "$PROJECT_DIR/frontend"
@@ -538,24 +681,41 @@ cleanup() {
 }
 trap cleanup EXIT INT TERM HUP
 
-echo "🎨 UGM-AICare Frontend Server"
+if [[ -f "$frontend_env_file" ]]; then
+  set -a
+  source "$frontend_env_file"
+  set +a
+fi
+
+rewrite_url() {
+  local val="${1:-}" fallback="${2:-}"
+  [[ -z "$val" || "$val" == *"://backend"* || "$val" == *"://frontend"* ]] && echo "$fallback" || echo "$val"
+}
+
+export INTERNAL_API_URL="$(rewrite_url "${INTERNAL_API_URL:-}" "$backend_origin")"
+export NEXT_PUBLIC_API_URL="$(rewrite_url "${NEXT_PUBLIC_API_URL:-}" "$backend_origin")"
+export NEXT_PUBLIC_BACKEND_BASE="$(rewrite_url "${NEXT_PUBLIC_BACKEND_BASE:-}" "$backend_origin")"
+export BACKEND_URL="$(rewrite_url "${BACKEND_URL:-}" "$backend_origin")"
+export NEXTAUTH_URL="$(rewrite_url "${NEXTAUTH_URL:-}" "$frontend_origin")"
+
+echo "UGM-AICare Frontend Server"
 echo "=============================="
 echo "URL: http://localhost:${frontend_port}"
 echo ""
 npm run dev -- -p "$frontend_port"
 EOF
-    
+
     chmod +x "$backend_script" "$frontend_script"
-    
+
     # Launch in new mintty terminals
     mintty --title "UGM-AICare Backend" --exec bash "$backend_script" &
     BACKEND_PID=$!
-    
+
     mintty --title "UGM-AICare Frontend" --exec bash "$frontend_script" &
     FRONTEND_PID=$!
-    
+
     save_pids
-    
+
     echo ""
     log_ok "Started backend and frontend in separate terminals."
     echo ""
@@ -563,14 +723,14 @@ EOF
     echo "   Frontend: http://localhost:${frontend_port}"
     echo ""
     log_info "Close the terminal windows to stop the servers."
-    log_info "Or run: ./dev.sh stop"
-    
+    log_info "Or run: ./run_dev.sh stop"
+
     # Clean up temp scripts after a delay
     (sleep 10 && rm -f "$backend_script" "$frontend_script") &
-    
+
   else
     log_warn "Separate terminals not fully supported on this OS. Running inline."
-    run_inline "$python_bin" "$backend_port" "$frontend_port"
+    run_inline "$python_bin" "$backend_port" "$frontend_port" "$backend_env_file" "$frontend_env_file" "$backend_origin" "$frontend_origin"
   fi
 }
 
@@ -580,17 +740,20 @@ EOF
 
 stop_servers() {
   log_info "Stopping development servers..."
-  
+
   # Load PIDs from file if exists
   if [[ -f "$PID_FILE" ]]; then
     source "$PID_FILE" 2>/dev/null || true
   fi
-  
-  # Load env for port numbers
-  load_env
-  local backend_port="${BACKEND_EXTERNAL_PORT:-22001}"
-  local frontend_port="${FRONTEND_EXTERNAL_PORT:-22000}"
-  
+
+  local backend_env_file="$PROJECT_DIR/backend/.env"
+  local frontend_env_file="$PROJECT_DIR/frontend/.env.local"
+
+  local backend_port
+  local frontend_port
+  backend_port="$(read_env_var "$backend_env_file" "PORT" "${BACKEND_EXTERNAL_PORT:-22001}")"
+  frontend_port="$(read_env_var "$frontend_env_file" "PORT" "${FRONTEND_EXTERNAL_PORT:-22000}")"
+
   # Kill by PID first
   if [[ -n "${BACKEND_PID:-}" ]]; then
     kill_process_tree "$BACKEND_PID" "backend"
@@ -598,14 +761,14 @@ stop_servers() {
   if [[ -n "${FRONTEND_PID:-}" ]]; then
     kill_process_tree "$FRONTEND_PID" "frontend"
   fi
-  
+
   # Then kill by port as safety net
   kill_port_processes "$backend_port"
   kill_port_processes "$frontend_port"
-  
+
   # Clean up PID file
   rm -f "$PID_FILE" 2>/dev/null || true
-  
+
   log_ok "All servers stopped."
 }
 
@@ -628,7 +791,7 @@ show_help() {
   cat << 'EOF'
 UGM-AICare Development Script
 
-Usage: ./dev.sh <command> [args]
+Usage: ./run_dev.sh <command> [args]
 
 Main Commands:
   local                    Start backend + frontend locally (unified terminal)
@@ -658,12 +821,12 @@ Features:
   ✓ Graceful shutdown with timeout
 
 Examples:
-  ./dev.sh local          # Start local dev servers
-  ./dev.sh local --separate  # Separate terminals (Windows)
-  ./dev.sh stop           # Stop all servers
-  ./dev.sh docker dev up  # Start Docker dev
-  ./dev.sh docker prod up --build  # Start Docker prod
-  ./dev.sh docker dev pause backend
+  ./run_dev.sh local          # Start local dev servers
+  ./run_dev.sh local --separate  # Separate terminals (Windows)
+  ./run_dev.sh stop           # Stop all servers
+  ./run_dev.sh docker dev up  # Start Docker dev
+  ./run_dev.sh docker prod up --build  # Start Docker prod
+  ./run_dev.sh docker dev pause backend
 EOF
 }
 
@@ -717,7 +880,7 @@ docker_env_action() {
       ;;
     *)
       log_error "Unknown docker action: $action"
-      echo "Run: ./dev.sh help" >&2
+      echo "Run: ./run_dev.sh help" >&2
       exit 2
       ;;
   esac
@@ -746,7 +909,7 @@ case "$cmd" in
     docker_env_action prod "${1:-up}" "${@:2}"
     ;;
 
-  # Docker dev commands  
+  # Docker dev commands
   up)
     docker_env_action dev up "$@"
     ;;
@@ -776,7 +939,7 @@ case "$cmd" in
   clean)
     # Backward-compatible: clean both envs.
     ensure_docker
-    echo "🧹 Cleaning up all containers (dev + prod)..."
+    echo "Cleaning up all containers (dev + prod)..."
     dc_dev down -v --remove-orphans 2>/dev/null || true
     dc_prod down -v --remove-orphans 2>/dev/null || true
     ;;
@@ -786,7 +949,7 @@ case "$cmd" in
     ;;
   *)
     log_error "Unknown command: $cmd"
-    echo "Run: ./dev.sh help" >&2
+    echo "Run: ./run_dev.sh help" >&2
     exit 2
     ;;
 esac

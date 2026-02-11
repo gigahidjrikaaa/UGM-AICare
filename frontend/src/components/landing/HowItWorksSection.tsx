@@ -37,8 +37,8 @@ export default function HowItWorksSection() {
                   <h3 className="text-sm font-bold text-slate-400 uppercase tracking-widest mb-4">Typical Chatbot</h3>
                   <div className="space-y-3">
                      <div className="bg-white/5 p-3 rounded-lg text-sm text-slate-400">"I am sad."</div>
-                     <div className="bg-[#000B1F] p-3 rounded-lg text-sm text-slate-500">"I am sorry to hear that." (Generic sympathy)</div>
-                     <div className="bg-[#000B1F] p-3 rounded-lg text-sm text-slate-500">"What do you want to talk about?" (Passive loop)</div>
+                     <div className="bg-[#000B1F]/70 p-3 rounded-lg text-sm text-slate-500">"I am sorry to hear that." (Generic sympathy)</div>
+                     <div className="bg-[#000B1F]/70 p-3 rounded-lg text-sm text-slate-500">"What do you want to talk about?" (Passive loop)</div>
                   </div>
                </motion.div>
 
@@ -47,7 +47,7 @@ export default function HowItWorksSection() {
                   whileInView={{ opacity: 1, x: 0 }}
                   viewport={{ once: true }}
                   transition={{ delay: 0.2 }}
-                  className="p-8 rounded-3xl border border-[#FFCA40]/30 bg-[#021029] shadow-[0_0_40px_-10px_rgba(255,202,64,0.1)]"
+                  className="p-8 rounded-3xl border border-[#FFCA40]/30 bg-[#021029]/70 backdrop-blur-md shadow-[0_0_40px_-10px_rgba(255,202,64,0.1)]"
                >
                   <h3 className="text-sm font-bold text-[#FFCA40] uppercase tracking-widest mb-6 flex items-center gap-2">
                      <StarburstGlyph className="w-4 h-4" />
@@ -95,9 +95,9 @@ export default function HowItWorksSection() {
             >
                <div className="absolute inset-x-0 -top-20 -bottom-20 bg-gradient-to-r from-transparent via-[#FFCA40]/5 to-transparent blur-xl" />
                
-               <div className="bg-[#0B162E] rounded-3xl border border-white/10 overflow-hidden shadow-2xl relative">
+               <div className="bg-[#0B162E]/70 backdrop-blur-md rounded-3xl border border-white/10 overflow-hidden shadow-2xl relative">
                   {/* Fake UI Header */}
-                  <div className="bg-[#000B1F] p-4 border-b border-white/5 flex items-center justify-between">
+                  <div className="bg-[#000B1F]/70 p-4 border-b border-white/5 flex items-center justify-between">
                      <div className="flex items-center gap-2">
                         <div className="w-3 h-3 rounded-full bg-red-400" />
                         <div className="w-3 h-3 rounded-full bg-yellow-400" />
@@ -118,7 +118,7 @@ export default function HowItWorksSection() {
                         </div>
                      </div>
 
-                     <div className="bg-[#000B1F] rounded-xl p-4 border border-white/5">
+                     <div className="bg-[#000B1F]/70 rounded-xl p-4 border border-white/5">
                         <div className="text-xs text-slate-500 uppercase mb-2">Aika Summary</div>
                         <p className="text-slate-300 text-sm leading-relaxed">
                            "User exhibited signs of <span className="text-white font-bold">acute academic anxiety</span> and mentioned <span className="text-white font-bold">sleep deprivation</span>. Initial grounding exercise (4-7-8 breathing) was completed but user requested human support."

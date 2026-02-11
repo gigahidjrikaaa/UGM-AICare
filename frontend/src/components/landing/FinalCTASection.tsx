@@ -49,7 +49,7 @@ export default function FinalCTASection() {
                    {t('landing.cta.primary', 'Chat with Aika')}
                    <ArrowScribbleGlyph className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Link>
-                <Link href="/resources" className="px-8 py-4 bg-[#000B1F] border border-white/20 text-white rounded-full font-bold text-lg hover:bg-white/5 transition-colors w-full sm:w-auto">
+                <Link href="/resources" className="px-8 py-4 bg-[#000B1F]/70 border border-white/20 text-white rounded-full font-bold text-lg hover:bg-white/5 transition-colors w-full sm:w-auto">
                    {t('landing.cta.secondary', 'Browse Resources')}
                 </Link>
              </div>
