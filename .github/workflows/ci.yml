@@ -19,13 +19,14 @@ on:
         type: boolean
         default: true
 
+
 jobs:
   # ========================================
   # Environment Validation - Check Required Variables
   # ========================================
   validate-env:
     runs-on: ubuntu-latest
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.PROD_ENV_READY == 'true'
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -178,7 +179,7 @@ jobs:
             backend:
               - 'backend/**'
               - 'backend/Dockerfile'
-              - 'requirements.txt'
+              - 'backend/requirements.txt'
             frontend:
               - 'frontend/**'
               - 'frontend/Dockerfile'
@@ -694,6 +695,7 @@ jobs:
     if: |
       always() &&
       (github.event_name == 'push' && github.ref == 'refs/heads/main') &&
+      vars.DEPLOY_ENABLED == 'true' &&
       needs.validate-env.result == 'success' &&
       (needs.build-backend.result == 'success' || needs.build-backend.result == 'skipped') &&
       (needs.build-frontend.result == 'success' || needs.build-frontend.result == 'skipped') &&
@@ -800,7 +802,7 @@ jobs:
   rollback:
     runs-on: ubuntu-latest
     environment: production
-    if: github.event_name == 'workflow_dispatch' && github.event.inputs.rollback_sha
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.rollback_sha && vars.DEPLOY_ENABLED == 'true'
     
     steps:
       - name: Checkout repository
