@@ -31,3 +31,17 @@ export type CohortRetentionSeries = {
   generated_at: string; // ISO datetime
   points: CohortRetentionPoint[];
 };
+
+export type RetentionSummaryPoint = {
+  day_n: number;
+  cohort_size: number;
+  retained_users: number;
+  retention_rate: number; // 0..1
+};
+
+export type RetentionSummary = {
+  cohort_date: string | null; // YYYY-MM-DD
+  day_n_values: number[];
+  generated_at: string; // ISO datetime
+  points: RetentionSummaryPoint[];
+};

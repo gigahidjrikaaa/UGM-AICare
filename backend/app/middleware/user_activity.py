@@ -25,6 +25,7 @@ from starlette.middleware.base import BaseHTTPMiddleware
 from app.database import AsyncSessionLocal
 from app.models import User, UserDailyActivity
 from app.services.user_normalization import ensure_user_normalized_tables, set_profile_last_activity_date
+from app.services.user_event_service import record_user_event
 
 try:
     from zoneinfo import ZoneInfo
@@ -100,6 +101,20 @@ class UserActivityMiddleware(BaseHTTPMiddleware):
                         request_count=1,
                     )
                     db.add(row)
+                    await record_user_event(
+                        db,
+                        user_id=user.id,
+                        event_name="activity.daily",
+                        session_id=getattr(request.state, "session_id", None),
+                        request_id=getattr(request.state, "request_id", None),
+                        ip_address=getattr(request.client, "host", None) if request.client else None,
+                        user_agent=request.headers.get("user-agent"),
+                        metadata={
+                            "source": "api",
+                            "path": request.url.path,
+                            "method": request.method,
+                        },
+                    )
 
                 await set_profile_last_activity_date(db, user=user, activity_date=activity_date)
 

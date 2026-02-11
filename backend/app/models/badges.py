@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING
 
 from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
@@ -141,7 +141,7 @@ class BadgeIssuance(Base):
 
     template: Mapped[BadgeTemplate] = relationship("BadgeTemplate", back_populates="issuances")
     user: Mapped["User"] = relationship("User", foreign_keys=[user_id])
-    requested_by_admin: Mapped["User" | None] = relationship("User", foreign_keys=[requested_by_admin_id])
+    requested_by_admin: Mapped[Optional["User"]] = relationship("User", foreign_keys=[requested_by_admin_id])
 
     __table_args__ = (
         UniqueConstraint("template_id", "user_id", name="uq_badge_issuances_template_user"),

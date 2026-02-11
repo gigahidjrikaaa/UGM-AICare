@@ -14,11 +14,13 @@ import type {
   ActiveUsersSummary,
   CohortRetentionSeries,
   DailyActiveUsersSeries,
+  RetentionSummary,
 } from '@/types/admin/retention';
 import {
   getActiveUsersSummary,
   getCohortRetentionSeries,
   getDailyActiveUsersSeries,
+  getRetentionSummary,
 } from '@/services/adminRetentionApi';
 import { useI18n } from '@/i18n/I18nProvider';
 
@@ -39,6 +41,7 @@ export default function AdminRetentionPage() {
   const [summary, setSummary] = useState<ActiveUsersSummary | null>(null);
   const [dauSeries, setDauSeries] = useState<DailyActiveUsersSeries | null>(null);
   const [cohorts, setCohorts] = useState<CohortRetentionSeries | null>(null);
+  const [retentionSummary, setRetentionSummary] = useState<RetentionSummary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,15 +50,17 @@ export default function AdminRetentionPage() {
     setError(null);
 
     try {
-      const [summaryData, dauData, cohortData] = await Promise.all([
+      const [summaryData, dauData, cohortData, retentionSummaryData] = await Promise.all([
         getActiveUsersSummary(),
         getDailyActiveUsersSeries(30),
         getCohortRetentionSeries(30, [1, 7, 30]),
+        getRetentionSummary([1, 7, 30]),
       ]);
 
       setSummary(summaryData);
       setDauSeries(dauData);
       setCohorts(cohortData);
+      setRetentionSummary(retentionSummaryData);
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load retention analytics';
       setError(msg);
@@ -142,9 +147,20 @@ export default function AdminRetentionPage() {
     return <div className="p-6 text-white/70">No retention data available</div>;
   }
 
+  const retentionByDay = new Map<number, { retained: number; rate: number; cohortSize: number }>();
+  if (retentionSummary) {
+    for (const point of retentionSummary.points) {
+      retentionByDay.set(point.day_n, {
+        retained: point.retained_users,
+        rate: point.retention_rate,
+        cohortSize: point.cohort_size,
+      });
+    }
+  }
+
   return (
     <div className="min-h-screen bg-linear-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] p-6">
-      <div className="max-w-[1600px] mx-auto space-y-6">
+      <div className="max-w-400 mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
           <div>
@@ -177,6 +193,29 @@ export default function AdminRetentionPage() {
             subtitle={t('admin.retention.kpi.mau_subtitle', 'Unique users (30 days)')}
             icon={<UsersIcon className="w-6 h-6 text-[#FFCA40]" />}
           />
+        </div>
+
+        {/* Retention summary cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          {[1, 7, 30].map((dayN) => {
+            const point = retentionByDay.get(dayN);
+            const value = point ? formatPercent(point.rate) : '—';
+            const cohortSize = point?.cohortSize ?? 0;
+            const retained = point?.retained ?? 0;
+            const subtitle = retentionSummary?.cohort_date
+              ? `${t('admin.retention.kpi.cohort', 'Cohort')} ${retentionSummary.cohort_date} · ${retained}/${cohortSize}`
+              : t('admin.retention.kpi.cohort_missing', 'No cohort data yet');
+
+            return (
+              <KPICard
+                key={dayN}
+                title={t(`admin.retention.kpi.d${dayN}`, `D${dayN} Retention`)}
+                value={value}
+                subtitle={subtitle}
+                icon={<ChartBarIcon className="w-6 h-6 text-[#FFCA40]" />}
+              />
+            );
+          })}
         </div>
 
         {/* DAU chart + table */}

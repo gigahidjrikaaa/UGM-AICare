@@ -3,6 +3,7 @@ import type {
   ActiveUsersSummary,
   CohortRetentionSeries,
   DailyActiveUsersSeries,
+  RetentionSummary,
 } from '@/types/admin/retention';
 
 export async function getActiveUsersSummary(): Promise<ActiveUsersSummary> {
@@ -23,4 +24,13 @@ export async function getCohortRetentionSeries(
     params.append('day_n_values', String(dayN));
   }
   return apiCall<CohortRetentionSeries>(`/api/v1/admin/analytics/retention/cohorts?${params.toString()}`);
+}
+
+export async function getRetentionSummary(dayNValues: number[] = [1, 7, 30]): Promise<RetentionSummary> {
+  const params = new URLSearchParams();
+  for (const dayN of dayNValues) {
+    params.append('day_n_values', String(dayN));
+  }
+  const query = params.toString();
+  return apiCall<RetentionSummary>(`/api/v1/admin/analytics/retention/summary${query ? `?${query}` : ''}`);
 }

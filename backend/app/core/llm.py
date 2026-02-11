@@ -4,6 +4,8 @@ import os
 import httpx
 import asyncio
 import re
+import time
+import threading
 from typing import Any, AsyncIterator, cast
 
 # NEW SDK imports
@@ -58,7 +60,75 @@ DEFAULT_GEMMA_LOCAL_MODEL = "gemma-3-12b-it-gguf"  # Local inference via Ollama/
 
 # --- Client Management ---
 _gemini_client: Optional[genai.Client] = None
+_gemini_client_by_key: dict[int, genai.Client] = {}
+_gemini_key_cooldowns: dict[int, float] = {}
 _current_key_index: int = 0
+_gemini_client_lock = threading.Lock()
+
+
+def _select_gemini_key_index(force_rotate: bool) -> int:
+    global _current_key_index
+
+    if not GEMINI_API_KEYS:
+        logger.error("No GOOGLE_GENAI_API_KEYs found. Gemini API will not be available.")
+        raise ValueError("Google API keys not configured.")
+
+    start_idx = (_current_key_index + 1) % len(GEMINI_API_KEYS) if force_rotate else _current_key_index
+    now = time.monotonic()
+    chosen_idx: Optional[int] = None
+
+    for offset in range(len(GEMINI_API_KEYS)):
+        idx = (start_idx + offset) % len(GEMINI_API_KEYS)
+        if _gemini_key_cooldowns.get(idx, 0.0) <= now:
+            chosen_idx = idx
+            break
+
+    if chosen_idx is None:
+        earliest_idx = min(range(len(GEMINI_API_KEYS)), key=lambda i: _gemini_key_cooldowns.get(i, 0.0))
+        wait_s = max(0.0, _gemini_key_cooldowns.get(earliest_idx, now) - now)
+        logger.warning(
+            "All Gemini API keys are in cooldown. Selecting index %s (ready in %.2fs).",
+            earliest_idx,
+            wait_s,
+        )
+        chosen_idx = earliest_idx
+
+    _current_key_index = int(chosen_idx)
+    return _current_key_index
+
+
+def _get_or_create_gemini_client(key_index: int) -> genai.Client:
+    if key_index in _gemini_client_by_key:
+        return _gemini_client_by_key[key_index]
+    try:
+        client = genai.Client(api_key=GEMINI_API_KEYS[key_index])
+    except Exception as e:
+        logger.error(f"Failed to initialize Gemini client: {e}")
+        raise
+    _gemini_client_by_key[key_index] = client
+    return client
+
+
+def _mark_gemini_key_cooldown(retry_after_s: float | None) -> None:
+    if not GEMINI_API_KEYS:
+        return
+
+    min_cooldown_s = 5.0
+    max_cooldown_s = 120.0
+    cooldown_s = retry_after_s if retry_after_s is not None else min_cooldown_s
+    cooldown_s = max(min_cooldown_s, min(cooldown_s, max_cooldown_s))
+    key_idx, key_last4 = _current_gemini_key_fingerprint()
+
+    with _gemini_client_lock:
+        _gemini_key_cooldowns[key_idx] = time.monotonic() + cooldown_s
+
+    logger.warning(
+        "Cooling down Gemini API key index %s (last4=%s) for %.2fs.",
+        key_idx,
+        key_last4,
+        cooldown_s,
+    )
+
 
 def get_gemini_client(force_rotate: bool = False) -> genai.Client:
     """Get Gemini client, optionally rotating to the next API key.
@@ -72,26 +142,22 @@ def get_gemini_client(force_rotate: bool = False) -> genai.Client:
     Raises:
         ValueError: If no API keys are configured
     """
-    global _gemini_client, _current_key_index
-    
-    if not GEMINI_API_KEYS:
-        logger.error("No GOOGLE_GENAI_API_KEYs found. Gemini API will not be available.")
-        raise ValueError("Google API keys not configured.")
-        
-    if _gemini_client is None or force_rotate:
+    global _gemini_client
+
+    with _gemini_client_lock:
+        prev_idx = _current_key_index
+        selected_idx = _select_gemini_key_index(force_rotate)
+
         if force_rotate:
-            _current_key_index = (_current_key_index + 1) % len(GEMINI_API_KEYS)
-            logger.info(f"🔄 Rotating Gemini API Key to index {_current_key_index} (Key ending in ...{GEMINI_API_KEYS[_current_key_index][-4:]})")
-            
-        try:
-            _gemini_client = genai.Client(api_key=GEMINI_API_KEYS[_current_key_index])
-            if not force_rotate:
-                logger.info("Gemini client initialized successfully.")
-        except Exception as e:
-            logger.error(f"Failed to initialize Gemini client: {e}")
-            raise
-            
-    return _gemini_client
+            logger.info(
+                "Rotating Gemini API key: %s -> %s (key ending in ...%s)",
+                prev_idx,
+                selected_idx,
+                GEMINI_API_KEYS[selected_idx][-4:],
+            )
+        client = _get_or_create_gemini_client(selected_idx)
+        _gemini_client = client
+        return client
 
 # --- Provider Type ---
 LLMProvider = Literal['gemini', 'gemma_local']
@@ -644,6 +710,7 @@ async def generate_gemini_content_with_fallback(
                 )
 
                 if should_fallback:
+                    _mark_gemini_key_cooldown(last_error_retry_after_s)
                     key_idx, key_last4 = _current_gemini_key_fingerprint()
                     logger.warning(
                         "Gemini request throttled/quota-limited: model=%s code=%s key_idx=%s key_last4=%s retry=%s/%s contents_mode=True",
@@ -659,9 +726,9 @@ async def generate_gemini_content_with_fallback(
                         get_gemini_client(force_rotate=True)
                         continue
 
-                    delay_match = re.search(r"retry in (\d+(\.\d+)?)s", error_msg)
-                    if delay_match and retry_attempt < max_retries_per_model - 1:
-                        delay_seconds = min(float(delay_match.group(1)), 60.0)
+                    retry_after_s = _parse_retry_after_s(error_msg)
+                    if retry_after_s is not None and retry_attempt < max_retries_per_model - 1:
+                        delay_seconds = min(retry_after_s, 60.0)
                         logger.warning(
                             f"⏳ Rate limit hit. Sleeping for {delay_seconds:.2f}s before retrying same model..."
                         )
@@ -787,6 +854,7 @@ async def generate_gemini_response_with_fallback(
                 )
                 
                 if should_fallback:
+                    _mark_gemini_key_cooldown(last_error_retry_after_s)
                     key_idx, key_last4 = _current_gemini_key_fingerprint()
                     logger.warning(
                         "Gemini request throttled/quota-limited: model=%s code=%s key_idx=%s key_last4=%s retry=%s/%s",
@@ -809,12 +877,10 @@ async def generate_gemini_response_with_fallback(
 
                     # Check for retry delay in error message
                     # Pattern: "Please retry in 45.63936562s." or similar
-                    delay_match = re.search(r"retry in (\d+(\.\d+)?)s", error_msg)
-                    if delay_match:
-                        delay_seconds = float(delay_match.group(1))
-                        # Cap delay to avoid hanging too long (e.g. 60s)
-                        delay_seconds = min(delay_seconds, 60.0)
-                        
+                    retry_after_s = _parse_retry_after_s(error_msg)
+                    if retry_after_s is not None:
+                        delay_seconds = min(retry_after_s, 60.0)
+
                         if retry_attempt < max_retries_per_model - 1:
                             logger.warning(f"⏳ Rate limit hit. Sleeping for {delay_seconds:.2f}s before retrying same model...")
                             await asyncio.sleep(delay_seconds + 1.0) # Add 1s buffer

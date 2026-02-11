@@ -107,6 +107,20 @@ class CohortRetentionSeries(BaseModel):
     points: List[CohortRetentionPoint]
 
 
+class RetentionSummaryPoint(BaseModel):
+    day_n: int
+    cohort_size: int
+    retained_users: int
+    retention_rate: float
+
+
+class RetentionSummary(BaseModel):
+    cohort_date: date | None
+    day_n_values: List[int]
+    generated_at: datetime
+    points: List[RetentionSummaryPoint]
+
+
 # ============================================================================
 # HELPER FUNCTIONS
 # ============================================================================
@@ -503,7 +517,10 @@ async def get_cohort_retention(
     current_user: User = Depends(require_role(["admin"])),
     db: AsyncSession = Depends(get_async_db),
 ) -> CohortRetentionSeries:
-    """Return cohort retention points from precomputed `retention_cohort_daily`."""
+    """Return cohort retention points from precomputed `retention_cohort_daily`.
+
+    Cohorts are based on the first chat event per user.
+    """
 
     today = date.today()
     start = today - timedelta(days=cohort_days - 1)
@@ -544,6 +561,67 @@ async def get_cohort_retention(
 
     return CohortRetentionSeries(
         cohort_days=cohort_days,
+        day_n_values=normalized_day_ns,
+        generated_at=datetime.utcnow(),
+        points=points,
+    )
+
+
+@router.get("/retention/summary", response_model=RetentionSummary)
+async def get_retention_summary(
+    day_n_values: List[int] = Query([1, 7, 30], description="Retention day offsets"),
+    current_user: User = Depends(require_role(["admin"])),
+    db: AsyncSession = Depends(get_async_db),
+) -> RetentionSummary:
+    """Return the latest cohort's D1/D7/D30 retention summary."""
+
+    normalized_day_ns = sorted({int(x) for x in day_n_values if int(x) >= 0})
+    if not normalized_day_ns:
+        normalized_day_ns = [1, 7, 30]
+
+    latest_date = (
+        await db.execute(
+            select(func.max(RetentionCohortDaily.cohort_date)).select_from(RetentionCohortDaily)
+        )
+    ).scalar()
+
+    if latest_date is None:
+        return RetentionSummary(
+            cohort_date=None,
+            day_n_values=normalized_day_ns,
+            generated_at=datetime.utcnow(),
+            points=[],
+        )
+
+    rows = (
+        await db.execute(
+            select(
+                RetentionCohortDaily.day_n,
+                RetentionCohortDaily.cohort_size,
+                RetentionCohortDaily.retained_users,
+            )
+            .where(RetentionCohortDaily.cohort_date == latest_date)
+            .where(RetentionCohortDaily.day_n.in_(normalized_day_ns))
+            .order_by(RetentionCohortDaily.day_n.asc())
+        )
+    ).all()
+
+    points: List[RetentionSummaryPoint] = []
+    for day_n, cohort_size, retained_users in rows:
+        denom = int(cohort_size or 0)
+        retained = int(retained_users or 0)
+        rate = (retained / denom) if denom > 0 else 0.0
+        points.append(
+            RetentionSummaryPoint(
+                day_n=int(day_n),
+                cohort_size=denom,
+                retained_users=retained,
+                retention_rate=rate,
+            )
+        )
+
+    return RetentionSummary(
+        cohort_date=latest_date,
         day_n_values=normalized_day_ns,
         generated_at=datetime.utcnow(),
         points=points,

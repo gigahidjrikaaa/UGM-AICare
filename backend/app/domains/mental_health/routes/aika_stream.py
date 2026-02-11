@@ -13,6 +13,7 @@ from typing import AsyncGenerator, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
@@ -29,6 +30,7 @@ from app.core.events import AgentEvent, emit_agent_event
 from app.domains.mental_health.models import AgentNameEnum
 from app.core.llm_request_tracking import get_stats, prompt_context
 from app.core.llm import GeminiResourceExhaustedError
+from app.services.user_event_service import record_user_event
 
 logger = logging.getLogger(__name__)
 
@@ -409,6 +411,12 @@ async def stream_aika_execution(
         
         # Save conversation to database
         try:
+            existing_count = (
+                await db.execute(
+                    select(func.count()).select_from(Conversation).where(Conversation.user_id == current_user.id)
+                )
+            ).scalar() or 0
+
             conversation_entry = Conversation(
                 user_id=current_user.id,
                 session_id=session_id,
@@ -421,6 +429,21 @@ async def stream_aika_execution(
                 llm_requests_by_model=llm_stats.requests_by_model,
             )
             db.add(conversation_entry)
+
+            if existing_count == 0:
+                await record_user_event(
+                    db,
+                    user_id=current_user.id,
+                    event_name="chat.first",
+                    session_id=session_id,
+                    request_id=request_id,
+                    ip_address=None,
+                    user_agent=None,
+                    metadata={
+                        "source": "aika",
+                        "preferred_model": request.preferred_model,
+                    },
+                )
             await db.commit()
             logger.debug(f"💾 Saved conversation to database for user {current_user.id}")
         except Exception as save_error:

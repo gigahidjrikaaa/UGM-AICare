@@ -33,6 +33,7 @@ from app.domains.mental_health.services.proactive_checkins import (
 from app.services.user_normalization import current_risk_level as current_risk_level_for_user
 from app.services.user_normalization import display_name as display_name_for_user
 from app.domains.mental_health.services.insights_service import InsightsService
+from app.services.retention_service import compute_retention_cohorts
 from datetime import datetime, timedelta, date
 import random
 import os
@@ -50,6 +51,32 @@ scheduler = AsyncIOScheduler(timezone="Asia/Jakarta")
 CHECKIN_JOB_ID = "proactive_checkin_job"
 TREND_DETECTION_JOB_ID = "trend_detection_job"
 WEEKLY_IA_REPORT_JOB_ID = "weekly_ia_report_job"
+RETENTION_COHORT_JOB_ID = "retention_cohort_job"
+
+
+def _parse_bool_env(name: str, default: bool = True) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "y", "on"}
+
+
+def _parse_day_n_values(raw: str | None) -> list[int]:
+    if not raw:
+        return [1, 7, 30]
+    values: list[int] = []
+    for item in raw.split(","):
+        item = item.strip()
+        if not item:
+            continue
+        try:
+            value = int(item)
+        except ValueError:
+            continue
+        if value >= 0:
+            values.append(value)
+    normalized = sorted(set(values))
+    return normalized or [1, 7, 30]
 
 # =============================================================================
 # RISK-WEIGHTED THRESHOLDS
@@ -383,6 +410,34 @@ async def generate_weekly_ia_report() -> None:
 
 
 # =============================================================================
+# RETENTION COHORT JOB
+# =============================================================================
+
+async def compute_retention_cohort_metrics() -> None:
+    """Scheduled job to materialize retention cohort points."""
+    logger.info("Scheduler: Running retention cohort materialization job...")
+    async with AsyncSessionLocal() as db:
+        try:
+            cohort_days = int(os.getenv("RETENTION_COHORT_DAYS", "30"))
+            day_ns = _parse_day_n_values(os.getenv("RETENTION_DAY_N_VALUES"))
+            inserted = await compute_retention_cohorts(
+                db,
+                cohort_days=cohort_days,
+                day_n_values=day_ns,
+            )
+            await db.commit()
+            logger.info(
+                "Scheduler: Retention cohorts updated. rows=%s cohort_days=%s day_ns=%s",
+                inserted,
+                cohort_days,
+                day_ns,
+            )
+        except Exception as e:
+            await db.rollback()
+            logger.error("Scheduler: Error during retention cohort job: %s", e, exc_info=True)
+
+
+# =============================================================================
 # SCHEDULER LIFECYCLE
 # =============================================================================
 
@@ -440,6 +495,23 @@ def start_scheduler() -> None:
         misfire_grace_time=3600
     )
     logger.info(f"Scheduled job '{WEEKLY_IA_REPORT_JOB_ID}' with trigger: cron[day_of_week=sun, hour=2, minute=0]")
+
+    if _parse_bool_env("ENABLE_RETENTION_COHORT_JOB", True):
+        scheduler.add_job(
+            compute_retention_cohort_metrics,
+            trigger='cron',
+            hour=1,
+            minute=30,
+            id=RETENTION_COHORT_JOB_ID,
+            replace_existing=True,
+            misfire_grace_time=3600,
+        )
+        logger.info(
+            "Scheduled job '%s' with trigger: cron[hour=1, minute=30]",
+            RETENTION_COHORT_JOB_ID,
+        )
+    else:
+        logger.info("Retention cohort job disabled by ENABLE_RETENTION_COHORT_JOB")
 
     try:
         scheduler.start()
