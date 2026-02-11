@@ -43,9 +43,9 @@ export default function MeetAikaSection() {
   const { t } = useI18n();
 
   return (
-    <section className="py-24 bg-linear-to-b from-[#000B1F] to-[#001D58] relative overflow-hidden">
+    <section className="min-h-screen flex flex-col justify-center py-20 bg-transparent relative overflow-hidden">
       {/* Background Decoration */}
-      <div className="absolute inset-0 opacity-10">
+      <div className="absolute inset-0 opacity-10 pointer-events-none">
         <div className="absolute top-1/4 right-0 w-96 h-96 bg-[#FFCA40] rounded-full blur-3xl" />
         <div className="absolute bottom-1/4 left-0 w-96 h-96 bg-[#6A98F0] rounded-full blur-3xl" />
       </div>

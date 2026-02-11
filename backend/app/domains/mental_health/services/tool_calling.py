@@ -19,6 +19,7 @@ MIGRATION NOTE: Migrated from google-generativeai to google-genai SDK
 """
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from typing import Any, Callable, Dict, List, Optional
@@ -85,8 +86,12 @@ async def generate_with_tools(
     """
     model_name = request.model or "gemini_google"
     if model_name == "gemini_google":
-        # Use Gemini 2.5 Flash as default (or use GEMINI_FLASH_MODEL from llm.py)
-        model_name = getattr(llm, "GEMINI_FLASH_MODEL", "gemini-2.5-flash")
+        model_name = llm.select_gemini_model(
+            intent=None,
+            role=None,
+            has_tools=True,
+            preferred_model=None,
+        )
     
     conversation_history = list(history)
     iterations = 0
@@ -551,11 +556,14 @@ async def _check_and_execute_tool_calls(
                 
                 # Execute the tool
                 try:
-                    result = await execute_tool_call(
-                        tool_name=tool_name,
-                        args=tool_args,  # Correct parameter name is 'args'
-                        db=db,
-                        user_id=str(user_id),  # Convert to string as expected by execute_tool_call
+                    result = await asyncio.wait_for(
+                        execute_tool_call(
+                            tool_name=tool_name,
+                            args=tool_args,  # Correct parameter name is 'args'
+                            db=db,
+                            user_id=str(user_id),  # Convert to string as expected by execute_tool_call
+                        ),
+                        timeout=DEFAULT_TOOL_TIMEOUT,
                     )
                     
                     tool_results.append({
@@ -574,6 +582,26 @@ async def _check_and_execute_tool_calls(
                     
                     logger.info(f"✓ Tool {tool_name} executed successfully")
                     
+                except asyncio.TimeoutError:
+                    logger.error(
+                        "Tool execution timed out: %s (timeout=%ss)",
+                        tool_name,
+                        DEFAULT_TOOL_TIMEOUT,
+                    )
+
+                    if execution_id:
+                        execution_tracker.fail_node(
+                            execution_id,
+                            f"tool::{tool_name}",
+                            f"timeout after {DEFAULT_TOOL_TIMEOUT}s",
+                        )
+
+                    tool_results.append({
+                        "tool_name": tool_name,
+                        "arguments": tool_args,
+                        "result": {"error": "Tool execution timed out"},
+                    })
+
                 except Exception as tool_error:
                     logger.error(f"Error executing tool {tool_name}: {tool_error}", exc_info=True)
                     
@@ -620,16 +648,29 @@ async def execute_manual_tool_call(
     logger.info(f"Manual tool execution: {tool_name} for user {user_id}")
     
     try:
-        result = await execute_tool_call(
-            tool_name=tool_name,
-            args=tool_args,  # Correct parameter name is 'args'
-            db=db,
-            user_id=str(user_id),  # Convert to string as expected by execute_tool_call
+        result = await asyncio.wait_for(
+            execute_tool_call(
+                tool_name=tool_name,
+                args=tool_args,  # Correct parameter name is 'args'
+                db=db,
+                user_id=str(user_id),  # Convert to string as expected by execute_tool_call
+            ),
+            timeout=DEFAULT_TOOL_TIMEOUT,
         )
         
         logger.info(f"✓ Manual tool execution completed: {tool_name}")
         return result
         
+    except asyncio.TimeoutError:
+        logger.error(
+            "Manual tool execution timed out: %s (timeout=%ss)",
+            tool_name,
+            DEFAULT_TOOL_TIMEOUT,
+        )
+        return {
+            "success": False,
+            "error": "Tool execution timed out",
+        }
     except Exception as e:
         logger.error(f"Error in manual tool execution: {e}", exc_info=True)
         return {

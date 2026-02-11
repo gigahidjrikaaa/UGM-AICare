@@ -17,22 +17,22 @@ export default function TrustSection() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex flex-col md:flex-row items-center justify-between gap-8">
            
-           <div className="text-sm font-semibold text-slate-400 uppercase tracking-widest whitespace-nowrap">
-              {t('landing.trust.title', 'Developed in collaboration with')}
+           <div className="text-sm font-bold text-[#FFCA40] uppercase tracking-widest whitespace-nowrap">
+              {t('landing.trust.title', 'Built for')}
            </div>
 
-           <div className="flex items-center gap-12 opacity-80 hover:opacity-100 transition-opacity">
+           <div className="flex items-center gap-12">
               {partners.map((partner, index) => (
                 <div key={index} className="flex items-center gap-4">
-                   <div className="relative w-12 h-12 grayscale hover:grayscale-0 transition-all duration-300">
+                   <div className="relative w-12 h-12">
                       <Image 
                         src={partner.logo} 
                         alt={partner.name} 
                         fill 
-                        className="object-contain" 
+                        className="object-contain drop-shadow-[0_0_15px_rgba(255,255,255,0.3)]" 
                       />
                    </div>
-                   <span className="text-white/80 font-medium text-sm hidden sm:block">
+                   <span className="text-white font-bold text-sm hidden sm:block tracking-wide">
                      {partner.name}
                    </span>
                 </div>

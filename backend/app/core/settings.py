@@ -78,6 +78,7 @@ class Settings(BaseSettings):
     # Celery Configuration
     celery_broker_url: Optional[str] = Field(None, alias="CELERY_BROKER_URL")
     celery_result_backend: Optional[str] = Field(None, alias="CELERY_RESULT_BACKEND")
+    celery_store_results: bool = Field(False, alias="CELERY_STORE_RESULTS")
     
     # Email Configuration
     email_username: Optional[str] = Field(None, alias="EMAIL_USERNAME")

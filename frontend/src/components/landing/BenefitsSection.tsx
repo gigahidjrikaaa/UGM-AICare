@@ -24,9 +24,9 @@ const features = [
   },
   {
     titleKey: 'landing.benefits.card3.title',
-    titleFallback: 'Psychologist Integration',
+    titleFallback: 'Human-in-the-Loop',
     descKey: 'landing.benefits.card3.desc',
-    descFallback: 'Direct referral generation to UGM counselors when you need human support.',
+    descFallback: 'Future active integration with UGM Psychologists ensures that help reaches you proactively when high-risk patterns are detected.',
     icon: BridgeGlyph,
     span: "md:col-span-4 lg:col-span-4"
   }
@@ -36,7 +36,7 @@ export default function BenefitsSection() {
   const { t } = useI18n();
 
   return (
-    <section className="py-24 bg-transparent relative">
+    <section className="min-h-screen flex flex-col justify-center py-20 bg-transparent relative">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         
         {/* Header */}
@@ -44,8 +44,8 @@ export default function BenefitsSection() {
           <h2 className="text-3xl lg:text-5xl font-bold text-white mb-6">
             {t('landing.benefits.title', 'More than just a chatbot.')}
           </h2>
-          <p className="text-slate-400 text-lg">
-            {t('landing.benefits.subtitle', 'A comprehensive proactive support system built for the specific needs of university students.')}
+          <p className="text-slate-400 text-lg leading-relaxed">
+            {t('landing.benefits.subtitle', 'Our vision is simple: Getting real humans to reach out before you even know you need them. UGM-AICare bridges the gap between AI triage and professional psychologist intervention.')}
           </p>
         </div>
 

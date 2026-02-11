@@ -33,19 +33,10 @@ export default function HeroSection() {
   const { t } = useI18n();
 
   return (
-    <section className="relative min-h-[90vh] flex items-center overflow-hidden bg-transparent">
+    <section className="relative min-h-screen flex items-center overflow-hidden bg-transparent">
       
       {/* 1. Background Layers */}
-      {/* Subtle Image Backdrop */}
-      <div className="absolute inset-0 z-0">
-        <Image
-          src="https://images.unsplash.com/photo-1541339907198-e08756dedf3f?q=80&w=1920&auto=format&fit=crop"
-          alt="University campus support"
-          fill
-          className="object-cover opacity-10 mix-blend-luminosity"
-          priority
-        />
-      </div>
+      {/* Subtle Image Backdrop removed as requested */}
 
       {/* Particle System - kept subtle */}
       <div className="absolute inset-0 z-0 pointer-events-none h-[120vh]">
@@ -72,19 +63,6 @@ export default function HeroSection() {
           {/* Left Column: Typography & CTA */}
           <div className="text-center lg:text-left space-y-8 max-w-2xl mx-auto lg:mx-0">
             
-            {/* Status Badge */}
-            <motion.div variants={itemVariants} className="inline-flex items-center justify-center lg:justify-start">
-              <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/5 border border-white/10 backdrop-blur-md">
-                <span className="relative flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#4ADE80] opacity-75"></span>
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#4ADE80]"></span>
-                </span>
-                <span className="text-xs font-medium text-[#4ADE80] uppercase tracking-wider">
-                  {t('landing.hero.status', 'System Online • 24/7')}
-                </span>
-              </div>
-            </motion.div>
-
             {/* Headline */}
             <div className="space-y-4">
               <motion.h1 
@@ -175,25 +153,25 @@ export default function HeroSection() {
                    </div>
                 </motion.div>
 
-                {/* Text Card (Purple-ish) */}
+                {/* Text Card (Yellow) */}
                 <motion.div 
                   whileHover={{ y: -5 }}
-                  className="bg-[#6A98F0] p-6 rounded-3xl flex flex-col justify-center h-48 relative overflow-hidden"
+                  className="bg-[#FFCA40] text-[#000B1F] p-6 rounded-3xl flex flex-col justify-center h-48 relative overflow-hidden"
                 >
                    <div className="absolute top-0 right-0 p-4 opacity-10">
                       <svg width="60" height="60" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/></svg>
                    </div>
-                   <h3 className="text-[#000B1F] font-bold text-lg leading-tight mb-2">Remote Support</h3>
-                   <p className="text-[#000B1F]/80 text-xs">Access help from anywhere, anytime.</p>
+                   <h3 className="font-bold text-lg leading-tight mb-2">Remote Support</h3>
+                   <p className="opacity-80 text-xs">Access help from anywhere, anytime.</p>
                 </motion.div>
              </div>
 
              {/* Column 2 */}
              <div className="flex flex-col gap-4 -mt-8">
-                {/* Text Card (Green/Teal) */}
+                {/* Text Card (White) */}
                 <motion.div 
                   whileHover={{ y: -5 }}
-                  className="bg-[#4ADE80] p-6 rounded-3xl flex flex-col justify-center h-40 relative overflow-hidden"
+                  className="bg-white p-6 rounded-3xl flex flex-col justify-center h-40 relative overflow-hidden"
                 >
                    <h3 className="text-[#001D58] font-bold text-lg leading-tight mb-2">Quick & Adaptive</h3>
                    <p className="text-[#001D58]/80 text-xs">Personalized care plans generated in seconds.</p>

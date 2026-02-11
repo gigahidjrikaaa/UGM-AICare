@@ -467,7 +467,15 @@ want to die, mau mati, ingin mati, etc.
             # If agents not needed, store direct response
             if not state["needs_agents"]:
                 # Get preferred model from state (use same default as decision node)
-                preferred_model = state.get("preferred_model") or DEFAULT_GEMINI_MODEL
+                from app.core.llm import select_gemini_model
+
+                preferred_model = select_gemini_model(
+                    intent=state.get("intent"),
+                    role=normalized_role,
+                    has_tools=True,
+                    preferred_model=state.get("preferred_model"),
+                )
+                state["preferred_model"] = preferred_model
                 
                 # ================================================================
                 # SCREENING AWARENESS: Enhance prompt with natural probing guidance
@@ -525,10 +533,7 @@ want to die, mau mati, ingin mati, etc.
                 
                 # Generate response with potential tool usage (ReAct loop)
                 response_text, tool_calls = await generate_with_tools(
-                    history=[{
-                        "role": "system",
-                        "content": enhanced_system_instruction
-                    }] + [
+                    history=[
                         {"role": h.get("role", "user"), "content": h.get("content", "")}
                         for h in state.get("conversation_history", [])
                     ] + [

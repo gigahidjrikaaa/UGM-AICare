@@ -18,7 +18,9 @@ def _resolve_celery_url(value: Optional[str]) -> Optional[str]:
 
 
 broker_url = _resolve_celery_url(settings.celery_broker_url)
-result_backend = _resolve_celery_url(settings.celery_result_backend)
+result_backend = None
+if settings.celery_store_results:
+    result_backend = _resolve_celery_url(settings.celery_result_backend)
 
 celery_app = Celery(
     "ugm_aicare",

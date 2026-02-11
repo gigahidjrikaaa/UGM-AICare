@@ -13,6 +13,8 @@ from google import genai
 from google.genai import types
 from dotenv import load_dotenv, find_dotenv
 import logging
+
+from app.core.gemini_key_tracker import gemini_tracker
 from typing import List, Dict, Literal, Optional, Tuple
 
 # Langfuse Tracing
@@ -46,6 +48,15 @@ DEFAULT_GEMINI_MODEL = "gemini-3-flash-preview"  # Default for general use
 GEMINI_LITE_MODEL = "gemini-2.5-flash-lite"  # For high-volume conversational
 GEMINI_FLASH_MODEL = "gemini-3-flash-preview"  # For most agent tasks
 GEMINI_PRO_MODEL = "gemini-3-pro-preview"  # For advanced reasoning (use where it matters)
+
+# Circuit breaker tuning
+_MODEL_FAILURE_WINDOW_S = 60.0
+_MODEL_FAILURE_THRESHOLD = 5
+_MODEL_COOLDOWN_S = 60.0
+_gemini_model_failures: dict[str, list[float]] = {}
+_gemini_model_open_until: dict[str, float] = {}
+_gemini_model_breaker_events: dict[str, dict[str, Any]] = {}
+_gemini_model_lock = threading.Lock()
 
 # Fallback chain for Gemini models (in order of preference)
 # Keep this list limited to models you can actually call; otherwise the chain may abort early.
@@ -107,6 +118,144 @@ def _get_or_create_gemini_client(key_index: int) -> genai.Client:
         raise
     _gemini_client_by_key[key_index] = client
     return client
+
+
+def select_gemini_model(
+    *,
+    intent: str | None,
+    role: str | None,
+    has_tools: bool,
+    preferred_model: str | None = None,
+) -> str:
+    """Select a Gemini model based on intent/role and tool usage.
+
+    This is a lightweight routing policy to reduce cost/latency for low-risk tasks.
+    """
+    if preferred_model:
+        return preferred_model
+
+    normalized_intent = (intent or "").lower()
+    normalized_role = (role or "").lower()
+
+    if normalized_role in ("admin", "counselor") and normalized_intent in (
+        "analytics_query",
+        "crisis_intervention",
+        "emergency_escalation",
+    ):
+        return GEMINI_PRO_MODEL
+
+    if normalized_intent in ("crisis_intervention", "emergency_escalation"):
+        return GEMINI_PRO_MODEL
+
+    if has_tools or normalized_intent in (
+        "emotional_support",
+        "appointment_scheduling",
+        "information_inquiry",
+    ):
+        return GEMINI_FLASH_MODEL
+
+    return GEMINI_LITE_MODEL
+
+
+def _get_breaker_event_entry(model: str) -> dict[str, Any]:
+    if model not in _gemini_model_breaker_events:
+        _gemini_model_breaker_events[model] = {
+            "total_opens": 0,
+            "total_closes": 0,
+            "last_opened_at": None,
+            "last_closed_at": None,
+        }
+    return _gemini_model_breaker_events[model]
+
+
+def _close_expired_breakers(now_mono: float, now_epoch: float) -> None:
+    for model, until in list(_gemini_model_open_until.items()):
+        if until <= now_mono:
+            _gemini_model_open_until.pop(model, None)
+            entry = _get_breaker_event_entry(model)
+            entry["total_closes"] = int(entry.get("total_closes", 0)) + 1
+            entry["last_closed_at"] = now_epoch
+
+
+def _record_model_failure(model: str) -> None:
+    now = time.monotonic()
+    now_epoch = time.time()
+    with _gemini_model_lock:
+        failures = _gemini_model_failures.get(model, [])
+        failures = [t for t in failures if now - t <= _MODEL_FAILURE_WINDOW_S]
+        failures.append(now)
+        _gemini_model_failures[model] = failures
+
+        if len(failures) >= _MODEL_FAILURE_THRESHOLD:
+            is_open = _gemini_model_open_until.get(model, 0.0) > now
+            if not is_open:
+                _gemini_model_open_until[model] = now + _MODEL_COOLDOWN_S
+                entry = _get_breaker_event_entry(model)
+                entry["total_opens"] = int(entry.get("total_opens", 0)) + 1
+                entry["last_opened_at"] = now_epoch
+
+
+def _record_model_success(model: str) -> None:
+    now_epoch = time.time()
+    with _gemini_model_lock:
+        was_open = model in _gemini_model_open_until
+        _gemini_model_failures.pop(model, None)
+        _gemini_model_open_until.pop(model, None)
+        if was_open:
+            entry = _get_breaker_event_entry(model)
+            entry["total_closes"] = int(entry.get("total_closes", 0)) + 1
+            entry["last_closed_at"] = now_epoch
+
+
+def _is_model_open(model: str) -> bool:
+    now = time.monotonic()
+    with _gemini_model_lock:
+        return _gemini_model_open_until.get(model, 0.0) > now
+
+
+def get_gemini_circuit_breaker_status(models: Optional[list[str]] = None) -> list[dict[str, Any]]:
+    """Return circuit breaker status for observability."""
+    now_mono = time.monotonic()
+    now_epoch = time.time()
+
+    with _gemini_model_lock:
+        _close_expired_breakers(now_mono, now_epoch)
+
+        if models is None:
+            models = list({
+                DEFAULT_GEMINI_MODEL,
+                GEMINI_LITE_MODEL,
+                GEMINI_FLASH_MODEL,
+                GEMINI_PRO_MODEL,
+                *GEMINI_FALLBACK_CHAIN,
+            })
+
+        statuses: list[dict[str, Any]] = []
+        for model in models:
+            failures = _gemini_model_failures.get(model, [])
+            failures = [t for t in failures if now_mono - t <= _MODEL_FAILURE_WINDOW_S]
+            if failures:
+                _gemini_model_failures[model] = failures
+            else:
+                _gemini_model_failures.pop(model, None)
+
+            open_until = _gemini_model_open_until.get(model, 0.0)
+            is_open = open_until > now_mono
+            remaining_s = max(0.0, open_until - now_mono) if is_open else 0.0
+            entry = _get_breaker_event_entry(model)
+
+            statuses.append({
+                "model": model,
+                "is_open": is_open,
+                "open_remaining_s": round(remaining_s, 2),
+                "failures_in_window": len(failures),
+                "total_opens": int(entry.get("total_opens", 0)),
+                "total_closes": int(entry.get("total_closes", 0)),
+                "last_opened_at": entry["last_opened_at"],
+                "last_closed_at": entry["last_closed_at"],
+            })
+
+        return statuses
 
 
 def _mark_gemini_key_cooldown(retry_after_s: float | None) -> None:
@@ -177,6 +326,10 @@ def _convert_history_to_contents(history: List[Dict[str, str]]) -> List[types.Co
         role = msg.get("role")
         content = msg.get("content")
         if not content:
+            continue
+
+        # System instructions should be passed via config.system_instruction.
+        if role == "system":
             continue
         
         # Map 'assistant' to 'model' for Gemini
@@ -661,12 +814,20 @@ async def generate_gemini_content_with_fallback(
         config = types.GenerateContentConfig(max_output_tokens=2048, temperature=0.7)
 
     models_to_try = [model] + [m for m in GEMINI_FALLBACK_CHAIN if m != model]
+    all_models_open = all(_is_model_open(m) for m in models_to_try)
+    all_models_open = all(_is_model_open(m) for m in models_to_try)
     last_error: Exception | None = None
     last_error_model: str | None = None
     last_error_key: tuple[int, str] | None = None
     last_error_retry_after_s: float | None = None
 
     for idx, current_model in enumerate(models_to_try):
+        if _is_model_open(current_model) and not all_models_open:
+            logger.warning("Skipping model %s due to open circuit breaker", current_model)
+            continue
+        if _is_model_open(current_model) and not all_models_open:
+            logger.warning("Skipping model %s due to open circuit breaker", current_model)
+            continue
         max_retries_per_model = max(3, len(GEMINI_API_KEYS))
 
         for retry_attempt in range(max_retries_per_model):
@@ -683,6 +844,11 @@ async def generate_gemini_content_with_fallback(
                     return_full_response=return_full_response,
                 )
 
+                # Track successful request
+                key_idx, _ = _current_gemini_key_fingerprint()
+                gemini_tracker.record_request(key_index=key_idx, model=current_model, success=True)
+                _record_model_success(current_model)
+
                 if idx > 0 or retry_attempt > 0:
                     logger.warning(f"✅ Fallback/Retry successful! Used model: {current_model}")
                 return response
@@ -694,6 +860,22 @@ async def generate_gemini_content_with_fallback(
                 last_error_retry_after_s = _parse_retry_after_s(str(e))
                 error_code = getattr(e, "status_code", 0)
                 error_msg = str(e)
+
+                _record_model_failure(current_model)
+
+                # Track failed request
+                key_idx_err, _ = _current_gemini_key_fingerprint()
+                is_rate_limited = (
+                    error_code == 429
+                    or "RESOURCE_EXHAUSTED" in error_msg
+                )
+                gemini_tracker.record_request(
+                    key_index=key_idx_err,
+                    model=current_model,
+                    success=False,
+                    is_rate_limited=is_rate_limited,
+                    error_message=error_msg[:200],
+                )
 
                 if _is_invalid_model_error(error_code, error_msg):
                     logger.warning(
@@ -825,7 +1007,11 @@ async def generate_gemini_response_with_fallback(
                     json_mode=json_mode
                 )
                 
-                # Success!
+                # Success! Track it.
+                key_idx, _ = _current_gemini_key_fingerprint()
+                gemini_tracker.record_request(key_index=key_idx, model=current_model, success=True)
+                _record_model_success(current_model)
+
                 if idx > 0 or retry_attempt > 0:
                     logger.warning(f"✅ Fallback/Retry successful! Used model: {current_model}")
                 return response
@@ -837,6 +1023,22 @@ async def generate_gemini_response_with_fallback(
                 last_error_retry_after_s = _parse_retry_after_s(str(e))
                 error_code = getattr(e, 'status_code', 0)
                 error_msg = str(e)
+
+                _record_model_failure(current_model)
+
+                # Track failed request
+                key_idx_err, _ = _current_gemini_key_fingerprint()
+                is_rate_limited = (
+                    error_code == 429
+                    or "RESOURCE_EXHAUSTED" in error_msg
+                )
+                gemini_tracker.record_request(
+                    key_index=key_idx_err,
+                    model=current_model,
+                    success=False,
+                    is_rate_limited=is_rate_limited,
+                    error_message=error_msg[:200],
+                )
                 
                 if _is_invalid_model_error(error_code, error_msg):
                     logger.warning(

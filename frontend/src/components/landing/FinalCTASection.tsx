@@ -12,7 +12,7 @@ export default function FinalCTASection() {
   const { t } = useI18n();
 
   return (
-    <section className="py-32 bg-transparent relative overflow-hidden">
+    <section className="min-h-screen flex flex-col justify-center py-20 bg-transparent relative overflow-hidden">
       
       {/* Portal Glow Effect */}
       <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[800px] h-[800px] bg-white opacity-[0.02] blur-[100px] rounded-full pointer-events-none" />

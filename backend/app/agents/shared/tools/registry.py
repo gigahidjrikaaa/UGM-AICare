@@ -190,6 +190,61 @@ def get_tool_schema(name: str) -> Optional[Dict[str, Any]]:
     }
 
 
+def _is_expected_type(expected: str, value: Any) -> bool:
+    if expected == "string":
+        return isinstance(value, str)
+    if expected == "integer":
+        return isinstance(value, int) and not isinstance(value, bool)
+    if expected == "number":
+        return isinstance(value, (int, float)) and not isinstance(value, bool)
+    if expected == "boolean":
+        return isinstance(value, bool)
+    if expected == "object":
+        return isinstance(value, dict)
+    if expected == "array":
+        return isinstance(value, list)
+    return True
+
+
+def _validate_tool_args(schema: Dict[str, Any], args: Dict[str, Any]) -> list[str]:
+    errors: list[str] = []
+
+    schema_type = schema.get("type")
+    if schema_type == "object":
+        if not isinstance(args, dict):
+            return ["Arguments must be an object"]
+
+        required = schema.get("required", [])
+        for key in required:
+            if key not in args:
+                errors.append(f"Missing required field: {key}")
+
+        properties = schema.get("properties", {})
+        for key, value in args.items():
+            prop = properties.get(key)
+            if not prop:
+                continue
+            expected = prop.get("type")
+            if expected and not _is_expected_type(expected, value):
+                errors.append(f"Invalid type for {key}: expected {expected}")
+            if "enum" in prop and value not in prop["enum"]:
+                errors.append(f"Invalid value for {key}: must be one of {prop['enum']}")
+            if expected == "array" and isinstance(value, list):
+                item_type = (prop.get("items") or {}).get("type")
+                if item_type:
+                    for idx, item in enumerate(value):
+                        if not _is_expected_type(item_type, item):
+                            errors.append(
+                                f"Invalid type for {key}[{idx}]: expected {item_type}"
+                            )
+                            break
+    elif schema_type:
+        if not _is_expected_type(schema_type, args):
+            errors.append(f"Invalid argument type: expected {schema_type}")
+
+    return errors
+
+
 # ============================================================================
 # TOOL EXECUTION
 # ============================================================================
@@ -237,6 +292,15 @@ async def execute_tool(
         return {
             "status": "failed",
             "error": f"Tool {tool_name} requires user_id"
+        }
+
+    schema = tool.get("parameters") or {}
+    validation_errors = _validate_tool_args(schema, args)
+    if validation_errors:
+        return {
+            "status": "failed",
+            "error": "Invalid tool arguments",
+            "details": validation_errors,
         }
     
     # Prepare function arguments

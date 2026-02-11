@@ -27,6 +27,7 @@ import {
   FiDatabase,
   FiEye,
   FiAward,
+  FiKey,
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink'; // Assuming SidebarLink component exists
 
@@ -65,6 +66,7 @@ const navGroups = [
     label: 'Development Tools',
     items: [
       { name: 'Database Viewer', icon: <FiDatabase size={18} />, href: '/admin/database' },
+      { name: 'API Key Monitor', icon: <FiKey size={18} />, href: '/admin/api-keys' },
     ]
   }
 ];

@@ -17,7 +17,7 @@ const FinalCTASection = dynamic(() => import('@/components/landing/FinalCTASecti
 // Loading skeleton for hero section
 function HeroSkeleton() {
   return (
-    <div className="min-h-screen bg-linear-to-br from-[#000B1F] via-[#001D58] to-[#002A7A] flex items-center justify-center">
+    <div className="min-h-screen bg-transparent flex items-center justify-center">
       <div className="animate-pulse flex flex-col items-center text-center px-4">
         <div className="h-8 w-48 bg-white/10 rounded-full mb-6" />
         <div className="h-16 w-80 md:w-125 bg-white/10 rounded-lg mb-4" />
@@ -41,7 +41,7 @@ export default function Home() {
   }
 
   return (
-    <main className="min-h-screen w-full bg-[#000B1F] text-white selection:bg-[#FFCA40] selection:text-[#001D58]">
+    <main className="min-h-screen w-full bg-transparent text-white selection:bg-[#FFCA40] selection:text-[#001D58]">
       {/* 
         Landing Page Structure:
         1. Hero - First impression, main CTA
