@@ -10,11 +10,6 @@ services:
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
     env_file:
       - .env.local
-    environment:
-      NODE_ENV: production
-      PORT: ${PORT:-22000}
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-      INTERNAL_API_URL: ${INTERNAL_API_URL}
     ports:
       - "${FRONTEND_EXTERNAL_PORT:-22000}:22000"
     healthcheck:

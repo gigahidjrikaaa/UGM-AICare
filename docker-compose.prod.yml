@@ -17,18 +17,6 @@ services:
           memory: 4G
         reservations:
           memory: 1G
-    environment:
-      PORT: ${PORT:-22001}
-      APP_ENV: production
-      LANGFUSE_ENABLED: "false"
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
-      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
-      MINIO_BUCKET: ${MINIO_BUCKET}
     restart: always
     networks:
       - ugm_aicare_network
@@ -48,11 +36,6 @@ services:
           memory: 6G
         reservations:
           memory: 2G
-    environment:
-      NODE_ENV: production
-      PORT: ${PORT:-22000}
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL}
-      INTERNAL_API_URL: ${INTERNAL_API_URL}
     restart: always
     networks:
       - ugm_aicare_network

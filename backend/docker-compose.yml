@@ -16,17 +16,6 @@ services:
     # - MINIO_BUCKET
     env_file:
       - .env
-    environment:
-      PYTHONPATH: /app
-      PORT: ${PORT:-22001}
-      DATABASE_URL: ${DATABASE_URL}
-      REDIS_URL: ${REDIS_URL}
-      CELERY_BROKER_URL: ${CELERY_BROKER_URL}
-      CELERY_RESULT_BACKEND: ${CELERY_RESULT_BACKEND}
-      MINIO_ENDPOINT: ${MINIO_ENDPOINT}
-      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY}
-      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY}
-      MINIO_BUCKET: ${MINIO_BUCKET}
     ports:
       - "${BACKEND_EXTERNAL_PORT:-22001}:22001"
     healthcheck:
