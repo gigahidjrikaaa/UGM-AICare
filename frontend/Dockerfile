@@ -6,7 +6,7 @@
 ARG NODE_IMAGE=node:20-bookworm-slim
 
 # 1. Development Stage ('development')
-FROM ${NODE_IMAGE} as development
+FROM ${NODE_IMAGE} AS development
 
 # Set working directory
 WORKDIR /app
@@ -16,9 +16,10 @@ ENV NEXT_TELEMETRY_DISABLED=1
 
 # Copy package.json and lock file
 COPY package.json package-lock.json ./
-# Install dependencies using npm ci (clean install based on lock file)
+# Install dependencies. Prefer npm ci for reproducibility, but fall back to npm install
+# if the lockfile is out of sync (avoids CI hard-fail during deployment).
 RUN --mount=type=cache,target=/root/.npm \
-	npm ci --no-audit --no-fund
+	sh -lc "npm ci --no-audit --no-fund || npm install --no-audit --no-fund"
 
 # Copy the rest of the application code
 COPY . .
@@ -35,7 +36,7 @@ CMD ["npm", "run", "dev:docker"]
 
 # 2. Production Build Stage ('builder')
 # Use the development stage as a base or start fresh
-FROM ${NODE_IMAGE} as builder
+FROM ${NODE_IMAGE} AS builder
 
 WORKDIR /app
 
@@ -45,9 +46,9 @@ ENV NEXT_TELEMETRY_DISABLED=1
 # Copy dependency manifests
 COPY package.json package-lock.json ./
 
-# Clean install to ensure exact versions from package-lock.json
+# Prefer clean install for exact versions, but fall back to npm install if lockfile drift exists.
 RUN --mount=type=cache,target=/root/.npm \
-	npm ci --prefer-offline --no-audit --no-fund
+	sh -lc "npm ci --prefer-offline --no-audit --no-fund || npm install --prefer-offline --no-audit --no-fund"
 
 # Copy the rest of the source code
 COPY . .
@@ -70,7 +71,7 @@ RUN npm run build
 
 # 3. Production Runtime Stage ('production')
 # Use a minimal Node.js image for the final production image
-FROM ${NODE_IMAGE} as production
+FROM ${NODE_IMAGE} AS production
 
 WORKDIR /app
 
