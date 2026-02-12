@@ -5,9 +5,6 @@ import { MessageBubble } from "./MessageBubble";
 
 import { AikaLoadingBubble } from "../aika/AikaLoadingBubble";
 
-import CounselorCard from "./CounselorCard";
-import TimeSlotCard from "./TimeSlotCard";
-
 interface ChatWindowProps {
   messages: Message[];
   chatContainerRef: React.RefObject<HTMLDivElement | null>;
@@ -16,6 +13,11 @@ interface ChatWindowProps {
   isLoading?: boolean;
   activeAgents?: string[];
   onCardSelect?: (text: string) => void;
+  onRegenerate?: (text: string) => void;
+
+  /** Optional: used to show names and avatar for user messages */
+  userDisplayName?: string;
+  userImageUrl?: string | null;
 }
 
 export function ChatWindow({
@@ -26,8 +28,16 @@ export function ChatWindow({
   isLoading,
   activeAgents = [],
   onCardSelect,
+  onRegenerate,
+  userDisplayName,
+  userImageUrl,
 }: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  const topFadeMaskStyle: React.CSSProperties = {
+    WebkitMaskImage: 'linear-gradient(to bottom, transparent 0px, black 24px)',
+    maskImage: 'linear-gradient(to bottom, transparent 0px, black 24px)',
+  };
 
   // Auto-scroll to bottom when messages change or loading state changes
   useEffect(() => {
@@ -42,62 +52,49 @@ export function ChatWindow({
   }, [messages, isLoading]);
 
   return (
-    <div ref={chatContainerRef} className="flex-1 overflow-y-auto bg-transparent space-y-2 px-2 pb-4 pt-2 sm:px-4 md:px-6">
-      {messages.map((msg, index) => {
-        // Determine if this is the last bubble in a continuation group
-        const nextMsg = messages[index + 1];
-        const isLastInGroup = !nextMsg || !nextMsg.isContinuation || nextMsg.role !== msg.role;
-        
-        return (
-          <div key={msg.id} className="flex flex-col">
-            <MessageBubble
-              message={msg}
-              isLastInGroup={isLastInGroup}
-              onCancelAppointment={onCancelAppointment}
-              onRescheduleAppointment={onRescheduleAppointment}
-            />
+    <div
+      ref={chatContainerRef}
+      className="flex-1 overflow-y-auto bg-transparent! px-2 pb-4 pt-4 sm:px-4 md:px-6"
+      style={topFadeMaskStyle}
+    >
+      {/* Centered conversation column (ChatGPT-like reading width) */}
+      <div className="mx-auto w-full max-w-3xl space-y-2">
+        {messages.map((msg, index) => {
+          const nextMsg = messages[index + 1];
+          const isLastInGroup = !nextMsg || !nextMsg.isContinuation || nextMsg.role !== msg.role;
 
-          {/* Render Interactive Cards based on Tool Calls */}
-          {msg.role === 'assistant' && msg.metadata?.tool_calls && Array.isArray(msg.metadata.tool_calls) && (
-            <div className="mt-2 w-full overflow-x-auto pb-2 custom-scrollbar pl-9">
-              <div className="flex gap-2 px-1">
-                {msg.metadata.tool_calls.map((tool: any, idx: number) => {
-                  // Check for get_available_counselors result
-                  if (tool.tool_name === 'get_available_counselors' && tool.result?.counselors) {
-                    return tool.result.counselors.map((counselor: any) => (
-                      <CounselorCard
-                        key={counselor.id}
-                        counselor={counselor}
-                        onSelect={(c) => onCardSelect?.(`Saya pilih ${c.name} (ID: ${c.id})`)}
-                      />
-                    ));
-                  }
-                  // Check for suggest_appointment_times result
-                  if (tool.tool_name === 'suggest_appointment_times' && tool.result?.suggestions) {
-                    return tool.result.suggestions.map((slot: any, sIdx: number) => (
-                      <TimeSlotCard
-                        key={sIdx}
-                        slot={slot}
-                        onSelect={(s) => onCardSelect?.(`Saya pilih waktu ${s.time_label} (${s.datetime})`)}
-                      />
-                    ));
-                  }
-                  return null;
-                })}
-              </div>
+          // For assistant messages, compute the most recent user prompt so we can "regenerate"
+          let retryText: string | null = null;
+          if (msg.role === 'assistant') {
+            for (let i = index - 1; i >= 0; i -= 1) {
+              if (messages[i]?.role === 'user') {
+                retryText = messages[i].content;
+                break;
+              }
+            }
+          }
+
+          return (
+            <div key={msg.id} className="flex flex-col">
+              <MessageBubble
+                message={msg}
+                isLastInGroup={isLastInGroup}
+                onCancelAppointment={onCancelAppointment}
+                onRescheduleAppointment={onRescheduleAppointment}
+                onCardSelect={onCardSelect}
+                retryText={retryText}
+                onRegenerate={onRegenerate}
+                userDisplayName={userDisplayName}
+                userImageUrl={userImageUrl}
+              />
             </div>
-          )}
-        </div>
-        );
-      })}
+          );
+        })}
 
-      {/* Loading Indicator inside Chat Window */}
-      {isLoading && (
-        <div className="pl-0 sm:pl-2">
-          <AikaLoadingBubble activeAgents={activeAgents} />
-        </div>
-      )}
-      
+        {/* Loading Indicator inside the centered column */}
+        {isLoading && <AikaLoadingBubble activeAgents={activeAgents} />}
+      </div>
+
       {/* Scroll anchor for auto-scroll */}
       <div ref={bottomRef} className="h-1" />
     </div>

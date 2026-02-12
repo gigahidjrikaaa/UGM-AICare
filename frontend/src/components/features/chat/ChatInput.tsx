@@ -152,7 +152,7 @@ export function ChatInput({
               placeholder={isLoading ? "Aika sedang mengetik..." : isStandardMode ? "Ketik pesan..." : "Ketik jawabanmu..."}
               rows={1}
               className={cn(
-                "w-full resize-none border-0 bg-transparent px-0 text-sm sm:text-[15px] text-white placeholder:text-white/40 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 transition-all duration-200"
+                "w-full resize-none border-0 bg-transparent px-0 text-sm sm:text-[15px] text-white placeholder:text-white/40 focus:outline-none focus:ring-0 focus:border-0 focus-visible:outline-none focus-visible:ring-0 focus-visible:border-0 transition-all duration-200"
               )}
               style={{ 
                 minHeight: '32px',

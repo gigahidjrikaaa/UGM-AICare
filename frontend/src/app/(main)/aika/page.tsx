@@ -21,6 +21,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
+import { Activity, X } from 'lucide-react';
 import { useAikaChat, type ToolActivityLog } from '@/hooks/useAikaChat';
 import { ChatWindow } from '@/components/features/chat/ChatWindow';
 import { ChatInput } from '@/components/features/chat/ChatInput';
@@ -28,13 +29,12 @@ import { AIKA_MEMORY_NOTE } from '@/constants/chat';
 import { useInterventionPlans } from '@/hooks/useInterventionPlans';
 import { AikaLoadingBubble } from '@/components/features/aika/AikaLoadingBubble';
 import {
-  AgentActivityBadge,
   RiskLevelIndicator,
   EscalationNotification,
   AikaAvatar,
   AikaPoweredBadge,
 } from '@/components/features/aika/AikaComponents';
-import { ActivityLogPanel, ActivityIndicator, type ViewMode } from '@/components/features/aika/ActivityLogPanel';
+import { ActivityLogPanel, ActivityIndicator } from '@/components/features/aika/ActivityLogPanel';
 import { useActivityLog } from '@/hooks/useActivityLog';
 
 // Loading Component
@@ -52,57 +52,13 @@ const LoadingIndicator = () => (
   </div>
 );
 
-// Header Bar Component
-function HeaderBar() {
-  return (
-    <div className="flex items-center justify-between px-4 py-3 border-b border-white/10 bg-white/3 backdrop-blur-md">
-      {/* Left: Avatar & Title */}
-      <div className="flex items-center gap-3">
-        <div className="relative">
-          <div className="w-9 h-9 rounded-full overflow-hidden border-2 border-ugm-gold/50 shadow-lg">
-            <Image src="/aika-human.jpeg" alt="Aika" width={36} height={36} className="object-cover w-full h-full" />
-          </div>
-          <div className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-green-500 rounded-full border-2 border-[#001D58]" />
-        </div>
-        <div>
-          <h1 className="text-base font-semibold text-white flex items-center gap-2">
-            Aika
-            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-ugm-gold/20 text-ugm-gold border border-ugm-gold/30">
-              AI
-            </span>
-          </h1>
-          <p className="text-[11px] text-white/50">
-            Mental Health Assistant
-          </p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
 export default function AikaEnhancedPage() {
   const [mounted, setMounted] = useState(false);
-  const { status } = useSession();
+  const { data: session, status } = useSession();
   const router = useRouter();
   const chatContainerRef = useRef<HTMLDivElement>(null);
-  
-  // Track floating panel view modes for layout adjustment
-  const [activityLogViewMode, setActivityLogViewMode] = useState<ViewMode>('minimized');
 
-  // Calculate left margin based on activity log state
-  // Activity log is always visible on desktop (lg+), hidden on mobile
-  // Margin = panel width + left offset (1rem) + gap (0.5rem)
-  // Panel widths: minimized=4rem (64px), compact=20rem (320px), expanded=24rem/26.25rem (384px/420px)
-  const getLeftMargin = () => {
-    // On mobile/tablet, no margin needed (panels overlay)
-    // On desktop (lg+), apply margin based on view mode
-    switch (activityLogViewMode) {
-      case 'expanded': return 'lg:ml-[25.5rem] xl:ml-[28rem]';
-      case 'compact': return 'lg:ml-[21.5rem]';
-      case 'minimized': return 'lg:ml-[5.5rem]';
-      default: return 'lg:ml-[5.5rem]';
-    }
-  };
+  const [isAikaPanelOpen, setIsAikaPanelOpen] = useState(true);
 
   // Fetch intervention plans
   const {
@@ -418,14 +374,23 @@ export default function AikaEnhancedPage() {
   return (
     <>
       {/* Content area - Fixed positioning to avoid navbar clash */}
-      <div className="fixed inset-0 top-[72px] md:top-20 w-full text-white flex flex-col p-2 md:p-4 lg:p-6 gap-4">
-        {/* Main Layout Container - Adjusts margins based on floating panel states */}
-        <div className={`w-full max-w-7xl mx-auto flex-1 flex gap-4 overflow-hidden transition-all duration-300 min-w-0 ${getLeftMargin()}`}>
-          {/* Chat Panel - Full width now since activity log is floating */}
-          <div className="w-full min-w-0 flex flex-col bg-white/10 backdrop-blur-xl rounded-2xl border border-white/20 shadow-xl overflow-hidden transition-all duration-300 min-h-0">
-            <HeaderBar />
+      <div className="fixed inset-0 top-18 md:top-20 w-full text-white flex flex-col">
+        {/* Main Layout Container */}
+        <motion.div
+          layout
+          transition={{ type: 'spring', damping: 28, stiffness: 220, mass: 0.9 }}
+          className="w-full flex-1 flex overflow-hidden min-w-0"
+        >
+          {/* Chat Panel */}
+          <motion.div
+            layout
+            transition={{ type: 'spring', damping: 28, stiffness: 220, mass: 0.9 }}
+            className="flex-1 min-w-0 flex flex-col bg-transparent overflow-hidden min-h-0 p-2 md:p-4 lg:p-6"
+          >
 
-            <div className="flex-1 overflow-hidden flex flex-col">
+            <div className="flex-1 overflow-hidden flex min-h-0">
+              {/* Chat area */}
+              <div className="flex-1 min-w-0 overflow-hidden flex flex-col">
               {/* Agent Activity Indicator */}
               {isReceiving && activeAgents.length > 0 && (
                 <div className="px-4 pt-3">
@@ -439,12 +404,6 @@ export default function AikaEnhancedPage() {
               {/* Agent Activity & Risk Display */}
               {lastMetadata && (
                 <div className="px-4 pt-3 space-y-2">
-                  {lastMetadata.agents_invoked.length > 0 && (
-                    <AgentActivityBadge
-                      agents={lastMetadata.agents_invoked}
-                      processingTime={lastMetadata.processing_time_ms}
-                    />
-                  )}
                   {lastMetadata.risk_assessment && lastMetadata.risk_assessment.risk_level !== 'low' && (
                     <RiskLevelIndicator
                       assessment={lastMetadata.risk_assessment}
@@ -464,51 +423,90 @@ export default function AikaEnhancedPage() {
                 isLoading={isLoading}
                 activeAgents={activeAgents}
                 onCardSelect={handleSendMessage}
+                onRegenerate={handleSendMessage}
+                userDisplayName={session?.user?.name ?? session?.user?.email ?? 'You'}
+                userImageUrl={session?.user?.image ?? null}
               />
 
               {/* Chat Input - using original component */}
-              <div className="p-4">
-                <ChatInput
-                  inputValue={inputValue}
-                  onInputChange={handleInputChange}
-                  onSendMessage={handleSendMessage}
-                  onStartModule={() => { }} // Disabled for now
-                  isLoading={isLoading}
-                  currentMode="standard"
-                  availableModules={[]}
-                  isLiveTalkActive={false}
-                  toggleLiveTalk={() => { }} // Disabled for now
-                  interruptOnEnter={false}
-                />
+              <div className="px-4 pb-3 pt-2">
+                <div className="mx-auto w-full max-w-3xl">
+                  <ChatInput
+                    inputValue={inputValue}
+                    onInputChange={handleInputChange}
+                    onSendMessage={handleSendMessage}
+                    onStartModule={() => { }} // Disabled for now
+                    isLoading={isLoading}
+                    currentMode="standard"
+                    availableModules={[]}
+                    isLiveTalkActive={false}
+                    toggleLiveTalk={() => { }} // Disabled for now
+                    interruptOnEnter={false}
+                  />
+                </div>
+              </div>
               </div>
             </div>
-          </div>
-        </div>
+          </motion.div>
 
-        {/* Activity Log Panel - Floating on the left, always visible on desktop */}
-        <div className="hidden lg:block">
-          <ActivityLogPanel
-            activities={activities}
-            metadata={lastMetadata ?? null}
-            interventionPlans={plansData}
-            interventionPlansLoading={interventionPlansLoading}
-            interventionPlansError={interventionPlansError}
-            onRefreshInterventionPlans={refetchPlans}
-            alwaysVisible={true}
-            onViewModeChange={setActivityLogViewMode}
-          />
-        </div>
+          {/* Integrated Right Sidebar */}
+          <AnimatePresence initial={false} mode="popLayout">
+            {isAikaPanelOpen && (
+              <motion.aside
+                key="aika-sidebar"
+                layout
+                initial={{ opacity: 0, x: 120, scaleX: 0.98 }}
+                animate={{ opacity: 1, x: 0, scaleX: 1 }}
+                exit={{ opacity: 0, x: 140, scaleX: 0.98 }}
+                transition={{ type: 'spring', damping: 26, stiffness: 260, mass: 0.8 }}
+                className="hidden lg:flex w-80 xl:w-96 shrink-0 flex-col origin-right border-l border-white/10 bg-linear-to-b from-[#0a1628]/60 to-[#0d1d35]/60 backdrop-blur-md overflow-hidden"
+              >
+                <div className="flex-1 min-h-0">
+                  <ActivityLogPanel
+                    activities={activities}
+                    metadata={lastMetadata ?? null}
+                    interventionPlans={plansData}
+                    interventionPlansLoading={interventionPlansLoading}
+                    interventionPlansError={interventionPlansError}
+                    onRefreshInterventionPlans={refetchPlans}
+                    embedded={true}
+                    onClose={() => setIsAikaPanelOpen(false)}
+                  />
+                </div>
 
-        {/* Footer credit */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 0.5 }}
-          className="shrink-0 py-2 text-center text-xs text-gray-300/70"
-        >
-          <p>Disclaimer: Aika adalah AI dan bukan pengganti profesional medis.</p>
-          <p className="mt-1">Built with ❤️ by UGM AICare Team • Powered by LangGraph</p>
+                <div className="border-t border-white/10 px-3 py-3 text-center">
+                  <p className="text-[10px] text-white/40">Disclaimer: Aika adalah AI dan bukan pengganti profesional medis.</p>
+                  <p className="text-[10px] text-white/30 mt-1">Built with ❤️ by UGM AICare Team • Powered by LangGraph</p>
+                </div>
+              </motion.aside>
+            )}
+          </AnimatePresence>
         </motion.div>
+
+        {/* Pull tag when sidebar is closed */}
+        <div className="hidden lg:block">
+          <AnimatePresence initial={false}>
+            {!isAikaPanelOpen && (
+              <motion.button
+                key="aika-panel-tag"
+                initial={{ x: 56, opacity: 0, scale: 0.98 }}
+                animate={{ x: 0, opacity: 1, scale: 1 }}
+                exit={{ x: 56, opacity: 0, scale: 0.98 }}
+                transition={{ type: 'spring', damping: 26, stiffness: 260, mass: 0.8 }}
+                type="button"
+                onClick={() => setIsAikaPanelOpen(true)}
+                className="fixed right-0 top-1/2 z-70 -translate-y-1/2 origin-right rounded-l-2xl border border-r-0 border-white/10 bg-black/20 px-3 py-3 text-white/80 backdrop-blur hover:bg-black/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ugm-gold/50"
+                aria-label="Buka Aika Panel"
+              >
+                <div className="flex items-center gap-2">
+                  <Activity className="h-4 w-4 text-ugm-gold" />
+                  <span className="text-xs font-semibold">Aika Panel</span>
+                </div>
+              </motion.button>
+            )}
+          </AnimatePresence>
+        </div>
+
       </div>
     </>
   );

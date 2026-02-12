@@ -105,19 +105,19 @@ export function AikaLoadingBubble({ activeAgents = [], className = '' }: AikaLoa
       className={`flex items-start gap-2 ${className}`}
     >
       {/* Aika Avatar */}
-      <div className="shrink-0 w-7 h-7 rounded-full overflow-hidden shadow-sm border border-white/20">
+      <div className="shrink-0 w-8 h-8 rounded-full overflow-hidden shadow-sm border border-white/20 bg-black/20 backdrop-blur-sm">
         <Image
           src="/aika-human.jpeg"
           alt="Aika"
-          width={28}
-          height={28}
+          width={32}
+          height={32}
           className="object-cover w-full h-full"
         />
       </div>
 
       {/* Message Bubble - Glass style */}
       <div className="flex flex-col items-start">
-        <div className="bg-white/10 backdrop-blur-sm rounded-2xl rounded-bl-sm border border-white/10 px-3 py-2 flex items-center gap-3 min-w-[180px]">
+        <div className="bg-white/10 backdrop-blur-sm rounded-2xl rounded-bl-sm border border-white/10 px-3 py-2 flex items-center gap-3 min-w-45">
           
           {/* Agent Icon with pulse */}
           <div className={`shrink-0 w-6 h-6 rounded-full flex items-center justify-center ${currentAgent?.bgColor || 'bg-ugm-gold/20'} ${currentAgent?.borderColor || 'border-ugm-gold/30'} border`}>

@@ -49,10 +49,15 @@ async def get_user_stats(db: AsyncSession) -> UserStats:
     week_ago = today - timedelta(days=7)
     month_ago = today - timedelta(days=30)
 
-    total_users = (await db.execute(select(func.count(User.id)))).scalar() or 0
+    total_users = (
+        await db.execute(
+            select(func.count(User.id)).select_from(User)
+        )
+    ).scalar() or 0
     active_30d = (
         await db.execute(
             select(func.count(User.id))
+            .select_from(User)
             .outerjoin(UserProfile, User.id == UserProfile.user_id)
             .filter(func.coalesce(UserProfile.last_activity_date, User.last_activity_date) >= month_ago)
         )
@@ -60,16 +65,22 @@ async def get_user_stats(db: AsyncSession) -> UserStats:
     active_7d = (
         await db.execute(
             select(func.count(User.id))
+            .select_from(User)
             .outerjoin(UserProfile, User.id == UserProfile.user_id)
             .filter(func.coalesce(UserProfile.last_activity_date, User.last_activity_date) >= week_ago)
         )
     ).scalar() or 0
     new_today = (
-        await db.execute(select(func.count(User.id)).filter(func.date(User.created_at) == today))
+        await db.execute(
+            select(func.count(User.id))
+            .select_from(User)
+            .filter(func.date(User.created_at) == today)
+        )
     ).scalar() or 0
     avg_sentiment = (
         await db.execute(
             select(func.avg(func.coalesce(UserProfile.sentiment_score, User.sentiment_score)))
+            .select_from(User)
             .outerjoin(UserProfile, User.id == UserProfile.user_id)
         )
     ).scalar() or 0

@@ -49,6 +49,9 @@ export interface ActivityLogPanelProps {
   interventionPlansError: Error | null;
   onRefreshInterventionPlans?: () => void;
 
+  /** Render as an in-layout sidebar (not a fixed floating panel) */
+  embedded?: boolean;
+
   /** Whether the panel is visible at all (controls permanent display) */
   alwaysVisible?: boolean;
   /** Legacy prop - if true AND alwaysVisible is false, shows the panel */
@@ -219,12 +222,13 @@ export function ActivityLogPanel({
   interventionPlansLoading,
   interventionPlansError,
   onRefreshInterventionPlans,
+  embedded = false,
   alwaysVisible = false,
   isOpen = false,
   onClose,
   onViewModeChange,
 }: ActivityLogPanelProps) {
-  const [viewModeInternal, setViewModeInternal] = useState<ViewMode>('minimized');
+  const [viewModeInternal, setViewModeInternal] = useState<ViewMode>(() => (embedded ? 'compact' : 'minimized'));
   const [activeTab, setActiveTab] = useState<TabKey>('activity');
 
   const setViewMode = (mode: ViewMode) => {
@@ -233,7 +237,7 @@ export function ActivityLogPanel({
   };
 
   const viewMode = viewModeInternal;
-  const shouldShow = alwaysVisible || isOpen;
+  const shouldShow = embedded ? true : (alwaysVisible || isOpen);
   const totalPlans = interventionPlans?.total ?? 0;
 
   const orderedActivities = useMemo(() => {
@@ -247,7 +251,7 @@ export function ActivityLogPanel({
       case 'compact':
         return 'w-80';
       case 'expanded':
-        return 'w-96 xl:w-[420px]';
+        return 'w-96 xl:w-105';
       default:
         return 'w-80';
     }
@@ -271,7 +275,7 @@ export function ActivityLogPanel({
     <AnimatePresence>
       {shouldShow && (
         <>
-          {viewMode === 'expanded' && (
+          {!embedded && viewMode === 'expanded' && (
             <motion.div
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
@@ -289,7 +293,11 @@ export function ActivityLogPanel({
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -100, opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className={`fixed left-4 top-24 bottom-24 ${getWidth()} bg-linear-to-b from-[#0a1628]/95 to-[#0d1d35]/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl shadow-black/30 z-70 flex flex-col overflow-hidden transition-all duration-300`}
+            className={
+              embedded
+                ? 'relative w-full h-full flex flex-col overflow-hidden'
+                : `fixed left-4 top-24 bottom-24 ${getWidth()} bg-linear-to-b from-[#0a1628]/95 to-[#0d1d35]/95 backdrop-blur-xl rounded-2xl border border-white/10 shadow-2xl shadow-black/30 z-70 flex flex-col overflow-hidden transition-all duration-300`
+            }
           >
             {viewMode === 'minimized' ? (
               <motion.div
@@ -358,30 +366,34 @@ export function ActivityLogPanel({
                         />
                       </button>
                     )}
-                    <button
-                      type="button"
-                      onClick={toggleViewMode}
-                      className="p-1.5 rounded-lg text-white/40 hover:text-white/60 hover:bg-white/5 transition-colors"
-                      title={viewMode === 'expanded' ? 'Kompak' : 'Perbesar'}
-                    >
-                      {viewMode === 'expanded' ? (
-                        <Minimize2 className="h-3 w-3" />
-                      ) : (
-                        <Maximize2 className="h-3 w-3" />
-                      )}
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setViewMode('minimized')}
-                      className="p-1.5 rounded-lg text-white/40 hover:text-white/60 hover:bg-white/5 transition-colors"
-                      title="Sembunyikan"
-                    >
-                      <ChevronRight className="h-3 w-3" />
-                    </button>
-                    {!alwaysVisible && (
+                    {!embedded && (
                       <button
                         type="button"
-                        onClick={handleClose}
+                        onClick={toggleViewMode}
+                        className="p-1.5 rounded-lg text-white/40 hover:text-white/60 hover:bg-white/5 transition-colors"
+                        title={viewMode === 'expanded' ? 'Kompak' : 'Perbesar'}
+                      >
+                        {viewMode === 'expanded' ? (
+                          <Minimize2 className="h-3 w-3" />
+                        ) : (
+                          <Maximize2 className="h-3 w-3" />
+                        )}
+                      </button>
+                    )}
+                    {!embedded && (
+                      <button
+                        type="button"
+                        onClick={() => setViewMode('minimized')}
+                        className="p-1.5 rounded-lg text-white/40 hover:text-white/60 hover:bg-white/5 transition-colors"
+                        title="Sembunyikan"
+                      >
+                        <ChevronRight className="h-3 w-3" />
+                      </button>
+                    )}
+                    {onClose && (
+                      <button
+                        type="button"
+                        onClick={onClose}
                         className="p-1.5 rounded-lg text-white/40 hover:text-red-400/60 hover:bg-red-500/5 transition-colors"
                         title="Tutup"
                       >
