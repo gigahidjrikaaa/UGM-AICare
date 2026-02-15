@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+import logging
 from typing import List
 
 from fastapi import APIRouter, Depends, HTTPException, status
@@ -23,6 +24,9 @@ from app.domains.mental_health.schemas.quests import (
 from app.domains.mental_health.services.dialogue_orchestrator_service import DialogueOrchestratorService
 from app.domains.mental_health.services.quest_engine_service import QuestEngineService
 from app.domains.mental_health.services.rewards_calculator_service import RewardsCalculatorService
+from app.services.achievement_service import trigger_achievement_check
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/quests", tags=["quests"])
 
@@ -102,6 +106,21 @@ async def complete_quest(
     except Exception:
         await session.rollback()
         raise
+
+    try:
+        await trigger_achievement_check(
+            session,
+            current_user,
+            action="quest_completed",
+            fail_on_config_error=False,
+        )
+    except Exception as exc:  # pragma: no cover - best effort
+        logger.warning(
+            "Badge auto-sync failed after quest completion for user %s: %s",
+            current_user.id,
+            exc,
+        )
+
     quest_response = QuestInstanceResponse.from_orm(quest)
     return QuestCompletionResponse(
         quest=quest_response,
@@ -145,6 +164,12 @@ async def get_daily_message(
     orchestrator = DialogueOrchestratorService(session)
     quests = await orchestrator.fetch_recent_quests(current_user.id, limit=3)
     message = await orchestrator.build_daily_check_in(current_user, quests, state)
+    if session.dirty:
+        try:
+            await session.commit()
+        except Exception:
+            await session.rollback()
+            raise
     return message
 
 

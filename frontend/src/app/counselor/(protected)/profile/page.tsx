@@ -15,6 +15,7 @@ import {
   FiAlertTriangle,
 } from 'react-icons/fi';
 import { apiCall } from '@/utils/adminApi';
+import toast from 'react-hot-toast';
 
 interface CounselorProfile {
   id: string;
@@ -55,32 +56,12 @@ export default function CounselorProfilePage() {
       setLoading(true);
       const data = await apiCall<CounselorProfile>('/api/counselor/profile');
       
-      // Mock fallback
-      const mockProfile: CounselorProfile = {
-        id: 'COUN-001',
-        name: 'Dr. Jane Smith',
-        email: 'jane.smith@ugm.ac.id',
-        phone: '+62 812-3456-7890',
-        specialization: ['Anxiety Disorders', 'Depression', 'CBT'],
-        license_number: 'PSY-12345',
-        years_experience: 8,
-        bio: 'Licensed clinical psychologist specializing in cognitive behavioral therapy for university students. Passionate about helping young adults navigate mental health challenges.',
-        availability: {
-          monday: ['09:00-12:00', '14:00-17:00'],
-          tuesday: ['09:00-12:00', '14:00-17:00'],
-          wednesday: ['09:00-12:00'],
-          thursday: ['09:00-12:00', '14:00-17:00'],
-          friday: ['09:00-12:00', '14:00-16:00'],
-        },
-        is_available: true,
-        total_patients: 45,
-        total_sessions: 320,
-        rating: 4.8,
-        joined_date: '2023-01-15',
-      };
+      if (!data) {
+        throw new Error('No profile data returned');
+      }
       
-      setProfile(data || mockProfile);
-      setEditedProfile(data || mockProfile);
+      setProfile(data);
+      setEditedProfile(data);
       setError(null);
     } catch (err) {
       console.error('Failed to load profile:', err);
@@ -94,13 +75,23 @@ export default function CounselorProfilePage() {
     if (!editedProfile) return;
     
     try {
-      // TODO: Implement save
-      // await apiCall('/api/counselor/profile', { method: 'PUT', body: editedProfile });
+      const payload = {
+        name: editedProfile.name,
+        bio: editedProfile.bio,
+      };
       
-      setProfile(editedProfile);
+      const updated = await apiCall<CounselorProfile>('/api/counselor/profile', {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+      
+      setProfile(updated || editedProfile);
+      setEditedProfile(updated || editedProfile);
       setIsEditing(false);
+      toast.success('Profile updated successfully');
     } catch (err) {
       console.error('Failed to save profile:', err);
+      toast.error('Failed to save profile changes');
     }
   };
 

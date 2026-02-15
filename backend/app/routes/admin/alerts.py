@@ -7,18 +7,24 @@ from typing import Any, Optional
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, ConfigDict
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.models.alerts import AlertType, AlertSeverity
 from app.models.user import User
-from app.services.alert_service import get_alert_service, AlertService
+from app.services.alert_service import get_alert_service
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/alerts", tags=["Admin - Alerts"])
+
+
+def _coerce_enum(value: Any) -> str:
+    if hasattr(value, "value"):
+        return value.value
+    return str(value)
 
 
 # Schemas
@@ -35,9 +41,8 @@ class AlertSchema(BaseModel):
     expires_at: Optional[str] = None
     is_seen: bool
     seen_at: Optional[str] = None
-    
-    class Config:
-        from_attributes = True
+
+    model_config = ConfigDict(from_attributes=True)
 
 
 class AlertListResponse(BaseModel):
@@ -123,8 +128,8 @@ async def list_alerts(
         alert_schemas = [
             AlertSchema(
                 id=str(a.id),
-                alert_type=a.alert_type.value,
-                severity=a.severity.value,
+                alert_type=_coerce_enum(a.alert_type),
+                severity=_coerce_enum(a.severity),
                 title=a.title,
                 message=a.message,
                 link=a.link,
@@ -177,8 +182,8 @@ async def get_alert(
         
         return AlertSchema(
             id=str(alert.id),
-            alert_type=alert.alert_type.value,
-            severity=alert.severity.value,
+            alert_type=_coerce_enum(alert.alert_type),
+            severity=_coerce_enum(alert.severity),
             title=alert.title,
             message=alert.message,
             link=alert.link,
@@ -221,8 +226,8 @@ async def mark_alert_seen(
         
         return AlertSchema(
             id=str(alert.id),
-            alert_type=alert.alert_type.value,
-            severity=alert.severity.value,
+            alert_type=_coerce_enum(alert.alert_type),
+            severity=_coerce_enum(alert.severity),
             title=alert.title,
             message=alert.message,
             link=alert.link,

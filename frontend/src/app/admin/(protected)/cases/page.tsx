@@ -1,12 +1,12 @@
 /**
  * Admin Cases Management Page
  * Comprehensive case management with filtering, sorting, pagination, and workflows
- * Enhanced with glassmorphism design and improved information architecture
+ * Compact stats bar, quick filter chips, and conditional alert banner
  */
 
 'use client';
 
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { listCases } from '@/services/adminCaseApi';
 import type { CaseListResponse, CaseFilters } from '@/types/admin/cases';
 import CaseListTable from '@/components/admin/cases/CaseListTable';
@@ -14,13 +14,40 @@ import CaseDetailModal from '@/components/admin/cases/CaseDetailModal';
 import CaseStatusWorkflow from '@/components/admin/cases/CaseStatusWorkflow';
 import CaseAssignment from '@/components/admin/cases/CaseAssignment';
 import toast from 'react-hot-toast';
-import { 
-  FiAlertCircle, FiClock, FiUsers, FiCheckCircle, 
-  FiAlertTriangle, FiActivity, FiInfo 
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
+import {
+  FiAlertCircle, FiClock, FiUsers, FiCheckCircle,
+  FiAlertTriangle, FiShield, FiFilter,
 } from 'react-icons/fi';
 import { useSSEEventHandler } from '@/contexts/AdminSSEContext';
 
+// Quick filter chip presets
+type QuickFilter = 'all' | 'critical_high' | 'unassigned' | 'sla_risk' | 'new';
+const QUICK_FILTERS: { key: QuickFilter; label: string; icon: React.ReactNode }[] = [
+  { key: 'all', label: 'All Cases', icon: <FiFilter size={14} /> },
+  { key: 'critical_high', label: 'Critical / High', icon: <FiAlertCircle size={14} /> },
+  { key: 'unassigned', label: 'Unassigned', icon: <FiUsers size={14} /> },
+  { key: 'sla_risk', label: 'SLA At Risk', icon: <FiClock size={14} /> },
+  { key: 'new', label: 'New', icon: <FiAlertTriangle size={14} /> },
+];
+
+function chipToFilters(chip: QuickFilter, base: CaseFilters): CaseFilters {
+  const next: CaseFilters = { page: 1, page_size: base.page_size, sort_by: base.sort_by, sort_order: base.sort_order };
+  switch (chip) {
+    case 'critical_high': next.severity = undefined; break; // we'll handle below
+    case 'unassigned': next.unassigned = true; break;
+    case 'sla_risk': next.sla_breached = true; break;
+    case 'new': next.status = 'new'; break;
+    default: break;
+  }
+  return next;
+}
+
 export default function CasesPage() {
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const caseIdParam = searchParams?.get('case_id');
   const [response, setResponse] = useState<CaseListResponse>({
     cases: [],
     total: 0,
@@ -37,32 +64,52 @@ export default function CasesPage() {
     sort_by: 'created_at',
     sort_order: 'desc',
   });
+  const [activeChip, setActiveChip] = useState<QuickFilter>('all');
 
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [showAssignmentModal, setShowAssignmentModal] = useState(false);
 
+  // Use ref for SSE handlers to avoid stale closures
+  const filtersRef = useRef(filters);
+  filtersRef.current = filters;
+
   // Handle case_created events via centralized SSE context
   useSSEEventHandler('case_created', useCallback(() => {
-    toast.success('📬 New case created', { duration: 3000 });
-    // Trigger refetch
+    toast.success('New case created', { duration: 3000 });
     setFilters(prev => ({ ...prev }));
   }, []));
 
   // Handle case_updated events
   useSSEEventHandler('case_updated', useCallback(() => {
-    toast('🔄 Case updated', { duration: 2000 });
-    // Trigger refetch
+    toast('Case updated', { duration: 2000 });
     setFilters(prev => ({ ...prev }));
   }, []));
 
   // Handle sla_breach events
   useSSEEventHandler('sla_breach', useCallback(() => {
-    toast.error('⚠️ SLA breach detected', { duration: 5000 });
-    // Trigger refetch
+    toast.error('SLA breach detected', { duration: 5000 });
     setFilters(prev => ({ ...prev }));
   }, []));
+
+  const updateCaseIdParam = useCallback((caseId: string | null) => {
+    const params = new URLSearchParams(searchParams?.toString());
+    if (caseId) {
+      params.set('case_id', caseId);
+    } else {
+      params.delete('case_id');
+    }
+    const query = params.toString();
+    router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+  }, [pathname, router, searchParams]);
+
+  useEffect(() => {
+    if (caseIdParam && caseIdParam !== selectedCaseId) {
+      setSelectedCaseId(caseIdParam);
+      setShowDetailModal(true);
+    }
+  }, [caseIdParam, selectedCaseId]);
 
   useEffect(() => {
     const fetchCases = async () => {
@@ -83,7 +130,20 @@ export default function CasesPage() {
     fetchCases();
   }, [filters]);
 
+  const handleChipClick = (chip: QuickFilter) => {
+    setActiveChip(chip);
+    if (chip === 'all') {
+      setFilters({ page: 1, page_size: 20, sort_by: 'created_at', sort_order: 'desc' });
+    } else if (chip === 'critical_high') {
+      // API doesn't support multiple severity values, so sort by severity desc to float critical/high to top
+      setFilters({ page: 1, page_size: 20, sort_by: 'severity', sort_order: 'desc' });
+    } else {
+      setFilters(chipToFilters(chip, filters));
+    }
+  };
+
   const handleCaseClick = (caseId: string) => {
+    updateCaseIdParam(caseId);
     setSelectedCaseId(caseId);
     setShowDetailModal(true);
   };
@@ -101,138 +161,115 @@ export default function CasesPage() {
   };
 
   const handleSuccess = () => {
-    // Trigger refetch by updating a timestamp or forcing filters update
     setFilters({ ...filters });
   };
 
   const selectedCase = response.cases.find((c) => c.id === selectedCaseId);
 
-  // Calculate statistics
-  const stats = {
-    total: response.total,
-    critical: response.cases.filter(c => c.severity === 'critical').length,
-    high: response.cases.filter(c => c.severity === 'high').length,
-    unassigned: response.cases.filter(c => !c.assigned_to).length,
-    slaBreached: response.cases.filter(c => c.sla_status === 'breached').length,
-    newCases: response.cases.filter(c => c.status === 'new').length,
-    resolved: response.cases.filter(c => c.status === 'resolved').length,
-  };
+  // Page-level stats (from current page of data)
+  const pageCritical = response.cases.filter(c => c.severity === 'critical').length;
+  const pageHigh = response.cases.filter(c => c.severity === 'high').length;
+  const pageUnassigned = response.cases.filter(c => !c.assigned_to).length;
+  const pageSlaBreached = response.cases.filter(c => c.sla_status === 'breached').length;
+
+  // Conditional alert: show if there are breached SLAs or critical unassigned on this page
+  const criticalUnassigned = response.cases.filter(c => c.severity === 'critical' && !c.assigned_to).length;
+  const showAlert = pageSlaBreached > 0 || criticalUnassigned > 0;
 
   return (
-    <div className="space-y-6">
-      {/* Header with Glassmorphism */}
-      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-6">
-        <div className="flex items-center justify-between mb-4">
+    <div className="space-y-4">
+      {/* Compact Header */}
+      <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-lg p-5">
+        <div className="flex items-center justify-between">
           <div>
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-2xl font-bold text-white">Case Management</h1>
-              <span className="px-3 py-1 bg-blue-500/20 border border-blue-500/30 text-blue-300 text-xs font-semibold rounded-full">
-                ADMINISTRATIVE
+            <div className="flex items-center gap-3 mb-1">
+              <FiShield className="text-[#FFCA40]" size={22} />
+              <h1 className="text-2xl font-bold text-white">Cases</h1>
+              <span className="px-2.5 py-0.5 bg-blue-500/20 border border-blue-500/30 text-blue-300 text-xs font-semibold rounded-full">
+                {response.total} total
               </span>
             </div>
-            <p className="text-white/70 mb-2">
+            <p className="text-white/60 text-sm ml-[34px]">
               Monitor and manage mental health cases with real-time SLA tracking
             </p>
-            <a 
-              href="/admin/service-desk" 
-              className="text-[#FFCA40] hover:text-[#FFCA40]/80 text-sm flex items-center gap-1 transition-colors"
-            >
-              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-              </svg>
-              Need quick triage? Go to Service Desk →
-            </a>
           </div>
-          <div className="text-right">
-            <div className="inline-flex items-center gap-2 px-4 py-2 bg-[#FFCA40]/20 border border-[#FFCA40]/30 rounded-lg">
-              <FiActivity className="text-[#FFCA40]" size={20} />
-              <div>
-                <p className="text-xs text-white/60">Total Active Cases</p>
-                <p className="text-xl font-bold text-white">{response.total}</p>
-              </div>
-            </div>
-          </div>
+          <a
+            href="/admin/quick-triage"
+            className="hidden sm:flex items-center gap-2 px-4 py-2 bg-[#FFCA40]/15 border border-[#FFCA40]/30 text-[#FFCA40] text-sm font-medium rounded-lg hover:bg-[#FFCA40]/25 transition-colors"
+          >
+            Quick Triage
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
+            </svg>
+          </a>
         </div>
 
-        {/* Quick Stats Grid */}
-        <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-4 mt-6">
-          {/* Critical Cases */}
-          <div className="bg-red-500/10 backdrop-blur-sm border border-red-500/30 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <FiAlertCircle className="text-red-400" size={18} />
-              <span className="text-xs text-red-300 font-semibold uppercase">Critical</span>
-            </div>
-            <p className="text-2xl font-bold text-white">{stats.critical}</p>
-            <p className="text-xs text-white/50 mt-1">Immediate action required</p>
+        {/* Compact Summary Bar */}
+        <div className="flex items-center gap-6 mt-4 ml-[34px] text-sm">
+          <div className="flex items-center gap-1.5">
+            <FiAlertCircle className="text-red-400" size={15} />
+            <span className="text-white/50">Critical:</span>
+            <span className="text-white font-semibold">{pageCritical}</span>
           </div>
-
-          {/* High Priority */}
-          <div className="bg-orange-500/10 backdrop-blur-sm border border-orange-500/30 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <FiAlertTriangle className="text-orange-400" size={18} />
-              <span className="text-xs text-orange-300 font-semibold uppercase">High</span>
-            </div>
-            <p className="text-2xl font-bold text-white">{stats.high}</p>
-            <p className="text-xs text-white/50 mt-1">High priority cases</p>
+          <div className="flex items-center gap-1.5">
+            <FiAlertTriangle className="text-orange-400" size={15} />
+            <span className="text-white/50">High:</span>
+            <span className="text-white font-semibold">{pageHigh}</span>
           </div>
-
-          {/* New Cases */}
-          <div className="bg-blue-500/10 backdrop-blur-sm border border-blue-500/30 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <FiInfo className="text-blue-400" size={18} />
-              <span className="text-xs text-blue-300 font-semibold uppercase">New</span>
-            </div>
-            <p className="text-2xl font-bold text-white">{stats.newCases}</p>
-            <p className="text-xs text-white/50 mt-1">Awaiting review</p>
+          <div className="flex items-center gap-1.5">
+            <FiUsers className="text-purple-400" size={15} />
+            <span className="text-white/50">Unassigned:</span>
+            <span className="text-white font-semibold">{pageUnassigned}</span>
           </div>
-
-          {/* Resolved Cases */}
-          <div className="bg-green-500/10 backdrop-blur-sm border border-green-500/30 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <FiCheckCircle className="text-green-400" size={18} />
-              <span className="text-xs text-green-300 font-semibold uppercase">Resolved</span>
-            </div>
-            <p className="text-2xl font-bold text-white">{stats.resolved}</p>
-            <p className="text-xs text-white/50 mt-1">Successfully handled</p>
-          </div>
-
-          {/* Unassigned Cases */}
-          <div className="bg-purple-500/10 backdrop-blur-sm border border-purple-500/30 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <FiUsers className="text-purple-400" size={18} />
-              <span className="text-xs text-purple-300 font-semibold uppercase">Unassigned</span>
-            </div>
-            <p className="text-2xl font-bold text-white">{stats.unassigned}</p>
-            <p className="text-xs text-white/50 mt-1">Need assignment</p>
-          </div>
-
-          {/* SLA Breached */}
-          <div className="bg-red-500/10 backdrop-blur-sm border border-red-500/30 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <FiClock className="text-red-400" size={18} />
-              <span className="text-xs text-red-300 font-semibold uppercase">SLA Breach</span>
-            </div>
-            <p className="text-2xl font-bold text-white">{stats.slaBreached}</p>
-            <p className="text-xs text-white/50 mt-1">Response time exceeded</p>
+          <div className="flex items-center gap-1.5">
+            <FiClock className="text-red-400" size={15} />
+            <span className="text-white/50">SLA Breached:</span>
+            <span className="text-white font-semibold">{pageSlaBreached}</span>
           </div>
         </div>
+      </div>
 
-        {/* Info Banner */}
-        <div className="mt-6 p-4 bg-blue-500/10 border border-blue-500/30 rounded-lg">
-          <div className="flex items-start gap-3">
-            <FiInfo className="text-blue-400 mt-0.5 flex-shrink-0" size={18} />
-            <div>
-              <h3 className="font-semibold text-blue-300 mb-2">Case Management Features:</h3>
-              <ul className="text-sm text-white/80 space-y-1.5">
-                <li>• Real-time case tracking with automatic severity classification</li>
-                <li>• SLA monitoring with breach alerts and color-coded indicators</li>
-                <li>• Case assignment workflow for counselors and admins</li>
-                <li>• Advanced filtering by status, severity, assignment, and SLA</li>
-                <li>• Integration with Safety Triage Agent (STA) risk assessments</li>
-              </ul>
-            </div>
+      {/* Alert Banner (conditional) */}
+      {showAlert && (
+        <div className="bg-red-500/10 border border-red-500/30 rounded-lg px-4 py-3 flex items-center gap-3">
+          <FiAlertCircle className="text-red-400 shrink-0" size={18} />
+          <div className="flex items-center gap-4 text-sm">
+            {pageSlaBreached > 0 && (
+              <span className="text-red-300 font-medium">
+                {pageSlaBreached} SLA breach{pageSlaBreached > 1 ? 'es' : ''} on this page
+              </span>
+            )}
+            {criticalUnassigned > 0 && (
+              <span className="text-orange-300 font-medium">
+                {criticalUnassigned} critical case{criticalUnassigned > 1 ? 's' : ''} unassigned
+              </span>
+            )}
           </div>
+          <button
+            onClick={() => handleChipClick('sla_risk')}
+            className="ml-auto text-xs text-red-300 hover:text-red-200 underline underline-offset-2"
+          >
+            Show SLA breaches
+          </button>
         </div>
+      )}
+
+      {/* Quick Filter Chips */}
+      <div className="flex items-center gap-2 flex-wrap">
+        {QUICK_FILTERS.map(chip => (
+          <button
+            key={chip.key}
+            onClick={() => handleChipClick(chip.key)}
+            className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+              activeChip === chip.key
+                ? 'bg-[#FFCA40]/20 border-[#FFCA40]/40 text-[#FFCA40]'
+                : 'bg-white/5 border-white/10 text-white/60 hover:bg-white/10 hover:text-white/80'
+            }`}
+          >
+            {chip.icon}
+            {chip.label}
+          </button>
+        ))}
       </div>
 
       {/* Error Display */}
@@ -254,7 +291,10 @@ export default function CasesPage() {
         hasNext={response.has_next}
         hasPrev={response.has_prev}
         filters={filters}
-        onFilterChange={setFilters}
+        onFilterChange={(f) => {
+          setActiveChip('all'); // reset chip highlight when user uses table filters
+          setFilters(f);
+        }}
         onCaseClick={handleCaseClick}
         loading={loading}
       />
@@ -268,6 +308,7 @@ export default function CasesPage() {
             onClose={() => {
               setShowDetailModal(false);
               setSelectedCaseId(null);
+              updateCaseIdParam(null);
             }}
             onStatusUpdate={handleStatusUpdate}
             onAssign={handleAssign}
@@ -280,6 +321,7 @@ export default function CasesPage() {
             onClose={() => {
               setShowStatusModal(false);
               setSelectedCaseId(null);
+              updateCaseIdParam(null);
             }}
             onSuccess={handleSuccess}
           />
@@ -291,6 +333,7 @@ export default function CasesPage() {
             onClose={() => {
               setShowAssignmentModal(false);
               setSelectedCaseId(null);
+              updateCaseIdParam(null);
             }}
             onSuccess={handleSuccess}
           />

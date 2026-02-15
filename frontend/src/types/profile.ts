@@ -115,6 +115,7 @@ export interface UserProfileOverviewUpdate {
   therapy_modality?: string | null;
   therapy_frequency?: string | null;
   therapy_notes?: string | null;
+  aicare_team_notes?: string | null;
   consent_data_sharing?: boolean;
   consent_research?: boolean;
   consent_emergency_contact?: boolean;

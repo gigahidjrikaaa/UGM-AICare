@@ -32,6 +32,9 @@ export interface BadgeTemplate {
   image_uri: string | null;
   metadata_uri: string | null;
   status: BadgeTemplateStatus;
+  auto_award_enabled: boolean;
+  auto_award_action: string | null;
+  auto_award_criteria: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
   published_at: string | null;
@@ -51,11 +54,17 @@ export interface BadgeTemplateCreatePayload {
   description?: string;
   /** Optional chain_id; defaults to EDU Chain (656476) on the server */
   chain_id?: number;
+  auto_award_enabled?: boolean;
+  auto_award_action?: string;
+  auto_award_criteria?: Record<string, unknown>;
 }
 
 export interface BadgeTemplateUpdatePayload {
   name?: string;
   description?: string | null;
+  auto_award_enabled?: boolean;
+  auto_award_action?: string | null;
+  auto_award_criteria?: Record<string, unknown> | null;
 }
 
 export interface BadgePublishResponse {

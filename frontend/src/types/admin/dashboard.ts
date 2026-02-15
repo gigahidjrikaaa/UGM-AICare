@@ -82,3 +82,11 @@ export interface TrendsResponse {
 }
 
 export type TimeRange = 7 | 30 | 90;
+
+// Active user counters from analytics endpoint
+export interface ActiveUsersSummary {
+  dau: number;
+  wau: number;
+  mau: number;
+  as_of: string;
+}

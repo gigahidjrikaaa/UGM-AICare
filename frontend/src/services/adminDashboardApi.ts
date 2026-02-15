@@ -1,5 +1,5 @@
 import { apiCall } from '@/utils/adminApi';
-import type { DashboardOverview, TrendsResponse, TimeRange } from '@/types/admin/dashboard';
+import type { DashboardOverview, TrendsResponse, TimeRange, ActiveUsersSummary } from '@/types/admin/dashboard';
 
 export interface GenerateReportRequest {
   report_type: 'weekly' | 'monthly' | 'ad_hoc';
@@ -67,4 +67,36 @@ export async function generateInsightsReport(request: GenerateReportRequest): Pr
     method: 'POST',
     body: JSON.stringify(request),
   });
+}
+
+/**
+ * Fetch a specific IA insights report by ID
+ */
+export async function getInsightsReport(reportId: string): Promise<InsightsReport> {
+  return apiCall<InsightsReport>(`/api/v1/admin/insights/reports/${reportId}`);
+}
+
+/**
+ * Fetch all IA insights reports with pagination
+ */
+export async function listInsightsReports(params?: {
+  report_type?: string;
+  limit?: number;
+  offset?: number;
+}): Promise<{ reports: InsightsReport[]; total: number; limit: number; offset: number }> {
+  const query = new URLSearchParams();
+  if (params?.report_type) query.append('report_type', params.report_type);
+  if (params?.limit) query.append('limit', String(params.limit));
+  if (params?.offset) query.append('offset', String(params.offset));
+  
+  return apiCall<{ reports: InsightsReport[]; total: number; limit: number; offset: number }>(
+    `/api/v1/admin/insights/reports${query.toString() ? '?' + query.toString() : ''}`
+  );
+}
+
+/**
+ * Fetch active users summary (DAU/WAU/MAU) from analytics endpoint
+ */
+export async function getActiveUsers(): Promise<ActiveUsersSummary> {
+  return apiCall<ActiveUsersSummary>('/api/v1/admin/analytics/retention/active');
 }

@@ -3,6 +3,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { motion, useReducedMotion } from "framer-motion";
 import { toast } from "react-hot-toast";
 
 import {
@@ -12,7 +13,9 @@ import {
   FiAward,
   FiCalendar,
   FiClock,
+  FiHeart,
   FiRefreshCw,
+  FiShield,
   FiTrendingUp,
 } from "@/icons";
 import WalletLinkButton from "@/components/ui/WalletLinkButton";
@@ -37,32 +40,39 @@ type QuickAction = {
 const quickActions: QuickAction[] = [
   {
     href: "/aika",
-    label: "Talk with Aika",
-    description: "Open a new session to chat or reflect.",
+    label: "Talk with Aika now",
+    description: "Get immediate emotional support and grounding.",
     icon: <BsChatDots className="h-5 w-5" />,
   },
   {
+    href: "/appointment",
+    label: "Book counselling",
+    description: "Reserve a slot with UGM support team.",
+    icon: <FiCalendar className="h-5 w-5" />,
+  },
+  {
     href: "/journaling",
-    label: "Log a reflection",
-    description: "Capture today's thoughts in your journal.",
+    label: "Journal check-in",
+    description: "Capture thoughts and mood in a private space.",
     icon: <FiActivity className="h-5 w-5" />,
   },
   {
-    href: "/appointment",
-    label: "Book support",
-    description: "Schedule time with the counselling team.",
-    icon: <FiCalendar className="h-5 w-5" />,
+    href: "/help",
+    label: "Help & safety",
+    description: "Find support contacts and guidance quickly.",
+    icon: <FiShield className="h-5 w-5" />,
   },
 ];
 
-// Streak Card with fire icon for current streak - blends with dark UI
-function StreakCard({
-  type,
-  value,
-}: {
-  type: "current" | "longest";
-  value: number;
-}) {
+function formatTimestamp(value: string) {
+  try {
+    return new Date(value).toLocaleString();
+  } catch {
+    return value;
+  }
+}
+
+function StreakCard({ type, value }: { type: "current" | "longest"; value: number }) {
   const isCurrent = type === "current";
 
   return (
@@ -90,8 +100,8 @@ function StreakCard({
                 ? "Keep the fire going!"
                 : "Start your streak today!"
               : value > 0
-              ? "Your all-time record!"
-              : "Set your first record!"}
+                ? "Your all-time record!"
+                : "Set your first record!"}
           </p>
         </div>
       </div>
@@ -99,12 +109,9 @@ function StreakCard({
   );
 }
 
-// Wellness Trend Card - blends with dark UI
 function WellnessTrendCard({ score }: { score: number }) {
-  // Score is 0-1 from backend, convert to percentage
   const percentage = Math.round(score * 100);
 
-  // Map score to mood levels
   const getMoodData = (s: number) => {
     if (s >= 80) return { emoji: "😊", label: "Thriving", color: "emerald" };
     if (s >= 60) return { emoji: "🙂", label: "Doing Well", color: "green" };
@@ -134,7 +141,6 @@ function WellnessTrendCard({ score }: { score: number }) {
           {mood.emoji}
         </span>
       </div>
-      {/* Progress bar */}
       <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
         <div
           className={`h-full rounded-full ${colors.bar} transition-all duration-500`}
@@ -149,7 +155,6 @@ function WellnessTrendCard({ score }: { score: number }) {
   );
 }
 
-// Badges Card - blends with dark UI
 function BadgesCard({ count }: { count: number | null }) {
   const displayCount = count ?? 0;
 
@@ -169,7 +174,6 @@ function BadgesCard({ count }: { count: number | null }) {
           </p>
         </div>
       </div>
-      {/* Decorative stars */}
       <div className="absolute right-3 top-3 text-lg opacity-20">✨</div>
     </div>
   );
@@ -179,8 +183,9 @@ function QuickActionCard({ action }: { action: QuickAction }) {
   return (
     <Link
       href={action.href}
-      className="group flex h-full flex-col justify-between rounded-2xl border border-white/10 bg-white/3 p-4 backdrop-blur-sm transition hover:border-[#FFCA40] hover:bg-[#FFCA40]/10"
+      className="group relative flex h-full flex-col justify-between overflow-hidden rounded-2xl border border-white/10 bg-white/3 p-4 backdrop-blur-sm transition hover:border-[#FFCA40] hover:bg-[#FFCA40]/10"
     >
+      <span className="pointer-events-none absolute -right-6 -top-6 h-20 w-20 rounded-full bg-[#FFCA40]/10 blur-xl" />
       <div className="flex items-center gap-3">
         <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-[#FFCA40]">
           {action.icon}
@@ -198,19 +203,33 @@ function QuickActionCard({ action }: { action: QuickAction }) {
   );
 }
 
-function formatTimestamp(value: string) {
-  try {
-    return new Date(value).toLocaleString();
-  } catch {
-    return value;
-  }
+function DashboardBentoCard({
+  children,
+  className,
+  reduceMotion,
+}: {
+  children: ReactNode;
+  className?: string;
+  reduceMotion: boolean;
+}) {
+  return (
+    <motion.div
+      initial={reduceMotion ? undefined : { opacity: 0, y: 8 }}
+      animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+      transition={reduceMotion ? undefined : { duration: 0.35, ease: "easeOut" }}
+      whileHover={reduceMotion ? undefined : { y: -2 }}
+      className={`relative overflow-hidden rounded-3xl border border-white/10 bg-white/3 p-6 shadow-xl backdrop-blur-md ${className ?? ""}`}
+    >
+      {children}
+    </motion.div>
+  );
 }
 
 export default function DashboardPage() {
+  const reduceMotion = !!useReducedMotion();
   const [profile, setProfile] = useState<UserProfileOverviewResponse | null>(null);
   const [profileLoading, setProfileLoading] = useState(true);
   const [profileError, setProfileError] = useState<string | null>(null);
-
   const [badgeCount, setBadgeCount] = useState<number | null>(null);
   const [latestBadgeDate, setLatestBadgeDate] = useState<string | null>(null);
 
@@ -219,14 +238,11 @@ export default function DashboardPage() {
       setProfileLoading(true);
       setProfileError(null);
       try {
-        // First, refresh user stats to ensure they're current
         try {
           await apiClient.post("/profile/refresh-stats");
         } catch (error) {
           console.warn("Failed to refresh user stats (non-critical)", error);
-          // Continue even if stats refresh fails
         }
-        
         const result = await fetchUserProfileOverview();
         setProfile(result);
       } catch (error) {
@@ -266,8 +282,6 @@ export default function DashboardPage() {
 
   const firstName = useMemo(() => {
     if (!profile) return "Friend";
-    // Use only fields that exist on ProfileHeaderSummary.
-    // Removed reference to `profile.header.name` which does not exist.
     const preferred = profile.header.preferred_name ?? profile.header.full_name ?? "";
     if (!preferred) return "Friend";
     return preferred.split(" ")[0];
@@ -326,64 +340,74 @@ export default function DashboardPage() {
   return (
     <main className="min-h-screen text-white">
       <div className="mx-auto max-w-6xl px-4 pt-24 pb-12 space-y-10">
-        {/* Aika CTA Card - Prominent call to action */}
-        <Link href="/aika" className="block">
-          <div className="group relative overflow-hidden rounded-3xl bg-linear-to-r from-teal-500 via-cyan-500 to-blue-500 p-6 shadow-2xl transition-all duration-300 hover:scale-[1.01] hover:shadow-cyan-500/30">
-            <div className="flex items-center gap-6">
-              {/* Aika Avatar */}
-              <div className="relative shrink-0">
-                <div className="h-20 w-20 overflow-hidden rounded-full border-4 border-white/30 shadow-xl">
-                  <Image
-                    src="/aika-avatar.png"
-                    alt="Aika - Your AI Companion"
-                    width={80}
-                    height={80}
-                    className="h-full w-full object-cover"
-                    priority
-                  />
+        <motion.div
+          initial={reduceMotion ? undefined : { opacity: 0, y: 10 }}
+          animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+          transition={reduceMotion ? undefined : { duration: 0.45, ease: "easeOut" }}
+        >
+          <Link href="/aika" className="block">
+            <div className="group relative overflow-hidden rounded-3xl bg-linear-to-r from-teal-500 via-cyan-500 to-blue-500 p-6 shadow-2xl transition-all duration-300 hover:scale-[1.01] hover:shadow-cyan-500/30">
+              {!reduceMotion && (
+                <motion.div
+                  className="pointer-events-none absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10"
+                  animate={{ scale: [1, 1.08, 1], opacity: [0.2, 0.35, 0.2] }}
+                  transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+                />
+              )}
+              <div className="absolute -bottom-5 -left-5 h-20 w-20 rounded-full bg-white/5" />
+
+              <div className="relative z-10 flex items-center gap-6">
+                <div className="relative shrink-0">
+                  <div className="h-20 w-20 overflow-hidden rounded-full border-4 border-white/30 shadow-xl">
+                    <Image
+                      src="/aika-avatar.png"
+                      alt="Aika - Your AI Companion"
+                      width={80}
+                      height={80}
+                      className="h-full w-full object-cover"
+                      priority
+                    />
+                  </div>
+                  <div className="absolute bottom-1 right-1 h-4 w-4 rounded-full border-2 border-white bg-green-400 animate-pulse" />
                 </div>
-                {/* Online indicator */}
-                <div className="absolute bottom-1 right-1 h-4 w-4 animate-pulse rounded-full border-2 border-white bg-green-400" />
-              </div>
 
-              {/* Content */}
-              <div className="flex-1">
-                <h2 className="text-2xl font-bold text-white">Talk with Aika</h2>
-                <p className="mt-1 text-white/80">
-                  Your AI companion is ready to listen and support you, {firstName}
-                </p>
-              </div>
+                <div className="flex-1">
+                  <h2 className="text-2xl font-bold text-white">Talk with Aika</h2>
+                  <p className="mt-1 text-white/80">
+                    Your AI companion is ready to listen and support you, {firstName}
+                  </p>
+                </div>
 
-              {/* CTA Button */}
-              <div className="flex items-center gap-2 rounded-xl bg-white px-6 py-3 font-semibold text-teal-600 shadow-lg transition-all group-hover:scale-105 group-hover:shadow-xl">
-                <BsChatDots className="h-5 w-5" />
-                <span>Chat Now</span>
-                <FiArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                <div className="flex items-center gap-2 rounded-xl bg-white px-6 py-3 font-semibold text-teal-600 shadow-lg transition-all group-hover:scale-105 group-hover:shadow-xl">
+                  <BsChatDots className="h-5 w-5" />
+                  <span>Chat Now</span>
+                  <FiArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
+                </div>
               </div>
             </div>
+          </Link>
+        </motion.div>
 
-            {/* Decorative elements */}
-            <div className="absolute -right-10 -top-10 h-40 w-40 rounded-full bg-white/10" />
-            <div className="absolute -bottom-5 -left-5 h-20 w-20 rounded-full bg-white/5" />
-          </div>
-        </Link>
-
-        {/* Stats Grid - Fun and differentiated cards */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StreakCard
-            type="current"
-            value={profile?.header.current_streak ?? 0}
-          />
-          <StreakCard
-            type="longest"
-            value={profile?.header.longest_streak ?? 0}
-          />
+        <motion.div
+          initial={reduceMotion ? undefined : { opacity: 0, y: 8 }}
+          animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+          transition={reduceMotion ? undefined : { duration: 0.45, delay: 0.05 }}
+          className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4"
+        >
+          <StreakCard type="current" value={profile?.header.current_streak ?? 0} />
+          <StreakCard type="longest" value={profile?.header.longest_streak ?? 0} />
           <WellnessTrendCard score={profile?.header.sentiment_score ?? 0.5} />
           <BadgesCard count={badgeCount} />
-        </div>
+        </motion.div>
 
-        {/* Header section with greeting and wallet */}
-        <header className="rounded-3xl border border-white/10 bg-white/3 p-8 shadow-2xl backdrop-blur-md">
+        <motion.header
+          initial={reduceMotion ? undefined : { opacity: 0, y: 8 }}
+          animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+          transition={reduceMotion ? undefined : { duration: 0.45, delay: 0.1 }}
+          className="relative overflow-hidden rounded-3xl border border-white/10 bg-white/3 p-8 shadow-2xl backdrop-blur-md"
+        >
+          <div className="pointer-events-none absolute -left-10 -top-14 h-40 w-40 rounded-full bg-[#FFCA40]/10 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-12 right-10 h-48 w-48 rounded-full bg-cyan-400/10 blur-3xl" />
           <div className="space-y-6">
             <p className="text-xs uppercase tracking-wide text-white/60">Welcome back</p>
             <h1 className="text-3xl font-semibold text-white">Ready for your next check-in, {firstName}?</h1>
@@ -412,113 +436,123 @@ export default function DashboardPage() {
               <WalletLinkButton />
             </div>
           </div>
-        </header>
+        </motion.header>
 
         <QuestBoard />
 
-        <section className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {quickActions.map((action) => (
-            <QuickActionCard key={action.href} action={action} />
-          ))}
-        </section>
-
-        <section className="grid gap-6 lg:grid-cols-9">
-            <div className="space-y-6 lg:col-span-5">
-            <div className="rounded-3xl border border-white/10 bg-white/3 p-6 shadow-xl backdrop-blur-md">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h2 className="text-xl font-semibold">Recent activity</h2>
-                  <p className="text-sm text-white/60">Highlights from your reflections, sessions, and achievements.</p>
-                </div>
-                <Link
-                  href="/profile"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-[#FFCA40] hover:text-[#ffd45c]"
-                >
-                  View profile
-                  <FiArrowRight className="h-4 w-4" />
-                </Link>
+        <section className="grid gap-6 lg:grid-cols-12">
+          <DashboardBentoCard className="lg:col-span-7" reduceMotion={reduceMotion}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-white/50">Your support hub</p>
+                <h2 className="mt-1 text-2xl font-semibold text-white">What do you need right now?</h2>
+                <p className="mt-2 max-w-xl text-sm text-white/70">
+                  Start with the path that fits your current state: quick emotional support, scheduled counselling, or private reflection.
+                </p>
               </div>
-
-              <div className="mt-6 space-y-4">
-                {timelineEntries.length === 0 ? (
-                  <p className="text-sm text-white/60">No activity yet. Start with a reflection or conversation.</p>
-                ) : (
-                  timelineEntries.map((entry, index) => (
-                    <div
-                      key={`${entry.kind}-${entry.timestamp}-${index}`}
-                      className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/2 p-4 backdrop-blur-sm"
-                    >
-                      <span className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#FFCA40]/15 text-[#FFCA40]">
-                        <FiClock className="h-5 w-5" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <p className="font-semibold text-white">{entry.title}</p>
-                          <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs uppercase tracking-wide text-white/60">
-                            {entry.kind}
-                          </span>
-                        </div>
-                        {entry.description && (
-                          <p className="mt-2 text-sm text-white/70">{entry.description}</p>
-                        )}
-                        <p className="mt-2 text-xs uppercase tracking-wide text-white/40">{entry.formattedTimestamp}</p>
-                      </div>
-                    </div>
-                  ))
-                )}
-              </div>
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-rose-400/20 text-rose-300">
+                <FiHeart className="h-6 w-6" />
+              </span>
             </div>
-          </div>
 
-          <aside className="space-y-6 lg:col-span-4">
-            <div className="rounded-3xl border border-white/10 bg-white/3 p-6 shadow-xl backdrop-blur-md">
-              <div className="flex items-center justify-between">
-                <h2 className="text-xl font-semibold">Upcoming appointments</h2>
-                <Link
-                  href="/appointment"
-                  className="inline-flex items-center gap-2 text-sm font-medium text-[#FFCA40] hover:text-[#ffd45c]"
-                >
-                  Book
-                  <FiArrowRight className="h-4 w-4" />
-                </Link>
-              </div>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              {quickActions.map((action) => (
+                <QuickActionCard key={action.href} action={action} />
+              ))}
+            </div>
+          </DashboardBentoCard>
 
-              <div className="mt-5 space-y-4">
-                {upcomingAppointments.length === 0 ? (
-                  <p className="text-sm text-white/60">
-                    You have no upcoming appointments scheduled.{' '}
-                    <Link
-                      href="/appointment"
-                      className="font-semibold text-[#FFCA40] hover:text-[#ffd45c]"
-                    >
-                      Reserve a time
-                    </Link>{' '}
-                    to connect with the counselling team.
+          <DashboardBentoCard className="lg:col-span-5" reduceMotion={reduceMotion}>
+            <div className="flex items-center justify-between">
+              <h2 className="text-xl font-semibold">Upcoming appointments</h2>
+              <Link
+                href="/appointment"
+                className="inline-flex items-center gap-2 text-sm font-medium text-[#FFCA40] hover:text-[#ffd45c]"
+              >
+                Book
+                <FiArrowRight className="h-4 w-4" />
+              </Link>
+            </div>
+
+            <div className="mt-5 space-y-3">
+              {upcomingAppointments.length === 0 ? (
+                <div className="rounded-2xl border border-white/10 bg-white/2 p-4">
+                  <p className="text-sm text-white/70">No upcoming appointments yet.</p>
+                  <p className="mt-1 text-xs text-white/50">
+                    If you would like guided support this week, reserve a time with the counselling team.
                   </p>
-                ) : (
-                  upcomingAppointments.map((entry, index) => (
-                    <div
-                      key={`${entry.timestamp}-${index}`}
-                      className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/2 p-4 backdrop-blur-sm"
-                    >
-                      <span className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#FFCA40]/15 text-[#FFCA40]">
-                        <FiCalendar className="h-5 w-5" />
-                      </span>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-semibold text-white">{entry.title || 'Counselling session'}</p>
-                        {entry.description && (
-                          <p className="mt-1 text-sm text-white/70">{entry.description}</p>
-                        )}
-                        <p className="mt-2 text-xs uppercase tracking-wide text-white/40">{entry.formattedTimestamp}</p>
-                      </div>
+                </div>
+              ) : (
+                upcomingAppointments.map((entry, index) => (
+                  <div
+                    key={`${entry.timestamp}-${index}`}
+                    className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/2 p-4 backdrop-blur-sm"
+                  >
+                    <span className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#FFCA40]/15 text-[#FFCA40]">
+                      <FiCalendar className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-semibold text-white">{entry.title || "Counselling session"}</p>
+                      {entry.description && <p className="mt-1 text-sm text-white/70">{entry.description}</p>}
+                      <p className="mt-2 text-xs uppercase tracking-wide text-white/40">{entry.formattedTimestamp}</p>
                     </div>
-                  ))
-                )}
+                  </div>
+                ))
+              )}
+            </div>
+          </DashboardBentoCard>
+
+          <DashboardBentoCard className="lg:col-span-7" reduceMotion={reduceMotion}>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-semibold">Recent activity</h2>
+                <p className="text-sm text-white/60">A compact timeline of your momentum this week.</p>
               </div>
+              <Link
+                href="/profile"
+                className="inline-flex items-center gap-2 text-sm font-medium text-[#FFCA40] hover:text-[#ffd45c]"
+              >
+                View profile
+                <FiArrowRight className="h-4 w-4" />
+              </Link>
             </div>
 
-            <div className="rounded-3xl border border-white/10 bg-white/3 p-6 shadow-xl backdrop-blur-md">
-              <h2 className="text-xl font-semibold">Achievements</h2>
+            <div className="mt-6 space-y-4">
+              {timelineEntries.length === 0 ? (
+                <p className="text-sm text-white/60">No activity yet. Start with a reflection or conversation.</p>
+              ) : (
+                timelineEntries.map((entry, index) => (
+                  <div
+                    key={`${entry.kind}-${entry.timestamp}-${index}`}
+                    className="flex items-start gap-4 rounded-2xl border border-white/10 bg-white/2 p-4 backdrop-blur-sm"
+                  >
+                    <span className="mt-1 inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#FFCA40]/15 text-[#FFCA40]">
+                      <FiClock className="h-5 w-5" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-semibold text-white">{entry.title}</p>
+                        <span className="rounded-full border border-white/10 bg-white/5 px-2 py-0.5 text-xs uppercase tracking-wide text-white/60">
+                          {entry.kind}
+                        </span>
+                      </div>
+                      {entry.description && <p className="mt-2 text-sm text-white/70">{entry.description}</p>}
+                      <p className="mt-2 text-xs uppercase tracking-wide text-white/40">{entry.formattedTimestamp}</p>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </DashboardBentoCard>
+
+          <div className="space-y-6 lg:col-span-5">
+            <DashboardBentoCard reduceMotion={reduceMotion}>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold">Achievements</h2>
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-[#FFCA40]/20 text-[#FFCA40]">
+                  <FiAward className="h-5 w-5" />
+                </span>
+              </div>
               <p className="mt-2 text-sm text-white/60">
                 {badgeCount != null
                   ? `You have unlocked ${badgeCount} badge${badgeCount === 1 ? "" : "s"}.`
@@ -534,14 +568,19 @@ export default function DashboardPage() {
                 View achievements
                 <FiArrowRight className="h-4 w-4" />
               </Link>
-            </div>
+            </DashboardBentoCard>
 
-            <div className="rounded-3xl border border-white/10 bg-white/3 p-6 shadow-xl backdrop-blur-md">
-              <h2 className="text-xl font-semibold">Focus for today</h2>
+            <DashboardBentoCard reduceMotion={reduceMotion}>
+              <div className="flex items-center justify-between">
+                <h2 className="text-xl font-semibold">Focus for today</h2>
+                <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-cyan-400/15 text-cyan-300">
+                  <FiTrendingUp className="h-5 w-5" />
+                </span>
+              </div>
               <p className="mt-2 text-sm text-white/60">
                 {profile?.safety.primary_concerns
                   ? profile.safety.primary_concerns
-                  : "Set a small intention - try a reflection prompt or chat with Aika about how you're feeling."}
+                  : "Set one gentle intention for today. A short check-in is enough to build momentum."}
               </p>
               <div className="mt-4 space-y-3 text-sm text-white/70">
                 <div>
@@ -553,12 +592,14 @@ export default function DashboardPage() {
                   <p>{profile?.aicare_team_notes ?? "Leave a note on your profile to let us know what you need right now."}</p>
                 </div>
               </div>
-            </div>
-          </aside>
+              <div className="mt-4 flex items-center gap-2 rounded-xl border border-white/10 bg-white/2 px-3 py-2 text-xs text-white/60">
+                <FiRefreshCw className="h-4 w-4 text-[#FFCA40]" />
+                This card updates as your activities and profile insights evolve.
+              </div>
+            </DashboardBentoCard>
+          </div>
         </section>
       </div>
     </main>
   );
 }
-
-

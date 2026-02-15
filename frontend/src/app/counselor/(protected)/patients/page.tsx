@@ -1,25 +1,46 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   FiUser,
   FiCalendar,
   FiClock,
   FiAlertTriangle,
+  FiRefreshCw,
+  FiMail,
+  FiPhone,
+  FiSend,
 } from 'react-icons/fi';
+import apiClient from '@/services/api';
+import toast from 'react-hot-toast';
+
+interface CaseItem {
+  id: string;
+  user_hash: string;
+  severity: 'low' | 'med' | 'high' | 'critical';
+  status: 'new' | 'in_progress' | 'waiting' | 'closed';
+  created_at: string;
+  updated_at: string;
+  assigned_to?: string;
+  summary_redacted?: string;
+  user_email?: string;
+  user_phone?: string;
+  telegram_username?: string;
+}
 
 interface Patient {
-  patient_id: string;
-  user_id_hash: string;
-  name?: string;
-  email?: string;
-  phone?: string;
-  first_session: string;
-  last_session: string;
-  total_sessions: number;
+  user_hash: string;
+  user_email?: string;
+  user_phone?: string;
+  telegram_username?: string;
+  first_case_date: string;
+  last_case_date: string;
+  total_cases: number;
   active_cases: number;
+  closed_cases: number;
+  highest_severity: 'low' | 'med' | 'high' | 'critical';
   status: 'active' | 'inactive' | 'discharged';
-  progress_score?: number;
 }
 
 const statusColors = {
@@ -28,69 +49,118 @@ const statusColors = {
   discharged: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
 };
 
+const severityColors: Record<string, string> = {
+  critical: 'bg-red-500/20 text-red-300',
+  high: 'bg-orange-500/20 text-orange-300',
+  med: 'bg-yellow-500/20 text-yellow-300',
+  low: 'bg-green-500/20 text-green-300',
+};
+
+const severityRank: Record<string, number> = {
+  critical: 4,
+  high: 3,
+  med: 2,
+  low: 1,
+};
+
+function derivePatients(cases: CaseItem[]): Patient[] {
+  const grouped = new Map<string, CaseItem[]>();
+  for (const c of cases) {
+    const key = c.user_hash;
+    if (!grouped.has(key)) grouped.set(key, []);
+    grouped.get(key)!.push(c);
+  }
+
+  const patients: Patient[] = [];
+  for (const [userHash, userCases] of grouped) {
+    const sorted = userCases.sort(
+      (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
+    );
+
+    const activeCases = userCases.filter(
+      (c) => c.status === 'new' || c.status === 'in_progress' || c.status === 'waiting'
+    );
+    const closedCases = userCases.filter((c) => c.status === 'closed');
+
+    // Use the most recent case for contact info
+    const latestCase = userCases.reduce((latest, c) =>
+      new Date(c.updated_at) > new Date(latest.updated_at) ? c : latest
+    );
+
+    // Highest severity across all active cases (or all cases if none active)
+    const relevantCases = activeCases.length > 0 ? activeCases : userCases;
+    const highestSeverity = relevantCases.reduce(
+      (max, c) => ((severityRank[c.severity] || 0) > (severityRank[max] || 0) ? c.severity : max),
+      'low' as CaseItem['severity']
+    );
+
+    // Determine patient status
+    let status: Patient['status'] = 'active';
+    if (activeCases.length === 0 && closedCases.length > 0) {
+      status = 'discharged';
+    } else if (activeCases.length === 0) {
+      status = 'inactive';
+    }
+
+    patients.push({
+      user_hash: userHash,
+      user_email: latestCase.user_email,
+      user_phone: latestCase.user_phone,
+      telegram_username: latestCase.telegram_username,
+      first_case_date: sorted[0].created_at,
+      last_case_date: latestCase.updated_at,
+      total_cases: userCases.length,
+      active_cases: activeCases.length,
+      closed_cases: closedCases.length,
+      highest_severity: highestSeverity,
+      status,
+    });
+  }
+
+  // Sort: active first, then by last case date descending
+  patients.sort((a, b) => {
+    const statusOrder = { active: 0, inactive: 1, discharged: 2 };
+    if (statusOrder[a.status] !== statusOrder[b.status]) {
+      return statusOrder[a.status] - statusOrder[b.status];
+    }
+    return new Date(b.last_case_date).getTime() - new Date(a.last_case_date).getTime();
+  });
+
+  return patients;
+}
+
 export default function CounselorPatientsPage() {
+  const router = useRouter();
   const [patients, setPatients] = useState<Patient[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
 
-  useEffect(() => {
-    loadPatients();
-  }, []);
-
-  const loadPatients = async () => {
+  const loadPatients = useCallback(async () => {
     try {
       setLoading(true);
-      // TODO: Replace with actual API endpoint
-      // const data = await apiCall<Patient[]>('/api/counselor/patients');
-      
-      // Mock data
-      const mockPatients: Patient[] = [
-        {
-          patient_id: 'PAT-001',
-          user_id_hash: 'user_abc123',
-          name: 'Patient A',
-          email: 'patient.a@example.com',
-          first_session: '2025-09-15',
-          last_session: '2025-10-20',
-          total_sessions: 8,
-          active_cases: 1,
-          status: 'active',
-          progress_score: 75,
-        },
-        {
-          patient_id: 'PAT-002',
-          user_id_hash: 'user_def456',
-          name: 'Patient B',
-          first_session: '2025-08-10',
-          last_session: '2025-10-18',
-          total_sessions: 12,
-          active_cases: 0,
-          status: 'active',
-          progress_score: 85,
-        },
-        {
-          patient_id: 'PAT-003',
-          user_id_hash: 'user_ghi789',
-          first_session: '2025-07-05',
-          last_session: '2025-09-30',
-          total_sessions: 15,
-          active_cases: 0,
-          status: 'discharged',
-          progress_score: 92,
-        },
-      ];
-      
-      setPatients(mockPatients);
       setError(null);
-    } catch (err) {
+
+      const response = await apiClient.get('/counselor/cases');
+      const cases: CaseItem[] = response.data?.cases ?? response.data ?? [];
+
+      const derived = derivePatients(cases);
+      setPatients(derived);
+    } catch (err: unknown) {
+      const message =
+        err instanceof Error ? err.message : 'Failed to load patients';
       console.error('Failed to load patients:', err);
-      setError('Failed to load patients');
+      setError(message);
+      toast.error('Failed to load patient data');
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    loadPatients();
+  }, [loadPatients]);
 
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
@@ -104,14 +174,15 @@ export default function CounselorPatientsPage() {
     const statusMatch = filterStatus === 'all' || patient.status === filterStatus;
     const searchMatch =
       searchQuery === '' ||
-      patient.name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.user_id_hash.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      patient.email?.toLowerCase().includes(searchQuery.toLowerCase());
+      patient.user_hash.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      patient.user_email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      patient.telegram_username?.toLowerCase().includes(searchQuery.toLowerCase());
     return statusMatch && searchMatch;
   });
 
   const activeCount = patients.filter((p) => p.status === 'active').length;
-  const totalSessions = patients.reduce((sum, p) => sum + p.total_sessions, 0);
+  const totalActiveCases = patients.reduce((sum, p) => sum + p.active_cases, 0);
+  const totalCases = patients.reduce((sum, p) => sum + p.total_cases, 0);
 
   if (loading) {
     return (
@@ -134,7 +205,7 @@ export default function CounselorPatientsPage() {
           <p className="text-red-300 font-semibold mb-2">Failed to load patients</p>
           <p className="text-red-300/70 text-sm mb-4">{error}</p>
           <button
-            onClick={() => window.location.reload()}
+            onClick={loadPatients}
             className="px-4 py-2 bg-red-500/20 hover:bg-red-500/30 border border-red-500/30 rounded-lg text-sm text-red-300 transition-all"
           >
             Try Again
@@ -153,9 +224,18 @@ export default function CounselorPatientsPage() {
             <FiUser className="w-8 h-8 text-[#FFCA40]" />
             My Patients
           </h1>
-          <p className="text-white/60">View and manage your patient caseload</p>
+          <p className="text-white/60">
+            Patients derived from your assigned cases ({patients.length} unique patients)
+          </p>
         </div>
         <div className="flex items-center gap-3">
+          <button
+            onClick={loadPatients}
+            className="p-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-white/70 hover:text-white transition-all"
+            title="Refresh"
+          >
+            <FiRefreshCw className="w-4 h-4" />
+          </button>
           <input
             type="text"
             placeholder="Search patients..."
@@ -188,13 +268,11 @@ export default function CounselorPatientsPage() {
           <div className="text-xs text-white/60 mt-1">Total Patients</div>
         </div>
         <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
-          <div className="text-2xl font-bold text-white">{totalSessions}</div>
-          <div className="text-xs text-white/60 mt-1">Total Sessions</div>
+          <div className="text-2xl font-bold text-white">{totalCases}</div>
+          <div className="text-xs text-white/60 mt-1">Total Cases</div>
         </div>
         <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
-          <div className="text-2xl font-bold text-white">
-            {patients.filter((p) => p.active_cases > 0).length}
-          </div>
+          <div className="text-2xl font-bold text-white">{totalActiveCases}</div>
           <div className="text-xs text-white/60 mt-1">Active Cases</div>
         </div>
       </div>
@@ -212,16 +290,16 @@ export default function CounselorPatientsPage() {
                   Status
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-white/70 uppercase tracking-wider">
-                  Sessions
+                  Cases
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-white/70 uppercase tracking-wider">
-                  Active Cases
+                  Severity
                 </th>
                 <th className="px-4 py-3 text-center text-xs font-semibold text-white/70 uppercase tracking-wider">
-                  Progress
+                  Contact
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">
-                  Last Session
+                  Last Activity
                 </th>
                 <th className="px-4 py-3 text-right text-xs font-semibold text-white/70 uppercase tracking-wider">
                   Actions
@@ -233,77 +311,116 @@ export default function CounselorPatientsPage() {
                 <tr>
                   <td colSpan={7} className="px-4 py-12 text-center">
                     <FiUser className="w-12 h-12 text-white/20 mx-auto mb-3" />
-                    <p className="text-white/60">No patients found</p>
+                    <p className="text-white/60">
+                      {patients.length === 0
+                        ? 'No patients yet. Patients appear when cases are assigned to you.'
+                        : 'No patients match your search criteria'}
+                    </p>
                   </td>
                 </tr>
               ) : (
                 filteredPatients.map((patient) => (
                   <tr
-                    key={patient.patient_id}
-                    className="hover:bg-white/5 transition-colors cursor-pointer"
+                    key={patient.user_hash}
+                    className="hover:bg-white/5 transition-colors"
                   >
                     <td className="px-4 py-4">
                       <div className="flex items-center gap-3">
                         <div className="w-10 h-10 rounded-full bg-[#FFCA40]/20 flex items-center justify-center">
                           <span className="text-[#FFCA40] font-semibold">
-                            {patient.name ? patient.name.charAt(0).toUpperCase() : 'P'}
+                            {patient.user_email
+                              ? patient.user_email.charAt(0).toUpperCase()
+                              : patient.user_hash.charAt(0).toUpperCase()}
                           </span>
                         </div>
                         <div>
                           <div className="text-sm font-medium text-white">
-                            {patient.name || patient.user_id_hash}
+                            {patient.user_email || 'Anonymous User'}
                           </div>
-                          <div className="text-xs text-white/50 font-mono">{patient.patient_id}</div>
+                          <div className="text-xs text-white/50 font-mono truncate max-w-[180px]">
+                            {patient.user_hash}
+                          </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 text-center whitespace-nowrap">
-                      <span className={`px-2 py-1 rounded text-xs font-medium border ${statusColors[patient.status]}`}>
-                        {patient.status}
-                      </span>
-                    </td>
-                    <td className="px-4 py-4 text-center whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-1">
-                        <FiCalendar className="w-3 h-3 text-[#FFCA40]" />
-                        <span className="text-sm text-white/80">{patient.total_sessions}</span>
                       </div>
                     </td>
                     <td className="px-4 py-4 text-center whitespace-nowrap">
                       <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${
-                          patient.active_cases > 0
-                            ? 'bg-orange-500/20 text-orange-300'
-                            : 'bg-green-500/20 text-green-300'
-                        }`}
+                        className={`px-2 py-1 rounded text-xs font-medium border ${statusColors[patient.status]}`}
                       >
-                        {patient.active_cases}
+                        {patient.status}
                       </span>
                     </td>
                     <td className="px-4 py-4 text-center whitespace-nowrap">
-                      {patient.progress_score !== undefined ? (
-                        <div className="flex items-center justify-center gap-2">
-                          <div className="w-16 h-2 bg-white/10 rounded-full overflow-hidden">
-                            <div
-                              className="h-full bg-[#FFCA40] transition-all"
-                              style={{ width: `${patient.progress_score}%` }}
-                            ></div>
-                          </div>
-                          <span className="text-xs text-white/70">{patient.progress_score}%</span>
+                      <div className="flex flex-col items-center gap-0.5">
+                        <div className="flex items-center gap-1">
+                          <FiCalendar className="w-3 h-3 text-[#FFCA40]" />
+                          <span className="text-sm text-white/80">{patient.total_cases}</span>
                         </div>
-                      ) : (
-                        <span className="text-xs text-white/40">N/A</span>
-                      )}
+                        {patient.active_cases > 0 && (
+                          <span className="text-[10px] text-orange-300">
+                            {patient.active_cases} active
+                          </span>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-4 py-4 text-center whitespace-nowrap">
+                      <span
+                        className={`px-2 py-1 rounded text-xs font-medium ${severityColors[patient.highest_severity] || 'bg-gray-500/20 text-gray-300'}`}
+                      >
+                        {patient.highest_severity}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 text-center whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-2">
+                        {patient.user_email && (
+                          <a
+                            href={`mailto:${patient.user_email}`}
+                            className="p-1 hover:bg-white/10 rounded text-white/50 hover:text-white transition-colors"
+                            title={patient.user_email}
+                          >
+                            <FiMail className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                        {patient.user_phone && (
+                          <a
+                            href={`tel:${patient.user_phone}`}
+                            className="p-1 hover:bg-white/10 rounded text-white/50 hover:text-white transition-colors"
+                            title={patient.user_phone}
+                          >
+                            <FiPhone className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                        {patient.telegram_username && (
+                          <a
+                            href={`https://t.me/${patient.telegram_username}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-1 hover:bg-white/10 rounded text-white/50 hover:text-white transition-colors"
+                            title={`@${patient.telegram_username}`}
+                          >
+                            <FiSend className="w-3.5 h-3.5" />
+                          </a>
+                        )}
+                        {!patient.user_email && !patient.user_phone && !patient.telegram_username && (
+                          <span className="text-xs text-white/30">N/A</span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap">
                       <div className="flex items-center gap-1.5 text-xs text-white/60">
                         <FiClock className="w-3 h-3" />
-                        {formatDate(patient.last_session)}
+                        {formatDate(patient.last_case_date)}
                       </div>
                     </td>
                     <td className="px-4 py-4 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-2">
-                        <button className="px-3 py-1 bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 rounded text-xs font-medium text-[#FFCA40] transition-all">
-                          View Profile
+                        <button
+                          onClick={() =>
+                            router.push(`/counselor/cases?search=${encodeURIComponent(patient.user_hash)}`)
+                          }
+                          className="px-3 py-1 bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 rounded text-xs font-medium text-[#FFCA40] transition-all"
+                        >
+                          View Cases
                         </button>
                       </div>
                     </td>

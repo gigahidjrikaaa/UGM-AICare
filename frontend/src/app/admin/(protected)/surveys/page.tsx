@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { useModalA11y } from '@/hooks/useModalA11y';
 import { FiPlus } from 'react-icons/fi';
@@ -19,6 +19,8 @@ import { MultipleChoiceQuestionDraft, QuestionDraft, createEmptyQuestion } from 
 
 interface NewSurveyState { title: string; description: string; category: string; questions: QuestionDraft[] }
 type QuestionErrorMap = Record<number, string | undefined>;
+
+const SURVEY_CATEGORY_DEFAULTS = ['Mental Health', 'Wellness', 'Assessment'];
 
 const toServiceDraft = (q: QuestionDraft): ServiceQuestionDraft => {
   if (q.question_type === 'rating') return { id: q.id, question_text: q.question_text, question_type: 'rating', options: { scale: { ...q.options.scale } } };
@@ -73,6 +75,16 @@ export default function SurveyManagementPage() {
   const [sort, setSort] = useState<{ key: 'index' | 'title' | 'category' | 'description' | 'created' | 'updated'; direction: 'asc' | 'desc' }>(() => ({ key: 'index', direction: 'asc' }));
   // Expanded description ids
   const [expanded, setExpanded] = useState<Set<number>>(() => new Set());
+  const surveyCategoryOptions = useMemo(() => {
+    const categorySet = new Set(SURVEY_CATEGORY_DEFAULTS);
+    surveys.forEach((survey) => {
+      const value = (survey.category || '').trim();
+      if (value) categorySet.add(value);
+    });
+    if (newSurvey.category.trim()) categorySet.add(newSurvey.category.trim());
+    if (editMeta.category.trim()) categorySet.add(editMeta.category.trim());
+    return Array.from(categorySet).sort((left, right) => left.localeCompare(right));
+  }, [surveys, newSurvey.category, editMeta.category]);
 
   // Initialize from URL (once)
   useEffect(() => {
@@ -278,7 +290,7 @@ export default function SurveyManagementPage() {
   useModalA11y(isEditModalOpen, editModalRef, handleEditModalClose);
   useModalA11y(isResultsModalOpen, resultsModalRef, handleResultsModalClose);
 
-  const handleNewSurveyChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+  const handleNewSurveyChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setNewSurvey((prev) => ({ ...prev, [name]: value }));
   }, []);
@@ -291,7 +303,7 @@ export default function SurveyManagementPage() {
     setEditMeta(meta => ({ ...meta, description: e.target.value }));
   }, []);
 
-  const handleEditCategoryChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleEditCategoryChange = useCallback((e: React.ChangeEvent<HTMLSelectElement>) => {
     setEditMeta(meta => ({ ...meta, category: e.target.value }));
   }, []);
 
@@ -834,16 +846,21 @@ export default function SurveyManagementPage() {
                 </div>
                 <div className="space-y-1">
                   <label htmlFor="category" className="block text-sm font-medium text-gray-300">Category</label>
-                  <input
-                    key="create-category-input"
+                  <select
+                    key="create-category-select"
                     id="category"
                     name="category"
-                    type="text"
                     value={newSurvey.category}
                     onChange={handleNewSurveyChange}
-                    placeholder="e.g., Mental Health, Wellness, Assessment"
                     className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
-                  />
+                  >
+                    <option value="" className="bg-[#1c1f26] text-gray-300">Select category</option>
+                    {surveyCategoryOptions.map((category) => (
+                      <option key={category} value={category} className="bg-[#1c1f26] text-gray-100">
+                        {category}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label htmlFor="description" className="block text-sm font-medium text-gray-300">Description</label>
@@ -931,16 +948,21 @@ export default function SurveyManagementPage() {
                 </div>
                 <div className="space-y-1">
                   <label htmlFor="edit-category" className="block text-sm font-medium text-gray-300">Category</label>
-                  <input
-                    key="edit-category-input"
+                  <select
+                    key="edit-category-select"
                     id="edit-category"
                     name="category"
-                    type="text"
                     value={editMeta.category}
                     onChange={handleEditCategoryChange}
-                    placeholder="e.g., Mental Health, Wellness, Assessment"
                     className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40]/50 outline-none transition-all duration-300 backdrop-blur-sm"
-                  />
+                  >
+                    <option value="" className="bg-[#1c1f26] text-gray-300">Select category</option>
+                    {surveyCategoryOptions.map((category) => (
+                      <option key={category} value={category} className="bg-[#1c1f26] text-gray-100">
+                        {category}
+                      </option>
+                    ))}
+                  </select>
                 </div>
                 <div className="space-y-1">
                   <label className="block text-sm font-medium text-gray-300">Description</label>

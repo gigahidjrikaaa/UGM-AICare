@@ -27,6 +27,8 @@ async def handle_case_created_event(event: Event) -> None:
         # Extract case data from event
         case_id = event.data.get("case_id")
         severity = event.data.get("severity", "medium")
+        if severity == "moderate":
+            severity = "medium"
         title = event.data.get("title", "New Case Created")
         
         # Map case severity to alert severity
@@ -46,7 +48,7 @@ async def handle_case_created_event(event: Event) -> None:
                 "severity": alert_severity.value,
                 "title": title,
                 "message": f"Case #{case_id} requires attention",
-                "link": f"/admin/cases/{case_id}",
+                "link": f"/admin/cases?case_id={case_id}",
                 "timestamp": datetime.utcnow().isoformat(),
                 "case_id": case_id
             }
@@ -77,9 +79,9 @@ async def handle_sla_breach_event(event: Event) -> None:
             data={
                 "alert_type": AlertType.SLA_BREACH.value,
                 "severity": AlertSeverity.CRITICAL.value,
-                "title": "⚠️ SLA Breach Detected",
+                "title": "SLA Breach Detected",
                 "message": f"Case #{case_id} has breached SLA (Assigned to: {assigned_to})",
-                "link": f"/admin/cases/{case_id}",
+                "link": f"/admin/cases?case_id={case_id}",
                 "timestamp": datetime.utcnow().isoformat(),
                 "case_id": case_id,
                 "assigned_to": assigned_to,
@@ -121,9 +123,9 @@ async def handle_ia_report_generated_event(event: Event) -> None:
             data={
                 "alert_type": AlertType.IA_REPORT_GENERATED.value,
                 "severity": severity.value,
-                "title": f"📊 New {report_type.capitalize()} IA Report",
+                "title": f"New {report_type.capitalize()} IA Report",
                 "message": f"Insights report generated ({high_risk_count} high-risk cases identified)",
-                "link": f"/admin/insights/reports/{report_id}",
+                "link": f"/admin/insights/reports/{report_id}" if report_id else "/admin/insights",
                 "timestamp": datetime.utcnow().isoformat(),
                 "report_id": report_id,
                 "report_type": report_type,
@@ -169,7 +171,7 @@ async def handle_case_status_changed_event(event: Event) -> None:
                     "severity": AlertSeverity.INFO.value,
                     "title": "Case Status Updated",
                     "message": f"Case #{case_id} status changed: {old_status} → {new_status}",
-                    "link": f"/admin/cases/{case_id}",
+                    "link": f"/admin/cases?case_id={case_id}",
                     "timestamp": datetime.utcnow().isoformat(),
                     "case_id": case_id,
                     "old_status": old_status,
@@ -196,19 +198,22 @@ async def handle_high_risk_detected_event(event: Event) -> None:
         user_hash = event.data.get("user_hash")
         risk_factors = event.data.get("risk_factors", [])
         severity = event.data.get("severity", "high")
+        if severity == "moderate":
+            severity = "medium"
+        if severity not in {"critical", "high", "medium", "low", "info"}:
+            severity = "high"
         
         await broadcaster.broadcast(
             event_type="alert_created",
             data={
                 "alert_type": AlertType.SYSTEM_NOTIFICATION.value,
-                "severity": AlertSeverity.HIGH.value,
-                "title": "⚠️ High-Risk User Detected",
+                "severity": severity,
+                "title": "High-Risk User Detected",
                 "message": f"High-risk indicators detected: {', '.join(risk_factors[:3])}",
                 "link": "/admin/dashboard",
                 "timestamp": datetime.utcnow().isoformat(),
                 "user_hash": user_hash,
-                "risk_factors": risk_factors,
-                "severity": severity
+                "risk_factors": risk_factors
             }
         )
         
@@ -236,9 +241,9 @@ async def handle_critical_risk_detected_event(event: Event) -> None:
             data={
                 "alert_type": AlertType.SYSTEM_NOTIFICATION.value,
                 "severity": AlertSeverity.CRITICAL.value,
-                "title": "🚨 CRITICAL: Immediate Intervention Required",
+                "title": "CRITICAL: Immediate Intervention Required",
                 "message": f"Critical risk detected: {', '.join(risk_factors[:3])}",
-                "link": f"/admin/cases/{case_id}" if case_id else "/admin/dashboard",
+                "link": f"/admin/cases?case_id={case_id}" if case_id else "/admin/dashboard",
                 "timestamp": datetime.utcnow().isoformat(),
                 "user_hash": user_hash,
                 "risk_factors": risk_factors,

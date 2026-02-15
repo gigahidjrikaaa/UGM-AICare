@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import {
   useAdminCounselors,
   useCreateCounselor,
@@ -643,6 +644,7 @@ export default function AdminCounselorsPage() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
   const [selectedCounselor, setSelectedCounselor] = useState<api.CounselorResponse | null>(null);
+  const queryClient = useQueryClient();
 
   return (
     <div className="space-y-6">
@@ -653,7 +655,7 @@ export default function AdminCounselorsPage() {
           <p className="text-white/70">Manage counselor profiles, availability, and assignments</p>
         </div>
         <button
-          onClick={() => window.location.reload()}
+          onClick={() => queryClient.invalidateQueries({ queryKey: ['admin-counselors'] })}
           className="flex items-center gap-2 px-4 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white/80 hover:bg-white/10 hover:text-white transition-all group"
           title="Refresh data"
         >
@@ -755,8 +757,10 @@ export default function AdminCounselorsPage() {
 // ========================================
 
 function StatsCards() {
-  const { data } = useAdminCounselors({ page: 1, page_size: 1 });
+  // Fetch all counselors (up to 500) so Available count and Average Rating are computed correctly
+  const { data } = useAdminCounselors({ page: 1, page_size: 500 });
 
+  const allCounselors = data?.counselors || [];
   const stats = [
     {
       label: 'Total counselors',
@@ -766,14 +770,14 @@ function StatsCards() {
     },
     {
       label: 'Available',
-      value: data?.counselors?.filter(p => p.is_available).length || 0,
+      value: allCounselors.filter(p => p.is_available).length,
       icon: Activity,
       color: 'from-green-500 to-emerald-500',
     },
     {
       label: 'Average Rating',
-      value: data?.counselors?.length 
-        ? (data.counselors.reduce((acc, p) => acc + p.rating, 0) / data.counselors.length).toFixed(1)
+      value: allCounselors.length 
+        ? (allCounselors.reduce((acc, p) => acc + p.rating, 0) / allCounselors.length).toFixed(1)
         : '0.0',
       icon: Star,
       color: 'from-yellow-500 to-orange-500',
@@ -829,15 +833,7 @@ function CounselorsTable({
     is_available: isAvailable,
   });
 
-  // Debug logging
-  useEffect(() => {
-    if (data) {
-      console.log('≡ƒöì [counselors Table] Data received:', data);
-      console.log('≡ƒöì [counselors Table] counselors count:', data.counselors?.length);
-      console.log('≡ƒöì [counselors Table] Total:', data.total);
-      console.log('≡ƒöì [counselors Table] Current filters:', { page, search, isAvailable });
-    }
-  }, [data, page, search, isAvailable]);
+  // Removed debug logging
 
   const toggleAvailability = useToggleCounselorAvailabilityAdmin();
   const deletecounselor = useDeleteCounselor();

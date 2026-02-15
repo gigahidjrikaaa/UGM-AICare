@@ -8,7 +8,14 @@ import { FiAward, FiExternalLink, FiHelpCircle, FiLoader, FiLock, FiRefreshCw } 
 import apiClient from "@/services/api";
 import InteractiveBadgeCard from "@/components/ui/InteractiveBadgeCard";
 import { Tooltip } from "@/components/ui/Tooltip";
-import { badgeMetadataMap, getBadgeMeta, getChainShortName, getExplorerTxUrl, getIpfsUrl } from "@/lib/badgeConstants";
+import {
+  badgeMetadataMap,
+  DEFAULT_BADGE_PLACEHOLDER_IMAGE,
+  getBadgeMeta,
+  getChainShortName,
+  getExplorerTxUrl,
+  getIpfsUrl,
+} from "@/lib/badgeConstants";
 
 const FALLBACK_CHAIN_ID = 656476; // EDU Chain Testnet (legacy badges)
 
@@ -161,13 +168,6 @@ export default function EarnedBadgesDisplay() {
     fetchBadges();
   }, [fetchBadges]);
 
-  useEffect(() => {
-    if (!isLoading) {
-      void handleSyncAchievements();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isLoading]);
-
   const content = useMemo(() => {
     if (isLoading) {
       return (
@@ -223,7 +223,7 @@ export default function EarnedBadgesDisplay() {
                     height={88}
                     className="h-20 w-20 rounded-full border border-[#FFCA40]/40 bg-black/30 object-cover shadow-[0_0_24px_rgba(255,202,64,0.35)]"
                     onError={(event) => {
-                      event.currentTarget.src = "/badges/badge-placeholder.png";
+                      event.currentTarget.src = DEFAULT_BADGE_PLACEHOLDER_IMAGE;
                     }}
                   />
                 ) : (
@@ -303,7 +303,7 @@ export default function EarnedBadgesDisplay() {
         </div>
 
         <div className="flex flex-col items-stretch gap-3 text-sm text-white/70 sm:flex-row sm:items-center">
-          <div className="w-full min-w-[200px] sm:w-60">
+          <div className="w-full min-w-50 sm:w-60">
             <div className="flex items-center justify-between text-xs uppercase tracking-wide text-white/50">
               <span>Progress</span>
               <span>{progressPercent}%</span>

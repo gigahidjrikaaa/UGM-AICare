@@ -78,6 +78,44 @@ class Alert(Base):
     )
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # Auto-expire alerts after a certain time (e.g., 7 days)
+
+    def _ensure_context_data(self) -> dict:
+        if not isinstance(self.context_data, dict):
+            self.context_data = {}
+        return self.context_data
+
+    @property
+    def link(self) -> Optional[str]:
+        if isinstance(self.context_data, dict):
+            value = self.context_data.get("link")
+            return str(value) if value is not None else None
+        return None
+
+    @link.setter
+    def link(self, value: Optional[str]) -> None:
+        data = self._ensure_context_data()
+        if value is None:
+            data.pop("link", None)
+        else:
+            data["link"] = value
+
+    @property
+    def alert_metadata(self) -> dict:
+        if not isinstance(self.context_data, dict):
+            return {}
+        data = dict(self.context_data)
+        data.pop("link", None)
+        return data
+
+    @alert_metadata.setter
+    def alert_metadata(self, value: Optional[dict]) -> None:
+        data = self._ensure_context_data()
+        existing_link = data.get("link")
+        data.clear()
+        if isinstance(value, dict):
+            data.update(value)
+        if existing_link is not None and "link" not in data:
+            data["link"] = existing_link
     
     def __repr__(self) -> str:
         return f"<Alert(id={self.id}, type={self.alert_type}, severity={self.severity}, seen={self.is_seen})>"
@@ -90,6 +128,8 @@ class Alert(Base):
             'severity': self.severity,
             'title': self.title,
             'message': self.message,
+            'link': self.link,
+            'alert_metadata': self.alert_metadata,
             'entity_type': self.entity_type,
             'entity_id': self.entity_id,
             'context_data': self.context_data,

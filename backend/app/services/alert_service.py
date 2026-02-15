@@ -62,12 +62,16 @@ class AlertService:
             severity=severity,
             title=title,
             message=message,
-            link=link,
-            alert_metadata=alert_metadata or {},
+            entity_type=None,
+            entity_id=None,
+            context_data={},
             created_at=datetime.utcnow(),
             expires_at=expires_at,
             is_seen=False
         )
+
+        alert.link = link
+        alert.alert_metadata = alert_metadata or {}
         
         self.db.add(alert)
         await self.db.commit()

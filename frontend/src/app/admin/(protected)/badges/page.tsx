@@ -12,6 +12,13 @@ import { getIpfsUrl } from '@/lib/badgeConstants';
 import { adminBadgesApi } from '@/services/adminBadgesApi';
 import type { BadgeIssuance, BadgeTemplate, ChainInfo } from '@/types/admin/badges';
 
+const AUTO_AWARD_ACTION_OPTIONS = [
+  'manual_sync',
+  'journal_saved',
+  'quest_completed',
+  'wellness_state_updated',
+] as const;
+
 function formatTimestamp(ts?: string | null): string {
   if (!ts) return '-';
   const d = new Date(ts);
@@ -45,6 +52,13 @@ export default function AdminBadgesPage() {
   const [newTokenId, setNewTokenId] = useState('');
   const [newName, setNewName] = useState('');
   const [newDescription, setNewDescription] = useState('');
+  const [newAutoAwardEnabled, setNewAutoAwardEnabled] = useState(false);
+  const [newAutoAwardAction, setNewAutoAwardAction] = useState('');
+  const [newAutoAwardCriteria, setNewAutoAwardCriteria] = useState('');
+
+  const [editAutoAwardEnabled, setEditAutoAwardEnabled] = useState(false);
+  const [editAutoAwardAction, setEditAutoAwardAction] = useState('');
+  const [editAutoAwardCriteria, setEditAutoAwardCriteria] = useState('');
 
   const fileInputs = useRef<Record<number, HTMLInputElement | null>>({});
 
@@ -84,23 +98,63 @@ export default function AdminBadgesPage() {
       toast.error(t('admin.badges.invalid_name', 'Name is required'));
       return;
     }
+
+    let parsedCriteria: Record<string, unknown> | undefined;
+    if (newAutoAwardEnabled) {
+      if (!newAutoAwardAction.trim()) {
+        toast.error('Auto-award action is required when auto-award is enabled');
+        return;
+      }
+      if (!newAutoAwardCriteria.trim()) {
+        toast.error('Auto-award criteria JSON is required when auto-award is enabled');
+        return;
+      }
+      try {
+        const parsed = JSON.parse(newAutoAwardCriteria);
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+          toast.error('Auto-award criteria must be a JSON object');
+          return;
+        }
+        parsedCriteria = parsed as Record<string, unknown>;
+      } catch {
+        toast.error('Invalid auto-award criteria JSON');
+        return;
+      }
+    }
+
     try {
       await adminBadgesApi.createTemplate({
         token_id: tokenId,
         name: newName.trim(),
         description: newDescription.trim() || undefined,
         chain_id: selectedChainId,
+        auto_award_enabled: newAutoAwardEnabled,
+        auto_award_action: newAutoAwardEnabled ? newAutoAwardAction.trim() : undefined,
+        auto_award_criteria: newAutoAwardEnabled ? parsedCriteria : undefined,
       });
       toast.success(t('admin.badges.created', 'Badge draft created'));
       setNewTokenId('');
       setNewName('');
       setNewDescription('');
+      setNewAutoAwardEnabled(false);
+      setNewAutoAwardAction('');
+      setNewAutoAwardCriteria('');
       await refresh();
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
       toast.error(`${t('admin.badges.create_failed', 'Create failed')}: ${msg}`);
     }
-  }, [newTokenId, newName, newDescription, refresh, t]);
+  }, [
+    newAutoAwardAction,
+    newAutoAwardCriteria,
+    newAutoAwardEnabled,
+    newDescription,
+    newName,
+    newTokenId,
+    refresh,
+    selectedChainId,
+    t,
+  ]);
 
   const requestUpload = useCallback((templateId: number) => {
     fileInputs.current[templateId]?.click();
@@ -151,6 +205,9 @@ export default function AdminBadgesPage() {
     setActiveTemplate(template);
     setEditName(template.name);
     setEditDescription(template.description ?? '');
+    setEditAutoAwardEnabled(Boolean(template.auto_award_enabled));
+    setEditAutoAwardAction(template.auto_award_action ?? '');
+    setEditAutoAwardCriteria(template.auto_award_criteria ? JSON.stringify(template.auto_award_criteria, null, 2) : '');
     setIsEditOpen(true);
   }, []);
 
@@ -160,10 +217,37 @@ export default function AdminBadgesPage() {
       toast.error(t('admin.badges.invalid_name', 'Name is required'));
       return;
     }
+
+    let parsedCriteria: Record<string, unknown> | null = null;
+    if (editAutoAwardEnabled) {
+      if (!editAutoAwardAction.trim()) {
+        toast.error('Auto-award action is required when auto-award is enabled');
+        return;
+      }
+      if (!editAutoAwardCriteria.trim()) {
+        toast.error('Auto-award criteria JSON is required when auto-award is enabled');
+        return;
+      }
+      try {
+        const parsed = JSON.parse(editAutoAwardCriteria);
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
+          toast.error('Auto-award criteria must be a JSON object');
+          return;
+        }
+        parsedCriteria = parsed as Record<string, unknown>;
+      } catch {
+        toast.error('Invalid auto-award criteria JSON');
+        return;
+      }
+    }
+
     try {
       await adminBadgesApi.updateTemplate(activeTemplate.id, {
         name: editName.trim(),
         description: editDescription.trim() ? editDescription.trim() : null,
+        auto_award_enabled: editAutoAwardEnabled,
+        auto_award_action: editAutoAwardEnabled ? editAutoAwardAction.trim() : null,
+        auto_award_criteria: editAutoAwardEnabled ? parsedCriteria : null,
       });
       toast.success(t('admin.badges.updated', 'Badge updated'));
       setIsEditOpen(false);
@@ -172,7 +256,16 @@ export default function AdminBadgesPage() {
       const msg = e instanceof Error ? e.message : String(e);
       toast.error(`${t('admin.badges.update_failed', 'Update failed')}: ${msg}`);
     }
-  }, [activeTemplate, editDescription, editName, refresh, t]);
+  }, [
+    activeTemplate,
+    editAutoAwardAction,
+    editAutoAwardCriteria,
+    editAutoAwardEnabled,
+    editDescription,
+    editName,
+    refresh,
+    t,
+  ]);
 
   const submitMint = useCallback(async () => {
     if (!activeTemplate) return;
@@ -238,6 +331,7 @@ export default function AdminBadgesPage() {
         <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-4">
           <Input
             name="token_id"
+            type="number"
             label={t('admin.badges.token_id', 'Token ID')}
             value={newTokenId}
             onChange={(e) => setNewTokenId(e.target.value)}
@@ -287,6 +381,45 @@ export default function AdminBadgesPage() {
             placeholder={t('admin.badges.description', 'Description (optional)')}
             aria-label={t('admin.badges.description', 'Description (optional)')}
           />
+        </div>
+        <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-3">
+          <label className="flex items-center gap-2 text-sm text-white/80">
+            <input
+              type="checkbox"
+              checked={newAutoAwardEnabled}
+              onChange={(e) => setNewAutoAwardEnabled(e.target.checked)}
+            />
+            Enable auto-award
+          </label>
+          {newAutoAwardEnabled ? (
+            <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
+              <div className="flex flex-col gap-1">
+                <label htmlFor="auto_award_action" className="text-xs font-medium text-white/70">
+                  Auto-award action
+                </label>
+                <select
+                  id="auto_award_action"
+                  value={newAutoAwardAction}
+                  onChange={(e) => setNewAutoAwardAction(e.target.value)}
+                  className="w-full rounded-lg border border-white/15 bg-white/8 px-3 py-2 text-sm text-white"
+                  aria-label="Auto-award action"
+                >
+                  <option value="">Select action</option>
+                  {AUTO_AWARD_ACTION_OPTIONS.map((action) => (
+                    <option key={action} value={action}>
+                      {action}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <Textarea
+                value={newAutoAwardCriteria}
+                onChange={(e) => setNewAutoAwardCriteria(e.target.value)}
+                placeholder='{"min_journal_count": 5}'
+                aria-label="Auto-award criteria JSON"
+              />
+            </div>
+          ) : null}
         </div>
       </section>
 
@@ -422,6 +555,7 @@ export default function AdminBadgesPage() {
             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
               <Input
                 name="user_id"
+                type="number"
                 label={t('admin.badges.user_id', 'User ID')}
                 value={mintUserId}
                 onChange={(e) => setMintUserId(e.target.value)}
@@ -431,6 +565,7 @@ export default function AdminBadgesPage() {
               />
               <Input
                 name="amount"
+                type="number"
                 label={t('admin.badges.amount', 'Amount')}
                 value={mintAmount}
                 onChange={(e) => setMintAmount(e.target.value)}
@@ -477,6 +612,42 @@ export default function AdminBadgesPage() {
                 placeholder={t('admin.badges.description', 'Description (optional)')}
                 aria-label={t('admin.badges.description', 'Description (optional)')}
               />
+              <label className="flex items-center gap-2 text-sm text-white/80">
+                <input
+                  type="checkbox"
+                  checked={editAutoAwardEnabled}
+                  onChange={(e) => setEditAutoAwardEnabled(e.target.checked)}
+                />
+                Enable auto-award
+              </label>
+              {editAutoAwardEnabled ? (
+                <>
+                  <div className="flex flex-col gap-1">
+                    <label htmlFor="edit_auto_award_action" className="text-xs font-medium text-white/70">
+                      Auto-award action
+                    </label>
+                    <select
+                      id="edit_auto_award_action"
+                      value={editAutoAwardAction}
+                      onChange={(e) => setEditAutoAwardAction(e.target.value)}
+                      className="w-full rounded-lg border border-white/15 bg-white/8 px-3 py-2 text-sm text-white"
+                    >
+                      <option value="">Select action</option>
+                      {AUTO_AWARD_ACTION_OPTIONS.map((action) => (
+                        <option key={action} value={action}>
+                          {action}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <Textarea
+                    value={editAutoAwardCriteria}
+                    onChange={(e) => setEditAutoAwardCriteria(e.target.value)}
+                    placeholder='{"min_streak": 7}'
+                    aria-label="Auto-award criteria JSON"
+                  />
+                </>
+              ) : null}
             </div>
 
             <div className="mt-4 flex justify-end gap-2">

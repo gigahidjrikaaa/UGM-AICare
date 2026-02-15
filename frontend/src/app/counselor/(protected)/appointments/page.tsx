@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import {
   FiCalendar,
   FiClock,
@@ -10,8 +10,10 @@ import {
   FiCheckCircle,
   FiXCircle,
   FiEdit,
+  FiAlertTriangle,
 } from 'react-icons/fi';
 import apiClient from '@/services/api';
+import toast from 'react-hot-toast';
 
 type AppointmentStatus = 'scheduled' | 'completed' | 'cancelled' | 'no_show';
 type AppointmentType = 'in_person' | 'video_call' | 'phone_call';
@@ -66,12 +68,10 @@ const typeIcons = {
 export default function CounselorAppointmentsPage() {
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'list' | 'calendar'>('list');
   const [filterStatus, setFilterStatus] = useState<string>('all');
-
-  useEffect(() => {
-    loadAppointments();
-  }, []);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
 
   const toYmd = (date: Date) => {
     const year = date.getFullYear();
@@ -107,9 +107,10 @@ export default function CounselorAppointmentsPage() {
     return 'in_person';
   };
 
-  const loadAppointments = async () => {
+  const loadAppointments = useCallback(async () => {
     try {
       setLoading(true);
+      setError(null);
       const response = await apiClient.get<BackendAppointment[]>('/counselor/appointments');
 
       const mapped: Appointment[] = (response.data || []).map((apt) => {
@@ -131,9 +132,69 @@ export default function CounselorAppointmentsPage() {
       setAppointments(mapped);
     } catch (err) {
       console.error('Failed to load appointments:', err);
+      setError('Failed to load appointments');
       setAppointments([]);
     } finally {
       setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadAppointments();
+  }, [loadAppointments]);
+
+  const handleComplete = async (appointmentId: string) => {
+    if (!confirm('Mark this appointment as completed?')) return;
+    try {
+      setActionLoading(appointmentId);
+      await apiClient.put(`/appointments/${appointmentId}`, { status: 'completed' });
+      toast.success('Appointment marked as completed');
+      await loadAppointments();
+    } catch (err) {
+      console.error('Failed to complete appointment:', err);
+      toast.error('Failed to complete appointment');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleReschedule = async (appointmentId: string) => {
+    const newDateTime = prompt('Enter new date & time (YYYY-MM-DD HH:MM):');
+    if (!newDateTime) return;
+    // Validate format
+    const dateRegex = /^\d{4}-\d{2}-\d{2}\s\d{2}:\d{2}$/;
+    if (!dateRegex.test(newDateTime.trim())) {
+      toast.error('Invalid format. Use YYYY-MM-DD HH:MM');
+      return;
+    }
+    try {
+      setActionLoading(appointmentId);
+      await apiClient.put(`/appointments/${appointmentId}`, { 
+        appointment_datetime: new Date(newDateTime.trim()).toISOString(),
+        status: 'scheduled' 
+      });
+      toast.success('Appointment rescheduled');
+      await loadAppointments();
+    } catch (err) {
+      console.error('Failed to reschedule appointment:', err);
+      toast.error('Failed to reschedule appointment');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleCancel = async (appointmentId: string) => {
+    if (!confirm('Are you sure you want to cancel this appointment?')) return;
+    try {
+      setActionLoading(appointmentId);
+      await apiClient.delete(`/appointments/${appointmentId}`);
+      toast.success('Appointment cancelled');
+      await loadAppointments();
+    } catch (err) {
+      console.error('Failed to cancel appointment:', err);
+      toast.error('Failed to cancel appointment');
+    } finally {
+      setActionLoading(null);
     }
   };
 
@@ -142,8 +203,9 @@ export default function CounselorAppointmentsPage() {
     return statusMatch;
   });
 
+  const todayStr = toYmd(new Date());
   const todayAppointments = filteredAppointments.filter(
-    (apt) => apt.date === new Date().toISOString().split('T')[0]
+    (apt) => apt.date === todayStr
   );
   const upcomingAppointments = filteredAppointments.filter(
     (apt) => new Date(apt.date) > new Date()
@@ -155,6 +217,24 @@ export default function CounselorAppointmentsPage() {
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFCA40] mb-4"></div>
           <p className="text-white/70">Loading appointments...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6 max-w-md text-center">
+          <FiAlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
+          <h2 className="text-lg font-semibold text-white mb-2">Error</h2>
+          <p className="text-white/70 text-sm mb-4">{error}</p>
+          <button
+            onClick={loadAppointments}
+            className="px-4 py-2 bg-[#FFCA40] text-[#001d58] rounded-lg font-medium hover:bg-[#FFD55C] transition-colors"
+          >
+            Try Again
+          </button>
         </div>
       </div>
     );
@@ -302,24 +382,37 @@ export default function CounselorAppointmentsPage() {
                     <div className="shrink-0 flex flex-col gap-2">
                       {appointment.status === 'scheduled' && (
                         <>
-                          <button className="px-4 py-2 bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 rounded-lg text-sm font-medium text-[#FFCA40] transition-all flex items-center gap-2 whitespace-nowrap">
+                          <button 
+                            onClick={() => handleComplete(appointment.appointment_id)}
+                            disabled={actionLoading === appointment.appointment_id}
+                            className="px-4 py-2 bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 rounded-lg text-sm font-medium text-[#FFCA40] transition-all flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
+                          >
                             <FiCheckCircle className="w-4 h-4" />
-                            Complete
+                            {actionLoading === appointment.appointment_id ? 'Processing...' : 'Complete'}
                           </button>
-                          <button className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/20 rounded-lg text-sm text-white/70 hover:text-white transition-all flex items-center gap-2 whitespace-nowrap">
+                          <button 
+                            onClick={() => handleReschedule(appointment.appointment_id)}
+                            disabled={actionLoading === appointment.appointment_id}
+                            className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/20 rounded-lg text-sm text-white/70 hover:text-white transition-all flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
+                          >
                             <FiEdit className="w-4 h-4" />
                             Reschedule
                           </button>
-                          <button className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-sm text-red-300 transition-all flex items-center gap-2 whitespace-nowrap">
+                          <button 
+                            onClick={() => handleCancel(appointment.appointment_id)}
+                            disabled={actionLoading === appointment.appointment_id}
+                            className="px-4 py-2 bg-red-500/10 hover:bg-red-500/20 border border-red-500/30 rounded-lg text-sm text-red-300 transition-all flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
+                          >
                             <FiXCircle className="w-4 h-4" />
                             Cancel
                           </button>
                         </>
                       )}
-                      {appointment.status === 'completed' && (
-                        <button className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/20 rounded-lg text-sm text-white/70 hover:text-white transition-all flex items-center gap-2 whitespace-nowrap">
-                          View Notes
-                        </button>
+                      {appointment.status === 'completed' && appointment.notes && (
+                        <div className="px-4 py-2 bg-white/5 border border-white/20 rounded-lg text-sm text-white/70">
+                          <span className="text-xs text-white/50 block mb-1">Notes:</span>
+                          {appointment.notes}
+                        </div>
                       )}
                     </div>
                   </div>

@@ -4,6 +4,8 @@ import hashlib
 from fastapi import Depends, HTTPException, Header, status, Cookie, Request  # type: ignore
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
+from sqlalchemy.exc import DBAPIError
+from sqlalchemy.orm import load_only, lazyload
 from app.models import User
 from app.database import get_async_db
 from app.auth_utils import decrypt_and_validate_token
@@ -75,8 +77,27 @@ async def get_current_active_user(
             headers={"WWW-Authenticate": 'Bearer error="invalid_token"'},
         )
 
-    result = await db.execute(select(User).where(User.id == user_id))
-    user = result.scalar_one_or_none()
+    auth_user_query = (
+        select(User)
+        .options(
+            lazyload("*"),
+            load_only(User.id, User.is_active, User.role, User.google_sub),
+        )
+        .where(User.id == user_id)
+    )
+
+    try:
+        result = await db.execute(auth_user_query)
+        user = result.scalar_one_or_none()
+    except DBAPIError as exc:
+        logger.warning(
+            "Transient DB error while resolving current user id=%s; retrying once: %s",
+            user_id,
+            exc,
+        )
+        await db.rollback()
+        result = await db.execute(auth_user_query)
+        user = result.scalar_one_or_none()
 
     if not user:
         logger.warning("JWT resolved to missing user id=%s", user_id)
@@ -115,11 +136,7 @@ async def get_current_active_user(
         try:
             request.state.user_id = int(user.id)
             request.state.session_id = hashlib.sha256(token.encode("utf-8")).hexdigest()
-            prefs = getattr(user, "preferences", None)
-            analytics_allowed = getattr(prefs, "allow_analytics_tracking", None)
-            if analytics_allowed is None:
-                analytics_allowed = True
-            request.state.analytics_allowed = bool(analytics_allowed)
+            request.state.analytics_allowed = True
         except Exception:
             # Non-fatal; auth should still succeed.
             pass

@@ -77,23 +77,46 @@ interface NavItem {
   label: string;
   icon: React.ReactNode;
   adminOnly?: boolean; // Flag for admin-specific links
+  featured?: boolean;
 }
 
-// Define Navigation Items (Combine user and admin, mark admin ones)
-const sidebarNavItems: NavItem[] = [
-  { href: "/dashboard", label: "Dashboard", icon: <FiGrid size={18} /> },
-  { href: "/aika", label: "Talk to Aika", icon: <BsChatDots size={18} /> },
-  { href: "/journaling", label: "Journaling", icon: <FiActivity size={18} /> },
-  { href: "/quests", label: "Quest Board", icon: <FiZap size={18} /> },
-  { href: "/appointments", label: "Appointments", icon: <BsCalendar size={18} /> },
-  { href: "/profile", label: "Profile", icon: <FiUser size={18} /> },
-  { href: "/resources", label: "Resources", icon: <FiBookOpen size={18} /> },
-  // --- Admin Specific Links ---
-  { href: "/admin/dashboard", label: "Admin Dashboard", icon: <FiPieChart size={18} />, adminOnly: true },
-  { href: "/admin/users", label: "Manage Users", icon: <FiUsers size={18} />, adminOnly: true }, // Example admin link
-  { href: "/admin/settings", label: "Admin Settings", icon: <FiSettings size={18} />, adminOnly: true }, // Example admin link
-  // --- General Links ---
-  { href: "/help", label: "Help & Support", icon: <BsQuestionCircle size={18} /> }
+type NavGroup = {
+  title: string;
+  items: NavItem[];
+};
+
+const sidebarNavGroups: NavGroup[] = [
+  {
+    title: "Core Support",
+    items: [
+      { href: "/aika", label: "Talk to Aika", icon: <BsChatDots size={18} />, featured: true },
+      { href: "/journaling", label: "Journaling", icon: <FiActivity size={18} />, featured: true },
+      { href: "/appointments", label: "Appointments", icon: <BsCalendar size={18} />, featured: true },
+      { href: "/quests", label: "Quest Board", icon: <FiZap size={18} />, featured: true },
+    ],
+  },
+  {
+    title: "My Space",
+    items: [
+      { href: "/dashboard", label: "Dashboard", icon: <FiGrid size={18} /> },
+      { href: "/profile", label: "Profile", icon: <FiUser size={18} /> },
+      { href: "/resources", label: "Resources", icon: <FiBookOpen size={18} /> },
+    ],
+  },
+  {
+    title: "Admin Tools",
+    items: [
+      { href: "/admin/dashboard", label: "Admin Dashboard", icon: <FiPieChart size={18} />, adminOnly: true },
+      { href: "/admin/users", label: "Manage Users", icon: <FiUsers size={18} />, adminOnly: true },
+      { href: "/admin/settings", label: "Admin Settings", icon: <FiSettings size={18} />, adminOnly: true },
+    ],
+  },
+  {
+    title: "Help",
+    items: [
+      { href: "/help", label: "Help & Support", icon: <BsQuestionCircle size={18} /> },
+    ],
+  },
 ];
 
 
@@ -131,7 +154,7 @@ export default function AppSidebar({ isOpen, onClose, onOpenFeedback }: AppSideb
             exit={{ x: '-100%' }}
             transition={{ type: "spring", stiffness: 300, damping: 30 }}
             // --- CHANGE HERE: Use 'fixed' positioning, remove lg:sticky ---
-            className="fixed top-0 left-0 bottom-0 z-90 w-[85%] max-w-[280px] bg-linear-to-b from-[#001a4f]/95 to-[#00112e]/95 backdrop-blur-xl border-r border-white/10 shadow-xl flex flex-col"
+            className="fixed top-0 left-0 bottom-0 z-90 w-[85%] max-w-70 bg-linear-to-b from-[#001a4f]/95 to-[#00112e]/95 backdrop-blur-xl border-r border-white/10 shadow-xl flex flex-col"
             // --- No more lg:sticky, lg:translate-x-0, etc. ---
             role="navigation"
             aria-label="Main navigation"
@@ -150,36 +173,57 @@ export default function AppSidebar({ isOpen, onClose, onOpenFeedback }: AppSideb
 
             {/* Navigation Links */}
             <nav className="flex-1 p-4 overflow-y-auto">
-              <ul className="space-y-1">
-                {sidebarNavItems.map((item) => {
-                  // Skip admin links if user is not admin
-                  if (item.adminOnly && !isAdmin) {
+              <div className="space-y-5">
+                {sidebarNavGroups.map((group) => {
+                  const visibleItems = group.items.filter((item) => !item.adminOnly || isAdmin);
+                  if (visibleItems.length === 0) {
                     return null;
                   }
 
-                  const isActive = pathname === item.href;
-
                   return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        onClick={onClose} // Close on mobile after click
-                        className={`flex items-center px-3 py-3 rounded-lg transition-colors duration-150 ${
-                          isActive
-                            ? 'bg-[#FFCA40]/20 text-[#FFCA40] font-medium'
-                            : 'text-white/80 hover:bg-white/10 hover:text-white'
-                        }`}
-                      >
-                        <span className="mr-3 shrink-0 w-5">{item.icon}</span>
-                        <span className="truncate">{item.label}</span>
-                        {item.adminOnly && ( // Optional: Visual indicator for admin links
-                           <span className="ml-auto text-[10px] uppercase bg-blue-500/30 text-blue-300 px-1.5 py-0.5 rounded">Admin</span>
-                        )}
-                      </Link>
-                    </li>
+                    <section key={group.title} aria-label={group.title}>
+                      <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-white/40">
+                        {group.title}
+                      </p>
+                      <ul className="space-y-1.5">
+                        {visibleItems.map((item) => {
+                          const isActive = pathname === item.href;
+
+                          return (
+                            <li key={item.href}>
+                              <Link
+                                href={item.href}
+                                onClick={onClose}
+                                className={`relative flex items-center px-3 py-3 rounded-lg transition-colors duration-150 ${
+                                  isActive
+                                    ? item.featured
+                                      ? 'bg-[#FFCA40]/25 text-[#FFCA40] font-semibold border border-[#FFCA40]/40 shadow-[0_0_24px_rgba(255,202,64,0.18)]'
+                                      : 'bg-[#FFCA40]/20 text-[#FFCA40] font-medium border border-[#FFCA40]/30'
+                                    : item.featured
+                                      ? 'text-white border border-white/10 bg-white/5 hover:bg-[#FFCA40]/10 hover:border-[#FFCA40]/30 hover:text-white'
+                                      : 'text-white/80 hover:bg-white/10 hover:text-white'
+                                }`}
+                              >
+                                {isActive && item.featured && (
+                                  <span className="absolute left-1.5 top-1/2 -translate-y-1/2 h-6 w-1 rounded-full bg-[#FFCA40]" aria-hidden="true" />
+                                )}
+                                <span className={`mr-3 shrink-0 w-5 ${item.featured ? 'text-[#FFCA40]' : ''}`}>{item.icon}</span>
+                                <span className="truncate">{item.label}</span>
+                                {item.featured && !isActive && (
+                                  <span className="ml-auto text-[10px] uppercase bg-[#FFCA40]/20 text-[#FFCA40] px-1.5 py-0.5 rounded">Main</span>
+                                )}
+                                {item.adminOnly && (
+                                  <span className="ml-auto text-[10px] uppercase bg-blue-500/30 text-blue-300 px-1.5 py-0.5 rounded">Admin</span>
+                                )}
+                              </Link>
+                            </li>
+                          );
+                        })}
+                      </ul>
+                    </section>
                   );
                 })}
-              </ul>
+              </div>
             </nav>
 
             {/* Bottom Actions - Compact & Modern */}

@@ -128,6 +128,7 @@ class UserProfileOverviewUpdate(BaseModel):
     therapy_modality: Optional[str] = None
     therapy_frequency: Optional[str] = None
     therapy_notes: Optional[str] = None
+    aicare_team_notes: Optional[str] = None
     consent_data_sharing: Optional[bool] = None
     consent_research: Optional[bool] = None
     consent_emergency_contact: Optional[bool] = None

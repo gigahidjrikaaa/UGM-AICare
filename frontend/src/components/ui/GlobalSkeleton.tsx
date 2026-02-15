@@ -194,40 +194,47 @@ function DashboardPageSkeleton() {
       className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F]"
     >
       <div className="max-w-6xl mx-auto px-4 pt-20 sm:pt-24 pb-12 space-y-6 sm:space-y-10">
-        {/* Welcome card */}
-        <div className="rounded-2xl sm:rounded-3xl border border-white/10 bg-white/3 p-4 sm:p-8">
-          <div className="grid gap-6 lg:grid-cols-[1fr_320px]">
-            <div className="space-y-4 sm:space-y-6">
-              <SkeletonText width="w-24" className="h-3" />
-              <SkeletonText width="w-full sm:w-3/4" className="h-6 sm:h-8" />
-              <SkeletonText width="w-full sm:w-2/3" className="h-4" />
-              <div className="flex flex-col sm:flex-row gap-3">
-                <SkeletonBox className="h-10 sm:h-12 w-full sm:w-40 rounded-full" />
-                <SkeletonBox className="h-10 sm:h-12 w-full sm:w-36 rounded-full" />
-              </div>
-            </div>
-            {/* Stats cards */}
-            <div className="grid grid-cols-2 gap-3 sm:gap-4">
-              {[...Array(4)].map((_, i) => (
-                <div key={i} className="bg-white/3 rounded-xl sm:rounded-2xl p-3 sm:p-4">
-                  <SkeletonCircle className="h-10 w-10 sm:h-12 sm:w-12 mb-2" />
-                  <SkeletonText width="w-16" className="h-3 mb-1" />
-                  <SkeletonText width="w-12" className="h-5" />
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
+        {/* Aika hero card */}
+        <SkeletonBox className="h-28 sm:h-32 rounded-3xl" />
 
-        {/* Quick actions */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-          {[...Array(3)].map((_, i) => (
-            <SkeletonBox key={i} className="h-28 sm:h-32 rounded-xl sm:rounded-2xl" />
+        {/* Stats cards */}
+        <div className="grid gap-3 sm:gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <div key={i} className="bg-white/3 rounded-xl sm:rounded-2xl p-3 sm:p-4">
+              <SkeletonCircle className="h-10 w-10 sm:h-12 sm:w-12 mb-2" />
+              <SkeletonText width="w-16" className="h-3 mb-1" />
+              <SkeletonText width="w-12" className="h-5" />
+            </div>
           ))}
         </div>
 
-        {/* Activity section */}
-        <SkeletonBox className="h-48 sm:h-64 rounded-xl sm:rounded-2xl" />
+        {/* Welcome card */}
+        <div className="rounded-2xl sm:rounded-3xl border border-white/10 bg-white/3 p-4 sm:p-8">
+          <div className="space-y-4 sm:space-y-6">
+            <SkeletonText width="w-24" className="h-3" />
+            <SkeletonText width="w-full sm:w-3/4" className="h-6 sm:h-8" />
+            <SkeletonText width="w-full sm:w-2/3" className="h-4" />
+            <div className="flex flex-col sm:flex-row gap-3">
+              <SkeletonBox className="h-10 sm:h-12 w-full sm:w-40 rounded-full" />
+              <SkeletonBox className="h-10 sm:h-12 w-full sm:w-36 rounded-full" />
+            </div>
+            <SkeletonBox className="h-16 rounded-2xl" />
+          </div>
+        </div>
+
+        {/* Quest board */}
+        <SkeletonBox className="h-56 rounded-3xl" />
+
+        {/* Bento grid */}
+        <div className="grid gap-6 lg:grid-cols-12">
+          <SkeletonBox className="h-64 rounded-3xl lg:col-span-7" />
+          <SkeletonBox className="h-64 rounded-3xl lg:col-span-5" />
+          <SkeletonBox className="h-72 rounded-3xl lg:col-span-7" />
+          <div className="space-y-6 lg:col-span-5">
+            <SkeletonBox className="h-40 rounded-3xl" />
+            <SkeletonBox className="h-48 rounded-3xl" />
+          </div>
+        </div>
       </div>
     </motion.div>
   );

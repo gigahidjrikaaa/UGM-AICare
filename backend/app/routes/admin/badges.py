@@ -85,6 +85,9 @@ def _as_template_response(template: BadgeTemplate) -> BadgeTemplateResponse:
         image_uri=image_uri,
         metadata_uri=template.metadata_uri,
         status=template.status,
+        auto_award_enabled=bool(template.auto_award_enabled),
+        auto_award_action=template.auto_award_action,
+        auto_award_criteria=template.auto_award_criteria,
         created_at=template.created_at,
         updated_at=template.updated_at,
         published_at=template.published_at,
@@ -186,12 +189,21 @@ async def create_badge_template(
             detail=f"NFT contract address not configured for {cfg.name}",
         )
 
+    if payload.auto_award_enabled:
+        if not payload.auto_award_action:
+            raise HTTPException(status_code=400, detail="auto_award_action is required when auto_award_enabled=true")
+        if not payload.auto_award_criteria:
+            raise HTTPException(status_code=400, detail="auto_award_criteria is required when auto_award_enabled=true")
+
     template = BadgeTemplate(
         chain_id=chain_id,
         contract_address=contract_address,
         token_id=payload.token_id,
         name=payload.name,
         description=payload.description,
+        auto_award_enabled=payload.auto_award_enabled,
+        auto_award_action=payload.auto_award_action,
+        auto_award_criteria=payload.auto_award_criteria,
         status="DRAFT",
     )
     db.add(template)
@@ -230,6 +242,20 @@ async def update_badge_template(
         template.name = payload.name
     if payload.description is not None:
         template.description = payload.description
+
+    provided = payload.model_fields_set
+    if "auto_award_enabled" in provided:
+        template.auto_award_enabled = bool(payload.auto_award_enabled)
+    if "auto_award_action" in provided:
+        template.auto_award_action = payload.auto_award_action
+    if "auto_award_criteria" in provided:
+        template.auto_award_criteria = payload.auto_award_criteria
+
+    if template.auto_award_enabled:
+        if not template.auto_award_action:
+            raise HTTPException(status_code=400, detail="auto_award_action is required when auto_award_enabled=true")
+        if not template.auto_award_criteria:
+            raise HTTPException(status_code=400, detail="auto_award_criteria is required when auto_award_enabled=true")
 
     db.add(template)
     await db.commit()

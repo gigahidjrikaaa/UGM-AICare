@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { 
   FiCalendar, 
   FiUsers, 
@@ -8,7 +9,8 @@ import {
   FiTrendingUp,
   FiClock,
   FiAlertTriangle,
-  FiCheckCircle
+  FiCheckCircle,
+  FiDollarSign
 } from 'react-icons/fi';
 import { apiCall } from '@/utils/adminApi';
 
@@ -70,6 +72,7 @@ export default function CounselorDashboard() {
   const [todayAppointments, setTodayAppointments] = useState<TodayAppointment[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const router = useRouter();
 
   useEffect(() => {
     loadDashboardData();
@@ -140,7 +143,7 @@ export default function CounselorDashboard() {
 
       {/* Stats Grid */}
       {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
           <StatCard
             icon={<FiCalendar className="w-6 h-6" />}
             label="This Week"
@@ -168,6 +171,13 @@ export default function CounselorDashboard() {
             value={stats.average_rating.toFixed(1)}
             subtitle={`${stats.total_reviews} reviews`}
             color="gold"
+          />
+          <StatCard
+            icon={<FiDollarSign className="w-6 h-6" />}
+            label="Total Revenue"
+            value={`Rp ${stats.total_revenue.toLocaleString()}`}
+            subtitle="lifetime"
+            color="green"
           />
         </div>
       )}
@@ -220,7 +230,9 @@ export default function CounselorDashboard() {
                         <p className="text-sm text-white/50 mt-2">{apt.notes}</p>
                       )}
                     </div>
-                    <button className="px-3 py-1.5 bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 rounded-lg text-sm font-medium text-[#FFCA40] transition-all">
+                    <button 
+                      onClick={() => router.push(`/counselor/appointments`)}
+                      className="px-3 py-1.5 bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 rounded-lg text-sm font-medium text-[#FFCA40] transition-all">
                       View
                     </button>
                   </div>

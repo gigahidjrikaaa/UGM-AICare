@@ -334,9 +334,15 @@ export default function UserManagementPage() {
     const { name, value, type, checked } = e.target as HTMLInputElement;
     setEditedUser(prev => {
       if (!prev) return null;
+      let fieldValue: string | boolean = value;
+      if (type === 'checkbox') {
+        fieldValue = checked;
+      } else if (name === 'is_active') {
+        fieldValue = value === 'true';
+      }
       return {
         ...prev,
-        [name]: type === 'checkbox' ? checked : value
+        [name]: fieldValue
       };
     });
   };

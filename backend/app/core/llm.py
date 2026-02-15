@@ -42,6 +42,10 @@ for i in range(2, 6):
 
 logger.info(f"Loaded {len(GEMINI_API_KEYS)} Gemini API keys for rotation.")
 
+# Backward compatibility for legacy call sites that still reference GOOGLE_API_KEY.
+# Keep as a nullable string so older guards like `if llm.GOOGLE_API_KEY` continue to work.
+GOOGLE_API_KEY: Optional[str] = GEMINI_API_KEYS[0] if GEMINI_API_KEYS else None
+
 # Gemini models for different use cases
 # NOTE: These are constrained to models confirmed usable in your AI Studio project.
 DEFAULT_GEMINI_MODEL = "gemini-3-flash-preview"  # Default for general use

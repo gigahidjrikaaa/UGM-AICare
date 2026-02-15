@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useCallback, useEffect, useMemo, useState } from "react";
-import Image from "next/image";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
@@ -37,7 +36,10 @@ import GlobalSkeleton from "@/components/ui/GlobalSkeleton";
 import ParticleBackground from "@/components/ui/ParticleBackground";
 import EarnedBadgesDisplay from "@/components/ui/EarnedBadgesDisplay";
 import WalletLinkButton from "@/components/ui/WalletLinkButton";
+import ProfileQuickSummary from "@/components/ui/profile/ProfileQuickSummary";
+import SafeAvatar from "@/components/ui/profile/SafeAvatar";
 import { useWellnessState } from "@/hooks/useQuests";
+import { sanitizeProfilePhotoInput } from "@/lib/imageUrl";
 import apiClient, {
   deleteUserAIMemoryFact,
   fetchUserAIMemoryFacts,
@@ -73,6 +75,7 @@ type ProfileFormState = {
   therapy_modality: string;
   therapy_frequency: string;
   therapy_notes: string;
+  aicare_team_notes: string;
   preferred_language: string;
   preferred_timezone: string;
   accessibility_needs: string;
@@ -111,6 +114,7 @@ const textareaBaseClass =
   "w-full rounded-lg border border-white/15 bg-white/10 px-3 py-2 text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/40";
 
 const TIMELINE_PREVIEW_COUNT = 5;
+const AICARE_TEAM_NOTES_MAX_LENGTH = 600;
 
 function TimelineList({
   entries,
@@ -201,6 +205,7 @@ function mapProfileToForm(profile: UserProfileOverviewResponse): ProfileFormStat
     therapy_modality: profile.therapy.therapy_modality ?? "",
     therapy_frequency: profile.therapy.therapy_frequency ?? "",
     therapy_notes: profile.therapy.therapy_notes ?? "",
+    aicare_team_notes: profile.aicare_team_notes ?? "",
     preferred_language: profile.localization.preferred_language ?? "",
     preferred_timezone: profile.localization.preferred_timezone ?? "",
     accessibility_needs: profile.localization.accessibility_needs ?? "",
@@ -238,6 +243,7 @@ const buildUpdatePayload = (state: ProfileFormState): UserProfileOverviewUpdate 
   therapy_modality: toNullableString(state.therapy_modality),
   therapy_frequency: toNullableString(state.therapy_frequency),
   therapy_notes: toNullableString(state.therapy_notes),
+  aicare_team_notes: toNullableString(state.aicare_team_notes),
   preferred_language: toNullableString(state.preferred_language),
   preferred_timezone: toNullableString(state.preferred_timezone),
   accessibility_needs: toNullableString(state.accessibility_needs),
@@ -445,9 +451,25 @@ export default function ProfilePage() {
     if (!profile || !form) {
       return;
     }
+
+    if (form.profile_photo_url.trim()) {
+      const sanitizedPhotoUrl = sanitizeProfilePhotoInput(form.profile_photo_url);
+      if (!sanitizedPhotoUrl) {
+        toast.error("Please provide a valid http(s) profile photo URL.");
+        return;
+      }
+      if (sanitizedPhotoUrl !== form.profile_photo_url.trim()) {
+        setForm((prev) => (prev ? { ...prev, profile_photo_url: sanitizedPhotoUrl } : prev));
+      }
+    }
+
     setIsSavingProfile(true);
     try {
-      const payload = buildUpdatePayload(form);
+      const normalizedForm = {
+        ...form,
+        profile_photo_url: sanitizeProfilePhotoInput(form.profile_photo_url) ?? "",
+      };
+      const payload = buildUpdatePayload(normalizedForm);
       const updated = await updateUserProfileOverview(payload);
       setProfile(updated);
       setForm(mapProfileToForm(updated));
@@ -574,7 +596,7 @@ export default function ProfilePage() {
     <div className="relative min-h-screen">
       <ParticleBackground />
       <div className="relative z-10 mx-auto max-w-6xl px-4 pb-16 pt-24">
-        <header className="rounded-3xl border border-white/10 bg-gradient-to-br from-white/10 to-white/5 p-8 shadow-2xl backdrop-blur">
+        <header className="rounded-3xl border border-white/10 bg-linear-to-br from-white/10 to-white/5 p-8 shadow-2xl backdrop-blur">
           <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
             <div>
               <p className="text-xs uppercase tracking-wide text-white/60">Profile overview</p>
@@ -599,7 +621,7 @@ export default function ProfilePage() {
                       : "border-white/20 text-white hover:border-[#FFCA40] hover:text-[#FFCA40]"
                   )}
                 >
-                  {showProfileDetails ? "Hide details" : "Show details"}
+                  {showProfileDetails ? "Hide advanced details" : "Show advanced details"}
                 </button>
                 {isEditing ? (
                   <>
@@ -660,15 +682,7 @@ export default function ProfilePage() {
           </div>
           <div className="mt-8 flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
             <div className="flex items-start gap-5">
-              <div className="relative h-24 w-24 overflow-hidden rounded-full border-2 border-white/30">
-                <Image
-                  src={headerImageSrc}
-                  alt={profile.header.full_name || "Profile"}
-                  fill
-                  className="object-cover"
-                  priority
-                />
-              </div>
+              <SafeAvatar src={headerImageSrc} alt={profile.header.full_name || "Profile"} className="h-24 w-24" />
               <div>
                 <div className="flex flex-wrap items-center gap-3">
                   <h1 className="text-3xl font-bold text-white">
@@ -1286,6 +1300,15 @@ export default function ProfilePage() {
           )}
         </header>
 
+        <ProfileQuickSummary
+          fullName={profile.header.full_name || firstName}
+          primaryEmail={profile.contact.primary_email}
+          phone={isEditing ? form.phone : profile.contact.phone}
+          city={isEditing ? form.city : profile.header.city}
+          university={isEditing ? form.university : profile.header.university}
+          major={isEditing ? form.major : profile.header.major}
+        />
+
         <section className="mt-8 rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl backdrop-blur">
           <EarnedBadgesDisplay />
         </section>
@@ -1335,10 +1358,33 @@ export default function ProfilePage() {
             <FiSliders className="h-5 w-5 text-[#FFCA40]" />
             Notes for the AICare team
           </h2>
-          <p className="mt-3 leading-relaxed text-white/80">
-            {profile.aicare_team_notes ??
-              "Share anything you would like the AICare support team to keep in mind for future sessions."}
+          <p className="mt-2 text-sm text-white/60">
+            Share context that helps support staff prepare for your next interaction. Useful examples include current stressors, preferred support style, scheduling constraints, and what kind of follow-up you want.
           </p>
+          {isEditing ? (
+            <div className="mt-4 space-y-2">
+              <label className="text-xs uppercase tracking-wide text-white/50">Team notes</label>
+              <textarea
+                value={form.aicare_team_notes}
+                onChange={(event) => updateFormField("aicare_team_notes", event.target.value)}
+                className={textareaBaseClass}
+                rows={5}
+                maxLength={AICARE_TEAM_NOTES_MAX_LENGTH}
+                placeholder="Example: I feel overwhelmed near exam weeks, prefer short check-ins by chat, and need reminders two days before appointments."
+              />
+              <div className="flex items-center justify-between text-xs text-white/50">
+                <span>Keep this practical and specific for your next support session.</span>
+                <span>
+                  {form.aicare_team_notes.length}/{AICARE_TEAM_NOTES_MAX_LENGTH}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <p className="mt-3 leading-relaxed text-white/80">
+              {profile.aicare_team_notes ??
+                "No notes added yet. Use Edit profile to share context with the AICare team."}
+            </p>
+          )}
         </section>
       </div>
     </div>

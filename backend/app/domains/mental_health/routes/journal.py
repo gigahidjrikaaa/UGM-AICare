@@ -13,6 +13,7 @@ from app.domains.mental_health.schemas.journal import JournalEntryCreate, Journa
 from app.core.llm import generate_response, LLMProvider
 from app.dependencies import get_current_active_user # Use your auth dependency
 from app.domains.mental_health.services.personal_context import invalidate_user_personal_context
+from app.services.achievement_service import trigger_achievement_check
 
 import logging
 logger = logging.getLogger(__name__)
@@ -134,6 +135,20 @@ async def create_or_update_journal_entry(
              raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Entry for this date might already exist or another error occurred.")
 
     if saved_entry:
+        try:
+            await trigger_achievement_check(
+                db,
+                current_user,
+                action="journal_saved",
+                fail_on_config_error=False,
+            )
+        except Exception as exc:  # pragma: no cover - best effort
+            logger.warning(
+                "Badge auto-sync failed after journal save for user %s: %s",
+                current_user.id,
+                exc,
+            )
+
         # Add background task for AI analysis
         background_tasks.add_task(
             analyze_journal_entry_for_insights,

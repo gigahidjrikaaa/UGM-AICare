@@ -17,9 +17,10 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
+from sqlalchemy.types import JSON
 
 from app.database import Base
 
@@ -69,6 +70,11 @@ class BadgeTemplate(Base):
     metadata_cid: Mapped[str | None] = mapped_column(String(128), nullable=True)
     metadata_uri: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
+    # Optional auto-award trigger metadata (admin-configurable)
+    auto_award_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default="false")
+    auto_award_action: Mapped[str | None] = mapped_column(String(64), nullable=True, index=True)
+    auto_award_criteria: Mapped[dict | None] = mapped_column(JSON, nullable=True)
+
     status: Mapped[str] = mapped_column(String(20), nullable=False, server_default="DRAFT")
     published_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     archived_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
@@ -93,6 +99,7 @@ class BadgeTemplate(Base):
         UniqueConstraint("chain_id", "contract_address", "token_id", name="uq_badge_templates_chain_contract_token"),
         Index("ix_badge_templates_status", "status"),
         Index("ix_badge_templates_chain_id", "chain_id"),
+        Index("ix_badge_templates_auto_award_action", "auto_award_action"),
     )
 
 

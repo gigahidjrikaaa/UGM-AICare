@@ -10,8 +10,12 @@ import {
   FiArrowRight,
   FiRefreshCw,
   FiBell,
+  FiMail,
+  FiPhone,
+  FiSend,
 } from 'react-icons/fi';
 import apiClient from '@/services/api';
+import toast from 'react-hot-toast';
 
 interface Escalation {
   id: string;
@@ -23,6 +27,9 @@ interface Escalation {
   assigned_to?: string;
   summary_redacted?: string;
   sla_breach_at?: string;
+  user_email?: string;
+  user_phone?: string;
+  telegram_username?: string;
 }
 
 const severityConfig = {
@@ -50,45 +57,56 @@ const severityConfig = {
 
 export default function CounselorEscalationsPage() {
   const router = useRouter();
-  const redirecting = true;
-
-  useEffect(() => {
-    router.replace('/counselor/cases');
-  }, [router]);
-
   const [escalations, setEscalations] = useState<Escalation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filter, setFilter] = useState<'all' | 'new' | 'in_progress'>('new');
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
   const loadEscalations = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
-      // Fetch cases assigned to this counselor
       const response = await apiClient.get<{ cases: Escalation[] }>('/counselor/cases');
-      setEscalations(response.data.cases || []);
+      const allCases = response.data.cases || [];
+      // Only show escalation-relevant cases (not closed)
+      const escalationCases = allCases.filter((c) => c.status !== 'closed');
+      setEscalations(escalationCases);
     } catch (err) {
       console.error('Failed to load escalations:', err);
       setError('Failed to load escalations');
+      toast.error('Failed to load escalations');
     } finally {
       setLoading(false);
     }
   }, []);
 
   useEffect(() => {
-    if (redirecting) return;
     loadEscalations();
-  }, [loadEscalations, redirecting]);
+  }, [loadEscalations]);
 
   const handleAccept = async (escalationId: string) => {
-    // TODO: Implement accept logic - update case status to in_progress
-    console.log('Accept escalation:', escalationId);
+    try {
+      setAcceptingId(escalationId);
+      await apiClient.put(`/counselor/cases/${escalationId}/status`, {
+        status: 'in_progress',
+        note: 'Case accepted by counselor',
+      });
+      toast.success('Case accepted successfully');
+      // Update local state
+      setEscalations((prev) =>
+        prev.map((e) => (e.id === escalationId ? { ...e, status: 'in_progress' as const } : e))
+      );
+    } catch (err) {
+      console.error('Failed to accept case:', err);
+      toast.error('Failed to accept case');
+    } finally {
+      setAcceptingId(null);
+    }
   };
 
-  const handleReassign = async (escalationId: string) => {
-    // TODO: Implement reassign logic
-    console.log('Reassign escalation:', escalationId);
+  const handleViewCase = (escalationId: string) => {
+    router.push(`/counselor/cases?highlight=${escalationId}`);
   };
 
   const formatDate = (dateString: string) => {
@@ -96,10 +114,15 @@ export default function CounselorEscalationsPage() {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffMins = Math.floor(diffMs / 60000);
-    
+
     if (diffMins < 60) return `${diffMins}m ago`;
     if (diffMins < 1440) return `${Math.floor(diffMins / 60)}h ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+    return date.toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
   };
 
   const filteredEscalations = escalations.filter((e) => {
@@ -107,12 +130,10 @@ export default function CounselorEscalationsPage() {
     return e.status === filter;
   });
 
-  const newCount = escalations.filter(e => e.status === 'new').length;
-  const criticalCount = escalations.filter(e => e.severity === 'critical' && e.status === 'new').length;
-
-  if (redirecting) {
-    return null;
-  }
+  const newCount = escalations.filter((e) => e.status === 'new').length;
+  const criticalCount = escalations.filter(
+    (e) => e.severity === 'critical' && e.status !== 'closed'
+  ).length;
 
   if (loading) {
     return (
@@ -154,7 +175,9 @@ export default function CounselorEscalationsPage() {
             <FiBell className="w-8 h-8 text-[#FFCA40]" />
             Escalations
           </h1>
-          <p className="text-white/60">Priority queue of AI-escalated cases requiring attention</p>
+          <p className="text-white/60">
+            Priority queue of AI-escalated cases requiring attention
+          </p>
         </div>
         <button
           onClick={loadEscalations}
@@ -172,9 +195,13 @@ export default function CounselorEscalationsPage() {
             <FiAlertTriangle className="w-6 h-6 text-red-400" />
             <div>
               <p className="text-red-300 font-semibold">
-                {criticalCount} critical {criticalCount === 1 ? 'case' : 'cases'} requiring immediate attention
+                {criticalCount} critical{' '}
+                {criticalCount === 1 ? 'case' : 'cases'} requiring immediate
+                attention
               </p>
-              <p className="text-red-300/70 text-sm">Please review and take action as soon as possible</p>
+              <p className="text-red-300/70 text-sm">
+                Please review and take action as soon as possible
+              </p>
             </div>
           </div>
         </div>
@@ -191,7 +218,9 @@ export default function CounselorEscalationsPage() {
           <div className="text-xs text-white/60 mt-1">Critical Priority</div>
         </div>
         <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
-          <div className="text-2xl font-bold text-white">{escalations.filter(e => e.status === 'in_progress').length}</div>
+          <div className="text-2xl font-bold text-white">
+            {escalations.filter((e) => e.status === 'in_progress').length}
+          </div>
           <div className="text-xs text-white/60 mt-1">In Progress</div>
         </div>
       </div>
@@ -216,7 +245,8 @@ export default function CounselorEscalationsPage() {
               : 'text-white/60 hover:text-white/80'
           }`}
         >
-          In Progress ({escalations.filter(e => e.status === 'in_progress').length})
+          In Progress (
+          {escalations.filter((e) => e.status === 'in_progress').length})
         </button>
         <button
           onClick={() => setFilter('all')}
@@ -226,7 +256,7 @@ export default function CounselorEscalationsPage() {
               : 'text-white/60 hover:text-white/80'
           }`}
         >
-          All
+          All ({escalations.length})
         </button>
       </div>
 
@@ -235,8 +265,11 @@ export default function CounselorEscalationsPage() {
         {filteredEscalations.length === 0 ? (
           <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl p-12 text-center">
             <FiCheckCircle className="w-12 h-12 text-white/20 mx-auto mb-3" />
-            <p className="text-white/60">No escalations found</p>
-            <p className="text-white/40 text-sm mt-1">Cases assigned to you will appear here</p>
+            <p className="text-white/60">
+              {escalations.length === 0
+                ? 'No escalations. Cases assigned to you by the AI agent will appear here.'
+                : 'No escalations match the current filter'}
+            </p>
           </div>
         ) : (
           filteredEscalations.map((escalation) => (
@@ -246,20 +279,39 @@ export default function CounselorEscalationsPage() {
             >
               <div className="flex items-start justify-between gap-4">
                 {/* Left: Severity Indicator */}
-                <div className="shrink-0">
-                  <div className={`w-3 h-3 rounded-full ${severityConfig[escalation.severity].icon} animate-pulse`}></div>
+                <div className="shrink-0 mt-1">
+                  <div
+                    className={`w-3 h-3 rounded-full ${severityConfig[escalation.severity].icon} ${
+                      escalation.status === 'new' ? 'animate-pulse' : ''
+                    }`}
+                  ></div>
                 </div>
 
                 {/* Middle: Content */}
                 <div className="flex-1 space-y-3">
                   {/* Header Row */}
                   <div className="flex items-center gap-3 flex-wrap">
-                    <span className="text-sm font-mono text-white/90">{escalation.id.substring(0, 8)}...</span>
-                    <span className={`px-2 py-0.5 rounded text-xs font-medium border ${severityConfig[escalation.severity].color}`}>
+                    <span className="text-sm font-mono text-white/90">
+                      {escalation.id.substring(0, 8)}...
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded text-xs font-medium border ${severityConfig[escalation.severity].color}`}
+                    >
                       {severityConfig[escalation.severity].label}
                     </span>
                     <span className="px-2 py-0.5 rounded text-xs font-medium bg-purple-500/20 text-purple-300">
                       CMA
+                    </span>
+                    <span
+                      className={`px-2 py-0.5 rounded text-xs font-medium ${
+                        escalation.status === 'new'
+                          ? 'bg-yellow-500/20 text-yellow-300'
+                          : escalation.status === 'in_progress'
+                            ? 'bg-blue-500/20 text-blue-300'
+                            : 'bg-gray-500/20 text-gray-300'
+                      }`}
+                    >
+                      {escalation.status === 'in_progress' ? 'In Progress' : escalation.status}
                     </span>
                     <div className="flex items-center gap-1.5 text-xs text-white/50">
                       <FiClock className="w-3 h-3" />
@@ -267,48 +319,79 @@ export default function CounselorEscalationsPage() {
                     </div>
                   </div>
 
-                  {/* Patient ID */}
-                  <div className="flex items-center gap-2">
-                    <FiUser className="w-4 h-4 text-white/40" />
-                    <span className="text-sm font-mono text-white/70">{escalation.user_hash.substring(0, 16)}...</span>
+                  {/* Patient Info */}
+                  <div className="flex items-center gap-4 flex-wrap">
+                    <div className="flex items-center gap-2">
+                      <FiUser className="w-4 h-4 text-white/40" />
+                      <span className="text-sm font-mono text-white/70">
+                        {escalation.user_hash.substring(0, 16)}...
+                      </span>
+                    </div>
+                    {escalation.user_email && (
+                      <div className="flex items-center gap-1.5 text-xs text-white/50">
+                        <FiMail className="w-3 h-3" />
+                        {escalation.user_email}
+                      </div>
+                    )}
+                    {escalation.user_phone && (
+                      <div className="flex items-center gap-1.5 text-xs text-white/50">
+                        <FiPhone className="w-3 h-3" />
+                        {escalation.user_phone}
+                      </div>
+                    )}
+                    {escalation.telegram_username && (
+                      <div className="flex items-center gap-1.5 text-xs text-white/50">
+                        <FiSend className="w-3 h-3" />
+                        @{escalation.telegram_username}
+                      </div>
+                    )}
                   </div>
 
                   {/* Summary */}
                   {escalation.summary_redacted && (
                     <div className="bg-white/5 rounded-lg p-3">
-                      <p className="text-sm font-medium text-white/90 mb-1">Case Summary:</p>
-                      <p className="text-sm text-white/70">{escalation.summary_redacted}</p>
+                      <p className="text-sm font-medium text-white/90 mb-1">
+                        Case Summary:
+                      </p>
+                      <p className="text-sm text-white/70">
+                        {escalation.summary_redacted}
+                      </p>
                     </div>
                   )}
 
                   {/* SLA Warning */}
                   {escalation.sla_breach_at && (
                     <div className="bg-orange-500/10 border border-orange-500/20 rounded-lg p-3">
-                      <p className="text-xs font-medium text-orange-300 mb-1">SLA Deadline:</p>
-                      <p className="text-sm text-orange-200/80">{new Date(escalation.sla_breach_at).toLocaleString()}</p>
+                      <p className="text-xs font-medium text-orange-300 mb-1">
+                        SLA Deadline:
+                      </p>
+                      <p className="text-sm text-orange-200/80">
+                        {new Date(escalation.sla_breach_at).toLocaleString()}
+                      </p>
                     </div>
                   )}
                 </div>
 
                 {/* Right: Actions */}
-                {escalation.status === 'new' && (
-                  <div className="shrink-0 flex flex-col gap-2">
+                <div className="shrink-0 flex flex-col gap-2">
+                  {escalation.status === 'new' && (
                     <button
                       onClick={() => handleAccept(escalation.id)}
-                      className="px-4 py-2 bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 rounded-lg text-sm font-medium text-[#FFCA40] transition-all flex items-center gap-2 whitespace-nowrap"
+                      disabled={acceptingId === escalation.id}
+                      className="px-4 py-2 bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 rounded-lg text-sm font-medium text-[#FFCA40] transition-all flex items-center gap-2 whitespace-nowrap disabled:opacity-50"
                     >
                       <FiCheckCircle className="w-4 h-4" />
-                      Accept Case
+                      {acceptingId === escalation.id ? 'Accepting...' : 'Accept Case'}
                     </button>
-                    <button
-                      onClick={() => handleReassign(escalation.id)}
-                      className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/20 rounded-lg text-sm text-white/70 hover:text-white transition-all flex items-center gap-2 whitespace-nowrap"
-                    >
-                      <FiArrowRight className="w-4 h-4" />
-                      Reassign
-                    </button>
-                  </div>
-                )}
+                  )}
+                  <button
+                    onClick={() => handleViewCase(escalation.id)}
+                    className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/20 rounded-lg text-sm text-white/70 hover:text-white transition-all flex items-center gap-2 whitespace-nowrap"
+                  >
+                    <FiArrowRight className="w-4 h-4" />
+                    View in Cases
+                  </button>
+                </div>
               </div>
             </div>
           ))

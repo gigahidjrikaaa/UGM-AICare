@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import {
   FiBell,
   FiLock,
@@ -10,6 +10,9 @@ import {
   FiShield,
   FiSave,
 } from 'react-icons/fi';
+import toast from 'react-hot-toast';
+
+const SETTINGS_STORAGE_KEY = 'counselor_settings';
 
 interface Settings {
   notifications: {
@@ -32,7 +35,7 @@ interface Settings {
 }
 
 export default function CounselorSettingsPage() {
-  const [settings, setSettings] = useState<Settings>({
+  const defaultSettings: Settings = {
     notifications: {
       email_alerts: true,
       new_escalations: true,
@@ -50,8 +53,27 @@ export default function CounselorSettingsPage() {
       show_patient_photos: false,
       timezone: 'Asia/Jakarta',
     },
-  });
+  };
+
+  const [settings, setSettings] = useState<Settings>(defaultSettings);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+  // Load from localStorage on mount
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(SETTINGS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored) as Partial<Settings>;
+        setSettings((prev) => ({
+          notifications: { ...prev.notifications, ...parsed.notifications },
+          privacy: { ...prev.privacy, ...parsed.privacy },
+          preferences: { ...prev.preferences, ...parsed.preferences },
+        }));
+      }
+    } catch {
+      // Invalid stored data — use defaults
+    }
+  }, []);
 
   const handleToggle = (section: keyof Settings, key: string) => {
     setSettings((prev) => ({
@@ -66,14 +88,13 @@ export default function CounselorSettingsPage() {
   const handleSave = async () => {
     try {
       setSaveStatus('saving');
-      // TODO: Implement save
-      // await apiCall('/api/counselor/settings', { method: 'PUT', body: settings });
-      
-      await new Promise((resolve) => setTimeout(resolve, 1000)); // Simulate API call
+      localStorage.setItem(SETTINGS_STORAGE_KEY, JSON.stringify(settings));
       setSaveStatus('saved');
+      toast.success('Settings saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch (err) {
       console.error('Failed to save settings:', err);
+      toast.error('Failed to save settings');
       setSaveStatus('idle');
     }
   };

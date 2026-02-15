@@ -11,8 +11,6 @@ from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from app.domains.blockchain.nft.nft_client_factory import NFTClientFactory
-from app.domains.blockchain.nft.chain_registry import DEFAULT_BADGE_CHAIN_ID, get_chain_config
 from app.database import get_async_db
 from app.dependencies import get_current_active_user
 from app.models import (
@@ -56,6 +54,7 @@ from app.services.user_normalization import (
     ensure_user_normalized_tables,
     set_checkins_opt_in,
 )
+from app.services.achievement_service import sync_user_achievements as sync_achievements_for_user
 from pydantic import BaseModel, Field
 from typing import Optional
 
@@ -87,20 +86,6 @@ class SimasterImportResponse(BaseModel):
     success: bool
     message: str
     updated_fields: List[str]
-
-
-# =============================================================================
-# Constants
-# =============================================================================
-
-LET_THERE_BE_BADGE_BADGE_ID = 1
-TRIPLE_THREAT_OF_THOUGHTS_BADGE_ID = 2
-SEVEN_DAYS_A_WEEK_BADGE_ID = 3
-TWO_WEEKS_NOTICE_YOU_GAVE_TO_NEGATIVITY_BADGE_ID = 4
-FULL_MOON_POSITIVITY_BADGE_ID = 5
-QUARTER_CENTURY_OF_JOURNALING_BADGE_ID = 6
-UNLEASH_THE_WORDS_BADGE_ID = 7
-BESTIES_BADGE_ID = 8
 
 
 def _normalize_optional_string(value: str | None) -> str | None:
@@ -487,6 +472,7 @@ async def update_profile_overview(
         "therapy_modality",
         "therapy_frequency",
         "therapy_notes",
+        "aicare_team_notes",
     }
 
     updated = False
@@ -673,6 +659,10 @@ async def update_profile_overview(
                     user.therapy_notes = therapy_notes
                 updated = True
 
+            if "aicare_team_notes" in clinical_data:
+                user.clinical_record.aicare_team_notes = _normalize_optional_string(clinical_data.get("aicare_team_notes"))
+                updated = True
+
         if updated:
             user.updated_at = datetime.utcnow()
             db.add(user)
@@ -771,99 +761,9 @@ async def sync_user_achievements(
     current_user: User = Depends(get_current_active_user),
 ) -> SyncAchievementsResponse:
     logger.info("Running achievement sync for user %s", current_user.id)
-    needs_db_update = False
-    badges_to_add_to_db: List[Dict[str, Any]] = []
-    newly_awarded_badge_info: List[EarnedBadgeInfo] = []
 
     try:
-        current_streak = current_user.current_streak
-        journal_count = (
-            await db.execute(
-                select(func.count(JournalEntry.id)).filter(JournalEntry.user_id == current_user.id)
-            )
-        ).scalar() or 0
-        total_activity_days = (
-            await db.execute(
-                select(func.count(func.distinct(JournalEntry.entry_date))).filter(
-                    JournalEntry.user_id == current_user.id
-                )
-            )
-        ).scalar() or 0
-        awarded_badges_res = await db.execute(
-            select(UserBadge.badge_id).filter(UserBadge.user_id == current_user.id)
-        )
-        awarded_badge_ids: Set[int] = {row[0] for row in awarded_badges_res.all()}
-
-        # Use the multi-chain NFT client factory (defaults to EDU Chain)
-        chain_id = DEFAULT_BADGE_CHAIN_ID
-        cfg = get_chain_config(chain_id)
-        nft_contract_address = cfg.contract_address if cfg else None
-        if not nft_contract_address:
-            logger.error("NFT contract address not configured for chain %d. Cannot mint badges.", chain_id)
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Server configuration error prevents badge awarding.")
-
-        factory = NFTClientFactory()
-
-        async def attempt_mint(badge_id: int, reason: str) -> None:
-            nonlocal needs_db_update
-            if badge_id in awarded_badge_ids:
-                return
-            logger.info("User %s qualifies for badge %s (%s)", current_user.id, badge_id, reason)
-            if current_user.wallet_address:
-                tx_hash = await factory.mint_badge(chain_id, current_user.wallet_address, badge_id)
-                if tx_hash:
-                    badges_to_add_to_db.append({"badge_id": badge_id, "tx_hash": tx_hash})
-                    needs_db_update = True
-                else:
-                    logger.error("Minting badge %s failed for user %s", badge_id, current_user.id)
-            else:
-                logger.warning("User %s qualifies for badge %s but has no linked wallet", current_user.id, badge_id)
-
-        if total_activity_days >= 1:
-            await attempt_mint(LET_THERE_BE_BADGE_BADGE_ID, "First activity")
-        if total_activity_days >= 3:
-            await attempt_mint(TRIPLE_THREAT_OF_THOUGHTS_BADGE_ID, "3 days of activity")
-        if current_streak >= 7:
-            await attempt_mint(SEVEN_DAYS_A_WEEK_BADGE_ID, "7-day streak")
-        if current_streak >= 14:
-            await attempt_mint(TWO_WEEKS_NOTICE_YOU_GAVE_TO_NEGATIVITY_BADGE_ID, "14-day streak")
-        if current_streak >= 30:
-            await attempt_mint(FULL_MOON_POSITIVITY_BADGE_ID, "30-day streak")
-        if journal_count >= 25:
-            await attempt_mint(QUARTER_CENTURY_OF_JOURNALING_BADGE_ID, "25 journal entries")
-
-        if badges_to_add_to_db:
-            current_time = datetime.now()
-            for badge_info in badges_to_add_to_db:
-                new_award = UserBadge(
-                    user_id=current_user.id,
-                    badge_id=badge_info["badge_id"],
-                    contract_address=nft_contract_address,
-                    transaction_hash=badge_info["tx_hash"],
-                    chain_id=chain_id,
-                    awarded_at=current_time,
-                )
-                db.add(new_award)
-                newly_awarded_badge_info.append(
-                    EarnedBadgeInfo(
-                        badge_id=badge_info["badge_id"],
-                        awarded_at=current_time,
-                        transaction_hash=badge_info["tx_hash"],
-                        contract_address=nft_contract_address,
-                    )
-                )
-
-        if needs_db_update:
-            try:
-                await db.commit()
-                logger.info("Saved %s new badge awards for user %s", len(newly_awarded_badge_info), current_user.id)
-            except Exception as exc:  # pragma: no cover - defensive logging
-                await db.rollback()
-                logger.error("Database error while saving new badge awards", exc_info=True)
-                return SyncAchievementsResponse(
-                    message="Checked achievements, but failed to save some awards.",
-                    newly_awarded_badges=[],
-                )
+        newly_awarded_badge_info = await sync_achievements_for_user(db, current_user, fail_on_config_error=True)
 
         return SyncAchievementsResponse(
             message="Achievements checked successfully.",

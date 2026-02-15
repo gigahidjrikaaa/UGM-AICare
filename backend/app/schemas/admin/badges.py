@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import List, Optional
+from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -38,6 +38,9 @@ class BadgeTemplateBase(BaseModel):
     image_uri: Optional[str] = None
     metadata_uri: Optional[str] = None
     status: str
+    auto_award_enabled: bool = False
+    auto_award_action: Optional[str] = None
+    auto_award_criteria: Optional[Dict[str, Any]] = None
     created_at: datetime
     updated_at: datetime
     published_at: Optional[datetime] = None
@@ -49,11 +52,17 @@ class BadgeTemplateCreate(BaseModel):
     description: Optional[str] = None
     # Optional chain_id; defaults to EDU Chain Testnet (656476) on the server
     chain_id: Optional[int] = None
+    auto_award_enabled: bool = False
+    auto_award_action: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    auto_award_criteria: Optional[Dict[str, Any]] = None
 
 
 class BadgeTemplateUpdate(BaseModel):
     name: Optional[str] = Field(default=None, min_length=1, max_length=120)
     description: Optional[str] = None
+    auto_award_enabled: Optional[bool] = None
+    auto_award_action: Optional[str] = Field(default=None, min_length=1, max_length=64)
+    auto_award_criteria: Optional[Dict[str, Any]] = None
 
 
 class BadgeTemplateResponse(BadgeTemplateBase):

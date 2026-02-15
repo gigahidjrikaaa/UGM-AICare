@@ -3,6 +3,7 @@
 
 import { motion, AnimatePresence } from 'framer-motion';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { HiX } from 'react-icons/hi';
 import { BsChatDots, BsCalendar, BsQuestionCircle } from 'react-icons/bs';
 import { FiActivity, FiBookOpen, FiMapPin, FiInfo } from 'react-icons/fi';
@@ -15,20 +16,44 @@ interface MobileNavMenuProps {
   onClose: () => void;
 }
 
+interface MobileNavItem {
+  href: string;
+  label: string;
+  icon: React.ReactNode;
+  highlight?: boolean;
+}
+
+interface MobileNavGroup {
+  title: string;
+  items: MobileNavItem[];
+}
+
 // Define navigation items with updated icons and links
-const mobileNavItems = [
-    { href: "/dashboard", label: "Home", icon: <FiBookOpen size={18} /> },
-    { href: "/carequest", label: "CareQuest", icon: <FiMapPin size={18} /> },
-    { href: "/caretoken", label: "$CARE Token", icon: <FaCoins size={18} />, highlight: true },
-    { href: "/about", label: "About", icon: <FiInfo size={18} /> },
-    { href: "/aika", label: "Talk to Aika", icon: <BsChatDots size={18} /> },
-    { href: "/journaling", label: "Journaling", icon: <FiActivity size={18} /> },
-    { href: "/appointments", label: "Appointments", icon: <BsCalendar size={18} /> },
-    { href: "/help", label: "Help & Support", icon: <BsQuestionCircle size={18} /> }
+const mobileNavGroups: MobileNavGroup[] = [
+  {
+    title: "Core Support",
+    items: [
+      { href: "/aika", label: "Talk to Aika", icon: <BsChatDots size={18} />, highlight: true },
+      { href: "/journaling", label: "Journaling", icon: <FiActivity size={18} />, highlight: true },
+      { href: "/appointments", label: "Appointments", icon: <BsCalendar size={18} />, highlight: true },
+    ],
+  },
+  {
+    title: "Explore",
+    items: [
+      { href: "/dashboard", label: "Home", icon: <FiBookOpen size={18} /> },
+      { href: "/carequest", label: "CareQuest", icon: <FiMapPin size={18} /> },
+      { href: "/caretoken", label: "$CARE Token", icon: <FaCoins size={18} /> },
+      { href: "/about", label: "About", icon: <FiInfo size={18} /> },
+      { href: "/help", label: "Help & Support", icon: <BsQuestionCircle size={18} /> },
+    ],
+  },
 ];
 
 
 export default function MobileNavMenu({ isOpen, onClose }: MobileNavMenuProps) {
+  const pathname = usePathname();
+
   return (
     <AnimatePresence>
       {isOpen && (
@@ -80,51 +105,75 @@ export default function MobileNavMenu({ isOpen, onClose }: MobileNavMenuProps) {
 
             {/* Navigation Links - Enhanced iOS Style */}
             <nav className="flex-1 p-6 overflow-y-auto">
-              <ul className="space-y-2">
-                {mobileNavItems.map((item, index) => (
-                  <motion.li 
-                    key={item.href}
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    transition={{ delay: 0.1 * index, duration: 0.3 }}
-                  >
-                    <Link
-                      href={item.href}
-                      onClick={onClose}
-                      className="flex items-center px-4 py-4 rounded-2xl text-white/80 hover:text-white hover:bg-white/10 transition-all duration-300 group relative overflow-hidden"
-                    >
-                      <span className="flex items-center w-full relative">
-                        {/* Background gradient */}
-                        <motion.div
-                          className="absolute inset-0 bg-linear-to-r from-white/5 to-white/8 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300"
-                          whileHover={{ 
-                            boxShadow: "0 0 20px rgba(255,202,64,0.15), inset 0 1px 0 rgba(255,255,255,0.05)"
-                          }}
-                        />
-                        {/* Icon */}
-                        <motion.span 
-                          className="mr-4 shrink-0 text-white/60 group-hover:text-[#FFCA40] transition-colors duration-300 relative z-10"
-                          whileHover={{ scale: 1.2 }}
+              <div className="space-y-5">
+                {mobileNavGroups.map((group, groupIndex) => (
+                  <section key={group.title} aria-label={group.title}>
+                    <p className="mb-2 px-2 text-[10px] font-semibold uppercase tracking-wider text-white/40">
+                      {group.title}
+                    </p>
+                    <ul className="space-y-2">
+                      {group.items.map((item, itemIndex) => (
+                        <motion.li
+                          key={item.href}
+                          initial={{ opacity: 0, x: -20 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: 0.06 * (groupIndex * 4 + itemIndex), duration: 0.3 }}
                         >
-                          {item.icon}
-                        </motion.span>
-                        {/* Label */}
-                        <span className="truncate font-medium relative z-10">{item.label}</span>
-                        {/* Arrow */}
-                        <motion.span
-                          className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300 relative z-10 flex items-center"
-                          initial={{ x: -10 }}
-                          whileHover={{ x: 0 }}
-                        >
-                          <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                          </svg>
-                        </motion.span>
-                      </span>
-                    </Link>
-                  </motion.li>
+                          {(() => {
+                            const isActive = pathname === item.href;
+                            return (
+                          <Link
+                            href={item.href}
+                            onClick={onClose}
+                            className={`flex items-center px-4 py-4 rounded-2xl transition-all duration-300 group relative overflow-hidden ${
+                              isActive
+                                ? item.highlight
+                                  ? 'text-[#FFCA40] border border-[#FFCA40]/45 bg-[#FFCA40]/18 shadow-[0_0_22px_rgba(255,202,64,0.18)]'
+                                  : 'text-white border border-white/20 bg-white/12'
+                                : item.highlight
+                                ? 'text-white border border-[#FFCA40]/25 bg-[#FFCA40]/8 hover:bg-[#FFCA40]/14'
+                                : 'text-white/80 hover:text-white hover:bg-white/10'
+                            }`}
+                          >
+                            {isActive && item.highlight && (
+                              <span className="absolute left-1.5 top-1/2 -translate-y-1/2 h-6 w-1 rounded-full bg-[#FFCA40]" aria-hidden="true" />
+                            )}
+                            <span className="flex items-center w-full relative">
+                              <motion.div
+                                className="absolute inset-0 bg-linear-to-r from-white/5 to-white/8 rounded-2xl opacity-0 group-hover:opacity-100 transition-all duration-300"
+                                whileHover={{ 
+                                  boxShadow: "0 0 20px rgba(255,202,64,0.15), inset 0 1px 0 rgba(255,255,255,0.05)"
+                                }}
+                              />
+                              <motion.span 
+                                className={`mr-4 shrink-0 transition-colors duration-300 relative z-10 ${item.highlight ? 'text-[#FFCA40]' : 'text-white/60 group-hover:text-[#FFCA40]'}`}
+                                whileHover={{ scale: 1.2 }}
+                              >
+                                {item.icon}
+                              </motion.span>
+                              <span className="truncate font-medium relative z-10">{item.label}</span>
+                              {item.highlight && !isActive && (
+                                <span className="ml-2 text-[10px] uppercase bg-[#FFCA40]/20 text-[#FFCA40] px-1.5 py-0.5 rounded relative z-10">Main</span>
+                              )}
+                              <motion.span
+                                className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity duration-300 relative z-10 flex items-center"
+                                initial={{ x: -10 }}
+                                whileHover={{ x: 0 }}
+                              >
+                                <svg className="w-4 h-4 text-white/40" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                </svg>
+                              </motion.span>
+                            </span>
+                          </Link>
+                            );
+                          })()}
+                        </motion.li>
+                      ))}
+                    </ul>
+                  </section>
                 ))}
-              </ul>
+              </div>
             </nav>
 
              {/* Account Linker Section at the bottom - Enhanced */}

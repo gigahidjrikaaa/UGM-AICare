@@ -24,6 +24,9 @@ from app.schemas.admin.dashboard import (
     DashboardKPIs,
     DashboardOverview,
     InsightsPanel,
+    PatternInsight,
+    RecommendationItem,
+    SeverityDistribution,
     TrendingTopic,
     TrendsResponse,
     HistoricalDataPoint,
@@ -251,11 +254,60 @@ async def get_overview(
             f"{sentiment_txt}. Active critical cases: {active_critical}. Trending: {top_topics}."
         )
 
+    # ===== Extract LLM data from sentiment_data if available =====
+    llm_patterns = None
+    llm_recommendations = None
+    llm_severity_dist = None
+    llm_powered = None
+
+    if latest_report and latest_report.sentiment_data and isinstance(latest_report.sentiment_data, dict):
+        sd = latest_report.sentiment_data
+        llm_powered = sd.get("llm_powered", None)
+
+        raw_patterns = sd.get("patterns")
+        if raw_patterns and isinstance(raw_patterns, list):
+            llm_patterns = [
+                PatternInsight(
+                    title=p.get("title", ""),
+                    description=p.get("description", ""),
+                    severity=p.get("severity", "medium"),
+                    trend=p.get("trend", "stable"),
+                )
+                for p in raw_patterns
+                if isinstance(p, dict)
+            ]
+
+        raw_recs = sd.get("recommendations")
+        if raw_recs and isinstance(raw_recs, list):
+            llm_recommendations = [
+                RecommendationItem(
+                    title=r.get("title", ""),
+                    description=r.get("description", ""),
+                    priority=r.get("priority", "medium"),
+                    category=r.get("category", "monitoring"),
+                )
+                for r in raw_recs
+                if isinstance(r, dict)
+            ]
+
+        raw_sev = sd.get("severity_distribution")
+        if raw_sev and isinstance(raw_sev, dict):
+            llm_severity_dist = SeverityDistribution(
+                low=int(raw_sev.get("low", 0)),
+                medium=int(raw_sev.get("medium", 0)),
+                high=int(raw_sev.get("high", 0)),
+                critical=int(raw_sev.get("critical", 0)),
+            )
+
     insights = InsightsPanel(
         trending_topics=trending,
         ia_summary=ia_summary,
         report_generated_at=latest_report.generated_at if latest_report else None,
         report_period=f"{latest_report.period_start.strftime('%Y-%m-%d')} to {latest_report.period_end.strftime('%Y-%m-%d')}" if latest_report else None,
+        patterns=llm_patterns,
+        recommendations=llm_recommendations,
+        severity_distribution=llm_severity_dist,
+        llm_powered=llm_powered,
     )
 
     # Recent alerts from cases

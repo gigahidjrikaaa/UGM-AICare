@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 import logging
-from datetime import datetime
-from typing import Dict, List, Sequence
+import os
+from datetime import datetime, timedelta
+from typing import Any, Dict, List, Sequence
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +29,7 @@ _BANNED_PHRASES: tuple[str, ...] = (
     "diagnosis",
 )
 _MAX_MEMORY = 3
+_DAILY_CACHE_KEY = "daily_check_in_cache"
 
 
 def _build_prompt(
@@ -59,6 +61,65 @@ def _passes_guardrails(text: str) -> bool:
     return not any(phrase in lowered for phrase in _BANNED_PHRASES)
 
 
+def _utcnow() -> datetime:
+    return datetime.utcnow()
+
+
+def _to_iso(value: datetime) -> str:
+    return value.replace(microsecond=0).isoformat()
+
+
+def _parse_iso(value: str | None) -> datetime | None:
+    if not value:
+        return None
+    try:
+        return datetime.fromisoformat(value)
+    except ValueError:
+        return None
+
+
+def _next_utc_midnight(value: datetime) -> datetime:
+    return value.replace(hour=0, minute=0, second=0, microsecond=0) + timedelta(days=1)
+
+
+def _quest_signature(quests: Sequence[QuestInstance]) -> str:
+    signatures: List[str] = []
+    for quest in quests:
+        status = quest.status.value if hasattr(quest.status, "value") else str(quest.status)
+        anchor_dt = quest.completed_at or quest.issued_at
+        anchor = anchor_dt.date().isoformat() if anchor_dt else "none"
+        template_name = quest.template.name if quest.template else "unknown"
+        signatures.append(f"{quest.id}:{status}:{template_name}:{anchor}")
+    return "|".join(signatures)
+
+
+def _build_daily_cache_fingerprint(
+    now: datetime,
+    wellness_state: PlayerWellnessState,
+    recent_quests: Sequence[QuestInstance],
+) -> str:
+    today = now.date().isoformat()
+    score = round(float(wellness_state.harmony_score), 2)
+    joy = round(float(wellness_state.joy_balance), 2)
+    compassion = "1" if wellness_state.compassion_mode_active else "0"
+    quests = _quest_signature(recent_quests)
+    return f"{today}:{wellness_state.current_streak}:{score}:{joy}:{compassion}:{quests}"
+
+
+def _llm_is_available() -> bool:
+    generate_response = getattr(llm, "generate_response", None)
+    if not callable(generate_response):
+        return False
+
+    configured_keys = getattr(llm, "GEMINI_API_KEYS", None)
+    if isinstance(configured_keys, list) and bool(configured_keys):
+        return True
+
+    if os.getenv("GOOGLE_GENAI_API_KEY"):
+        return True
+    return False
+
+
 class DialogueOrchestratorService:
     """Dialogue orchestration with optional LLM and deterministic fallback."""
 
@@ -74,25 +135,78 @@ class DialogueOrchestratorService:
         completed = [quest for quest in recent_quests if quest.status == QuestStatusEnum.COMPLETED]
         active = [quest for quest in recent_quests if quest.status == QuestStatusEnum.ACTIVE]
 
-        echo_memory: List[str] = list((wellness_state.extra_data or {}).get("echo_memory", []))  # type: ignore[arg-type]
+        now = _utcnow()
+        extra_data = dict(wellness_state.extra_data or {})  # type: ignore[arg-type]
+        cache_fingerprint = _build_daily_cache_fingerprint(now, wellness_state, recent_quests)
+        cached_payload = self._read_cached_daily_message(extra_data, cache_fingerprint, now)
+        if cached_payload is not None:
+            return cached_payload
+
+        echo_memory: List[str] = list(extra_data.get("echo_memory", [])) if isinstance(extra_data.get("echo_memory", []), list) else []
         prompt = _build_prompt(user, completed, active, wellness_state, echo_memory)
 
-        message = await self._generate_ai_message(prompt) if llm.GOOGLE_API_KEY else None
+        message = await self._generate_ai_message(prompt) if _llm_is_available() else None
+        source = "llm" if message else "fallback"
         if not message:
             message = self._render_fallback_message(user, completed, active, wellness_state)
 
         sanitized = sanitize_text(message)
         new_memory = (echo_memory + [sanitized])[-_MAX_MEMORY:]
-        extra = dict(wellness_state.extra_data or {})  # type: ignore[arg-type]
-        extra["echo_memory"] = new_memory
-        extra["last_ai_message_at"] = datetime.utcnow().isoformat()
-        wellness_state.extra_data = extra  # reassign to trigger JSON change tracking
+        generated_at = _to_iso(now)
+        expires_at = _to_iso(_next_utc_midnight(now))
+
+        extra_data["echo_memory"] = new_memory
+        extra_data["last_ai_message_at"] = generated_at
+        extra_data[_DAILY_CACHE_KEY] = {
+            "fingerprint": cache_fingerprint,
+            "message": sanitized,
+            "tone": "supportive",
+            "source": source,
+            "generated_at": generated_at,
+            "expires_at": expires_at,
+        }
+        wellness_state.extra_data = extra_data
         await self.session.flush()
 
         return {
             "message": sanitized,
             "tone": "supportive",
-            "generated_at": datetime.utcnow().isoformat(),
+            "generated_at": generated_at,
+            "source": source,
+        }
+
+    def _read_cached_daily_message(
+        self,
+        extra_data: Dict[str, Any],
+        expected_fingerprint: str,
+        now: datetime,
+    ) -> Dict[str, str] | None:
+        cache = extra_data.get(_DAILY_CACHE_KEY)
+        if not isinstance(cache, dict):
+            return None
+
+        fingerprint = cache.get("fingerprint")
+        if fingerprint != expected_fingerprint:
+            return None
+
+        message = cache.get("message")
+        tone = cache.get("tone", "supportive")
+        generated_at = cache.get("generated_at")
+        expires_at_raw = cache.get("expires_at")
+        if not isinstance(message, str) or not message.strip():
+            return None
+        if not isinstance(generated_at, str) or not generated_at:
+            return None
+
+        expires_at = _parse_iso(expires_at_raw if isinstance(expires_at_raw, str) else None)
+        if expires_at is not None and expires_at <= now:
+            return None
+
+        return {
+            "message": message,
+            "tone": tone if isinstance(tone, str) and tone else "supportive",
+            "generated_at": generated_at,
+            "source": "cache",
         }
 
     async def fetch_recent_quests(self, user_id: int, limit: int = 5) -> List[QuestInstance]:

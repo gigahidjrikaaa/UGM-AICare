@@ -3,7 +3,7 @@
 // --- Configuration ---
 // const IMAGE_FOLDER_CID = "bafybeidzdbsjft24ujpcn77hfkbhom7tmo5i5p2aqfsig2vtxvt3kd7jbu"; // <<< REPLACE WITH YOUR ACTUAL IMAGE FOLDER CID
 // ----------------------------------------------------------------
-const DEFAULT_PLACEHOLDER_IMAGE = '/nft-asset/badge-placeholder.png'; // Local fallback image
+export const DEFAULT_BADGE_PLACEHOLDER_IMAGE = '/nft-asset/badge-placeholder.svg'; // Local fallback image
 
 // --- Interface for Badge Metadata ---
 export interface BadgeMeta {
@@ -160,7 +160,7 @@ export const badgeMetadataMap: { [key: number]: BadgeMeta } = {
 // Converts ipfs:// URI to a usable HTTPS URL
 export const getIpfsUrl = (ipfsUri: string | undefined | null): string => {
     if (!ipfsUri || !ipfsUri.startsWith('ipfs://')) {
-        return DEFAULT_PLACEHOLDER_IMAGE; // Return local placeholder if URI invalid
+        return DEFAULT_BADGE_PLACEHOLDER_IMAGE; // Return local placeholder if URI invalid
     }
     // Use a reliable public gateway or Pinata's gateway
     const cidAndPath = ipfsUri.substring('ipfs://'.length);

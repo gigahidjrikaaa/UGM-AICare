@@ -3,6 +3,9 @@
 from datetime import datetime, timedelta
 from typing import List, Optional
 
+from uuid import UUID as PyUUID
+
+from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -14,9 +17,11 @@ from app.domains.mental_health.models import (
     Psychologist as CounselorProfile,
     Appointment,
     Case,
+    CaseNote,
     CaseStatusEnum,
     Conversation,
 )
+from app.domains.mental_health.models.interventions import InterventionPlanRecord
 from app.domains.mental_health.models.assessments import UserScreeningProfile, TriageAssessment
 from app.models.user import User
 from app.domains.mental_health.schemas.appointments import AppointmentWithUser
@@ -575,6 +580,485 @@ async def get_my_case_stats(
         "critical_cases": critical,
         "high_priority_cases": high,
     }
+
+
+class CounselorCaseStatusUpdate(BaseModel):
+    """Request body for counselor case status update."""
+    status: str = Field(..., description="New status: in_progress, resolved, closed")
+    note: str | None = Field(None, description="Optional note explaining the change")
+
+
+@router.put("/cases/{case_id}/status")
+async def update_my_case_status(
+    case_id: str,
+    payload: CounselorCaseStatusUpdate,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+):
+    """Update the status of a case assigned to the current counselor.
+
+    Counselors may only update cases assigned to them.
+    Valid transitions:
+    - new -> in_progress  (accept)
+    - in_progress -> resolved
+    - Any open status -> closed (emergency closure)
+    """
+    profile_query = select(CounselorProfile).where(CounselorProfile.user_id == current_user.id)
+    profile = (await db.execute(profile_query)).scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Counselor profile not found")
+
+    case = (await db.execute(select(Case).where(Case.id == case_id))).scalar_one_or_none()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    if case.assigned_to != str(profile.id):
+        raise HTTPException(status_code=403, detail="Not authorized for this case")
+
+    valid_statuses = ['in_progress', 'resolved', 'closed']
+    if payload.status not in valid_statuses:
+        raise HTTPException(status_code=400, detail=f"Invalid status. Must be one of: {', '.join(valid_statuses)}")
+
+    old_status = case.status.value if hasattr(case.status, 'value') else str(case.status)
+
+    if old_status == 'closed':
+        raise HTTPException(status_code=400, detail="Cannot change status of closed case")
+
+    # Validate transitions (except emergency close)
+    if payload.status != 'closed':
+        valid_transitions: dict[str, list[str]] = {
+            'new': ['in_progress'],
+            'waiting': ['in_progress'],
+            'in_progress': ['resolved'],
+            'resolved': ['closed'],
+        }
+        if payload.status not in valid_transitions.get(old_status, []):
+            raise HTTPException(
+                status_code=400,
+                detail=f"Invalid transition from {old_status} to {payload.status}"
+            )
+
+    case.status = CaseStatusEnum[payload.status]  # type: ignore[assignment]
+
+    if payload.note:
+        note = CaseNote(
+            case_id=case.id,
+            note=f"Status changed to {payload.status}: {payload.note}",
+            author_id=current_user.id,
+        )
+        db.add(note)
+
+    await db.commit()
+    await db.refresh(case)
+
+    return {
+        "case_id": str(case.id),
+        "status": case.status.value if hasattr(case.status, 'value') else str(case.status),
+        "message": f"Status updated to {payload.status}",
+    }
+
+
+class CounselorNoteCreate(BaseModel):
+    """Request body for creating a counselor case note."""
+    note: str = Field(..., min_length=1, max_length=5000)
+
+
+# ========================================
+# Case Notes (per case)
+# ========================================
+
+@router.get("/cases/{case_id}/notes")
+async def list_my_case_notes(
+    case_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+):
+    """List all notes for a case assigned to the current counselor."""
+    profile_query = select(CounselorProfile).where(CounselorProfile.user_id == current_user.id)
+    profile = (await db.execute(profile_query)).scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Counselor profile not found")
+
+    case = (await db.execute(select(Case).where(Case.id == PyUUID(case_id)))).scalar_one_or_none()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    if case.assigned_to != str(profile.id):
+        raise HTTPException(status_code=403, detail="Not authorized for this case")
+
+    notes = (
+        await db.execute(
+            select(CaseNote).where(CaseNote.case_id == case.id).order_by(CaseNote.created_at.desc())
+        )
+    ).scalars().all()
+
+    return {
+        "items": [
+            {
+                "id": n.id,
+                "case_id": str(n.case_id),
+                "note": n.note,
+                "author_id": n.author_id,
+                "created_at": n.created_at.isoformat() if n.created_at else None,
+            }
+            for n in notes
+        ]
+    }
+
+
+@router.post("/cases/{case_id}/notes")
+async def add_my_case_note(
+    case_id: str,
+    payload: CounselorNoteCreate,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+):
+    """Add a note to a case assigned to the current counselor."""
+    profile_query = select(CounselorProfile).where(CounselorProfile.user_id == current_user.id)
+    profile = (await db.execute(profile_query)).scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Counselor profile not found")
+
+    case = (await db.execute(select(Case).where(Case.id == PyUUID(case_id)))).scalar_one_or_none()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    if case.assigned_to != str(profile.id):
+        raise HTTPException(status_code=403, detail="Not authorized for this case")
+
+    note = CaseNote(case_id=case.id, note=payload.note, author_id=current_user.id)
+    db.add(note)
+    await db.commit()
+    await db.refresh(note)
+
+    return {
+        "id": note.id,
+        "case_id": str(note.case_id),
+        "note": note.note,
+        "author_id": note.author_id,
+        "created_at": note.created_at.isoformat() if note.created_at else None,
+    }
+
+
+# ========================================
+# All Notes (across all counselor's cases)
+# ========================================
+
+@router.get("/notes")
+async def list_all_my_notes(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+):
+    """List all notes across all cases assigned to the current counselor.
+
+    This endpoint powers the counselor's 'Session Notes' page.
+    """
+    profile_query = select(CounselorProfile).where(CounselorProfile.user_id == current_user.id)
+    profile = (await db.execute(profile_query)).scalar_one_or_none()
+    if not profile:
+        return {"items": []}
+
+    psychologist_id_str = str(profile.id)
+
+    # Fetch all case IDs assigned to this counselor
+    case_ids_query = select(Case.id, Case.user_hash).where(Case.assigned_to == psychologist_id_str)
+    case_rows = (await db.execute(case_ids_query)).all()
+    if not case_rows:
+        return {"items": []}
+
+    case_ids = [row[0] for row in case_rows]
+    case_user_hash_map = {str(row[0]): row[1] for row in case_rows}
+
+    # Fetch all notes for those cases
+    notes = (
+        await db.execute(
+            select(CaseNote)
+            .where(CaseNote.case_id.in_(case_ids))
+            .order_by(CaseNote.created_at.desc())
+        )
+    ).scalars().all()
+
+    return {
+        "items": [
+            {
+                "id": n.id,
+                "case_id": str(n.case_id),
+                "user_hash": case_user_hash_map.get(str(n.case_id), ""),
+                "note": n.note,
+                "author_id": n.author_id,
+                "created_at": n.created_at.isoformat() if n.created_at else None,
+            }
+            for n in notes
+        ]
+    }
+
+
+# ========================================
+# Treatment Plans (intervention plans for counselor's patients)
+# ========================================
+
+@router.get("/treatment-plans")
+async def list_patient_treatment_plans(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+):
+    """List all intervention plans for patients in the counselor's caseload.
+
+    Derives patient user IDs from assigned cases, then queries their
+    intervention plan records.
+    """
+    profile_query = select(CounselorProfile).where(CounselorProfile.user_id == current_user.id)
+    profile = (await db.execute(profile_query)).scalar_one_or_none()
+    if not profile:
+        return {"items": []}
+
+    psychologist_id_str = str(profile.id)
+
+    # Get cases assigned to this counselor
+    cases_result = (
+        await db.execute(
+            select(Case).where(Case.assigned_to == psychologist_id_str)
+        )
+    ).scalars().all()
+
+    if not cases_result:
+        return {"items": []}
+
+    # Resolve user IDs from conversations linked to cases
+    conversation_ids = {c.conversation_id for c in cases_result if getattr(c, "conversation_id", None)}
+    session_ids = {c.session_id for c in cases_result if getattr(c, "session_id", None)}
+
+    user_ids: set[int] = set()
+    if conversation_ids or session_ids:
+        conv_stmt = select(Conversation.user_id, Conversation.id, Conversation.session_id)
+        filters = []
+        if conversation_ids:
+            filters.append(Conversation.id.in_(conversation_ids))
+        if session_ids:
+            filters.append(Conversation.session_id.in_(session_ids))
+        conv_stmt = conv_stmt.where(or_(*filters))
+        conv_rows = (await db.execute(conv_stmt)).all()
+        for user_id, _, _ in conv_rows:
+            user_ids.add(int(user_id))
+
+    if not user_ids:
+        return {"items": []}
+
+    # Fetch intervention plans for these users
+    plans = (
+        await db.execute(
+            select(InterventionPlanRecord)
+            .where(InterventionPlanRecord.user_id.in_(user_ids))
+            .order_by(InterventionPlanRecord.created_at.desc())
+        )
+    ).scalars().all()
+
+    # Fetch user info for display
+    users_by_id: dict[int, User] = {}
+    if user_ids:
+        user_rows = (
+            await db.execute(
+                select(User).where(User.id.in_(user_ids))
+            )
+        ).scalars().all()
+        users_by_id = {u.id: u for u in user_rows}
+
+    items = []
+    for plan in plans:
+        user_obj = users_by_id.get(plan.user_id)
+        plan_data = plan.plan_data or {}
+        plan_steps = plan_data.get("plan_steps", [])
+        resource_cards = plan_data.get("resource_cards", [])
+
+        items.append({
+            "id": plan.id,
+            "user_id": plan.user_id,
+            "user_email": user_obj.email if user_obj else None,
+            "plan_title": plan.plan_title,
+            "risk_level": plan.risk_level,
+            "status": plan.status,
+            "is_active": plan.is_active,
+            "total_steps": plan.total_steps,
+            "completed_steps": plan.completed_steps,
+            "plan_steps": plan_steps,
+            "resource_cards": resource_cards,
+            "created_at": plan.created_at.isoformat() if plan.created_at else None,
+            "updated_at": plan.updated_at.isoformat() if plan.updated_at else None,
+        })
+
+    return {"items": items}
+
+
+# ========================================
+# Progress Tracking (aggregated from case assessments)
+# ========================================
+
+@router.get("/progress")
+async def get_patient_progress(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+):
+    """Aggregate progress data for all patients in the counselor's caseload.
+
+    Derives data from triage assessments, screening profiles, and treatment
+    plan completion rates. One entry per unique patient (user_hash).
+    """
+    profile_query = select(CounselorProfile).where(CounselorProfile.user_id == current_user.id)
+    profile = (await db.execute(profile_query)).scalar_one_or_none()
+    if not profile:
+        return {"items": []}
+
+    psychologist_id_str = str(profile.id)
+
+    # Get all cases assigned to this counselor
+    cases_result = (
+        await db.execute(
+            select(Case).where(Case.assigned_to == psychologist_id_str)
+        )
+    ).scalars().all()
+
+    if not cases_result:
+        return {"items": []}
+
+    # Resolve user IDs from conversations
+    conversation_ids = {c.conversation_id for c in cases_result if getattr(c, "conversation_id", None)}
+    session_ids = {c.session_id for c in cases_result if getattr(c, "session_id", None)}
+
+    conv_user_map: dict[str, int] = {}  # case_id -> user_id
+    session_user_map: dict[str, int] = {}
+    if conversation_ids or session_ids:
+        conv_stmt = select(Conversation.user_id, Conversation.id, Conversation.session_id)
+        filters = []
+        if conversation_ids:
+            filters.append(Conversation.id.in_(conversation_ids))
+        if session_ids:
+            filters.append(Conversation.session_id.in_(session_ids))
+        conv_stmt = conv_stmt.where(or_(*filters))
+        conv_rows = (await db.execute(conv_stmt)).all()
+        for user_id, conv_id, sess_id in conv_rows:
+            conv_user_map[str(conv_id)] = int(user_id)
+            if sess_id:
+                session_user_map[str(sess_id)] = int(user_id)
+
+    # Build case->user_id mapping + group cases by user_hash
+    user_hash_cases: dict[str, list] = {}
+    user_hash_to_user_id: dict[str, int | None] = {}
+    for case in cases_result:
+        uh = str(case.user_hash) if case.user_hash else "unknown"
+        if uh not in user_hash_cases:
+            user_hash_cases[uh] = []
+        user_hash_cases[uh].append(case)
+
+        linked_user_id: int | None = None
+        if case.conversation_id and str(case.conversation_id) in conv_user_map:
+            linked_user_id = conv_user_map[str(case.conversation_id)]
+        elif case.session_id and str(case.session_id) in session_user_map:
+            linked_user_id = session_user_map[str(case.session_id)]
+        if linked_user_id:
+            user_hash_to_user_id[uh] = linked_user_id
+
+    # Fetch triage assessments for known user IDs
+    all_user_ids = set(v for v in user_hash_to_user_id.values() if v)
+    user_triages: dict[int, list] = {}
+    if all_user_ids:
+        triage_rows = (
+            await db.execute(
+                select(TriageAssessment)
+                .where(TriageAssessment.user_id.in_(all_user_ids))
+                .order_by(TriageAssessment.created_at.asc())
+            )
+        ).scalars().all()
+        for t in triage_rows:
+            uid = int(t.user_id)
+            if uid not in user_triages:
+                user_triages[uid] = []
+            user_triages[uid].append(t)
+
+    # Fetch treatment plan progress for known user IDs
+    user_plan_progress: dict[int, dict] = {}
+    if all_user_ids:
+        plan_rows = (
+            await db.execute(
+                select(InterventionPlanRecord)
+                .where(
+                    InterventionPlanRecord.user_id.in_(all_user_ids),
+                    InterventionPlanRecord.is_active == True,  # noqa: E712
+                )
+            )
+        ).scalars().all()
+        for p in plan_rows:
+            uid = int(p.user_id)
+            if uid not in user_plan_progress:
+                user_plan_progress[uid] = {"total_steps": 0, "completed_steps": 0}
+            user_plan_progress[uid]["total_steps"] += p.total_steps
+            user_plan_progress[uid]["completed_steps"] += p.completed_steps
+
+    # Fetch user emails
+    users_by_id: dict[int, User] = {}
+    if all_user_ids:
+        user_rows = (
+            await db.execute(select(User).where(User.id.in_(all_user_ids)))
+        ).scalars().all()
+        users_by_id = {u.id: u for u in user_rows}
+
+    items = []
+    for user_hash, user_cases in user_hash_cases.items():
+        uid = user_hash_to_user_id.get(user_hash)
+        user_obj = users_by_id.get(uid) if uid else None
+        triages = user_triages.get(uid, []) if uid else []
+        plan_prog = user_plan_progress.get(uid) if uid else None
+
+        # Compute risk scores over time (last 10)
+        risk_scores = [t.risk_score for t in triages if t.risk_score is not None][-10:]
+
+        # Determine trend from risk scores (lower = better)
+        trend = "stable"
+        if len(risk_scores) >= 3:
+            first_half = sum(risk_scores[: len(risk_scores) // 2]) / max(len(risk_scores) // 2, 1)
+            second_half = sum(risk_scores[len(risk_scores) // 2 :]) / max(
+                len(risk_scores) - len(risk_scores) // 2, 1
+            )
+            if second_half < first_half - 0.3:
+                trend = "improving"  # Risk going down = improving
+            elif second_half > first_half + 0.3:
+                trend = "declining"  # Risk going up = declining
+
+        # Active cases count
+        active_cases = sum(
+            1
+            for c in user_cases
+            if (c.status.value if hasattr(c.status, "value") else str(c.status))
+            in ("new", "in_progress", "waiting")
+        )
+
+        # Goal completion from treatment plans
+        goal_completion = 0
+        if plan_prog and plan_prog["total_steps"] > 0:
+            goal_completion = round(
+                (plan_prog["completed_steps"] / plan_prog["total_steps"]) * 100
+            )
+
+        # Last assessment date
+        last_assessment = triages[-1].created_at.isoformat() if triages else None
+
+        items.append(
+            {
+                "user_hash": user_hash,
+                "user_email": user_obj.email if user_obj else None,
+                "total_cases": len(user_cases),
+                "active_cases": active_cases,
+                "risk_scores": risk_scores,
+                "trend": trend,
+                "goal_completion": goal_completion,
+                "last_assessment": last_assessment,
+            }
+        )
+
+    # Sort: declining first, then by active cases descending
+    trend_order = {"declining": 0, "stable": 1, "improving": 2}
+    items.sort(key=lambda x: (trend_order.get(x["trend"], 1), -x["active_cases"]))
+
+    return {"items": items}
 
 
 # ========================================
