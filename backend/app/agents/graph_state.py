@@ -501,6 +501,21 @@ class AikaOrchestratorState(TypedDict, total=False):
     
     screening_enhanced_response: Optional[str]
     """Response enhanced with intervention if applicable."""
+
+    # ============================================================================
+    # AUTOPILOT FIELDS
+    # ============================================================================
+    autopilot_action_id: Optional[int]
+    """Database ID of created autopilot action when policy allows creation."""
+
+    autopilot_action_type: Optional[str]
+    """Autopilot action type selected from intervention and risk context."""
+
+    autopilot_policy_decision: Optional[str]
+    """Policy decision for autopilot action (e.g., approved, review_required, denied)."""
+
+    autopilot_requires_human_review: bool
+    """Whether autopilot policy requires human review before execution."""
     
     # ============================================================================
     # FINAL RESPONSE

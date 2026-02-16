@@ -21,11 +21,11 @@ import { FiChevronLeft, FiChevronRight, FiLoader } from 'react-icons/fi';
 import toast from 'react-hot-toast';
 
 // Define the structure of the data received from the backend
-interface ActivityData {
+export interface ActivityData {
     hasJournal: boolean;
     hasConversation: boolean;
 }
-interface ActivitySummary {
+export interface ActivitySummary {
     [dateStr: string]: ActivityData; // Key is "YYYY-MM-DD"
 }
 

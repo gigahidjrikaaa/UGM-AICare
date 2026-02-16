@@ -23,11 +23,17 @@ import WalletLinkButton from "@/components/ui/WalletLinkButton";
 import QuestBoard from "@/components/quests/QuestBoard";
 import apiClient, { fetchUserProfileOverview } from "@/services/api";
 import type { TimelineEntry, UserProfileOverviewResponse } from "@/types/profile";
-import Link from "next/link";
 
 interface EarnedBadgeSummary {
   badge_id: number;
   awarded_at: string;
+}
+
+interface JournalStats {
+  todayHasEntry: boolean;
+  currentStreak: number;
+  entriesThisMonth: number;
+  recentMood: number | null;
 }
 
 type DashboardTimelineEntry = TimelineEntry & { formattedTimestamp: string };
@@ -181,7 +187,7 @@ function BadgesCard({ count }: { count: number | null }) {
   );
 }
 
-function JournalWidget({ stats }: { stats: typeof journalStats }) {
+function JournalWidget({ stats }: { stats: JournalStats | null }) {
   if (!stats) {
     return (
       <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/3 p-4 shadow-lg backdrop-blur-sm transition-all duration-300 hover:border-[#FFCA40]/30 hover:bg-white/5">
@@ -197,7 +203,7 @@ function JournalWidget({ stats }: { stats: typeof journalStats }) {
   }
 
   return (
-    <Link href="/journaling" className="group block relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#FFCA40]/10 to-[#FFB700]/10 p-6 shadow-lg backdrop-blur-sm transition-all duration-300 hover:border-[#FFCA40]/50 hover:scale-[1.02]">
+    <Link href="/journaling" className="group block relative overflow-hidden rounded-2xl border border-white/10 bg-linear-to-r from-[#FFCA40]/10 to-[#FFB700]/10 p-6 shadow-lg backdrop-blur-sm transition-all duration-300 hover:border-[#FFCA40]/50 hover:scale-[1.02]">
       <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-[#FFCA40]/10 blur-3xl group-hover:blur-4xl transition-all" />
       
       <div className="relative">
@@ -211,7 +217,7 @@ function JournalWidget({ stats }: { stats: typeof journalStats }) {
               {stats.todayHasEntry ? '✓' : '📝'}
             </div>
             <div>
-              <p className="text-xs uppercase tracking-wide text-white/60">Today's Journal</p>
+              <p className="text-xs uppercase tracking-wide text-white/60">Today&apos;s Journal</p>
               <h3 className="text-lg font-bold text-white">
                 {stats.todayHasEntry ? "Completed!" : "Not yet"}
               </h3>
@@ -238,60 +244,6 @@ function JournalWidget({ stats }: { stats: typeof journalStats }) {
         </div>
 
         <button className="w-full flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-medium shadow-lg transition-all bg-white/10 text-white hover:bg-white/20 hover:border-[#FFCA40]">
-          {stats.todayHasEntry ? "View Journal" : "Write Now"}
-          {stats.todayHasEntry && <FiArrowRight className="h-4 w-4" />}
-        </button>
-      </div>
-    </Link>
-  );
-}
-
-  return (
-    <Link href="/journaling" className="group block relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#FFCA40]/10 to-[#FFB700]/10 p-6 shadow-lg backdrop-blur-sm transition-all duration-300 hover:border-[#FFCA40]/50 hover:scale-[1.02]">
-      <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-[#FFCA40]/10 blur-3xl group-hover:blur-4xl transition-all" />
-      
-      <div className="relative">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex items-center gap-3">
-            <div className={`h-14 w-14 rounded-xl flex items-center justify-center text-2xl shadow-lg ${
-              stats.todayHasEntry
-                ? 'bg-green-500/30 text-green-400'
-                : 'bg-[#FFCA40]/30 text-[#FFCA40]'
-            }`}>
-              {stats.todayHasEntry ? '✓' : '📝'}
-            </div>
-            <div>
-              <p className="text-xs uppercase tracking-wide text-white/60">Today's Journal</p>
-              <h3 className="text-lg font-bold text-white">
-                {stats.todayHasEntry ? "Completed!" : "Not yet"}
-              </h3>
-            </div>
-          </div>
-          <div className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-[#FFCA40] group-hover:scale-110 transition-all">
-            <FiArrowRight className="h-5 w-5 text-white/40 group-hover:text-[#001D58] transition-colors" />
-          </div>
-        </div>
-
-        <div className="grid grid-cols-3 gap-4 mb-4">
-          <div className="text-center bg-white/5 rounded-xl p-3">
-            <p className="text-2xl font-bold text-white">{stats.currentStreak}</p>
-            <p className="text-xs text-white/50 uppercase tracking-wide">Streak</p>
-          </div>
-          <div className="text-center bg-white/5 rounded-xl p-3">
-            <p className="text-2xl font-bold text-white">{stats.entriesThisMonth}</p>
-            <p className="text-xs text-white/50 uppercase tracking-wide">Month</p>
-          </div>
-          <div className="text-center bg-white/5 rounded-xl p-3">
-            <p className="text-2xl">{stats.recentMood || '—'}</p>
-            <p className="text-xs text-white/50 uppercase tracking-wide">Mood</p>
-          </div>
-        </div>
-
-        <button className={`w-full flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-medium shadow-lg transition-all ${
-          stats.todayHasEntry
-            ? 'bg-white/10 text-white hover:bg-white/20 hover:border-[#FFCA40]'
-            : 'bg-gradient-to-r from-[#FFCA40] to-[#FFB700] text-[#001D58] hover:from-[#FFD060] hover:to-[#FFC730] hover:shadow-[#FFCA40]/50'
-        }`}>
           {stats.todayHasEntry ? "View Journal" : "Write Now"}
           {stats.todayHasEntry && <FiArrowRight className="h-4 w-4" />}
         </button>
@@ -353,12 +305,7 @@ export default function DashboardPage() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [badgeCount, setBadgeCount] = useState<number | null>(null);
   const [latestBadgeDate, setLatestBadgeDate] = useState<string | null>(null);
-  const [journalStats, setJournalStats] = useState<{
-    todayHasEntry: boolean;
-    currentStreak: number;
-    entriesThisMonth: number;
-    recentMood: number | null;
-  } | null>(null);
+  const [journalStats, setJournalStats] = useState<JournalStats | null>(null);
 
   useEffect(() => {
     async function loadProfile() {

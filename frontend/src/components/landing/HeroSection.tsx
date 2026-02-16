@@ -3,12 +3,13 @@
 import Image from 'next/image';
 import Link from 'next/link';
 import { motion, useReducedMotion } from 'framer-motion';
+import type { Variants } from 'framer-motion';
 import { ArrowScribbleGlyph, StarburstGlyph } from '@/components/landing/CustomGlyphs';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import { useI18n } from '@/i18n/I18nProvider';
 
 // Animation variants for staggered entrance
-const containerVariants = {
+const containerVariants: Variants = {
   hidden: { opacity: 0 },
   visible: {
     opacity: 1,
@@ -19,7 +20,7 @@ const containerVariants = {
   }
 };
 
-const itemVariants = {
+const itemVariants: Variants = {
   hidden: { y: 20, opacity: 0 },
   visible: {
     y: 0,
@@ -50,7 +51,7 @@ export default function HeroSection() {
       </div>
 
       {/* Grid Pattern Overlay for "Tech/Structural" feel */}
-      <div className="absolute inset-0 z-0 opacity-[0.03] bg-[linear-gradient(to_right,#ffffff_1px,transparent_1px),linear-gradient(to_bottom,#ffffff_1px,transparent_1px)] bg-[size:4rem_4rem] h-[200vh]" />
+      <div className="absolute inset-0 z-0 opacity-[0.03] bg-[linear-gradient(to_right,#ffffff_1px,transparent_1px),linear-gradient(to_bottom,#ffffff_1px,transparent_1px)] bg-size-[4rem_4rem] h-[200vh]" />
 
       {/* 2. Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 z-20 w-full pt-20 pb-16 lg:pt-32 lg:pb-24">
@@ -131,7 +132,7 @@ export default function HeroSection() {
           {/* Right Column: Student Grid Layout */}
           <motion.div
             variants={itemVariants}
-            className="hidden lg:grid grid-cols-3 gap-4 h-[600px] items-center"
+            className="hidden lg:grid grid-cols-3 gap-4 h-150 items-center"
           >
              {/* Column 1 */}
              <div className="flex flex-col gap-4 mt-8">

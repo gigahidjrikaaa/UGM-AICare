@@ -1,7 +1,9 @@
 import pytest
 
 from app.agents.aika_orchestrator_graph import (
+    _detect_crisis_keywords,
     _format_personal_memory_block,
+    _is_smalltalk_message,
     _normalize_user_role,
     should_invoke_agents,
     should_route_to_sca,
@@ -52,7 +54,28 @@ def test_should_invoke_agents_routes_by_next_step() -> None:
 @pytest.mark.agents
 @pytest.mark.unit
 def test_should_invoke_agents_fallbacks_to_tca_when_needs_agents_true() -> None:
-    assert should_invoke_agents({"needs_agents": True}) == "invoke_tca"
+    assert should_invoke_agents({"needs_agents": True}) == "end"
+
+
+@pytest.mark.agents
+@pytest.mark.unit
+def test_should_invoke_agents_fallback_uses_risk_context() -> None:
+    assert should_invoke_agents({"needs_agents": True, "immediate_risk_level": "moderate"}) == "invoke_tca"
+    assert should_invoke_agents({"needs_agents": True, "immediate_risk_level": "high"}) == "invoke_cma"
+
+
+@pytest.mark.agents
+@pytest.mark.unit
+def test_should_invoke_agents_fallback_uses_admin_analytics_context() -> None:
+    result = should_invoke_agents(
+        {
+            "needs_agents": True,
+            "intent": "analytics_query",
+            "user_role": "admin",
+            "immediate_risk_level": "none",
+        }
+    )
+    assert result == "invoke_ia"
 
 
 @pytest.mark.agents
@@ -68,3 +91,20 @@ def test_should_route_to_sca_routes_high_to_sda_and_tca_to_sca() -> None:
     assert should_route_to_sca({"severity": "critical"}) == "route_sda"
     assert should_route_to_sca({"severity": "moderate", "next_step": "tca"}) == "invoke_sca"
     assert should_route_to_sca({"severity": "low"}) == "synthesize"
+
+
+@pytest.mark.agents
+@pytest.mark.unit
+def test_smalltalk_detector_matches_greetings() -> None:
+    assert _is_smalltalk_message("hi")
+    assert _is_smalltalk_message("Halo Aika")
+    assert _is_smalltalk_message("terima kasih")
+    assert not _is_smalltalk_message("aku panik banget dan nggak bisa napas")
+
+
+@pytest.mark.agents
+@pytest.mark.unit
+def test_crisis_keyword_detector_captures_high_risk_phrases() -> None:
+    hits = _detect_crisis_keywords("aku mau mati dan berpikir untuk bunuh diri")
+    assert "mau mati" in hits
+    assert "bunuh diri" in hits

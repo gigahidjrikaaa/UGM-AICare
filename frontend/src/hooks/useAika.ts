@@ -70,6 +70,18 @@ export interface ToolEvent {
   timestamp: string;
 }
 
+export interface ReasoningTrace {
+  id: string;
+  stage: string;
+  summary: string;
+  sourceNode: string;
+  timestamp: string;
+  intent?: string;
+  confidence?: number;
+  needsAgents?: boolean;
+  riskLevel?: string;
+}
+
 interface UseAikaOptions {
   onAgentActivity?: (agents: string[]) => void;
   onRiskDetected?: (assessment: AikaRiskAssessment) => void;
@@ -77,6 +89,7 @@ interface UseAikaOptions {
   onPartialResponse?: (text: string) => void;
   onToolEvent?: (event: ToolEvent) => void;
   onStatusUpdate?: (message: string) => void;
+  onReasoning?: (trace: ReasoningTrace) => void;
   showToasts?: boolean;
 }
 
@@ -93,6 +106,7 @@ export function useAika(options: UseAikaOptions = {}) {
     onPartialResponse,
     onToolEvent,
     onStatusUpdate,
+    onReasoning,
     showToasts = true,
   } = options;
 
@@ -221,6 +235,27 @@ export function useAika(options: UseAikaOptions = {}) {
                 console.log('🤔 Thinking:', data.message);
                 if (onStatusUpdate) {
                   onStatusUpdate(`Thinking: ${data.message}`);
+                }
+              } else if (eventType === 'reasoning') {
+                const reasoningData = data.data || {};
+                const trace: ReasoningTrace = {
+                  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+                  stage: String(reasoningData.stage || 'unknown'),
+                  summary: String(reasoningData.summary || data.message || 'Reasoning update'),
+                  sourceNode: String(reasoningData.source_node || 'unknown'),
+                  timestamp: String(reasoningData.timestamp || new Date().toISOString()),
+                  intent: typeof reasoningData.intent === 'string' ? reasoningData.intent : undefined,
+                  confidence: typeof reasoningData.confidence === 'number' ? reasoningData.confidence : undefined,
+                  needsAgents: typeof reasoningData.needs_agents === 'boolean' ? reasoningData.needs_agents : undefined,
+                  riskLevel: typeof reasoningData.risk_level === 'string' ? reasoningData.risk_level : undefined,
+                };
+
+                if (onReasoning) {
+                  onReasoning(trace);
+                }
+
+                if (onStatusUpdate) {
+                  onStatusUpdate(`Reasoning: ${trace.summary}`);
                 }
               } else if (eventType === 'agent_activity') {
                 // Agent activity data with risk assessment

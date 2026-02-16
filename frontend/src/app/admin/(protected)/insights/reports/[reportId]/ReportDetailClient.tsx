@@ -338,7 +338,11 @@ export function ReportDetailClient({ reportId }: ReportDetailClientProps) {
                   key={index}
                   className="px-3 py-1.5 bg-[#FFCA40]/15 border border-[#FFCA40]/30 text-[#FFCA40] rounded-full text-sm"
                 >
-                  {typeof data === 'object' && data !== null && 'topic' in data ? data.topic : topic}
+                  {typeof data === 'string'
+                    ? data
+                    : typeof data === 'object' && data !== null && 'topic' in data && typeof (data as { topic?: unknown }).topic === 'string'
+                      ? (data as { topic: string }).topic
+                      : topic}
                 </div>
               ))}
             </div>

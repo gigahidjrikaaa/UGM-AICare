@@ -99,6 +99,7 @@ const EVENT_CONFIG: Record<ActivityType, { icon: React.ElementType; color: strin
   tool_start: { icon: Zap, color: 'text-blue-400' },
   tool_use: { icon: Zap, color: 'text-ugm-gold' },
   tool_end: { icon: CheckCircle, color: 'text-green-400' },
+  reasoning_trace: { icon: Cpu, color: 'text-ugm-gold' },
   info: { icon: Info, color: 'text-gray-300' },
   warning: { icon: AlertTriangle, color: 'text-yellow-400' },
 };

@@ -810,6 +810,7 @@ async def generate_gemini_content_with_fallback(
     model: str = DEFAULT_GEMINI_MODEL,
     config: Optional[types.GenerateContentConfig] = None,
     return_full_response: bool = False,
+    allow_retry_sleep: bool = True,
 ) -> str | Any:
     """Generate Gemini response with automatic fallback, using pre-built contents."""
     from google.genai.errors import ClientError, ServerError
@@ -913,7 +914,7 @@ async def generate_gemini_content_with_fallback(
                         continue
 
                     retry_after_s = _parse_retry_after_s(error_msg)
-                    if retry_after_s is not None and retry_attempt < max_retries_per_model - 1:
+                    if allow_retry_sleep and retry_after_s is not None and retry_attempt < max_retries_per_model - 1:
                         delay_seconds = min(retry_after_s, 60.0)
                         logger.warning(
                             f"⏳ Rate limit hit. Sleeping for {delay_seconds:.2f}s before retrying same model..."
@@ -965,6 +966,7 @@ async def generate_gemini_response_with_fallback(
     tools: Optional[List[Any]] = None,
     return_full_response: bool = False,
     json_mode: bool = False,
+    allow_retry_sleep: bool = True,
 ) -> str | Any:
     """Generate Gemini response with automatic fallback to alternative models.
     
@@ -977,6 +979,7 @@ async def generate_gemini_response_with_fallback(
     
     Args:
         Same as generate_gemini_response
+        allow_retry_sleep: If False, skip retry-after sleeps for interactive UX.
         
     Returns:
         Generated response or raises exception if all models fail
@@ -1084,7 +1087,7 @@ async def generate_gemini_response_with_fallback(
                     # Check for retry delay in error message
                     # Pattern: "Please retry in 45.63936562s." or similar
                     retry_after_s = _parse_retry_after_s(error_msg)
-                    if retry_after_s is not None:
+                    if allow_retry_sleep and retry_after_s is not None:
                         delay_seconds = min(retry_after_s, 60.0)
 
                         if retry_attempt < max_retries_per_model - 1:

@@ -7,6 +7,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import secrets
+import subprocess
 import sys
 import uuid
 from datetime import datetime, timedelta
@@ -273,23 +274,30 @@ async def run_autopilot_replay(
 
     command = f"{sys.executable} {script_path}"
 
-    process = await asyncio.create_subprocess_exec(
-        sys.executable,
-        str(script_path),
-        cwd=str(repo_root),
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-    )
-
     try:
-        stdout_data, stderr_data = await asyncio.wait_for(process.communicate(), timeout=timeout_seconds)
-    except asyncio.TimeoutError as exc:
-        process.kill()
-        await process.wait()
+        completed = await asyncio.to_thread(
+            subprocess.run,
+            [sys.executable, str(script_path)],
+            cwd=str(repo_root),
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            timeout=timeout_seconds,
+            check=False,
+        )
+    except subprocess.TimeoutExpired as exc:
         raise HTTPException(
             status_code=504,
             detail=f"Autopilot replay timed out after {timeout_seconds}s",
         ) from exc
+    except OSError as exc:
+        logger.exception("Failed to execute autopilot replay subprocess")
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to execute autopilot replay subprocess: {exc}",
+        ) from exc
+
+    stdout_data = completed.stdout or b""
+    stderr_data = completed.stderr or b""
 
     artifact_data: Optional[Dict] = None
     if artifact_path.exists():
@@ -300,7 +308,7 @@ async def run_autopilot_replay(
 
     return AutopilotReplayResponse(
         command=command,
-        exit_code=int(process.returncode or 0),
+        exit_code=int(completed.returncode or 0),
         stdout_tail=_tail_text_lines(stdout_data),
         stderr_tail=_tail_text_lines(stderr_data),
         artifact_path=str(artifact_path),

@@ -21,6 +21,7 @@ Note: onchain worker handlers currently include a documented placeholder tx mode
 ## 1) Why this plan exists
 
 Current UGM-AICare already has:
+
 - LangGraph orchestration and conditional routing.
 - Tool calling and appointment workflows.
 - Multi-chain NFT capabilities including BNB chain IDs.
@@ -28,6 +29,7 @@ Current UGM-AICare already has:
 
 A judge may still see a gap between "smart assistant" and "autonomous operator".  
 This plan closes that gap by adding:
+
 1. Policy-governed autonomous actions.
 2. Durable action execution with idempotency and retries.
 3. Onchain attestation publication and reconciliation.
@@ -38,12 +40,14 @@ This plan closes that gap by adding:
 ## 2) Scope boundaries (for hackathon speed)
 
 ### In scope
+
 - Autonomous action decisions for low/moderate risk operational events.
 - Human approval gates for high/critical risk events.
 - Onchain attestations that store hashes only (no sensitive content).
 - Deterministic demo scenario with replay script and tx links.
 
 ### Out of scope
+
 - Full protocol tokenomics redesign.
 - Cross-chain bridge logic.
 - Production-grade SOC2/GDPR legal implementation.
@@ -64,6 +68,7 @@ This plan closes that gap by adding:
 ## 4) File map against current codebase
 
 ## Existing files to modify
+
 - `backend/app/agents/aika_orchestrator_graph.py`
 - `backend/app/agents/aika/tools.py`
 - `backend/app/agents/shared/tools/registry.py`
@@ -77,6 +82,7 @@ This plan closes that gap by adding:
 - `blockchain/hardhat.config.ts`
 
 ## New files to add
+
 - `backend/app/domains/mental_health/models/autopilot_actions.py`
 - `backend/app/domains/mental_health/services/autopilot_policy_engine.py`
 - `backend/app/domains/mental_health/services/autopilot_action_service.py`
@@ -97,6 +103,7 @@ Note: if `opBNB` is selected, add chain config in both backend and frontend chai
 ## 5) Data model design (minimal)
 
 Create `AutopilotAction` table:
+
 - `id` (pk)
 - `action_type` (enum: `create_checkin`, `create_case`, `mint_badge`, `publish_attestation`)
 - `risk_level` (enum)
@@ -116,6 +123,7 @@ Create `AutopilotAction` table:
 - `created_at`, `updated_at`, `executed_at`
 
 Create `AutopilotPolicySnapshot` table (optional in hackathon, useful for audit):
+
 - action id fk, policy version, applied rules json.
 
 ---
@@ -125,19 +133,24 @@ Create `AutopilotPolicySnapshot` table (optional in hackathon, useful for audit)
 ## Phase 0 - Autopilot contract and policy spec
 
 ### Goal
+
 Freeze autonomy boundaries before coding.
 
 ### Tasks
+
 1. Define policy matrix by risk level and action type.
 2. Define idempotency formula per action.
 3. Define attestation payload schema (hash only).
 
 ### Deliverable
+
 `docs/AUTOPILOT_POLICY_MATRIX.md` with one source of truth.
 
 ### LLM Agent prompt (copy-paste)
+
 """
 Read the existing orchestration and intervention flow. Produce `docs/AUTOPILOT_POLICY_MATRIX.md` containing:
+
 1) Risk x action decision matrix (`allow`, `require_approval`, `deny`),
 2) Idempotency key formulas per action,
 3) Minimal hashed attestation payload schema,
@@ -146,6 +159,7 @@ Keep policies conservative for high/critical risk.
 """
 
 ### Done criteria
+
 - Matrix exists and is approved by developer.
 - No ambiguous policy branch remains.
 
@@ -154,15 +168,18 @@ Keep policies conservative for high/critical risk.
 ## Phase 1 - Action Control Plane and DB model
 
 ### Goal
+
 Create durable action records before execution.
 
 ### Tasks
+
 1. Add SQLAlchemy model `AutopilotAction`.
 2. Add Alembic migration.
 3. Add CRUD service skeleton for create/list/get/update status.
 4. Add admin read endpoints for queue visibility.
 
 ### File targets
+
 - `backend/app/domains/mental_health/models/autopilot_actions.py`
 - `backend/alembic/versions/<timestamp>_add_autopilot_actions.py`
 - `backend/app/domains/mental_health/services/autopilot_action_service.py`
@@ -170,8 +187,10 @@ Create durable action records before execution.
 - `backend/app/main.py` (router include)
 
 ### LLM Agent prompt (copy-paste)
+
 """
 Implement Phase 1 Action Control Plane:
+
 - Add SQLAlchemy model `AutopilotAction` and migration.
 - Add service with methods: `enqueue_action`, `mark_awaiting_approval`, `mark_running`, `mark_confirmed`, `mark_failed`, `mark_dead_letter`.
 - Add admin routes:
@@ -182,6 +201,7 @@ Follow existing backend style and async patterns.
 """
 
 ### Done criteria
+
 - Migration runs.
 - Actions can be created and listed through API.
 - Status transitions persist correctly.
@@ -191,22 +211,27 @@ Follow existing backend style and async patterns.
 ## Phase 2 - Policy engine and Aika integration
 
 ### Goal
+
 Aika decides and enqueues actions through explicit policy checks.
 
 ### Tasks
+
 1. Add `autopilot_policy_engine.py`.
 2. Integrate policy check after risk/intent classification in orchestrator.
 3. Enqueue allowed actions, queue approvals for gated actions.
 4. Emit structured events for traceability.
 
 ### File targets
+
 - `backend/app/domains/mental_health/services/autopilot_policy_engine.py`
 - `backend/app/agents/aika_orchestrator_graph.py`
 - `backend/app/services/compliance_service.py` (reuse for audit event writes)
 
 ### LLM Agent prompt (copy-paste)
+
 """
 Implement Phase 2 policy integration:
+
 - Create policy engine function `evaluate_action_policy(risk_level, action_type, context) -> decision`.
 - In Aika orchestration flow, before executing operational side effects, call policy engine.
 - If `allow`, enqueue action with `queued`.
@@ -216,6 +241,7 @@ Implement Phase 2 policy integration:
 """
 
 ### Done criteria
+
 - High/critical actions are never auto-executed.
 - Low/moderate allowed actions are queued reliably.
 - Audit entries are created for each policy decision.
@@ -225,23 +251,28 @@ Implement Phase 2 policy integration:
 ## Phase 3 - Durable worker and blockchain attestation publisher
 
 ### Goal
+
 Execute queued actions with retries and onchain reconciliation.
 
 ### Tasks
+
 1. Build worker loop for queued approved actions.
 2. Add idempotency enforcement before execution.
 3. Extend attestation publisher to submit tx and capture hash.
 4. Add retry strategy with exponential backoff and dead-letter state.
 
 ### File targets
+
 - `backend/app/domains/mental_health/services/autopilot_worker.py`
 - `backend/app/services/attestation_service.py`
 - `backend/app/tasks/attestation_tasks.py`
 - `backend/app/main.py` (startup worker hook or scheduler integration)
 
 ### LLM Agent prompt (copy-paste)
+
 """
 Implement Phase 3 durable execution:
+
 - Worker reads `AutopilotAction` in `queued` or `approved` state.
 - Uses idempotency key check to prevent duplicate external side effects.
 - Executes action handlers (mint badge, publish attestation, create check-in).
@@ -252,6 +283,7 @@ Add structured logs and metrics counters.
 """
 
 ### Done criteria
+
 - Duplicate execution is blocked by idempotency.
 - Failed blockchain operations retry and finally dead-letter.
 - Confirmed actions have explorer-ready tx hash stored.
@@ -261,14 +293,17 @@ Add structured logs and metrics counters.
 ## Phase 4 - Admin approval flow and proof timeline
 
 ### Goal
+
 Expose governance and proof to judges in UI.
 
 ### Tasks
+
 1. Add approve/reject endpoints for `awaiting_approval` actions.
 2. Add admin queue page with filters and action details.
 3. Add public/user proof page with action timeline and tx links.
 
 ### File targets
+
 - `backend/app/domains/mental_health/routes/admin/autopilot.py`
 - `backend/app/schemas/admin/autopilot.py`
 - `frontend/src/app/admin/(protected)/autopilot/page.tsx`
@@ -277,8 +312,10 @@ Expose governance and proof to judges in UI.
 - `frontend/src/services/proofApi.ts`
 
 ### LLM Agent prompt (copy-paste)
+
 """
 Implement Phase 4 approval and proof UX:
+
 - Backend endpoints:
   - POST `/api/v1/admin/autopilot/actions/{id}/approve`
   - POST `/api/v1/admin/autopilot/actions/{id}/reject`
@@ -289,6 +326,7 @@ Use existing UI patterns and API client style.
 """
 
 ### Done criteria
+
 - Admin can approve/reject queued actions.
 - Proof page shows verifiable onchain links.
 - Demo can show one full lifecycle from detection to confirmed tx.
@@ -298,21 +336,26 @@ Use existing UI patterns and API client style.
 ## Phase 5 - Replayable demo harness and submission package
 
 ### Goal
+
 Make verification easy for judges.
 
 ### Tasks
+
 1. Create deterministic demo script that seeds scenario and triggers one autopilot run.
 2. Export result artifact JSON with action IDs, statuses, tx hashes.
 3. Add quickstart reproduction guide.
 
 ### File targets
+
 - `scripts/replay_autopilot_demo.py`
 - `docs/AUTOPILOT_DEMO_RUNBOOK.md`
 - `README.md` (append hackathon quickstart section)
 
 ### LLM Agent prompt (copy-paste)
+
 """
 Implement Phase 5 reproducibility package:
+
 - Add `scripts/replay_autopilot_demo.py` to seed one user, one risk event, one allowed action, one approval-required action.
 - Script prints final artifact JSON with tx hashes and explorer links.
 - Add `docs/AUTOPILOT_DEMO_RUNBOOK.md` with exact commands and expected outputs.
@@ -320,6 +363,7 @@ Keep setup minimal and deterministic.
 """
 
 ### Done criteria
+
 - One-command demo replay works on clean environment.
 - Artifact includes verifiable tx hashes.
 - Runbook covers setup, run, and verification.
@@ -340,16 +384,19 @@ Keep setup minimal and deterministic.
 ## 8) Testing matrix (minimum)
 
 ### Unit tests
+
 - Policy decisions by risk/action permutation.
 - Idempotency key collision handling.
 - Retry backoff and dead-letter transition.
 
 ### Integration tests
+
 - Orchestrator enqueues action with correct policy decision.
 - Approval transitions from awaiting_approval -> approved -> running -> confirmed.
 - Attestation publisher stores tx hash and chain id.
 
 ### Demo tests
+
 - End-to-end run from user message to proof timeline display.
 - Explorer links resolve.
 
@@ -358,6 +405,7 @@ Keep setup minimal and deterministic.
 ## 9) Environment variables to add
 
 Add to `backend/env.example`:
+
 - `AUTOPILOT_ENABLED=true`
 - `AUTOPILOT_MAX_RETRIES=5`
 - `AUTOPILOT_RETRY_BASE_SECONDS=30`
@@ -367,6 +415,7 @@ Add to `backend/env.example`:
 - `AUTOPILOT_POLICY_VERSION=v1`
 
 If targeting opBNB:
+
 - `OPBNB_TESTNET_RPC_URL=`
 - `OPBNB_NFT_CONTRACT_ADDRESS=`
 - `OPBNB_MINTER_PRIVATE_KEY=`

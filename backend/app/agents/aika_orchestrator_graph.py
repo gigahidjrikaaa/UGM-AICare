@@ -31,6 +31,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import os
+import re
 import time
 from datetime import datetime, timedelta
 from typing import Dict, Any, List, Optional, TYPE_CHECKING, Protocol, cast
@@ -55,6 +56,82 @@ if TYPE_CHECKING:
     from app.agents.ia.ia_graph import create_ia_graph
 
 logger = logging.getLogger(__name__)
+
+_CRISIS_KEYWORDS: tuple[str, ...] = (
+    "suicide",
+    "bunuh diri",
+    "kill myself",
+    "end my life",
+    "tidak ingin hidup lagi",
+    "self-harm",
+    "menyakiti diri",
+    "overdose",
+    "mau mati",
+    "ingin mati",
+)
+
+_SMALLTALK_EXACT: tuple[str, ...] = (
+    "hi",
+    "hello",
+    "halo",
+    "hai",
+    "hey",
+    "p",
+    "ping",
+    "ok",
+    "oke",
+    "thanks",
+    "thank you",
+    "makasih",
+    "terima kasih",
+)
+
+
+def _detect_crisis_keywords(text: str) -> list[str]:
+    lowered = (text or "").lower()
+    return [keyword for keyword in _CRISIS_KEYWORDS if keyword in lowered]
+
+
+def _is_smalltalk_message(text: str) -> bool:
+    cleaned = re.sub(r"\s+", " ", (text or "").strip().lower())
+    if not cleaned:
+        return False
+    if cleaned in _SMALLTALK_EXACT:
+        return True
+    if len(cleaned) <= 18 and cleaned in {
+        "hi aika",
+        "halo aika",
+        "hai aika",
+        "hello aika",
+        "thank you aika",
+        "makasih ya",
+        "terima kasih ya",
+    }:
+        return True
+    return False
+
+
+def _requests_structured_support(text: str) -> bool:
+    lowered = (text or "").lower()
+    structured_support_triggers = (
+        "rencana",
+        "langkah",
+        "step by step",
+        "strategi",
+        "coping plan",
+        "buatkan plan",
+        "bikin rencana",
+        "cara mengatasi",
+    )
+    return any(trigger in lowered for trigger in structured_support_triggers)
+
+
+def _build_smalltalk_response(role: str) -> str:
+    if role == "admin":
+        return "Halo! Aku siap bantu untuk cek data atau operasional platform. Mau mulai dari apa?"
+    if role == "counselor":
+        return "Halo! Aku siap bantu kebutuhan case management atau insight klinis. Ada yang ingin dicek dulu?"
+    return "Halo! Aku Aika. Senang ketemu kamu. Lagi pengin ngobrol tentang apa hari ini?"
 
 
 class _AsyncInvokable(Protocol):
@@ -165,6 +242,37 @@ async def aika_decision_node(
         personal_memory_block = _format_personal_memory_block(state)
 
         current_message = state.get("message") or ""
+
+        # Deterministic smalltalk short-circuit to avoid unnecessary LLM/tool latency
+        # and prevent over-routing (e.g., greeting -> TCA).
+        if normalized_role == "student" and _is_smalltalk_message(current_message):
+            state["intent"] = "casual_chat"
+            state["intent_confidence"] = 1.0
+            state["needs_agents"] = False
+            state["next_step"] = "none"
+            state["agent_reasoning"] = "Deterministic smalltalk route (no agent/tool invocation needed)."
+            state["immediate_risk_level"] = "none"
+            state["crisis_keywords_detected"] = []
+            state["risk_reasoning"] = "No distress or risk signal detected from greeting/smalltalk."
+            state["aika_direct_response"] = _build_smalltalk_response(normalized_role)
+            state["final_response"] = state["aika_direct_response"]
+            state["response_source"] = "aika_direct"
+            state.setdefault("execution_path", []).append("aika_decision")
+
+            elapsed_ms = (time.time() - start_time) * 1000
+            if execution_id:
+                execution_tracker.complete_node(
+                    execution_id,
+                    "aika::decision",
+                    metrics={
+                        "intent": state.get("intent"),
+                        "needs_agents": False,
+                        "duration_ms": elapsed_ms,
+                    },
+                )
+
+            logger.info("🤖 Aika Decision (deterministic smalltalk): duration=%.0fms", elapsed_ms)
+            return state
         
         # Prepare conversation history for Gemini
         history_contents = []
@@ -307,7 +415,8 @@ want to die, mau mati, ingin mati, etc.
             temperature=0.3,
             max_tokens=2048,
             system_prompt=system_instruction,
-            json_mode=True  # Force valid JSON output
+            json_mode=True,  # Force valid JSON output
+            allow_retry_sleep=False,
         )
         
         # Parse decision (response_text is already a string from fallback function)
@@ -436,25 +545,31 @@ want to die, mau mati, ingin mati, etc.
                 state["needs_agents"] = True
                 logger.info(f"⚠️ Moderate risk detected - Routing to TCA")
             elif state["immediate_risk_level"] == "low" and state["intent"] in ("emotional_support", "crisis"):
-                 state["next_step"] = "tca"
-                 state["needs_agents"] = True
-                 logger.info(f"ℹ️ Low risk support requested - Routing to TCA")
+                 if _requests_structured_support(state.get("message", "")):
+                     state["next_step"] = "tca"
+                     state["needs_agents"] = True
+                     logger.info("ℹ️ Low-risk but structured support requested - Routing to TCA")
+                 else:
+                     state["next_step"] = "none"
+                     state["needs_agents"] = False
+                     logger.info("ℹ️ Low-risk emotional support - keeping direct Aika response")
             elif state["intent"] == "analytics_query" and normalized_role in ("admin", "counselor"):
                  state["next_step"] = "ia"
                  state["needs_agents"] = True
                  logger.info(f"📊 Analytics query detected - Routing to IA")
             else:
                 state["needs_cma_escalation"] = False
-                # If needs_agents was set to True by LLM but risk is None/Low (and not support), 
-                # we might want to respect LLM's decision or override it.
-                # For now, let's trust the LLM's 'needs_agents' but default next_step to 'tca' if it says yes.
                 if state["needs_agents"] and not state.get("next_step"):
-                     # Check if it might be an analytics query that wasn't explicitly caught
-                     if normalized_role in ("admin", "counselor") and "analytics" in str(state.get("agent_reasoning", "")).lower():
+                     if state.get("immediate_risk_level") in ("high", "critical"):
+                         state["next_step"] = "cma"
+                     elif state.get("immediate_risk_level") == "moderate":
+                         state["next_step"] = "tca"
+                     elif normalized_role in ("admin", "counselor") and "analytics" in str(state.get("agent_reasoning", "")).lower():
                          state["next_step"] = "ia"
                      else:
-                         # Default fallback if LLM says needs_agents but didn't specify next_step
-                         state["next_step"] = "tca" 
+                         state["needs_agents"] = False
+                         state["next_step"] = "none"
+                         logger.warning("needs_agents=True without valid next_step; forcing safe direct response")
 
             # ========================================================================
             # AUTOPILOT POLICY CHECK (Phase 2)
@@ -670,10 +785,17 @@ want to die, mau mati, ingin mati, etc.
         except json.JSONDecodeError as e:
             logger.warning(f"Failed to parse Gemini decision JSON: {e}")
             logger.debug(f"Raw response text: {response_text[:200]}...")
-            # Fallback: assume agents needed for safety
-            state["intent"] = "unknown"
-            state["needs_agents"] = True
-            state["agent_reasoning"] = "JSON parse failed, defaulting to agent invocation for safety"
+            crisis_hits = _detect_crisis_keywords(current_message)
+            state["intent"] = "crisis_intervention" if crisis_hits else "casual_chat"
+            state["needs_agents"] = bool(crisis_hits)
+            state["next_step"] = "cma" if crisis_hits else "none"
+            state["immediate_risk_level"] = "high" if crisis_hits else "none"
+            state["crisis_keywords_detected"] = crisis_hits
+            state["agent_reasoning"] = (
+                "Decision JSON parse failed; crisis keywords detected, escalating to CMA."
+                if crisis_hits
+                else "Decision JSON parse failed; using safe direct-response fallback."
+            )
         
         # Track execution
         state.setdefault("execution_path", []).append("aika_decision")
@@ -741,9 +863,25 @@ want to die, mau mati, ingin mati, etc.
                     metrics={"fallback": "rate_limit"}
                 )
         else:
-            # Standard Fallback: invoke agents for safety (unknown error)
-            state["needs_agents"] = True
-            state["agent_reasoning"] = f"Error occurred, invoking agents for safety: {str(e)}"
+            crisis_hits = _detect_crisis_keywords(str(state.get("message") or ""))
+            state["needs_agents"] = bool(crisis_hits)
+            state["intent"] = "crisis_intervention" if crisis_hits else "system_fallback"
+            state["immediate_risk_level"] = "high" if crisis_hits else "none"
+            state["crisis_keywords_detected"] = crisis_hits
+            state["next_step"] = "cma" if crisis_hits else "none"
+            state["agent_reasoning"] = (
+                f"Error occurred and crisis keywords detected; escalating to CMA: {str(e)}"
+                if crisis_hits
+                else f"Error occurred; using safe direct-response fallback: {str(e)}"
+            )
+
+            if not crisis_hits:
+                state["aika_direct_response"] = (
+                    "Maaf, aku lagi sempat terkendala teknis sebentar. "
+                    "Coba kirim ulang pesanmu ya, aku tetap di sini buat bantu kamu."
+                )
+                state["final_response"] = state["aika_direct_response"]
+                state["response_source"] = "aika_direct"
             
             if execution_id:
                 execution_tracker.fail_node(execution_id, "aika::decision", str(e))
@@ -1354,15 +1492,45 @@ def should_invoke_agents(state: AikaOrchestratorState) -> str:
         logger.info(f"🔀 Routing after Aika: STA (Manual Invocation)")
         return "invoke_sta"
 
-    # Fallback: if needs_agents is True but next_step not set, default to TCA
+    # Fallback: only route when a valid signal exists.
+    # Avoid defaulting to TCA for ambiguous states (prevents over-triggering).
     if needs_agents:
+        immediate_risk = str(state.get("immediate_risk_level") or "none")
+        if immediate_risk in {"high", "critical"}:
+            if execution_id:
+                execution_tracker.trigger_edge(
+                    execution_id,
+                    "aika::decision->cma",
+                    condition_result=True
+                )
+            return "invoke_cma"
+
+        if immediate_risk == "moderate":
+            if execution_id:
+                execution_tracker.trigger_edge(
+                    execution_id,
+                    "aika::decision->tca",
+                    condition_result=True
+                )
+            return "invoke_tca"
+
+        if state.get("intent") == "analytics_query" and str(state.get("user_role", "")).lower() in {"admin", "counselor"}:
+            if execution_id:
+                execution_tracker.trigger_edge(
+                    execution_id,
+                    "aika::decision->ia",
+                    condition_result=True
+                )
+            return "invoke_ia"
+
         if execution_id:
             execution_tracker.trigger_edge(
                 execution_id,
-                "aika::decision->tca",
+                "aika::decision->end",
                 condition_result=True
             )
-        return "invoke_tca"
+        logger.warning("Ambiguous needs_agents=True without valid route; ending safely")
+        return "end"
     
     # Direct response
     if execution_id:

@@ -18,6 +18,7 @@ export type ActivityType =
   | 'tool_start'
   | 'tool_end'
   | 'tool_use'
+  | 'reasoning_trace'
   | 'info'
   | 'warning';
 

@@ -189,7 +189,7 @@ export default function CasesPage() {
                 {response.total} total
               </span>
             </div>
-            <p className="text-white/60 text-sm ml-[34px]">
+            <p className="text-white/60 text-sm ml-8.5">
               Monitor and manage mental health cases with real-time SLA tracking
             </p>
           </div>

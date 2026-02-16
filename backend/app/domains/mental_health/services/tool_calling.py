@@ -145,6 +145,7 @@ async def generate_with_tools(
                     temperature=request.temperature,
                     system_prompt=system_prompt,
                     tools=tools,
+                    allow_retry_sleep=False,
                     return_full_response=True,  # Get full response to check for function calls
                 )
                 
@@ -247,6 +248,7 @@ async def generate_with_tools(
                         system_instruction=system_prompt if system_prompt else None,
                         tools=normalized_tools,
                     ),
+                    allow_retry_sleep=False,
                     return_full_response=True,
                 )
                 
@@ -346,6 +348,7 @@ async def _generate_streaming_with_tools(
             temperature=request.temperature,
             system_prompt=system_prompt,
             tools=tools,
+            allow_retry_sleep=False,
             return_full_response=True,
         )
         
@@ -438,6 +441,7 @@ async def _generate_streaming_with_tools(
                     max_output_tokens=request.max_tokens,
                     system_instruction=system_prompt if system_prompt else None,
                 ),
+                allow_retry_sleep=False,
                 return_full_response=True,
             )
             

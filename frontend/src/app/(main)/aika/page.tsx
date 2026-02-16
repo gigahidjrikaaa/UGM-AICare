@@ -21,7 +21,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useSession } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
-import { Activity, X } from 'lucide-react';
+import { Activity, Eye, EyeOff, X } from 'lucide-react';
 import { useAikaChat, type ToolActivityLog } from '@/hooks/useAikaChat';
 import { ChatWindow } from '@/components/features/chat/ChatWindow';
 import { ChatInput } from '@/components/features/chat/ChatInput';
@@ -59,6 +59,7 @@ export default function AikaEnhancedPage() {
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
   const [isAikaPanelOpen, setIsAikaPanelOpen] = useState(true);
+  const [showThinkingTrace, setShowThinkingTrace] = useState(true);
 
   // Fetch intervention plans
   const {
@@ -125,6 +126,8 @@ export default function AikaEnhancedPage() {
     inputValue,
     isLoading,
     activeAgents,
+    currentThinking,
+    thinkingTrace,
     error,
     lastMetadata,
     handleInputChange,
@@ -140,6 +143,7 @@ export default function AikaEnhancedPage() {
   const processedMetadataRef = useRef<string | null>(null);
   const lastMessageCountRef = useRef<number>(0);
   const hasLoggedGreetingRef = useRef<boolean>(false);
+  const processedReasoningCountRef = useRef<number>(0);
 
   // Log initial greeting when component mounts
   useEffect(() => {
@@ -241,6 +245,43 @@ export default function AikaEnhancedPage() {
     }
     prevActiveAgentsRef.current = activeAgents;
   }, [activeAgents, addActivity]);
+
+  // Log transparent reasoning trace into activity panel timeline
+  useEffect(() => {
+    if (thinkingTrace.length === 0) {
+      processedReasoningCountRef.current = 0;
+      return;
+    }
+
+    if (!showThinkingTrace) {
+      return;
+    }
+
+    if (thinkingTrace.length <= processedReasoningCountRef.current) {
+      return;
+    }
+
+    const pending = thinkingTrace.slice(processedReasoningCountRef.current);
+    pending.forEach((trace) => {
+      addActivity({
+        timestamp: trace.timestamp,
+        activity_type: 'reasoning_trace',
+        agent: 'Aika',
+        message: trace.summary,
+        duration_ms: null,
+        details: {
+          stage: trace.stage,
+          source_node: trace.sourceNode,
+          intent: trace.intent,
+          confidence: trace.confidence,
+          needs_agents: trace.needsAgents,
+          risk_level: trace.riskLevel,
+        }
+      });
+    });
+
+    processedReasoningCountRef.current = thinkingTrace.length;
+  }, [thinkingTrace, addActivity, showThinkingTrace]);
 
   // Log errors when they occur
   useEffect(() => {
@@ -358,6 +399,17 @@ export default function AikaEnhancedPage() {
   }, []);
 
   useEffect(() => {
+    const saved = window.localStorage.getItem('aika_show_thinking_trace');
+    if (saved === '0') {
+      setShowThinkingTrace(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem('aika_show_thinking_trace', showThinkingTrace ? '1' : '0');
+  }, [showThinkingTrace]);
+
+  useEffect(() => {
     if (mounted && status === 'unauthenticated') {
       router.push('/signin');
     }
@@ -401,6 +453,22 @@ export default function AikaEnhancedPage() {
                 </div>
               )}
 
+              <div className="px-4 pt-3">
+                <div className="mx-auto w-full max-w-3xl flex justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowThinkingTrace((prev) => !prev)}
+                    className="inline-flex items-center gap-2 rounded-lg border border-white/15 bg-white/5 px-3 py-1.5 text-xs text-white/80 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ugm-gold/50"
+                    aria-pressed={showThinkingTrace}
+                    aria-label={showThinkingTrace ? 'Hide Aika Thinking Trace' : 'Show Aika Thinking Trace'}
+                    title={showThinkingTrace ? 'Hide Aika Thinking Trace' : 'Show Aika Thinking Trace'}
+                  >
+                    {showThinkingTrace ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+                    <span>{showThinkingTrace ? 'Thinking Trace: On' : 'Thinking Trace: Off'}</span>
+                  </button>
+                </div>
+              </div>
+
               {/* Agent Activity & Risk Display */}
               {lastMetadata && (
                 <div className="px-4 pt-3 space-y-2">
@@ -422,6 +490,7 @@ export default function AikaEnhancedPage() {
                 chatContainerRef={chatContainerRef}
                 isLoading={isLoading}
                 activeAgents={activeAgents}
+                currentThinking={showThinkingTrace ? currentThinking : null}
                 onCardSelect={handleSendMessage}
                 onRegenerate={handleSendMessage}
                 userDisplayName={session?.user?.name ?? session?.user?.email ?? 'You'}
@@ -463,7 +532,7 @@ export default function AikaEnhancedPage() {
               >
                 <div className="flex-1 min-h-0">
                   <ActivityLogPanel
-                    activities={activities}
+                    activities={showThinkingTrace ? activities : activities.filter((a) => a.activity_type !== 'reasoning_trace')}
                     metadata={lastMetadata ?? null}
                     interventionPlans={plansData}
                     interventionPlansLoading={interventionPlansLoading}

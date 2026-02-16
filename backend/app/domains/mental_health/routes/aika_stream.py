@@ -53,6 +53,75 @@ AGENT_NAMES = {
 }
 
 
+def _sanitize_reasoning_text(value: Any, max_len: int = 220) -> str:
+    if not isinstance(value, str):
+        return ""
+    cleaned = " ".join(value.strip().split())
+    if len(cleaned) <= max_len:
+        return cleaned
+    return f"{cleaned[: max_len - 1].rstrip()}…"
+
+
+def _build_reasoning_payload(node_name: str, node_state: Dict[str, Any]) -> Dict[str, Any] | None:
+    stage_map = {
+        "aika_decision": "intent_assessment",
+        "sta_subgraph": "risk_assessment",
+        "sca_subgraph": "support_planning",
+        "tca_subgraph": "support_planning",
+        "sda_subgraph": "resource_coordination",
+        "cma_subgraph": "resource_coordination",
+        "ia_subgraph": "insight_analysis",
+        "synthesize_response": "response_synthesis",
+    }
+
+    stage = stage_map.get(node_name)
+    if stage is None:
+        return None
+
+    summary = ""
+    if node_name == "aika_decision":
+        summary = _sanitize_reasoning_text(node_state.get("agent_reasoning"))
+        if not summary:
+            intent = node_state.get("intent") or "unknown"
+            needs_agents = bool(node_state.get("needs_agents", False))
+            summary = (
+                f"Menilai intent '{intent}' dan memutuskan {'perlu' if needs_agents else 'tidak perlu'} agen tambahan."
+            )
+    elif node_name in {"sta_subgraph", "sca_subgraph", "tca_subgraph", "sda_subgraph", "cma_subgraph", "ia_subgraph"}:
+        summary = AGENT_STATUS_MESSAGES.get(node_name, "Menjalankan langkah agen khusus.")
+    elif node_name == "synthesize_response":
+        summary = "Menggabungkan hasil analisis menjadi respons akhir yang konsisten."
+
+    summary = _sanitize_reasoning_text(summary)
+    if not summary:
+        return None
+
+    payload: Dict[str, Any] = {
+        "stage": stage,
+        "summary": summary,
+        "source_node": node_name,
+        "timestamp": datetime.utcnow().isoformat(),
+    }
+
+    intent = node_state.get("intent")
+    if isinstance(intent, str) and intent:
+        payload["intent"] = intent
+
+    intent_confidence = node_state.get("intent_confidence")
+    if isinstance(intent_confidence, (int, float)):
+        payload["confidence"] = float(intent_confidence)
+
+    needs_agents = node_state.get("needs_agents")
+    if isinstance(needs_agents, bool):
+        payload["needs_agents"] = needs_agents
+
+    risk_level = node_state.get("severity")
+    if isinstance(risk_level, str) and risk_level:
+        payload["risk_level"] = risk_level
+
+    return payload
+
+
 async def stream_aika_execution(
     request: AikaRequest,
     current_user: User,
@@ -134,6 +203,7 @@ async def stream_aika_execution(
         
         # Track what we've already sent
         sent_agents = set()
+        sent_reasoning_nodes: set[str] = set()
         current_node = None
         current_node_started = None
         start_time = datetime.now()
@@ -219,6 +289,18 @@ async def stream_aika_execution(
                     }
                     yield f"data: {json.dumps(status_data)}\n\n"
                     await asyncio.sleep(0.05)
+
+                if isinstance(node_state, dict) and node_name not in sent_reasoning_nodes:
+                    reasoning_payload = _build_reasoning_payload(node_name, node_state)
+                    if reasoning_payload is not None:
+                        sent_reasoning_nodes.add(node_name)
+                        reasoning_data = {
+                            "type": "reasoning",
+                            "message": reasoning_payload["summary"],
+                            "data": reasoning_payload,
+                        }
+                        yield f"data: {json.dumps(reasoning_data)}\n\n"
+                        await asyncio.sleep(0.03)
                 
                 # Check for newly invoked agents
                 if isinstance(node_state, dict) and "agents_invoked" in node_state:

@@ -3,7 +3,7 @@ import { useState, useCallback, useRef } from 'react';
 import { getSession } from 'next-auth/react';
 
 interface StreamEvent {
-  type: 'thinking' | 'status' | 'agent' | 'intervention_plan' | 'appointment' | 'agent_activity' | 'complete' | 'error';
+  type: 'thinking' | 'status' | 'reasoning' | 'agent' | 'intervention_plan' | 'appointment' | 'agent_activity' | 'complete' | 'error';
   message?: string;
   node?: string;
   agent?: string;
@@ -31,6 +31,7 @@ interface AgentActivity {
 export interface StreamCallbacks {
   onThinking?: (message: string) => void;
   onStatus?: (node: string, message: string) => void;
+  onReasoning?: (message: string, data?: any) => void;
   onAgentInvoked?: (agent: string, name: string, description?: string) => void;
   onInterventionPlan?: (plan: any) => void;
   onAppointment?: (appointment: any) => void;
@@ -137,6 +138,11 @@ export function useAikaStream() {
                 case 'status':
                   setCurrentStatus(event);
                   callbacks.onStatus?.(event.node || '', event.message || '');
+                  break;
+
+                case 'reasoning':
+                  setCurrentStatus({ type: 'thinking', message: event.message || 'Menyusun pertimbangan...' });
+                  callbacks.onReasoning?.(event.message || '', event.data);
                   break;
 
                 case 'agent':

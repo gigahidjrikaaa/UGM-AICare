@@ -8,7 +8,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { v4 as uuidv4 } from 'uuid';
-import { useAika, type AikaMessage, type AikaMetadata, type ToolEvent } from './useAika';
+import { useAika, type AikaMessage, type AikaMetadata, type ReasoningTrace } from './useAika';
 import type { Message } from '@/types/chat';
 
 // Activity log entry type for tool/API tracking
@@ -41,6 +41,8 @@ export function useAikaChat({
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [activeAgents, setActiveAgents] = useState<string[]>([]);
+  const [currentThinking, setCurrentThinking] = useState<string | null>(null);
+  const [thinkingTrace, setThinkingTrace] = useState<ReasoningTrace[]>([]);
   const lastConversationIdRef = useRef<string | null>(null);
   const [lastMetadata, setLastMetadata] = useState<AikaMetadata | null>(null);
 
@@ -156,6 +158,8 @@ export function useAikaChat({
       }
     },
     onStatusUpdate: (message) => {
+      setCurrentThinking(message.replace(/^Thinking:\s*/i, '').replace(/^Reasoning:\s*/i, ''));
+
       // Forward status updates as activity logs
       if (onToolActivity) {
         onToolActivity({
@@ -165,6 +169,16 @@ export function useAikaChat({
           timestamp: new Date().toISOString(),
         });
       }
+    },
+    onReasoning: (trace) => {
+      setCurrentThinking(trace.summary);
+      setThinkingTrace((prev) => {
+        const next = [...prev, trace];
+        if (next.length > 30) {
+          return next.slice(next.length - 30);
+        }
+        return next;
+      });
     },
     onPartialResponse: (text) => {
       setIsLoading(false);
@@ -257,6 +271,8 @@ export function useAikaChat({
       setInputValue('');
       setIsLoading(true);
       setActiveAgents([]); // Reset active agents
+      setCurrentThinking('Aika sedang menganalisis pesanmu...');
+      setThinkingTrace([]);
 
       try {
         // Prepare conversation history for Aika
@@ -356,6 +372,7 @@ export function useAikaChat({
       } finally {
         setIsLoading(false);
         setActiveAgents([]); // Clear active agents when done
+        setCurrentThinking(null);
       }
     },
     [
@@ -382,6 +399,8 @@ export function useAikaChat({
     inputValue,
     isLoading: isLoading || aikaLoading,
     activeAgents,
+    currentThinking,
+    thinkingTrace,
     error: aikaError,
     lastMetadata,
     handleInputChange,

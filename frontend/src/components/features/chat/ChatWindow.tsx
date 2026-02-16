@@ -12,6 +12,7 @@ interface ChatWindowProps {
   onRescheduleAppointment?: (appointmentId: number, newDatetime: string) => Promise<void>;
   isLoading?: boolean;
   activeAgents?: string[];
+  currentThinking?: string | null;
   onCardSelect?: (text: string) => void;
   onRegenerate?: (text: string) => void;
 
@@ -27,6 +28,7 @@ export function ChatWindow({
   onRescheduleAppointment,
   isLoading,
   activeAgents = [],
+  currentThinking,
   onCardSelect,
   onRegenerate,
   userDisplayName,
@@ -92,7 +94,7 @@ export function ChatWindow({
         })}
 
         {/* Loading Indicator inside the centered column */}
-        {isLoading && <AikaLoadingBubble activeAgents={activeAgents} />}
+        {isLoading && <AikaLoadingBubble activeAgents={activeAgents} currentThinking={currentThinking} />}
       </div>
 
       {/* Scroll anchor for auto-scroll */}

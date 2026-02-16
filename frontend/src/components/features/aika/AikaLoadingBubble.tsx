@@ -13,6 +13,7 @@ import { Brain, Shield, Heart, Users, Sparkles } from 'lucide-react';
 
 interface AikaLoadingBubbleProps {
   activeAgents?: string[];
+  currentThinking?: string | null;
   className?: string;
 }
 
@@ -67,7 +68,7 @@ const DEFAULT_ACTIVITIES = [
   "Menyusun jawaban...",
 ];
 
-export function AikaLoadingBubble({ activeAgents = [], className = '' }: AikaLoadingBubbleProps) {
+export function AikaLoadingBubble({ activeAgents = [], currentThinking = null, className = '' }: AikaLoadingBubbleProps) {
   const [currentActivity, setCurrentActivity] = useState(DEFAULT_ACTIVITIES[0]);
   const [activityIndex, setActivityIndex] = useState(0);
 
@@ -77,8 +78,13 @@ export function AikaLoadingBubble({ activeAgents = [], className = '' }: AikaLoa
     : null;
   const currentAgent = currentAgentCode ? AGENT_CONFIG[currentAgentCode] : null;
 
-  // Cycle through activities
+  // Cycle through activities when no explicit thinking trace is available
   useEffect(() => {
+    if (currentThinking && currentThinking.trim().length > 0) {
+      setCurrentActivity(currentThinking.trim());
+      return;
+    }
+
     if (currentAgent) {
       setCurrentActivity(currentAgent.action);
       return;
@@ -93,7 +99,7 @@ export function AikaLoadingBubble({ activeAgents = [], className = '' }: AikaLoa
     }, 2500);
 
     return () => clearInterval(interval);
-  }, [currentAgent]);
+  }, [currentAgent, currentThinking]);
 
   const AgentIcon = currentAgent?.icon || Brain;
 
