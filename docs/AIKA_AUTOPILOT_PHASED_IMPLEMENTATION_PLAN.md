@@ -1,9 +1,20 @@
 # Aika Autopilot Phased Implementation Plan (Hackathon Execution)
 
 **Date**: 2026-02-16  
-**Status**: Ready to execute  
+**Status**: Phases 0-5 implemented (demo-grade)  
 **Target**: Convert current Aika orchestration into a judge-ready autonomous onchain operations flow  
 **Track fit**: Agent (primary), Consumer (secondary)
+
+## Implementation snapshot (2026-02-16)
+
+- Phase 0: Completed (`docs/AUTOPILOT_POLICY_MATRIX.md`)
+- Phase 1: Completed (model, migration, service, admin list/detail API)
+- Phase 2: Completed (policy engine integrated into Aika orchestrator)
+- Phase 3: Completed (durable worker, retries, dead-letter flow)
+- Phase 4: Completed (approve/reject admin flow + proof timeline API/UI)
+- Phase 5: Completed (replay script + runbook + artifact generation)
+
+Note: onchain worker handlers currently include a documented placeholder tx mode controlled by `AUTOPILOT_ONCHAIN_PLACEHOLDER`.
 
 ---
 

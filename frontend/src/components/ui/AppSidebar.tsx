@@ -99,6 +99,7 @@ const sidebarNavGroups: NavGroup[] = [
     title: "My Space",
     items: [
       { href: "/dashboard", label: "Dashboard", icon: <FiGrid size={18} /> },
+      { href: "/proof", label: "Proof Timeline", icon: <FiCheckCircle size={18} /> },
       { href: "/profile", label: "Profile", icon: <FiUser size={18} /> },
       { href: "/resources", label: "Resources", icon: <FiBookOpen size={18} /> },
     ],

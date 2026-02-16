@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import toast from "react-hot-toast";
-import { FiCheckCircle, FiRefreshCw, FiXCircle, FiCpu } from "react-icons/fi";
+import { FiCheckCircle, FiExternalLink, FiRefreshCw, FiXCircle, FiCpu } from "react-icons/fi";
 
 import {
   approveAutopilotAction,
@@ -146,6 +147,17 @@ export default function AdminAutopilotPage() {
                     </p>
                     {action.error_message && <p className="text-sm text-red-300">{action.error_message}</p>}
                     {action.approval_notes && <p className="text-sm text-white/70">Note: {action.approval_notes}</p>}
+                    {action.explorer_tx_url && (
+                      <Link
+                        href={action.explorer_tx_url}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center gap-1 text-sm text-emerald-300 hover:text-emerald-200"
+                      >
+                        <FiExternalLink className="h-4 w-4" />
+                        Explorer tx
+                      </Link>
+                    )}
                   </div>
 
                   <div className="flex items-center gap-2">

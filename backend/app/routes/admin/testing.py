@@ -4,8 +4,10 @@
 """
 from __future__ import annotations
 
+import asyncio
 import logging
 import secrets
+import sys
 import uuid
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
@@ -13,7 +15,7 @@ import json
 from pathlib import Path
 import random
 
-from fastapi import APIRouter, Body, Depends, HTTPException, status
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, status
 from pydantic import BaseModel, EmailStr, Field
 from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -191,7 +193,121 @@ class BatchTestResponse(BaseModel):
     metrics: Optional[Dict] = None
 
 
+class LogTailResponse(BaseModel):
+    """Response for backend log tail data."""
+    log_file: str
+    returned_lines: int
+    total_lines: int
+    lines: List[str]
+
+
+class AutopilotReplayResponse(BaseModel):
+    """Response for autopilot replay execution."""
+    command: str
+    exit_code: int
+    stdout_tail: List[str]
+    stderr_tail: List[str]
+    artifact_path: str
+    artifact: Optional[Dict] = None
+
+
+def _tail_lines(file_path: Path, line_count: int) -> List[str]:
+    try:
+        content = file_path.read_text(encoding="utf-8", errors="ignore")
+    except FileNotFoundError:
+        return []
+    all_lines = content.splitlines()
+    if line_count <= 0:
+        return all_lines
+    return all_lines[-line_count:]
+
+
+def _tail_text_lines(value: bytes, line_count: int = 120) -> List[str]:
+    text_value = value.decode("utf-8", errors="ignore")
+    lines = text_value.splitlines()
+    return lines[-line_count:]
+
+
 # --- Endpoints ---
+@router.get("/logs", response_model=LogTailResponse)
+async def get_backend_logs(
+    lines: int = Query(default=200, ge=10, le=2000),
+    contains: Optional[str] = Query(default=None, min_length=1, max_length=200),
+    admin_user: User = Depends(get_admin_user),
+) -> LogTailResponse:
+    """Return tail lines from backend logs for admin diagnostics/testing UI."""
+    del admin_user
+
+    backend_root = Path(__file__).resolve().parents[3]
+    log_path = backend_root / "logs" / "app.log"
+
+    all_tail_lines = _tail_lines(log_path, lines)
+    if contains:
+        needle = contains.strip().lower()
+        filtered = [line for line in all_tail_lines if needle in line.lower()]
+    else:
+        filtered = all_tail_lines
+
+    return LogTailResponse(
+        log_file=str(log_path),
+        returned_lines=len(filtered),
+        total_lines=len(all_tail_lines),
+        lines=filtered,
+    )
+
+
+@router.post("/autopilot-replay", response_model=AutopilotReplayResponse)
+async def run_autopilot_replay(
+    timeout_seconds: int = Query(default=240, ge=30, le=900),
+    admin_user: User = Depends(get_admin_user),
+) -> AutopilotReplayResponse:
+    """Run scripts/replay_autopilot_demo.py and return execution summary for admin testing UI."""
+    del admin_user
+
+    repo_root = Path(__file__).resolve().parents[4]
+    script_path = repo_root / "scripts" / "replay_autopilot_demo.py"
+    artifact_path = repo_root / "docs" / "autopilot_demo_artifact.json"
+
+    if not script_path.exists():
+        raise HTTPException(status_code=404, detail=f"Replay script not found: {script_path}")
+
+    command = f"{sys.executable} {script_path}"
+
+    process = await asyncio.create_subprocess_exec(
+        sys.executable,
+        str(script_path),
+        cwd=str(repo_root),
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+    )
+
+    try:
+        stdout_data, stderr_data = await asyncio.wait_for(process.communicate(), timeout=timeout_seconds)
+    except asyncio.TimeoutError as exc:
+        process.kill()
+        await process.wait()
+        raise HTTPException(
+            status_code=504,
+            detail=f"Autopilot replay timed out after {timeout_seconds}s",
+        ) from exc
+
+    artifact_data: Optional[Dict] = None
+    if artifact_path.exists():
+        try:
+            artifact_data = json.loads(artifact_path.read_text(encoding="utf-8"))
+        except Exception:
+            artifact_data = None
+
+    return AutopilotReplayResponse(
+        command=command,
+        exit_code=int(process.returncode or 0),
+        stdout_tail=_tail_text_lines(stdout_data),
+        stderr_tail=_tail_text_lines(stderr_data),
+        artifact_path=str(artifact_path),
+        artifact=artifact_data,
+    )
+
+
 @router.post("/users", response_model=CreateTestUserResponse, status_code=status.HTTP_201_CREATED)
 async def create_test_user(
     request: CreateTestUserRequest,

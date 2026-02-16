@@ -56,6 +56,10 @@ def _get_retry_config() -> tuple[int, int]:
     return max_retries, base_seconds
 
 
+def _is_onchain_placeholder_enabled() -> bool:
+    return _parse_bool(os.getenv("AUTOPILOT_ONCHAIN_PLACEHOLDER"), default=True)
+
+
 def _risk_to_case_severity(risk_level: str) -> CaseSeverityEnum:
     normalized = (risk_level or "none").strip().lower()
     if normalized in {"critical"}:
@@ -153,9 +157,20 @@ async def _handle_create_checkin(action: AutopilotAction) -> dict[str, Any]:
 
 
 async def _handle_onchain_placeholder(action: AutopilotAction) -> dict[str, Any]:
+    # IMPORTANT:
+    # This is a deterministic placeholder path for hackathon/demo mode.
+    # It DOES NOT submit a real onchain transaction and returns a synthetic tx hash.
+    # Replace this path with real chain submission before production rollout.
     payload = action.payload_json or {}
     chain_id = int(payload.get("chain_id") or DEFAULT_BADGE_CHAIN_ID)
     tx_hash = _simulated_tx_hash(action)
+    logger.warning(
+        "Autopilot placeholder tx hash generated for action_id=%s action_type=%s chain_id=%s. "
+        "No real blockchain transaction was submitted.",
+        action.id,
+        action.action_type.value,
+        chain_id,
+    )
     return {"chain_id": chain_id, "tx_hash": tx_hash}
 
 
@@ -165,6 +180,11 @@ async def execute_autopilot_action(action: AutopilotAction) -> dict[str, Any]:
     if action.action_type == AutopilotActionType.create_checkin:
         return await _handle_create_checkin(action)
     if action.action_type in {AutopilotActionType.mint_badge, AutopilotActionType.publish_attestation}:
+        if not _is_onchain_placeholder_enabled():
+            raise NotImplementedError(
+                "Real onchain execution is not yet wired for autopilot worker. "
+                "Enable AUTOPILOT_ONCHAIN_PLACEHOLDER=true or implement blockchain handler."
+            )
         return await _handle_onchain_placeholder(action)
     raise ValueError(f"Unsupported action type: {action.action_type.value}")
 
@@ -177,6 +197,13 @@ async def process_autopilot_queue_once(batch_limit: int = 20) -> int:
         actions = await list_due_actions(db, limit=batch_limit)
 
         for action in actions:
+            logger.info(
+                "Autopilot worker processing action_id=%s action_type=%s status=%s retry_count=%s",
+                action.id,
+                action.action_type.value,
+                action.status.value,
+                int(action.retry_count or 0),
+            )
             if action.status == AutopilotActionStatus.awaiting_approval:
                 continue
 
@@ -218,7 +245,19 @@ async def process_autopilot_queue_once(batch_limit: int = 20) -> int:
                     entity_id=str(action.id),
                     extra_data=result,
                 )
+                logger.info(
+                    "Autopilot action confirmed action_id=%s tx_hash=%s chain_id=%s",
+                    action.id,
+                    action.tx_hash,
+                    action.chain_id,
+                )
             except Exception as exc:
+                logger.error(
+                    "Autopilot action execution failed action_id=%s action_type=%s error=%s",
+                    action.id,
+                    action.action_type.value,
+                    str(exc),
+                )
                 await mark_failed(db, action, error_message=str(exc), commit=False)
                 retries = int(action.retry_count or 0)
                 if retries >= max_retries:

@@ -29,6 +29,7 @@ import {
   FiAward,
   FiKey,
   FiFlag,
+  FiTerminal,
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink';
 
@@ -92,6 +93,7 @@ const navGroups = [
   {
     label: 'System',
     items: [
+      { name: 'Testing Console', icon: <FiTerminal size={18} />, href: '/admin/testing' },
       { name: 'LangGraph Monitoring', icon: <FiMonitor size={18} />, href: '/admin/langgraph' },
       { name: 'Database Viewer', icon: <FiDatabase size={18} />, href: '/admin/database' },
       { name: 'API Key Monitor', icon: <FiKey size={18} />, href: '/admin/api-keys' },

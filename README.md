@@ -278,6 +278,33 @@ This project is guided by three core research questions:
 
 ---
 
+## 🤖 Autopilot Demo Replay
+
+UGM-AICare includes a deterministic replay harness for the Aika Autopilot flow.
+
+Quick steps:
+
+```bash
+cd backend
+alembic upgrade head
+cd ..
+python scripts/replay_autopilot_demo.py
+```
+
+This generates:
+
+- Terminal artifact JSON output.
+- File artifact at `docs/autopilot_demo_artifact.json`.
+
+Reference runbook: `docs/AUTOPILOT_DEMO_RUNBOOK.md`.
+
+Important:
+
+- If `AUTOPILOT_ONCHAIN_PLACEHOLDER=true`, tx hashes are synthetic placeholders for demo stability.
+- Backend logs include warnings whenever placeholder tx hashes are produced.
+- Set `AUTOPILOT_DEMO_USER_ID` or `AUTOPILOT_DEMO_EMAIL` to an existing account before running replay.
+- Replay uses API auth for approval/proof checks, so backend must be running and demo auth/token env vars must be available.
+
 ## 🚀 Getting Started
 
 ### Prerequisites

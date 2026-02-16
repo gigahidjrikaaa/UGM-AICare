@@ -1,0 +1,56 @@
+{
+  "run_id": "c1a62b0b39",
+  "started_at": "2026-02-16T08:08:29.692064+00:00",
+  "finished_at": "2026-02-16T08:08:38.980719+00:00",
+  "user": {
+    "id": 1,
+    "email": "komentatorugm@gmail.com"
+  },
+  "api": {
+    "base_url": "http://localhost:22001",
+    "auth_user_id": 1
+  },
+  "notes": {
+    "flow_mode": "hybrid_seed_db_execute_api",
+    "onchain_mode": "placeholder",
+    "warning": "If onchain_mode=placeholder, tx hashes are synthetic and not real blockchain submissions."
+  },
+  "proof_snapshot": {
+    "count": 10,
+    "latest_action_ids": [
+      11,
+      10,
+      9,
+      8,
+      7,
+      6,
+      5,
+      4,
+      3,
+      2
+    ],
+    "error": null
+  },
+  "actions": [
+    {
+      "action_id": 10,
+      "action_type": "publish_attestation",
+      "risk_level": "low",
+      "policy_decision": "allow",
+      "status": "confirmed",
+      "tx_hash": "0xa008b42ee2b0bed5a177727ea287d5171fb3e61bdd0dfe4e787e5a37e568c6aa",
+      "chain_id": 656476,
+      "explorer_url": "https://edu-chain-testnet.blockscout.com/tx/0xa008b42ee2b0bed5a177727ea287d5171fb3e61bdd0dfe4e787e5a37e568c6aa"
+    },
+    {
+      "action_id": 11,
+      "action_type": "publish_attestation",
+      "risk_level": "high",
+      "policy_decision": "require_approval",
+      "status": "confirmed",
+      "tx_hash": "0xd9a1f98d145fd5e3995674802d0dd3c910788455087fd1c72289f52505ecebe4",
+      "chain_id": 656476,
+      "explorer_url": "https://edu-chain-testnet.blockscout.com/tx/0xd9a1f98d145fd5e3995674802d0dd3c910788455087fd1c72289f52505ecebe4"
+    }
+  ]
+}

@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
+import Link from 'next/link';
 import {
   ExclamationTriangleIcon,
   HeartIcon,
@@ -255,6 +256,13 @@ export default function AdminDashboardPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            href="/admin/testing"
+            className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all duration-200 text-sm"
+          >
+            Testing Console
+          </Link>
+
           {/* Mobile connection status */}
           <ConnectionStatus
             isConnected={isConnected}

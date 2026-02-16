@@ -171,6 +171,11 @@ async def lifespan(app: FastAPI):
                 name="autopilot-worker",
             )
             startup_log("Autopilot worker started")
+            onchain_placeholder = os.getenv("AUTOPILOT_ONCHAIN_PLACEHOLDER", "true").strip().lower() in {"1", "true", "yes", "on"}
+            if onchain_placeholder:
+                logger.warning(
+                    "AUTOPILOT_ONCHAIN_PLACEHOLDER is enabled. Onchain autopilot actions currently use synthetic tx hashes."
+                )
         except Exception:
             logger.warning("Failed to start autopilot worker (non-blocking)", exc_info=True)
     # Start the finance revenue scheduler

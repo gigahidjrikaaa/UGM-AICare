@@ -61,16 +61,18 @@ async def list_proof_actions(
 
     # user_id is stored inside payload_json to preserve flexibility across action types.
     user_id_text = str(requested_user_id)
+    user_id_filter = AutopilotAction.payload_json.op("->>")("user_id") == user_id_text
+
     stmt = (
         select(AutopilotAction)
-        .where(AutopilotAction.payload_json["user_id"].astext == user_id_text)
+        .where(user_id_filter)
         .order_by(desc(AutopilotAction.created_at))
         .offset(skip)
         .limit(limit)
     )
     rows = (await db.execute(stmt)).scalars().all()
 
-    total_stmt = select(AutopilotAction).where(AutopilotAction.payload_json["user_id"].astext == user_id_text)
+    total_stmt = select(AutopilotAction).where(user_id_filter)
     total = len((await db.execute(total_stmt)).scalars().all())
 
     items = [
