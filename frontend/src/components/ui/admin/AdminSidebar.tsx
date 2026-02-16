@@ -68,6 +68,7 @@ const navGroups = [
     label: 'Programs',
     items: [
       { name: 'Intervention Plans', icon: <FiClipboard size={18} />, href: '/admin/interventions' },
+      { name: 'Autopilot Queue', icon: <FiZap size={18} />, href: '/admin/autopilot' },
       { name: 'TCA Outreach', icon: <FiSend size={18} />, href: '/admin/campaigns' },
       { name: 'CBT Modules', icon: <FiHeart size={18} />, href: '/admin/cbt-modules' },
       { name: 'Quest Templates', icon: <FiZap size={18} />, href: '/admin/quests' },

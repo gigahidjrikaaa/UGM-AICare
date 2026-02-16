@@ -1,0 +1,271 @@
+from __future__ import annotations
+
+import hashlib
+import logging
+import os
+import asyncio
+from datetime import datetime, timedelta
+from typing import Any
+
+from sqlalchemy import select
+
+from app.database import AsyncSessionLocal
+from app.domains.blockchain.nft.chain_registry import DEFAULT_BADGE_CHAIN_ID
+from app.domains.mental_health.models.assessments import UserScreeningProfile
+from app.domains.mental_health.models.autopilot_actions import (
+    AutopilotAction,
+    AutopilotActionStatus,
+    AutopilotActionType,
+)
+from app.domains.mental_health.models.cases import Case, CaseSeverityEnum, CaseStatusEnum
+from app.domains.mental_health.services.autopilot_action_service import (
+    list_due_actions,
+    mark_confirmed,
+    mark_dead_letter,
+    mark_failed,
+    mark_running,
+    schedule_retry,
+)
+from app.domains.mental_health.services.proactive_checkins import queue_checkin_execution
+from app.models import User
+from app.services.compliance_service import record_audit_event
+
+logger = logging.getLogger(__name__)
+
+
+def _parse_bool(value: str | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    return value.strip().lower() in {"1", "true", "t", "yes", "y", "on"}
+
+
+def _parse_int_env(name: str, default: int, minimum: int = 1) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        parsed = int(raw)
+    except ValueError:
+        return default
+    return max(minimum, parsed)
+
+
+def _get_retry_config() -> tuple[int, int]:
+    max_retries = _parse_int_env("AUTOPILOT_MAX_RETRIES", default=5, minimum=1)
+    base_seconds = _parse_int_env("AUTOPILOT_RETRY_BASE_SECONDS", default=30, minimum=1)
+    return max_retries, base_seconds
+
+
+def _risk_to_case_severity(risk_level: str) -> CaseSeverityEnum:
+    normalized = (risk_level or "none").strip().lower()
+    if normalized in {"critical"}:
+        return CaseSeverityEnum.critical
+    if normalized in {"high"}:
+        return CaseSeverityEnum.high
+    if normalized in {"moderate", "med", "medium"}:
+        return CaseSeverityEnum.med
+    return CaseSeverityEnum.low
+
+
+def _simulated_tx_hash(action: AutopilotAction) -> str:
+    raw = f"autopilot:{action.id}:{action.idempotency_key}:{datetime.utcnow().isoformat()}"
+    return f"0x{hashlib.sha256(raw.encode('utf-8')).hexdigest()}"
+
+
+async def _handle_create_case(action: AutopilotAction) -> dict[str, Any]:
+    payload = action.payload_json or {}
+    user_hash = str(payload.get("user_hash") or "").strip()
+    user_id = payload.get("user_id")
+    if not user_hash and user_id is not None:
+        user_hash = hashlib.sha256(f"u:{user_id}".encode("utf-8")).hexdigest()
+    if not user_hash:
+        raise ValueError("create_case requires user_hash or user_id")
+
+    severity = _risk_to_case_severity(str(payload.get("risk_level") or action.risk_level))
+    session_id = payload.get("session_id")
+    summary = str(payload.get("reasoning") or payload.get("intent") or "Autopilot escalation")
+
+    sla_minutes = 15 if severity == CaseSeverityEnum.critical else 60
+    case = Case(
+        status=CaseStatusEnum.new,
+        severity=severity,
+        user_hash=user_hash,
+        session_id=str(session_id) if session_id else None,
+        conversation_id=None,
+        summary_redacted=summary[:1500],
+        sla_breach_at=datetime.utcnow() + timedelta(minutes=sla_minutes),
+    )
+
+    async with AsyncSessionLocal() as db:
+        db.add(case)
+        await db.flush()
+        await record_audit_event(
+            db,
+            actor_id=(int(user_id) if isinstance(user_id, int) else None),
+            actor_role="system",
+            action="autopilot.case_created",
+            entity_type="case",
+            entity_id=str(case.id),
+            extra_data={"autopilot_action_id": action.id, "risk_level": action.risk_level},
+        )
+        await db.commit()
+
+    return {"entity_type": "case", "entity_id": str(case.id)}
+
+
+async def _handle_create_checkin(action: AutopilotAction) -> dict[str, Any]:
+    payload = action.payload_json or {}
+    user_id_raw = payload.get("user_id")
+    if not isinstance(user_id_raw, int):
+        raise ValueError("create_checkin requires integer user_id")
+
+    async with AsyncSessionLocal() as db:
+        user = (await db.execute(select(User).where(User.id == user_id_raw))).scalar_one_or_none()
+        if user is None:
+            raise ValueError(f"User not found: {user_id_raw}")
+
+        screening_profile = (
+            await db.execute(select(UserScreeningProfile).where(UserScreeningProfile.user_id == user.id))
+        ).scalar_one_or_none()
+
+        execution = await queue_checkin_execution(
+            db=db,
+            user=user,
+            screening_profile=screening_profile,
+            now=datetime.utcnow(),
+            app_url=os.getenv("FRONTEND_URL", "http://localhost:22000"),
+            risk_level=str(payload.get("risk_level") or action.risk_level or "none"),
+            primary_concerns=[],
+        )
+
+        await record_audit_event(
+            db,
+            actor_id=user.id,
+            actor_role="system",
+            action="autopilot.checkin_queued",
+            entity_type="campaign_execution",
+            entity_id=str(execution.id),
+            extra_data={"autopilot_action_id": action.id, "risk_level": action.risk_level},
+        )
+        await db.commit()
+
+    return {"entity_type": "campaign_execution", "entity_id": str(execution.id)}
+
+
+async def _handle_onchain_placeholder(action: AutopilotAction) -> dict[str, Any]:
+    payload = action.payload_json or {}
+    chain_id = int(payload.get("chain_id") or DEFAULT_BADGE_CHAIN_ID)
+    tx_hash = _simulated_tx_hash(action)
+    return {"chain_id": chain_id, "tx_hash": tx_hash}
+
+
+async def execute_autopilot_action(action: AutopilotAction) -> dict[str, Any]:
+    if action.action_type == AutopilotActionType.create_case:
+        return await _handle_create_case(action)
+    if action.action_type == AutopilotActionType.create_checkin:
+        return await _handle_create_checkin(action)
+    if action.action_type in {AutopilotActionType.mint_badge, AutopilotActionType.publish_attestation}:
+        return await _handle_onchain_placeholder(action)
+    raise ValueError(f"Unsupported action type: {action.action_type.value}")
+
+
+async def process_autopilot_queue_once(batch_limit: int = 20) -> int:
+    max_retries, base_seconds = _get_retry_config()
+    processed = 0
+
+    async with AsyncSessionLocal() as db:
+        actions = await list_due_actions(db, limit=batch_limit)
+
+        for action in actions:
+            if action.status == AutopilotActionStatus.awaiting_approval:
+                continue
+
+            if action.status == AutopilotActionStatus.failed and int(action.retry_count or 0) >= max_retries:
+                await mark_dead_letter(
+                    db,
+                    action,
+                    error_message=action.error_message or "Exceeded max retries",
+                    commit=False,
+                )
+                await record_audit_event(
+                    db,
+                    actor_id=None,
+                    actor_role="system",
+                    action="autopilot.action_dead_letter",
+                    entity_type="autopilot_action",
+                    entity_id=str(action.id),
+                    extra_data={"retry_count": int(action.retry_count or 0)},
+                )
+                processed += 1
+                continue
+
+            await mark_running(db, action, commit=False)
+            try:
+                result = await execute_autopilot_action(action)
+                await mark_confirmed(
+                    db,
+                    action,
+                    tx_hash=str(result.get("tx_hash")) if result.get("tx_hash") else None,
+                    chain_id=int(result.get("chain_id")) if result.get("chain_id") else None,
+                    commit=False,
+                )
+                await record_audit_event(
+                    db,
+                    actor_id=None,
+                    actor_role="system",
+                    action="autopilot.action_confirmed",
+                    entity_type="autopilot_action",
+                    entity_id=str(action.id),
+                    extra_data=result,
+                )
+            except Exception as exc:
+                await mark_failed(db, action, error_message=str(exc), commit=False)
+                retries = int(action.retry_count or 0)
+                if retries >= max_retries:
+                    await mark_dead_letter(db, action, error_message=str(exc), commit=False)
+                    await record_audit_event(
+                        db,
+                        actor_id=None,
+                        actor_role="system",
+                        action="autopilot.action_dead_letter",
+                        entity_type="autopilot_action",
+                        entity_id=str(action.id),
+                        extra_data={"error": str(exc), "retry_count": retries},
+                    )
+                else:
+                    await schedule_retry(db, action, base_seconds=base_seconds, commit=False)
+                    await record_audit_event(
+                        db,
+                        actor_id=None,
+                        actor_role="system",
+                        action="autopilot.action_retry_scheduled",
+                        entity_type="autopilot_action",
+                        entity_id=str(action.id),
+                        extra_data={
+                            "error": str(exc),
+                            "retry_count": retries,
+                            "next_retry_at": action.next_retry_at.isoformat() if action.next_retry_at else None,
+                        },
+                    )
+            processed += 1
+
+        await db.commit()
+
+    return processed
+
+
+async def run_autopilot_worker_loop(stop_event, *, poll_seconds: int | None = None) -> None:
+    interval = poll_seconds or _parse_int_env("AUTOPILOT_WORKER_INTERVAL_SECONDS", default=5, minimum=1)
+    logger.info("Autopilot worker started (interval=%ss)", interval)
+
+    while not stop_event.is_set():
+        try:
+            await process_autopilot_queue_once(batch_limit=20)
+        except Exception as exc:
+            logger.error("Autopilot worker iteration failed: %s", exc, exc_info=True)
+        try:
+            await asyncio.wait_for(stop_event.wait(), timeout=interval)
+        except asyncio.TimeoutError:
+            pass
+
+    logger.info("Autopilot worker stopped")

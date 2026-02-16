@@ -456,6 +456,116 @@ want to die, mau mati, ingin mati, etc.
                          # Default fallback if LLM says needs_agents but didn't specify next_step
                          state["next_step"] = "tca" 
 
+            # ========================================================================
+            # AUTOPILOT POLICY CHECK (Phase 2)
+            # Queue policy-governed actions before operational side effects execute.
+            # ========================================================================
+            state["autopilot_action_id"] = None
+            state["autopilot_action_type"] = None
+            state["autopilot_policy_decision"] = None
+            state["autopilot_requires_human_review"] = False
+
+            autopilot_enabled = os.getenv("AUTOPILOT_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+            if autopilot_enabled:
+                try:
+                    from app.domains.mental_health.models.autopilot_actions import (
+                        AutopilotActionType,
+                        AutopilotPolicyDecision,
+                    )
+                    from app.domains.mental_health.services.autopilot_policy_engine import evaluate_action_policy
+                    from app.domains.mental_health.services.autopilot_action_service import (
+                        build_idempotency_key,
+                        enqueue_action,
+                    )
+                    from app.services.compliance_service import record_audit_event
+
+                    candidate_action_type = None
+                    next_step = str(state.get("next_step") or "").lower()
+                    if normalized_role == "student":
+                        if next_step == "cma":
+                            candidate_action_type = AutopilotActionType.create_case
+                        elif next_step == "tca":
+                            candidate_action_type = AutopilotActionType.create_checkin
+
+                    if candidate_action_type is not None:
+                        policy_result = evaluate_action_policy(
+                            risk_level=str(state.get("immediate_risk_level") or "none"),
+                            action_type=candidate_action_type,
+                            context={
+                                "intent": state.get("intent"),
+                                "next_step": state.get("next_step"),
+                                "user_role": normalized_role,
+                                "session_id": state.get("session_id"),
+                            },
+                        )
+
+                        idempotency_raw = (
+                            f"{candidate_action_type.value}:"
+                            f"{state.get('user_id')}:"
+                            f"{state.get('session_id')}:"
+                            f"{state.get('immediate_risk_level')}:"
+                            f"{str(state.get('message') or '')[:160]}"
+                        )
+
+                        action_payload = {
+                            "user_id": state.get("user_id"),
+                            "user_hash": state.get("user_hash"),
+                            "session_id": state.get("session_id"),
+                            "intent": state.get("intent"),
+                            "next_step": state.get("next_step"),
+                            "risk_level": state.get("immediate_risk_level"),
+                            "reasoning": state.get("agent_reasoning"),
+                        }
+
+                        action = await enqueue_action(
+                            db,
+                            action_type=candidate_action_type,
+                            risk_level=str(state.get("immediate_risk_level") or "none"),
+                            policy_decision=policy_result.decision,
+                            idempotency_key=build_idempotency_key(idempotency_raw),
+                            payload_json=action_payload,
+                            requires_human_review=policy_result.requires_human_review,
+                            commit=True,
+                        )
+
+                        state["autopilot_action_id"] = action.id
+                        state["autopilot_action_type"] = candidate_action_type.value
+                        state["autopilot_policy_decision"] = policy_result.decision.value
+                        state["autopilot_requires_human_review"] = policy_result.requires_human_review
+
+                        if policy_result.decision == AutopilotPolicyDecision.deny:
+                            state["needs_agents"] = False
+                            state["next_step"] = "none"
+                            state["needs_cma_escalation"] = False
+                            if not state.get("aika_direct_response"):
+                                state["aika_direct_response"] = (
+                                    "Aku belum bisa menjalankan aksi otomatis untuk konteks ini. "
+                                    "Kita tetap bisa lanjut ngobrol dan cari langkah yang lebih aman ya."
+                                )
+                                state["final_response"] = state["aika_direct_response"]
+
+                            await record_audit_event(
+                                db,
+                                actor_id=state.get("user_id"),
+                                actor_role=normalized_role,
+                                action="autopilot.action_denied",
+                                entity_type="autopilot_action",
+                                entity_id=str(action.id),
+                                extra_data={
+                                    "action_type": candidate_action_type.value,
+                                    "risk_level": state.get("immediate_risk_level"),
+                                    "rationale": policy_result.rationale,
+                                },
+                            )
+                            await db.commit()
+
+                except Exception as autopilot_err:
+                    logger.warning(
+                        "Autopilot policy integration failed (non-blocking): %s",
+                        autopilot_err,
+                        exc_info=True,
+                    )
+
             
             # Log risk assessment
             if state["immediate_risk_level"] != "none":

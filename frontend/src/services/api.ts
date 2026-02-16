@@ -6,12 +6,13 @@ import type {
   ChatResponsePayload,
   JournalPromptResponse,
   JournalEntryItem,
-  JournalReflectionPointResponse, // Add this type
+  JournalReflectionPointResponse,
+  JournalEntryCreate,
   Psychologist,
   AppointmentType,
   AppointmentCreate,
   Appointment
-} from '@/types/api'; // Import types
+} from '@/types/api';
 import toast from 'react-hot-toast';
 import type { AIMemoryFact, UserProfileOverviewResponse, UserProfileOverviewUpdate } from '@/types/profile';
 import { signOut } from 'next-auth/react';
@@ -133,22 +134,97 @@ export const getActiveJournalPrompts = async (): Promise<JournalPromptResponse[]
   }
 };
 
-// --- Journal Entries API (Example for creating/updating if not already in a specific hook/component) ---
-// You might already have this logic within JournalEntryModal.tsx, but for completeness:
+// --- Journal Entries API ---
 export interface JournalEntryPayload {
   entry_date: string; // YYYY-MM-DD
   content: string;
   prompt_id?: number | null;
+  mood?: number | null;
+  tags: string[];
 }
 
 export const saveJournalEntry = async (payload: JournalEntryPayload): Promise<JournalEntryItem> => {
   try {
-    // The backend endpoint is POST /journal/ for both create and update based on date
     const response = await apiClient.post<JournalEntryItem>('/journal/', payload);
     return response.data;
   } catch (error) {
     console.error('Error saving journal entry:', error);
     let errorMessage = 'Failed to save journal entry.';
+    if (axios.isAxiosError(error) && error.response) {
+      errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    throw new Error(errorMessage);
+  }
+};
+
+export const searchJournalEntries = async (filters: {
+  search_query?: string;
+  mood_min?: number;
+  mood_max?: number;
+  tags?: string[];
+  date_from?: string;
+  date_to?: string;
+  skip?: number;
+  limit?: number;
+}): Promise<JournalEntryItem[]> => {
+  try {
+    const response = await apiClient.post<JournalEntryItem[]>('/journal/search', filters);
+    return response.data;
+  } catch (error) {
+    console.error('Error searching journal entries:', error);
+    let errorMessage = 'Failed to search journal entries.';
+    if (axios.isAxiosError(error) && error.response) {
+      errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    throw new Error(errorMessage);
+  }
+};
+
+export const getJournalAnalytics = async (days: number = 30): Promise<any> => {
+  try {
+    const response = await apiClient.get('/journal/analytics/overview', { params: { days } });
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching journal analytics:', error);
+    let errorMessage = 'Failed to load analytics.';
+    if (axios.isAxiosError(error) && error.response) {
+      errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    throw new Error(errorMessage);
+  }
+};
+
+export const exportJournalEntries = async (format: 'csv' | 'pdf'): Promise<Blob> => {
+  try {
+    const response = await apiClient.get(`/journal/export/${format}`, {
+      responseType: 'blob'
+    });
+    return response.data;
+  } catch (error) {
+    console.error('Error exporting journal entries:', error);
+    let errorMessage = 'Failed to export journal entries.';
+    if (axios.isAxiosError(error) && error.response) {
+      errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
+    } else if (error instanceof Error) {
+      errorMessage = error.message;
+    }
+    throw new Error(errorMessage);
+  }
+};
+
+export const getAllUserTags = async (): Promise<string[]> => {
+  try {
+    const response = await apiClient.get<string[]>('/journal/tags/all');
+    return response.data;
+  } catch (error) {
+    console.error('Error fetching user tags:', error);
+    let errorMessage = 'Failed to load tags.';
     if (axios.isAxiosError(error) && error.response) {
       errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
     } else if (error instanceof Error) {

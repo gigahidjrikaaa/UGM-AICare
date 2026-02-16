@@ -1,0 +1,160 @@
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.database import get_async_db
+from app.dependencies import get_admin_user
+from app.domains.blockchain.nft.chain_registry import get_chain_config
+from app.domains.mental_health.models.autopilot_actions import (
+    AutopilotAction,
+    AutopilotActionStatus,
+    AutopilotActionType,
+)
+from app.domains.mental_health.services.autopilot_action_service import (
+    get_action_by_id,
+    list_actions,
+    mark_approved,
+    mark_rejected,
+)
+from app.schemas.admin.autopilot import (
+    AutopilotActionListResponse,
+    AutopilotActionReviewRequest,
+    AutopilotActionReviewResponse,
+    AutopilotActionResponse,
+)
+
+router = APIRouter(prefix="/autopilot", tags=["Admin - Autopilot"])
+
+
+def _to_action_response(action: AutopilotAction) -> AutopilotActionResponse:
+    explorer_tx_url = None
+    if action.chain_id and action.tx_hash:
+        cfg = get_chain_config(int(action.chain_id))
+        if cfg is not None:
+            explorer_tx_url = cfg.explorer_tx_url(action.tx_hash)
+
+    return AutopilotActionResponse(
+        id=action.id,
+        action_type=action.action_type.value,
+        risk_level=action.risk_level,
+        policy_decision=action.policy_decision.value,
+        status=action.status.value,
+        idempotency_key=action.idempotency_key,
+        payload_hash=action.payload_hash,
+        payload_json=action.payload_json or {},
+        requires_human_review=bool(action.requires_human_review),
+        approved_by=action.approved_by,
+        approval_notes=action.approval_notes,
+        tx_hash=action.tx_hash,
+        explorer_tx_url=explorer_tx_url,
+        chain_id=action.chain_id,
+        error_message=action.error_message,
+        retry_count=int(action.retry_count or 0),
+        next_retry_at=action.next_retry_at,
+        executed_at=action.executed_at,
+        created_at=action.created_at,
+        updated_at=action.updated_at,
+    )
+
+
+@router.get("/actions", response_model=AutopilotActionListResponse)
+async def list_autopilot_actions(
+    status: str | None = Query(default=None),
+    action_type: str | None = Query(default=None),
+    risk_level: str | None = Query(default=None),
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_async_db),
+    admin_user=Depends(get_admin_user),
+) -> AutopilotActionListResponse:
+    del admin_user
+
+    parsed_status = None
+    if status:
+        try:
+            parsed_status = AutopilotActionStatus(status)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=f"Invalid status: {status}") from exc
+
+    parsed_action_type = None
+    if action_type:
+        try:
+            parsed_action_type = AutopilotActionType(action_type)
+        except ValueError as exc:
+            raise HTTPException(status_code=422, detail=f"Invalid action_type: {action_type}") from exc
+
+    items, total = await list_actions(
+        db,
+        status=parsed_status,
+        action_type=parsed_action_type,
+        risk_level=risk_level,
+        skip=skip,
+        limit=limit,
+    )
+    return AutopilotActionListResponse(
+        items=[_to_action_response(item) for item in items],
+        total=total,
+    )
+
+
+@router.get("/actions/{action_id}", response_model=AutopilotActionResponse)
+async def get_autopilot_action(
+    action_id: int,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user=Depends(get_admin_user),
+) -> AutopilotActionResponse:
+    del admin_user
+    action = await get_action_by_id(db, action_id)
+    if not action:
+        raise HTTPException(status_code=404, detail="Autopilot action not found")
+    return _to_action_response(action)
+
+
+@router.post("/actions/{action_id}/approve", response_model=AutopilotActionReviewResponse)
+async def approve_autopilot_action(
+    action_id: int,
+    payload: AutopilotActionReviewRequest,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user=Depends(get_admin_user),
+) -> AutopilotActionReviewResponse:
+    action = await get_action_by_id(db, action_id)
+    if not action:
+        raise HTTPException(status_code=404, detail="Autopilot action not found")
+
+    if action.status != AutopilotActionStatus.awaiting_approval:
+        raise HTTPException(status_code=400, detail="Action is not awaiting approval")
+
+    await mark_approved(
+        db,
+        action,
+        approved_by=getattr(admin_user, "id", None),
+        approval_notes=payload.note,
+        commit=True,
+    )
+    return AutopilotActionReviewResponse(status="approved", action_id=action.id)
+
+
+@router.post("/actions/{action_id}/reject", response_model=AutopilotActionReviewResponse)
+async def reject_autopilot_action(
+    action_id: int,
+    payload: AutopilotActionReviewRequest,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user=Depends(get_admin_user),
+) -> AutopilotActionReviewResponse:
+    action = await get_action_by_id(db, action_id)
+    if not action:
+        raise HTTPException(status_code=404, detail="Autopilot action not found")
+
+    if action.status != AutopilotActionStatus.awaiting_approval:
+        raise HTTPException(status_code=400, detail="Action is not awaiting approval")
+
+    note = (payload.note or "Rejected by reviewer").strip()
+    await mark_rejected(
+        db,
+        action,
+        approved_by=getattr(admin_user, "id", None),
+        reason=note,
+        commit=True,
+    )
+    return AutopilotActionReviewResponse(status="rejected", action_id=action.id)

@@ -10,13 +10,22 @@ import ReactMarkdown from 'react-markdown';
 import type { JournalEntryItem } from '@/types/api';
 
 interface DailyJournalProps {
-  // Called when DailyJournal wants to open the modal for a new or existing entry
-  onOpenModalRequest: (date?: string) => void; 
-  // A key that changes when the parent wants DailyJournal to refresh its entries
-  refreshKey?: number; 
+   // Called when DailyJournal wants to open the modal for a new or existing entry
+   onOpenModalRequest: (date?: string) => void; 
+   // A key that changes when the parent wants DailyJournal to refresh its entries
+   refreshKey?: number;
+   // Display mode: 'all' shows all entries, 'search' shows filtered results
+   displayMode?: 'all' | 'search';
+   // Search results to display (when displayMode is 'search')
+   searchResults?: JournalEntryItem[];
 }
 
-export default function DailyJournal({ onOpenModalRequest, refreshKey }: DailyJournalProps) {
+export default function DailyJournal({ 
+  onOpenModalRequest, 
+  refreshKey,
+  displayMode = 'all',
+  searchResults = []
+}: DailyJournalProps) {
     const [allEntries, setAllEntries] = useState<JournalEntryItem[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -37,14 +46,27 @@ export default function DailyJournal({ onOpenModalRequest, refreshKey }: DailyJo
     }, []);
 
     useEffect(() => {
-        fetchAllEntries();
-    }, [fetchAllEntries, refreshKey]); // Add refreshKey to dependencies
+        if (displayMode === 'all') {
+            fetchAllEntries();
+        }
+    }, [fetchAllEntries, refreshKey, displayMode]); // Add refreshKey to dependencies
+
+    const entriesToDisplay = displayMode === 'search' ? searchResults : allEntries;
+    const title = displayMode === 'search' ? `Search Results (${entriesToDisplay.length})` : 'Your Journal Entries';
+
+    const MOOD_EMOJIS: { [key: number]: string } = {
+        1: '😢',
+        2: '😕',
+        3: '😐',
+        4: '😊',
+        5: '😄',
+    };
 
     return (
         <div className="space-y-6">
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
                 <h2 className="text-xl font-semibold text-white flex items-center">
-                    <FiBookOpen className="mr-3 text-[#FFCA40]" /> Your Journal Entries
+                    <FiBookOpen className="mr-3 text-[#FFCA40]" /> {title}
                 </h2>
                 <button
                     onClick={() => onOpenModalRequest(format(new Date(), 'yyyy-MM-dd'))}
@@ -54,19 +76,21 @@ export default function DailyJournal({ onOpenModalRequest, refreshKey }: DailyJo
                 </button>
             </div>
 
-            {isLoading && (
+            {isLoading && displayMode === 'all' && (
                  <div className="text-center py-10"><FiLoader className="animate-spin inline-block mr-2"/>Loading entries...</div>
             )}
             {error && !isLoading && (
                  <div className="text-center py-10 text-red-400">{error}</div>
             )}
 
-            {!isLoading && !error && allEntries.length === 0 && (
-                 <div className="text-center py-10 text-gray-400 italic">No journal entries found yet. Click the button above to add one for today!</div>
+            {!isLoading && !error && entriesToDisplay.length === 0 && (
+                 <div className="text-center py-10 text-gray-400 italic">
+                    {displayMode === 'search' ? 'No entries match your search criteria.' : 'No journal entries found yet. Click the button above to add one for today!'}
+                 </div>
             )}
-            {!isLoading && !error && allEntries.length > 0 && (
+            {!isLoading && !error && entriesToDisplay.length > 0 && (
                 <div className="space-y-4 max-h-[calc(100vh-20rem)] md:max-h-[60vh] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-gray-600 scrollbar-track-gray-800">
-                    {allEntries.map((entry) => (
+                    {entriesToDisplay.map((entry) => (
                         <div 
                             key={entry.id} 
                             className="bg-white/5 p-4 rounded-lg border border-white/10 cursor-pointer hover:bg-white/10 transition-colors"
@@ -75,9 +99,30 @@ export default function DailyJournal({ onOpenModalRequest, refreshKey }: DailyJo
                             tabIndex={0}
                             onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onOpenModalRequest(entry.entry_date);}}
                         >
-                            <h3 className="font-semibold text-[#FFCA40] mb-1">
-                                {format(parseISO(entry.entry_date), 'EEEE, MMMM d, yyyy', { locale: id })}
-                            </h3>
+                            <div className="flex items-start justify-between mb-2">
+                                <h3 className="font-semibold text-[#FFCA40]">
+                                    {format(parseISO(entry.entry_date), 'EEEE, MMMM d, yyyy', { locale: id })}
+                                </h3>
+                                {entry.mood && (
+                                    <span className="text-2xl ml-2" title={`Mood: ${entry.mood}/5`}>
+                                        {MOOD_EMOJIS[entry.mood]}
+                                    </span>
+                                )}
+                            </div>
+                            
+                            {entry.tags && entry.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mb-2">
+                                    {entry.tags.map((tag) => (
+                                        <span 
+                                            key={tag.id} 
+                                            className="inline-block px-2 py-0.5 bg-purple-500/20 text-purple-300 rounded-full text-xs"
+                                        >
+                                            #{tag.tag_name}
+                                        </span>
+                                    ))}
+                                </div>
+                            )}
+
                             {entry.prompt && entry.prompt.text && (
                                 <div className="mb-2 p-2 bg-white/5 rounded-md border border-white/10">
                                     <p className="text-xs text-gray-400 italic flex items-start">
@@ -89,8 +134,13 @@ export default function DailyJournal({ onOpenModalRequest, refreshKey }: DailyJo
                             <div className="prose prose-invert prose-sm max-w-none text-gray-300 line-clamp-3">
                                 <ReactMarkdown components={{ p: 'span' }}>{entry.content}</ReactMarkdown>
                             </div>
-                             <p className="text-xs text-gray-500 mt-2">
-                                Last updated: {format(parseISO(entry.updated_at), 'Pp', { locale: id })}
+                             <p className="text-xs text-gray-500 mt-2 flex justify-between">
+                                <span>
+                                    {entry.word_count} words
+                                </span>
+                                <span>
+                                    Last updated: {format(parseISO(entry.updated_at), 'Pp', { locale: id })}
+                                </span>
                             </p>
                         </div>
                     ))}

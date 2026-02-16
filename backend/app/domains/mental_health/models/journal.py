@@ -31,12 +31,26 @@ class JournalEntry(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
     prompt_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("journal_prompts.id"), nullable=True)
+    mood: Mapped[Optional[int]] = mapped_column(Integer, nullable=True) # 1-5 scale (1: very negative, 5: very positive)
+    word_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     user: Mapped["User"] = relationship("User", back_populates="journal_entries")
     prompt: Mapped["JournalPrompt"] = relationship("JournalPrompt")
     reflection_points: Mapped[List["JournalReflectionPoint"]] = relationship("JournalReflectionPoint", back_populates="journal_entry", cascade="all, delete-orphan")
+    tags: Mapped[List["JournalTag"]] = relationship("JournalTag", back_populates="journal_entry", cascade="all, delete-orphan")
 
     __table_args__ = (UniqueConstraint('user_id', 'entry_date', name='_user_entry_date_uc'),)
+
+class JournalTag(Base):
+    """Custom tags for journal entries."""
+    __tablename__ = "journal_tags"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    journal_entry_id: Mapped[int] = mapped_column(Integer, ForeignKey("journal_entries.id"), nullable=False, index=True)
+    tag_name: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+
+    journal_entry: Mapped["JournalEntry"] = relationship("JournalEntry", back_populates="tags")
 
 class JournalReflectionPoint(Base):
     """Reflection points within journal entries."""

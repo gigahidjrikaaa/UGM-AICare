@@ -2,6 +2,8 @@ import os
 import logging
 from urllib.parse import urlparse, urlunparse
 
+logger = logging.getLogger(__name__)
+
 
 def _redact_url_credentials(raw_url: str) -> str:
     """Redact URL credentials for log output.
@@ -26,7 +28,14 @@ def _redact_url_credentials(raw_url: str) -> str:
     except Exception:
         return "<redacted>"
 
-def check_env():
+def _parse_bool(value: str | None, default: bool = False) -> bool:
+    if value is None:
+        return default
+    normalized = value.strip().lower()
+    return normalized in {"1", "true", "t", "yes", "y", "on"}
+
+
+def check_env(verbose: bool | None = None):
     """
     Checks for the presence of all required environment variables for the backend.
     Logs warnings for missing or empty variables.
@@ -90,38 +99,60 @@ def check_env():
         "EMAIL_SMTP_PORT",
     ]
 
-    print("--- Backend Environment Variable Check (Required) ---")
+    if verbose is None:
+        verbose = _parse_bool(os.getenv("ENV_CHECK_VERBOSE"), default=False)
+
+    required_missing = 0
+    required_empty = 0
+    optional_empty = 0
+
+    if verbose:
+        logger.info("Backend environment variable check (required)")
     for var in required_env_vars:
         value = os.environ.get(var)
         if value is None:
+            required_missing += 1
             logging.warning(f"ENV CHECK: {var} is UNDEFINED.")
         elif value == "":
+            required_empty += 1
             logging.warning(f"ENV CHECK: {var} is an EMPTY STRING.")
-        else:
+        elif verbose:
             if var in ["DATABASE_URL", "REDIS_HOST", "REDIS_PORT", "ALLOWED_ORIGINS", "FRONTEND_URL", "APP_ENV", "PORT"]:
                 if var in {"DATABASE_URL"}:
                     safe_value = _redact_url_credentials(value)
-                    print(f"ENV CHECK: {var} is SET to: \"{safe_value}\"")
+                    logger.debug(f"ENV CHECK: {var} is SET to: \"{safe_value}\"")
                 else:
-                    print(f"ENV CHECK: {var} is SET to: \"{value}\"")
+                    logger.debug(f"ENV CHECK: {var} is SET to: \"{value}\"")
             else:
-                print(f"ENV CHECK: {var} is SET (value hidden for security).")
+                logger.debug(f"ENV CHECK: {var} is SET (value hidden for security).")
 
-    print("--- Backend Environment Variable Check (Optional) ---")
+    if verbose:
+        logger.info("Backend environment variable check (optional)")
     for var in optional_env_vars:
         value = os.environ.get(var)
         if value is None:
             continue
         if value == "":
+            optional_empty += 1
             logging.warning(f"ENV CHECK: {var} is set but EMPTY STRING.")
+            continue
+        if not verbose:
             continue
         if var in ["REDIS_URL", "REDIS_HOST", "REDIS_PORT", "MINIO_ENDPOINT", "MINIO_BUCKET"]:
             if var in {"REDIS_URL"}:
                 safe_value = _redact_url_credentials(value)
-                print(f"ENV CHECK: {var} is SET to: \"{safe_value}\"")
+                logger.debug(f"ENV CHECK: {var} is SET to: \"{safe_value}\"")
             else:
-                print(f"ENV CHECK: {var} is SET to: \"{value}\"")
+                logger.debug(f"ENV CHECK: {var} is SET to: \"{value}\"")
         else:
-            print(f"ENV CHECK: {var} is SET (value hidden for security).")
+            logger.debug(f"ENV CHECK: {var} is SET (value hidden for security).")
 
-    print("--- End Backend Environment Variable Check ---")
+    if required_missing or required_empty or optional_empty:
+        logger.info(
+            "ENV CHECK summary: required_missing=%s required_empty=%s optional_empty=%s",
+            required_missing,
+            required_empty,
+            optional_empty,
+        )
+    elif verbose:
+        logger.info("ENV CHECK summary: all required variables present and non-empty")

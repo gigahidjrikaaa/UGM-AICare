@@ -17,11 +17,13 @@ import {
   FiRefreshCw,
   FiShield,
   FiTrendingUp,
+  FiPlus,
 } from "@/icons";
 import WalletLinkButton from "@/components/ui/WalletLinkButton";
 import QuestBoard from "@/components/quests/QuestBoard";
 import apiClient, { fetchUserProfileOverview } from "@/services/api";
 import type { TimelineEntry, UserProfileOverviewResponse } from "@/types/profile";
+import Link from "next/link";
 
 interface EarnedBadgeSummary {
   badge_id: number;
@@ -167,7 +169,7 @@ function BadgesCard({ count }: { count: number | null }) {
         <div>
           <p className="text-xs uppercase tracking-wide text-white/60">Badges Earned</p>
           <p className="text-lg font-bold text-white">
-            {count !== null ? displayCount : "--"} {displayCount === 1 ? "badge" : "badges"}
+            {count !== null ? displayCount : "--"} {displayCount ===1 ? "badge" : "badges"}
           </p>
           <p className="text-xs font-medium text-[#FFCA40]">
             {displayCount > 0 ? "🎉 Keep achieving!" : "Unlock your first badge!"}
@@ -176,6 +178,125 @@ function BadgesCard({ count }: { count: number | null }) {
       </div>
       <div className="absolute right-3 top-3 text-lg opacity-20">✨</div>
     </div>
+  );
+}
+
+function JournalWidget({ stats }: { stats: typeof journalStats }) {
+  if (!stats) {
+    return (
+      <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/3 p-4 shadow-lg backdrop-blur-sm transition-all duration-300 hover:border-[#FFCA40]/30 hover:bg-white/5">
+        <div className="animate-pulse flex items-center gap-4">
+          <div className="h-12 w-12 rounded-xl bg-white/10" />
+          <div className="flex-1 space-y-2">
+            <div className="h-4 w-32 bg-white/10 rounded" />
+            <div className="h-3 w-24 bg-white/10 rounded" />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <Link href="/journaling" className="group block relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#FFCA40]/10 to-[#FFB700]/10 p-6 shadow-lg backdrop-blur-sm transition-all duration-300 hover:border-[#FFCA40]/50 hover:scale-[1.02]">
+      <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-[#FFCA40]/10 blur-3xl group-hover:blur-4xl transition-all" />
+      
+      <div className="relative">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className={`h-14 w-14 rounded-xl flex items-center justify-center text-2xl shadow-lg ${
+                stats.todayHasEntry
+                  ? 'bg-green-500/30 text-green-400'
+                  : 'bg-[#FFCA40]/30 text-[#FFCA40]'
+            }`}>
+              {stats.todayHasEntry ? '✓' : '📝'}
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-white/60">Today's Journal</p>
+              <h3 className="text-lg font-bold text-white">
+                {stats.todayHasEntry ? "Completed!" : "Not yet"}
+              </h3>
+            </div>
+          </div>
+          <div className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-[#FFCA40] group-hover:scale-110 transition-all">
+            <FiArrowRight className="h-5 w-5 text-white/40 group-hover:text-[#001D58] transition-colors" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="text-center bg-white/5 rounded-xl p-3">
+            <p className="text-2xl font-bold text-white">{stats.currentStreak}</p>
+            <p className="text-xs text-white/50 uppercase tracking-wide">Streak</p>
+          </div>
+          <div className="text-center bg-white/5 rounded-xl p-3">
+            <p className="text-2xl font-bold text-white">{stats.entriesThisMonth}</p>
+            <p className="text-xs text-white/50 uppercase tracking-wide">Month</p>
+          </div>
+          <div className="text-center bg-white/5 rounded-xl p-3">
+            <p className="text-2xl">{stats.recentMood || '—'}</p>
+            <p className="text-xs text-white/50 uppercase tracking-wide">Mood</p>
+          </div>
+        </div>
+
+        <button className="w-full flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-medium shadow-lg transition-all bg-white/10 text-white hover:bg-white/20 hover:border-[#FFCA40]">
+          {stats.todayHasEntry ? "View Journal" : "Write Now"}
+          {stats.todayHasEntry && <FiArrowRight className="h-4 w-4" />}
+        </button>
+      </div>
+    </Link>
+  );
+}
+
+  return (
+    <Link href="/journaling" className="group block relative overflow-hidden rounded-2xl border border-white/10 bg-gradient-to-r from-[#FFCA40]/10 to-[#FFB700]/10 p-6 shadow-lg backdrop-blur-sm transition-all duration-300 hover:border-[#FFCA40]/50 hover:scale-[1.02]">
+      <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-[#FFCA40]/10 blur-3xl group-hover:blur-4xl transition-all" />
+      
+      <div className="relative">
+        <div className="flex items-start justify-between mb-4">
+          <div className="flex items-center gap-3">
+            <div className={`h-14 w-14 rounded-xl flex items-center justify-center text-2xl shadow-lg ${
+              stats.todayHasEntry
+                ? 'bg-green-500/30 text-green-400'
+                : 'bg-[#FFCA40]/30 text-[#FFCA40]'
+            }`}>
+              {stats.todayHasEntry ? '✓' : '📝'}
+            </div>
+            <div>
+              <p className="text-xs uppercase tracking-wide text-white/60">Today's Journal</p>
+              <h3 className="text-lg font-bold text-white">
+                {stats.todayHasEntry ? "Completed!" : "Not yet"}
+              </h3>
+            </div>
+          </div>
+          <div className="h-10 w-10 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-[#FFCA40] group-hover:scale-110 transition-all">
+            <FiArrowRight className="h-5 w-5 text-white/40 group-hover:text-[#001D58] transition-colors" />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className="text-center bg-white/5 rounded-xl p-3">
+            <p className="text-2xl font-bold text-white">{stats.currentStreak}</p>
+            <p className="text-xs text-white/50 uppercase tracking-wide">Streak</p>
+          </div>
+          <div className="text-center bg-white/5 rounded-xl p-3">
+            <p className="text-2xl font-bold text-white">{stats.entriesThisMonth}</p>
+            <p className="text-xs text-white/50 uppercase tracking-wide">Month</p>
+          </div>
+          <div className="text-center bg-white/5 rounded-xl p-3">
+            <p className="text-2xl">{stats.recentMood || '—'}</p>
+            <p className="text-xs text-white/50 uppercase tracking-wide">Mood</p>
+          </div>
+        </div>
+
+        <button className={`w-full flex items-center justify-center gap-2 rounded-xl px-6 py-3 text-sm font-medium shadow-lg transition-all ${
+          stats.todayHasEntry
+            ? 'bg-white/10 text-white hover:bg-white/20 hover:border-[#FFCA40]'
+            : 'bg-gradient-to-r from-[#FFCA40] to-[#FFB700] text-[#001D58] hover:from-[#FFD060] hover:to-[#FFC730] hover:shadow-[#FFCA40]/50'
+        }`}>
+          {stats.todayHasEntry ? "View Journal" : "Write Now"}
+          {stats.todayHasEntry && <FiArrowRight className="h-4 w-4" />}
+        </button>
+      </div>
+    </Link>
   );
 }
 
@@ -232,6 +353,12 @@ export default function DashboardPage() {
   const [profileError, setProfileError] = useState<string | null>(null);
   const [badgeCount, setBadgeCount] = useState<number | null>(null);
   const [latestBadgeDate, setLatestBadgeDate] = useState<string | null>(null);
+  const [journalStats, setJournalStats] = useState<{
+    todayHasEntry: boolean;
+    currentStreak: number;
+    entriesThisMonth: number;
+    recentMood: number | null;
+  } | null>(null);
 
   useEffect(() => {
     async function loadProfile() {
@@ -276,6 +403,52 @@ export default function DashboardPage() {
     }
 
     loadBadges().catch(() => {
+      /* handled above */
+    });
+  }, []);
+
+  useEffect(() => {
+    async function loadJournalStats() {
+      try {
+        const today = new Date();
+        const currentMonth = today.getMonth();
+        const currentYear = today.getFullYear();
+        const monthStr = `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}`;
+        
+        const [activityResponse, entriesResponse] = await Promise.all([
+          apiClient.get<{
+            summary: { [dateStr: string]: { hasJournal: boolean; hasConversation: boolean } };
+            currentStreak: number;
+            longestStreak: number;
+          }>(`/activity-summary/?month=${monthStr}`),
+          apiClient.get<any[]>('/journal/'),
+        ]);
+        
+        const todayStr = today.toISOString().split('T')[0];
+        const todayHasEntry = activityResponse.data.summary[todayStr]?.hasJournal || false;
+        const entriesThisMonth = Object.values(activityResponse.data.summary).filter(d => d.hasJournal).length;
+        
+        // Get most recent mood from entries
+        let recentMood: number | null = null;
+        if (entriesResponse.data && entriesResponse.data.length > 0) {
+          const sortedEntries = entriesResponse.data.sort((a, b) => 
+            new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime()
+          );
+          recentMood = sortedEntries[0].mood || null;
+        }
+        
+        setJournalStats({
+          todayHasEntry,
+          currentStreak: activityResponse.data.currentStreak || 0,
+          entriesThisMonth,
+          recentMood,
+        });
+      } catch (error) {
+        console.error("Failed to load journal stats", error);
+      }
+    }
+
+    loadJournalStats().catch(() => {
       /* handled above */
     });
   }, []);
@@ -400,6 +573,35 @@ export default function DashboardPage() {
           <BadgesCard count={badgeCount} />
         </motion.div>
 
+        <motion.div
+          initial={reduceMotion ? undefined : { opacity: 0, y: 8 }}
+          animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
+          transition={reduceMotion ? undefined : { duration: 0.45, delay: 0.1 }}
+          className="grid gap-4 lg:grid-cols-3"
+        >
+          <JournalWidget stats={journalStats} />
+          <DashboardBentoCard className="lg:col-span-2" reduceMotion={reduceMotion}>
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <p className="text-xs uppercase tracking-wide text-white/50">Your support hub</p>
+                <h2 className="mt-1 text-2xl font-semibold text-white">What do you need right now?</h2>
+                <p className="mt-2 max-w-xl text-sm text-white/70">
+                  Start with a path that fits your current state: quick emotional support, scheduled counselling, or private reflection.
+                </p>
+              </div>
+              <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-rose-400/20 text-rose-300">
+                <FiHeart className="h-6 w-6" />
+              </span>
+            </div>
+
+            <div className="mt-6 grid gap-4 sm:grid-cols-2">
+              {quickActions.map((action) => (
+                <QuickActionCard key={action.href} action={action} />
+              ))}
+            </div>
+          </DashboardBentoCard>
+        </motion.div>
+
         <motion.header
           initial={reduceMotion ? undefined : { opacity: 0, y: 8 }}
           animate={reduceMotion ? undefined : { opacity: 1, y: 0 }}
@@ -414,7 +616,7 @@ export default function DashboardPage() {
             <p className="text-sm text-white/70">
               Aika is available anytime. Start a session to reflect, release, and get support tailored to you.
             </p>
-            <div className="flex flex-col gap-4 sm:flex-row">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <Link href="/aika" className="w-full sm:w-auto">
                 <span className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-[#FFCA40] px-6 py-3 text-sm font-semibold text-[#001D58] shadow-lg shadow-[#FFCA40]/40 transition hover:bg-[#ffd45c]">
                   Talk with Aika now
@@ -422,8 +624,8 @@ export default function DashboardPage() {
                 </span>
               </Link>
               <Link href="/journaling" className="w-full sm:w-auto">
-                <span className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white transition hover:border-[#FFCA40] hover:text-[#FFCA40]">
-                  Log a reflection
+                <span className="inline-flex w-full items-center justify-center gap-2 rounded-full border border-white/20 px-6 py-3 text-sm font-semibold text-white transition hover:border-[#FFCA40] hover:text-[#FFCA40] hover:bg-[#FFCA40]/10">
+                  <span>Log a reflection</span>
                   <FiActivity className="h-4 w-4" />
                 </span>
               </Link>
@@ -441,27 +643,6 @@ export default function DashboardPage() {
         <QuestBoard />
 
         <section className="grid gap-6 lg:grid-cols-12">
-          <DashboardBentoCard className="lg:col-span-7" reduceMotion={reduceMotion}>
-            <div className="flex items-start justify-between gap-4">
-              <div>
-                <p className="text-xs uppercase tracking-wide text-white/50">Your support hub</p>
-                <h2 className="mt-1 text-2xl font-semibold text-white">What do you need right now?</h2>
-                <p className="mt-2 max-w-xl text-sm text-white/70">
-                  Start with the path that fits your current state: quick emotional support, scheduled counselling, or private reflection.
-                </p>
-              </div>
-              <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-rose-400/20 text-rose-300">
-                <FiHeart className="h-6 w-6" />
-              </span>
-            </div>
-
-            <div className="mt-6 grid gap-4 sm:grid-cols-2">
-              {quickActions.map((action) => (
-                <QuickActionCard key={action.href} action={action} />
-              ))}
-            </div>
-          </DashboardBentoCard>
-
           <DashboardBentoCard className="lg:col-span-5" reduceMotion={reduceMotion}>
             <div className="flex items-center justify-between">
               <h2 className="text-xl font-semibold">Upcoming appointments</h2>
@@ -479,7 +660,7 @@ export default function DashboardPage() {
                 <div className="rounded-2xl border border-white/10 bg-white/2 p-4">
                   <p className="text-sm text-white/70">No upcoming appointments yet.</p>
                   <p className="mt-1 text-xs text-white/50">
-                    If you would like guided support this week, reserve a time with the counselling team.
+                    If you would like guided support this week, reserve a time with counselling team.
                   </p>
                 </div>
               ) : (

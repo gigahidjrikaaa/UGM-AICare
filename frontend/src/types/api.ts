@@ -69,6 +69,16 @@ export interface JournalEntryItem {
   prompt_id?: number | null;
   prompt?: JournalPromptResponse | null; // Include the prompt object
   reflection_points?: JournalReflectionPointResponse[];
+  mood?: number | null; // 1-5 scale
+  word_count: number;
+  tags?: JournalTagResponse[];
+}
+
+export interface JournalTagResponse {
+  id: number;
+  journal_entry_id: number;
+  tag_name: string;
+  created_at: string;
 }
 
 export interface JournalReflectionPointResponse {
@@ -78,6 +88,35 @@ export interface JournalReflectionPointResponse {
   reflection_text: string;
   // reflection_category?: string | null; // Uncomment if you add this field in the backend schema
   created_at: string; // ISO date string
+}
+
+export interface JournalEntryCreate {
+  entry_date: string;
+  content: string;
+  prompt_id?: number | null;
+  mood?: number | null;
+  tags: string[];
+}
+
+export interface JournalEntryFilter {
+  search_query?: string;
+  mood_min?: number;
+  mood_max?: number;
+  tags?: string[];
+  date_from?: string;
+  date_to?: string;
+  skip?: number;
+  limit?: number;
+}
+
+export interface JournalAnalyticsResponse {
+  total_entries: number;
+  total_word_count: number;
+  avg_word_count: number;
+  mood_distribution: { [key: number]: number };
+  most_used_tags: Array<{ tag: string; count: number }>;
+  mood_trend: Array<{ date: string; mood: number }>;
+  writing_frequency: Array<{ date: string; count: number }>;
 }
 
 // --- Psychologist Appointment Types ---

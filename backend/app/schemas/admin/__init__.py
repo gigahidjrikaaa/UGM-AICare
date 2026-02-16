@@ -112,6 +112,12 @@ from .quests import (
     QuestTemplateResponse,
     QuestTemplateUpdate,
 )
+from .autopilot import (
+    AutopilotActionResponse,
+    AutopilotActionListResponse,
+    AutopilotActionReviewRequest,
+    AutopilotActionReviewResponse,
+)
 
 __all__ = [
     "AnalyticsResponse",
@@ -206,6 +212,10 @@ __all__ = [
     "QuestTemplateListResponse",
     "QuestTemplateResponse",
     "QuestTemplateUpdate",
+    "AutopilotActionResponse",
+    "AutopilotActionListResponse",
+    "AutopilotActionReviewRequest",
+    "AutopilotActionReviewResponse",
 ]
 
 

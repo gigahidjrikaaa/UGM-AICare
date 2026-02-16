@@ -18,7 +18,7 @@ from .conversations import Conversation, UserSummary
 from .messages import Message, MessageRoleEnum
 
 # Wellness subdomain
-from .journal import JournalPrompt, JournalEntry, JournalReflectionPoint
+from .journal import JournalPrompt, JournalEntry, JournalReflectionPoint, JournalTag
 from .quests import (
     QuestTemplate,
     QuestInstance,
@@ -59,6 +59,12 @@ from .events import Event, AgentNameEnum
 from .cases import Case, CaseNote, CaseStatusEnum, CaseSeverityEnum
 from .consents import Consent, ConsentScopeEnum
 from .resources import Resource
+from .autopilot_actions import (
+    AutopilotAction,
+    AutopilotActionType,
+    AutopilotPolicyDecision,
+    AutopilotActionStatus,
+)
 
 __all__ = [
     # Chat
@@ -70,6 +76,7 @@ __all__ = [
     "JournalPrompt",
     "JournalEntry",
     "JournalReflectionPoint",
+    "JournalTag",
     "QuestTemplate",
     "QuestInstance",
     "QuestCategoryEnum",
@@ -116,4 +123,8 @@ __all__ = [
     "Consent",
     "ConsentScopeEnum",
     "Resource",
+    "AutopilotAction",
+    "AutopilotActionType",
+    "AutopilotPolicyDecision",
+    "AutopilotActionStatus",
 ]

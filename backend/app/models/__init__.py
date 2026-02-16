@@ -78,6 +78,12 @@ from app.domains.mental_health.models.quests import (
     ComplianceAuditLog,
     QuestAnalyticsEvent,
 )
+from app.domains.mental_health.models.autopilot_actions import (
+    AutopilotAction,
+    AutopilotActionType,
+    AutopilotPolicyDecision,
+    AutopilotActionStatus,
+)
 
 # Real-time alert models (Phase 4)
 from .alerts import Alert, AlertType, AlertSeverity
@@ -142,6 +148,10 @@ __all__ = [
     "AttestationStatusEnum",
     "ComplianceAuditLog",
     "QuestAnalyticsEvent",
+    "AutopilotAction",
+    "AutopilotActionType",
+    "AutopilotPolicyDecision",
+    "AutopilotActionStatus",
     
     # Real-time Alert Models
     "Alert",

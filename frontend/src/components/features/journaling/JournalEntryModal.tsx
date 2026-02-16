@@ -5,7 +5,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import apiClient from '@/services/api'; // Use your configured client
 import { format, parseISO } from 'date-fns';
 import { Dialog, Transition } from '@headlessui/react';
-import { FiSave, FiLoader, FiX, FiMessageSquare, FiChevronDown } from 'react-icons/fi';
+import { FiSave, FiLoader, FiX, FiMessageSquare, FiChevronDown, FiSmile, FiTag, FiPlus } from 'react-icons/fi';
 import ReflectionPointsPanel from './ReflectionPointsModal'; // Corrected import name
 import { getActiveJournalPrompts, saveJournalEntry, getMyJournalReflections } from '@/services/api';
 import type { JournalPromptResponse, JournalEntryItem, JournalReflectionPointResponse } from '@/types/api';
@@ -36,6 +36,10 @@ export default function JournalEntryModal({
     
     const [reflectionPoints, setReflectionPoints] = useState<JournalReflectionPointResponse[]>([]);
     const [isFetchingReflections, setIsFetchingReflections] = useState(false);
+    
+    const [mood, setMood] = useState<number | null>(null);
+    const [tags, setTags] = useState<string[]>([]);
+    const [newTag, setNewTag] = useState('');
 
     const fetchEntryForDate = useCallback(async (dateToFetch: string) => {
         setIsFetchingEntry(true);
@@ -51,10 +55,14 @@ export default function JournalEntryModal({
             if (response.status === 404) {
                 setContent(''); // No entry for this date, clear content
                 setSelectedPromptId(null); // Clear selected prompt
+                setMood(null); // Clear mood
+                setTags([]); // Clear tags
                 toast("Journal is empty. Remember what you felt this day?", { duration: 4000, icon: '🤔', position: 'bottom-center' });
             } else if (response.status >= 200 && response.status < 300) {
                 setContent(response.data.content);
                 setSelectedPromptId(response.data.prompt?.id || null);
+                setMood(response.data.mood || null);
+                setTags(response.data.tags?.map(t => t.tag_name) || []);
             } else {
                 throw new Error(`Unexpected response status: ${response.status}`);
             }
@@ -108,7 +116,10 @@ export default function JournalEntryModal({
             setContent('');
             setSelectedPromptId(null);
             setError(null);
-            setReflectionPoints([]); 
+            setReflectionPoints([]);
+            setMood(null);
+            setTags([]);
+            setNewTag('');
         }
     }, [isOpen, initialDate, fetchEntryForDate, fetchPrompts, prompts.length, fetchReflectionPoints]);
     
@@ -124,6 +135,8 @@ export default function JournalEntryModal({
                 entry_date: entryDate,
                 content,
                 prompt_id: selectedPromptId,
+                mood,
+                tags,
             });
             toast.success('Journal entry saved!');
             onSaveSuccess(); 
@@ -170,59 +183,109 @@ export default function JournalEntryModal({
                             >
                             {/* Main Dialog Panel - Wider to accommodate side-by-side */}
                             <Dialog.Panel className={`w-full rounded-xl bg-[#0a2a6e]/90 border border-white/20 shadow-2xl text-white flex overflow-hidden ${showReflectionPanel ? 'max-w-5xl' : 'max-w-lg'}`}>
-                                {/* Right Side: Reflection Points Panel (Conditional) */}
-                                { showReflectionPanel && (
-                                    <div className="w-1/3 min-w-md bg-ugm-blue-dark/30 border-l border-white/10 overflow-y-auto max-h-[80vh]">
-                                        <ReflectionPointsPanel
-                                            reflectionPoints={reflectionPoints}
-                                            entryDate={format(parseISO(entryDate), 'MMMM d, yyyy')}
-                                            isLoading={isFetchingReflections}
-                                            // You could add an onClose here if you want a dedicated close for this panel
-                                            // e.g., onClose={() => setReflectionPoints([])} to hide it
-                                        />
-                                    </div>
-                                )}
-                                {/* Left Side: Journal Entry Form */}
-                                <div className="flex-1 p-6 min-w-lg overflow-y-auto max-h-[80vh]">
-                                    <Dialog.Title className="text-lg font-semibold text-[#FFCA40] flex justify-between items-center">
-                                        Journal Entry for {format(parseISO(entryDate), 'MMMM d, yyyy')}
-                                        <button onClick={onClose} className="text-gray-400 hover:text-white" aria-label="Close modal">
-                                            <FiX size={20} />
-                                        </button>
-                                    </Dialog.Title>
-                                    <Dialog.Description className="mt-1 text-sm text-gray-300 mb-4">
-                                        {isFetchingEntry ? "Loading entry..." : "Reflect on your day or use a prompt to guide your thoughts."}
-                                    </Dialog.Description>
-
-                                    {/* Prompt Selection */}
+                                     {/* Right Side: Reflection Points Panel (Conditional) */}
+                                 { showReflectionPanel && (
+                                     <div className="w-1/3 min-w-md bg-ugm-blue-dark/30 border-l border-white/10 overflow-y-auto max-h-[80vh]">
+                                         <ReflectionPointsPanel
+                                             reflectionPoints={reflectionPoints}
+                                             entryDate={format(parseISO(entryDate), 'MMMM d, yyyy')}
+                                             isLoading={isFetchingReflections}
+                                             // You could add an onClose here if you want a dedicated close for this panel
+                                             // e.g., onClose={() => setReflectionPoints([])} to hide it
+                                         />
+                                     </div>
+                                     )}
+                                      
+                                    {/* Left Side: Journal Entry Form */}
+                                    <div className="flex-1 p-6 min-w-lg overflow-y-auto max-h-[80vh]">
+                                     {/* Mood Selection */}
                                     <div className="mb-4">
-                                        <label htmlFor="journal-prompt" className="block text-sm font-medium text-gray-300 mb-1">
-                                            Choose a Prompt (Optional)
+                                        <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center">
+                                            <FiSmile className="mr-2 text-[#FFCA40]" />
+                                            How are you feeling today?
                                         </label>
-                                        <div className="relative">
-                                            <select
-                                                id="journal-prompt"
-                                                value={selectedPromptId || ""}
-                                                onChange={(e) => setSelectedPromptId(e.target.value ? parseInt(e.target.value) : null)}
-                                                disabled={isFetchingPrompts || isFetchingEntry}
-                                                className="w-full bg-white/10 border border-white/20 rounded-md py-2 px-3 text-white focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] appearance-none"
-                                            >
-                                                <option value="">-- Write freely --</option>
-                                                {isFetchingPrompts && <option disabled>Loading prompts...</option>}
-                                                {prompts.map(prompt => (
-                                                    <option key={prompt.id} value={prompt.id}>
-                                                        {prompt.category ? `[${prompt.category}] ` : ''}{prompt.text.substring(0, 70)}{prompt.text.length > 70 ? '...' : ''}
-                                                    </option>
-                                                ))}
-                                            </select>
-                                            <FiChevronDown className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 pointer-events-none" />
+                                        <div className="flex items-center justify-between gap-2">
+                                            {[1, 2, 3, 4, 5].map((moodValue) => (
+                                                <button
+                                                    key={moodValue}
+                                                    onClick={() => setMood(mood === moodValue ? null : moodValue)}
+                                                    className={`flex-1 py-3 px-2 rounded-lg text-center transition-all duration-200 ${
+                                                        mood === moodValue
+                                                            ? 'bg-[#FFCA40] text-slate-900 font-bold transform scale-105'
+                                                            : 'bg-slate-700/50 text-gray-400 hover:bg-slate-600/50 hover:text-white'
+                                                    }`}
+                                                    disabled={isFetchingEntry}
+                                                >
+                                                    <div className="text-2xl mb-1">
+                                                        {moodValue === 1 && '😢'}
+                                                        {moodValue === 2 && '😕'}
+                                                        {moodValue === 3 && '😐'}
+                                                        {moodValue === 4 && '😊'}
+                                                        {moodValue === 5 && '😄'}
+                                                    </div>
+                                                    <div className="text-xs">
+                                                        {moodValue === 1 && 'Very Low'}
+                                                        {moodValue === 2 && 'Low'}
+                                                        {moodValue === 3 && 'Okay'}
+                                                        {moodValue === 4 && 'Good'}
+                                                        {moodValue === 5 && 'Great'}
+                                                    </div>
+                                                </button>
+                                            ))}
                                         </div>
-                                        {selectedPromptText && (
-                                            <div className="mt-2 p-3 bg-white/5 rounded-md border border-white/10">
-                                                <p className="text-sm text-gray-300 italic">
-                                                    <FiMessageSquare className="inline mr-2 mb-0.5 text-[#FFCA40]" />
-                                                    {selectedPromptText}
-                                                </p>
+                                    </div>
+
+                                    {/* Tags Input */}
+                                    <div className="mb-4">
+                                        <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center">
+                                            <FiTag className="mr-2 text-[#FFCA40]" />
+                                            Tags (optional)
+                                        </label>
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <input
+                                                type="text"
+                                                value={newTag}
+                                                onChange={(e) => setNewTag(e.target.value)}
+                                                onKeyDown={(e) => {
+                                                    if (e.key === 'Enter' && newTag.trim()) {
+                                                        e.preventDefault();
+                                                        setTags([...tags, newTag.trim()]);
+                                                        setNewTag('');
+                                                    }
+                                                }}
+                                                placeholder="Add a tag..."
+                                                className="flex-1 bg-white/10 border border-white/20 rounded-md py-2 px-3 text-gray-200 focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] placeholder-gray-500"
+                                                disabled={isFetchingEntry}
+                                            />
+                                            <button
+                                                onClick={() => {
+                                                    if (newTag.trim()) {
+                                                        setTags([...tags, newTag.trim()]);
+                                                        setNewTag('');
+                                                    }
+                                                }}
+                                                disabled={isFetchingEntry || !newTag.trim()}
+                                                className="px-4 py-2 bg-[#FFCA40] hover:bg-[#FFCA40]/90 text-slate-900 font-semibold rounded-md flex items-center justify-center transition disabled:opacity-50"
+                                            >
+                                                <FiPlus />
+                                            </button>
+                                        </div>
+                                        {tags.length > 0 && (
+                                            <div className="flex flex-wrap gap-2">
+                                                {tags.map((tag, index) => (
+                                                    <span
+                                                        key={index}
+                                                        className="inline-flex items-center gap-1 px-3 py-1 bg-slate-700/50 text-gray-300 rounded-full text-sm"
+                                                    >
+                                                        #{tag}
+                                                        <button
+                                                            onClick={() => setTags(tags.filter((_, i) => i !== index))}
+                                                            className="hover:text-red-400 transition-colors"
+                                                        >
+                                                            <FiX size={14} />
+                                                        </button>
+                                                    </span>
+                                                ))}
                                             </div>
                                         )}
                                     </div>
@@ -235,6 +298,11 @@ export default function JournalEntryModal({
                                         className="w-full bg-white/10 border border-white/20 rounded-md p-3 text-gray-200 focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] placeholder-gray-500"
                                         disabled={isFetchingEntry || isLoading}
                                     />
+                                    {content && (
+                                        <p className="text-xs text-gray-400 mt-1 text-right">
+                                            {content.trim().split(/\s+/).filter(word => word.length > 0).length} words
+                                        </p>
+                                    )}
 
                                     {error && <p className="mt-2 text-sm text-red-400">{error}</p>}
 

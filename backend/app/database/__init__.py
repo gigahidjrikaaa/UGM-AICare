@@ -12,8 +12,6 @@ from urllib.parse import parse_qs, urlparse, urlencode, urlunparse
 # Load environment variables from .env file (supports running from subdirectories)
 load_dotenv(find_dotenv())
 
-# Logging configuration
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # Determine the database URL from environment variables (should be using Dockerized setup)
@@ -146,7 +144,7 @@ else:
     )
 
 # Avoid leaking DB credentials in logs
-logger.info(f"Using async database: {_redact_database_url(DATABASE_URL)}")
+logger.debug(f"Using async database: {_redact_database_url(DATABASE_URL)}")
 
 # Create async session factory.
 # Prefer SQLAlchemy 2.x's async_sessionmaker when available, but fall back to
@@ -179,7 +177,7 @@ async def init_db():
     async with async_engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
 
-    logger.info(f"Database initialized with asyncpg: {_redact_database_url(DATABASE_URL)}")
+    logger.debug(f"Database initialized with asyncpg: {_redact_database_url(DATABASE_URL)}")
 
     from app.services.admin_bootstrap import ensure_default_admin, ensure_default_counselor
 
@@ -217,7 +215,7 @@ async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
 async def close_db():
     """Gracefully close database connections"""
     await async_engine.dispose()
-    logger.info("Database connections closed")
+    logger.debug("Database connections closed")
 
 # Connection health check
 async def check_db_health() -> bool:

@@ -23,6 +23,7 @@ from .database import router as database_router
 from .screening import router as screening_router
 from .badges import router as badges_router
 from .api_keys import router as api_keys_router
+from .autopilot import router as autopilot_router
 
 router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
 router.include_router(appointments_router)
@@ -46,6 +47,7 @@ router.include_router(database_router)
 router.include_router(screening_router)
 router.include_router(badges_router)
 router.include_router(api_keys_router)
+router.include_router(autopilot_router)
 
 __all__ = [
     "router",
@@ -62,4 +64,5 @@ __all__ = [
     "screening",
     "badges",
     "api_keys",
+    "autopilot",
 ]

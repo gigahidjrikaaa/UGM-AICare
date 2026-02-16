@@ -1,5 +1,6 @@
 import json
 import logging
+import asyncio
 from fastapi import FastAPI, Request as FastAPIRequest # type: ignore
 from scalar_fastapi import get_scalar_api_reference
 from datetime import datetime, timezone
@@ -13,6 +14,7 @@ from app.routes import (
     internal,
     profile,
     admin,
+    proof,
     system,
 )
 from app.routes.admin import insights as admin_insights
@@ -82,6 +84,7 @@ import inspect
 # Set up structured logging
 LOG_LEVEL = os.getenv("LOG_LEVEL", "INFO")
 APP_ENV = os.getenv("APP_ENV", "development")
+STARTUP_VERBOSE_LOGS = os.getenv("STARTUP_VERBOSE_LOGS", "false").strip().lower() in {"1", "true", "yes", "on"}
 
 # Use JSON format in production, human-readable in development
 configure_logging(
@@ -93,16 +96,51 @@ configure_logging(
 
 logger = get_logger(__name__)
 
+
+def startup_log(message: str) -> None:
+    if STARTUP_VERBOSE_LOGS:
+        logger.info(message)
+    else:
+        logger.debug(message)
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """
     Handles application startup and shutdown events.
     """
-    logger.info("Starting application lifespan...")
+    startup_log("Starting application lifespan...")
     # Initialize the database (handle both sync and async implementations)
-    db_result = init_db()
-    if inspect.isawaitable(db_result):
-        await db_result
+    db_max_retries = max(1, int(os.getenv("STARTUP_DB_MAX_RETRIES", "3")))
+    db_retry_delay_seconds = max(1.0, float(os.getenv("STARTUP_DB_RETRY_DELAY_SECONDS", "2")))
+    db_init_error: Exception | None = None
+
+    for attempt in range(1, db_max_retries + 1):
+        try:
+            db_result = init_db()
+            if inspect.isawaitable(db_result):
+                await db_result
+            db_init_error = None
+            break
+        except Exception as exc:
+            db_init_error = exc
+            if attempt >= db_max_retries:
+                break
+            logger.warning(
+                "Database init attempt %s/%s failed. Retrying in %.1fs...",
+                attempt,
+                db_max_retries,
+                db_retry_delay_seconds,
+                exc_info=STARTUP_VERBOSE_LOGS,
+            )
+            await asyncio.sleep(db_retry_delay_seconds)
+
+    if db_init_error is not None:
+        logger.error(
+            "Database initialization failed after %s attempts: %s",
+            db_max_retries,
+            str(db_init_error),
+        )
+        raise db_init_error
 
     # Initialize LangGraph durable checkpointer (Postgres)
     try:
@@ -119,10 +157,26 @@ async def lifespan(app: FastAPI):
 
     # Start the background scheduler
     start_scheduler()
+
+    autopilot_enabled = os.getenv("AUTOPILOT_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
+    autopilot_worker_task: asyncio.Task | None = None
+    autopilot_stop_event: asyncio.Event | None = None
+    if autopilot_enabled:
+        try:
+            from app.domains.mental_health.services.autopilot_worker import run_autopilot_worker_loop
+
+            autopilot_stop_event = asyncio.Event()
+            autopilot_worker_task = asyncio.create_task(
+                run_autopilot_worker_loop(autopilot_stop_event),
+                name="autopilot-worker",
+            )
+            startup_log("Autopilot worker started")
+        except Exception:
+            logger.warning("Failed to start autopilot worker (non-blocking)", exc_info=True)
     # Start the finance revenue scheduler
     from app.domains.finance import start_scheduler as start_finance_scheduler
     start_finance_scheduler()
-    logger.info("Finance revenue scheduler started")
+    startup_log("Finance revenue scheduler started")
     # Initialize event bus subscriptions for SSE broadcasting
     from app.services.event_sse_bridge import initialize_event_subscriptions
     sub_result = initialize_event_subscriptions()
@@ -130,12 +184,21 @@ async def lifespan(app: FastAPI):
         await sub_result
     yield
     # Clean up resources on shutdown
-    logger.info("Shutting down application lifespan...")
+    startup_log("Shutting down application lifespan...")
     shutdown_scheduler()
+    if autopilot_worker_task is not None and autopilot_stop_event is not None:
+        try:
+            autopilot_stop_event.set()
+            await asyncio.wait_for(autopilot_worker_task, timeout=10)
+            startup_log("Autopilot worker stopped")
+        except asyncio.TimeoutError:
+            autopilot_worker_task.cancel()
+        except Exception:
+            logger.warning("Autopilot worker shutdown failed (non-blocking)", exc_info=True)
     # Stop the finance revenue scheduler
     from app.domains.finance import stop_scheduler as stop_finance_scheduler
     stop_finance_scheduler()
-    logger.info("Finance revenue scheduler stopped")
+    startup_log("Finance revenue scheduler stopped")
     # Close database connections
     try:
         from app.core.langgraph_checkpointer import close_langgraph_checkpointer
@@ -192,7 +255,7 @@ Instrumentator().instrument(app).expose(app, endpoint="/metrics/fastapi")
 metrics_app = make_asgi_app()
 app.mount("/metrics", metrics_app)
 
-logger.info("Prometheus metrics enabled at /metrics and /metrics/fastapi")
+startup_log("Prometheus metrics enabled at /metrics and /metrics/fastapi")
 
 # ============================================
 # CORS MIDDLEWARE
@@ -217,7 +280,7 @@ else:
         "https://api.aicare.ina17.com"
     ]
 
-logger.info(f"CORS configured with origins: {origins}")
+startup_log(f"CORS configured with origins: {origins}")
 
 app.add_middleware(
     CORSMiddleware,
@@ -228,7 +291,7 @@ app.add_middleware(
     expose_headers=["*"]
 )
 
-logger.info("Including API routers...")
+startup_log("Including API routers...")
 
 app.include_router(auth.router)
 app.include_router(chat.router)
@@ -242,6 +305,7 @@ app.include_router(session_events.session_event_router) # This will have prefix 
 app.include_router(summary.activity_router) # This will have prefix /api/v1/activity-summary
 app.include_router(summary.user_data_router)  # This will have prefix /api/v1/user
 app.include_router(profile.router)
+app.include_router(proof.router)
 app.include_router(quests.router)
 app.include_router(admin_counselors.router, prefix="/api/v1")  # Admin counselor management (MUST be before admin.router to avoid route conflicts)
 app.include_router(counselor.router, prefix="/api/v1")  # Counselor self-management
@@ -271,10 +335,10 @@ app.include_router(clinical_analytics_routes.router)  # New clinical analytics e
 # app.include_router(finance_router, prefix="/api/v1/finance", tags=["Finance"])  # Finance domain routes (commented out - domain incomplete)
 app.include_router(blockchain_router, prefix="/api/v1/blockchain", tags=["Blockchain"])  # Blockchain domain routes
 # logger.info(f"List of routers (/api/v1): {app.routes}")
-logger.info(f"Allowed origins: {origins}")
+startup_log(f"Allowed origins: {origins}")
 
 # Check environment variables
-check_env()
+check_env(verbose=STARTUP_VERBOSE_LOGS)
 
 # Add custom OpenAPI generation with error handling
 @app.get("/openapi.json", include_in_schema=False)
