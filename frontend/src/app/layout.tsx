@@ -12,9 +12,70 @@ import HydrationSafeWrapper from "@/components/layout/HydrationSafeWrapper";
 
 const inter = Inter({ subsets: ['latin'] })
 
+const getSiteUrl = (): string => {
+  const configuredUrl =
+    process.env.NEXT_PUBLIC_SITE_URL ??
+    process.env.NEXTAUTH_URL ??
+    "https://aicare.sumbu.xyz";
+
+  return configuredUrl.startsWith("http") ? configuredUrl : `https://${configuredUrl}`;
+};
+
+const siteUrl = getSiteUrl();
+
 export const metadata: Metadata = {
-  title: 'UGM-AICare: Aika - Mental Health Assistant',
-  description: "A supportive mental health AI assistant developed by UGM-AICare team.",
+  metadataBase: new URL(siteUrl),
+  title: {
+    default: "UGM-AICare | AI Mental Health Support for UGM Students",
+    template: "%s | UGM-AICare",
+  },
+  description:
+    "UGM-AICare helps UGM students access earlier mental health support through AI-guided check-ins, supportive conversations, and clear pathways to campus counseling services.",
+  keywords: [
+    "UGM-AICare",
+    "UGM mental health support",
+    "Aika AI assistant",
+    "student wellbeing",
+    "campus counseling pathway",
+    "mental health AI Indonesia",
+  ],
+  alternates: {
+    canonical: siteUrl,
+  },
+  openGraph: {
+    type: "website",
+    url: siteUrl,
+    siteName: "UGM-AICare",
+    title: "UGM-AICare | AI Mental Health Support for UGM Students",
+    description:
+      "Student-first mental health support with proactive AI triage, reflective journaling, and guided access to campus resources.",
+    images: [
+      {
+        url: "/aicare_logo.png",
+        width: 1200,
+        height: 630,
+        alt: "UGM-AICare platform",
+      },
+    ],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: "UGM-AICare | AI Mental Health Support for UGM Students",
+    description:
+      "A student-first platform for earlier mental health support, AI-guided conversations, and campus care navigation.",
+    images: ["/aicare_logo.png"],
+  },
+  robots: {
+    index: true,
+    follow: true,
+    googleBot: {
+      index: true,
+      follow: true,
+      "max-video-preview": -1,
+      "max-image-preview": "large",
+      "max-snippet": -1,
+    },
+  },
   icons: {
     icon: '/favicon.ico',
     apple: '/apple-icon.png',
