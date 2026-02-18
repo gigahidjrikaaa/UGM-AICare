@@ -17,6 +17,7 @@ import {
   FiBarChart2,
   FiBookOpen,
   FiActivity,
+  FiEye,
 } from 'react-icons/fi';
 import SidebarLink from '../admin/SidebarLink';
 
@@ -38,6 +39,7 @@ const navGroups = [
       { name: 'Treatment Plans', icon: <FiBookOpen size={18}/>, href: '/counselor/treatment-plans' },
       { name: 'Progress Tracking', icon: <FiBarChart2 size={18}/>, href: '/counselor/progress' },
       { name: 'Activities', icon: <FiActivity size={18}/>, href: '/counselor/activities' },
+      { name: 'Agent Decisions', icon: <FiEye size={18}/>, href: '/counselor/agent-decisions' },
     ]
   }
 ];

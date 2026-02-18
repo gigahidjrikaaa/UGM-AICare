@@ -30,71 +30,66 @@ import {
   FiKey,
   FiFlag,
   FiTerminal,
+  FiLink,
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink';
 
-// Reorganized navigation: 8 logical groups for better UX
+// Reorganized navigation: clearer operational categories for admin workflows
 const navGroups = [
   {
-    label: 'Command Center',
+    label: 'Overview',
     items: [
       { name: 'Dashboard', icon: <FiBarChart2 size={18} />, href: '/admin/dashboard' },
+      { name: 'Insights Analytics', icon: <FiTrendingUp size={18} />, href: '/admin/insights' },
+      { name: 'Retention Analytics', icon: <FiTarget size={18} />, href: '/admin/retention' },
     ],
   },
   {
-    label: 'Case Management',
+    label: 'Care Operations',
     items: [
       { name: 'Cases', icon: <FiShield size={18} />, href: '/admin/cases' },
       { name: 'Quick Triage', icon: <FiBriefcase size={18} />, href: '/admin/quick-triage' },
+      { name: 'Appointments', icon: <FiCalendar size={18} />, href: '/admin/appointments' },
       { name: 'Flagged Chats', icon: <FiFlag size={18} />, href: '/admin/flags' },
     ],
   },
   {
-    label: 'People',
+    label: 'People & Activity',
     items: [
       { name: 'Users', icon: <FiUsers size={18} />, href: '/admin/users' },
       { name: 'Counselors', icon: <FiUserCheck size={18} />, href: '/admin/counselors' },
-      { name: 'Appointments', icon: <FiCalendar size={18} />, href: '/admin/appointments' },
-    ],
-  },
-  {
-    label: 'Conversations',
-    items: [
       { name: 'Conversations', icon: <FiMessageSquare size={18} />, href: '/admin/conversations' },
       { name: 'Screening Intel', icon: <FiEye size={18} />, href: '/admin/screening' },
       { name: 'Activities', icon: <FiActivity size={18} />, href: '/admin/activities' },
     ],
   },
   {
-    label: 'Programs',
+    label: 'Agentic & On-Chain',
     items: [
-      { name: 'Intervention Plans', icon: <FiClipboard size={18} />, href: '/admin/interventions' },
+      { name: 'Agent Decisions', icon: <FiEye size={18} />, href: '/admin/agent-decisions' },
       { name: 'Autopilot Queue', icon: <FiZap size={18} />, href: '/admin/autopilot' },
-      { name: 'TCA Outreach', icon: <FiSend size={18} />, href: '/admin/campaigns' },
-      { name: 'CBT Modules', icon: <FiHeart size={18} />, href: '/admin/cbt-modules' },
-      { name: 'Quest Templates', icon: <FiZap size={18} />, href: '/admin/quests' },
+      { name: 'Autopilot Policy', icon: <FiShield size={18} />, href: '/admin/policy' },
+      { name: 'Attestation Monitor', icon: <FiLink size={18} />, href: '/admin/attestations' },
+      { name: 'Smart Contracts', icon: <FiLink size={18} />, href: '/admin/contracts' },
       { name: 'EDU Badges', icon: <FiAward size={18} />, href: '/admin/badges' },
     ],
   },
   {
-    label: 'Content',
+    label: 'Programs & Content',
     items: [
+      { name: 'Intervention Plans', icon: <FiClipboard size={18} />, href: '/admin/interventions' },
+      { name: 'TCA Outreach', icon: <FiSend size={18} />, href: '/admin/campaigns' },
+      { name: 'CBT Modules', icon: <FiHeart size={18} />, href: '/admin/cbt-modules' },
+      { name: 'Quest Templates', icon: <FiZap size={18} />, href: '/admin/quests' },
       { name: 'Content Resources', icon: <FiBookOpen size={18} />, href: '/admin/content-resources' },
       { name: 'Surveys', icon: <FiHelpCircle size={18} />, href: '/admin/surveys' },
     ],
   },
   {
-    label: 'Analytics',
+    label: 'Platform',
     items: [
-      { name: 'Insights Analytics', icon: <FiTrendingUp size={18} />, href: '/admin/insights' },
-      { name: 'Retention Analytics', icon: <FiTarget size={18} />, href: '/admin/retention' },
-    ],
-  },
-  {
-    label: 'System',
-    items: [
-      { name: 'Testing Console', icon: <FiTerminal size={18} />, href: '/admin/testing' },
       { name: 'LangGraph Monitoring', icon: <FiMonitor size={18} />, href: '/admin/langgraph' },
+      { name: 'Testing Console', icon: <FiTerminal size={18} />, href: '/admin/testing' },
       { name: 'Database Viewer', icon: <FiDatabase size={18} />, href: '/admin/database' },
       { name: 'API Key Monitor', icon: <FiKey size={18} />, href: '/admin/api-keys' },
     ],

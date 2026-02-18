@@ -18,6 +18,20 @@ logger = logging.getLogger(__name__)
 DATABASE_URL = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./aika.db")
 
 
+def get_database_endpoint_summary() -> str:
+    """Return a safe DB endpoint summary for diagnostics (no credentials)."""
+    try:
+        parsed = urlparse(DATABASE_URL)
+        scheme = parsed.scheme or "unknown"
+        host = parsed.hostname or "local"
+        if parsed.port is not None:
+            host = f"{host}:{parsed.port}"
+        db_name = (parsed.path or "").lstrip("/") or "-"
+        return f"{scheme}://{host}/{db_name}"
+    except Exception:
+        return "<unavailable>"
+
+
 def _redact_database_url(database_url: str) -> str:
     """Redact secrets in a DB URL for logging."""
     try:

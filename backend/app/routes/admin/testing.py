@@ -5,13 +5,14 @@
 from __future__ import annotations
 
 import asyncio
+import os
 import logging
 import secrets
 import subprocess
 import sys
 import uuid
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 import json
 from pathlib import Path
 import random
@@ -159,6 +160,32 @@ class SimulateRealChatResponse(BaseModel):
     agent_routing_log: Optional[List[str]] = None  # RQ2 Verification
 
 
+class FullUserFlowSimulationRequest(BaseModel):
+    """Request to run end-to-end user flow simulation in one API call."""
+    user_id: int
+    user_messages: List[str] = Field(..., min_length=1, max_length=20)
+    enable_sta: bool = True
+    enable_sca: bool = True
+
+
+class FullUserFlowSimulationResponse(BaseModel):
+    """Response for full flow simulation summary."""
+    user_id: int
+    session_id: str
+    ai_responses: List[str]
+    escalation_triggered: bool
+    case_id: Optional[str] = None
+    case_status: Optional[str] = None
+    case_severity: Optional[str] = None
+    assigned_psychologist_id: Optional[int] = None
+    assigned_counselor_user_id: Optional[int] = None
+    assigned_counselor_name: Optional[str] = None
+    counselor_can_see_case: bool = False
+    counselor_case_page: str = "/counselor/cases"
+    autopilot_actions: List[Dict[str, Any]] = Field(default_factory=list)
+    notes: List[str] = Field(default_factory=list)
+
+
 class ListTestUsersResponse(BaseModel):
     """Response with list of test users."""
     users: List[dict]
@@ -204,12 +231,26 @@ class LogTailResponse(BaseModel):
 
 class AutopilotReplayResponse(BaseModel):
     """Response for autopilot replay execution."""
+    scenario: str
+    parameters: Dict[str, Any]
     command: str
     exit_code: int
     stdout_tail: List[str]
     stderr_tail: List[str]
     artifact_path: str
     artifact: Optional[Dict] = None
+
+
+class AutopilotReplayRequest(BaseModel):
+    """Request parameters for autopilot replay scenario execution."""
+    scenario: Literal["attestation_pipeline", "case_management", "mixed_operations"] = "attestation_pipeline"
+    action_a_type: Optional[Literal["publish_attestation", "mint_badge", "create_checkin", "create_case"]] = None
+    action_a_risk: Optional[Literal["none", "low", "moderate", "high", "critical"]] = None
+    action_b_type: Optional[Literal["publish_attestation", "mint_badge", "create_checkin", "create_case"]] = None
+    action_b_risk: Optional[Literal["none", "low", "moderate", "high", "critical"]] = None
+    auto_approve: bool = True
+    wait_timeout_seconds: Optional[int] = Field(default=None, ge=10, le=600)
+    wait_interval_seconds: Optional[float] = Field(default=None, ge=0.2, le=10.0)
 
 
 def _tail_lines(file_path: Path, line_count: int) -> List[str]:
@@ -260,6 +301,7 @@ async def get_backend_logs(
 @router.post("/autopilot-replay", response_model=AutopilotReplayResponse)
 async def run_autopilot_replay(
     timeout_seconds: int = Query(default=240, ge=30, le=900),
+    payload: AutopilotReplayRequest = Body(default_factory=AutopilotReplayRequest),
     admin_user: User = Depends(get_admin_user),
 ) -> AutopilotReplayResponse:
     """Run scripts/replay_autopilot_demo.py and return execution summary for admin testing UI."""
@@ -272,13 +314,31 @@ async def run_autopilot_replay(
     if not script_path.exists():
         raise HTTPException(status_code=404, detail=f"Replay script not found: {script_path}")
 
-    command = f"{sys.executable} {script_path}"
+    scenario_env = {
+        "AUTOPILOT_DEMO_SCENARIO": payload.scenario,
+        "AUTOPILOT_DEMO_AUTO_APPROVE": "true" if payload.auto_approve else "false",
+    }
+    if payload.action_a_type:
+        scenario_env["AUTOPILOT_DEMO_ACTION_A_TYPE"] = payload.action_a_type
+    if payload.action_a_risk:
+        scenario_env["AUTOPILOT_DEMO_ACTION_A_RISK"] = payload.action_a_risk
+    if payload.action_b_type:
+        scenario_env["AUTOPILOT_DEMO_ACTION_B_TYPE"] = payload.action_b_type
+    if payload.action_b_risk:
+        scenario_env["AUTOPILOT_DEMO_ACTION_B_RISK"] = payload.action_b_risk
+    if payload.wait_timeout_seconds is not None:
+        scenario_env["AUTOPILOT_DEMO_WAIT_TIMEOUT_SECONDS"] = str(payload.wait_timeout_seconds)
+    if payload.wait_interval_seconds is not None:
+        scenario_env["AUTOPILOT_DEMO_WAIT_INTERVAL_SECONDS"] = str(payload.wait_interval_seconds)
+
+    command = f"{sys.executable} {script_path} [scenario={payload.scenario}]"
 
     try:
         completed = await asyncio.to_thread(
             subprocess.run,
             [sys.executable, str(script_path)],
             cwd=str(repo_root),
+            env={**os.environ, **scenario_env},
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             timeout=timeout_seconds,
@@ -307,6 +367,16 @@ async def run_autopilot_replay(
             artifact_data = None
 
     return AutopilotReplayResponse(
+        scenario=payload.scenario,
+        parameters={
+            "action_a_type": payload.action_a_type,
+            "action_a_risk": payload.action_a_risk,
+            "action_b_type": payload.action_b_type,
+            "action_b_risk": payload.action_b_risk,
+            "auto_approve": payload.auto_approve,
+            "wait_timeout_seconds": payload.wait_timeout_seconds,
+            "wait_interval_seconds": payload.wait_interval_seconds,
+        },
         command=command,
         exit_code=int(completed.returncode or 0),
         stdout_tail=_tail_text_lines(stdout_data),
@@ -837,6 +907,116 @@ Tujuan utamamu adalah menjadi pendengar yang baik, suportif, hangat, dan tidak m
         case_created=case_created,
         final_history=history,
         agent_routing_log=agent_routing_log
+    )
+
+
+@router.post("/full-user-flow", response_model=FullUserFlowSimulationResponse, status_code=status.HTTP_201_CREATED)
+async def simulate_full_user_flow(
+    request: FullUserFlowSimulationRequest,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user),
+) -> FullUserFlowSimulationResponse:
+    """Run chat + escalation + assignment + counselor visibility checks in one endpoint."""
+    logger.info("Admin %s running full user flow simulation for user %s", admin_user.id, request.user_id)
+
+    chat_result = await simulate_real_chat(
+        SimulateRealChatRequest(
+            user_id=request.user_id,
+            user_messages=request.user_messages,
+            enable_sta=request.enable_sta,
+            enable_sca=request.enable_sca,
+        ),
+        db=db,
+        admin_user=admin_user,
+    )
+
+    from sqlalchemy import desc
+    from app.domains.mental_health.models import Case
+    from app.domains.mental_health.models.autopilot_actions import AutopilotAction
+
+    notes: List[str] = []
+
+    latest_case = (
+        await db.execute(
+            select(Case)
+            .where(Case.session_id == chat_result.session_id)
+            .order_by(desc(Case.created_at))
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+    escalation_triggered = latest_case is not None
+
+    assigned_psychologist_id: Optional[int] = None
+    assigned_counselor_user_id: Optional[int] = None
+    assigned_counselor_name: Optional[str] = None
+    counselor_can_see_case = False
+
+    if latest_case is not None and latest_case.assigned_to:
+        try:
+            assigned_psychologist_id = int(str(latest_case.assigned_to))
+        except ValueError:
+            assigned_psychologist_id = None
+
+        if assigned_psychologist_id is not None:
+            psych = (
+                await db.execute(select(Psychologist).where(Psychologist.id == assigned_psychologist_id))
+            ).scalar_one_or_none()
+            if psych is not None and psych.user_id is not None:
+                assigned_counselor_user_id = int(psych.user_id)
+                counselor_user = (
+                    await db.execute(select(User).where(User.id == psych.user_id))
+                ).scalar_one_or_none()
+                assigned_counselor_name = counselor_user.name if counselor_user else None
+                counselor_can_see_case = latest_case.assigned_to == str(psych.id)
+                notes.append("Case assigned to counselor profile and visible in counselor case list.")
+            else:
+                notes.append("Case assigned_to is set but matching counselor profile was not found.")
+        else:
+            notes.append("Case assigned_to is not a valid counselor profile id.")
+    elif latest_case is not None:
+        notes.append("Case exists but is not assigned to any counselor yet.")
+    else:
+        notes.append("No case created from this conversation (no escalation trigger).")
+
+    autopilot_rows = (
+        await db.execute(
+            select(AutopilotAction)
+            .where(AutopilotAction.payload_json.op("->>")("session_id") == chat_result.session_id)
+            .order_by(desc(AutopilotAction.created_at))
+            .limit(20)
+        )
+    ).scalars().all()
+
+    autopilot_actions = [
+        {
+            "id": int(row.id),
+            "action_type": row.action_type.value,
+            "policy_decision": row.policy_decision.value,
+            "status": row.status.value,
+            "risk_level": row.risk_level,
+            "requires_human_review": bool(row.requires_human_review),
+            "approved_by": row.approved_by,
+            "error_message": row.error_message,
+            "created_at": row.created_at.isoformat() if row.created_at else None,
+        }
+        for row in autopilot_rows
+    ]
+
+    return FullUserFlowSimulationResponse(
+        user_id=request.user_id,
+        session_id=chat_result.session_id,
+        ai_responses=chat_result.ai_responses,
+        escalation_triggered=escalation_triggered,
+        case_id=(str(latest_case.id) if latest_case is not None else None),
+        case_status=(latest_case.status.value if latest_case is not None and hasattr(latest_case.status, "value") else None),
+        case_severity=(latest_case.severity.value if latest_case is not None and hasattr(latest_case.severity, "value") else None),
+        assigned_psychologist_id=assigned_psychologist_id,
+        assigned_counselor_user_id=assigned_counselor_user_id,
+        assigned_counselor_name=assigned_counselor_name,
+        counselor_can_see_case=counselor_can_see_case,
+        autopilot_actions=autopilot_actions,
+        notes=notes,
     )
 
 

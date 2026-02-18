@@ -52,7 +52,7 @@ const StatCard: React.FC<{
   };
 
   return (
-    <div className={`bg-gradient-to-br ${colorClasses[color]} backdrop-blur border rounded-2xl p-5`}>
+    <div className={`bg-linear-to-br ${colorClasses[color]} backdrop-blur border rounded-2xl p-5`}>
       <div className="flex items-center gap-4">
         <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#FFCA40]/15 text-[#FFCA40]">
           {icon}
@@ -259,7 +259,7 @@ export default function CounselorDashboard() {
                 <div className="overflow-hidden h-3 text-xs flex rounded-full bg-white/10">
                   <div
                     style={{ width: `${stats.profile_completion_percentage}%` }}
-                    className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-gradient-to-r from-[#FFCA40] to-[#FFD55C] transition-all duration-500"
+                    className="shadow-none flex flex-col text-center whitespace-nowrap text-white justify-center bg-linear-to-r from-[#FFCA40] to-[#FFD55C] transition-all duration-500"
                   />
                 </div>
               </div>
@@ -293,6 +293,13 @@ export default function CounselorDashboard() {
               >
                 <FiAlertTriangle className="w-5 h-5 text-[#FFCA40]" />
                 <span className="text-sm text-white">Check Escalations</span>
+              </a>
+              <a
+                href="/counselor/agent-decisions"
+                className="flex items-center gap-3 p-3 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg transition-colors"
+              >
+                <FiTrendingUp className="w-5 h-5 text-[#FFCA40]" />
+                <span className="text-sm text-white">Review Agent Decisions</span>
               </a>
             </div>
           </div>

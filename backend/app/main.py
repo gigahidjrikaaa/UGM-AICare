@@ -149,11 +149,18 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.warning("LangGraph checkpointer init failed (non-blocking)", exc_info=True)
 
-    # Initialize blockchain connection (EDU Chain NFT)
+    # Initialize blockchain connections (NFT + attestation registries)
     from app.domains.blockchain import init_nft_client
     nft_result = init_nft_client()
     if inspect.isawaitable(nft_result):
         await nft_result
+
+    try:
+        from app.domains.blockchain.attestation import AttestationClientFactory
+
+        await AttestationClientFactory.init_all()
+    except Exception:
+        logger.warning("Attestation client initialization failed (non-blocking)", exc_info=True)
 
     # Start the background scheduler
     start_scheduler()

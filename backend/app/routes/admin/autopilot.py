@@ -1,6 +1,9 @@
 from __future__ import annotations
 
+import os
+
 from fastapi import APIRouter, Depends, HTTPException, Query
+from pydantic import BaseModel, Field
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
@@ -25,6 +28,53 @@ from app.schemas.admin.autopilot import (
 )
 
 router = APIRouter(prefix="/autopilot", tags=["Admin - Autopilot"])
+
+
+class AutopilotStatusResponse(BaseModel):
+    enabled: bool
+    onchain_placeholder: bool
+    worker_interval_seconds: int
+
+
+class AutopilotPolicyResponse(BaseModel):
+    autopilot_enabled: bool
+    onchain_placeholder: bool
+    worker_interval_seconds: int
+    require_approval_high_risk: bool
+    require_approval_critical_risk: bool
+
+
+class AutopilotPolicyUpdateRequest(BaseModel):
+    autopilot_enabled: bool | None = None
+    onchain_placeholder: bool | None = None
+    worker_interval_seconds: int | None = Field(default=None, ge=1, le=3600)
+    require_approval_high_risk: bool | None = None
+    require_approval_critical_risk: bool | None = None
+
+
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    return raw.strip().lower() in {"1", "true", "yes", "on"}
+
+
+def _env_int(name: str, default: int) -> int:
+    raw = os.getenv(name)
+    if raw is None:
+        return default
+    try:
+        return int(raw)
+    except ValueError:
+        return default
+
+
+def _set_env_bool(name: str, value: bool) -> None:
+    os.environ[name] = "true" if value else "false"
+
+
+def _set_env_int(name: str, value: int) -> None:
+    os.environ[name] = str(value)
 
 
 def _to_action_response(action: AutopilotAction) -> AutopilotActionResponse:
@@ -95,6 +145,59 @@ async def list_autopilot_actions(
     return AutopilotActionListResponse(
         items=[_to_action_response(item) for item in items],
         total=total,
+    )
+
+
+@router.get("/status", response_model=AutopilotStatusResponse)
+async def get_autopilot_status(
+    admin_user=Depends(get_admin_user),
+) -> AutopilotStatusResponse:
+    del admin_user
+    return AutopilotStatusResponse(
+        enabled=_env_bool("AUTOPILOT_ENABLED", True),
+        onchain_placeholder=_env_bool("AUTOPILOT_ONCHAIN_PLACEHOLDER", True),
+        worker_interval_seconds=max(1, _env_int("AUTOPILOT_WORKER_INTERVAL_SECONDS", 5)),
+    )
+
+
+@router.get("/policy", response_model=AutopilotPolicyResponse)
+async def get_autopilot_policy(
+    admin_user=Depends(get_admin_user),
+) -> AutopilotPolicyResponse:
+    del admin_user
+    return AutopilotPolicyResponse(
+        autopilot_enabled=_env_bool("AUTOPILOT_ENABLED", True),
+        onchain_placeholder=_env_bool("AUTOPILOT_ONCHAIN_PLACEHOLDER", True),
+        worker_interval_seconds=max(1, _env_int("AUTOPILOT_WORKER_INTERVAL_SECONDS", 5)),
+        require_approval_high_risk=_env_bool("AUTOPILOT_REQUIRE_APPROVAL_HIGH_RISK", True),
+        require_approval_critical_risk=_env_bool("AUTOPILOT_REQUIRE_APPROVAL_CRITICAL_RISK", True),
+    )
+
+
+@router.patch("/policy", response_model=AutopilotPolicyResponse)
+async def update_autopilot_policy(
+    payload: AutopilotPolicyUpdateRequest,
+    admin_user=Depends(get_admin_user),
+) -> AutopilotPolicyResponse:
+    del admin_user
+
+    if payload.autopilot_enabled is not None:
+        _set_env_bool("AUTOPILOT_ENABLED", payload.autopilot_enabled)
+    if payload.onchain_placeholder is not None:
+        _set_env_bool("AUTOPILOT_ONCHAIN_PLACEHOLDER", payload.onchain_placeholder)
+    if payload.worker_interval_seconds is not None:
+        _set_env_int("AUTOPILOT_WORKER_INTERVAL_SECONDS", payload.worker_interval_seconds)
+    if payload.require_approval_high_risk is not None:
+        _set_env_bool("AUTOPILOT_REQUIRE_APPROVAL_HIGH_RISK", payload.require_approval_high_risk)
+    if payload.require_approval_critical_risk is not None:
+        _set_env_bool("AUTOPILOT_REQUIRE_APPROVAL_CRITICAL_RISK", payload.require_approval_critical_risk)
+
+    return AutopilotPolicyResponse(
+        autopilot_enabled=_env_bool("AUTOPILOT_ENABLED", True),
+        onchain_placeholder=_env_bool("AUTOPILOT_ONCHAIN_PLACEHOLDER", True),
+        worker_interval_seconds=max(1, _env_int("AUTOPILOT_WORKER_INTERVAL_SECONDS", 5)),
+        require_approval_high_risk=_env_bool("AUTOPILOT_REQUIRE_APPROVAL_HIGH_RISK", True),
+        require_approval_critical_risk=_env_bool("AUTOPILOT_REQUIRE_APPROVAL_CRITICAL_RISK", True),
     )
 
 

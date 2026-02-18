@@ -1,7 +1,8 @@
 """Counselor routes for self-management."""
 
+import hashlib
 from datetime import datetime, timedelta
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from uuid import UUID as PyUUID
 
@@ -13,20 +14,35 @@ from sqlalchemy.orm import joinedload
 
 from app.database import get_async_db
 from app.dependencies import get_current_active_user
+from app.domains.blockchain.attestation.chain_registry import get_attestation_chain_config
+from app.domains.blockchain.nft.chain_registry import get_chain_config
+from app.domains.mental_health.models.autopilot_actions import (
+    AutopilotAction,
+    AutopilotActionType,
+    AutopilotPolicyDecision,
+)
 from app.domains.mental_health.models import (
     Psychologist as CounselorProfile,
     Appointment,
     Case,
     CaseNote,
+    CaseSeverityEnum,
     CaseStatusEnum,
     Conversation,
 )
+from app.domains.mental_health.models.quests import AttestationRecord, AttestationStatusEnum
 from app.domains.mental_health.models.interventions import InterventionPlanRecord
 from app.domains.mental_health.models.assessments import UserScreeningProfile, TriageAssessment
+from app.domains.mental_health.services.autopilot_action_service import (
+    build_idempotency_key,
+    enqueue_action,
+    hash_payload,
+)
 from app.models.user import User
 from app.domains.mental_health.schemas.appointments import AppointmentWithUser
 from app.agents.cma.schemas import SDACase, SDAListCasesResponse
 from app.core.redaction import prelog_redact
+from app.services.compliance_service import record_audit_event
 from app.schemas.counselor import (
     CounselorAvailabilityToggle,
     CounselorDashboardStats,
@@ -37,11 +53,219 @@ from app.schemas.counselor import (
 router = APIRouter(prefix="/counselor", tags=["Counselor"])
 
 
+class CounselorAgentDecisionItem(BaseModel):
+    id: int
+    action_type: str
+    policy_decision: str
+    risk_level: str
+    status: str
+    created_at: datetime
+    executed_at: Optional[datetime] = None
+
+    user_id: Optional[int] = None
+    session_id: Optional[str] = None
+    intent: Optional[str] = None
+    next_step: Optional[str] = None
+    agent_reasoning: Optional[str] = None
+
+    requires_human_review: bool
+    approved_by: Optional[int] = None
+    approval_notes: Optional[str] = None
+
+    chain_id: Optional[int] = None
+    tx_hash: Optional[str] = None
+    explorer_tx_url: Optional[str] = None
+
+    attestation_record_id: Optional[int] = None
+    attestation_status: Optional[str] = None
+    attestation_last_error: Optional[str] = None
+    attestation_tx_hash: Optional[str] = None
+    attestation_schema: Optional[str] = None
+    attestation_type: Optional[str] = None
+    attestation_decision: Optional[str] = None
+    attestation_feedback_redacted: Optional[str] = None
+
+
+class CounselorAgentDecisionListResponse(BaseModel):
+    items: list[CounselorAgentDecisionItem]
+    total: int
+
+
+class CounselorCaseAttestationResponse(BaseModel):
+    found: bool
+    record_id: Optional[int] = None
+    status: Optional[str] = None
+    schema: Optional[str] = None
+    attestation_type: Optional[str] = None
+    decision: Optional[str] = None
+    feedback_redacted: Optional[str] = None
+    tx_hash: Optional[str] = None
+    chain_id: Optional[int] = None
+    autopilot_action_id: Optional[int] = None
+    created_at: Optional[str] = None
+    processed_at: Optional[str] = None
+
+
+def _to_int(value: Any) -> Optional[int]:
+    if isinstance(value, bool) or value is None:
+        return None
+    if isinstance(value, int):
+        return value
+    if isinstance(value, float):
+        return int(value)
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        try:
+            return int(stripped)
+        except ValueError:
+            return None
+    return None
+
+
+def _to_str(value: Any) -> Optional[str]:
+    if value is None:
+        return None
+    text = str(value).strip()
+    return text or None
+
+
+def _build_explorer_url(chain_id: Optional[int], tx_hash: Optional[str]) -> Optional[str]:
+    if chain_id is None or not tx_hash:
+        return None
+
+    nft_cfg = get_chain_config(int(chain_id))
+    if nft_cfg is not None:
+        return nft_cfg.explorer_tx_url(tx_hash)
+
+    att_cfg = get_attestation_chain_config(int(chain_id))
+    if att_cfg is not None:
+        return att_cfg.explorer_tx_url(tx_hash)
+
+    return None
+
+
 async def require_counselor(current_user: User = Depends(get_current_active_user)) -> User:
     """Ensure the current user has counselor access."""
     if current_user.role not in {"counselor", "admin"}:
         raise HTTPException(status_code=403, detail="Counselor access required")
     return current_user
+
+
+@router.get("/agent-decisions", response_model=CounselorAgentDecisionListResponse)
+async def list_counselor_agent_decisions(
+    skip: int = Query(default=0, ge=0),
+    limit: int = Query(default=20, ge=1, le=100),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+) -> CounselorAgentDecisionListResponse:
+    role = (current_user.role or "").strip().lower()
+
+    stmt = select(AutopilotAction)
+
+    if role != "admin":
+        profile_query = select(CounselorProfile).where(CounselorProfile.user_id == current_user.id)
+        profile = (await db.execute(profile_query)).scalar_one_or_none()
+        if not profile:
+            raise HTTPException(status_code=404, detail="Counselor profile not found")
+
+        assigned_session_rows = (
+            await db.execute(
+                select(Case.session_id)
+                .where(Case.assigned_to == str(profile.id), Case.session_id.is_not(None))
+            )
+        ).scalars().all()
+        session_ids = [session_id for session_id in assigned_session_rows if session_id]
+
+        assigned_user_ids: set[int] = set()
+        if session_ids:
+            user_rows = (
+                await db.execute(
+                    select(Conversation.user_id).where(Conversation.session_id.in_(session_ids))
+                )
+            ).scalars().all()
+            assigned_user_ids = {int(user_id) for user_id in user_rows if user_id is not None}
+
+        if not assigned_user_ids:
+            return CounselorAgentDecisionListResponse(items=[], total=0)
+
+        user_id_texts = [str(user_id) for user_id in sorted(assigned_user_ids)]
+        stmt = stmt.where(AutopilotAction.payload_json.op("->>")("user_id").in_(user_id_texts))
+
+    count_stmt = stmt
+
+    rows = (
+        await db.execute(
+            stmt.order_by(AutopilotAction.created_at.desc()).offset(skip).limit(limit)
+        )
+    ).scalars().all()
+    total = len((await db.execute(count_stmt)).scalars().all())
+
+    attestation_ids: set[int] = set()
+    for row in rows:
+        payload = row.payload_json or {}
+        attestation_record_id = _to_int(payload.get("attestation_record_id"))
+        if attestation_record_id is not None:
+            attestation_ids.add(attestation_record_id)
+
+    attestation_map: dict[int, AttestationRecord] = {}
+    if attestation_ids:
+        attestation_rows = (
+            await db.execute(select(AttestationRecord).where(AttestationRecord.id.in_(attestation_ids)))
+        ).scalars().all()
+        attestation_map = {int(record.id): record for record in attestation_rows}
+
+    items: list[CounselorAgentDecisionItem] = []
+    for row in rows:
+        payload = row.payload_json or {}
+        attestation_record_id = _to_int(payload.get("attestation_record_id"))
+        attestation_record = attestation_map.get(attestation_record_id) if attestation_record_id is not None else None
+        attestation_tx_hash = None
+        attestation_schema = None
+        attestation_type = None
+        attestation_decision = None
+        attestation_feedback_redacted = None
+        if attestation_record is not None:
+            attestation_extra = attestation_record.extra_data or {}
+            attestation_tx_hash = _to_str(attestation_extra.get("tx_hash"))
+            attestation_schema = _to_str(attestation_extra.get("schema"))
+            attestation_type = _to_str(attestation_extra.get("attestation_type"))
+            attestation_decision = _to_str(attestation_extra.get("decision"))
+            attestation_feedback_redacted = _to_str(attestation_extra.get("feedback_redacted"))
+
+        items.append(
+            CounselorAgentDecisionItem(
+                id=int(row.id),
+                action_type=row.action_type.value,
+                policy_decision=row.policy_decision.value,
+                risk_level=row.risk_level,
+                status=row.status.value,
+                created_at=row.created_at,
+                executed_at=row.executed_at,
+                user_id=_to_int(payload.get("user_id")),
+                session_id=_to_str(payload.get("session_id")),
+                intent=_to_str(payload.get("intent")),
+                next_step=_to_str(payload.get("next_step")),
+                agent_reasoning=_to_str(payload.get("reasoning")),
+                requires_human_review=bool(row.requires_human_review),
+                approved_by=row.approved_by,
+                approval_notes=row.approval_notes,
+                chain_id=row.chain_id,
+                tx_hash=row.tx_hash,
+                explorer_tx_url=_build_explorer_url(row.chain_id, row.tx_hash),
+                attestation_record_id=attestation_record_id,
+                attestation_status=(attestation_record.status.value if attestation_record else None),
+                attestation_last_error=(attestation_record.last_error if attestation_record else None),
+                attestation_tx_hash=attestation_tx_hash,
+                attestation_schema=attestation_schema,
+                attestation_type=attestation_type,
+                attestation_decision=attestation_decision,
+                attestation_feedback_redacted=attestation_feedback_redacted,
+            )
+        )
+
+    return CounselorAgentDecisionListResponse(items=items, total=total)
 
 
 @router.get("/cases/{case_id}/assessments")
@@ -127,6 +351,53 @@ async def get_case_assessments(
         "screening_profile": screening,
         "triage_assessments": triage_payload,
     }
+
+
+@router.get("/cases/{case_id}/latest-attestation", response_model=CounselorCaseAttestationResponse)
+async def get_case_latest_attestation(
+    case_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+) -> CounselorCaseAttestationResponse:
+    profile_query = select(CounselorProfile).where(CounselorProfile.user_id == current_user.id)
+    profile = (await db.execute(profile_query)).scalar_one_or_none()
+    if not profile:
+        raise HTTPException(status_code=404, detail="Counselor profile not found")
+
+    case = (await db.execute(select(Case).where(Case.id == case_id))).scalar_one_or_none()
+    if not case:
+        raise HTTPException(status_code=404, detail="Case not found")
+
+    if case.assigned_to != str(profile.id):
+        raise HTTPException(status_code=403, detail="Not authorized for this case")
+
+    record = (
+        await db.execute(
+            select(AttestationRecord)
+            .where(AttestationRecord.extra_data.op("->>")("case_id") == str(case.id))
+            .order_by(AttestationRecord.created_at.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+    if record is None:
+        return CounselorCaseAttestationResponse(found=False)
+
+    extra = record.extra_data or {}
+    return CounselorCaseAttestationResponse(
+        found=True,
+        record_id=int(record.id),
+        status=record.status.value if hasattr(record.status, "value") else str(record.status),
+        schema=_to_str(extra.get("schema")),
+        attestation_type=_to_str(extra.get("attestation_type")),
+        decision=_to_str(extra.get("decision")),
+        feedback_redacted=_to_str(extra.get("feedback_redacted")),
+        tx_hash=_to_str(extra.get("tx_hash")),
+        chain_id=_to_int(extra.get("chain_id")),
+        autopilot_action_id=_to_int(extra.get("autopilot_action_id")),
+        created_at=record.created_at.isoformat() if record.created_at else None,
+        processed_at=record.processed_at.isoformat() if record.processed_at else None,
+    )
 
 
 async def get_counselor_profile(user: User, db: AsyncSession) -> CounselorProfile:
@@ -638,6 +909,18 @@ async def update_my_case_status(
                 detail=f"Invalid transition from {old_status} to {payload.status}"
             )
 
+    decision_event: str | None = None
+    if old_status in {'new', 'waiting'} and payload.status == 'in_progress':
+        decision_event = 'accepted'
+    elif old_status in {'new', 'waiting'} and payload.status == 'closed':
+        decision_event = 'rejected'
+
+    if decision_event == 'rejected' and not (payload.note or '').strip():
+        raise HTTPException(
+            status_code=400,
+            detail="Rejecting a newly assigned case requires justification note",
+        )
+
     case.status = CaseStatusEnum[payload.status]  # type: ignore[assignment]
 
     if payload.note:
@@ -648,14 +931,116 @@ async def update_my_case_status(
         )
         db.add(note)
 
+    critical_case_attestation: dict[str, Any] | None = None
+    if case.severity == CaseSeverityEnum.critical and decision_event in {'accepted', 'rejected'}:
+        linked_user_id: int | None = None
+        if case.session_id:
+            linked_user_id = (
+                await db.execute(
+                    select(Conversation.user_id)
+                    .where(Conversation.session_id == case.session_id)
+                    .limit(1)
+                )
+            ).scalar_one_or_none()
+
+        note_text = (payload.note or "").strip()
+        note_hash = hashlib.sha256(note_text.encode("utf-8")).hexdigest() if note_text else None
+        feedback_redacted = prelog_redact(note_text) if note_text else None
+
+        attestation_context = {
+            "schema": "aicare.critical_case.decision.v1",
+            "attestation_type": "critical_case_decision",
+            "decision": decision_event,
+            "case_id": str(case.id),
+            "status_before": old_status,
+            "status_after": payload.status,
+            "severity": "critical",
+            "session_id": case.session_id,
+            "user_hash": case.user_hash,
+            "user_id": linked_user_id,
+            "counselor_id": current_user.id,
+            "feedback_redacted": feedback_redacted,
+            "feedback_hash": note_hash,
+            "decision_at": datetime.utcnow().isoformat(),
+        }
+
+        payload_hash_hex = hash_payload(attestation_context)
+        record = AttestationRecord(
+            quest_instance_id=None,
+            counselor_id=current_user.id,
+            hashed_payload=payload_hash_hex,
+            status=AttestationStatusEnum.PENDING,
+            extra_data={
+                **attestation_context,
+                "autopilot_linked": True,
+            },
+        )
+        db.add(record)
+        await db.flush()
+
+        action_payload = {
+            "attestation_record_id": int(record.id),
+            "schema": "aicare.critical_case.decision.v1",
+            "payload_hash": f"0x{payload_hash_hex}",
+            "metadata_uri": "",
+            "case_id": str(case.id),
+            "session_id": case.session_id,
+            "user_hash": case.user_hash,
+            "user_id": linked_user_id,
+            "decision": decision_event,
+            "anonymized_result": f"critical_case_{decision_event}",
+            "feedback_redacted": feedback_redacted,
+        }
+
+        action = await enqueue_action(
+            db,
+            action_type=AutopilotActionType.publish_attestation,
+            risk_level="critical",
+            policy_decision=AutopilotPolicyDecision.allow,
+            idempotency_key=build_idempotency_key(
+                f"critical-case-attestation:{case.id}:{old_status}:{payload.status}:{record.id}"
+            ),
+            payload_json=action_payload,
+            requires_human_review=False,
+            commit=False,
+        )
+
+        extra = dict(record.extra_data or {})
+        extra["autopilot_action_id"] = int(action.id)
+        record.extra_data = extra
+
+        await record_audit_event(
+            db,
+            actor_id=current_user.id,
+            actor_role=current_user.role,
+            action="autopilot.critical_case_attestation_queued",
+            entity_type="case",
+            entity_id=str(case.id),
+            extra_data={
+                "attestation_record_id": int(record.id),
+                "autopilot_action_id": int(action.id),
+                "decision": decision_event,
+            },
+        )
+
+        critical_case_attestation = {
+            "record_id": int(record.id),
+            "autopilot_action_id": int(action.id),
+            "schema": "aicare.critical_case.decision.v1",
+            "decision": decision_event,
+        }
+
     await db.commit()
     await db.refresh(case)
 
-    return {
+    response_payload = {
         "case_id": str(case.id),
         "status": case.status.value if hasattr(case.status, 'value') else str(case.status),
         "message": f"Status updated to {payload.status}",
     }
+    if critical_case_attestation is not None:
+        response_payload["critical_case_attestation"] = critical_case_attestation
+    return response_payload
 
 
 class CounselorNoteCreate(BaseModel):

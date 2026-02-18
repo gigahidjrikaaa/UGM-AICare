@@ -1,7 +1,7 @@
 {
-  "run_id": "c1a62b0b39",
-  "started_at": "2026-02-16T08:08:29.692064+00:00",
-  "finished_at": "2026-02-16T08:08:38.980719+00:00",
+  "run_id": "e26a27390a",
+  "started_at": "2026-02-18T08:52:51.067641+00:00",
+  "finished_at": "2026-02-18T08:53:01.360689+00:00",
   "user": {
     "id": 1,
     "email": "komentatorugm@gmail.com"
@@ -12,45 +12,54 @@
   },
   "notes": {
     "flow_mode": "hybrid_seed_db_execute_api",
-    "onchain_mode": "placeholder",
+    "scenario": "mixed_operations",
+    "scenario_description": "Simulates mixed operation flow: badge minting with attestation publication under policy gating.",
+    "scenario_parameters": {
+      "action_a_type": "mint_badge",
+      "action_a_risk": "low",
+      "action_b_type": "publish_attestation",
+      "action_b_risk": "moderate",
+      "auto_approve": true
+    },
+    "onchain_mode": "real-or-unimplemented",
     "warning": "If onchain_mode=placeholder, tx hashes are synthetic and not real blockchain submissions."
   },
   "proof_snapshot": {
-    "count": 10,
+    "count": 16,
     "latest_action_ids": [
+      17,
+      16,
+      15,
+      14,
+      13,
+      12,
       11,
       10,
       9,
-      8,
-      7,
-      6,
-      5,
-      4,
-      3,
-      2
+      8
     ],
     "error": null
   },
   "actions": [
     {
-      "action_id": 10,
-      "action_type": "publish_attestation",
+      "action_id": 16,
+      "action_type": "mint_badge",
       "risk_level": "low",
       "policy_decision": "allow",
       "status": "confirmed",
-      "tx_hash": "0xa008b42ee2b0bed5a177727ea287d5171fb3e61bdd0dfe4e787e5a37e568c6aa",
+      "tx_hash": "0xdeb2c267a420058d674ade47ac0a2e9576c71653106ddc427b8f135457fddfe6",
       "chain_id": 656476,
-      "explorer_url": "https://edu-chain-testnet.blockscout.com/tx/0xa008b42ee2b0bed5a177727ea287d5171fb3e61bdd0dfe4e787e5a37e568c6aa"
+      "explorer_url": "https://edu-chain-testnet.blockscout.com/tx/0xdeb2c267a420058d674ade47ac0a2e9576c71653106ddc427b8f135457fddfe6"
     },
     {
-      "action_id": 11,
+      "action_id": 17,
       "action_type": "publish_attestation",
-      "risk_level": "high",
-      "policy_decision": "require_approval",
+      "risk_level": "moderate",
+      "policy_decision": "allow",
       "status": "confirmed",
-      "tx_hash": "0xd9a1f98d145fd5e3995674802d0dd3c910788455087fd1c72289f52505ecebe4",
+      "tx_hash": "0x873d94e766e0224bf6c088e8d3e2d969ab6cfdbadc97bb11fe8fa076bbb25182",
       "chain_id": 656476,
-      "explorer_url": "https://edu-chain-testnet.blockscout.com/tx/0xd9a1f98d145fd5e3995674802d0dd3c910788455087fd1c72289f52505ecebe4"
+      "explorer_url": "https://edu-chain-testnet.blockscout.com/tx/0x873d94e766e0224bf6c088e8d3e2d969ab6cfdbadc97bb11fe8fa076bbb25182"
     }
   ]
 }

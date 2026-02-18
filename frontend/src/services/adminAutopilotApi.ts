@@ -28,6 +28,28 @@ export interface AdminAutopilotListResponse {
   total: number;
 }
 
+export interface AdminAutopilotStatus {
+  enabled: boolean;
+  onchain_placeholder: boolean;
+  worker_interval_seconds: number;
+}
+
+export interface AdminAutopilotPolicy {
+  autopilot_enabled: boolean;
+  onchain_placeholder: boolean;
+  worker_interval_seconds: number;
+  require_approval_high_risk: boolean;
+  require_approval_critical_risk: boolean;
+}
+
+export interface UpdateAdminAutopilotPolicyPayload {
+  autopilot_enabled?: boolean;
+  onchain_placeholder?: boolean;
+  worker_interval_seconds?: number;
+  require_approval_high_risk?: boolean;
+  require_approval_critical_risk?: boolean;
+}
+
 export const listAutopilotActions = async (params: {
   status?: string;
   action_type?: string;
@@ -51,4 +73,21 @@ export const approveAutopilotAction = async (actionId: number, note?: string): P
 
 export const rejectAutopilotAction = async (actionId: number, note: string): Promise<void> => {
   await apiClient.post(`/admin/autopilot/actions/${actionId}/reject`, { note });
+};
+
+export const getAutopilotStatus = async (): Promise<AdminAutopilotStatus> => {
+  const response = await apiClient.get<AdminAutopilotStatus>(`/admin/autopilot/status`);
+  return response.data;
+};
+
+export const getAutopilotPolicy = async (): Promise<AdminAutopilotPolicy> => {
+  const response = await apiClient.get<AdminAutopilotPolicy>(`/admin/autopilot/policy`);
+  return response.data;
+};
+
+export const updateAutopilotPolicy = async (
+  payload: UpdateAdminAutopilotPolicyPayload,
+): Promise<AdminAutopilotPolicy> => {
+  const response = await apiClient.patch<AdminAutopilotPolicy>(`/admin/autopilot/policy`, payload);
+  return response.data;
 };

@@ -76,6 +76,7 @@ class BaseNFTClient:
         self._account = None
         self._contract = None
         self._initialized = False
+        self._last_error: Optional[str] = None
 
     # ------------------------------------------------------------------
     # Initialization
@@ -112,6 +113,7 @@ class BaseNFTClient:
                 "⚠️  [%s] Not fully configured. Missing: %s. NFT ops disabled.",
                 self.chain.name, ", ".join(missing),
             )
+            self._last_error = f"Missing configuration: {', '.join(missing)}"
             self._initialized = True
             return
 
@@ -125,6 +127,7 @@ class BaseNFTClient:
 
             if not self._w3.is_connected():
                 logger.error("❌ [%s] Failed to connect to RPC: %s", self.chain.name, rpc_url)
+                self._last_error = f"RPC not reachable: {rpc_url}"
                 self._w3 = None
                 self._initialized = True
                 return
@@ -139,9 +142,11 @@ class BaseNFTClient:
                 abi=abi,
             )
             logger.info("📝 [%s] Contract: %s", self.chain.name, contract_address)
+            self._last_error = None
 
         except Exception as exc:
             logger.error("❌ [%s] Init error: %s", self.chain.name, exc, exc_info=True)
+            self._last_error = str(exc)
             self._w3 = None
             self._account = None
             self._contract = None
@@ -156,6 +161,28 @@ class BaseNFTClient:
     def is_ready(self) -> bool:
         """True when the client can sign and send transactions."""
         return all([self._w3, self._account, self._contract])
+
+    def status_snapshot(self) -> dict[str, Optional[object]]:
+        rpc_connected = bool(self._w3 and self._w3.is_connected())
+        chain_id: Optional[int] = None
+        if self._w3 and rpc_connected:
+            try:
+                chain_id = int(self._w3.eth.chain_id)
+            except Exception:
+                chain_id = None
+
+        minter_address = None
+        if self._account is not None:
+            minter_address = self._account.address
+
+        return {
+            "is_ready": bool(self.is_ready),
+            "rpc_connected": rpc_connected,
+            "chain_id": chain_id,
+            "contract_address": self.chain.contract_address,
+            "minter_address": minter_address,
+            "last_error": self._last_error,
+        }
 
     # ------------------------------------------------------------------
     # Core operations (synchronous - run via ``run_in_threadpool``)

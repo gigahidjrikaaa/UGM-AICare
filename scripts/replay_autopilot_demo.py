@@ -28,6 +28,30 @@ EXPLORER_BASE_BY_CHAIN_ID: dict[int, str] = {
     56: "https://bscscan.com/tx/",
 }
 
+SCENARIO_DEFINITIONS: dict[str, dict[str, Any]] = {
+    "attestation_pipeline": {
+        "description": "Simulates attestation publication lane with one auto-allowed action and one approval-gated action.",
+        "action_a_type": "publish_attestation",
+        "action_a_risk": "low",
+        "action_b_type": "publish_attestation",
+        "action_b_risk": "high",
+    },
+    "case_management": {
+        "description": "Simulates case-management decisions: urgent case creation plus approval-gated follow-up check-in.",
+        "action_a_type": "create_case",
+        "action_a_risk": "high",
+        "action_b_type": "create_checkin",
+        "action_b_risk": "high",
+    },
+    "mixed_operations": {
+        "description": "Simulates mixed operation flow: badge minting with attestation publication under policy gating.",
+        "action_a_type": "mint_badge",
+        "action_a_risk": "low",
+        "action_b_type": "publish_attestation",
+        "action_b_risk": "moderate",
+    },
+}
+
 
 def _utc_now_iso() -> str:
     return datetime.now(timezone.utc).isoformat()
@@ -70,6 +94,42 @@ def _policy_decision(
     if risk_level in {"none", "low", "moderate"}:
         return "allow", False
     return "require_approval", True
+
+
+def _resolve_scenario_actions() -> dict[str, Any]:
+    scenario = os.getenv("AUTOPILOT_DEMO_SCENARIO", "attestation_pipeline").strip().lower()
+    if scenario not in SCENARIO_DEFINITIONS:
+        scenario = "attestation_pipeline"
+
+    defaults = SCENARIO_DEFINITIONS[scenario]
+    action_a_type = os.getenv("AUTOPILOT_DEMO_ACTION_A_TYPE", defaults["action_a_type"]).strip().lower()
+    action_a_risk = os.getenv("AUTOPILOT_DEMO_ACTION_A_RISK", defaults["action_a_risk"]).strip().lower()
+    action_b_type = os.getenv("AUTOPILOT_DEMO_ACTION_B_TYPE", defaults["action_b_type"]).strip().lower()
+    action_b_risk = os.getenv("AUTOPILOT_DEMO_ACTION_B_RISK", defaults["action_b_risk"]).strip().lower()
+
+    allowed_action_types = {"publish_attestation", "mint_badge", "create_checkin", "create_case"}
+    allowed_risk_levels = {"none", "low", "moderate", "high", "critical"}
+
+    if action_a_type not in allowed_action_types:
+        action_a_type = defaults["action_a_type"]
+    if action_b_type not in allowed_action_types:
+        action_b_type = defaults["action_b_type"]
+    if action_a_risk not in allowed_risk_levels:
+        action_a_risk = defaults["action_a_risk"]
+    if action_b_risk not in allowed_risk_levels:
+        action_b_risk = defaults["action_b_risk"]
+
+    auto_approve = os.getenv("AUTOPILOT_DEMO_AUTO_APPROVE", "true").strip().lower() in {"1", "true", "yes", "on"}
+
+    return {
+        "scenario": scenario,
+        "description": defaults["description"],
+        "action_a_type": action_a_type,
+        "action_a_risk": action_a_risk,
+        "action_b_type": action_b_type,
+        "action_b_risk": action_b_risk,
+        "auto_approve": auto_approve,
+    }
 
 
 async def _resolve_demo_user() -> dict[str, Any]:
@@ -352,20 +412,21 @@ async def run_demo() -> dict[str, Any]:
 
     user = await _resolve_demo_user()
     user_id = int(user["id"])
+    scenario_config = _resolve_scenario_actions()
 
-    # Action A (allow): low-risk publish_attestation
+    # Action A (scenario-defined)
     allow_action = await _enqueue_demo_action(
         user_id=user_id,
-        action_type="publish_attestation",
-        risk_level="low",
+        action_type=scenario_config["action_a_type"],
+        risk_level=scenario_config["action_a_risk"],
         run_id=run_id,
     )
 
-    # Action B (approval required): high-risk publish_attestation
+    # Action B (scenario-defined)
     approval_action = await _enqueue_demo_action(
         user_id=user_id,
-        action_type="publish_attestation",
-        risk_level="high",
+        action_type=scenario_config["action_b_type"],
+        risk_level=scenario_config["action_b_risk"],
         run_id=run_id,
     )
 
@@ -373,7 +434,7 @@ async def run_demo() -> dict[str, Any]:
     token, auth_user = await _api_login()
     reviewer_id = int(auth_user.get("id") or user_id)
 
-    if approval_action.get("status") == "awaiting_approval":
+    if scenario_config["auto_approve"] and approval_action.get("status") == "awaiting_approval":
         async with httpx.AsyncClient(timeout=60.0) as client:
             await _api_approve_action(
                 client,
@@ -441,6 +502,15 @@ async def run_demo() -> dict[str, Any]:
         },
         "notes": {
             "flow_mode": "hybrid_seed_db_execute_api",
+            "scenario": scenario_config["scenario"],
+            "scenario_description": scenario_config["description"],
+            "scenario_parameters": {
+                "action_a_type": scenario_config["action_a_type"],
+                "action_a_risk": scenario_config["action_a_risk"],
+                "action_b_type": scenario_config["action_b_type"],
+                "action_b_risk": scenario_config["action_b_risk"],
+                "auto_approve": scenario_config["auto_approve"],
+            },
             "onchain_mode": "placeholder" if os.getenv("AUTOPILOT_ONCHAIN_PLACEHOLDER", "true").strip().lower() in {"1", "true", "yes", "on"} else "real-or-unimplemented",
             "warning": "If onchain_mode=placeholder, tx hashes are synthetic and not real blockchain submissions.",
         },

@@ -1,26 +1,27 @@
 'use client';
 
-import { useState, useEffect, Fragment } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   FiClock,
   FiUser,
-  FiMessageSquare,
   FiCheckCircle,
   FiEye,
-  FiEdit,
   FiRefreshCw,
   FiAlertTriangle,
   FiMail,
   FiPhone,
   FiSend,
+  FiX,
+  FiXCircle,
 } from 'react-icons/fi';
+import toast from 'react-hot-toast';
 import apiClient from '@/services/api';
 
 interface Case {
   id: string;
   user_hash: string;
   severity: 'low' | 'med' | 'high' | 'critical';
-  status: 'new' | 'in_progress' | 'waiting' | 'closed';
+  status: 'new' | 'in_progress' | 'waiting' | 'closed' | 'resolved';
   created_at: string;
   updated_at: string;
   assigned_to?: string;
@@ -65,6 +66,33 @@ interface CaseAssessmentsResponse {
   }>;
 }
 
+interface CaseStatusUpdateResponse {
+  case_id: string;
+  status: string;
+  message: string;
+  critical_case_attestation?: {
+    record_id: number;
+    autopilot_action_id: number;
+    schema: string;
+    decision: 'accepted' | 'rejected';
+  };
+}
+
+interface CaseLatestAttestationResponse {
+  found: boolean;
+  record_id?: number;
+  status?: string;
+  schema?: string;
+  attestation_type?: string;
+  decision?: string;
+  feedback_redacted?: string;
+  tx_hash?: string;
+  chain_id?: number;
+  autopilot_action_id?: number;
+  created_at?: string;
+  processed_at?: string;
+}
+
 const severityColors = {
   low: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
   med: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/30',
@@ -76,6 +104,7 @@ const statusColors = {
   new: 'bg-purple-500/20 text-purple-300',
   in_progress: 'bg-blue-500/20 text-blue-300',
   waiting: 'bg-yellow-500/20 text-yellow-300',
+  resolved: 'bg-emerald-500/20 text-emerald-300',
   closed: 'bg-gray-500/20 text-gray-300',
 };
 
@@ -86,9 +115,14 @@ export default function CounselorCasesPage() {
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
-  const [expandedCaseId, setExpandedCaseId] = useState<string | null>(null);
   const [assessmentsByCaseId, setAssessmentsByCaseId] = useState<Record<string, CaseAssessmentsResponse | null>>({});
   const [loadingAssessments, setLoadingAssessments] = useState<string | null>(null);
+  const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
+  const [actingCaseId, setActingCaseId] = useState<string | null>(null);
+  const [rejectNote, setRejectNote] = useState('');
+  const [lastAttestationMessage, setLastAttestationMessage] = useState<string | null>(null);
+  const [latestAttestationByCaseId, setLatestAttestationByCaseId] = useState<Record<string, CaseLatestAttestationResponse | null>>({});
+  const [loadingLatestAttestation, setLoadingLatestAttestation] = useState<string | null>(null);
 
   useEffect(() => {
     loadCases();
@@ -127,19 +161,21 @@ export default function CounselorCasesPage() {
     });
   };
 
-  const filteredCases = cases.filter((c) => {
+  const filteredCases = useMemo(() => cases.filter((c) => {
     const statusMatch = filterStatus === 'all' || c.status === filterStatus;
     const severityMatch = filterSeverity === 'all' || c.severity === filterSeverity;
     return statusMatch && severityMatch;
-  });
+  }), [cases, filterStatus, filterSeverity]);
 
-  const toggleCaseDetails = async (caseId: string) => {
-    if (expandedCaseId === caseId) {
-      setExpandedCaseId(null);
-      return;
-    }
+  const selectedCase = useMemo(
+    () => (selectedCaseId ? cases.find((caseItem) => caseItem.id === selectedCaseId) ?? null : null),
+    [cases, selectedCaseId],
+  );
 
-    setExpandedCaseId(caseId);
+  const openCaseDetails = async (caseId: string) => {
+    setSelectedCaseId(caseId);
+    setRejectNote('');
+    setLastAttestationMessage(null);
     if (assessmentsByCaseId[caseId] !== undefined) return;
 
     setLoadingAssessments(caseId);
@@ -153,6 +189,80 @@ export default function CounselorCasesPage() {
       setLoadingAssessments(null);
     }
   };
+
+  const loadLatestAttestation = async (caseId: string) => {
+    setLoadingLatestAttestation(caseId);
+    try {
+      const response = await apiClient.get<CaseLatestAttestationResponse>(`/counselor/cases/${caseId}/latest-attestation`);
+      setLatestAttestationByCaseId((prev) => ({ ...prev, [caseId]: response.data }));
+    } catch (latestError) {
+      console.error('Failed to load latest attestation:', latestError);
+      setLatestAttestationByCaseId((prev) => ({ ...prev, [caseId]: null }));
+    } finally {
+      setLoadingLatestAttestation(null);
+    }
+  };
+
+  const closeCaseDetails = () => {
+    setSelectedCaseId(null);
+    setRejectNote('');
+    setLastAttestationMessage(null);
+  };
+
+  const isReceivable = (caseItem: Case) => ['new', 'waiting'].includes(caseItem.status);
+
+  const updateCaseStatus = async (caseItem: Case, status: 'in_progress' | 'closed', note?: string) => {
+    try {
+      setActingCaseId(caseItem.id);
+      const response = await apiClient.put<CaseStatusUpdateResponse>(`/counselor/cases/${caseItem.id}/status`, {
+        status,
+        note,
+      });
+
+      setCases((prev) => prev.map((existing) => (
+        existing.id === caseItem.id
+          ? { ...existing, status: response.data.status as Case['status'], updated_at: new Date().toISOString() }
+          : existing
+      )));
+
+      await loadStats();
+      toast.success(response.data.message || 'Case updated');
+
+      if (response.data.critical_case_attestation) {
+        const info = response.data.critical_case_attestation;
+        setLastAttestationMessage(
+          `Critical-case attestation queued: decision=${info.decision}, action #${info.autopilot_action_id}`,
+        );
+        await loadLatestAttestation(caseItem.id);
+      }
+    } catch (updateError) {
+      console.error('Failed to update case status:', updateError);
+      toast.error('Failed to update case status');
+    } finally {
+      setActingCaseId(null);
+    }
+  };
+
+  const onAcceptCase = async () => {
+    if (!selectedCase) return;
+    await updateCaseStatus(selectedCase, 'in_progress', 'Accepted by counselor');
+  };
+
+  const onRejectCase = async () => {
+    if (!selectedCase) return;
+    const note = rejectNote.trim();
+    if (!note) {
+      toast.error('Rejecting a case requires justification');
+      return;
+    }
+    await updateCaseStatus(selectedCase, 'closed', note);
+  };
+
+  useEffect(() => {
+    if (!selectedCaseId) return;
+    if (latestAttestationByCaseId[selectedCaseId] !== undefined) return;
+    loadLatestAttestation(selectedCaseId).catch(() => undefined);
+  }, [latestAttestationByCaseId, selectedCaseId]);
 
   const normalizePhoneForWhatsApp = (phoneRaw: string) => {
     // wa.me expects digits only, ideally E.164 without plus.
@@ -326,8 +436,8 @@ export default function CounselorCasesPage() {
                 </tr>
               ) : (
                 filteredCases.map((caseItem) => (
-                  <Fragment key={caseItem.id}>
                   <tr 
+                    key={caseItem.id}
                     className="hover:bg-white/5 transition-colors"
                   >
                     <td className="px-4 py-4 whitespace-nowrap">
@@ -394,14 +504,17 @@ export default function CounselorCasesPage() {
                         >
                           <FiSend className="w-3 h-3" />
                         </button>
-                        <button 
-                          className="px-2 py-1 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-xs text-white/70 hover:text-white transition-all"
-                          title="Edit case"
-                        >
-                          <FiEdit className="w-3 h-3" />
-                        </button>
+                        {isReceivable(caseItem) && (
+                          <button
+                            onClick={() => updateCaseStatus(caseItem, 'in_progress', 'Accepted from case list')}
+                            disabled={actingCaseId === caseItem.id}
+                            className="px-3 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 rounded text-xs font-medium text-emerald-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            Receive
+                          </button>
+                        )}
                         <button
-                          onClick={() => toggleCaseDetails(caseItem.id)}
+                          onClick={() => openCaseDetails(caseItem.id)}
                           className="px-3 py-1 bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 rounded text-xs font-medium text-[#FFCA40] transition-all flex items-center gap-1"
                           title="View risk assessment transparency"
                         >
@@ -411,105 +524,208 @@ export default function CounselorCasesPage() {
                       </div>
                     </td>
                   </tr>
-                  {expandedCaseId === caseItem.id && (
-                    <tr key={`${caseItem.id}-details`} className="bg-black/20">
-                      <td colSpan={8} className="px-4 py-4">
-                        {loadingAssessments === caseItem.id ? (
-                          <div className="text-sm text-white/60 flex items-center gap-2">
-                            <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-[#FFCA40]"></div>
-                            Loading risk assessment…
-                          </div>
-                        ) : assessmentsByCaseId[caseItem.id] ? (
-                          <div className="space-y-4">
-                            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                              <div className="text-xs text-white/60 mb-2">Case summary (redacted)</div>
-                              <div className="text-sm text-white/80 whitespace-pre-wrap">
-                                {caseItem.summary_redacted || 'No summary available.'}
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                              <div className="text-xs text-white/60 mb-2">Screening profile (aggregated)</div>
-                              {assessmentsByCaseId[caseItem.id]?.screening_profile ? (
-                                <div className="space-y-2">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-sm text-white/70">Overall risk</span>
-                                    <span className="text-sm font-semibold text-white">
-                                      {assessmentsByCaseId[caseItem.id]?.screening_profile?.overall_risk}
-                                    </span>
-                                  </div>
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-sm text-white/70">Requires attention</span>
-                                    <span className="text-sm text-white">
-                                      {assessmentsByCaseId[caseItem.id]?.screening_profile?.requires_attention ? 'Yes' : 'No'}
-                                    </span>
-                                  </div>
-                                  <div className="text-sm text-white/70">
-                                    <div className="text-xs text-white/50">Primary concerns</div>
-                                    <div className="text-white/80">
-                                      {(assessmentsByCaseId[caseItem.id]?.screening_profile?.primary_concerns || []).slice(0, 6).join(', ') || '—'}
-                                    </div>
-                                  </div>
-                                  <div className="text-sm text-white/70">
-                                    <div className="text-xs text-white/50">Protective factors</div>
-                                    <div className="text-white/80">
-                                      {(assessmentsByCaseId[caseItem.id]?.screening_profile?.protective_factors || []).slice(0, 6).join(', ') || '—'}
-                                    </div>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="text-sm text-white/60">No screening profile found.</div>
-                              )}
-                            </div>
-
-                            <div className="bg-white/5 border border-white/10 rounded-xl p-4">
-                              <div className="text-xs text-white/60 mb-2">Recent triage assessments (STA)</div>
-                              {(assessmentsByCaseId[caseItem.id]?.triage_assessments || []).length === 0 ? (
-                                <div className="text-sm text-white/60">No triage assessments available.</div>
-                              ) : (
-                                <div className="space-y-3">
-                                  {assessmentsByCaseId[caseItem.id]?.triage_assessments.slice(0, 3).map((t) => (
-                                    <div key={t.id} className="bg-black/20 border border-white/10 rounded-lg p-3">
-                                      <div className="flex items-center justify-between gap-2">
-                                        <div className="text-sm text-white font-semibold">
-                                          {t.severity_level} (score {t.risk_score.toFixed(2)})
-                                        </div>
-                                        <div className="text-xs text-white/50">
-                                          {t.created_at ? formatDate(t.created_at) : ''}
-                                        </div>
-                                      </div>
-                                      <div className="text-xs text-white/60 mt-1">
-                                        intent: {t.intent || '—'} | next: {t.next_step || '—'} | action: {t.recommended_action || '—'}
-                                      </div>
-                                      <div className="text-xs text-white/60 mt-2">
-                                        factors: {(t.risk_factors || []).slice(0, 4).join(' | ') || '—'}
-                                      </div>
-                                      {t.diagnostic_notes_redacted && (
-                                        <div className="text-xs text-white/60 mt-2">
-                                          notes: <span className="text-white/80">{t.diagnostic_notes_redacted}</span>
-                                        </div>
-                                      )}
-                                    </div>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="text-sm text-red-300">Failed to load risk assessment details.</div>
-                        )}
-                      </td>
-                    </tr>
-                  )}
-                  </Fragment>
                 ))
               )}
             </tbody>
           </table>
         </div>
       </div>
+
+      {selectedCase && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
+          <div className="max-h-[90vh] w-full max-w-5xl overflow-hidden rounded-2xl border border-white/15 bg-[#001A4D] shadow-2xl">
+            <div className="flex items-start justify-between border-b border-white/10 p-5">
+              <div>
+                <h2 className="text-xl font-semibold text-white">Case Details</h2>
+                <p className="mt-1 text-sm text-white/60">Case #{selectedCase.id.substring(0, 8)} · {selectedCase.status.replace('_', ' ')}</p>
+              </div>
+              <button
+                onClick={closeCaseDetails}
+                className="rounded-lg border border-white/20 p-2 text-white/70 hover:text-white"
+                aria-label="Close case details"
+              >
+                <FiX className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="max-h-[calc(90vh-180px)] overflow-y-auto p-5 space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                  <div className="text-xs text-white/50">Severity</div>
+                  <div className="mt-1">
+                    <span className={`px-2 py-1 rounded text-xs font-medium border ${severityColors[selectedCase.severity]}`}>
+                      {selectedCase.severity}
+                    </span>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                  <div className="text-xs text-white/50">Patient Hash</div>
+                  <div className="mt-1 text-xs font-mono text-white/80">{selectedCase.user_hash}</div>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-white/5 p-3">
+                  <div className="text-xs text-white/50">Updated</div>
+                  <div className="mt-1 text-sm text-white/80">{formatDate(selectedCase.updated_at)}</div>
+                </div>
+              </div>
+
+              <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                <div className="text-xs text-white/60 mb-2">Case summary (redacted)</div>
+                <div className="text-sm text-white/80 whitespace-pre-wrap">
+                  {selectedCase.summary_redacted || 'No summary available.'}
+                </div>
+              </div>
+
+              {loadingAssessments === selectedCase.id ? (
+                <div className="text-sm text-white/60 flex items-center gap-2">
+                  <div className="inline-block animate-spin rounded-full h-4 w-4 border-b-2 border-[#FFCA40]"></div>
+                  Loading risk assessment…
+                </div>
+              ) : assessmentsByCaseId[selectedCase.id] ? (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                    <div className="text-xs text-white/60 mb-2">Screening profile (aggregated)</div>
+                    {assessmentsByCaseId[selectedCase.id]?.screening_profile ? (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-white/70">Overall risk</span>
+                          <span className="text-sm font-semibold text-white">
+                            {assessmentsByCaseId[selectedCase.id]?.screening_profile?.overall_risk}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm text-white/70">Requires attention</span>
+                          <span className="text-sm text-white">
+                            {assessmentsByCaseId[selectedCase.id]?.screening_profile?.requires_attention ? 'Yes' : 'No'}
+                          </span>
+                        </div>
+                        <div className="text-sm text-white/70">
+                          <div className="text-xs text-white/50">Primary concerns</div>
+                          <div className="text-white/80">
+                            {(assessmentsByCaseId[selectedCase.id]?.screening_profile?.primary_concerns || []).slice(0, 6).join(', ') || '—'}
+                          </div>
+                        </div>
+                        <div className="text-sm text-white/70">
+                          <div className="text-xs text-white/50">Protective factors</div>
+                          <div className="text-white/80">
+                            {(assessmentsByCaseId[selectedCase.id]?.screening_profile?.protective_factors || []).slice(0, 6).join(', ') || '—'}
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="text-sm text-white/60">No screening profile found.</div>
+                    )}
+                  </div>
+
+                  <div className="bg-white/5 border border-white/10 rounded-xl p-4">
+                    <div className="text-xs text-white/60 mb-2">Recent triage assessments (STA)</div>
+                    {(assessmentsByCaseId[selectedCase.id]?.triage_assessments || []).length === 0 ? (
+                      <div className="text-sm text-white/60">No triage assessments available.</div>
+                    ) : (
+                      <div className="space-y-3">
+                        {assessmentsByCaseId[selectedCase.id]?.triage_assessments.slice(0, 3).map((triage) => (
+                          <div key={triage.id} className="bg-black/20 border border-white/10 rounded-lg p-3">
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="text-sm text-white font-semibold">
+                                {triage.severity_level} (score {triage.risk_score.toFixed(2)})
+                              </div>
+                              <div className="text-xs text-white/50">
+                                {triage.created_at ? formatDate(triage.created_at) : ''}
+                              </div>
+                            </div>
+                            <div className="text-xs text-white/60 mt-1">
+                              intent: {triage.intent || '—'} | next: {triage.next_step || '—'} | action: {triage.recommended_action || '—'}
+                            </div>
+                            <div className="text-xs text-white/60 mt-2">
+                              factors: {(triage.risk_factors || []).slice(0, 4).join(' | ') || '—'}
+                            </div>
+                            {triage.diagnostic_notes_redacted && (
+                              <div className="text-xs text-white/60 mt-2">
+                                notes: <span className="text-white/80">{triage.diagnostic_notes_redacted}</span>
+                              </div>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="text-sm text-red-300">Failed to load risk assessment details.</div>
+              )}
+
+              {lastAttestationMessage && (
+                <div className="rounded-lg border border-emerald-300/30 bg-emerald-500/10 p-3 text-sm text-emerald-200">
+                  {lastAttestationMessage}
+                </div>
+              )}
+
+              <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+                <h3 className="text-sm font-semibold text-white">Latest Linked Attestation</h3>
+                {loadingLatestAttestation === selectedCase.id ? (
+                  <p className="mt-2 text-xs text-white/60">Loading attestation details...</p>
+                ) : (() => {
+                  const latest = latestAttestationByCaseId[selectedCase.id];
+                  if (!latest?.found) {
+                    return <p className="mt-2 text-xs text-white/60">No linked attestation yet for this case.</p>;
+                  }
+                  return (
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-3 text-xs text-white/80">
+                      <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                        <p>Record ID: <span className="text-white">{latest.record_id ?? '-'}</span></p>
+                        <p className="mt-1">Status: <span className="text-white">{latest.status ?? '-'}</span></p>
+                        <p className="mt-1">Schema: <span className="text-white">{latest.schema ?? '-'}</span></p>
+                        <p className="mt-1">Type: <span className="text-white">{latest.attestation_type ?? '-'}</span></p>
+                      </div>
+                      <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+                        <p>Decision: <span className="text-white">{latest.decision ?? '-'}</span></p>
+                        <p className="mt-1">Autopilot Action: <span className="text-white">{latest.autopilot_action_id ?? '-'}</span></p>
+                        <p className="mt-1">Chain ID: <span className="text-white">{latest.chain_id ?? '-'}</span></p>
+                        <p className="mt-1">Tx Hash: <span className="text-white break-all">{latest.tx_hash ?? '-'}</span></p>
+                      </div>
+                      {latest.feedback_redacted && (
+                        <div className="md:col-span-2 rounded-lg border border-white/10 bg-black/20 p-3">
+                          <p className="text-white/60">Feedback (redacted)</p>
+                          <p className="mt-1 text-white/80 whitespace-pre-wrap">{latest.feedback_redacted}</p>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })()}
+              </div>
+
+              {isReceivable(selectedCase) && (
+                <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
+                  <h3 className="text-sm font-semibold text-white">Decision</h3>
+                  <p className="text-xs text-white/60">Accept receives this case into active handling. Reject closes the case and requires justification.</p>
+                  <textarea
+                    value={rejectNote}
+                    onChange={(event) => setRejectNote(event.target.value)}
+                    rows={3}
+                    placeholder="Required if rejecting this case"
+                    className="w-full rounded-lg border border-white/20 bg-[#001D58] px-3 py-2 text-sm text-white"
+                  />
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      onClick={onAcceptCase}
+                      disabled={actingCaseId === selectedCase.id}
+                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/20 px-3 py-2 text-sm text-emerald-300 border border-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FiCheckCircle className="h-4 w-4" /> Accept Case
+                    </button>
+                    <button
+                      onClick={onRejectCase}
+                      disabled={actingCaseId === selectedCase.id}
+                      className="inline-flex items-center gap-2 rounded-lg bg-red-500/20 px-3 py-2 text-sm text-red-300 border border-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <FiXCircle className="h-4 w-4" /> Reject Case
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -278,6 +278,33 @@ This project is guided by three core research questions:
 
 ---
 
+## 🏁 Hackathon Focus: Aika Autopilot + Onchain Attestation Ledger
+
+This section summarizes the exact feature set implemented for hackathon judging.
+
+### What the system does
+
+- **Policy-governed autonomy:** Aika routes operational actions into an autopilot control plane with explicit decisions (`allow`, `require_approval`, `deny`).
+- **Human approval gates:** High-risk paths are queued for admin review before execution (`/admin/autopilot`).
+- **Durable execution worker:** Queued actions run with retry scheduling and dead-letter handling to preserve execution traceability.
+- **Onchain attestation path:** Confirmed autopilot actions store `tx_hash` and `chain_id` for ledger-style verification.
+- **Proof timeline:** User-facing and admin-facing proof views expose lifecycle states from queue to confirmation (`/proof`).
+- **Replayable evidence:** Deterministic replay script exports artifact JSON for reproducible demo checks (`docs/autopilot_demo_artifact.json`).
+
+### Verification surfaces for judges
+
+- **Admin queue UI:** `/admin/autopilot` (approval and status transition visibility).
+- **Proof UI:** `/proof` (status, tx hash, explorer link visibility).
+- **Admin APIs:** `/api/v1/admin/autopilot/actions`, `/api/v1/admin/autopilot/actions/{id}/approve`, `/api/v1/admin/autopilot/actions/{id}/reject`.
+- **Proof API:** `/api/v1/proof/actions`.
+- **Demo runbook:** `docs/AUTOPILOT_DEMO_RUNBOOK.md`.
+
+### Safety note on current demo mode
+
+- If `AUTOPILOT_ONCHAIN_PLACEHOLDER=true`, tx hashes are synthetic placeholders and no real chain submission occurs.
+- Backend startup and worker logs include explicit warnings for placeholder tx generation.
+- Switching to real onchain submission requires replacing placeholder handlers in autopilot execution paths.
+
 ## 🤖 Autopilot Demo Replay
 
 UGM-AICare includes a deterministic replay harness for the Aika Autopilot flow.

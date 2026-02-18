@@ -46,13 +46,14 @@ Decision values:
 | none | allow | deny | allow | allow |
 | low | allow | deny | allow | allow |
 | moderate | allow | require_approval | allow | allow |
-| high | require_approval | allow | require_approval | require_approval |
-| critical | require_approval | allow | require_approval | require_approval |
+| high | require_approval | allow | require_approval | allow |
+| critical | require_approval | allow | require_approval | allow |
 
 Rationale:
 
 - `create_case` at high/critical remains `allow` to preserve safety escalation latency.
-- User-facing or onchain actions (`mint_badge`, `publish_attestation`) are approval-gated for high/critical.
+- Reward-like onchain actions (`mint_badge`) stay approval-gated for high/critical.
+- Audit attestations (`publish_attestation`) are always auto-allowed to preserve continuous verifiability of agentic flow.
 - `create_case` at none/low is denied to avoid unnecessary escalation noise.
 
 ---

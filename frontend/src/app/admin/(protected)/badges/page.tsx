@@ -26,6 +26,12 @@ function formatTimestamp(ts?: string | null): string {
   return d.toLocaleString();
 }
 
+function statusClass(status: BadgeTemplateStatus): string {
+  if (status === 'PUBLISHED') return 'border-emerald-300/30 bg-emerald-500/10 text-emerald-200';
+  if (status === 'ARCHIVED') return 'border-white/20 bg-white/10 text-white/70';
+  return 'border-amber-300/30 bg-amber-500/10 text-amber-200';
+}
+
 export default function AdminBadgesPage() {
   const { t } = useI18n();
 
@@ -87,6 +93,12 @@ export default function AdminBadgesPage() {
     const tokenId = Number.parseInt(newTokenId, 10);
     return Number.isFinite(tokenId) && tokenId >= 0 && newName.trim().length > 0;
   }, [newTokenId, newName]);
+
+  const templateCounts = useMemo(() => {
+    const draft = templates.filter((item) => item.status === 'DRAFT').length;
+    const published = templates.filter((item) => item.status === 'PUBLISHED').length;
+    return { total: templates.length, draft, published };
+  }, [templates]);
 
   const onCreate = useCallback(async () => {
     const tokenId = Number.parseInt(newTokenId, 10);
@@ -311,24 +323,53 @@ export default function AdminBadgesPage() {
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-semibold text-white">{t('admin.badges.title', 'Multi-Chain Badges')}</h1>
-          <p className="text-sm text-white/60">
-            {t(
-              'admin.badges.subtitle',
-              'Create drafts, upload images to IPFS, publish metadata on-chain, and mint NFTs to users across multiple chains'
-            )}
-          </p>
+      <div className="rounded-2xl border border-white/10 bg-linear-to-r from-white/10 via-white/5 to-transparent p-5">
+        <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <h1 className="text-2xl font-semibold text-white">{t('admin.badges.title', 'EDU Badges')}</h1>
+            <p className="mt-1 text-sm text-white/70">
+              {t(
+                'admin.badges.subtitle',
+                'Simple flow for non-technical admins: create draft, upload image, publish on-chain metadata, then mint to students.'
+              )}
+            </p>
+          </div>
+          <div className="grid grid-cols-3 gap-2 text-xs">
+            <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-center">
+              <div className="text-white/60">Total</div>
+              <div className="text-lg font-semibold text-white">{templateCounts.total}</div>
+            </div>
+            <div className="rounded-lg border border-amber-300/20 bg-amber-500/10 px-3 py-2 text-center">
+              <div className="text-amber-200/80">Drafts</div>
+              <div className="text-lg font-semibold text-amber-200">{templateCounts.draft}</div>
+            </div>
+            <div className="rounded-lg border border-emerald-300/20 bg-emerald-500/10 px-3 py-2 text-center">
+              <div className="text-emerald-200/80">Published</div>
+              <div className="text-lg font-semibold text-emerald-200">{templateCounts.published}</div>
+            </div>
+          </div>
         </div>
-        <Button onClick={refresh} disabled={isLoading}>
-          {isLoading ? t('admin.badges.loading', 'Loading...') : t('admin.badges.refresh', 'Refresh')}
-        </Button>
+        <div className="mt-4 grid grid-cols-1 gap-2 text-xs md:grid-cols-4">
+          <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white/80"><span className="font-semibold text-white">1.</span> Create badge draft</div>
+          <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white/80"><span className="font-semibold text-white">2.</span> Upload badge image</div>
+          <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white/80"><span className="font-semibold text-white">3.</span> Publish metadata on-chain</div>
+          <div className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-white/80"><span className="font-semibold text-white">4.</span> Mint badge to student</div>
+        </div>
+        <div className="mt-4">
+          <Button onClick={refresh} disabled={isLoading}>
+            {isLoading ? t('admin.badges.loading', 'Loading...') : t('admin.badges.refresh', 'Refresh')}
+          </Button>
+        </div>
       </div>
 
-      <section className="rounded-lg border border-white/10 bg-white/5 p-4">
-        <h2 className="text-lg font-medium text-white">{t('admin.badges.create_title', 'Create badge draft')}</h2>
-        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-4">
+      <section className="rounded-xl border border-white/10 bg-white/5 p-4">
+        <div className="flex items-center gap-2">
+          <h2 className="text-lg font-medium text-white">{t('admin.badges.create_title', 'Add New Badge')}</h2>
+          <span className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[11px] text-white/70">Step 1</span>
+        </div>
+        <p className="mt-1 text-sm text-white/60">Fill the basics below, then create the draft. Upload and publish actions are available in the template list.</p>
+
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
           <Input
             name="token_id"
             type="number"
@@ -341,24 +382,26 @@ export default function AdminBadgesPage() {
           />
           <Input
             name="name"
-            label={t('admin.badges.name', 'Name')}
+            label={t('admin.badges.name', 'Badge Name')}
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
-            placeholder={t('admin.badges.name', 'Name')}
-            aria-label={t('admin.badges.name', 'Name')}
+            placeholder={t('admin.badges.name', 'Badge Name')}
+            aria-label={t('admin.badges.name', 'Badge Name')}
             className="w-full pl-3 pr-3 py-2 bg-white/8 border border-white/15 rounded-lg text-white"
           />
-          {/* Chain selector */}
+        </div>
+
+        <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
           <div className="flex flex-col gap-1">
             <label htmlFor="chain_select" className="text-xs font-medium text-white/70">
-              {t('admin.badges.chain', 'Chain')}
+              {t('admin.badges.chain', 'Target Chain')}
             </label>
             <select
               id="chain_select"
               value={selectedChainId ?? ''}
               onChange={(e) => setSelectedChainId(e.target.value ? Number(e.target.value) : undefined)}
               className="w-full rounded-lg border border-white/15 bg-white/8 px-3 py-2 text-sm text-white"
-              aria-label={t('admin.badges.chain', 'Chain')}
+              aria-label={t('admin.badges.chain', 'Target Chain')}
             >
               <option value="">{t('admin.badges.default_chain', 'Default (EDU Chain)')}</option>
               {chains.map((c) => (
@@ -368,12 +411,11 @@ export default function AdminBadgesPage() {
               ))}
             </select>
           </div>
-          <div className="flex items-end">
-            <Button onClick={onCreate} disabled={!canCreate} className="w-full">
-              {t('admin.badges.create', 'Create')}
-            </Button>
+          <div className="rounded-lg border border-white/10 bg-black/20 p-3 text-xs text-white/70">
+            Only chains marked as configured are selectable. If a chain is disabled, complete RPC and contract setup first.
           </div>
         </div>
+
         <div className="mt-3">
           <Textarea
             value={newDescription}
@@ -382,6 +424,7 @@ export default function AdminBadgesPage() {
             aria-label={t('admin.badges.description', 'Description (optional)')}
           />
         </div>
+
         <div className="mt-3 rounded-lg border border-white/10 bg-white/5 p-3">
           <label className="flex items-center gap-2 text-sm text-white/80">
             <input
@@ -389,7 +432,7 @@ export default function AdminBadgesPage() {
               checked={newAutoAwardEnabled}
               onChange={(e) => setNewAutoAwardEnabled(e.target.checked)}
             />
-            Enable auto-award
+            Enable auto-award (optional)
           </label>
           {newAutoAwardEnabled ? (
             <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -404,7 +447,7 @@ export default function AdminBadgesPage() {
                   className="w-full rounded-lg border border-white/15 bg-white/8 px-3 py-2 text-sm text-white"
                   aria-label="Auto-award action"
                 >
-                  <option value="">Select action</option>
+                  <option value="">Select trigger event</option>
                   {AUTO_AWARD_ACTION_OPTIONS.map((action) => (
                     <option key={action} value={action}>
                       {action}
@@ -421,11 +464,21 @@ export default function AdminBadgesPage() {
             </div>
           ) : null}
         </div>
+
+        <div className="mt-4 flex justify-end">
+          <Button onClick={onCreate} disabled={!canCreate} className="min-w-42">
+            {t('admin.badges.create', 'Create Draft')}
+          </Button>
+        </div>
       </section>
 
       <section className="rounded-lg border border-white/10 bg-white/5">
         <div className="border-b border-white/10 p-4">
-          <h2 className="text-lg font-medium text-white">{t('admin.badges.list_title', 'Badge templates')}</h2>
+          <div className="flex items-center gap-2">
+            <h2 className="text-lg font-medium text-white">{t('admin.badges.list_title', 'Badge Templates')}</h2>
+            <span className="rounded-md border border-white/15 bg-white/5 px-2 py-1 text-[11px] text-white/70">Steps 2-4</span>
+          </div>
+          <p className="mt-1 text-sm text-white/60">For each draft: upload image, publish metadata, then mint badge.</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-sm">
@@ -465,7 +518,7 @@ export default function AdminBadgesPage() {
                         ) : null}
                       </td>
                       <td className="p-3">
-                        <div className="text-xs text-white/70">{tpl.status}</div>
+                        <div className={`inline-flex rounded-md border px-2 py-1 text-xs ${statusClass(tpl.status)}`}>{tpl.status}</div>
                         {tpl.published_at ? (
                           <div className="text-[11px] text-white/50">{formatTimestamp(tpl.published_at)}</div>
                         ) : null}
@@ -507,20 +560,20 @@ export default function AdminBadgesPage() {
                                 onChange={(e) => onUpload(tpl, e.target.files?.[0] ?? null)}
                               />
                               <Button variant="secondary" onClick={() => openEdit(tpl)}>
-                                {t('admin.badges.edit', 'Edit')}
+                                1) {t('admin.badges.edit', 'Edit')}
                               </Button>
                               <Button variant="secondary" onClick={() => requestUpload(tpl.id)}>
-                                {t('admin.badges.upload', 'Upload image')}
+                                2) {t('admin.badges.upload', 'Upload Image')}
                               </Button>
                               <Button onClick={() => onPublish(tpl)} disabled={!tpl.image_uri}>
-                                {t('admin.badges.publish', 'Publish')}
+                                3) {t('admin.badges.publish', 'Publish')}
                               </Button>
                             </>
                           ) : null}
 
                           {tpl.status === 'PUBLISHED' ? (
                             <>
-                              <Button onClick={() => openMint(tpl)}>{t('admin.badges.mint', 'Mint')}</Button>
+                              <Button onClick={() => openMint(tpl)}>4) {t('admin.badges.mint', 'Mint')}</Button>
                               <Button variant="secondary" onClick={() => openIssuances(tpl)}>
                                 {t('admin.badges.issuances', 'Issuances')}
                               </Button>

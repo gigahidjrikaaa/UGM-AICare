@@ -191,7 +191,7 @@ export default function AdminDashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#00153a] via-[#001a47] to-[#00153a]">
+      <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-[#00153a] via-[#001a47] to-[#00153a]">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-white/20 border-t-[#FFCA40] rounded-full animate-spin mx-auto" />
           <p className="text-white/60">Loading dashboard...</p>
@@ -202,7 +202,7 @@ export default function AdminDashboardPage() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#00153a] via-[#001a47] to-[#00153a]">
+      <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-[#00153a] via-[#001a47] to-[#00153a]">
         <div className="text-center space-y-4 max-w-md">
           <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto">
             <ExclamationTriangleIcon className="w-8 h-8 text-red-400" />
@@ -227,7 +227,7 @@ export default function AdminDashboardPage() {
   const { insights, alerts } = overview;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#00153a] via-[#001a47] to-[#00153a] p-6 space-y-6">
+    <div className="min-h-screen bg-linear-to-br from-[#00153a] via-[#001a47] to-[#00153a] p-6 space-y-6">
       {/* ============================================================ */}
       {/*  1. HEADER                                                    */}
       {/* ============================================================ */}
@@ -256,6 +256,30 @@ export default function AdminDashboardPage() {
         </div>
 
         <div className="flex items-center gap-2">
+          <Link
+            href="/admin/contracts"
+            className="inline-flex items-center rounded-xl border border-white/15 bg-white/8 px-3 py-2 text-sm font-medium text-white hover:bg-white/12"
+          >
+            Contracts
+          </Link>
+          <Link
+            href="/admin/agent-decisions"
+            className="inline-flex items-center rounded-xl border border-white/15 bg-white/8 px-3 py-2 text-sm font-medium text-white hover:bg-white/12"
+          >
+            Agent Decisions
+          </Link>
+          <Link
+            href="/admin/attestations"
+            className="inline-flex items-center rounded-xl border border-white/15 bg-white/8 px-3 py-2 text-sm font-medium text-white hover:bg-white/12"
+          >
+            Attestations
+          </Link>
+          <Link
+            href="/admin/autopilot"
+            className="inline-flex items-center rounded-xl border border-white/15 bg-white/8 px-3 py-2 text-sm font-medium text-white hover:bg-white/12"
+          >
+            Autopilot Queue
+          </Link>
           <Link
             href="/admin/testing"
             className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all duration-200 text-sm"

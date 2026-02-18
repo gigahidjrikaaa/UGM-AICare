@@ -97,7 +97,14 @@ def evaluate_action_policy(
                 rationale="Critical-risk check-ins require reviewer approval",
             )
 
-    if action_type in {AutopilotActionType.mint_badge, AutopilotActionType.publish_attestation}:
+    if action_type == AutopilotActionType.publish_attestation:
+        return PolicyEvaluationResult(
+            decision=AutopilotPolicyDecision.allow,
+            requires_human_review=False,
+            rationale="Attestation publishing is automatic for auditability of agentic flow",
+        )
+
+    if action_type == AutopilotActionType.mint_badge:
         if level in {"none", "low", "moderate"}:
             return PolicyEvaluationResult(
                 decision=AutopilotPolicyDecision.allow,

@@ -99,6 +99,30 @@ export interface SimulateRealChatResponse {
   agent_routing_log?: string[] | null;
 }
 
+export interface FullUserFlowSimulationRequest {
+  user_id: number;
+  user_messages: string[];
+  enable_sta?: boolean;
+  enable_sca?: boolean;
+}
+
+export interface FullUserFlowSimulationResponse {
+  user_id: number;
+  session_id: string;
+  ai_responses: string[];
+  escalation_triggered: boolean;
+  case_id?: string | null;
+  case_status?: string | null;
+  case_severity?: string | null;
+  assigned_psychologist_id?: number | null;
+  assigned_counselor_user_id?: number | null;
+  assigned_counselor_name?: string | null;
+  counselor_can_see_case: boolean;
+  counselor_case_page: string;
+  autopilot_actions: Array<Record<string, unknown>>;
+  notes: string[];
+}
+
 export interface RQ2ValidationResponse {
   total: number;
   passed: number;
@@ -120,12 +144,25 @@ export interface RQ3PrivacyResponse {
 }
 
 export interface AutopilotReplayResponse {
+  scenario: string;
+  parameters: Record<string, unknown>;
   command: string;
   exit_code: number;
   stdout_tail: string[];
   stderr_tail: string[];
   artifact_path: string;
   artifact?: Record<string, unknown> | null;
+}
+
+export interface AutopilotReplayRequest {
+  scenario?: 'attestation_pipeline' | 'case_management' | 'mixed_operations';
+  action_a_type?: 'publish_attestation' | 'mint_badge' | 'create_checkin' | 'create_case';
+  action_a_risk?: 'none' | 'low' | 'moderate' | 'high' | 'critical';
+  action_b_type?: 'publish_attestation' | 'mint_badge' | 'create_checkin' | 'create_case';
+  action_b_risk?: 'none' | 'low' | 'moderate' | 'high' | 'critical';
+  auto_approve?: boolean;
+  wait_timeout_seconds?: number;
+  wait_interval_seconds?: number;
 }
 
 export interface LogTailResponse {
@@ -194,6 +231,13 @@ export async function simulateRealChat(payload: SimulateRealChatRequest): Promis
   });
 }
 
+export async function simulateFullUserFlow(payload: FullUserFlowSimulationRequest): Promise<FullUserFlowSimulationResponse> {
+  return apiCall<FullUserFlowSimulationResponse>('/api/v1/admin/testing/full-user-flow', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
 export async function runRQ2Validation(): Promise<RQ2ValidationResponse> {
   return apiCall<RQ2ValidationResponse>('/api/v1/admin/testing/rq2/validation', {
     method: 'POST',
@@ -212,8 +256,9 @@ export async function runRQ3PrivacyTest(): Promise<RQ3PrivacyResponse> {
   });
 }
 
-export async function runAutopilotReplay(timeoutSeconds = 240): Promise<AutopilotReplayResponse> {
+export async function runAutopilotReplay(timeoutSeconds = 240, payload?: AutopilotReplayRequest): Promise<AutopilotReplayResponse> {
   return apiCall<AutopilotReplayResponse>(`/api/v1/admin/testing/autopilot-replay?timeout_seconds=${timeoutSeconds}`, {
     method: 'POST',
+    body: JSON.stringify(payload ?? {}),
   });
 }

@@ -38,6 +38,12 @@ from app.domains.blockchain.nft import (
     get_chain_config,
     get_configured_chains,
 )
+from app.domains.blockchain.attestation import (
+    AttestationClientFactory,
+    SUPPORTED_ATTESTATION_CHAINS,
+    DEFAULT_ATTESTATION_CHAIN_ID,
+    get_attestation_chain_config,
+)
 
 # Legacy EDU Chain imports (kept for backward compatibility)
 from app.domains.blockchain.edu_chain import (
@@ -65,6 +71,10 @@ __all__ = [
     "DEFAULT_BADGE_CHAIN_ID",
     "get_chain_config",
     "get_configured_chains",
+    "AttestationClientFactory",
+    "SUPPORTED_ATTESTATION_CHAINS",
+    "DEFAULT_ATTESTATION_CHAIN_ID",
+    "get_attestation_chain_config",
 
     # Legacy EDU Chain (deprecated)
     "init_nft_client",

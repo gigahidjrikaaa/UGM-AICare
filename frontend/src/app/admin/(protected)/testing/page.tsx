@@ -20,6 +20,8 @@ import {
 import toast from "react-hot-toast";
 
 import {
+  type AutopilotReplayRequest,
+  type FullUserFlowSimulationResponse,
   cleanupTestingData,
   createTestingUser,
   getTestingLogTail,
@@ -30,6 +32,7 @@ import {
   runRQ3Generate,
   runRQ3PrivacyTest,
   seedTestingDatabase,
+  simulateFullUserFlow,
   simulateConversation,
   simulateRealChat,
 } from "@/services/adminTestingApi";
@@ -41,6 +44,37 @@ type TerminalEntry = {
   time: string;
   level: "info" | "success" | "error";
   message: string;
+};
+
+type AutopilotScenario = "attestation_pipeline" | "case_management" | "mixed_operations";
+type AutopilotActionType = "publish_attestation" | "mint_badge" | "create_checkin" | "create_case";
+type AutopilotRisk = "none" | "low" | "moderate" | "high" | "critical";
+
+const SCENARIO_PRESETS: Record<AutopilotScenario, { label: string; description: string; actionAType: AutopilotActionType; actionARisk: AutopilotRisk; actionBType: AutopilotActionType; actionBRisk: AutopilotRisk; }> = {
+  attestation_pipeline: {
+    label: "Attestation Pipeline",
+    description: "Simulates attestation publishing with one auto-allowed action and one approval-gated action.",
+    actionAType: "publish_attestation",
+    actionARisk: "low",
+    actionBType: "publish_attestation",
+    actionBRisk: "high",
+  },
+  case_management: {
+    label: "Case Management",
+    description: "Simulates urgent case creation plus high-risk follow-up check-in requiring governance review.",
+    actionAType: "create_case",
+    actionARisk: "high",
+    actionBType: "create_checkin",
+    actionBRisk: "high",
+  },
+  mixed_operations: {
+    label: "Mixed Operations",
+    description: "Simulates badge minting and attestation publishing in one replay run.",
+    actionAType: "mint_badge",
+    actionARisk: "low",
+    actionBType: "publish_attestation",
+    actionBRisk: "moderate",
+  },
 };
 
 function nowTime(): string {
@@ -87,6 +121,18 @@ export default function AdminTestingPage() {
   const [seedCounselorsCount, setSeedCounselorsCount] = useState(2);
   const [seedAdminsCount, setSeedAdminsCount] = useState(1);
   const [replayTimeoutSeconds, setReplayTimeoutSeconds] = useState(240);
+  const [autopilotScenario, setAutopilotScenario] = useState<AutopilotScenario>("attestation_pipeline");
+  const [actionAType, setActionAType] = useState<AutopilotActionType>(SCENARIO_PRESETS.attestation_pipeline.actionAType);
+  const [actionARisk, setActionARisk] = useState<AutopilotRisk>(SCENARIO_PRESETS.attestation_pipeline.actionARisk);
+  const [actionBType, setActionBType] = useState<AutopilotActionType>(SCENARIO_PRESETS.attestation_pipeline.actionBType);
+  const [actionBRisk, setActionBRisk] = useState<AutopilotRisk>(SCENARIO_PRESETS.attestation_pipeline.actionBRisk);
+  const [autoApproveReplay, setAutoApproveReplay] = useState(true);
+  const [replayWaitTimeoutSeconds, setReplayWaitTimeoutSeconds] = useState(90);
+  const [replayWaitIntervalSeconds, setReplayWaitIntervalSeconds] = useState(2);
+  const [fullFlowMessages, setFullFlowMessages] = useState(
+    "Aku ngerasa semuanya berat banget minggu ini\nAku jadi susah tidur dan panik tiap malam\nAku takut aku nggak kuat ngejalanin ini",
+  );
+  const [latestFullFlowResult, setLatestFullFlowResult] = useState<FullUserFlowSimulationResponse | null>(null);
 
   const appendTerminal = useCallback((level: TerminalEntry["level"], message: string) => {
     setTerminalEntries((prev) => {
@@ -246,6 +292,42 @@ export default function AdminTestingPage() {
     );
   }, [runAction, selectedUserId]);
 
+  const onRunFullUserFlow = useCallback(async () => {
+    if (!selectedUserId) {
+      toast.error("Please select a test user first");
+      return;
+    }
+    const userMessages = fullFlowMessages
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 20);
+    if (userMessages.length === 0) {
+      toast.error("Please provide at least one message for simulation");
+      return;
+    }
+
+    const actionName = "simulate full user flow (chat -> escalation -> assignment)";
+    setLoadingAction(actionName);
+    appendTerminal("info", `$ ${actionName}`);
+    try {
+      const result = await simulateFullUserFlow({
+        user_id: selectedUserId,
+        user_messages: userMessages,
+        enable_sta: true,
+        enable_sca: true,
+      });
+      setLatestFullFlowResult(result);
+      appendTerminal("success", stringify(result));
+    } catch (error) {
+      console.error(error);
+      appendTerminal("error", error instanceof Error ? error.message : "Unknown error");
+      toast.error(`${actionName} failed`);
+    } finally {
+      setLoadingAction(null);
+    }
+  }, [appendTerminal, fullFlowMessages, selectedUserId]);
+
   const onRunRQ2 = useCallback(async () => {
     await runAction("run RQ2 orchestration validation", runRQ2Validation);
   }, [runAction]);
@@ -259,9 +341,40 @@ export default function AdminTestingPage() {
   }, [runAction]);
 
   const onRunAutopilotReplay = useCallback(async () => {
-    await runAction("run autopilot replay", () => runAutopilotReplay(replayTimeoutSeconds));
+    const payload: AutopilotReplayRequest = {
+      scenario: autopilotScenario,
+      action_a_type: actionAType,
+      action_a_risk: actionARisk,
+      action_b_type: actionBType,
+      action_b_risk: actionBRisk,
+      auto_approve: autoApproveReplay,
+      wait_timeout_seconds: replayWaitTimeoutSeconds,
+      wait_interval_seconds: replayWaitIntervalSeconds,
+    };
+    await runAction("run autopilot replay", () => runAutopilotReplay(replayTimeoutSeconds, payload));
     await refreshBackendLogs();
-  }, [refreshBackendLogs, replayTimeoutSeconds, runAction]);
+  }, [
+    actionARisk,
+    actionAType,
+    actionBRisk,
+    actionBType,
+    autoApproveReplay,
+    autopilotScenario,
+    refreshBackendLogs,
+    replayTimeoutSeconds,
+    replayWaitIntervalSeconds,
+    replayWaitTimeoutSeconds,
+    runAction,
+  ]);
+
+  const applyScenarioPreset = useCallback((scenario: AutopilotScenario) => {
+    const preset = SCENARIO_PRESETS[scenario];
+    setAutopilotScenario(scenario);
+    setActionAType(preset.actionAType);
+    setActionARisk(preset.actionARisk);
+    setActionBType(preset.actionBType);
+    setActionBRisk(preset.actionBRisk);
+  }, []);
 
   useEffect(() => {
     refreshBackendLogs().catch(() => {
@@ -428,10 +541,38 @@ export default function AdminTestingPage() {
         )}
 
         {activeTab === "chat" && (
-          <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            <button onClick={onConversationScenario} disabled={disabledAction} className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white disabled:opacity-50"><FiSearch /> STA Classification Scenario</button>
-            <button onClick={onRealChatScenario} disabled={disabledAction} className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-sm text-emerald-300 disabled:opacity-50"><FiPlay /> Real Chat Flow Scenario</button>
-            <button onClick={onListUsers} disabled={disabledAction} className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/20 px-3 py-2 text-sm text-white disabled:opacity-50"><FiUsers /> Validate User Pool</button>
+          <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3 lg:col-span-2">
+              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-white/70">Full User Flow Simulation</h2>
+              <p className="mb-3 text-xs text-white/60">
+                Runs one end-to-end flow: simulate chat, inspect AI response, verify escalation, check assigned counselor, and confirm counselor visibility.
+              </p>
+              <label className="text-xs text-white/60">
+                User messages (one line = one chat turn)
+                <textarea
+                  rows={5}
+                  value={fullFlowMessages}
+                  onChange={(event) => setFullFlowMessages(event.target.value)}
+                  className="mt-1 w-full rounded-md border border-white/20 bg-[#001D58] px-2 py-2 text-sm text-white"
+                />
+              </label>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <button onClick={onRunFullUserFlow} disabled={disabledAction} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#FFCA40]/30 bg-[#FFCA40]/15 px-3 py-2 text-sm text-[#FFCA40] disabled:opacity-50"><FiZap /> Run Full User Flow</button>
+                <button onClick={onRealChatScenario} disabled={disabledAction} className="inline-flex items-center justify-center gap-2 rounded-lg border border-emerald-400/30 bg-emerald-400/10 px-3 py-2 text-sm text-emerald-300 disabled:opacity-50"><FiPlay /> Real Chat Only</button>
+                <button onClick={onConversationScenario} disabled={disabledAction} className="inline-flex items-center justify-center gap-2 rounded-lg border border-white/20 bg-white/5 px-3 py-2 text-sm text-white disabled:opacity-50"><FiSearch /> STA Classification Only</button>
+              </div>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-white/70">
+              <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-white/70">Validation Checklist</h2>
+              <ul className="list-disc space-y-1 pl-4">
+                <li>AI returns responses for each user turn.</li>
+                <li>Escalation is detected or skipped based on risk outcome.</li>
+                <li>If escalated, case id and assignment are returned.</li>
+                <li>Counselor visibility check confirms case appears in counselor page flow.</li>
+                <li>Autopilot actions for the same session are listed.</li>
+              </ul>
+              <button onClick={onListUsers} disabled={disabledAction} className="mt-3 inline-flex w-full items-center justify-center gap-2 rounded-lg border border-white/20 px-3 py-2 text-sm text-white disabled:opacity-50"><FiUsers /> Validate User Pool</button>
+            </div>
           </div>
         )}
 
@@ -448,10 +589,67 @@ export default function AdminTestingPage() {
           <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-3">
             <div className="rounded-lg border border-white/10 bg-white/5 p-3 lg:col-span-2">
               <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-white/70">Autopilot Replay Scenario</h2>
-              <p className="mb-3 text-xs text-white/60">Executes `scripts/replay_autopilot_demo.py` via backend and returns artifact/log tail for judge-ready demo proof.</p>
+              <p className="mb-3 text-xs text-white/60">Executes `scripts/replay_autopilot_demo.py` via backend and returns artifact/log tail for judge-ready demo proof with scenario metadata.</p>
+
+              <div className="mb-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <label className="text-xs text-white/60 sm:col-span-2">
+                  Scenario Preset
+                  <select
+                    value={autopilotScenario}
+                    onChange={(event) => applyScenarioPreset(event.target.value as AutopilotScenario)}
+                    className="mt-1 w-full rounded-md border border-white/20 bg-[#001D58] px-2 py-2 text-sm text-white"
+                  >
+                    {Object.entries(SCENARIO_PRESETS).map(([key, item]) => (
+                      <option key={key} value={key}>{item.label}</option>
+                    ))}
+                  </select>
+                </label>
+                <p className="sm:col-span-2 rounded-md border border-white/10 bg-black/20 p-2 text-xs text-white/70">
+                  {SCENARIO_PRESETS[autopilotScenario].description}
+                </p>
+                <label className="text-xs text-white/60">
+                  Action A Type
+                  <select value={actionAType} onChange={(event) => setActionAType(event.target.value as AutopilotActionType)} className="mt-1 w-full rounded-md border border-white/20 bg-[#001D58] px-2 py-1.5 text-sm text-white">
+                    <option value="publish_attestation">publish_attestation</option>
+                    <option value="mint_badge">mint_badge</option>
+                    <option value="create_checkin">create_checkin</option>
+                    <option value="create_case">create_case</option>
+                  </select>
+                </label>
+                <label className="text-xs text-white/60">
+                  Action A Risk
+                  <select value={actionARisk} onChange={(event) => setActionARisk(event.target.value as AutopilotRisk)} className="mt-1 w-full rounded-md border border-white/20 bg-[#001D58] px-2 py-1.5 text-sm text-white">
+                    <option value="none">none</option>
+                    <option value="low">low</option>
+                    <option value="moderate">moderate</option>
+                    <option value="high">high</option>
+                    <option value="critical">critical</option>
+                  </select>
+                </label>
+                <label className="text-xs text-white/60">
+                  Action B Type
+                  <select value={actionBType} onChange={(event) => setActionBType(event.target.value as AutopilotActionType)} className="mt-1 w-full rounded-md border border-white/20 bg-[#001D58] px-2 py-1.5 text-sm text-white">
+                    <option value="publish_attestation">publish_attestation</option>
+                    <option value="mint_badge">mint_badge</option>
+                    <option value="create_checkin">create_checkin</option>
+                    <option value="create_case">create_case</option>
+                  </select>
+                </label>
+                <label className="text-xs text-white/60">
+                  Action B Risk
+                  <select value={actionBRisk} onChange={(event) => setActionBRisk(event.target.value as AutopilotRisk)} className="mt-1 w-full rounded-md border border-white/20 bg-[#001D58] px-2 py-1.5 text-sm text-white">
+                    <option value="none">none</option>
+                    <option value="low">low</option>
+                    <option value="moderate">moderate</option>
+                    <option value="high">high</option>
+                    <option value="critical">critical</option>
+                  </select>
+                </label>
+              </div>
+
               <div className="flex flex-wrap items-end gap-2">
                 <label className="text-xs text-white/60">
-                  Timeout (seconds)
+                  Process timeout (seconds)
                   <input
                     type="number"
                     min={30}
@@ -461,15 +659,47 @@ export default function AdminTestingPage() {
                     className="mt-1 rounded-md border border-white/20 bg-[#001D58] px-2 py-1.5 text-sm text-white"
                   />
                 </label>
+                <label className="text-xs text-white/60">
+                  Wait timeout (seconds)
+                  <input
+                    type="number"
+                    min={10}
+                    max={600}
+                    value={replayWaitTimeoutSeconds}
+                    onChange={(event) => setReplayWaitTimeoutSeconds(Number(event.target.value) || 90)}
+                    className="mt-1 rounded-md border border-white/20 bg-[#001D58] px-2 py-1.5 text-sm text-white"
+                  />
+                </label>
+                <label className="text-xs text-white/60">
+                  Poll interval (seconds)
+                  <input
+                    type="number"
+                    min={0.2}
+                    max={10}
+                    step={0.2}
+                    value={replayWaitIntervalSeconds}
+                    onChange={(event) => setReplayWaitIntervalSeconds(Number(event.target.value) || 2)}
+                    className="mt-1 rounded-md border border-white/20 bg-[#001D58] px-2 py-1.5 text-sm text-white"
+                  />
+                </label>
+                <label className="mb-0.5 inline-flex items-center gap-2 rounded-md border border-white/20 bg-[#001D58]/60 px-2 py-2 text-xs text-white/80">
+                  <input
+                    type="checkbox"
+                    checked={autoApproveReplay}
+                    onChange={(event) => setAutoApproveReplay(event.target.checked)}
+                  />
+                  Auto-approve gated actions
+                </label>
                 <button onClick={onRunAutopilotReplay} disabled={disabledAction} className="inline-flex items-center justify-center gap-2 rounded-lg border border-[#FFCA40]/30 bg-[#FFCA40]/15 px-3 py-2 text-sm text-[#FFCA40] disabled:opacity-50"><FiZap /> Run Autopilot Replay</button>
               </div>
             </div>
             <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-xs text-white/70">
               <h2 className="mb-2 text-sm font-semibold uppercase tracking-wide text-white/70">Expected Validation</h2>
               <ul className="list-disc space-y-1 pl-4">
-                <li>Two actions confirmed (`allow` and `require_approval`).</li>
-                <li>Tx hashes populated with explorer URLs.</li>
-                <li>Proof timeline entries visible.</li>
+                <li>Two actions are enqueued based on selected scenario and action parameters.</li>
+                <li>Policy decisions (`allow` / `require_approval`) reflect selected risk levels.</li>
+                <li>Tx hashes and explorer links are present once actions are confirmed.</li>
+                <li>Artifact includes scenario description and exact parameters used.</li>
               </ul>
             </div>
           </div>
@@ -496,6 +726,48 @@ export default function AdminTestingPage() {
           </div>
         )}
       </div>
+
+      {latestFullFlowResult && (
+        <div className="rounded-xl border border-white/10 bg-white/5 p-4">
+          <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-white/70">Latest Full Flow Result</h2>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
+            <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <p className="text-xs text-white/50">Escalated</p>
+              <p className={`mt-1 text-sm font-semibold ${latestFullFlowResult.escalation_triggered ? "text-amber-300" : "text-emerald-300"}`}>
+                {latestFullFlowResult.escalation_triggered ? "YES" : "NO"}
+              </p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <p className="text-xs text-white/50">Case ID</p>
+              <p className="mt-1 text-sm font-semibold text-white break-all">{latestFullFlowResult.case_id ?? "-"}</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <p className="text-xs text-white/50">Assigned Counselor</p>
+              <p className="mt-1 text-sm font-semibold text-white">{latestFullFlowResult.assigned_counselor_name ?? "Unassigned"}</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <p className="text-xs text-white/50">Counselor Visibility</p>
+              <p className={`mt-1 text-sm font-semibold ${latestFullFlowResult.counselor_can_see_case ? "text-emerald-300" : "text-red-300"}`}>
+                {latestFullFlowResult.counselor_can_see_case ? "VISIBLE" : "NOT VISIBLE"}
+              </p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/20 p-3">
+              <p className="text-xs text-white/50">Autopilot Actions</p>
+              <p className="mt-1 text-sm font-semibold text-white">{latestFullFlowResult.autopilot_actions.length}</p>
+            </div>
+          </div>
+          {latestFullFlowResult.notes.length > 0 && (
+            <div className="mt-3 rounded-lg border border-white/10 bg-black/20 p-3">
+              <p className="text-xs text-white/50">Notes</p>
+              <ul className="mt-1 list-disc pl-4 text-xs text-white/80 space-y-1">
+                {latestFullFlowResult.notes.map((note, index) => (
+                  <li key={`${index}-${note.slice(0, 16)}`}>{note}</li>
+                ))}
+              </ul>
+            </div>
+          )}
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
         <div className="rounded-xl border border-white/10 bg-black/50 p-4">
