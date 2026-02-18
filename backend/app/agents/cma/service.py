@@ -20,6 +20,7 @@ from app.database import get_async_db
 from app.models import CaseAssignment  # Core infrastructure model
 from app.domains.mental_health.models import Case, CaseNote, CaseSeverityEnum, CaseStatusEnum
 from app.models.agent_user import AgentUser
+from app.services.event_bus import EventType, publish_event
 
 
 class CaseManagementService:
@@ -80,6 +81,19 @@ class CaseManagementService:
 
         await self._session.commit()
         await self._session.refresh(case)
+
+        await publish_event(
+            event_type=EventType.CASE_ASSIGNED,
+            source_agent="cma",
+            data={
+                "case_id": str(case.id),
+                "assigned_to": assignee.id,
+                "assigned_by": None,
+                "is_reassignment": previous_assignee is not None,
+                "previous_assignee": previous_assignee,
+            },
+        )
+
         return SDAAssignResponse(case_id=str(case.id), assigned_to=assignee.id)
 
     async def close_case(self, payload: SDACloseRequest) -> SDACloseResponse:

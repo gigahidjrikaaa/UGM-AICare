@@ -8,7 +8,7 @@ from uuid import UUID as PyUUID
 
 from pydantic import BaseModel, Field
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select, or_
+from sqlalchemy import and_, func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -39,6 +39,7 @@ from app.domains.mental_health.services.autopilot_action_service import (
     hash_payload,
 )
 from app.models.user import User
+from app.models.alerts import Alert
 from app.domains.mental_health.schemas.appointments import AppointmentWithUser
 from app.agents.cma.schemas import SDACase, SDAListCasesResponse
 from app.core.redaction import prelog_redact
@@ -106,6 +107,37 @@ class CounselorCaseAttestationResponse(BaseModel):
     processed_at: Optional[str] = None
 
 
+class CounselorAlertSchema(BaseModel):
+    id: str
+    alert_type: str
+    severity: str
+    title: str
+    message: str
+    link: Optional[str] = None
+    created_at: str
+    expires_at: Optional[str] = None
+    is_seen: bool
+    seen_at: Optional[str] = None
+
+
+class CounselorAlertListResponse(BaseModel):
+    alerts: list[CounselorAlertSchema]
+    total: int
+    unread_count: int
+    limit: int
+    offset: int
+
+
+def _counselor_audience_filter(user_id: int):
+    return and_(
+        Alert.context_data["audience"].astext == "counselor",
+        or_(
+            Alert.context_data["recipient_user_ids"].is_(None),
+            Alert.context_data["recipient_user_ids"].contains([user_id]),
+        ),
+    )
+
+
 def _to_int(value: Any) -> Optional[int]:
     if isinstance(value, bool) or value is None:
         return None
@@ -151,6 +183,171 @@ async def require_counselor(current_user: User = Depends(get_current_active_user
     if current_user.role not in {"counselor", "admin"}:
         raise HTTPException(status_code=403, detail="Counselor access required")
     return current_user
+
+
+@router.get("/alerts", response_model=CounselorAlertListResponse)
+async def list_counselor_alerts(
+    is_seen: Optional[bool] = Query(None, description="Filter by seen status"),
+    include_expired: bool = Query(False, description="Include expired alerts"),
+    limit: int = Query(20, ge=1, le=100, description="Maximum results"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+) -> CounselorAlertListResponse:
+    visibility_filter = _counselor_audience_filter(int(current_user.id))
+
+    list_stmt = select(Alert).where(visibility_filter)
+    if is_seen is not None:
+        list_stmt = list_stmt.where(Alert.is_seen == is_seen)
+    if not include_expired:
+        list_stmt = list_stmt.where(
+            or_(
+                Alert.expires_at.is_(None),
+                Alert.expires_at > datetime.utcnow(),
+            )
+        )
+
+    list_stmt = list_stmt.order_by(Alert.created_at.desc()).offset(offset).limit(limit)
+    alerts = (await db.execute(list_stmt)).scalars().all()
+
+    total_stmt = select(func.count(Alert.id)).where(visibility_filter)
+    if is_seen is not None:
+        total_stmt = total_stmt.where(Alert.is_seen == is_seen)
+    if not include_expired:
+        total_stmt = total_stmt.where(
+            or_(
+                Alert.expires_at.is_(None),
+                Alert.expires_at > datetime.utcnow(),
+            )
+        )
+    total = int((await db.execute(total_stmt)).scalar() or 0)
+
+    unread_stmt = select(func.count(Alert.id)).where(
+        visibility_filter,
+        Alert.is_seen.is_(False),
+        or_(
+            Alert.expires_at.is_(None),
+            Alert.expires_at > datetime.utcnow(),
+        ),
+    )
+    unread_count = int((await db.execute(unread_stmt)).scalar() or 0)
+
+    return CounselorAlertListResponse(
+        alerts=[
+            CounselorAlertSchema(
+                id=str(alert.id),
+                alert_type=str(alert.alert_type),
+                severity=str(alert.severity),
+                title=alert.title,
+                message=alert.message,
+                link=alert.link,
+                created_at=alert.created_at.isoformat(),
+                expires_at=alert.expires_at.isoformat() if alert.expires_at else None,
+                is_seen=bool(alert.is_seen),
+                seen_at=alert.seen_at.isoformat() if alert.seen_at else None,
+            )
+            for alert in alerts
+        ],
+        total=total,
+        unread_count=unread_count,
+        limit=limit,
+        offset=offset,
+    )
+
+
+@router.get("/alerts/stats/unread", response_model=dict)
+async def get_counselor_unread_alert_stats(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+) -> dict:
+    visibility_filter = _counselor_audience_filter(int(current_user.id))
+    total_unread = int(
+        (
+            await db.execute(
+                select(func.count(Alert.id)).where(
+                    visibility_filter,
+                    Alert.is_seen.is_(False),
+                    or_(Alert.expires_at.is_(None), Alert.expires_at > datetime.utcnow()),
+                )
+            )
+        ).scalar()
+        or 0
+    )
+
+    critical_unread = int(
+        (
+            await db.execute(
+                select(func.count(Alert.id)).where(
+                    visibility_filter,
+                    Alert.is_seen.is_(False),
+                    Alert.severity == "critical",
+                    or_(Alert.expires_at.is_(None), Alert.expires_at > datetime.utcnow()),
+                )
+            )
+        ).scalar()
+        or 0
+    )
+    high_unread = int(
+        (
+            await db.execute(
+                select(func.count(Alert.id)).where(
+                    visibility_filter,
+                    Alert.is_seen.is_(False),
+                    Alert.severity == "high",
+                    or_(Alert.expires_at.is_(None), Alert.expires_at > datetime.utcnow()),
+                )
+            )
+        ).scalar()
+        or 0
+    )
+
+    return {
+        "total_unread": total_unread,
+        "critical_unread": critical_unread,
+        "high_unread": high_unread,
+        "requires_attention": critical_unread + high_unread,
+    }
+
+
+@router.put("/alerts/{alert_id}/seen", response_model=CounselorAlertSchema)
+async def mark_counselor_alert_seen(
+    alert_id: PyUUID,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+) -> CounselorAlertSchema:
+    visibility_filter = _counselor_audience_filter(int(current_user.id))
+    alert = (
+        await db.execute(
+            select(Alert).where(
+                Alert.id == alert_id,
+                visibility_filter,
+            )
+        )
+    ).scalar_one_or_none()
+
+    if not alert:
+        raise HTTPException(status_code=404, detail="Alert not found")
+
+    if not alert.is_seen:
+        alert.is_seen = True
+        alert.seen_at = datetime.utcnow()
+        alert.seen_by = int(current_user.id)
+        db.add(alert)
+        await db.commit()
+        await db.refresh(alert)
+
+    return CounselorAlertSchema(
+        id=str(alert.id),
+        alert_type=str(alert.alert_type),
+        severity=str(alert.severity),
+        title=alert.title,
+        message=alert.message,
+        link=alert.link,
+        created_at=alert.created_at.isoformat(),
+        expires_at=alert.expires_at.isoformat() if alert.expires_at else None,
+        is_seen=bool(alert.is_seen),
+        seen_at=alert.seen_at.isoformat() if alert.seen_at else None,
+    )
 
 
 @router.get("/agent-decisions", response_model=CounselorAgentDecisionListResponse)

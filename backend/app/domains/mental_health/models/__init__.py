@@ -65,6 +65,7 @@ from .autopilot_actions import (
     AutopilotPolicyDecision,
     AutopilotActionStatus,
 )
+from .agent_decision_events import AgentDecisionEvent
 
 __all__ = [
     # Chat
@@ -127,4 +128,5 @@ __all__ = [
     "AutopilotActionType",
     "AutopilotPolicyDecision",
     "AutopilotActionStatus",
+    "AgentDecisionEvent",
 ]

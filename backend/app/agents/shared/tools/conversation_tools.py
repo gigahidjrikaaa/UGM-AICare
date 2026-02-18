@@ -19,7 +19,7 @@ from sqlalchemy import select, desc, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User  # Core model
-from app.domains.mental_health.models import Conversation, Message
+from app.domains.mental_health.models import Conversation
 from app.agents.shared.tools.registry import register_tool
 
 import logging
@@ -31,6 +31,13 @@ MAX_MESSAGES = 50
 MAX_CONVERSATIONS = 20
 MAX_SEARCH_RESULTS = 20
 MESSAGE_PREVIEW_LENGTH = 200
+
+
+def _coerce_user_id(user_id: str) -> Optional[int]:
+    try:
+        return int(str(user_id).strip())
+    except (TypeError, ValueError):
+        return None
 
 
 @register_tool(
@@ -71,32 +78,38 @@ async def get_conversation_history(
         if limit > MAX_MESSAGES:
             limit = MAX_MESSAGES
             
-        # Query messages
+        # Query conversation turns by logical conversation_id
         query = (
-            select(Message)
-            .where(Message.conversation_id == conversation_id)
-            .order_by(desc(Message.created_at))
+            select(Conversation)
+            .where(Conversation.conversation_id == conversation_id)
+            .order_by(Conversation.timestamp.asc())
             .limit(limit)
         )
-        
+
         result = await db.execute(query)
-        messages = result.scalars().all()
-        
-        # Reverse to chronological order (oldest first)
-        messages = list(reversed(messages))
-        
+        turns = result.scalars().all()
+
         message_list = []
-        for msg in messages:
-            message_list.append({
-                "message_id": str(msg.id),
-                "sender": msg.sender,  # "user" or "assistant"
-                "content": msg.content,
-                "created_at": msg.created_at.isoformat(),
-                "metadata": msg.metadata or {}
-            })
-        
-        # Get conversation info
-        conv_query = select(Conversation).where(Conversation.id == conversation_id)
+        for turn in turns:
+            turn_ts = turn.timestamp.isoformat() if turn.timestamp else None
+            message_list.append(
+                {
+                    "role": "user",
+                    "content": turn.message,
+                    "timestamp": turn_ts,
+                    "session_id": turn.session_id,
+                }
+            )
+            message_list.append(
+                {
+                    "role": "assistant",
+                    "content": turn.response,
+                    "timestamp": turn_ts,
+                    "session_id": turn.session_id,
+                }
+            )
+
+        conv_query = select(Conversation).where(Conversation.conversation_id == conversation_id).order_by(Conversation.timestamp.asc()).limit(1)
         conv_result = await db.execute(conv_query)
         conversation = conv_result.scalar_one_or_none()
         
@@ -105,7 +118,7 @@ async def get_conversation_history(
         return {
             "success": True,
             "conversation_id": conversation_id,
-            "conversation_title": conversation.title if conversation else None,
+            "session_id": conversation.session_id if conversation else None,
             "total_messages": len(message_list),
             "messages": message_list
         }
@@ -149,40 +162,43 @@ async def get_conversation_summary(
     SENSITIVE DATA - conversation content.
     """
     try:
-        # Get conversation
-        query = select(Conversation).where(Conversation.id == conversation_id)
+        # Get conversation turns
+        query = (
+            select(Conversation)
+            .where(Conversation.conversation_id == conversation_id)
+            .order_by(Conversation.timestamp.asc())
+        )
         result = await db.execute(query)
-        conversation = result.scalar_one_or_none()
+        turns = result.scalars().all()
         
-        if not conversation:
+        if not turns:
             logger.warning(f"⚠️ Conversation {conversation_id} not found")
             return {
                 "success": False,
                 "error": f"Conversation {conversation_id} not found",
                 "conversation_id": conversation_id
             }
-        
-        # Check for existing summary in metadata
-        summary = conversation.metadata.get("summary") if conversation.metadata else None
-        
-        if not summary:
-            # Generate basic summary from message count
-            msg_query = select(func.count(Message.id)).where(Message.conversation_id == conversation_id)
-            msg_result = await db.execute(msg_query)
-            message_count = msg_result.scalar()
-            
-            summary = f"Conversation with {message_count} messages"
+
+        total_turns = len(turns)
+        first_ts = turns[0].timestamp
+        last_ts = turns[-1].timestamp
+        latest_topic_hint = (turns[-1].message or "").strip()[:120]
+
+        summary = (
+            f"Conversation with {total_turns} turn(s). "
+            f"Latest topic hint: {latest_topic_hint or 'n/a'}."
+        )
         
         logger.info(f"✅ Retrieved summary for conversation {conversation_id}")
         
         return {
             "success": True,
             "conversation_id": conversation_id,
-            "title": conversation.title,
+            "session_id": turns[0].session_id,
             "summary": summary,
-            "created_at": conversation.created_at.isoformat(),
-            "updated_at": conversation.updated_at.isoformat() if conversation.updated_at else None,
-            "has_detailed_summary": bool(conversation.metadata and conversation.metadata.get("summary"))
+            "created_at": first_ts.isoformat() if first_ts else None,
+            "updated_at": last_ts.isoformat() if last_ts else None,
+            "turn_count": total_turns,
         }
         
     except Exception as e:
@@ -237,20 +253,30 @@ async def search_conversations(
         if limit > MAX_SEARCH_RESULTS:
             limit = MAX_SEARCH_RESULTS
             
-        # Search messages by content (case-insensitive)
+        normalized_user_id = _coerce_user_id(user_id)
+        if normalized_user_id is None:
+            return {
+                "success": False,
+                "error": "Invalid user_id",
+                "user_id": user_id,
+                "query": query,
+            }
+
+        # Search conversation turns by content (case-insensitive)
         search_pattern = f"%{query}%"
-        
-        # Find conversations with matching messages
+
         msg_query = (
-            select(Message.conversation_id, func.count(Message.id).label("match_count"))
-            .join(Conversation, Message.conversation_id == Conversation.id)
+            select(Conversation.conversation_id, func.count(Conversation.id).label("match_count"))
             .where(
                 and_(
-                    Conversation.user_id == user_id,
-                    Message.content.ilike(search_pattern)
+                    Conversation.user_id == normalized_user_id,
+                    or_(
+                        Conversation.message.ilike(search_pattern),
+                        Conversation.response.ilike(search_pattern),
+                    ),
                 )
             )
-            .group_by(Message.conversation_id)
+            .group_by(Conversation.conversation_id)
             .order_by(desc("match_count"))
             .limit(limit)
         )
@@ -261,36 +287,27 @@ async def search_conversations(
         search_results = []
         for conv_id, match_count in conversation_matches:
             # Get conversation details
-            conv_query = select(Conversation).where(Conversation.id == conv_id)
+            conv_query = (
+                select(Conversation)
+                .where(Conversation.conversation_id == conv_id)
+                .order_by(desc(Conversation.timestamp))
+                .limit(1)
+            )
             conv_result = await db.execute(conv_query)
             conversation = conv_result.scalar_one_or_none()
             
             if conversation:
-                # Get a sample matching message
-                sample_query = (
-                    select(Message)
-                    .where(
-                        and_(
-                            Message.conversation_id == conv_id,
-                            Message.content.ilike(search_pattern)
-                        )
-                    )
-                    .limit(1)
-                )
-                sample_result = await db.execute(sample_query)
-                sample_message = sample_result.scalar_one_or_none()
-                
-                # Truncate message for preview
-                preview = sample_message.content[:MESSAGE_PREVIEW_LENGTH] if sample_message else ""
-                if len(sample_message.content) > MESSAGE_PREVIEW_LENGTH if sample_message else False:
+                preview_source = conversation.message or conversation.response or ""
+                preview = preview_source[:MESSAGE_PREVIEW_LENGTH]
+                if len(preview_source) > MESSAGE_PREVIEW_LENGTH:
                     preview += "..."
                 
                 search_results.append({
-                    "conversation_id": str(conversation.id),
-                    "title": conversation.title,
+                    "conversation_id": str(conversation.conversation_id),
+                    "session_id": conversation.session_id,
                     "match_count": match_count,
                     "preview": preview,
-                    "created_at": conversation.created_at.isoformat()
+                    "created_at": conversation.timestamp.isoformat() if conversation.timestamp else None,
                 })
         
         logger.info(f"✅ Found {len(search_results)} conversations matching '{query}' for user {user_id}")
@@ -348,55 +365,49 @@ async def get_conversation_stats(
     Used for engagement tracking.
     """
     try:
+        normalized_user_id = _coerce_user_id(user_id)
+        if normalized_user_id is None:
+            return {
+                "success": False,
+                "error": "Invalid user_id",
+                "user_id": user_id,
+            }
+
         # Calculate date range
         start_date = datetime.utcnow() - timedelta(days=days)
         
         # Count conversations
         conv_query = (
-            select(func.count(Conversation.id))
+            select(func.count(func.distinct(Conversation.conversation_id)))
             .where(
                 and_(
-                    Conversation.user_id == user_id,
-                    Conversation.created_at >= start_date
+                    Conversation.user_id == normalized_user_id,
+                    Conversation.timestamp >= start_date
                 )
             )
         )
         conv_result = await db.execute(conv_query)
         conversation_count = conv_result.scalar()
         
-        # Count messages
+        # Count total turns (each row stores user+assistant text)
         msg_query = (
-            select(func.count(Message.id))
-            .join(Conversation, Message.conversation_id == Conversation.id)
+            select(func.count(Conversation.id))
             .where(
                 and_(
-                    Conversation.user_id == user_id,
-                    Message.created_at >= start_date
+                    Conversation.user_id == normalized_user_id,
+                    Conversation.timestamp >= start_date
                 )
             )
         )
         msg_result = await db.execute(msg_query)
-        message_count = msg_result.scalar()
-        
-        # Get user messages only (exclude assistant)
-        user_msg_query = (
-            select(func.count(Message.id))
-            .join(Conversation, Message.conversation_id == Conversation.id)
-            .where(
-                and_(
-                    Conversation.user_id == user_id,
-                    Message.sender == "user",
-                    Message.created_at >= start_date
-                )
-            )
-        )
-        user_msg_result = await db.execute(user_msg_query)
-        user_message_count = user_msg_result.scalar()
+        turn_count = msg_result.scalar()
         
         # Calculate averages (handle None values)
         conversation_count = conversation_count or 0
-        message_count = message_count or 0
-        user_message_count = user_message_count or 0
+        turn_count = turn_count or 0
+        user_message_count = turn_count
+        assistant_message_count = turn_count
+        message_count = user_message_count + assistant_message_count
         
         avg_messages_per_conversation = (
             message_count / conversation_count if conversation_count > 0 else 0
@@ -411,7 +422,7 @@ async def get_conversation_stats(
             "total_conversations": conversation_count,
             "total_messages": message_count,
             "user_messages": user_message_count,
-            "assistant_messages": message_count - user_message_count,
+            "assistant_messages": assistant_message_count,
             "avg_messages_per_conversation": round(avg_messages_per_conversation, 1)
         }
         

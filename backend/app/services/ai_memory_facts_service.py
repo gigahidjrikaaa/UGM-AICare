@@ -27,6 +27,17 @@ from app.models import User, UserAIMemoryFact
 logger = logging.getLogger(__name__)
 
 
+async def _is_ai_memory_consented(db: AsyncSession, user_id: int) -> bool:
+    """Return persisted consent flag using an explicit query.
+
+    This avoids lazy-loading `User.consent_ai_memory` from potentially detached
+    ORM instances passed across request-scoped dependencies.
+    """
+    stmt = select(User.consent_ai_memory).where(User.id == user_id)
+    consent_value = (await db.execute(stmt)).scalar_one_or_none()
+    return bool(consent_value)
+
+
 @dataclass(frozen=True)
 class CandidateFact:
     text: str
@@ -176,7 +187,11 @@ async def remember_from_user_message(
     source: str = "conversation",
 ) -> None:
     """Extract + store candidate facts if user consented."""
-    if not getattr(user, "consent_ai_memory", False):
+    user_id = int(getattr(user, "id", 0) or 0)
+    if user_id <= 0:
+        return
+
+    if not await _is_ai_memory_consented(db, user_id):
         return
 
     facts = extract_candidate_facts(message)
@@ -184,7 +199,7 @@ async def remember_from_user_message(
         return
 
     try:
-        await upsert_facts(db, user.id, facts, source=source)
+        await upsert_facts(db, user_id, facts, source=source)
         await db.commit()
     except Exception:
         await db.rollback()
@@ -204,10 +219,14 @@ async def list_user_facts(db: AsyncSession, user_id: int, limit: int = 50) -> Li
 
 async def list_user_fact_texts_for_agent(db: AsyncSession, user: User, limit: int = 20) -> List[str]:
     """Return fact texts only if consent_ai_memory is enabled."""
-    if not getattr(user, "consent_ai_memory", False):
+    user_id = int(getattr(user, "id", 0) or 0)
+    if user_id <= 0:
         return []
 
-    rows = await list_user_facts(db, user.id, limit=limit)
+    if not await _is_ai_memory_consented(db, user_id):
+        return []
+
+    rows = await list_user_facts(db, user_id, limit=limit)
     texts: List[str] = []
     for row in rows:
         # fact_encrypted column now stores plaintext (encryption removed for performance)

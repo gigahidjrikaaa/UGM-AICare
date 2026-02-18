@@ -1,5 +1,6 @@
 export interface AgentDecisionItem {
   id: number;
+  source: string;
   action_type: string;
   policy_decision: string;
   risk_level: string;
@@ -21,6 +22,10 @@ export interface AgentDecisionItem {
   attestation_status: string | null;
   attestation_last_error: string | null;
   attestation_tx_hash: string | null;
+  attestation_schema: string | null;
+  attestation_type: string | null;
+  attestation_decision: string | null;
+  attestation_feedback_redacted: string | null;
 }
 
 export interface AgentDecisionListResponse {

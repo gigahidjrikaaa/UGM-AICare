@@ -516,6 +516,12 @@ class AikaOrchestratorState(TypedDict, total=False):
 
     autopilot_requires_human_review: bool
     """Whether autopilot policy requires human review before execution."""
+
+    decision_event_id: Optional[int]
+    """Database ID of recorded decision audit event for this message turn."""
+
+    attestation_record_id: Optional[int]
+    """Optional linked attestation record id when decision is tied to attestation flow."""
     
     # ============================================================================
     # FINAL RESPONSE

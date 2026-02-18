@@ -15,6 +15,7 @@ Privacy: All risk data is HIGHLY SENSITIVE and requires consent.
 """
 
 from typing import Dict, Any, Optional, List
+import hashlib
 from datetime import datetime, timedelta
 from sqlalchemy import select, desc, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -37,6 +38,22 @@ logger = logging.getLogger(__name__)
 MAX_ASSESSMENTS = 10
 MAX_CASES = 5
 MAX_RESOURCES = 10
+
+
+def _coerce_user_id_int(user_id: str) -> Optional[int]:
+    try:
+        return int(str(user_id).strip())
+    except (TypeError, ValueError):
+        return None
+
+
+def _to_user_hash_candidates(user_id: str) -> list[str]:
+    raw = str(user_id).strip()
+    if not raw:
+        return []
+    candidates = {raw, f"user_{raw}"}
+    candidates.add(hashlib.sha256(f"user_{raw}".encode()).hexdigest()[:16])
+    return list(candidates)
 
 
 @register_tool(
@@ -74,13 +91,21 @@ async def get_risk_assessment_history(
     SENSITIVE DATA - requires consent check.
     """
     try:
+        normalized_user_id = _coerce_user_id_int(user_id)
+        if normalized_user_id is None:
+            return {
+                "success": False,
+                "error": "Invalid user_id",
+                "user_id": user_id,
+            }
+
         if limit > MAX_ASSESSMENTS:
             limit = MAX_ASSESSMENTS
             
         # Query recent assessments
         query = (
             select(TriageAssessment)
-            .where(TriageAssessment.user_id == user_id)
+            .where(TriageAssessment.user_id == normalized_user_id)
             .order_by(desc(TriageAssessment.created_at))
             .limit(limit)
         )
@@ -92,11 +117,12 @@ async def get_risk_assessment_history(
         for assessment in assessments:
             assessment_list.append({
                 "assessment_id": str(assessment.id),
-                "conversation_id": str(assessment.conversation_id),
-                "risk_level": assessment.risk_level,
-                "concerns": assessment.concerns or [],
-                "needs_intervention": assessment.needs_intervention,
-                "recommended_actions": assessment.recommended_actions or [],
+                "conversation_id": str(assessment.conversation_id) if assessment.conversation_id else None,
+                "risk_score": assessment.risk_score,
+                "confidence_score": assessment.confidence_score,
+                "severity_level": assessment.severity_level,
+                "risk_factors": assessment.risk_factors or [],
+                "recommended_action": assessment.recommended_action,
                 "created_at": assessment.created_at.isoformat(),
             })
             
@@ -156,13 +182,21 @@ async def get_active_safety_cases(
         if limit > MAX_CASES:
             limit = MAX_CASES
             
-        # Query open cases (use string literals instead of enum)
+        user_hash_candidates = _to_user_hash_candidates(user_id)
+        if not user_hash_candidates:
+            return {
+                "success": False,
+                "error": "Invalid user_id",
+                "user_id": user_id,
+            }
+
+        # Query active cases for user-hash variants
         query = (
             select(Case)
             .where(
                 and_(
-                    Case.user_id == user_id,
-                    Case.status.in_(["open", "in_progress"])
+                    Case.user_hash.in_(user_hash_candidates),
+                    Case.status.in_([CaseStatusEnum.new, CaseStatusEnum.in_progress, CaseStatusEnum.waiting])
                 )
             )
             .order_by(desc(Case.created_at))
@@ -181,12 +215,12 @@ async def get_active_safety_cases(
                 
             case_list.append({
                 "case_id": str(case.id),
-                "assessment_id": str(case.assessment_id) if case.assessment_id else None,
-                "severity": case.severity,
-                "status": case.status,
-                "description": case.description,
+                "severity": case.severity.value if isinstance(case.severity, CaseSeverityEnum) else str(case.severity),
+                "status": case.status.value if isinstance(case.status, CaseStatusEnum) else str(case.status),
+                "summary_redacted": case.summary_redacted,
                 "assigned_to": str(case.assigned_to) if case.assigned_to else None,
-                "priority": case.priority,
+                "session_id": case.session_id,
+                "conversation_id": case.conversation_id,
                 "created_at": case.created_at.isoformat(),
                 "updated_at": updated_at_str,
             })
@@ -323,10 +357,18 @@ async def check_risk_level(
     SENSITIVE DATA - safety monitoring.
     """
     try:
+        normalized_user_id = _coerce_user_id_int(user_id)
+        if normalized_user_id is None:
+            return {
+                "success": False,
+                "error": "Invalid user_id",
+                "user_id": user_id,
+            }
+
         # Get most recent assessment
         query = (
             select(TriageAssessment)
-            .where(TriageAssessment.user_id == user_id)
+            .where(TriageAssessment.user_id == normalized_user_id)
             .order_by(desc(TriageAssessment.created_at))
             .limit(1)
         )
@@ -348,16 +390,17 @@ async def check_risk_level(
         age_hours = (datetime.utcnow() - latest_assessment.created_at).total_seconds() / 3600
         is_recent = age_hours < 24  # Consider recent if within 24 hours
         
-        logger.info(f"✅ Current risk level for user {user_id}: {latest_assessment.risk_level}")
+        logger.info(f"✅ Current risk level for user {user_id}: {latest_assessment.severity_level}")
         
         return {
             "success": True,
             "user_id": user_id,
             "has_assessment": True,
-            "risk_level": latest_assessment.risk_level,
-            "concerns": latest_assessment.concerns or [],
-            "needs_intervention": latest_assessment.needs_intervention,
-            "recommended_actions": latest_assessment.recommended_actions or [],
+            "risk_score": latest_assessment.risk_score,
+            "confidence_score": latest_assessment.confidence_score,
+            "severity_level": latest_assessment.severity_level,
+            "risk_factors": latest_assessment.risk_factors or [],
+            "recommended_action": latest_assessment.recommended_action,
             "assessment_age_hours": round(age_hours, 1),
             "is_recent": is_recent,
             "assessed_at": latest_assessment.created_at.isoformat(),

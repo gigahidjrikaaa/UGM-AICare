@@ -231,6 +231,7 @@ async def aika_decision_node(
         execution_tracker.start_node(execution_id, "aika::decision", "aika")
     
     start_time = time.time()
+    raw_decision_payload: dict[str, Any] = {}
     
     try:
         # Get role-specific system prompt (lazy loaded)
@@ -272,6 +273,26 @@ async def aika_decision_node(
                 )
 
             logger.info("🤖 Aika Decision (deterministic smalltalk): duration=%.0fms", elapsed_ms)
+            try:
+                from app.domains.mental_health.services.agent_decision_audit_service import record_aika_decision_event
+
+                event = await record_aika_decision_event(
+                    db,
+                    state,
+                    raw_decision={
+                        "mode": "deterministic_smalltalk",
+                        "message": current_message,
+                        "decision": {
+                            "intent": state.get("intent"),
+                            "needs_agents": state.get("needs_agents"),
+                            "next_step": state.get("next_step"),
+                            "immediate_risk": state.get("immediate_risk_level"),
+                        },
+                    },
+                )
+                state["decision_event_id"] = int(event.id)
+            except Exception as audit_err:
+                logger.warning("Decision audit persistence failed (non-blocking): %s", audit_err)
             return state
         
         # Prepare conversation history for Gemini
@@ -433,6 +454,7 @@ want to die, mau mati, ingin mati, etc.
             
         try:
             decision = json.loads(cleaned_text)
+            raw_decision_payload = decision if isinstance(decision, dict) else {}
             
             # Validate required fields
             required_fields = ["intent", "needs_agents"]
@@ -768,6 +790,7 @@ want to die, mau mati, ingin mati, etc.
                     request=chat_request,
                     db=db,
                     user_id=state.get("user_id", 0),
+                    user_role=normalized_role,
                     max_tool_iterations=5,
                     execution_id=execution_id
                 )
@@ -818,6 +841,18 @@ want to die, mau mati, ingin mati, etc.
             f"needs_agents={state.get('needs_agents')}, "
             f"duration={elapsed_ms:.0f}ms"
         )
+
+        try:
+            from app.domains.mental_health.services.agent_decision_audit_service import record_aika_decision_event
+
+            event = await record_aika_decision_event(
+                db,
+                state,
+                raw_decision=raw_decision_payload,
+            )
+            state["decision_event_id"] = int(event.id)
+        except Exception as audit_err:
+            logger.warning("Decision audit persistence failed (non-blocking): %s", audit_err)
         
         # ========================================================================
         # TWO-TIER RISK MONITORING: Trigger background STA analysis if conversation ended
@@ -885,6 +920,18 @@ want to die, mau mati, ingin mati, etc.
             
             if execution_id:
                 execution_tracker.fail_node(execution_id, "aika::decision", str(e))
+
+        try:
+            from app.domains.mental_health.services.agent_decision_audit_service import record_aika_decision_event
+
+            event = await record_aika_decision_event(
+                db,
+                state,
+                raw_decision=raw_decision_payload,
+            )
+            state["decision_event_id"] = int(event.id)
+        except Exception as audit_err:
+            logger.warning("Decision audit persistence failed (non-blocking): %s", audit_err)
     
     return state
 

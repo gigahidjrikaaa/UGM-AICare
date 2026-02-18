@@ -16,9 +16,11 @@ This enables a safe 2-phase migration:
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date, datetime
+from datetime import date
 from typing import Iterable, Optional
 
+from sqlalchemy import inspect, select
+from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User
@@ -116,6 +118,36 @@ async def ensure_user_normalized_tables(db: AsyncSession, user: User) -> User:
     """
 
     changed = False
+
+    # Ensure relationships are loaded in async-safe way.
+    # Some call sites intentionally resolve a minimal auth user object
+    # with lazy relationships disabled; direct relationship access would
+    # otherwise trigger MissingGreenlet.
+    relationship_names = {
+        "profile",
+        "preferences",
+        "clinical_record",
+        "emergency_contacts",
+    }
+    user_state = inspect(user)
+    should_preload = user_state.detached or any(
+        rel_name in user_state.unloaded for rel_name in relationship_names
+    )
+
+    if should_preload:
+        preload_result = await db.execute(
+            select(User)
+            .options(
+                joinedload(User.profile),
+                joinedload(User.preferences),
+                selectinload(User.clinical_record),
+                selectinload(User.emergency_contacts),
+            )
+            .where(User.id == user.id)
+        )
+        loaded_user = preload_result.unique().scalar_one_or_none()
+        if loaded_user is not None:
+            user = loaded_user
 
     # ---------------------------------------------------------------------
     # user_profiles

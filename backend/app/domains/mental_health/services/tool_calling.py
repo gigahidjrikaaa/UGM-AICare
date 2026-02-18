@@ -22,11 +22,13 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
-from typing import Any, Callable, Dict, List, Optional
+import re
+from typing import Any, Callable, Dict, List, Optional, cast
 
 from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.database import AsyncSessionLocal
 
 # New SDK imports
 from google import genai
@@ -56,6 +58,104 @@ MAX_TOOL_ITERATIONS = 5
 DEFAULT_TOOL_TIMEOUT = 30  # seconds
 
 
+def _latest_user_message(history: List[Dict[str, str]]) -> str:
+    for msg in reversed(history):
+        if msg.get("role") == "user" and msg.get("content"):
+            return str(msg.get("content") or "")
+    return ""
+
+
+def _select_tool_subset_from_message(message: str) -> Optional[set[str]]:
+    """Return a narrowed tool set for obvious intents to reduce latency.
+
+    Returns None when intent is ambiguous, so full toolset remains available.
+    """
+    text = re.sub(r"\s+", " ", (message or "").strip().lower())
+    if not text:
+        return None
+
+    profile_keywords = (
+        "profil", "profile", "siapa aku", "tentang aku", "data aku", "info aku",
+        "nama aku", "umur", "fakultas", "jurusan", "tahun studi",
+    )
+    appointment_keywords = (
+        "appointment", "jadwal", "booking", "book", "counselor", "psikolog",
+        "reschedule", "cancel",
+    )
+    journal_keywords = (
+        "jurnal", "journal", "catatan", "diary", "refleksi", "mood",
+    )
+    intervention_keywords = (
+        "intervensi", "intervention", "coping", "rencana", "plan", "progress",
+    )
+
+    if any(keyword in text for keyword in profile_keywords):
+        return {
+            "get_user_profile",
+            "get_user_preferences",
+            "get_user_consent_status",
+            "update_user_profile",
+        }
+
+    if any(keyword in text for keyword in appointment_keywords):
+        return {
+            "get_available_counselors",
+            "suggest_appointment_times",
+            "book_appointment",
+            "reschedule_appointment",
+            "cancel_appointment",
+            "get_user_profile",
+        }
+
+    if any(keyword in text for keyword in journal_keywords):
+        return {
+            "get_journal_entries",
+            "get_activity_streak",
+            "get_user_profile",
+        }
+
+    if any(keyword in text for keyword in intervention_keywords):
+        return {
+            "get_intervention_plan_progress",
+            "get_user_intervention_plan_progress",
+            "create_intervention_plan",
+            "get_user_profile",
+        }
+
+    return None
+
+
+def _should_use_tools(message: str, user_role: Optional[str]) -> bool:
+    """Conservative gate to avoid unnecessary tool calls.
+
+    Tools are only enabled for account-specific, historical, or transactional intents.
+    """
+    text = re.sub(r"\s+", " ", (message or "").strip().lower())
+    if not text:
+        return False
+
+    role = (user_role or "student").strip().lower()
+    common_triggers = (
+        "profil", "profile", "siapa aku", "data aku", "riwayat",
+        "jurnal", "journal", "progress", "rencana", "intervensi",
+        "appointment", "jadwal", "booking", "book", "counselor", "psikolog",
+        "cancel", "reschedule",
+    )
+
+    if any(trigger in text for trigger in common_triggers):
+        return True
+
+    if role in {"admin", "administrator", "superadmin", "super-admin", "counselor", "therapist"}:
+        privileged_triggers = (
+            "case", "kasus", "trend", "analytics", "statistik", "conversation stats",
+            "risk", "risiko", "escalation", "eskalasi",
+        )
+        if any(trigger in text for trigger in privileged_triggers):
+            return True
+
+    return False
+
+
 async def generate_with_tools(
     history: List[Dict[str, str]],
     system_prompt: Optional[str],
@@ -65,6 +165,7 @@ async def generate_with_tools(
     stream_callback: Optional[StreamCallback] = None,
     max_tool_iterations: int = MAX_TOOL_ITERATIONS,
     execution_id: Optional[str] = None,
+    user_role: Optional[str] = None,
 ) -> tuple[str, List[Dict[str, Any]]]:
     """Generate response with tool calling support.
     
@@ -80,6 +181,7 @@ async def generate_with_tools(
         stream_callback: Optional callback for streaming responses
         max_tool_iterations: Maximum number of tool calling iterations
         execution_id: Optional execution ID for tracking tool calls
+        user_role: Optional caller role (student/counselor/admin) for tool policy
         
     Returns:
         Tuple of (final_response_text, list_of_tool_calls_executed)
@@ -96,10 +198,40 @@ async def generate_with_tools(
     conversation_history = list(history)
     iterations = 0
     tool_calls_executed: List[Dict[str, Any]] = []
+
+    latest_message = _latest_user_message(conversation_history)
+
+    if not _should_use_tools(latest_message, user_role):
+        logger.info("Tool calling skipped: request does not require tools")
+        response = await llm.generate_gemini_response_with_fallback(
+            history=conversation_history,
+            model=model_name,
+            max_tokens=request.max_tokens,
+            temperature=request.temperature,
+            system_prompt=system_prompt,
+            tools=None,
+            allow_retry_sleep=False,
+            return_full_response=False,
+        )
+        response_text = cast(str, response)
+
+        if stream_callback:
+            for char in response_text:
+                await stream_callback(char)
+
+        return response_text, tool_calls_executed
     
-    # Get available tools
-    tools = get_aika_tools()
-    logger.info(f"Tool calling enabled with {len(tools)} tool(s) available")
+    # Get available tools (optionally narrowed by user intent for latency)
+    tool_subset = _select_tool_subset_from_message(latest_message)
+    tools = get_aika_tools(allowed_tool_names=tool_subset, user_role=user_role)
+    tool_declaration_count = sum(len(getattr(tool, "function_declarations", []) or []) for tool in tools)
+    if tool_subset is None:
+        logger.info("Tool calling enabled with %d declaration(s) (full set)", tool_declaration_count)
+    else:
+        logger.info(
+            "Tool calling enabled with %d declaration(s) (intent-filtered subset)",
+            tool_declaration_count,
+        )
 
     # Defensive: if this function is used outside the LangGraph chat entrypoint,
     # we still want per-prompt request counting.
@@ -138,20 +270,22 @@ async def generate_with_tools(
 
                 # For non-streaming mode (default)
                 # Get full response object for tool calling (with automatic fallback on rate limits)
+                planning_max_tokens = max(128, min(int(request.max_tokens), 384))
                 response_obj = await llm.generate_gemini_response_with_fallback(
                     history=conversation_history,
                     model=model_name,
-                    max_tokens=request.max_tokens,
+                    max_tokens=planning_max_tokens,
                     temperature=request.temperature,
                     system_prompt=system_prompt,
                     tools=tools,
                     allow_retry_sleep=False,
                     return_full_response=True,  # Get full response to check for function calls
                 )
+                response_obj_any = cast(Any, response_obj)
                 
                 # Check if response contains tool call requests
                 tool_results = await _check_and_execute_tool_calls(
-                    response=response_obj,  # Pass full response object
+                    response=response_obj_any,  # Pass full response object
                     db=db,
                     user_id=user_id,
                     execution_id=execution_id,
@@ -161,7 +295,7 @@ async def generate_with_tools(
                 if not tool_results:
                     # No tool calls detected, return final response
                     try:
-                        response_text = response_obj.text  # type: ignore
+                        response_text = response_obj_any.text  # type: ignore[attr-defined]
                         if response_text is None:
                             response_text = "I've processed your request."
                     except (ValueError, AttributeError):
@@ -187,21 +321,16 @@ async def generate_with_tools(
                 # Start with conversation history
                 contents = llm._convert_history_to_contents(conversation_history)
                 
-                # Add the model's function call parts from the response
-                if hasattr(response_obj, 'candidates') and response_obj.candidates:
-                    candidate = response_obj.candidates[0]
-                    if hasattr(candidate, 'content') and candidate.content:
-                        # Add all function call parts from model
-                        function_call_parts = []
-                        for part in candidate.content.parts:
-                            if hasattr(part, 'function_call') and part.function_call:
-                                function_call_parts.append(
-                                    types.Part.from_function_call(
-                                        name=part.function_call.name,
-                                        args=dict(part.function_call.args) if hasattr(part.function_call, 'args') else {}
-                                    )
-                                )
-                        
+                # Add the model's original function_call parts from the response.
+                # IMPORTANT: keep raw parts to preserve Gemini thought_signature.
+                if hasattr(response_obj_any, 'candidates') and response_obj_any.candidates:
+                    candidate = response_obj_any.candidates[0]
+                    if hasattr(candidate, 'content') and candidate.content and getattr(candidate.content, 'parts', None):
+                        function_call_parts = [
+                            part
+                            for part in candidate.content.parts
+                            if hasattr(part, 'function_call') and part.function_call
+                        ]
                         if function_call_parts:
                             contents.append(types.Content(role='model', parts=function_call_parts))
                 
@@ -228,7 +357,6 @@ async def generate_with_tools(
                 conversation_history.append({
                     "role": "assistant",
                     "content": "", # Content is empty for tool calls in some models, or we can add a description
-                    "tool_calls": tool_results # Store for debugging/tracking
                 })
                 
                 # 2. Add tool results (simulated as user message for history tracking, 
@@ -239,12 +367,13 @@ async def generate_with_tools(
                 # Make another API call with the updated contents to get final response
                 logger.info(f"Sending tool results back to LLM (iteration {iterations})")
                 normalized_tools = llm._normalize_tools_for_generate_config(tools)
+                response_max_tokens = max(256, min(int(request.max_tokens), 1024))
                 final_response_obj = await llm.generate_gemini_content_with_fallback(
                     contents=contents,
                     model=model_name,
                     config=types.GenerateContentConfig(
                         temperature=request.temperature,
-                        max_output_tokens=request.max_tokens,
+                        max_output_tokens=response_max_tokens,
                         system_instruction=system_prompt if system_prompt else None,
                         tools=normalized_tools,
                     ),
@@ -254,11 +383,11 @@ async def generate_with_tools(
                 
                 # Check if there are more function calls (nested tool calling)
                 # For safety, limit to max_iterations
-                response_obj = final_response_obj
+                response_obj_any = cast(Any, final_response_obj)
                 
                 # Check if the new response has tool calls
                 new_tool_results = await _check_and_execute_tool_calls(
-                    response=response_obj,
+                    response=response_obj_any,
                     db=db,
                     user_id=user_id,
                     execution_id=execution_id,
@@ -272,7 +401,7 @@ async def generate_with_tools(
                 else:
                     # No more tool calls, we have the final response
                     try:
-                        response_text = response_obj.text
+                        response_text = response_obj_any.text
                         if response_text is None:
                             response_text = "I've processed your request."
                     except (ValueError, AttributeError):
@@ -351,10 +480,11 @@ async def _generate_streaming_with_tools(
             allow_retry_sleep=False,
             return_full_response=True,
         )
+        response_obj_any = cast(Any, response_obj)
         
         # Check if response contains tool call requests
         tool_results = await _check_and_execute_tool_calls(
-            response=response_obj,
+            response=response_obj_any,
             db=db,
             user_id=user_id,
             execution_id=execution_id,
@@ -363,8 +493,8 @@ async def _generate_streaming_with_tools(
         if tool_results:
             # 1. Check for and emit any initial text (explanation) from the model
             # This allows "Explain -> Act" behavior like ChatGPT
-            if hasattr(response_obj, 'candidates') and response_obj.candidates:
-                candidate = response_obj.candidates[0]
+            if hasattr(response_obj_any, 'candidates') and response_obj_any.candidates:
+                candidate = response_obj_any.candidates[0]
                 if hasattr(candidate, 'content') and candidate.content:
                     initial_text = ""
                     for part in candidate.content.parts:
@@ -400,20 +530,16 @@ async def _generate_streaming_with_tools(
             # Start with conversation history
             contents = llm._convert_history_to_contents(conversation_history)
             
-            # Add the model's function call parts from the response
-            if hasattr(response_obj, 'candidates') and response_obj.candidates:
-                candidate = response_obj.candidates[0]
-                if hasattr(candidate, 'content') and candidate.content:
-                    function_call_parts = []
-                    for part in candidate.content.parts:
-                        if hasattr(part, 'function_call') and part.function_call:
-                            function_call_parts.append(
-                                types.Part.from_function_call(
-                                    name=part.function_call.name,
-                                    args=dict(part.function_call.args) if hasattr(part.function_call, 'args') else {}
-                                )
-                            )
-                    
+            # Add the model's original function_call parts from the response.
+            # IMPORTANT: keep raw parts to preserve Gemini thought_signature.
+            if hasattr(response_obj_any, 'candidates') and response_obj_any.candidates:
+                candidate = response_obj_any.candidates[0]
+                if hasattr(candidate, 'content') and candidate.content and getattr(candidate.content, 'parts', None):
+                    function_call_parts = [
+                        part
+                        for part in candidate.content.parts
+                        if hasattr(part, 'function_call') and part.function_call
+                    ]
                     if function_call_parts:
                         contents.append(types.Content(role='model', parts=function_call_parts))
             
@@ -444,9 +570,10 @@ async def _generate_streaming_with_tools(
                 allow_retry_sleep=False,
                 return_full_response=True,
             )
+            final_response_obj_any = cast(Any, final_response_obj)
             
             # Extract final text
-            final_response = final_response_obj.text
+            final_response = final_response_obj_any.text
             
             # Stream the final response character by character for smooth UX
             full_text = tool_indicator_msg
@@ -459,7 +586,7 @@ async def _generate_streaming_with_tools(
         else:
             # No function calls, extract and stream text normally
             try:
-                response_text = response_obj.text  # type: ignore
+                response_text = response_obj_any.text  # type: ignore[attr-defined]
             except (ValueError, AttributeError):
                 response_text = "I've processed your request."
             
@@ -502,7 +629,59 @@ async def _check_and_execute_tool_calls(
     Returns:
         List of executed tool calls with their results
     """
-    tool_results = []
+    tool_results: List[Dict[str, Any]] = []
+
+    async def _execute_one_tool_call(
+        tool_name: str,
+        tool_args: Dict[str, Any],
+        *,
+        use_isolated_session: bool,
+    ) -> Dict[str, Any]:
+        local_db: AsyncSession | None = None
+        execution_db: AsyncSession = db
+        try:
+            if use_isolated_session:
+                local_db = AsyncSessionLocal()
+                execution_db = local_db
+
+            result = await asyncio.wait_for(
+                execute_tool_call(
+                    tool_name=tool_name,
+                    args=tool_args,
+                    db=execution_db,
+                    user_id=str(user_id),
+                ),
+                timeout=DEFAULT_TOOL_TIMEOUT,
+            )
+            return {
+                "tool_name": tool_name,
+                "arguments": tool_args,
+                "result": result,
+                "success": not (isinstance(result, dict) and bool(result.get("error"))),
+            }
+        except asyncio.TimeoutError:
+            logger.error(
+                "Tool execution timed out: %s (timeout=%ss)",
+                tool_name,
+                DEFAULT_TOOL_TIMEOUT,
+            )
+            return {
+                "tool_name": tool_name,
+                "arguments": tool_args,
+                "result": {"status": "failed", "success": False, "error": "Tool execution timed out"},
+                "success": False,
+            }
+        except Exception as tool_error:
+            logger.error(f"Error executing tool {tool_name}: {tool_error}", exc_info=True)
+            return {
+                "tool_name": tool_name,
+                "arguments": tool_args,
+                "result": {"status": "failed", "success": False, "error": str(tool_error)},
+                "success": False,
+            }
+        finally:
+            if local_db is not None:
+                await local_db.close()
     
     try:
         # Check if response has candidates
@@ -528,100 +707,82 @@ async def _check_and_execute_tool_calls(
         if initial_text:
             await adispatch_custom_event("partial_response", {"text": initial_text})
 
-        # Look for function calls in parts
+        pending_calls: List[tuple[str, Dict[str, Any]]] = []
         for part in content.parts:
-            if hasattr(part, 'function_call') and part.function_call:
-                function_call = part.function_call
-                tool_name = function_call.name
-                
-                # Extract arguments
-                tool_args = {}
-                if hasattr(function_call, 'args') and function_call.args:
-                    # Convert protobuf Struct to dict
-                    tool_args = dict(function_call.args)
-                
-                logger.info(f"Executing tool call: {tool_name} with args: {tool_args}")
-                
-                # Calculate retry count
+            if not (hasattr(part, 'function_call') and part.function_call):
+                continue
+            function_call = part.function_call
+            tool_name = function_call.name
+
+            tool_args: Dict[str, Any] = {}
+            if hasattr(function_call, 'args') and function_call.args:
+                tool_args = dict(function_call.args)
+
+            logger.info(f"Executing tool call: {tool_name} with args: {tool_args}")
+            pending_calls.append((tool_name, tool_args))
+
+            if execution_id:
                 retry_count = 0
                 if previous_tool_calls:
                     retry_count = sum(1 for tc in previous_tool_calls if tc["tool_name"] == tool_name)
-                
-                # Track tool execution start
-                if execution_id:
-                    execution_tracker.start_node(
-                        execution_id, 
-                        f"tool::{tool_name}", 
-                        "tool_executor",
-                        input_data=tool_args,
-                        node_type="tool",
-                        retry_count=retry_count
+                execution_tracker.start_node(
+                    execution_id,
+                    f"tool::{tool_name}",
+                    "tool_executor",
+                    input_data=tool_args,
+                    node_type="tool",
+                    retry_count=retry_count,
+                )
+
+        if not pending_calls:
+            return tool_results
+
+        can_parallelize = all(name.startswith("get_") for name, _ in pending_calls) and len(pending_calls) > 1
+
+        if can_parallelize:
+            logger.info("⚡ Executing %d read-only tool calls in parallel", len(pending_calls))
+            executed = await asyncio.gather(
+                *[
+                    _execute_one_tool_call(name, args, use_isolated_session=True)
+                    for name, args in pending_calls
+                ],
+                return_exceptions=False,
+            )
+        else:
+            executed = []
+            for name, args in pending_calls:
+                executed.append(
+                    await _execute_one_tool_call(name, args, use_isolated_session=False)
+                )
+
+        for item in executed:
+            tool_results.append({
+                "tool_name": item["tool_name"],
+                "arguments": item["arguments"],
+                "result": item["result"],
+            })
+
+            if execution_id:
+                if item["success"]:
+                    execution_tracker.complete_node(
+                        execution_id,
+                        f"tool::{item['tool_name']}",
+                        output_data={"result": str(item["result"])[:500]},
                     )
-                
-                # Execute the tool
-                try:
-                    result = await asyncio.wait_for(
-                        execute_tool_call(
-                            tool_name=tool_name,
-                            args=tool_args,  # Correct parameter name is 'args'
-                            db=db,
-                            user_id=str(user_id),  # Convert to string as expected by execute_tool_call
-                        ),
-                        timeout=DEFAULT_TOOL_TIMEOUT,
-                    )
-                    
-                    tool_results.append({
-                        "tool_name": tool_name,
-                        "arguments": tool_args,
-                        "result": result,
-                    })
-                    
-                    # Track tool execution success
-                    if execution_id:
-                        execution_tracker.complete_node(
-                            execution_id,
-                            f"tool::{tool_name}",
-                            output_data={"result": str(result)[:500]} # Truncate for storage
-                        )
-                    
-                    logger.info(f"✓ Tool {tool_name} executed successfully")
-                    
-                except asyncio.TimeoutError:
-                    logger.error(
-                        "Tool execution timed out: %s (timeout=%ss)",
-                        tool_name,
-                        DEFAULT_TOOL_TIMEOUT,
+                else:
+                    error_message = "Tool execution failed"
+                    if isinstance(item.get("result"), dict):
+                        error_message = str(item["result"].get("error") or error_message)
+                    execution_tracker.fail_node(
+                        execution_id,
+                        f"tool::{item['tool_name']}",
+                        error_message,
                     )
 
-                    if execution_id:
-                        execution_tracker.fail_node(
-                            execution_id,
-                            f"tool::{tool_name}",
-                            f"timeout after {DEFAULT_TOOL_TIMEOUT}s",
-                        )
-
-                    tool_results.append({
-                        "tool_name": tool_name,
-                        "arguments": tool_args,
-                        "result": {"error": "Tool execution timed out"},
-                    })
-
-                except Exception as tool_error:
-                    logger.error(f"Error executing tool {tool_name}: {tool_error}", exc_info=True)
-                    
-                    # Track tool execution failure
-                    if execution_id:
-                        execution_tracker.fail_node(
-                            execution_id,
-                            f"tool::{tool_name}",
-                            str(tool_error)
-                        )
-                        
-                    tool_results.append({
-                        "tool_name": tool_name,
-                        "arguments": tool_args,
-                        "result": {"error": str(tool_error)},
-                    })
+            if item["success"]:
+                logger.info("✓ Tool %s executed successfully", item["tool_name"])
+            else:
+                logger.warning("⚠️ Tool %s returned error result", item["tool_name"])
     
     except Exception as e:
         logger.error(f"Error parsing function calls from response: {e}", exc_info=True)

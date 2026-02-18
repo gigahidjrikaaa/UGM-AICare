@@ -347,6 +347,19 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
         state["assignment_id"] = str(assignment.id)
         state["assignment_reason"] = "auto_assigned_lowest_workload"
         state["assigned_workload"] = assigned_workload
+
+        await publish_event(
+            event_type=EventType.CASE_ASSIGNED,
+            source_agent="cma",
+            data={
+                "case_id": str(case_id),
+                "assigned_to": assigned_counsellor_id_str,
+                "assigned_by": None,
+                "is_reassignment": False,
+                "previous_assignee": None,
+            },
+        )
+
         execution_path = state.get("execution_path", [])
         execution_path.append("auto_assign")
         state["execution_path"] = execution_path
@@ -422,6 +435,7 @@ async def notify_counsellor_node(state: SDAState) -> SDAState:
             source_agent="cma",
             data={
                 "case_id": str(state.get("case_id")),
+                "assigned_to": state.get("assigned_to"),
                 "severity": severity,
                 "user_hash": state.get("user_hash"),
                 "session_id": state.get("session_id"),

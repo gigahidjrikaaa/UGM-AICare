@@ -16,7 +16,7 @@ Architecture:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional, Set
 from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import NEW registry functions (decorator pattern)
@@ -30,12 +30,70 @@ from app.agents.shared.tools import (
 logger = logging.getLogger(__name__)
 
 
-def get_aika_tools() -> List[Any]:
+_AIKA_ROLE_TOOL_ALLOWLISTS: Dict[str, Set[str]] = {
+    "student": {
+        "get_user_profile",
+        "get_user_preferences",
+        "update_user_profile",
+        "get_journal_entries",
+        "get_activity_streak",
+        "get_intervention_plan_progress",
+        "get_user_intervention_plan_progress",
+        "create_intervention_plan",
+        "get_available_counselors",
+        "suggest_appointment_times",
+        "book_appointment",
+        "cancel_appointment",
+        "reschedule_appointment",
+        "get_user_appointments",
+        "get_crisis_resources",
+    },
+    "counselor": {
+        "get_case_details",
+        "get_user_cases",
+        "get_conversation_summary",
+        "get_conversation_stats",
+        "search_conversations",
+        "get_active_safety_cases",
+        "get_risk_assessment_history",
+        "get_escalation_protocol",
+    },
+    "admin": {
+        "get_conversation_stats",
+        "search_conversations",
+        "get_case_details",
+        "get_user_cases",
+        "get_active_safety_cases",
+        "get_crisis_resources",
+    },
+}
+
+
+def _normalize_role(user_role: Optional[str]) -> str:
+    role = (user_role or "student").strip().lower()
+    if role in {"user", "student"}:
+        return "student"
+    if role in {"counselor", "therapist"}:
+        return "counselor"
+    if role in {"admin", "administrator", "superadmin", "super-admin"}:
+        return "admin"
+    return "student"
+
+
+def get_aika_tools(
+    allowed_tool_names: Optional[Set[str]] = None,
+    user_role: Optional[str] = None,
+) -> List[Any]:
     """Return list of tools available to Aika.
     
     This function returns tools in the format expected by the Google GenAI SDK.
     It filters out agent-invoking tools to prevent conflicts with LangGraph routing.
     
+    Args:
+        allowed_tool_names: Optional whitelist of tool names. If provided,
+            only matching tools are exposed to the model.
+        user_role: Optional caller role used for role-based hard allowlisting.
+
     Returns:
         List[types.Tool]: Tool schemas for Gemini function calling
     """
@@ -48,10 +106,18 @@ def get_aika_tools() -> List[Any]:
             "run_safety_triage_agent",
             "run_support_coach_agent",
             "run_service_desk_agent",
-            "run_insights_agent"
+            "run_insights_agent",
+            "general_query",
         }
+
+        normalized_role = _normalize_role(user_role)
+        role_allowlist = _AIKA_ROLE_TOOL_ALLOWLISTS.get(normalized_role, _AIKA_ROLE_TOOL_ALLOWLISTS["student"])
+        active_allowlist: Set[str] = set(role_allowlist)
+        if allowed_tool_names is not None:
+            active_allowlist &= set(allowed_tool_names)
         
         filtered_tools = []
+        selected_declarations_count = 0
         
         for tool in all_gemini_tools:
             # Each tool object has function_declarations list
@@ -61,16 +127,33 @@ def get_aika_tools() -> List[Any]:
                 
             valid_decls = []
             for decl in tool.function_declarations:
-                if decl.name not in excluded_tools:
-                    valid_decls.append(decl)
+                if decl.name in excluded_tools:
+                    continue
+                if decl.name not in active_allowlist:
+                    continue
+                valid_decls.append(decl)
             
             if valid_decls:
                 # Create new Tool object with filtered declarations
                 # We can't modify the existing one safely if it's shared
                 from google.genai import types
                 filtered_tools.append(types.Tool(function_declarations=valid_decls))
+                selected_declarations_count += len(valid_decls)
         
-        logger.info(f"✅ Loaded {len(filtered_tools)} tool groups for Aika (filtered agent runners)")
+        if allowed_tool_names is None:
+            logger.info(
+                "✅ Loaded %d tool groups for Aika role=%s (%d declarations)",
+                len(filtered_tools),
+                normalized_role,
+                selected_declarations_count,
+            )
+        else:
+            logger.info(
+                "✅ Loaded %d tool groups for Aika role=%s (%d declarations after role+intent allowlist)",
+                len(filtered_tools),
+                normalized_role,
+                selected_declarations_count,
+            )
         
         return filtered_tools
         

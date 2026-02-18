@@ -74,6 +74,7 @@ export default function AdminAgentDecisionsPage() {
           <table className="min-w-full text-sm text-white/90">
             <thead>
               <tr className="border-b border-white/10 text-left text-xs uppercase tracking-wide text-white/50">
+                <th className="px-3 py-2">Source</th>
                 <th className="px-3 py-2">Action</th>
                 <th className="px-3 py-2">Policy</th>
                 <th className="px-3 py-2">Reasoning</th>
@@ -86,6 +87,7 @@ export default function AdminAgentDecisionsPage() {
             <tbody>
               {items.map((item) => (
                 <tr key={item.id} className="border-b border-white/5 align-top">
+                  <td className="px-3 py-2 text-xs text-white/70">{item.source}</td>
                   <td className="px-3 py-2">
                     <div className="font-medium text-white">#{item.id} · {item.action_type}</div>
                     <div className="text-xs text-white/50">risk={item.risk_level} intent={item.intent ?? '-'}</div>

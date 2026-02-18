@@ -12,6 +12,84 @@ router = APIRouter(prefix="/database", tags=["Admin Database Viewer"])
 class DeleteRowsRequest(BaseModel):
     rows: List[Dict[str, Any]]
 
+
+class TableSchemaColumn(BaseModel):
+    name: str
+    type: str
+    nullable: bool
+    primary_key: bool
+
+
+class TableSchema(BaseModel):
+    table_name: str
+    columns: List[TableSchemaColumn]
+
+
+class TableRelationship(BaseModel):
+    source_table: str
+    source_column: str
+    target_table: str
+    target_column: str
+    constraint_name: Optional[str] = None
+
+
+class DatabaseSchemaResponse(BaseModel):
+    tables: List[TableSchema]
+    relationships: List[TableRelationship]
+
+
+def _introspect_schema(sync_conn: Any) -> Dict[str, Any]:
+    inspector = inspect(sync_conn)
+    table_names = sorted(inspector.get_table_names())
+
+    tables_payload: List[Dict[str, Any]] = []
+    relationships_payload: List[Dict[str, Any]] = []
+
+    for table_name in table_names:
+        columns = inspector.get_columns(table_name)
+        pk_constraint = inspector.get_pk_constraint(table_name)
+        primary_keys = set(pk_constraint.get("constrained_columns", []) or [])
+
+        tables_payload.append(
+            {
+                "table_name": table_name,
+                "columns": [
+                    {
+                        "name": col["name"],
+                        "type": str(col["type"]),
+                        "nullable": bool(col.get("nullable", True)),
+                        "primary_key": col["name"] in primary_keys,
+                    }
+                    for col in columns
+                ],
+            }
+        )
+
+        foreign_keys = inspector.get_foreign_keys(table_name)
+        for fk in foreign_keys:
+            constrained = list(fk.get("constrained_columns") or [])
+            referred = list(fk.get("referred_columns") or [])
+            referred_table = fk.get("referred_table")
+            if not referred_table:
+                continue
+
+            pair_count = min(len(constrained), len(referred))
+            for idx in range(pair_count):
+                relationships_payload.append(
+                    {
+                        "source_table": table_name,
+                        "source_column": str(constrained[idx]),
+                        "target_table": str(referred_table),
+                        "target_column": str(referred[idx]),
+                        "constraint_name": (str(fk.get("name")) if fk.get("name") else None),
+                    }
+                )
+
+    return {
+        "tables": tables_payload,
+        "relationships": relationships_payload,
+    }
+
 @router.get("/tables", response_model=List[str])
 async def list_tables(
     admin: Any = Depends(get_admin_user)
@@ -23,6 +101,24 @@ async def list_tables(
                 lambda sync_conn: inspect(sync_conn).get_table_names()
             )
         return tables
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/schema", response_model=DatabaseSchemaResponse)
+async def get_database_schema(
+    admin: Any = Depends(get_admin_user)
+):
+    """Return table schema and foreign-key relationships for ERD-like visualization."""
+    del admin
+    try:
+        async with async_engine.connect() as conn:
+            payload = await conn.run_sync(_introspect_schema)
+
+        return DatabaseSchemaResponse(
+            tables=[TableSchema(**item) for item in payload["tables"]],
+            relationships=[TableRelationship(**item) for item in payload["relationships"]],
+        )
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 

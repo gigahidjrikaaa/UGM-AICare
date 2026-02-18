@@ -295,6 +295,7 @@ async def _tool_aware_llm_responder(
     request: ChatRequest,
     db: AsyncSession,
     user_id: int,
+    user_role: Optional[str] = None,
     stream_callback: Optional[Callable[[str], Any]] = None,
 ) -> str:
     """LLM responder with tool calling capabilities.
@@ -324,6 +325,7 @@ async def _tool_aware_llm_responder(
         request=request,
         db=db,
         user_id=user_id,
+        user_role=user_role,
         stream_callback=stream_callback,
     )
     
@@ -374,6 +376,7 @@ async def _streaming_tool_aware_llm_responder(
     request: ChatRequest,
     db: AsyncSession,
     user_id: int,
+    user_role: Optional[str] = None,
     stream_callback: Optional[Callable[[str], Any]] = None,
 ) -> str:
     """Streaming LLM responder with tool calling capabilities.
@@ -394,7 +397,15 @@ async def _streaming_tool_aware_llm_responder(
     """
     if stream_callback is None:
         # Fallback to non-streaming tool-aware responder
-        return await _tool_aware_llm_responder(history, system_prompt, request, db, user_id, None)
+        return await _tool_aware_llm_responder(
+            history,
+            system_prompt,
+            request,
+            db,
+            user_id,
+            user_role,
+            None,
+        )
 
     # Use the proper tool calling service with streaming
     from app.domains.mental_health.services.tool_calling import generate_with_tools
@@ -405,6 +416,7 @@ async def _streaming_tool_aware_llm_responder(
         request=request,
         db=db,
         user_id=user_id,
+        user_role=user_role,
         stream_callback=stream_callback,
     )
     

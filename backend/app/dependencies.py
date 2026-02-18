@@ -5,7 +5,7 @@ from fastapi import Depends, HTTPException, Header, status, Cookie, Request  # t
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.orm import load_only, lazyload
+from sqlalchemy.orm import joinedload, load_only, lazyload, selectinload
 from app.models import User
 from app.database import get_async_db
 from app.auth_utils import decrypt_and_validate_token
@@ -65,6 +65,62 @@ async def get_current_active_user(
     request: Request = None,  # type: ignore[assignment]
 ) -> User:
     """Dependency to return the authenticated and active user for a valid JWT."""
+    return await _resolve_current_active_user(
+        token=token,
+        db=db,
+        request=request,
+        eager_normalized_relations=False,
+    )
+
+
+async def get_current_active_user_with_normalized_relations(
+    token: str = Depends(get_token_from_request),
+    db: AsyncSession = Depends(get_async_db),
+    request: Request = None,  # type: ignore[assignment]
+) -> User:
+    """Authenticated active user with normalized relations eagerly loaded.
+
+    Use this dependency only for routes that read/write normalized user tables
+    (e.g., profile/preferences/clinical views) to avoid async lazy-load issues.
+    """
+    return await _resolve_current_active_user(
+        token=token,
+        db=db,
+        request=request,
+        eager_normalized_relations=True,
+    )
+
+
+def _build_auth_user_query(user_id: int, eager_normalized_relations: bool):
+    if eager_normalized_relations:
+        return (
+            select(User)
+            .options(
+                joinedload(User.profile),
+                joinedload(User.preferences),
+                selectinload(User.clinical_record),
+                selectinload(User.emergency_contacts),
+            )
+            .where(User.id == user_id)
+        )
+
+    return (
+        select(User)
+        .options(
+            lazyload("*"),
+            load_only(User.id, User.is_active, User.role, User.google_sub),
+        )
+        .where(User.id == user_id)
+    )
+
+
+async def _resolve_current_active_user(
+    token: str,
+    db: AsyncSession,
+    request: Request | None,
+    eager_normalized_relations: bool,
+) -> User:
+    """Resolve authenticated active user with optional eager relation loading."""
     payload = decrypt_and_validate_token(token)
 
     try:
@@ -77,18 +133,14 @@ async def get_current_active_user(
             headers={"WWW-Authenticate": 'Bearer error="invalid_token"'},
         )
 
-    auth_user_query = (
-        select(User)
-        .options(
-            lazyload("*"),
-            load_only(User.id, User.is_active, User.role, User.google_sub),
-        )
-        .where(User.id == user_id)
+    auth_user_query = _build_auth_user_query(
+        user_id=user_id,
+        eager_normalized_relations=eager_normalized_relations,
     )
 
     try:
         result = await db.execute(auth_user_query)
-        user = result.scalar_one_or_none()
+        user = result.unique().scalar_one_or_none()
     except DBAPIError as exc:
         logger.warning(
             "Transient DB error while resolving current user id=%s; retrying once: %s",
@@ -97,7 +149,7 @@ async def get_current_active_user(
         )
         await db.rollback()
         result = await db.execute(auth_user_query)
-        user = result.scalar_one_or_none()
+        user = result.unique().scalar_one_or_none()
 
     if not user:
         logger.warning("JWT resolved to missing user id=%s", user_id)

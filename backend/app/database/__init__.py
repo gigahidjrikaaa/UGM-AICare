@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from typing import AsyncGenerator, Optional
+import asyncio
 
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base
@@ -219,12 +220,24 @@ async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
     async with AsyncSessionLocal() as session:
         try:
             yield session
+        except asyncio.CancelledError:
+            try:
+                await asyncio.shield(session.rollback())
+            except Exception:
+                pass
+            logger.debug("Database session cancelled; rolled back safely")
+            raise
         except Exception as e:
-            await session.rollback()
+            await asyncio.shield(session.rollback())
             logger.error(f"Database session error: {e}")
             raise
         finally:
-            await session.close()
+            try:
+                await asyncio.shield(session.close())
+            except asyncio.CancelledError:
+                logger.debug("Database session close cancelled by request scope")
+            except Exception as close_err:
+                logger.debug("Database session close encountered non-fatal error: %s", close_err)
 
 async def close_db():
     """Gracefully close database connections"""

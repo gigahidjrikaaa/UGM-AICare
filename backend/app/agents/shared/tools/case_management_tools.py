@@ -12,6 +12,7 @@ Privacy: Case data is HIGHLY SENSITIVE - clinical information.
 """
 
 from typing import Dict, Any, Optional, List
+import hashlib
 from datetime import datetime
 from sqlalchemy import select, desc, and_
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,6 +29,36 @@ import logging
 logger = logging.getLogger(__name__)
 
 MAX_CASES = 20
+
+
+def _to_user_hash_candidates(user_id: str) -> list[str]:
+    raw = str(user_id).strip()
+    if not raw:
+        return []
+    candidates = {raw, f"user_{raw}"}
+    candidates.add(hashlib.sha256(f"user_{raw}".encode()).hexdigest()[:16])
+    return list(candidates)
+
+
+def _normalize_case_status(status: Optional[str]) -> Optional[CaseStatusEnum]:
+    if not status:
+        return None
+    normalized = str(status).strip().lower()
+    alias_map = {
+        "open": "new",
+        "new": "new",
+        "in_progress": "in_progress",
+        "waiting": "waiting",
+        "resolved": "resolved",
+        "closed": "closed",
+    }
+    mapped = alias_map.get(normalized)
+    if not mapped:
+        return None
+    try:
+        return CaseStatusEnum(mapped)
+    except ValueError:
+        return None
 
 
 @register_tool(
@@ -77,17 +108,17 @@ async def get_case_details(
         return {
             "success": True,
             "case_id": case_id,
-            "user_id": str(case.user_id),
-            "assessment_id": str(case.assessment_id) if case.assessment_id else None,
-            "severity": case.severity,
-            "status": case.status,
-            "description": case.description,
+            "user_hash": str(case.user_hash),
+            "session_id": case.session_id,
+            "conversation_id": case.conversation_id,
+            "severity": case.severity.value if isinstance(case.severity, CaseSeverityEnum) else str(case.severity),
+            "status": case.status.value if isinstance(case.status, CaseStatusEnum) else str(case.status),
+            "summary_redacted": case.summary_redacted,
             "assigned_to": str(case.assigned_to) if case.assigned_to else None,
-            "priority": case.priority,
-            "resolution": case.resolution,
-            "created_at": case.created_at.isoformat(),
-            "updated_at": case.updated_at.isoformat() if hasattr(case.updated_at, 'isoformat') else None,
-            "resolved_at": case.resolved_at.isoformat() if hasattr(case.resolved_at, 'isoformat') else None
+            "sla_breach_at": case.sla_breach_at.isoformat() if case.sla_breach_at else None,
+            "closure_reason": case.closure_reason,
+            "created_at": case.created_at.isoformat() if case.created_at else None,
+            "updated_at": case.updated_at.isoformat() if case.updated_at else None,
         }
         
     except Exception as e:
@@ -111,8 +142,8 @@ async def get_case_details(
             },
             "status": {
                 "type": "string",
-                "description": "Optional status filter (OPEN, IN_PROGRESS, RESOLVED, CLOSED)",
-                "enum": ["OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED"]
+                "description": "Optional status filter (new, in_progress, waiting, resolved, closed)",
+                "enum": ["new", "in_progress", "waiting", "resolved", "closed"]
             },
             "limit": {
                 "type": "integer",
@@ -142,11 +173,28 @@ async def get_user_cases(
     try:
         if limit > MAX_CASES:
             limit = MAX_CASES
+        if limit < 1:
+            limit = 1
+
+        user_hash_candidates = _to_user_hash_candidates(user_id)
+        if not user_hash_candidates:
+            return {
+                "success": False,
+                "error": "Invalid user_id",
+                "user_id": user_id,
+            }
             
         # Query cases
-        query = select(Case).where(Case.user_id == user_id)
+        query = select(Case).where(Case.user_hash.in_(user_hash_candidates))
         if status:
-            query = query.where(Case.status == status)
+            normalized_status = _normalize_case_status(status)
+            if normalized_status is None:
+                return {
+                    "success": False,
+                    "error": f"Invalid status filter: {status}",
+                    "user_id": user_id,
+                }
+            query = query.where(Case.status == normalized_status)
         query = query.order_by(desc(Case.created_at)).limit(limit)
         
         result = await db.execute(query)
@@ -160,11 +208,13 @@ async def get_user_cases(
                 
             case_list.append({
                 "case_id": str(case.id),
-                "severity": case.severity,
-                "status": case.status,
-                "description": case.description,
-                "priority": case.priority,
-                "created_at": case.created_at.isoformat(),
+                "severity": case.severity.value if isinstance(case.severity, CaseSeverityEnum) else str(case.severity),
+                "status": case.status.value if isinstance(case.status, CaseStatusEnum) else str(case.status),
+                "summary_redacted": case.summary_redacted,
+                "assigned_to": str(case.assigned_to) if case.assigned_to else None,
+                "session_id": case.session_id,
+                "conversation_id": case.conversation_id,
+                "created_at": case.created_at.isoformat() if case.created_at else None,
                 "updated_at": updated_at_value
             })
         

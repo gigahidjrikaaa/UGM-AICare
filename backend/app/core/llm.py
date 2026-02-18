@@ -517,6 +517,31 @@ def _parse_retry_after_s(error_msg: str) -> float | None:
         return None
 
 
+def _extract_error_code(error: Exception) -> int:
+    """Best-effort extract HTTP-like error code from SDK exceptions/messages."""
+    try:
+        status_code = getattr(error, "status_code", None)
+        if isinstance(status_code, int):
+            return status_code
+    except Exception:
+        pass
+
+    try:
+        code = getattr(error, "code", None)
+        if isinstance(code, int):
+            return code
+    except Exception:
+        pass
+
+    match = re.search(r"\b(4\d\d|5\d\d)\b", str(error or ""))
+    if match:
+        try:
+            return int(match.group(1))
+        except ValueError:
+            return 0
+    return 0
+
+
 def _is_resource_exhausted_error(status_code: int, error_msg: str) -> bool:
     msg = (error_msg or "")
     return status_code == 429 or "RESOURCE_EXHAUSTED" in msg
@@ -727,19 +752,28 @@ async def generate_gemini_response(
         logger.error(f"ValueError calling Gemini API: {e}")
         return f"Error: Invalid configuration or request. {e}"
     except Exception as e:
-        # Let fallback handlers decide what to do, but avoid noisy tracebacks
-        # for expected SDK client/server errors (e.g., 429 RESOURCE_EXHAUSTED).
+        # Let fallback handlers decide what to do; keep expected provider errors concise.
         try:
             from google.genai.errors import ClientError, ServerError
-
-            if isinstance(e, (ClientError, ServerError)):
-                raise
+            is_provider_error = isinstance(e, (ClientError, ServerError))
         except Exception:
-            # If imports fail for any reason, fall through to logging.
-            pass
+            is_provider_error = False
+
+        error_code = _extract_error_code(e)
+        error_msg = str(e)
+        if is_provider_error and _is_resource_exhausted_error(error_code, error_msg):
+            logger.warning(
+                "Gemini quota/throttle event detected (code=%s): %s",
+                error_code,
+                error_msg[:300],
+            )
+            raise
+
+        if is_provider_error:
+            logger.warning("Gemini provider error (code=%s): %s", error_code, error_msg[:300])
+            raise
 
         logger.error(f"Error calling Gemini API: {e}", exc_info=True)
-        # Don't return error message here - let fallback handler decide
         raise
 
 
@@ -793,11 +827,23 @@ async def generate_gemini_content(
     except Exception as e:
         try:
             from google.genai.errors import ClientError, ServerError
-
-            if isinstance(e, (ClientError, ServerError)):
-                raise
+            is_provider_error = isinstance(e, (ClientError, ServerError))
         except Exception:
-            pass
+            is_provider_error = False
+
+        error_code = _extract_error_code(e)
+        error_msg = str(e)
+        if is_provider_error and _is_resource_exhausted_error(error_code, error_msg):
+            logger.warning(
+                "Gemini quota/throttle event detected (contents mode, code=%s): %s",
+                error_code,
+                error_msg[:300],
+            )
+            raise
+
+        if is_provider_error:
+            logger.warning("Gemini provider error in contents mode (code=%s): %s", error_code, error_msg[:300])
+            raise
 
         logger.error(f"Error calling Gemini API (contents): {e}", exc_info=True)
         raise
@@ -819,7 +865,6 @@ async def generate_gemini_content_with_fallback(
         config = types.GenerateContentConfig(max_output_tokens=2048, temperature=0.7)
 
     models_to_try = [model] + [m for m in GEMINI_FALLBACK_CHAIN if m != model]
-    all_models_open = all(_is_model_open(m) for m in models_to_try)
     all_models_open = all(_is_model_open(m) for m in models_to_try)
     last_error: Exception | None = None
     last_error_model: str | None = None
@@ -863,7 +908,7 @@ async def generate_gemini_content_with_fallback(
                 last_error_model = current_model
                 last_error_key = _current_gemini_key_fingerprint()
                 last_error_retry_after_s = _parse_retry_after_s(str(e))
-                error_code = getattr(e, "status_code", 0)
+                error_code = _extract_error_code(e)
                 error_msg = str(e)
 
                 _record_model_failure(current_model)
@@ -941,7 +986,7 @@ async def generate_gemini_content_with_fallback(
 
     logger.error(f"❌ All fallback models exhausted. Last error: {last_error}")
     if last_error is not None and last_error_model is not None and last_error_key is not None:
-        error_code = getattr(last_error, "status_code", 0)
+        error_code = _extract_error_code(last_error)
         error_msg = str(last_error)
         if _is_resource_exhausted_error(int(error_code), error_msg):
             key_idx, key_last4 = last_error_key
@@ -1028,7 +1073,7 @@ async def generate_gemini_response_with_fallback(
                 last_error_model = current_model
                 last_error_key = _current_gemini_key_fingerprint()
                 last_error_retry_after_s = _parse_retry_after_s(str(e))
-                error_code = getattr(e, 'status_code', 0)
+                error_code = _extract_error_code(e)
                 error_msg = str(e)
 
                 _record_model_failure(current_model)
@@ -1119,7 +1164,7 @@ async def generate_gemini_response_with_fallback(
     logger.error(f"❌ All fallback models exhausted. Last error: {last_error}")
 
     if last_error is not None and last_error_model is not None and last_error_key is not None:
-        error_code = getattr(last_error, "status_code", 0)
+        error_code = _extract_error_code(last_error)
         error_msg = str(last_error)
         if _is_resource_exhausted_error(int(error_code), error_msg):
             key_idx, key_last4 = last_error_key

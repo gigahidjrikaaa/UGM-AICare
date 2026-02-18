@@ -83,9 +83,17 @@ async def get_journal_entries(
 ) -> Dict[str, Any]:
     """Get user's recent journal entries."""
     try:
-        cutoff_date = datetime.utcnow() - timedelta(days=days)
+        bounded_days = max(1, min(days, 90))
+        bounded_limit = max(1, min(limit, MAX_JOURNAL_ENTRIES))
+        cutoff_date = datetime.utcnow() - timedelta(days=bounded_days)
         
-        query = select(JournalEntry).where(
+        query = select(
+            JournalEntry.id,
+            JournalEntry.content,
+            JournalEntry.created_at,
+            JournalEntry.entry_date,
+            JournalEntry.word_count,
+        ).where(
             JournalEntry.user_id == user_id,
             JournalEntry.created_at >= cutoff_date
         )
@@ -96,23 +104,24 @@ async def get_journal_entries(
                 JournalEntry.content.ilike(f"%{keywords}%")
             )
         
-        query = query.order_by(desc(JournalEntry.created_at)).limit(limit)
+        query = query.order_by(desc(JournalEntry.created_at)).limit(bounded_limit)
         
         result = await db.execute(query)
-        entries = result.scalars().all()
+        entries = result.mappings().all()
         
         return {
             "user_id": user_id,
             "total_entries": len(entries),
-            "days_searched": days,
+            "days_searched": bounded_days,
             "keywords": keywords,
             "entries": [
                 {
-                    "id": entry.id,
-                    "content": entry.content[:MAX_JOURNAL_CONTENT_LENGTH] if entry.content else "",
-                    "content_truncated": len(entry.content or "") > MAX_JOURNAL_CONTENT_LENGTH,
-                    "mood": entry.mood,
-                    "created_at": entry.created_at.isoformat() if entry.created_at else None,
+                    "id": entry["id"],
+                    "content": entry["content"][:MAX_JOURNAL_CONTENT_LENGTH] if entry["content"] else "",
+                    "content_truncated": len(entry["content"] or "") > MAX_JOURNAL_CONTENT_LENGTH,
+                    "entry_date": entry["entry_date"].isoformat() if entry["entry_date"] else None,
+                    "word_count": entry["word_count"] or 0,
+                    "created_at": entry["created_at"].isoformat() if entry["created_at"] else None,
                 }
                 for entry in entries
             ]
@@ -620,3 +629,39 @@ async def get_intervention_plan_progress(
             "error": str(e),
             "user_id": user_id
         }
+
+
+@register_tool(
+    name="get_user_intervention_plan_progress",
+    description="Compatibility alias for get_intervention_plan_progress. Returns progress on intervention plans for the current user.",
+    parameters={
+        "type": "object",
+        "properties": {
+            "user_id": {
+                "type": "integer",
+                "description": "The user's ID"
+            },
+            "plan_id": {
+                "type": "integer",
+                "description": "Optional specific plan ID (if omitted, returns all active plans)"
+            }
+        },
+        "required": ["user_id"]
+    },
+    category="progress_tracking",
+    requires_db=True,
+    requires_user_id=False
+)
+async def get_user_intervention_plan_progress(
+    db: AsyncSession,
+    user_id: int,
+    plan_id: Optional[int] = None,
+    **kwargs
+) -> Dict[str, Any]:
+    """Backward-compatible alias for intervention progress lookup."""
+    return await get_intervention_plan_progress(
+        db=db,
+        user_id=user_id,
+        plan_id=plan_id,
+        **kwargs,
+    )

@@ -14,6 +14,7 @@ from typing import AsyncGenerator, Dict, Any
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
+from sqlalchemy.exc import PendingRollbackError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
@@ -321,7 +322,13 @@ async def stream_aika_execution(
         result = final_state
 
         # Best-effort memory write (consent-gated)
-        await remember_from_user_message(db, current_user, request.message, source="conversation")
+        try:
+            await remember_from_user_message(db, current_user, request.message, source="conversation")
+        except PendingRollbackError as tx_err:
+            logger.warning("Skipping memory write due to aborted transaction state; recovering session: %s", tx_err)
+            await db.rollback()
+        except Exception as memory_err:
+            logger.warning("Best-effort memory write failed (non-blocking): %s", memory_err)
         
         processing_time_ms = (datetime.now() - start_time).total_seconds() * 1000
 
@@ -358,7 +365,6 @@ async def stream_aika_execution(
             # Only ID available, fetch from database
             try:
                 from app.domains.mental_health.models.appointments import Appointment
-                from sqlalchemy import select
                 
                 stmt = select(Appointment).where(Appointment.id == appointment_id)
                 db_result = await db.execute(stmt)
@@ -530,6 +536,10 @@ async def stream_aika_execution(
             logger.debug(f"💾 Saved conversation to database for user {current_user.id}")
         except Exception as save_error:
             logger.error(f"Failed to save conversation: {save_error}")
+            try:
+                await db.rollback()
+            except Exception:
+                pass
             # Don't fail the request if DB save fails
         
         execution_tracker.complete_execution(execution_id, success=True)

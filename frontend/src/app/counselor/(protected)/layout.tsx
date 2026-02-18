@@ -31,7 +31,7 @@ export default function CounselorLayout({ children }: { children: ReactNode }) {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F] flex items-center justify-center">
         <div className="animate-pulse flex flex-col items-center">
           <div className="h-12 w-12 rounded-full bg-white/20 mb-4 animate-bounce"></div>
           <div className="text-white text-lg">Loading Counselor Portal...</div>
@@ -45,11 +45,11 @@ export default function CounselorLayout({ children }: { children: ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] text-white flex">
+    <div className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F] text-white flex">
       <CounselorSidebar />
-      <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden">
+      <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden relative">
         <CounselorHeader />
-        <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto">
+        <main className="flex-1 overflow-y-auto bg-[#001030]/30 p-4 md:p-6 lg:p-8">
           {children}
         </main>
         <CounselorFooter />

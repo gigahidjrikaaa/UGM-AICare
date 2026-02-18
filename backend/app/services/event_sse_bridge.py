@@ -8,11 +8,116 @@ import logging
 from datetime import datetime
 from uuid import UUID
 
+from sqlalchemy import select
+
+from app.database import AsyncSessionLocal
+from app.domains.mental_health.models import Case, Psychologist
 from app.models.alerts import AlertSeverity, AlertType
 from app.services.event_bus import Event, EventType, get_event_bus
+from app.services.alert_service import AlertService
 from app.services.sse_broadcaster import get_broadcaster
 
 logger = logging.getLogger(__name__)
+
+
+async def _resolve_recipient_user_ids(
+    assigned_to: str | None = None,
+    case_id: str | None = None,
+) -> list[int]:
+    recipient_ids: set[int] = set()
+
+    async with AsyncSessionLocal() as db:
+        assigned_value = (assigned_to or "").strip() or None
+        if not assigned_value and case_id:
+            try:
+                case_uuid = UUID(str(case_id))
+                case = (await db.execute(select(Case).where(Case.id == case_uuid))).scalar_one_or_none()
+                if case and case.assigned_to:
+                    assigned_value = str(case.assigned_to)
+            except Exception:
+                assigned_value = None
+
+        if assigned_value:
+            try:
+                psychologist_id = int(assigned_value)
+            except ValueError:
+                psychologist_id = None
+
+            if psychologist_id is not None:
+                profile = (
+                    await db.execute(select(Psychologist).where(Psychologist.id == psychologist_id))
+                ).scalar_one_or_none()
+                if profile and profile.user_id is not None:
+                    recipient_ids.add(int(profile.user_id))
+
+    return sorted(recipient_ids)
+
+
+async def _create_counselor_alert(
+    *,
+    title: str,
+    message: str,
+    severity: AlertSeverity,
+    case_id: str | None,
+    recipient_user_ids: list[int],
+    alert_type: AlertType = AlertType.CASE_UPDATED,
+) -> None:
+    if not recipient_user_ids:
+        return
+
+    link = f"/counselor/cases?case_id={case_id}" if case_id else "/counselor/cases"
+    metadata = {
+        "audience": "counselor",
+        "recipient_user_ids": recipient_user_ids,
+        "case_id": case_id,
+    }
+
+    async with AsyncSessionLocal() as db:
+        alert_service = AlertService(db)
+        await alert_service.create_alert(
+            alert_type=alert_type,
+            severity=severity,
+            title=title,
+            message=message,
+            link=link,
+            alert_metadata=metadata,
+        )
+
+
+async def handle_case_assigned_event(event: Event) -> None:
+    """Handle CASE_ASSIGNED and create counselor assignment alert."""
+    try:
+        case_id = str(event.data.get("case_id") or "").strip() or None
+        assigned_to = str(event.data.get("assigned_to") or "").strip() or None
+        is_reassignment = bool(event.data.get("is_reassignment"))
+
+        if not assigned_to:
+            return
+
+        recipient_user_ids = await _resolve_recipient_user_ids(assigned_to=assigned_to, case_id=case_id)
+        if not recipient_user_ids:
+            return
+
+        title = "Case Reassigned" if is_reassignment else "New Case Assignment"
+        case_label = f"Case #{case_id}" if case_id else "A case"
+        message = (
+            f"{case_label} has been reassigned to you."
+            if is_reassignment
+            else f"{case_label} has been assigned to you."
+        )
+
+        await _create_counselor_alert(
+            title=title,
+            message=message,
+            severity=AlertSeverity.HIGH,
+            case_id=case_id,
+            recipient_user_ids=recipient_user_ids,
+            alert_type=AlertType.CASE_UPDATED,
+        )
+
+        logger.info("Created counselor assignment alert for case %s", case_id)
+    except Exception as exc:
+        logger.error("Failed to handle case_assigned event: %s", exc, exc_info=True)
 
 
 async def handle_case_created_event(event: Event) -> None:
@@ -216,6 +321,19 @@ async def handle_high_risk_detected_event(event: Event) -> None:
                 "risk_factors": risk_factors
             }
         )
+
+        case_id = str(event.data.get("case_id") or "").strip() or None
+        assigned_to = str(event.data.get("assigned_to") or "").strip() or None
+        recipient_user_ids = await _resolve_recipient_user_ids(assigned_to=assigned_to, case_id=case_id)
+        case_label = f"Case #{case_id}" if case_id else "A case"
+        await _create_counselor_alert(
+            title="Case Needs Attention",
+            message=f"{case_label} needs counselor attention based on elevated risk signals.",
+            severity=AlertSeverity.HIGH,
+            case_id=case_id,
+            recipient_user_ids=recipient_user_ids,
+            alert_type=AlertType.CASE_UPDATED,
+        )
         
         logger.warning(f"Broadcasted high-risk detection alert for user {user_hash}")
         
@@ -250,6 +368,20 @@ async def handle_critical_risk_detected_event(event: Event) -> None:
                 "case_id": case_id
             }
         )
+
+        recipient_user_ids = await _resolve_recipient_user_ids(
+            assigned_to=str(event.data.get("assigned_to") or "").strip() or None,
+            case_id=str(case_id).strip() if case_id else None,
+        )
+        case_label = f"Case #{case_id}" if case_id else "A case"
+        await _create_counselor_alert(
+            title="Critical Case Requires Immediate Attention",
+            message=f"{case_label} requires immediate counselor intervention.",
+            severity=AlertSeverity.CRITICAL,
+            case_id=str(case_id) if case_id else None,
+            recipient_user_ids=recipient_user_ids,
+            alert_type=AlertType.CASE_UPDATED,
+        )
         
         logger.critical(f"Broadcasted critical-risk alert for user {user_hash}")
         
@@ -267,6 +399,7 @@ async def initialize_event_subscriptions() -> None:
         bus = get_event_bus()
         
         # Subscribe to all relevant events
+        await bus.subscribe(EventType.CASE_ASSIGNED, handle_case_assigned_event)
         await bus.subscribe(EventType.CASE_CREATED, handle_case_created_event)
         await bus.subscribe(EventType.SLA_BREACH, handle_sla_breach_event)
         await bus.subscribe(EventType.IA_REPORT_GENERATED, handle_ia_report_generated_event)
@@ -275,6 +408,7 @@ async def initialize_event_subscriptions() -> None:
         await bus.subscribe(EventType.CRITICAL_RISK_DETECTED, handle_critical_risk_detected_event)
         
         logger.info("✅ Event bus subscriptions initialized for SSE broadcasting")
+        logger.info(f"   - Subscribed to {EventType.CASE_ASSIGNED.value}")
         logger.info(f"   - Subscribed to {EventType.CASE_CREATED.value}")
         logger.info(f"   - Subscribed to {EventType.SLA_BREACH.value}")
         logger.info(f"   - Subscribed to {EventType.IA_REPORT_GENERATED.value}")

@@ -9,10 +9,13 @@ from urllib.parse import quote
 from fastapi import APIRouter, Depends, HTTPException, Response, status
 from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload, selectinload
+from sqlalchemy.orm import selectinload
 
 from app.database import get_async_db
-from app.dependencies import get_current_active_user
+from app.dependencies import (
+    get_current_active_user,
+    get_current_active_user_with_normalized_relations,
+)
 from app.models import (
     User, 
     UserBadge,
@@ -105,37 +108,21 @@ def _calculate_age(dob: date | None) -> int | None:
 
 
 async def _ensure_check_in_code(user: User, db: AsyncSession) -> None:
-    await ensure_user_normalized_tables(db, user)
+    normalized_user = await ensure_user_normalized_tables(db, user)
 
-    code = get_check_in_code(user)
+    code = get_check_in_code(normalized_user)
     if not code:
         code = uuid.uuid4().hex
-        if user.preferences:
-            user.preferences.check_in_code = code
-            db.add(user.preferences)
+        if normalized_user.preferences:
+            normalized_user.preferences.check_in_code = code
+            db.add(normalized_user.preferences)
 
     # Keep legacy users.check_in_code in sync during the migration window.
-    if getattr(user, "check_in_code", None) != code:
-        user.check_in_code = code
-        db.add(user)
+    if getattr(normalized_user, "check_in_code", None) != code:
+        normalized_user.check_in_code = code
+        db.add(normalized_user)
 
     await db.commit()
-
-
-async def _load_user_with_profile(user_id: int, db: AsyncSession) -> User:
-    """Load user with all normalized table relationships."""
-    stmt = (
-        select(User)
-        .options(
-            joinedload(User.profile),
-            joinedload(User.preferences),
-            selectinload(User.clinical_record),
-            selectinload(User.emergency_contacts),
-        )
-        .where(User.id == user_id)
-    )
-    result = await db.execute(stmt)
-    return result.unique().scalar_one()
 
 
 def _build_avatar_url(full_name: str | None, check_in_code: str) -> str:
@@ -254,20 +241,12 @@ async def _build_timeline(user_id: int, db: AsyncSession) -> List[TimelineEntry]
 @router.get("/overview", response_model=UserProfileOverviewResponse)
 async def get_profile_overview(
     db: AsyncSession = Depends(get_async_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user_with_normalized_relations),
 ) -> UserProfileOverviewResponse:
     await _ensure_check_in_code(current_user, db)
 
-    # Load user with normalized tables
-    user = await _load_user_with_profile(current_user.id, db)
-
-    # Best-effort backfill from legacy -> normalized so we can read canonical fields.
-    # Do not fail the request if normalization writes fail.
-    try:
-        await ensure_user_normalized_tables(db, user)
-        await db.commit()
-    except Exception:  # pragma: no cover - defensive migration shim
-        await db.rollback()
+    # Reuse eager-loaded auth user to avoid redundant DB roundtrips.
+    user = current_user
 
     # Email always from User table (core auth)
     email = user.email
@@ -429,14 +408,13 @@ async def refresh_user_stats(
 async def update_profile_overview(
     payload: UserProfileOverviewUpdate,
     db: AsyncSession = Depends(get_async_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user_with_normalized_relations),
 ) -> UserProfileOverviewResponse:
     data = payload.model_dump(exclude_unset=True)
     if not data:
         return await get_profile_overview(db=db, current_user=current_user)
 
-    # Load user with normalized tables
-    user = await _load_user_with_profile(current_user.id, db)
+    user = current_user
 
     # Ensure 1:1 normalized rows exist so writes target the canonical tables.
     await ensure_user_normalized_tables(db, user)
@@ -687,10 +665,10 @@ async def update_profile_overview(
 async def update_checkin_settings(
     settings: CheckinSettingsUpdate,
     db: AsyncSession = Depends(get_async_db),
-    current_user: User = Depends(get_current_active_user),
+    current_user: User = Depends(get_current_active_user_with_normalized_relations),
 ) -> CheckinSettingsResponse:
     logger.info("Updating check-in settings for user %s to %s", current_user.id, settings.allow_email_checkins)
-    user = await _load_user_with_profile(current_user.id, db)
+    user = current_user
 
     await set_checkins_opt_in(db, user=user, allow=settings.allow_email_checkins)
 

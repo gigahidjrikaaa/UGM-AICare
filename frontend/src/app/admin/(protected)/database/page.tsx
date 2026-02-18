@@ -2,7 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import api from '@/services/api';
-import { FiDatabase, FiRefreshCw, FiChevronLeft, FiChevronRight, FiAlertCircle, FiChevronDown, FiSearch, FiTrash2 } from 'react-icons/fi';
+import { FiDatabase, FiRefreshCw, FiChevronLeft, FiChevronRight, FiAlertCircle, FiChevronDown, FiSearch, FiTrash2, FiArrowRight } from 'react-icons/fi';
 
 interface Column {
     name: string;
@@ -23,6 +23,31 @@ interface TableData {
     };
 }
 
+interface TableSchemaColumn {
+    name: string;
+    type: string;
+    nullable: boolean;
+    primary_key: boolean;
+}
+
+interface TableSchema {
+    table_name: string;
+    columns: TableSchemaColumn[];
+}
+
+interface TableRelationship {
+    source_table: string;
+    source_column: string;
+    target_table: string;
+    target_column: string;
+    constraint_name: string | null;
+}
+
+interface DatabaseSchema {
+    tables: TableSchema[];
+    relationships: TableRelationship[];
+}
+
 export default function DatabaseViewerPage() {
     const [tables, setTables] = useState<string[]>([]);
     const [selectedTable, setSelectedTable] = useState<string>('');
@@ -31,6 +56,8 @@ export default function DatabaseViewerPage() {
     const [error, setError] = useState<string | null>(null);
     const [page, setPage] = useState(1);
     const [limit, setLimit] = useState(50);
+    const [schema, setSchema] = useState<DatabaseSchema | null>(null);
+    const [schemaLoading, setSchemaLoading] = useState(false);
 
     // Selection state
     const [selectedRows, setSelectedRows] = useState<Set<number>>(new Set());
@@ -44,6 +71,7 @@ export default function DatabaseViewerPage() {
     // Fetch table list on mount
     useEffect(() => {
         fetchTables();
+        fetchSchema();
     }, []);
 
     // Close dropdown when clicking outside
@@ -102,6 +130,18 @@ export default function DatabaseViewerPage() {
             setTableData(null);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const fetchSchema = async () => {
+        try {
+            setSchemaLoading(true);
+            const response = await api.get('/admin/database/schema');
+            setSchema(response.data as DatabaseSchema);
+        } catch (err: any) {
+            setError(err.message || 'Failed to fetch schema relationships');
+        } finally {
+            setSchemaLoading(false);
         }
     };
 
@@ -168,8 +208,14 @@ export default function DatabaseViewerPage() {
         table.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    const selectedTableRelationships = selectedTable && schema
+        ? schema.relationships.filter(
+            (rel) => rel.source_table === selectedTable || rel.target_table === selectedTable
+        )
+        : [];
+
     return (
-        <div className="p-6 max-w-[1600px] mx-auto space-y-6">
+        <div className="p-6 max-w-400 mx-auto space-y-6">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
@@ -255,12 +301,63 @@ export default function DatabaseViewerPage() {
                     </div>
 
                     <button
-                        onClick={() => selectedTable && fetchTableData(selectedTable, page, limit)}
+                        onClick={() => {
+                            if (selectedTable) {
+                                fetchTableData(selectedTable, page, limit);
+                            }
+                            fetchSchema();
+                        }}
                         className="p-2 text-slate-500 hover:text-blue-500 transition-colors bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg"
-                        title="Refresh Data"
+                        title="Refresh Data & Schema"
                     >
                         <FiRefreshCw className={loading ? "animate-spin" : ""} size={20} />
                     </button>
+                </div>
+            </div>
+
+            {/* ERD / Relationship Figure */}
+            <div className="bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 shadow-sm p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                    <h2 className="text-sm font-semibold text-slate-900 dark:text-white">Table Relationship Figure</h2>
+                    <div className="text-xs text-slate-500">
+                        {schemaLoading
+                            ? 'Loading schema...'
+                            : `Tables: ${schema?.tables.length ?? 0} · Relationships: ${schema?.relationships.length ?? 0}`}
+                    </div>
+                </div>
+
+                {selectedTable ? (
+                    <p className="text-xs text-slate-500">
+                        Showing relationships for <span className="font-medium text-slate-700 dark:text-slate-300">{selectedTable}</span>
+                    </p>
+                ) : (
+                    <p className="text-xs text-slate-500">Select a table to focus its inbound/outbound relationships.</p>
+                )}
+
+                <div className="overflow-x-auto">
+                    {selectedTable && selectedTableRelationships.length > 0 ? (
+                        <div className="min-w-180 space-y-2">
+                            {selectedTableRelationships.map((rel, idx) => {
+                                const isOutbound = rel.source_table === selectedTable;
+                                return (
+                                    <div key={`${rel.source_table}-${rel.source_column}-${rel.target_table}-${rel.target_column}-${idx}`} className="flex items-center gap-3 text-sm">
+                                        <span className={`rounded-md border px-2 py-1 ${isOutbound ? 'border-blue-200 bg-blue-50 text-blue-700 dark:border-blue-500/40 dark:bg-blue-900/20 dark:text-blue-300' : 'border-amber-200 bg-amber-50 text-amber-700 dark:border-amber-500/40 dark:bg-amber-900/20 dark:text-amber-300'}`}>
+                                            {rel.source_table}.{rel.source_column}
+                                        </span>
+                                        <FiArrowRight className="text-slate-400" />
+                                        <span className="rounded-md border border-slate-200 bg-slate-50 px-2 py-1 text-slate-700 dark:border-slate-600 dark:bg-slate-700/40 dark:text-slate-200">
+                                            {rel.target_table}.{rel.target_column}
+                                        </span>
+                                        <span className="text-xs text-slate-400">{rel.constraint_name ?? 'fk'}</span>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="text-sm text-slate-400 py-2">
+                            {selectedTable ? 'No foreign-key relationship found for selected table.' : 'No table selected.'}
+                        </div>
+                    )}
                 </div>
             </div>
 

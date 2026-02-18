@@ -9,7 +9,7 @@ All tools are registered using @register_tool decorator for zero-redundancy arch
 from __future__ import annotations
 
 import logging
-from datetime import datetime, timedelta
+from datetime import date, datetime, time, timedelta
 from typing import Any, Dict, List, Optional
 from sqlalchemy import select, and_, or_, func
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -23,6 +23,120 @@ from app.models.user import User
 from .registry import register_tool
 
 logger = logging.getLogger(__name__)
+
+
+_WEEKDAY_NAMES = {
+    0: "monday",
+    1: "tuesday",
+    2: "wednesday",
+    3: "thursday",
+    4: "friday",
+    5: "saturday",
+    6: "sunday",
+}
+
+
+def _parse_time_value(value: Any) -> Optional[time]:
+    if not isinstance(value, str):
+        return None
+    raw = value.strip()
+    if not raw:
+        return None
+    candidates = ["%H:%M", "%H:%M:%S"]
+    for fmt in candidates:
+        try:
+            return datetime.strptime(raw, fmt).time()
+        except ValueError:
+            continue
+    return None
+
+
+def _normalize_schedule_entries(schedule: Any) -> List[Dict[str, Any]]:
+    if not isinstance(schedule, list):
+        return []
+    normalized: List[Dict[str, Any]] = []
+    for item in schedule:
+        if not isinstance(item, dict):
+            continue
+        day_value = str(item.get("day") or "").strip().lower()
+        start_value = _parse_time_value(item.get("start_time"))
+        end_value = _parse_time_value(item.get("end_time"))
+        if day_value not in set(_WEEKDAY_NAMES.values()):
+            continue
+        if start_value is None or end_value is None or end_value <= start_value:
+            continue
+        if item.get("is_available") is False:
+            continue
+        normalized.append(
+            {
+                "day": day_value,
+                "start_time": start_value,
+                "end_time": end_value,
+            }
+        )
+    return normalized
+
+
+def _build_upcoming_slot_windows(
+    schedule_entries: List[Dict[str, Any]],
+    *,
+    start_date: date,
+    days_ahead: int,
+) -> List[tuple[datetime, datetime]]:
+    windows: List[tuple[datetime, datetime]] = []
+    if days_ahead <= 0:
+        return windows
+
+    for offset in range(days_ahead):
+        current_date = start_date + timedelta(days=offset)
+        weekday_name = _WEEKDAY_NAMES[current_date.weekday()]
+        for entry in schedule_entries:
+            if entry["day"] != weekday_name:
+                continue
+            start_dt = datetime.combine(current_date, entry["start_time"])
+            end_dt = datetime.combine(current_date, entry["end_time"])
+            if end_dt <= start_dt:
+                continue
+            windows.append((start_dt, end_dt))
+
+    windows.sort(key=lambda item: item[0])
+    return windows
+
+
+def _windows_conflict(window: tuple[datetime, datetime], appointment_dt: datetime) -> bool:
+    start_dt, end_dt = window
+    return start_dt <= appointment_dt < end_dt
+
+
+def _matches_preferred_language(
+    counselor_languages: Any,
+    preferred_language: Optional[str],
+) -> bool:
+    """Return True when counselor_languages includes preferred_language.
+
+    Handles JSON/list/string payloads safely without DB-specific casts.
+    """
+    if not preferred_language:
+        return True
+
+    needle = preferred_language.strip().lower()
+    if not needle:
+        return True
+
+    if counselor_languages is None:
+        return False
+
+    if isinstance(counselor_languages, str):
+        return needle in counselor_languages.lower()
+
+    if isinstance(counselor_languages, list):
+        return any(needle in str(item).lower() for item in counselor_languages)
+
+    if isinstance(counselor_languages, dict):
+        values = " ".join(str(value) for value in counselor_languages.values())
+        return needle in values.lower()
+
+    return needle in str(counselor_languages).lower()
 
 
 # ============================================================================
@@ -61,6 +175,11 @@ You: Note psychologist_id → Call book_appointment""",
             "preferred_language": {
                 "type": "string",
                 "description": "Optional filter by language (e.g., 'English', 'Indonesian')"
+            },
+            "days_ahead": {
+                "type": "integer",
+                "description": "How many upcoming days to inspect for real schedule slots (default 14, max 30)",
+                "default": 14
             }
         }
     },
@@ -72,6 +191,7 @@ async def get_available_counselors(
     db: AsyncSession,
     specialization: Optional[str] = None,
     preferred_language: Optional[str] = None,
+    days_ahead: int = 14,
     **kwargs
 ) -> Dict[str, Any]:
     """Get list of available psychologists."""
@@ -84,17 +204,58 @@ async def get_available_counselors(
                 Psychologist.specialization.ilike(f"%{specialization}%")
             )
         
-        if preferred_language:
-            query = query.where(
-                Psychologist.languages.cast(str).ilike(f"%{preferred_language}%")
-            )
-        
         result = await db.execute(query)
         psychologists = result.scalars().all()
+
+        bounded_days = max(1, min(days_ahead, 30))
+        today = datetime.now().date()
+        horizon_start = datetime.combine(today, time.min)
+        horizon_end = horizon_start + timedelta(days=bounded_days + 1)
+
+        psychologist_ids = [p.id for p in psychologists]
+        appointments_by_psychologist: Dict[int, List[datetime]] = {pid: [] for pid in psychologist_ids}
+        if psychologist_ids:
+            appt_result = await db.execute(
+                select(Appointment)
+                .where(
+                    Appointment.psychologist_id.in_(psychologist_ids),
+                    Appointment.appointment_datetime >= horizon_start,
+                    Appointment.appointment_datetime < horizon_end,
+                    Appointment.status.in_(["scheduled", "pending", "confirmed", "in_progress"]),
+                )
+                .order_by(Appointment.appointment_datetime.asc())
+            )
+            for appt in appt_result.scalars().all():
+                appointments_by_psychologist.setdefault(appt.psychologist_id, []).append(appt.appointment_datetime)
         
         # Format response
         counselors = []
         for p in psychologists:
+            if not _matches_preferred_language(p.languages, preferred_language):
+                continue
+
+            schedule_entries = _normalize_schedule_entries(p.availability_schedule)
+            slot_windows = _build_upcoming_slot_windows(
+                schedule_entries,
+                start_date=today,
+                days_ahead=bounded_days,
+            )
+
+            blocked_times = appointments_by_psychologist.get(p.id, [])
+            free_windows: List[Dict[str, str]] = []
+            for window in slot_windows:
+                if any(_windows_conflict(window, appt_time) for appt_time in blocked_times):
+                    continue
+                free_windows.append(
+                    {
+                        "start": window[0].isoformat(),
+                        "end": window[1].isoformat(),
+                        "day": _WEEKDAY_NAMES[window[0].weekday()],
+                    }
+                )
+                if len(free_windows) >= 3:
+                    break
+
             counselors.append({
                 "id": p.id,
                 "name": p.name,
@@ -105,9 +266,9 @@ async def get_available_counselors(
                 "rating": p.rating,
                 "total_reviews": p.total_reviews,
                 "consultation_fee": p.consultation_fee,
-                # "contact_email": p.contact_email, # Not in model
-                # "contact_phone": p.contact_phone, # Not in model
-                "has_availability": bool(p.availability_schedule)
+                "has_availability": bool(free_windows),
+                "next_available_slots": free_windows,
+                "availability_window_days": bounded_days,
             })
         
         return {

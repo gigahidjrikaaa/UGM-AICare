@@ -23,6 +23,7 @@ Usage:
 from __future__ import annotations
 
 import logging
+import difflib
 from typing import Any, Callable, Dict, Optional
 from functools import wraps
 
@@ -190,6 +191,29 @@ def get_tool_schema(name: str) -> Optional[Dict[str, Any]]:
     }
 
 
+def _resolve_tool_name(tool_name: str) -> str:
+    """Resolve incoming tool names to a registered canonical name.
+
+    Supports:
+    - exact matches
+    - common alias prefix (`get_user_*` -> `get_*`)
+    - close-match typo recovery
+    """
+    if tool_name in _TOOL_REGISTRY:
+        return tool_name
+
+    if tool_name.startswith("get_user_"):
+        candidate = "get_" + tool_name[len("get_user_"):]
+        if candidate in _TOOL_REGISTRY:
+            return candidate
+
+    close = difflib.get_close_matches(tool_name, _TOOL_REGISTRY.keys(), n=1, cutoff=0.86)
+    if close:
+        return close[0]
+
+    return tool_name
+
+
 def _is_expected_type(expected: str, value: Any) -> bool:
     if expected == "string":
         return isinstance(value, str)
@@ -272,7 +296,8 @@ async def execute_tool(
     Raises:
         ValueError: If tool not found or missing required parameters
     """
-    tool = get_tool(tool_name)
+    resolved_name = _resolve_tool_name(tool_name)
+    tool = get_tool(resolved_name)
     
     if not tool:
         logger.error(f"❌ Tool not found: {tool_name}")
@@ -280,6 +305,9 @@ async def execute_tool(
             "status": "failed",
             "error": f"Unknown tool: {tool_name}"
         }
+
+    if resolved_name != tool_name:
+        logger.info("🔁 Resolved tool alias '%s' -> '%s'", tool_name, resolved_name)
     
     # Validate required parameters
     if tool["requires_db"] and db is None:
@@ -317,18 +345,53 @@ async def execute_tool(
     
     # Execute tool
     try:
-        logger.info(f"🔧 Executing tool: {tool_name}")
+        logger.info(f"🔧 Executing tool: {resolved_name}")
         handler = tool["handler"]
         result = await handler(**func_kwargs)
-        
-        logger.info(f"✅ Tool executed successfully: {tool_name}")
-        return result
+
+        # Normalize response envelope for consistent downstream logging/handling.
+        if isinstance(result, dict):
+            has_error = bool(result.get("error"))
+            if has_error:
+                if db is not None and hasattr(db, "rollback"):
+                    try:
+                        await db.rollback()
+                    except Exception:
+                        pass
+                normalized_result = dict(result)
+                normalized_result.setdefault("status", "failed")
+                normalized_result.setdefault("success", False)
+                normalized_result.setdefault("tool_name", resolved_name)
+                logger.warning("⚠️ Tool returned logical failure: %s", resolved_name)
+                return normalized_result
+
+            normalized_result = dict(result)
+            normalized_result.setdefault("status", "completed")
+            normalized_result.setdefault("success", True)
+            normalized_result.setdefault("tool_name", resolved_name)
+            logger.info(f"✅ Tool executed successfully: {resolved_name}")
+            return normalized_result
+
+        logger.info(f"✅ Tool executed successfully: {resolved_name}")
+        return {
+            "status": "completed",
+            "success": True,
+            "tool_name": resolved_name,
+            "data": result,
+        }
     
     except Exception as e:
-        logger.error(f"❌ Tool execution failed: {tool_name} - {e}", exc_info=True)
+        if db is not None and hasattr(db, "rollback"):
+            try:
+                await db.rollback()
+            except Exception:
+                pass
+        logger.error(f"❌ Tool execution failed: {resolved_name} - {e}", exc_info=True)
         return {
             "status": "failed",
-            "error": str(e)
+            "success": False,
+            "error": str(e),
+            "tool_name": resolved_name,
         }
 
 
