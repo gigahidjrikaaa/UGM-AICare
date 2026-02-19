@@ -9,6 +9,7 @@ const somniaMainnetRpcUrl = process.env.SOMNIA_MAINNET_RPC_URL;
 const somniaTestnetRpcUrl = process.env.SOMNIA_TESTNET_RPC_URL;
 const bscTestnetRpcUrl = process.env.BSC_TESTNET_RPC_URL;
 const bscMainnetRpcUrl = process.env.BSC_MAINNET_RPC_URL;
+const opbnbTestnetRpcUrl = process.env.OPBNB_TESTNET_RPC_URL;
 const privateKey = process.env.TESTNET_PRIVATE_KEY;
 const mainnetPrivateKey = process.env.MAINNET_PRIVATE_KEY;
 
@@ -22,6 +23,7 @@ warnIfMissing("SOMNIA_MAINNET_RPC_URL", somniaMainnetRpcUrl);
 warnIfMissing("SOMNIA_TESTNET_RPC_URL", somniaTestnetRpcUrl);
 warnIfMissing("BSC_TESTNET_RPC_URL", bscTestnetRpcUrl);
 warnIfMissing("BSC_MAINNET_RPC_URL", bscMainnetRpcUrl);
+warnIfMissing("OPBNB_TESTNET_RPC_URL", opbnbTestnetRpcUrl);
 warnIfMissing("TESTNET_PRIVATE_KEY", privateKey);
 warnIfMissing("MAINNET_PRIVATE_KEY", mainnetPrivateKey);
 
@@ -71,6 +73,15 @@ const config: HardhatUserConfig = {
       url: bscMainnetRpcUrl || "https://bsc-dataseed.bnbchain.org",
       chainId: 56,
       accounts: mainnetPrivateKey ? [`0x${mainnetPrivateKey}`] : [],
+      gasPrice: "auto",
+    },
+
+    // --- opBNB (L2 on BNB Chain)
+    // NOTE: opBNB Testnet chain ID is 5611, Mainnet is 204
+    opbnbTestnet: {
+      url: opbnbTestnetRpcUrl || "https://opbnb-testnet-rpc.bnbchain.org",
+      chainId: 5611,
+      accounts: privateKey ? [`0x${privateKey}`] : [],
       gasPrice: "auto",
     },
   },

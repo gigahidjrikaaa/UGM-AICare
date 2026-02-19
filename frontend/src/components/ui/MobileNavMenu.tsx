@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { HiX } from 'react-icons/hi';
 import { BsChatDots, BsCalendar, BsQuestionCircle } from 'react-icons/bs';
-import { FiActivity, FiBookOpen, FiMapPin, FiInfo } from 'react-icons/fi';
+import { FiActivity, FiBookOpen, FiMapPin, FiInfo, FiShield } from 'react-icons/fi';
 import { FaCoins } from 'react-icons/fa';
 import AccountLinker from '@/components/AccountLinker'; //
 
@@ -44,6 +44,7 @@ const mobileNavGroups: MobileNavGroup[] = [
       { href: "/dashboard", label: "Home", icon: <FiBookOpen size={18} /> },
       { href: "/carequest", label: "CareQuest", icon: <FiMapPin size={18} /> },
       { href: "/caretoken", label: "$CARE Token", icon: <FaCoins size={18} /> },
+      { href: "/proof", label: "Proof Timeline", icon: <FiShield size={18} /> },
       { href: "/about", label: "About", icon: <FiInfo size={18} /> },
       { href: "/help", label: "Help & Support", icon: <BsQuestionCircle size={18} /> },
     ],

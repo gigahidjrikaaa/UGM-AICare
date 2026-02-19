@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_async_db
 from app.dependencies import get_current_active_user
 from app.domains.blockchain.nft.chain_registry import get_chain_config
+from app.domains.blockchain.attestation.chain_registry import get_attestation_chain_config
 from app.domains.mental_health.models.autopilot_actions import AutopilotAction
 from app.models import User
 
@@ -39,8 +40,15 @@ class ProofActionListResponse(BaseModel):
 def _build_explorer_url(chain_id: Optional[int], tx_hash: Optional[str]) -> Optional[str]:
     if chain_id is None or not tx_hash:
         return None
+    # Try NFT registry first (for badge minting)
     cfg = get_chain_config(int(chain_id))
-    return cfg.explorer_tx_url(tx_hash) if cfg else None
+    if cfg:
+        return cfg.explorer_tx_url(tx_hash)
+    # Fallback to attestation registry
+    att_cfg = get_attestation_chain_config(int(chain_id))
+    if att_cfg:
+        return att_cfg.explorer_tx_url(tx_hash)
+    return None
 
 
 @router.get("/actions", response_model=ProofActionListResponse)

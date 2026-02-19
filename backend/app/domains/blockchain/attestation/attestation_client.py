@@ -49,6 +49,14 @@ class AttestationClient:
         return bool(private_key and not private_key.startswith("YOUR_") and len(private_key.strip()) > 0)
 
     @staticmethod
+    def _normalize_private_key(private_key: str) -> str:
+        """Ensure private key has 0x prefix for web3.py."""
+        key = private_key.strip()
+        if not key.startswith("0x"):
+            return f"0x{key}"
+        return key
+
+    @staticmethod
     def _normalize_bytes32(value: str, field_name: str) -> str:
         normalized = value.strip().lower()
         if not normalized.startswith("0x"):
@@ -106,7 +114,7 @@ class AttestationClient:
                 self._initialized = True
                 return
 
-            self._account = self._w3.eth.account.from_key(private_key)
+            self._account = self._w3.eth.account.from_key(self._normalize_private_key(private_key))
             self._contract = self._w3.eth.contract(
                 address=Web3.to_checksum_address(contract_address),
                 abi=abi,

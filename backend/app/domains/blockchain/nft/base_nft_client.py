@@ -117,6 +117,11 @@ class BaseNFTClient:
             self._initialized = True
             return
 
+        # Normalize private key to have 0x prefix for web3.py
+        normalized_key = private_key.strip()
+        if not normalized_key.startswith("0x"):
+            normalized_key = f"0x{normalized_key}"
+
         try:
             self._w3 = Web3(Web3.HTTPProvider(rpc_url))
 
@@ -134,7 +139,7 @@ class BaseNFTClient:
 
             logger.info("✅ [%s] Connected (chain %s)", self.chain.name, self._w3.eth.chain_id)
 
-            self._account = self._w3.eth.account.from_key(private_key)
+            self._account = self._w3.eth.account.from_key(normalized_key)
             logger.info("🔑 [%s] Minter: %s", self.chain.name, self._account.address)
 
             self._contract = self._w3.eth.contract(

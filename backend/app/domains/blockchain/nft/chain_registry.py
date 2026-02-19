@@ -95,10 +95,23 @@ SUPPORTED_CHAINS: Dict[int, ChainConfig] = {
         is_testnet=False,
         requires_poa_middleware=False,
     ),
+    5611: ChainConfig(
+        chain_id=5611,
+        name="opBNB Testnet",
+        short_name="opBNB",
+        rpc_url_env="OPBNB_TESTNET_RPC_URL",
+        contract_address_env="OPBNB_NFT_CONTRACT_ADDRESS",
+        private_key_env="OPBNB_MINTER_PRIVATE_KEY",
+        explorer_base_url="https://opbnb-testnet.bscscan.com",
+        native_currency="tBNB",
+        is_testnet=True,
+        requires_poa_middleware=False,
+    ),
 }
 
-# Default chain used for auto-awarded badges (sync-achievements)
-DEFAULT_BADGE_CHAIN_ID: int = 656476
+# HACKATHON: Default chain changed to BSC Testnet for BNB Chain hackathon.
+# TODO: Make this configurable via environment variable (e.g., DEFAULT_BADGE_CHAIN_ID=97)
+DEFAULT_BADGE_CHAIN_ID: int = 97
 
 
 def get_chain_config(chain_id: int) -> Optional[ChainConfig]:

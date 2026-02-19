@@ -9,6 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.domains.blockchain.nft.chain_registry import get_chain_config
+from app.domains.blockchain.attestation.chain_registry import get_attestation_chain_config
 from app.domains.mental_health.models.autopilot_actions import (
     AutopilotAction,
     AutopilotActionStatus,
@@ -80,9 +81,15 @@ def _set_env_int(name: str, value: int) -> None:
 def _to_action_response(action: AutopilotAction) -> AutopilotActionResponse:
     explorer_tx_url = None
     if action.chain_id and action.tx_hash:
+        # Try NFT registry first (for badge minting)
         cfg = get_chain_config(int(action.chain_id))
         if cfg is not None:
             explorer_tx_url = cfg.explorer_tx_url(action.tx_hash)
+        else:
+            # Fallback to attestation registry
+            att_cfg = get_attestation_chain_config(int(action.chain_id))
+            if att_cfg is not None:
+                explorer_tx_url = att_cfg.explorer_tx_url(action.tx_hash)
 
     return AutopilotActionResponse(
         id=action.id,

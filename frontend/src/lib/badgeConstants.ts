@@ -179,6 +179,8 @@ export const getBadgeMeta = (badgeId: number): BadgeMeta => {
 
 // ---------------------------------------------------------------------------
 // Multi-chain explorer mapping
+// Updated for BNB Chain hackathon: BSC Testnet as primary, added opBNB support
+// NOTE: opBNB Testnet chain ID is 5611, Mainnet is 204
 // ---------------------------------------------------------------------------
 
 /** Known chain ID to explorer base URL mapping. */
@@ -186,6 +188,7 @@ export const CHAIN_EXPLORER_MAP: Record<number, string> = {
     656476: 'https://edu-chain-testnet.blockscout.com',  // EDU Chain Testnet
     97:     'https://testnet.bscscan.com',                // BNB Smart Chain Testnet
     56:     'https://bscscan.com',                        // BNB Smart Chain Mainnet
+    5611:   'https://opbnb-testnet.bscscan.com',          // opBNB Testnet
 };
 
 /** Short display names per chain. */
@@ -193,20 +196,23 @@ export const CHAIN_SHORT_NAME_MAP: Record<number, string> = {
     656476: 'EDU',
     97:     'BNB',
     56:     'BNB',
+    5611:   'opBNB',
 };
 
 /**
  * Build a block-explorer transaction URL for a given chain + tx hash.
- * Falls back to EDU Chain Testnet if the chain is unknown.
+ * HACKATHON: Falls back to BSC Testnet (97) if chain is unknown.
+ * TODO: Make fallback configurable via environment
  */
 export const getExplorerTxUrl = (chainId: number | undefined, txHash: string): string => {
-    const base = CHAIN_EXPLORER_MAP[chainId ?? 656476] ?? CHAIN_EXPLORER_MAP[656476];
+    const base = CHAIN_EXPLORER_MAP[chainId ?? 97] ?? CHAIN_EXPLORER_MAP[97];
     return `${base}/tx/${txHash}`;
 };
 
 /**
- * Get a short display name for a chain (e.g. "EDU", "BNB").
+ * Get a short display name for a chain (e.g. "EDU", "BNB", "opBNB").
+ * HACKATHON: Falls back to BSC Testnet (97) if chain is unknown.
  */
 export const getChainShortName = (chainId: number | undefined): string => {
-    return CHAIN_SHORT_NAME_MAP[chainId ?? 656476] ?? 'EVM';
+    return CHAIN_SHORT_NAME_MAP[chainId ?? 97] ?? 'EVM';
 };

@@ -130,7 +130,7 @@ interface AppSidebarProps {
 export default function AppSidebar({ isOpen, onClose, onOpenFeedback }: AppSidebarProps) {
   const pathname = usePathname();
   const { data: session } = useSession(); // Get session to check role
-  const isAdmin = session?.user?.role === 'admin';
+  const isAdmin = session?.user?.role === 'admin' || session?.user?.role === 'admin_viewer' || session?.user?.role === 'therapist';
 
   return (
     <AnimatePresence>

@@ -17,6 +17,12 @@ from app.schemas.user import EarnedBadgeInfo
 
 logger = logging.getLogger(__name__)
 
+# HACKATHON: Hardcoded dual-chain minting configuration.
+# TODO: Replace with environment variable config (e.g., AUTOPILOT_MINT_CHAINS=97,656476,204)
+# These chains will receive simultaneous badge mints when a user earns a badge.
+# Currently: BSC Testnet only for BNB Chain hackathon
+DUAL_MINT_CHAIN_IDS: list[int] = [97]  # BSC Testnet
+
 
 LET_THERE_BE_BADGE_BADGE_ID = 1
 TRIPLE_THREAT_OF_THOUGHTS_BADGE_ID = 2
@@ -171,16 +177,17 @@ async def trigger_achievement_check(
 
     metrics = await _load_achievement_metrics(db, user)
 
-    default_chain_id = DEFAULT_BADGE_CHAIN_ID
-    cfg = get_chain_config(default_chain_id)
-    default_contract_address = cfg.contract_address if cfg else None
-    if not default_contract_address and fail_on_config_error:
-        message = f"NFT contract address not configured for chain {default_chain_id}."
+    configured_dual_chains = [
+        chain_id for chain_id in DUAL_MINT_CHAIN_IDS
+        if (cfg := get_chain_config(chain_id)) and cfg.contract_address
+    ]
+    if not configured_dual_chains and fail_on_config_error and candidate_rules:
+        message = f"No NFT contract addresses configured for DUAL_MINT_CHAIN_IDS: {DUAL_MINT_CHAIN_IDS}"
         raise RuntimeError(message)
-    if not default_contract_address:
+    if not configured_dual_chains and candidate_rules:
         logger.warning(
-            "NFT contract address not configured for default chain %s. Skipping default rules for user %s action=%s",
-            default_chain_id,
+            "No NFT contract addresses configured for DUAL_MINT_CHAIN_IDS %s. Skipping default rules for user %s action=%s",
+            DUAL_MINT_CHAIN_IDS,
             user.id,
             action,
         )
@@ -209,14 +216,10 @@ async def trigger_achievement_check(
 
     async def attempt_mint(
         *,
-        chain_id: int,
         badge_id: int,
-        contract_address: str,
         reason: str,
     ) -> None:
-        badge_key = (badge_id, chain_id)
-        if badge_key in awarded_badges:
-            return
+        """Mint badge on all chains in DUAL_MINT_CHAIN_IDS. Saves successful mints to badges_to_add_to_db."""
         if not user.wallet_address:
             logger.info(
                 "User %s qualifies for badge %s (%s) but has no linked wallet",
@@ -227,34 +230,62 @@ async def trigger_achievement_check(
             return
 
         logger.info(
-            "User %s qualifies for badge %s on chain %s (%s)",
+            "User %s qualifies for badge %s (%s) - attempting mint on %s chains",
             user.id,
             badge_id,
-            chain_id,
             reason,
-        )
-        tx_hash = await factory.mint_badge(chain_id, user.wallet_address, badge_id)
-        if not tx_hash:
-            logger.error("Minting badge %s failed for user %s", badge_id, user.id)
-            return
-
-        awarded_badges.add(badge_key)
-        badges_to_add_to_db.append(
-            {
-                "badge_id": badge_id,
-                "chain_id": chain_id,
-                "contract_address": contract_address,
-                "tx_hash": tx_hash,
-            }
+            len(DUAL_MINT_CHAIN_IDS),
         )
 
-    if default_contract_address:
+        for chain_id in DUAL_MINT_CHAIN_IDS:
+            cfg = get_chain_config(chain_id)
+            if not cfg or not cfg.contract_address:
+                logger.warning("Chain %s not configured for badge minting, skipping", chain_id)
+                continue
+
+            badge_key = (badge_id, chain_id)
+            if badge_key in awarded_badges:
+                logger.debug("User already has badge %s on chain %s, skipping", badge_id, chain_id)
+                continue
+
+            try:
+                tx_hash = await factory.mint_badge(chain_id, user.wallet_address, badge_id)
+                if tx_hash:
+                    awarded_badges.add(badge_key)
+                    badges_to_add_to_db.append({
+                        "badge_id": badge_id,
+                        "chain_id": chain_id,
+                        "contract_address": cfg.contract_address,
+                        "tx_hash": tx_hash,
+                    })
+                    logger.info(
+                        "Badge %s minted successfully on chain %s for user %s (tx: %s)",
+                        badge_id,
+                        chain_id,
+                        user.id,
+                        tx_hash[:16] + "...",
+                    )
+                else:
+                    logger.warning(
+                        "Badge %s mint returned no tx_hash on chain %s for user %s",
+                        badge_id,
+                        chain_id,
+                        user.id,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to mint badge %s on chain %s for user %s: %s. Continuing with other chains.",
+                    badge_id,
+                    chain_id,
+                    user.id,
+                    exc,
+                )
+
+    if configured_dual_chains:
         for rule in candidate_rules:
             if _qualifies(rule, metrics):
                 await attempt_mint(
-                    chain_id=default_chain_id,
                     badge_id=rule.badge_id,
-                    contract_address=default_contract_address,
                     reason=rule.reason,
                 )
 
@@ -269,12 +300,47 @@ async def trigger_achievement_check(
         if not _criteria_qualifies(criteria, metrics):
             continue
 
-        await attempt_mint(
-            chain_id=int(template.chain_id),
-            badge_id=int(template.token_id),
-            contract_address=str(template.contract_address),
-            reason=f"Admin auto-award template {template.id}",
-        )
+        # Admin templates mint on their specified chain only (not dual-chain)
+        template_chain_id = int(template.chain_id)
+        template_cfg = get_chain_config(template_chain_id)
+        if not template_cfg or not template_cfg.contract_address:
+            logger.warning(
+                "Admin template %s chain %s not configured, skipping",
+                template.id,
+                template_chain_id,
+            )
+            continue
+
+        badge_key = (int(template.token_id), template_chain_id)
+        if badge_key in awarded_badges:
+            continue
+
+        if not user.wallet_address:
+            continue
+
+        try:
+            tx_hash = await factory.mint_badge(template_chain_id, user.wallet_address, int(template.token_id))
+            if tx_hash:
+                awarded_badges.add(badge_key)
+                badges_to_add_to_db.append({
+                    "badge_id": int(template.token_id),
+                    "chain_id": template_chain_id,
+                    "contract_address": template_cfg.contract_address,
+                    "tx_hash": tx_hash,
+                })
+                logger.info(
+                    "Admin template %s badge minted on chain %s for user %s",
+                    template.id,
+                    template_chain_id,
+                    user.id,
+                )
+        except Exception as exc:
+            logger.warning(
+                "Failed to mint admin template %s badge on chain %s: %s",
+                template.id,
+                template_chain_id,
+                exc,
+            )
 
     if not badges_to_add_to_db:
         return []

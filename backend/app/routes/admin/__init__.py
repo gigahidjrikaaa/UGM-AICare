@@ -1,6 +1,8 @@
 """Admin sub-route package."""
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from app.dependencies import get_admin_readonly_user
 
 from .appointments import router as appointments_router
 from .content_resources import router as content_resources_router
@@ -28,7 +30,14 @@ from .contracts import router as contracts_router
 from .attestations import router as attestations_router
 from .agent_decisions import router as agent_decisions_router
 
-router = APIRouter(prefix="/api/v1/admin", tags=["Admin"])
+# Router-level dependency: runs on every admin route before the route handler.
+# - admin / therapist: unrestricted (read + write).
+# - admin_viewer: read-only (GET/HEAD/OPTIONS only); any other method → 403.
+router = APIRouter(
+    prefix="/api/v1/admin",
+    tags=["Admin"],
+    dependencies=[Depends(get_admin_readonly_user)],
+)
 router.include_router(appointments_router)
 router.include_router(content_resources_router)
 router.include_router(conversations_router)

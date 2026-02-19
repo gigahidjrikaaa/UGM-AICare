@@ -60,6 +60,18 @@ SUPPORTED_ATTESTATION_CHAINS: Dict[int, AttestationChainConfig] = {
         is_testnet=False,
         requires_poa_middleware=False,
     ),
+    5611: AttestationChainConfig(
+        chain_id=5611,
+        name="opBNB Testnet",
+        short_name="opBNB",
+        rpc_url_env="OPBNB_TESTNET_RPC_URL",
+        contract_address_env="OPBNB_ATTESTATION_CONTRACT_ADDRESS",
+        private_key_env="OPBNB_ATTESTATION_PUBLISHER_PRIVATE_KEY",
+        explorer_base_url="https://opbnb-testnet.bscscan.com",
+        native_currency="tBNB",
+        is_testnet=True,
+        requires_poa_middleware=False,
+    ),
 }
 
 

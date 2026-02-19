@@ -81,8 +81,10 @@ export function useAdminSessionGuard(options: UseAdminSessionGuardOptions = {}) 
       return;
     }
 
-    // Check 3: User is not an admin
-    if (status === 'authenticated' && session?.user?.role !== 'admin') {
+    // Check 3: User is not an admin or read-only admin viewer
+    const userRole = session?.user?.role;
+    const hasAdminAccess = userRole === 'admin' || userRole === 'admin_viewer' || userRole === 'therapist';
+    if (status === 'authenticated' && !hasAdminAccess) {
       console.warn('User is not an admin. Redirecting...');
       hasRedirectedRef.current = true;
       router.push('/access-denied');
@@ -191,7 +193,7 @@ export function useAdminSessionGuard(options: UseAdminSessionGuardOptions = {}) 
 
   return {
     isValid: status === 'authenticated' && 
-             session?.user?.role === 'admin' && 
+             (session?.user?.role === 'admin' || session?.user?.role === 'admin_viewer' || session?.user?.role === 'therapist') && 
              !!session?.accessToken,
     isLoading: status === 'loading',
     session,

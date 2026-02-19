@@ -21,11 +21,16 @@ import httpx
 
 from app.database import AsyncSessionLocal
  
-DEFAULT_BADGE_CHAIN_ID = int(os.getenv("AUTOPILOT_DEMO_CHAIN_ID", "656476"))
+# HACKATHON: Default chain changed to BSC Testnet for BNB Chain hackathon.
+# TODO: Make configurable via environment variable (e.g., AUTOPILOT_DEMO_CHAIN_ID=97)
+# NOTE: opBNB Testnet chain ID is 5611, Mainnet is 204
+DEFAULT_BADGE_CHAIN_ID = int(os.getenv("AUTOPILOT_DEMO_CHAIN_ID", "97"))
+
 EXPLORER_BASE_BY_CHAIN_ID: dict[int, str] = {
     656476: "https://edu-chain-testnet.blockscout.com/tx/",
     97: "https://testnet.bscscan.com/tx/",
     56: "https://bscscan.com/tx/",
+    5611: "https://opbnb-testnet.bscscan.com/tx/",
 }
 
 SCENARIO_DEFINITIONS: dict[str, dict[str, Any]] = {

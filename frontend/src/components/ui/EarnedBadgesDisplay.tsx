@@ -17,7 +17,9 @@ import {
   getIpfsUrl,
 } from "@/lib/badgeConstants";
 
-const FALLBACK_CHAIN_ID = 656476; // EDU Chain Testnet (legacy badges)
+// HACKATHON: Fallback chain changed to BSC Testnet for BNB Chain hackathon.
+// TODO: Consider making this configurable or derive from API response.
+const FALLBACK_CHAIN_ID = 97; // BSC Testnet (changed from EDU Chain 656476)
 
 interface EarnedBadge {
   badge_id: number;

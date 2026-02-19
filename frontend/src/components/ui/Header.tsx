@@ -5,6 +5,7 @@ import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
 import Link from "next/link";
 import { HiMenu, HiViewGrid } from "react-icons/hi"; // Added HiViewGrid for Dashboard icon
+import { FiShield } from "react-icons/fi";
 import { useWellnessState } from "@/hooks/useQuests";
 import MobileNavMenu from "./MobileNavMenu";
 import ProfileDropdown from "./ProfileDropdown";
@@ -145,6 +146,15 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
                   >
                     <HiViewGrid className="w-4 h-4 group-hover:text-[#FFCA40] transition-colors" />
                     <span className="text-xs font-medium uppercase tracking-wider">Dashboard</span>
+                  </Link>
+
+                  {/* Proof Timeline Button (Desktop) */}
+                  <Link
+                    href="/proof"
+                    className="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border border-white/10 bg-white/5 hover:bg-white/10 hover:border-white/20 transition-all duration-200 text-white/80 group"
+                  >
+                    <FiShield className="w-4 h-4 group-hover:text-emerald-400 transition-colors" />
+                    <span className="text-xs font-medium uppercase tracking-wider">Proof</span>
                   </Link>
 
                   {/* Profile Dropdown Trigger */}
