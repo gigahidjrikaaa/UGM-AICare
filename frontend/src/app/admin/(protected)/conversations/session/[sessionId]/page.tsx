@@ -449,7 +449,7 @@ export default function SessionDetailPage() {
 
   if (error || !data) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
+      <div className="flex items-center justify-center min-h-100">
         <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 max-w-md text-center">
           <span className="text-red-400 text-sm">{error || "Failed to load session"}</span>
           <div className="mt-4">
@@ -468,7 +468,7 @@ export default function SessionDetailPage() {
   const screening = assessment?.raw_assessment?.screening;
 
   return (
-    <div className="space-y-5 max-w-[1600px]">
+    <div className="space-y-5 max-w-400">
       {/* Header */}
       <div className="bg-white/5 backdrop-blur-sm border border-white/10 rounded-xl p-5">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -478,7 +478,7 @@ export default function SessionDetailPage() {
             </Button>
             <ChatIcon className="h-6 w-6 text-[#FFCA40]" />
             <h1 className="text-xl font-bold text-white truncate">Session ...{shortId}</h1>
-            <span className="px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[11px] text-white/50 font-mono truncate max-w-[200px]">
+            <span className="px-2 py-0.5 bg-white/5 border border-white/10 rounded text-[11px] text-white/50 font-mono truncate max-w-50">
               {data.user_id_hash}
             </span>
           </div>
@@ -495,7 +495,7 @@ export default function SessionDetailPage() {
           </div>
         </div>
         {data.user?.email && (
-          <div className="text-xs text-white/50 mt-2 ml-[120px] flex items-center gap-2">
+          <div className="text-xs text-white/50 mt-2 ml-30 flex items-center gap-2">
             <span>User: <span className="font-mono">{data.user.email}</span></span>
             {data.user.role && <span className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[10px]">{data.user.role}</span>}
           </div>
@@ -646,7 +646,7 @@ export default function SessionDetailPage() {
                     <ul className="space-y-2">
                       {assessment.concerns.map((c, i) => (
                         <li key={i} className="flex items-start gap-2 text-sm text-white/70">
-                          <span className="w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 flex-shrink-0" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-red-400 mt-1.5 shrink-0" />
                           {c}
                         </li>
                       ))}
@@ -663,7 +663,7 @@ export default function SessionDetailPage() {
                     <ul className="space-y-2">
                       {assessment.protective_factors.map((f, i) => (
                         <li key={i} className="flex items-start gap-2 text-sm text-white/70">
-                          <span className="w-1.5 h-1.5 rounded-full bg-green-400 mt-1.5 flex-shrink-0" />
+                          <span className="w-1.5 h-1.5 rounded-full bg-green-400 mt-1.5 shrink-0" />
                           {f}
                         </li>
                       ))}
@@ -680,7 +680,7 @@ export default function SessionDetailPage() {
                     <ul className="space-y-2">
                       {assessment.recommended_actions.map((a, i) => (
                         <li key={i} className="flex items-start gap-2 text-sm text-white/70">
-                          <span className="text-blue-400 text-xs mt-0.5 flex-shrink-0">{i + 1}.</span>
+                          <span className="text-blue-400 text-xs mt-0.5 shrink-0">{i + 1}.</span>
                           {a}
                         </li>
                       ))}
@@ -842,7 +842,7 @@ export default function SessionDetailPage() {
                           <span>{new Date(c.timestamp).toLocaleString()}</span>
                         </div>
                         <div className="px-4 py-3 rounded-xl bg-blue-600/80 text-white rounded-br-none">
-                          <p className="whitespace-pre-wrap break-words text-sm">{c.message}</p>
+                          <p className="whitespace-pre-wrap wrap-break-word text-sm">{c.message}</p>
                         </div>
                       </div>
                     </div>
@@ -866,7 +866,7 @@ export default function SessionDetailPage() {
                           )}
                         </div>
                         <div className="px-4 py-3 rounded-xl bg-white/10 text-white/90 rounded-bl-none border border-white/10">
-                          <p className="whitespace-pre-wrap break-words text-sm">{c.response}</p>
+                          <p className="whitespace-pre-wrap wrap-break-word text-sm">{c.response}</p>
                         </div>
                       </div>
                     </div>
@@ -882,7 +882,7 @@ export default function SessionDetailPage() {
       {flagOpen && (
         <div className="fixed inset-0 z-50">
           <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={() => setFlagOpen(false)} />
-          <div className="absolute right-0 top-0 h-full w-full sm:w-[420px] bg-[#000c24] border-l border-white/10 shadow-xl">
+          <div className="absolute right-0 top-0 h-full w-full sm:w-105 bg-[#000c24] border-l border-white/10 shadow-xl">
             <div className="p-5 border-b border-white/10 flex items-center justify-between">
               <h3 className="text-base font-semibold text-white flex items-center gap-2">
                 <FlagIcon className="h-4 w-4 text-yellow-400" />

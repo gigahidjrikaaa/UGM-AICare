@@ -61,6 +61,7 @@ export interface AikaRequest {
   message: string;
   conversation_history: AikaMessage[];
   preferred_model?: string;
+  session_id?: string;
 }
 
 export interface ToolEvent {
@@ -121,6 +122,7 @@ export function useAika(options: UseAikaOptions = {}) {
     conversationHistory: AikaMessage[] = [],
     role: 'user' | 'admin' | 'counselor' = 'user',
     preferredModel?: string,
+    sessionId?: string,
   ): Promise<AikaResponse | null> => {
     if (!session?.user?.id) {
       const errorMsg = 'User not authenticated';
@@ -143,6 +145,7 @@ export function useAika(options: UseAikaOptions = {}) {
         role,
         message,
         conversation_history: conversationHistory.slice(-10), // Last 10 messages
+        ...(sessionId ? { session_id: sessionId } : {}),
       };
 
       if (preferredModel && preferredModel.trim().length > 0) {

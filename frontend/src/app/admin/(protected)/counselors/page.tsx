@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   useAdminCounselors,
@@ -49,6 +49,27 @@ function createEmptyTimeSlots(): api.TimeSlot[] {
     });
   });
   return slots;
+}
+
+/** Returns slots with Mon-Fri 09:00-17:00 pre-enabled as a sensible default schedule. */
+function createDefaultWorkingHoursSlots(): api.TimeSlot[] {
+  const WORKING_DAYS: api.TimeSlot['day'][] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+  return createEmptyTimeSlots().map((slot) => ({
+    ...slot,
+    available: WORKING_DAYS.includes(slot.day) && slot.hour >= 9 && slot.hour < 17,
+  }));
+}
+
+/** Sets a single cell to an explicit available value instead of toggling. Used for drag selection. */
+function setSlotAvailability(
+  slots: api.TimeSlot[],
+  day: api.TimeSlot['day'],
+  hour: number,
+  available: boolean,
+): api.TimeSlot[] {
+  return slots.map((slot) =>
+    slot.day === day && slot.hour === hour ? { ...slot, available } : slot,
+  );
 }
 
 function normalizeDay(value: string): api.TimeSlot['day'] | null {
@@ -184,21 +205,40 @@ function toggleHourAvailability(
 
 interface AvailabilityGridProps {
   slots: api.TimeSlot[];
-  onToggleSlot: (day: api.TimeSlot['day'], hour: number) => void;
+  /** Set a single cell to an explicit value — used for both click and drag interactions. */
+  onSetSlot: (day: api.TimeSlot['day'], hour: number, available: boolean) => void;
   onToggleDay: (day: api.TimeSlot['day']) => void;
   onToggleHour: (hour: number) => void;
 }
 
 function AvailabilityGrid({
   slots,
-  onToggleSlot,
+  onSetSlot,
   onToggleDay,
   onToggleHour,
 }: AvailabilityGridProps) {
+  // Drag-selection state: track whether a pointer drag is in progress and the target value.
+  const isDraggingRef = useRef(false);
+  const dragIntentRef = useRef<boolean>(false);
+
   const totalActive = slots.filter((slot) => slot.available).length;
 
+  // Release drag when the pointer is lifted anywhere on the page.
+  useEffect(() => {
+    const handlePointerUp = () => {
+      isDraggingRef.current = false;
+    };
+    window.addEventListener('pointerup', handlePointerUp);
+    window.addEventListener('pointercancel', handlePointerUp);
+    return () => {
+      window.removeEventListener('pointerup', handlePointerUp);
+      window.removeEventListener('pointercancel', handlePointerUp);
+    };
+  }, []);
+
   return (
-    <div className="space-y-3">
+    <div className="space-y-3 select-none">
+      {/* Day column headers */}
       <div className="flex gap-1 overflow-x-auto pb-2">
         <div className="w-14 shrink-0" aria-hidden />
         {WEEK_DAYS.map((day) => {
@@ -210,7 +250,7 @@ function AvailabilityGrid({
               key={day}
               type="button"
               onClick={() => onToggleDay(day)}
-              className="text-xs text-white/60 bg-white/5 border border-white/10 rounded px-2 py-1 hover:text-[#FFCA40] hover:border-[#FFCA40]/60 transition-colors"
+              className="flex-1 text-xs text-white/60 bg-white/5 border border-white/10 rounded px-2 py-1 hover:text-[#FFCA40] hover:border-[#FFCA40]/60 transition-colors"
               title={`Toggle all ${formatDayLabel(day)} slots (${availableCount}/24 available)`}
             >
               {formatDayLabel(day).slice(0, 3)}
@@ -222,6 +262,7 @@ function AvailabilityGrid({
         })}
       </div>
 
+      {/* Hour rows */}
       <div className="space-y-1">
         {HOURS.map((hour) => {
           const availableCount = slots.filter(
@@ -230,6 +271,7 @@ function AvailabilityGrid({
 
           return (
             <div key={hour} className="grid grid-cols-8 gap-1">
+              {/* Hour row header */}
               <button
                 type="button"
                 onClick={() => onToggleHour(hour)}
@@ -246,20 +288,38 @@ function AvailabilityGrid({
                 const isAvailable = slot?.available ?? false;
 
                 return (
-                  <button
+                  <div
                     key={`${day}-${hour}`}
-                    type="button"
-                    onClick={() => onToggleSlot(day, hour)}
-                    className={`py-2 rounded transition-all ${
+                    role="button"
+                    tabIndex={0}
+                    aria-pressed={isAvailable}
+                    aria-label={`${formatDayLabel(day)} ${hour.toString().padStart(2, '0')}:00 — ${isAvailable ? 'Available' : 'Unavailable'}`}
+                    // Prevent text selection and default touch scroll during drag.
+                    style={{ touchAction: 'none' }}
+                    onPointerDown={(e) => {
+                      // Left-button / touch only
+                      if (e.button !== 0 && e.pointerType === 'mouse') return;
+                      e.preventDefault();
+                      isDraggingRef.current = true;
+                      dragIntentRef.current = !isAvailable;
+                      onSetSlot(day, hour, !isAvailable);
+                    }}
+                    onPointerEnter={() => {
+                      if (!isDraggingRef.current) return;
+                      onSetSlot(day, hour, dragIntentRef.current);
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        onSetSlot(day, hour, !isAvailable);
+                      }
+                    }}
+                    className={`py-2 rounded cursor-pointer transition-all ${
                       isAvailable
                         ? 'bg-green-500/30 border border-green-400/50 hover:bg-green-500/40'
                         : 'bg-white/5 border border-white/10 hover:bg-white/10'
                     }`}
-                    title={`${formatDayLabel(day)} ${hour
-                      .toString()
-                      .padStart(2, '0')}:00 - ${
-                      isAvailable ? 'Available' : 'Unavailable'
-                    }`}
+                    title={`${formatDayLabel(day)} ${hour.toString().padStart(2, '0')}:00 — ${isAvailable ? 'Available' : 'Unavailable'}`}
                   />
                 );
               })}
@@ -740,6 +800,7 @@ export default function AdminCounselorsPage() {
       <AnimatePresence>
         {showEditModal && selectedCounselor && (
           <EditCounselorModal
+            key={selectedCounselor.id}
             counselor={selectedCounselor}
             onClose={() => {
               setShowEditModal(false);
@@ -799,7 +860,7 @@ function StatsCards() {
               <p className="text-white/70 text-sm mb-1">{stat.label}</p>
               <p className="text-3xl font-bold text-white">{stat.value}</p>
             </div>
-            <div className={`p-3 rounded-lg bg-gradient-to-br ${stat.color} group-hover:scale-110 transition-transform`}>
+            <div className={`p-3 rounded-lg bg-linear-to-br ${stat.color} group-hover:scale-110 transition-transform`}>
               <stat.icon className="w-6 h-6 text-white" />
             </div>
           </div>
@@ -921,7 +982,7 @@ function CounselorsTable({
               >
                 <td className="px-6 py-4 whitespace-nowrap">
                   <div className="flex items-center">
-                    <div className="flex-shrink-0 h-10 w-10">
+                    <div className="shrink-0 h-10 w-10">
                       {counselor.image_url ? (
                         <>
                           {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -932,7 +993,7 @@ function CounselorsTable({
                           />
                         </>
                       ) : (
-                        <div className="h-10 w-10 rounded-full bg-gradient-to-br from-blue-500 to-cyan-500 flex items-center justify-center ring-2 ring-white/10">
+                        <div className="h-10 w-10 rounded-full bg-linear-to-br from-blue-500 to-cyan-500 flex items-center justify-center ring-2 ring-white/10">
                           <span className="text-white font-semibold">
                             {counselor.name.charAt(0)}
                           </span>
@@ -1055,7 +1116,7 @@ function CreateCounselorModal({ onClose }: { onClose: () => void }) {
   const [loadingUsers, setLoadingUsers] = useState(true);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [availabilitySlots, setAvailabilitySlots] = useState<api.TimeSlot[]>(() =>
-    createEmptyTimeSlots(),
+    createDefaultWorkingHoursSlots(),
   );
   const [languages, setLanguages] = useState<string[]>([]);
   const [languageInput, setLanguageInput] = useState('');
@@ -1101,9 +1162,9 @@ function CreateCounselorModal({ onClose }: { onClose: () => void }) {
     }));
   };
 
-  const toggleTimeSlot = (day: api.TimeSlot['day'], hour: number) => {
+  const setTimeSlot = (day: api.TimeSlot['day'], hour: number, available: boolean) => {
     setAvailabilitySlots((previous) =>
-      toggleSlotAvailability(previous, day, hour),
+      setSlotAvailability(previous, day, hour, available),
     );
   };
 
@@ -1300,10 +1361,10 @@ function CreateCounselorModal({ onClose }: { onClose: () => void }) {
         exit={{ scale: 0.95, opacity: 0, y: 20 }}
         transition={{ type: "spring", damping: 25, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-gradient-to-br from-[#001D58] via-[#00246F] to-[#00308F] rounded-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden border border-white/20 shadow-2xl"
+        className="bg-linear-to-br from-[#001D58] via-[#00246F] to-[#00308F] rounded-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden border border-white/20 shadow-2xl"
       >
         {/* Header */}
-        <div className="sticky top-0 z-10 bg-gradient-to-r from-[#001D58] to-[#00308F] border-b border-white/10 backdrop-blur-sm">
+        <div className="sticky top-0 z-10 bg-linear-to-r from-[#001D58] to-[#00308F] border-b border-white/10 backdrop-blur-sm">
           <div className="p-6 flex items-center justify-between">
             <div>
               <h2 className="text-3xl font-bold text-white flex items-center gap-3">
@@ -1539,7 +1600,7 @@ function CreateCounselorModal({ onClose }: { onClose: () => void }) {
 
           <AvailabilityGrid
             slots={availabilitySlots}
-            onToggleSlot={toggleTimeSlot}
+            onSetSlot={setTimeSlot}
             onToggleDay={toggleDayColumn}
             onToggleHour={toggleHourRow}
           />
@@ -1568,7 +1629,7 @@ function CreateCounselorModal({ onClose }: { onClose: () => void }) {
         </div>
 
         {/* Footer with buttons */}
-        <div className="sticky bottom-0 bg-gradient-to-r from-[#001D58] to-[#00308F] border-t border-white/10 p-6 backdrop-blur-sm">
+        <div className="sticky bottom-0 bg-linear-to-r from-[#001D58] to-[#00308F] border-t border-white/10 p-6 backdrop-blur-sm">
           <div className="flex justify-end gap-3">
             <button
               type="button"
@@ -1581,7 +1642,7 @@ function CreateCounselorModal({ onClose }: { onClose: () => void }) {
               type="submit"
               form="create-counselor-form"
               disabled={createMutation.isPending || !selectedUserId}
-              className="px-8 py-3 bg-gradient-to-r from-[#FFCA40] to-[#FFD666] text-[#001D58] font-bold rounded-lg hover:shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all shadow-md flex items-center gap-2"
+              className="px-8 py-3 bg-linear-to-r from-[#FFCA40] to-[#FFD666] text-[#001D58] font-bold rounded-lg hover:shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all shadow-md flex items-center gap-2"
             >
               {createMutation.isPending ? (
                 <>
@@ -1613,6 +1674,10 @@ function EditCounselorModal({
   onClose: () => void;
 }) {
   const updateMutation = useUpdateCounselor();
+
+  // State is initialized directly from props. Because the parent passes
+  // key={counselor.id}, React will remount this component when the counselor
+  // changes — no useEffect reset is needed.
   const [formData, setFormData] = useState<api.CounselorUpdate>({
     name: counselor.name,
     specialization: counselor.specialization,
@@ -1626,31 +1691,20 @@ function EditCounselorModal({
   const [educationEntries, setEducationEntries] = useState<api.Education[]>(
     counselor.education ?? [],
   );
-  const [certificationEntries, setCertificationEntries] = useState<
-    api.Certification[]
-  >(counselor.certifications ?? []);
-  const [availabilitySlots, setAvailabilitySlots] = useState<api.TimeSlot[]>(() =>
-    buildSlotsFromSchedule(counselor.availability_schedule),
+  const [certificationEntries, setCertificationEntries] = useState<api.Certification[]>(
+    counselor.certifications ?? [],
   );
+  const [availabilitySlots, setAvailabilitySlots] = useState<api.TimeSlot[]>(() => {
+    const schedule = counselor.availability_schedule;
+    // Fall back to Mon-Fri working hours when the counselor has no schedule yet.
+    return schedule && schedule.length > 0
+      ? buildSlotsFromSchedule(schedule)
+      : createDefaultWorkingHoursSlots();
+  });
 
-  useEffect(() => {
-    setFormData({
-      name: counselor.name,
-      specialization: counselor.specialization,
-      bio: counselor.bio,
-      years_of_experience: counselor.years_of_experience,
-      consultation_fee: counselor.consultation_fee,
-      is_available: counselor.is_available,
-    });
-    setLanguages(counselor.languages ?? []);
-    setEducationEntries(counselor.education ?? []);
-    setCertificationEntries(counselor.certifications ?? []);
-    setAvailabilitySlots(buildSlotsFromSchedule(counselor.availability_schedule));
-  }, [counselor]);
-
-  const toggleTimeSlot = (day: api.TimeSlot['day'], hour: number) => {
+  const setTimeSlot = (day: api.TimeSlot['day'], hour: number, available: boolean) => {
     setAvailabilitySlots((previous) =>
-      toggleSlotAvailability(previous, day, hour),
+      setSlotAvailability(previous, day, hour, available),
     );
   };
 
@@ -1833,197 +1887,256 @@ function EditCounselorModal({
       initial={{ opacity: 0 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
-      className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/80 backdrop-blur-md flex items-center justify-center z-50 p-4"
       onClick={onClose}
     >
       <motion.div
-        initial={{ scale: 0.9, opacity: 0 }}
-        animate={{ scale: 1, opacity: 1 }}
-        exit={{ scale: 0.9, opacity: 0 }}
+        initial={{ scale: 0.95, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.95, opacity: 0, y: 20 }}
+        transition={{ type: 'spring', damping: 25, stiffness: 300 }}
         onClick={(e) => e.stopPropagation()}
-        className="bg-[#001D58] rounded-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto border border-white/10 shadow-2xl"
+        className="bg-linear-to-br from-[#001D58] via-[#00246F] to-[#00308F] rounded-2xl max-w-6xl w-full max-h-[95vh] overflow-hidden border border-white/20 shadow-2xl"
       >
-        <div className="p-6 border-b border-white/10">
-          <h2 className="text-2xl font-bold text-white">Edit counselor profile</h2>
-          <p className="text-white/60 text-sm mt-1">Update counselor information</p>
+        {/* Sticky Header */}
+        <div className="sticky top-0 z-10 bg-linear-to-r from-[#001D58] to-[#00308F] border-b border-white/10 backdrop-blur-sm p-6 flex items-center justify-between">
+          <div>
+            <h2 className="text-3xl font-bold text-white">Edit counselor profile</h2>
+            <p className="text-white/60 text-sm mt-2">
+              Editing:{' '}
+              <span className="text-[#FFCA40] font-medium">{counselor.name}</span>
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="p-2 hover:bg-white/10 rounded-lg transition-colors group"
+            aria-label="Close modal"
+          >
+            <FiX size={24} className="text-white/60 group-hover:text-white transition-colors" />
+          </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-6">
-          <div className="bg-white/5 rounded-xl border border-white/10 p-5 space-y-4">
-            <div>
-              <h3 className="text-lg font-semibold text-white">Profile Information</h3>
-              <p className="text-white/50 text-sm">
-                Edit the counselor&apos;s headline details, credentials, and pricing.
-              </p>
-            </div>
+        {/* Scrollable Content */}
+        <div className="overflow-y-auto max-h-[calc(95vh-160px)] custom-scrollbar">
+          <form id="edit-counselor-form" onSubmit={handleSubmit} className="p-6 space-y-8">
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-white/90 mb-2">
-                  Full Name
-                </label>
-                <input
-                  type="text"
-                  value={formData.name || ''}
-                  onChange={(event) =>
-                    setFormData({ ...formData, name: event.target.value })
-                  }
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40] focus:border-transparent transition-all"
-                  placeholder="Counselor full name"
-                />
+            {/* Section 1: Profile Information */}
+            <div className="bg-white/5 rounded-xl p-6 border border-white/10 space-y-4">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-[#FFCA40]/20 flex items-center justify-center">
+                  <span className="text-[#FFCA40] text-xl font-bold">1</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Profile Information</h3>
+                  <p className="text-white/50 text-sm">
+                    Edit headline details, credentials, and pricing
+                  </p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-white/90 mb-2">
+                    Full Name <span className="text-red-400">*</span>
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.name || ''}
+                    onChange={(event) =>
+                      setFormData({ ...formData, name: event.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40] focus:border-transparent transition-all"
+                    placeholder="Counselor full name"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-white/90 mb-2">
+                    Specialization
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.specialization || ''}
+                    onChange={(event) =>
+                      setFormData({ ...formData, specialization: event.target.value })
+                    }
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40] focus:border-transparent transition-all"
+                    placeholder="Areas of focus or modalities"
+                  />
+                </div>
               </div>
 
               <div>
                 <label className="block text-sm font-semibold text-white/90 mb-2">
-                  Specialization
+                  Professional Bio
                 </label>
-                <input
-                  type="text"
-                  value={formData.specialization || ''}
+                <textarea
+                  value={formData.bio || ''}
                   onChange={(event) =>
-                    setFormData({ ...formData, specialization: event.target.value })
+                    setFormData({ ...formData, bio: event.target.value })
                   }
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40] focus:border-transparent transition-all"
-                  placeholder="Areas of focus or modalities"
+                  rows={4}
+                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40] focus:border-transparent transition-all resize-none"
+                  placeholder="Summarize experience, therapeutic style, and focus areas."
                 />
               </div>
-            </div>
 
-            <div>
-              <label className="block text-sm font-semibold text-white/90 mb-2">
-                Professional Bio
-              </label>
-              <textarea
-                value={formData.bio || ''}
-                onChange={(event) =>
-                  setFormData({ ...formData, bio: event.target.value })
-                }
-                rows={4}
-                className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40] focus:border-transparent transition-all resize-none"
-                placeholder="Summarize experience, therapeutic style, and focus areas."
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-white/90 mb-2">
+                    Years of Experience
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    max="70"
+                    value={formData.years_of_experience ?? ''}
+                    onChange={(event) =>
+                      setFormData({
+                        ...formData,
+                        years_of_experience: event.target.value
+                          ? Number.parseInt(event.target.value, 10)
+                          : undefined,
+                      })
+                    }
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40] focus:border-transparent transition-all"
+                    placeholder="e.g. 5"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-white/90 mb-2">
+                    Consultation Fee (Rp)
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={formData.consultation_fee ?? ''}
+                    onChange={(event) =>
+                      setFormData({
+                        ...formData,
+                        consultation_fee: event.target.value
+                          ? Number.parseFloat(event.target.value)
+                          : undefined,
+                      })
+                    }
+                    className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40] focus:border-transparent transition-all"
+                    placeholder="e.g. 150000"
+                  />
+                </div>
+              </div>
+
+              <LanguagesAndCredentialsFields
+                languages={languages}
+                languageInput={languageInput}
+                onLanguageInputChange={setLanguageInput}
+                onAddLanguage={addLanguage}
+                onRemoveLanguage={removeLanguage}
+                educationEntries={educationEntries}
+                onEducationFieldChange={handleEducationFieldChange}
+                onAddEducation={addEducationEntry}
+                onRemoveEducation={removeEducationEntry}
+                certificationEntries={certificationEntries}
+                onCertificationFieldChange={handleCertificationFieldChange}
+                onAddCertification={addCertificationEntry}
+                onRemoveCertification={removeCertificationEntry}
               />
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-white/90 mb-2">
-                  📅 Years of Experience
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  max="70"
-                  value={formData.years_of_experience ?? ''}
-                  onChange={(event) =>
-                    setFormData({
-                      ...formData,
-                      years_of_experience: event.target.value
-                        ? Number.parseInt(event.target.value, 10)
-                        : undefined,
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40] focus:border-transparent transition-all"
-                  placeholder="e.g. 5"
-                />
+            {/* Section 2: Weekly Availability */}
+            <div className="bg-white/5 rounded-xl p-6 border border-white/10 space-y-4">
+              <div className="flex items-center gap-3 mb-2">
+                <div className="w-10 h-10 rounded-full bg-[#FFCA40]/20 flex items-center justify-center">
+                  <span className="text-[#FFCA40] text-xl font-bold">2</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Weekly Availability Schedule</h3>
+                  <p className="text-white/50 text-sm">
+                    Adjust hourly availability blocks for the week
+                  </p>
+                </div>
               </div>
-              <div>
-                <label className="block text-sm font-semibold text-white/90 mb-2">
-                  💰 Consultation Fee (Rp)
-                </label>
-                <input
-                  type="number"
-                  min="0"
-                  value={formData.consultation_fee ?? ''}
-                  onChange={(event) =>
-                    setFormData({
-                      ...formData,
-                      consultation_fee: event.target.value
-                        ? Number.parseFloat(event.target.value)
-                        : undefined,
-                    })
-                  }
-                  className="w-full px-4 py-3 bg-white/5 border border-white/10 rounded-lg text-white placeholder-white/40 focus:ring-2 focus:ring-[#FFCA40] focus:border-transparent transition-all"
-                  placeholder="e.g. 150000"
-                />
-              </div>
+              <p className="text-xs text-white/60 bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
+                <strong>How to use:</strong> Click and drag across cells to set availability, or
+                click day/hour headers to toggle entire columns or rows at once.
+              </p>
+              <AvailabilityGrid
+                slots={availabilitySlots}
+                onSetSlot={setTimeSlot}
+                onToggleDay={toggleDayColumn}
+                onToggleHour={toggleHourRow}
+              />
             </div>
 
-            <LanguagesAndCredentialsFields
-              languages={languages}
-              languageInput={languageInput}
-              onLanguageInputChange={setLanguageInput}
-              onAddLanguage={addLanguage}
-              onRemoveLanguage={removeLanguage}
-              educationEntries={educationEntries}
-              onEducationFieldChange={handleEducationFieldChange}
-              onAddEducation={addEducationEntry}
-              onRemoveEducation={removeEducationEntry}
-              certificationEntries={certificationEntries}
-              onCertificationFieldChange={handleCertificationFieldChange}
-              onAddCertification={addCertificationEntry}
-              onRemoveCertification={removeCertificationEntry}
-            />
-          </div>
-
-          <div className="bg-white/5 rounded-xl border border-white/10 p-5 space-y-4">
-            <div>
-              <h3 className="text-lg font-semibold text-white">Weekly Availability</h3>
-              <p className="text-white/50 text-sm">
-                Adjust availability blocks to control when the counselor can be booked.
+            {/* Section 3: Appointment Settings */}
+            <div className="bg-white/5 rounded-xl p-6 border border-white/10">
+              <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-full bg-[#FFCA40]/20 flex items-center justify-center">
+                  <span className="text-[#FFCA40] text-xl font-bold">3</span>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-white">Appointment Settings</h3>
+                  <p className="text-white/50 text-sm">
+                    Control the overall availability status for this counselor
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center p-4 bg-white/5 rounded-lg border border-white/10">
+                <input
+                  type="checkbox"
+                  id="edit_is_available"
+                  checked={formData.is_available ?? false}
+                  onChange={(event) =>
+                    setFormData({ ...formData, is_available: event.target.checked })
+                  }
+                  className="w-4 h-4 text-[#FFCA40] bg-white/5 border-white/20 rounded focus:ring-[#FFCA40]"
+                />
+                <label htmlFor="edit_is_available" className="ml-3 text-sm font-medium text-white/80">
+                  Mark as available for new appointments
+                </label>
+              </div>
+              <p className="mt-2 text-xs text-white/50 ml-4">
+                Disable to temporarily pause bookings without removing the counselor.
               </p>
             </div>
-            <p className="text-xs text-white/60 bg-blue-500/10 border border-blue-500/20 rounded-lg p-3">
-              💡 Click individual cells to toggle availability or use the row/column headers
-              to bulk enable time slots.
-            </p>
-            <AvailabilityGrid
-              slots={availabilitySlots}
-              onToggleSlot={toggleTimeSlot}
-              onToggleDay={toggleDayColumn}
-              onToggleHour={toggleHourRow}
-            />
-          </div>
 
-          <div className="bg-white/5 rounded-xl border border-white/10 p-5 space-y-3">
-            <div className="flex items-center">
-              <input
-                type="checkbox"
-                id="edit_is_available"
-                checked={formData.is_available ?? false}
-                onChange={(event) =>
-                  setFormData({ ...formData, is_available: event.target.checked })
-                }
-                className="w-4 h-4 text-[#FFCA40] bg-white/5 border-white/20 rounded focus:ring-[#FFCA40]"
-              />
-              <label htmlFor="edit_is_available" className="ml-3 text-sm text-white/80">
-                Available for new appointments
-              </label>
-            </div>
-            <p className="text-xs text-white/50">
-              Disable availability to temporarily hide this counselor from scheduling flows.
-            </p>
-          </div>
+          </form>
+        </div>
 
+        {/* Sticky Footer */}
+        <div className="sticky bottom-0 bg-linear-to-r from-[#001D58] to-[#00308F] border-t border-white/10 p-6 backdrop-blur-sm">
           <div className="flex justify-end gap-3">
             <button
               type="button"
               onClick={onClose}
-              className="px-6 py-2.5 bg-white/5 border border-white/10 rounded-lg text-white/80 hover:bg-white/10 transition-all"
+              className="px-8 py-3 bg-white/5 border border-white/10 rounded-lg text-white/80 hover:bg-white/10 transition-all font-medium"
             >
               Cancel
             </button>
             <button
               type="submit"
+              form="edit-counselor-form"
               disabled={updateMutation.isPending}
-              className="px-6 py-2.5 bg-[#FFCA40] text-[#001D58] font-semibold rounded-lg hover:bg-[#FFD666] disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-lg"
+              className="px-8 py-3 bg-linear-to-r from-[#FFCA40] to-[#FFD666] text-[#001D58] font-bold rounded-lg hover:shadow-lg hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100 transition-all shadow-md flex items-center gap-2"
             >
-              {updateMutation.isPending ? 'Updating...' : 'Update Profile'}
+              {updateMutation.isPending ? (
+                <>
+                  <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-[#001D58]" />
+                  Updating...
+                </>
+              ) : (
+                'Save Changes'
+              )}
             </button>
           </div>
-        </form>
+        </div>
       </motion.div>
     </motion.div>
   );
 }
+
+
+
+
 
 

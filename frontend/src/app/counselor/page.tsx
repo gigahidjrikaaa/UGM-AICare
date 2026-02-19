@@ -76,14 +76,14 @@ export default function CounselorLoginPage() {
 
   if (status === "loading" || (status === "authenticated" && (session?.user?.role === "counselor" || session?.user?.role === "admin"))) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] flex items-center justify-center">
+      <div className="min-h-screen bg-linear-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] flex items-center justify-center">
         <div className="animate-pulse text-white text-lg">Loading Counselor Portal...</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] flex flex-col items-center justify-center p-4">
+    <div className="min-h-screen bg-linear-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] flex flex-col items-center justify-center p-4">
       {/* Background decoration */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-0 w-96 h-96 bg-[#FFCA40]/5 rounded-full blur-3xl"></div>
@@ -99,7 +99,7 @@ export default function CounselorLoginPage() {
         {/* Logo and Title */}
         <div className="text-center mb-8">
           <div className="flex items-center justify-center mb-4">
-            <div className="w-16 h-16 bg-gradient-to-br from-[#FFCA40] to-[#FFD55C] rounded-2xl flex items-center justify-center shadow-xl">
+            <div className="w-16 h-16 bg-linear-to-br from-[#FFCA40] to-[#FFD55C] rounded-2xl flex items-center justify-center shadow-xl">
               <FiHeart className="w-8 h-8 text-[#001d58]" />
             </div>
           </div>
@@ -115,7 +115,7 @@ export default function CounselorLoginPage() {
             className="mb-6 p-4 bg-orange-500/10 border border-orange-500/30 rounded-xl"
           >
             <div className="flex items-center gap-3">
-              <FiAlertCircle className="w-5 h-5 text-orange-400 flex-shrink-0" />
+              <FiAlertCircle className="w-5 h-5 text-orange-400 shrink-0" />
               <p className="text-sm text-orange-200">{sessionExpiredMessage}</p>
             </div>
           </motion.div>
@@ -129,7 +129,7 @@ export default function CounselorLoginPage() {
             className="mb-6 p-4 bg-red-500/10 border border-red-500/30 rounded-xl"
           >
             <div className="flex items-center gap-3">
-              <FiAlertCircle className="w-5 h-5 text-red-400 flex-shrink-0" />
+              <FiAlertCircle className="w-5 h-5 text-red-400 shrink-0" />
               <p className="text-sm text-red-200">{error}</p>
             </div>
           </motion.div>
@@ -199,7 +199,7 @@ export default function CounselorLoginPage() {
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-gradient-to-r from-[#FFCA40] to-[#FFD55C] text-[#001d58] rounded-xl font-semibold hover:shadow-lg hover:shadow-[#FFCA40]/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
+              className="w-full flex items-center justify-center gap-2 px-6 py-3 bg-linear-to-r from-[#FFCA40] to-[#FFD55C] text-[#001d58] rounded-xl font-semibold hover:shadow-lg hover:shadow-[#FFCA40]/30 disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200"
             >
               {isLoading ? (
                 <>

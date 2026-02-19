@@ -568,16 +568,37 @@ async def get_conversation_session_detail(
     }
 
     session_user: Optional[SessionUser] = None
-    user_obj = await db.get(User, user_id)
-    if user_obj:
+    user_row = (
+        await db.execute(
+            select(
+                User.id,
+                User.email,
+                User.role,
+                User.is_active,
+                User.created_at,
+                User.last_login,
+                User.sentiment_score,
+            ).where(User.id == user_id)
+        )
+    ).first()
+    if user_row:
+        (
+            user_row_id,
+            user_row_email,
+            user_row_role,
+            user_row_is_active,
+            user_row_created_at,
+            user_row_last_login,
+            user_row_sentiment_score,
+        ) = user_row
         session_user = SessionUser(
-            id=user_obj.id,
-            email=decrypt_user_email(user_obj.email),
-            role=getattr(user_obj, "role", None),
-            is_active=getattr(user_obj, "is_active", None),
-            created_at=getattr(user_obj, "created_at", None),
-            last_login=getattr(user_obj, "last_login", None),
-            sentiment_score=getattr(user_obj, "sentiment_score", None),
+            id=user_row_id,
+            email=decrypt_user_email(user_row_email),
+            role=user_row_role,
+            is_active=user_row_is_active,
+            created_at=user_row_created_at,
+            last_login=user_row_last_login,
+            sentiment_score=user_row_sentiment_score,
         )
 
     return SessionDetailResponse(

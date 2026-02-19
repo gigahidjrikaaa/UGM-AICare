@@ -290,7 +290,8 @@ export function useAikaChat({
           userMessageContent,
           historyForAika,
           'user', // 'user' for students, can be 'counselor' or 'admin' based on user role
-          preferredModel
+          preferredModel,
+          sessionId  // Forward stable session_id so all turns belong to the same DB session
         );
 
         if (!aikaResponse) {

@@ -342,7 +342,7 @@ export default function AdminHeader() {
                 >
                   <FiBell className="text-white" size={20} />
                   {unreadCount > 0 && (
-                    <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 rounded-full bg-red-500 text-[10px] font-semibold text-white flex items-center justify-center border border-[#000c24]">
+                    <span className="absolute -top-0.5 -right-0.5 min-w-4.5 h-4.5 px-1 rounded-full bg-red-500 text-[10px] font-semibold text-white flex items-center justify-center border border-[#000c24]">
                       {unreadCount > 99 ? '99+' : unreadCount}
                     </span>
                   )}
@@ -356,7 +356,7 @@ export default function AdminHeader() {
                   leaveFrom="transform opacity-100 scale-100"
                   leaveTo="transform opacity-0 scale-95"
                 >
-                  <Popover.Panel className="absolute right-0 mt-2 w-[360px] origin-top-right bg-[#00153A] border border-white/10 rounded-xl shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none overflow-hidden">
+                  <Popover.Panel className="absolute right-0 mt-2 w-90 origin-top-right bg-[#00153A] border border-white/10 rounded-xl shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none overflow-hidden">
                     <div className="px-4 py-3 border-b border-white/10 flex items-start justify-between gap-4">
                       <div>
                         <p className="text-sm font-semibold text-white">Alerts</p>
@@ -367,7 +367,7 @@ export default function AdminHeader() {
                         {isLoadingAlerts || isLoadingCount ? 'Updating' : 'Live'}
                       </div>
                     </div>
-                    <div className="max-h-[360px] overflow-y-auto">
+                    <div className="max-h-90 overflow-y-auto">
                       {isLoadingAlerts && !hasLoadedAlerts ? (
                         <div className="space-y-2 p-4">
                           {[...Array(4)].map((_, i) => (
