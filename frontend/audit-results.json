@@ -1,0 +1,683 @@
+{
+  "auditReportVersion": 2,
+  "vulnerabilities": {
+    "@eslint/config-array": {
+      "name": "@eslint/config-array",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "minimatch"
+      ],
+      "effects": [
+        "eslint"
+      ],
+      "range": "<=0.22.0",
+      "nodes": [
+        "node_modules/@eslint/config-array"
+      ],
+      "fixAvailable": {
+        "name": "eslint",
+        "version": "10.0.1",
+        "isSemVerMajor": true
+      }
+    },
+    "@eslint/eslintrc": {
+      "name": "@eslint/eslintrc",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "minimatch"
+      ],
+      "effects": [
+        "eslint"
+      ],
+      "range": "0.0.1 || >=0.1.1",
+      "nodes": [
+        "node_modules/@eslint/eslintrc"
+      ],
+      "fixAvailable": {
+        "name": "@eslint/eslintrc",
+        "version": "0.1.0",
+        "isSemVerMajor": true
+      }
+    },
+    "@typescript-eslint/eslint-plugin": {
+      "name": "@typescript-eslint/eslint-plugin",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@typescript-eslint/type-utils",
+        "@typescript-eslint/utils",
+        "eslint"
+      ],
+      "effects": [],
+      "range": "<=8.55.1-alpha.3",
+      "nodes": [
+        "node_modules/@typescript-eslint/eslint-plugin"
+      ],
+      "fixAvailable": true
+    },
+    "@typescript-eslint/parser": {
+      "name": "@typescript-eslint/parser",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@typescript-eslint/typescript-estree",
+        "eslint"
+      ],
+      "effects": [
+        "typescript-eslint"
+      ],
+      "range": "1.1.1-alpha.0 - 8.56.1-alpha.2",
+      "nodes": [
+        "node_modules/@typescript-eslint/parser"
+      ],
+      "fixAvailable": true
+    },
+    "@typescript-eslint/type-utils": {
+      "name": "@typescript-eslint/type-utils",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@typescript-eslint/typescript-estree",
+        "@typescript-eslint/utils",
+        "eslint"
+      ],
+      "effects": [
+        "@typescript-eslint/eslint-plugin"
+      ],
+      "range": "5.9.2-alpha.0 - 8.56.1-alpha.2",
+      "nodes": [
+        "node_modules/@typescript-eslint/type-utils"
+      ],
+      "fixAvailable": true
+    },
+    "@typescript-eslint/typescript-estree": {
+      "name": "@typescript-eslint/typescript-estree",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "minimatch"
+      ],
+      "effects": [
+        "@typescript-eslint/parser",
+        "@typescript-eslint/type-utils",
+        "@typescript-eslint/utils",
+        "typescript-eslint"
+      ],
+      "range": "6.16.0 - 8.56.1-alpha.2",
+      "nodes": [
+        "node_modules/@typescript-eslint/typescript-estree"
+      ],
+      "fixAvailable": true
+    },
+    "@typescript-eslint/utils": {
+      "name": "@typescript-eslint/utils",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@typescript-eslint/typescript-estree",
+        "eslint"
+      ],
+      "effects": [
+        "@typescript-eslint/eslint-plugin",
+        "@typescript-eslint/type-utils",
+        "typescript-eslint"
+      ],
+      "range": "<=8.56.1-alpha.2",
+      "nodes": [
+        "node_modules/@typescript-eslint/utils"
+      ],
+      "fixAvailable": true
+    },
+    "ajv": {
+      "name": "ajv",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1113398,
+          "name": "ajv",
+          "dependency": "ajv",
+          "title": "ajv has ReDoS when using `$data` option",
+          "url": "https://github.com/advisories/GHSA-2g4f-4pwh-qvx6",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-400"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": "<6.14.0"
+        }
+      ],
+      "effects": [],
+      "range": "<6.14.0",
+      "nodes": [
+        "node_modules/ajv"
+      ],
+      "fixAvailable": true
+    },
+    "axios": {
+      "name": "axios",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 1113275,
+          "name": "axios",
+          "dependency": "axios",
+          "title": "Axios is Vulnerable to Denial of Service via __proto__ Key in mergeConfig",
+          "url": "https://github.com/advisories/GHSA-43fc-jf86-j433",
+          "severity": "high",
+          "cwe": [
+            "CWE-754"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": ">=1.0.0 <=1.13.4"
+        }
+      ],
+      "effects": [],
+      "range": "1.0.0 - 1.13.4",
+      "nodes": [
+        "node_modules/axios"
+      ],
+      "fixAvailable": true
+    },
+    "bn.js": {
+      "name": "bn.js",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1113402,
+          "name": "bn.js",
+          "dependency": "bn.js",
+          "title": "bn.js affected by an infinite loop",
+          "url": "https://github.com/advisories/GHSA-378v-28hj-76wf",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-835"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:L"
+          },
+          "range": "<5.2.3"
+        }
+      ],
+      "effects": [],
+      "range": "<5.2.3",
+      "nodes": [
+        "node_modules/bn.js"
+      ],
+      "fixAvailable": true
+    },
+    "eslint": {
+      "name": "eslint",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "@eslint/config-array",
+        "@eslint/eslintrc",
+        "minimatch"
+      ],
+      "effects": [
+        "@typescript-eslint/eslint-plugin",
+        "@typescript-eslint/parser",
+        "@typescript-eslint/type-utils",
+        "@typescript-eslint/utils",
+        "typescript-eslint"
+      ],
+      "range": "0.7.1 - 2.0.0-rc.1 || 4.1.0 - 10.0.0-rc.2",
+      "nodes": [
+        "node_modules/eslint"
+      ],
+      "fixAvailable": {
+        "name": "eslint",
+        "version": "10.0.1",
+        "isSemVerMajor": true
+      }
+    },
+    "eslint-config-next": {
+      "name": "eslint-config-next",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        "eslint-plugin-import",
+        "eslint-plugin-jsx-a11y",
+        "eslint-plugin-react"
+      ],
+      "effects": [],
+      "range": ">=10.2.1-canary.2",
+      "nodes": [
+        "node_modules/eslint-config-next"
+      ],
+      "fixAvailable": {
+        "name": "eslint-config-next",
+        "version": "0.2.4",
+        "isSemVerMajor": true
+      }
+    },
+    "eslint-plugin-import": {
+      "name": "eslint-plugin-import",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "minimatch"
+      ],
+      "effects": [
+        "eslint-config-next"
+      ],
+      "range": ">=1.15.0",
+      "nodes": [
+        "node_modules/eslint-plugin-import"
+      ],
+      "fixAvailable": {
+        "name": "eslint-config-next",
+        "version": "0.2.4",
+        "isSemVerMajor": true
+      }
+    },
+    "eslint-plugin-jsx-a11y": {
+      "name": "eslint-plugin-jsx-a11y",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "minimatch"
+      ],
+      "effects": [
+        "eslint-config-next"
+      ],
+      "range": ">=6.5.0",
+      "nodes": [
+        "node_modules/eslint-plugin-jsx-a11y"
+      ],
+      "fixAvailable": {
+        "name": "eslint-config-next",
+        "version": "0.2.4",
+        "isSemVerMajor": true
+      }
+    },
+    "eslint-plugin-react": {
+      "name": "eslint-plugin-react",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "minimatch"
+      ],
+      "effects": [],
+      "range": ">=7.23.0",
+      "nodes": [
+        "node_modules/eslint-plugin-react"
+      ],
+      "fixAvailable": true
+    },
+    "h3": {
+      "name": "h3",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1112186,
+          "name": "h3",
+          "dependency": "h3",
+          "title": "h3 v1 has Request Smuggling (TE.TE) issue",
+          "url": "https://github.com/advisories/GHSA-mp2g-9vg9-f4cg",
+          "severity": "high",
+          "cwe": [
+            "CWE-444"
+          ],
+          "cvss": {
+            "score": 8.9,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:C/C:H/I:H/A:L"
+          },
+          "range": "<=1.15.4"
+        }
+      ],
+      "effects": [],
+      "range": "<=1.15.4",
+      "nodes": [
+        "node_modules/h3"
+      ],
+      "fixAvailable": true
+    },
+    "hono": {
+      "name": "hono",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1112134,
+          "name": "hono",
+          "dependency": "hono",
+          "title": "Hono JWK Auth Middleware has JWT algorithm confusion when JWK lacks \"alg\" (untrusted header.alg fallback)",
+          "url": "https://github.com/advisories/GHSA-3vhc-576x-3qv4",
+          "severity": "high",
+          "cwe": [
+            "CWE-347"
+          ],
+          "cvss": {
+            "score": 8.2,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:H/A:N"
+          },
+          "range": "<4.11.4"
+        },
+        {
+          "source": 1112135,
+          "name": "hono",
+          "dependency": "hono",
+          "title": "Hono JWT Middleware's JWT Algorithm Confusion via Unsafe Default (HS256) Allows Token Forgery and Auth Bypass",
+          "url": "https://github.com/advisories/GHSA-f67f-6cw9-8mq4",
+          "severity": "high",
+          "cwe": [
+            "CWE-347"
+          ],
+          "cvss": {
+            "score": 8.2,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:H/A:N"
+          },
+          "range": "<4.11.4"
+        },
+        {
+          "source": 1112644,
+          "name": "hono",
+          "dependency": "hono",
+          "title": "Hono vulnerable to XSS through ErrorBoundary component ",
+          "url": "https://github.com/advisories/GHSA-9r54-q6cx-xmh5",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-79"
+          ],
+          "cvss": {
+            "score": 4.7,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:R/S:C/C:L/I:L/A:N"
+          },
+          "range": "<4.11.7"
+        },
+        {
+          "source": 1112677,
+          "name": "hono",
+          "dependency": "hono",
+          "title": "Hono cache middleware ignores \"Cache-Control: private\" leading to Web Cache Deception",
+          "url": "https://github.com/advisories/GHSA-6wqw-2p9w-4vw4",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-524",
+            "CWE-613"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N"
+          },
+          "range": "<4.11.7"
+        },
+        {
+          "source": 1112678,
+          "name": "hono",
+          "dependency": "hono",
+          "title": "Hono IPv4 address validation bypass in IP Restriction Middleware allows IP spoofing",
+          "url": "https://github.com/advisories/GHSA-r354-f388-2fhh",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-185"
+          ],
+          "cvss": {
+            "score": 4.8,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:L/A:N"
+          },
+          "range": "<4.11.7"
+        },
+        {
+          "source": 1112911,
+          "name": "hono",
+          "dependency": "hono",
+          "title": "Hono has an Arbitrary Key Read in Serve static Middleware (Cloudflare Workers Adapter)",
+          "url": "https://github.com/advisories/GHSA-w332-q679-j88p",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-200",
+            "CWE-284",
+            "CWE-668"
+          ],
+          "cvss": {
+            "score": 5.3,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:L/I:N/A:N"
+          },
+          "range": "<4.11.7"
+        },
+        {
+          "source": 1113311,
+          "name": "hono",
+          "dependency": "hono",
+          "title": "Hono added timing comparison hardening in basicAuth and bearerAuth",
+          "url": "https://github.com/advisories/GHSA-gq3j-xvxp-8hrf",
+          "severity": "low",
+          "cwe": [
+            "CWE-208"
+          ],
+          "cvss": {
+            "score": 3.7,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:L/I:N/A:N"
+          },
+          "range": "<4.11.10"
+        }
+      ],
+      "effects": [],
+      "range": "<=4.11.9",
+      "nodes": [
+        "node_modules/hono"
+      ],
+      "fixAvailable": true
+    },
+    "lodash": {
+      "name": "lodash",
+      "severity": "moderate",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1112455,
+          "name": "lodash",
+          "dependency": "lodash",
+          "title": "Lodash has Prototype Pollution Vulnerability in `_.unset` and `_.omit` functions",
+          "url": "https://github.com/advisories/GHSA-xxjr-mmjv-4gpg",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-1321"
+          ],
+          "cvss": {
+            "score": 6.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:L/A:L"
+          },
+          "range": ">=4.0.0 <=4.17.22"
+        }
+      ],
+      "effects": [],
+      "range": "4.0.0 - 4.17.21",
+      "nodes": [
+        "node_modules/lodash"
+      ],
+      "fixAvailable": true
+    },
+    "minimatch": {
+      "name": "minimatch",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1113371,
+          "name": "minimatch",
+          "dependency": "minimatch",
+          "title": "minimatch has a ReDoS via repeated wildcards with non-matching literal in pattern",
+          "url": "https://github.com/advisories/GHSA-3ppc-4f35-3m26",
+          "severity": "high",
+          "cwe": [
+            "CWE-1333"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": "<10.2.1"
+        }
+      ],
+      "effects": [
+        "@eslint/config-array",
+        "@eslint/eslintrc",
+        "@typescript-eslint/typescript-estree",
+        "eslint",
+        "eslint-plugin-import",
+        "eslint-plugin-jsx-a11y",
+        "eslint-plugin-react"
+      ],
+      "range": "<10.2.1",
+      "nodes": [
+        "node_modules/@typescript-eslint/typescript-estree/node_modules/minimatch",
+        "node_modules/minimatch"
+      ],
+      "fixAvailable": {
+        "name": "@eslint/eslintrc",
+        "version": "0.1.0",
+        "isSemVerMajor": true
+      }
+    },
+    "next": {
+      "name": "next",
+      "severity": "high",
+      "isDirect": true,
+      "via": [
+        {
+          "source": 1112592,
+          "name": "next",
+          "dependency": "next",
+          "title": "Next.js self-hosted applications vulnerable to DoS via Image Optimizer remotePatterns configuration",
+          "url": "https://github.com/advisories/GHSA-9g9p-9gw9-jx7f",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-400",
+            "CWE-770"
+          ],
+          "cvss": {
+            "score": 5.9,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": ">=15.6.0-canary.0 <16.1.5"
+        },
+        {
+          "source": 1112645,
+          "name": "next",
+          "dependency": "next",
+          "title": "Next.js HTTP request deserialization can lead to DoS when using insecure React Server Components",
+          "url": "https://github.com/advisories/GHSA-h25m-26qc-wcjf",
+          "severity": "high",
+          "cwe": [
+            "CWE-400",
+            "CWE-502"
+          ],
+          "cvss": {
+            "score": 7.5,
+            "vectorString": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": ">=16.1.0-canary.0 <16.1.5"
+        },
+        {
+          "source": 1112990,
+          "name": "next",
+          "dependency": "next",
+          "title": "Next.js has Unbounded Memory Consumption via PPR Resume Endpoint ",
+          "url": "https://github.com/advisories/GHSA-5f7q-jpqc-wp7h",
+          "severity": "moderate",
+          "cwe": [
+            "CWE-400",
+            "CWE-409",
+            "CWE-770"
+          ],
+          "cvss": {
+            "score": 5.9,
+            "vectorString": "CVSS:3.1/AV:N/AC:H/PR:N/UI:N/S:U/C:N/I:N/A:H"
+          },
+          "range": ">=16.0.0-beta.0 <16.1.5"
+        }
+      ],
+      "effects": [],
+      "range": "15.6.0-canary.0 - 16.1.4",
+      "nodes": [
+        "node_modules/next"
+      ],
+      "fixAvailable": {
+        "name": "next",
+        "version": "16.1.6",
+        "isSemVerMajor": false
+      }
+    },
+    "preact": {
+      "name": "preact",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        {
+          "source": 1111982,
+          "name": "preact",
+          "dependency": "preact",
+          "title": "Preact has JSON VNode Injection issue",
+          "url": "https://github.com/advisories/GHSA-36hm-qxxp-pg3m",
+          "severity": "high",
+          "cwe": [
+            "CWE-843"
+          ],
+          "cvss": {
+            "score": 0,
+            "vectorString": null
+          },
+          "range": ">=10.28.0 <10.28.2"
+        }
+      ],
+      "effects": [],
+      "range": "10.28.0 - 10.28.1",
+      "nodes": [
+        "node_modules/preact"
+      ],
+      "fixAvailable": true
+    },
+    "typescript-eslint": {
+      "name": "typescript-eslint",
+      "severity": "high",
+      "isDirect": false,
+      "via": [
+        "@typescript-eslint/eslint-plugin",
+        "@typescript-eslint/parser",
+        "@typescript-eslint/typescript-estree",
+        "@typescript-eslint/utils",
+        "eslint"
+      ],
+      "effects": [],
+      "range": "<=8.56.1-alpha.2",
+      "nodes": [
+        "node_modules/typescript-eslint"
+      ],
+      "fixAvailable": true
+    }
+  },
+  "metadata": {
+    "vulnerabilities": {
+      "info": 0,
+      "low": 0,
+      "moderate": 3,
+      "high": 19,
+      "critical": 0,
+      "total": 22
+    },
+    "dependencies": {
+      "prod": 807,
+      "dev": 326,
+      "optional": 82,
+      "peer": 2,
+      "peerOptional": 0,
+      "total": 1170
+    }
+  }
+}
