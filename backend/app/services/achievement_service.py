@@ -11,8 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.domains.blockchain.nft.chain_registry import DEFAULT_BADGE_CHAIN_ID, get_chain_config
 from app.domains.blockchain.nft.nft_client_factory import NFTClientFactory
-from app.models import BadgeTemplate, User, UserBadge
-from app.domains.mental_health.models import JournalEntry, PlayerWellnessState
+from app.models import BadgeTemplate, PendingBadgeGrant, User, UserBadge
+from app.domains.mental_health.models import Conversation, JournalEntry, PlayerWellnessState
 from app.schemas.user import EarnedBadgeInfo
 
 logger = logging.getLogger(__name__)
@@ -49,6 +49,10 @@ class BadgeRule:
     min_activity_days: int | None = None
     min_streak: int | None = None
     min_journal_count: int | None = None
+    # Badge 7: longest single journal entry must reach this word count
+    min_word_count: int | None = None
+    # Badge 8: highest number of exchanges in any single conversation session
+    min_chat_session_messages: int | None = None
 
 
 DEFAULT_BADGE_RULES: tuple[BadgeRule, ...] = (
@@ -88,6 +92,19 @@ DEFAULT_BADGE_RULES: tuple[BadgeRule, ...] = (
         trigger_actions={"manual_sync", "journal_saved"},
         min_journal_count=25,
     ),
+    BadgeRule(
+        badge_id=UNLEASH_THE_WORDS_BADGE_ID,
+        reason="Journal entry longer than 500 words",
+        trigger_actions={"manual_sync", "journal_saved"},
+        min_word_count=500,
+    ),
+    BadgeRule(
+        badge_id=BESTIES_BADGE_ID,
+        reason="100 messages in a single chat session",
+        # No real-time chat trigger exists yet; manual_sync provides the catch-up path.
+        trigger_actions={"manual_sync"},
+        min_chat_session_messages=100,
+    ),
 )
 
 
@@ -96,6 +113,10 @@ class AchievementMetrics:
     current_streak: int
     journal_count: int
     total_activity_days: int
+    # Highest word count across any single journal entry (for badge 7)
+    max_entry_word_count: int
+    # Highest exchange count in any single conversation session (for badge 8)
+    max_chat_session_messages: int
 
 
 async def _load_achievement_metrics(db: AsyncSession, user: User) -> AchievementMetrics:
@@ -122,10 +143,35 @@ async def _load_achievement_metrics(db: AsyncSession, user: User) -> Achievement
     ).scalar() or 0
     current_streak = max(current_streak, int(wellness_streak or 0))
 
+    # Max word count across any single journal entry (badge 7 criterion)
+    max_entry_word_count = (
+        await db.execute(
+            select(func.coalesce(func.max(JournalEntry.word_count), 0)).filter(
+                JournalEntry.user_id == user.id
+            )
+        )
+    ).scalar() or 0
+
+    # Max exchanges in any single conversation session (badge 8 criterion).
+    # Each Conversation row represents one user-assistant exchange, grouped by session_id.
+    session_counts_sq = (
+        select(func.count(Conversation.id).label("msg_count"))
+        .filter(Conversation.user_id == user.id)
+        .group_by(Conversation.session_id)
+        .subquery()
+    )
+    max_chat_session_messages = (
+        await db.execute(
+            select(func.coalesce(func.max(session_counts_sq.c.msg_count), 0))
+        )
+    ).scalar() or 0
+
     return AchievementMetrics(
         current_streak=current_streak,
         journal_count=int(journal_count),
         total_activity_days=int(total_activity_days),
+        max_entry_word_count=int(max_entry_word_count),
+        max_chat_session_messages=int(max_chat_session_messages),
     )
 
 
@@ -135,6 +181,10 @@ def _qualifies(rule: BadgeRule, metrics: AchievementMetrics) -> bool:
     if rule.min_streak is not None and metrics.current_streak < rule.min_streak:
         return False
     if rule.min_journal_count is not None and metrics.journal_count < rule.min_journal_count:
+        return False
+    if rule.min_word_count is not None and metrics.max_entry_word_count < rule.min_word_count:
+        return False
+    if rule.min_chat_session_messages is not None and metrics.max_chat_session_messages < rule.min_chat_session_messages:
         return False
     return True
 
@@ -160,6 +210,17 @@ def _criteria_qualifies(criteria: Dict[str, Any], metrics: AchievementMetrics) -
     if min_streak is not None and metrics.current_streak < min_streak:
         return False
     if min_journal_count is not None and metrics.journal_count < min_journal_count:
+        return False
+
+    # Admin templates can also specify word-count or chat-session thresholds
+    min_word_count_raw = criteria.get("min_word_count")
+    min_chat_session_messages_raw = criteria.get("min_chat_session_messages")
+    min_word_count = int(min_word_count_raw) if min_word_count_raw is not None else None
+    min_chat_session_messages = int(min_chat_session_messages_raw) if min_chat_session_messages_raw is not None else None
+
+    if min_word_count is not None and metrics.max_entry_word_count < min_word_count:
+        return False
+    if min_chat_session_messages is not None and metrics.max_chat_session_messages < min_chat_session_messages:
         return False
 
     return True
@@ -213,6 +274,8 @@ async def trigger_achievement_check(
 
     factory = NFTClientFactory()
     badges_to_add_to_db: List[Dict[str, Any]] = []
+    # Collects pending grants for wallet-less users (written in same commit batch)
+    pending_grants_to_add: List[Dict[str, Any]] = []
 
     async def attempt_mint(
         *,
@@ -222,10 +285,15 @@ async def trigger_achievement_check(
         """Mint badge on all chains in DUAL_MINT_CHAIN_IDS. Saves successful mints to badges_to_add_to_db."""
         if not user.wallet_address:
             logger.info(
-                "User %s qualifies for badge %s (%s) but has no linked wallet",
+                "User %s qualifies for badge %s (%s) but has no linked wallet — recording pending grant",
                 user.id,
                 badge_id,
                 reason,
+            )
+            # Store eligibility so the badge can be minted retroactively once
+            # the user links their wallet via /api/v1/link-did.
+            pending_grants_to_add.append(
+                {"badge_id": badge_id, "reason": reason, "action": action}
             )
             return
 
@@ -342,7 +410,7 @@ async def trigger_achievement_check(
                 exc,
             )
 
-    if not badges_to_add_to_db:
+    if not badges_to_add_to_db and not pending_grants_to_add:
         return []
 
     current_time = datetime.now()
@@ -363,6 +431,20 @@ async def trigger_achievement_check(
                 awarded_at=current_time,
                 transaction_hash=badge_info["tx_hash"],
                 contract_address=badge_info["contract_address"],
+            )
+        )
+
+    # Persist pending grants so they survive until the user links a wallet.
+    # ON CONFLICT DO NOTHING semantics: if a record already exists (user already
+    # qualified before), the IntegrityError is caught below and we roll back cleanly.
+    for grant_info in pending_grants_to_add:
+        db.add(
+            PendingBadgeGrant(
+                user_id=user.id,
+                badge_id=grant_info["badge_id"],
+                reason=grant_info["reason"],
+                action_context=grant_info.get("action"),
+                qualified_at=current_time,
             )
         )
 
@@ -401,3 +483,103 @@ async def sync_user_achievements(
         action="manual_sync",
         fail_on_config_error=fail_on_config_error,
     )
+
+
+async def drain_pending_grants(db: AsyncSession, user: User) -> List[EarnedBadgeInfo]:
+    """Retroactively mint all pending badge grants for a user who just linked their wallet.
+
+    Called immediately after a successful wallet linkage so that any eligibility
+    recorded while the user had no wallet is honoured without requiring manual sync.
+    """
+    if not user.wallet_address:
+        return []
+
+    grants_result = await db.execute(
+        select(PendingBadgeGrant).where(PendingBadgeGrant.user_id == user.id)
+    )
+    grants = grants_result.scalars().all()
+
+    if not grants:
+        return []
+
+    factory = NFTClientFactory()
+    awarded_badges_res = await db.execute(
+        select(UserBadge.badge_id, UserBadge.chain_id).filter(UserBadge.user_id == user.id)
+    )
+    awarded_badges: Set[tuple[int, int]] = {(int(r[0]), int(r[1])) for r in awarded_badges_res.all()}
+
+    minted: List[EarnedBadgeInfo] = []
+    now = datetime.now()
+
+    for grant in grants:
+        succeeded_on_any_chain = False
+        for chain_id in DUAL_MINT_CHAIN_IDS:
+            cfg = get_chain_config(chain_id)
+            if not cfg or not cfg.contract_address:
+                continue
+
+            badge_key = (grant.badge_id, chain_id)
+            if badge_key in awarded_badges:
+                succeeded_on_any_chain = True
+                continue
+
+            try:
+                tx_hash = await factory.mint_badge(chain_id, user.wallet_address, grant.badge_id)
+                if tx_hash:
+                    awarded_badges.add(badge_key)
+                    db.add(
+                        UserBadge(
+                            user_id=user.id,
+                            badge_id=grant.badge_id,
+                            chain_id=chain_id,
+                            contract_address=cfg.contract_address,
+                            transaction_hash=tx_hash,
+                            awarded_at=now,
+                        )
+                    )
+                    minted.append(
+                        EarnedBadgeInfo(
+                            badge_id=grant.badge_id,
+                            awarded_at=now,
+                            transaction_hash=tx_hash,
+                            contract_address=cfg.contract_address,
+                        )
+                    )
+                    succeeded_on_any_chain = True
+                    logger.info(
+                        "Drained pending grant: badge %s minted on chain %s for user %s",
+                        grant.badge_id,
+                        chain_id,
+                        user.id,
+                    )
+            except Exception as exc:
+                logger.warning(
+                    "Failed to drain pending grant badge %s on chain %s for user %s: %s",
+                    grant.badge_id,
+                    chain_id,
+                    user.id,
+                    exc,
+                )
+
+        # Delete the pending row only when at least one chain succeeded (or was already minted).
+        if succeeded_on_any_chain:
+            await db.delete(grant)
+
+    try:
+        await db.commit()
+    except IntegrityError:
+        await db.rollback()
+        logger.warning(
+            "Integrity error during pending grant drain for user %s — badges may already exist.",
+            user.id,
+        )
+    except Exception:
+        await db.rollback()
+        raise
+
+    logger.info(
+        "Drained %s pending badge grants for user %s",
+        len(minted),
+        user.id,
+    )
+    return minted

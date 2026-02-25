@@ -42,7 +42,7 @@ from .user_activity import UserDailyActivity, UserEvent, RetentionCohortDaily
 from app.domains.finance.models import RevenueReport, RevenueApproval, ReportStatus
 
 # Social features
-from .social import Tweet, UserBadge
+from .social import Tweet, UserBadge, PendingBadgeGrant
 
 # EDU Chain badge templates (admin-managed)
 from .badges import BadgeTemplate, BadgeIssuance

@@ -75,6 +75,21 @@ class UserStatsService:
                 f"Current streak={current_streak}, Longest streak={longest_streak}, "
                 f"Sentiment={sentiment_score:.2f}"
             )
+
+            # Streak has been freshly written; evaluate streak-based badge rules now
+            # so users don't have to manually sync or complete a quest to receive them.
+            try:
+                from app.services.achievement_service import trigger_achievement_check  # local import avoids circular
+                await trigger_achievement_check(
+                    self.db,
+                    user,
+                    action="wellness_state_updated",
+                    fail_on_config_error=False,
+                )
+            except Exception as badge_exc:
+                logger.warning(
+                    "Badge check failed after stat refresh for user %s: %s", user.id, badge_exc
+                )
             
             return UserStatsResponse(
                 current_streak=current_streak,
