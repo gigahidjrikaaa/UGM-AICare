@@ -1,30 +1,34 @@
 """Unified Aika Orchestrator Graph - LangGraph with Aika as First Decision Node.
 
-This module implements the ideal architecture where Aika is the first LangGraph node
+This module implements the architecture where Aika is the first LangGraph node
 that intelligently decides whether specialized agents are needed.
 
-Architecture:
-    START → aika_decision_node → [needs_agents?]
-                                   ↓               ↓
-                              [YES: STA]      [NO: END]
-                                   ↓
-                            [Conditional: TCA/CMA]
-                                   ↓
-                                 END
+Real-time Graph Architecture:
+    START → aika_decision_node
+                 │
+                 ├─[high/critical]──► parallel_crisis (TCA ∥ CMA, async fan-out)
+                 │                          │
+                 ├─[moderate]──► execute_sca (TCA only)
+                 │                          │
+                 ├─[analytics]──► execute_ia  │
+                 │                    │       │
+                 └─[direct]──► END    └───────┴──► synthesize ──► END
 
-Enhanced with Conversational Intelligence Extraction (CIE):
-    - Parallel screening runs alongside normal conversation
-    - Seamlessly extracts mental health indicators
-    - Builds longitudinal screening profile
-    - Triggers proactive interventions when warranted
+Safety Triage Agent (STA) — Post-Conversation Background Task:
+    STA does NOT participate in the real-time graph. It runs separately:
+    - Automatically triggered via asyncio.create_task() when a conversation ends.
+    - Manually triggerable by counselors/admins via the trigger_conversation_analysis tool.
+    - Performs deep clinical analysis: risk trend, PHQ-9/GAD-7/DASS-21 screening,
+      psychologist report, and CMA referral recommendation.
+    - Results persisted to ConversationRiskAssessment and ScreeningProfile tables.
 
 Benefits:
-- Single unified LangGraph workflow
+- Single unified LangGraph workflow for real-time responses
 - Aika personality throughout
-- Smart conditional routing (only invoke agents when needed)
-- Covert mental health screening without explicit questions
-- Better execution tracking
-- Easier debugging
+- Parallel fan-out for crisis paths (TCA + CMA concurrently)
+- STA decoupled: richer post-hoc clinical reports without blocking the student
+- Covert longitudinal screening via background analysis
+- Better execution tracking and easier debugging
 """
 from __future__ import annotations
 
@@ -70,21 +74,58 @@ _CRISIS_KEYWORDS: tuple[str, ...] = (
     "ingin mati",
 )
 
-_SMALLTALK_EXACT: tuple[str, ...] = (
-    "hi",
-    "hello",
-    "halo",
-    "hai",
-    "hey",
-    "p",
-    "ping",
-    "ok",
-    "oke",
-    "thanks",
-    "thank you",
-    "makasih",
-    "terima kasih",
-)
+_SMALLTALK_EXACT: frozenset[str] = frozenset({
+    # English greetings / acks
+    "hi", "hello", "hey", "yo", "sup",
+    "ok", "okay", "okey", "okk", "alright", "sure", "yep", "nope", "noted",
+    "thanks", "thank you", "thx", "ty",
+    "bye", "bye bye", "see you", "good morning", "good night", "good afternoon",
+    "p", "ping",
+    # Indonesian greetings / acks
+    "halo", "hai", "hey",
+    "oke", "oke deh", "sip", "siap", "iya", "ya", "yap", "nggak", "nope",
+    "makasih", "terima kasih", "trims",
+    "baik", "baik baik",
+    "dadah", "sampai jumpa",
+    "selamat pagi", "selamat siang", "selamat sore", "selamat malam",
+    "selamat tidur",
+    # Filler / acknowledgment
+    "hmm", "hm", "oh", "oh oke", "oh okay", "oh baik", "ooh",
+})
+
+# Short-prefix + Aika-name variants (max 22 chars)
+_SMALLTALK_AIKA_PREFIX: frozenset[str] = frozenset({
+    "hi aika", "halo aika", "hai aika", "hello aika", "hey aika",
+    "thank you aika", "makasih ya", "terima kasih ya",
+    "oke aika", "ok aika", "sip aika", "noted aika", "bye aika",
+})
+
+# Maximum number of conversation *turns* (user+model pairs) to include in the
+# context window sent to Gemini on each non-crisis direct-response call.
+# Keeping this at 10 turns (20 messages) caps per-request input token cost for
+# long conversations while preserving enough recency for coherent replies.
+_MAX_HISTORY_TURNS: int = 10
+
+
+def _tool_iterations_for_intent(intent: str) -> int:
+    """Map routing intent to a tool-calling iteration budget.
+
+    Fewer iterations = fewer API round-trips.  The budget is chosen to be
+    just enough for each intent class:
+
+    - casual_chat      : 1 — single pass, no tool calls expected.
+    - information_inquiry: 2 — at most one tool look-up then a reply.
+    - appointment_scheduling: 4 — get counselors → slots → book → confirm.
+    - Everything else  : 3 — emotional support may call create_intervention_plan
+                             or get_user_profile once then respond.
+    """
+    if intent == "casual_chat":
+        return 1
+    if intent == "information_inquiry":
+        return 2
+    if intent == "appointment_scheduling":
+        return 4
+    return 3
 
 
 def _detect_crisis_keywords(text: str) -> list[str]:
@@ -93,20 +134,32 @@ def _detect_crisis_keywords(text: str) -> list[str]:
 
 
 def _is_smalltalk_message(text: str) -> bool:
+    """Return True when the message is a short social/ack phrase with no distress content.
+
+    Three tiers (cheapest first):
+    1. Exact match against _SMALLTALK_EXACT.
+    2. Short (<= 22 chars) match against _SMALLTALK_AIKA_PREFIX variants.
+    3. Regex: single-emoji, pure-punctuation, or very short repeated-char fillers.
+    """
     cleaned = re.sub(r"\s+", " ", (text or "").strip().lower())
     if not cleaned:
         return False
+    # Tier 1 — exact set lookup (O(1))
     if cleaned in _SMALLTALK_EXACT:
         return True
-    if len(cleaned) <= 18 and cleaned in {
-        "hi aika",
-        "halo aika",
-        "hai aika",
-        "hello aika",
-        "thank you aika",
-        "makasih ya",
-        "terima kasih ya",
-    }:
+    # Tier 2 — Aika-name prefix variants (max 22 chars)
+    if len(cleaned) <= 22 and cleaned in _SMALLTALK_AIKA_PREFIX:
+        return True
+    # Tier 3 — structural patterns that are never distress signals
+    # e.g. pure emoji, single punctuation, "hahaha", "wkwkwk"
+    if re.fullmatch(
+        r"[^\w\s]{1,4}"                   # pure punctuation / emoji surrogates
+        r"|[\U00010000-\U0010FFFF]{1,3}"   # actual emoji codepoints
+        r"|(ha){2,6}|(wk){2,6}|(heh)+"    # laughter fillers
+        r"|oh\s+(iya|okay|oke|i see|gitu)" # short realizations
+        r"|hmm+|hm+",
+        cleaned,
+    ):
         return True
     return False
 
@@ -314,11 +367,26 @@ async def aika_decision_node(
             )
         )
         
+        # Build a short tail-context block (last 4 turns = 8 messages) so the
+        # decision model can resolve references like "I still feel the same" or
+        # "but that's not what I meant" without seeing the full history.
+        _tail_msgs = (state.get("conversation_history") or [])[-8:]
+        if _tail_msgs:
+            _tail_lines = []
+            for _m in _tail_msgs:
+                _r = "User" if _m.get("role") == "user" else "Aika"
+                _c = (_m.get("content") or "")[:200]  # cap each turn at 200 chars
+                _tail_lines.append(f"  [{_r}]: {_c}")
+            _tail_context_block = "Recent conversation (last 4 turns):\n" + "\n".join(_tail_lines) + "\n"
+        else:
+            _tail_context_block = ""
+
         # Create specialized decision prompt
         decision_prompt = f"""
 Analyze this message and determine the next step.
 
 User Role: {user_role}
+{_tail_context_block}
 Message: {current_message}
 
 Decision Criteria:
@@ -336,14 +404,11 @@ FOR ADMINS:
   * Aggregated reports requiring specialized processing
   * Questions about system usage, user engagement, or mental health trends
 
-- NEEDS AGENTS (invoke STA for manual risk check):
-  * Explicit requests to analyze risk for a specific text or user.
-  * "Check if this message is risky: ..."
-  
-- NO AGENTS NEEDED:
+- NO AGENTS NEEDED (handle directly with tools):
   * Simple status checks ("is system healthy?")
   * General platform questions
   * Specific user lookups (Aika can use tools for this)
+  * Requests to analyze a specific conversation or student: use trigger_conversation_analysis tool directly
 
 FOR COUNSELORS:
 - NEEDS AGENTS (invoke CMA for case management):
@@ -354,23 +419,20 @@ FOR COUNSELORS:
   * Requests for population-level insights or trends
   * "How many students are stressed this week?"
 
-- NEEDS AGENTS (invoke STA for manual risk check):
-  * "Analyze the risk level of this student input..."
-  * "Is this text suicidal?"
-  
-- NO AGENTS NEEDED:
+- NO AGENTS NEEDED (handle directly with tools):
   * General clinical questions
   * Viewing patient data (Aika can use tools)
+  * Requests to analyse a conversation or run a risk assessment on a student:
+    use trigger_conversation_analysis tool directly
 
 Return JSON with:
 {{
   "intent": "string (MUST be one of: 'casual_chat', 'emotional_support', 'crisis_intervention', 'information_inquiry', 'appointment_scheduling', 'emergency_escalation', 'analytics_query')",
   "intent_confidence": float (0.0-1.0),
   "needs_agents": boolean,
-  "next_step": "string (MUST be one of: 'tca', 'cma', 'ia', 'sta', 'none')",
+  "next_step": "string (MUST be one of: 'tca', 'cma', 'ia', 'none')",
   "reasoning": "string explaining decision",
-  "suggested_response": "string (only if needs_agents=false, provide direct response)",
-  
+
   "immediate_risk": "none|low|moderate|high|critical",
   "crisis_keywords": ["list of crisis keywords found, empty if none"],
   "risk_reasoning": "Brief 1-sentence explanation of risk assessment",
@@ -430,11 +492,13 @@ want to die, mau mati, ingin mati, etc.
             {"role": "user", "content": decision_prompt}
         ]
         
+        # max_tokens is set to 512 — the decision JSON is typically <400 tokens;
+        # the previous 2048 limit was 5× over-provisioned and wasted output budget.
         response_text = await generate_gemini_response_with_fallback(
             history=decision_history,
             model=preferred_model,  # Use preferred model with fallback chain
             temperature=0.3,
-            max_tokens=2048,
+            max_tokens=512,
             system_prompt=system_instruction,
             json_mode=True,  # Force valid JSON output
             allow_retry_sleep=False,
@@ -562,6 +626,15 @@ want to die, mau mati, ingin mati, etc.
                     f"(keywords: {state['crisis_keywords_detected']}) "
                     f"- Auto-escalating to CMA"
                 )
+                # Set an immediate holding response so the user is not left in silence
+                # while the parallel TCA ∥ CMA pipeline runs (~3-8s). The
+                # synthesize_final_response node will overwrite this with the
+                # full agent-informed reply once both subgraphs complete.
+                if not state.get("aika_direct_response"):
+                    state["aika_direct_response"] = (
+                        "Aku dengar kamu, dan kamu tidak sendirian sekarang. "
+                        "Biarkan aku ambilkan dukungan untukmu sebentar ya."
+                    )
             elif state["immediate_risk_level"] == "moderate":
                 state["next_step"] = "tca"
                 state["needs_agents"] = True
@@ -600,14 +673,12 @@ want to die, mau mati, ingin mati, etc.
             state["autopilot_action_id"] = None
             state["autopilot_action_type"] = None
             state["autopilot_policy_decision"] = None
-            state["autopilot_requires_human_review"] = False
 
             autopilot_enabled = os.getenv("AUTOPILOT_ENABLED", "true").strip().lower() in {"1", "true", "yes", "on"}
             if autopilot_enabled:
                 try:
                     from app.domains.mental_health.models.autopilot_actions import (
                         AutopilotActionType,
-                        AutopilotPolicyDecision,
                     )
                     from app.domains.mental_health.services.autopilot_policy_engine import evaluate_action_policy
                     from app.domains.mental_health.services.autopilot_action_service import (
@@ -658,19 +729,16 @@ want to die, mau mati, ingin mati, etc.
                             db,
                             action_type=candidate_action_type,
                             risk_level=str(state.get("immediate_risk_level") or "none"),
-                            policy_decision=policy_result.decision,
                             idempotency_key=build_idempotency_key(idempotency_raw),
                             payload_json=action_payload,
-                            requires_human_review=policy_result.requires_human_review,
                             commit=True,
                         )
 
                         state["autopilot_action_id"] = action.id
                         state["autopilot_action_type"] = candidate_action_type.value
                         state["autopilot_policy_decision"] = policy_result.decision.value
-                        state["autopilot_requires_human_review"] = policy_result.requires_human_review
 
-                        if policy_result.decision == AutopilotPolicyDecision.deny:
+                        if policy_result.decision.value == "deny":
                             state["needs_agents"] = False
                             state["next_step"] = "none"
                             state["needs_cma_escalation"] = False
@@ -778,11 +846,25 @@ want to die, mau mati, ingin mati, etc.
                     temperature=0.7
                 )
                 
+                # Trim history to the most recent _MAX_HISTORY_TURNS turns
+                # (user+model pairs) before sending to Gemini.  This caps
+                # input token cost for long conversations while keeping enough
+                # recent context for coherent replies.
+                _recent_hist = (state.get("conversation_history") or [])[
+                    -(_MAX_HISTORY_TURNS * 2) :
+                ]
+
+                # Gate tool-calling iterations by intent so simple informational
+                # or casual turns don't burn unnecessary API round-trips.
+                _tool_iters = _tool_iterations_for_intent(
+                    state.get("intent") or "unknown"
+                )
+
                 # Generate response with potential tool usage (ReAct loop)
                 response_text, tool_calls = await generate_with_tools(
                     history=[
                         {"role": h.get("role", "user"), "content": h.get("content", "")}
-                        for h in state.get("conversation_history", [])
+                        for h in _recent_hist
                     ] + [
                         {"role": "user", "content": state.get("message", "")}
                     ],
@@ -791,7 +873,7 @@ want to die, mau mati, ingin mati, etc.
                     db=db,
                     user_id=state.get("user_id", 0),
                     user_role=normalized_role,
-                    max_tool_iterations=5,
+                    max_tool_iterations=_tool_iters,
                     execution_id=execution_id
                 )
                 
@@ -888,6 +970,13 @@ want to die, mau mati, ingin mati, etc.
                 "Boleh coba kirim pesan lagi dalam 1 menit? "
                 "Kalau kamu butuh bantuan darurat, jangan ragu hubungi Crisis Centre UGM."
             )
+            # Propagate directly so chat.py can read final_response without going through synthesize.
+            state["final_response"] = state["aika_direct_response"]
+            state["response_source"] = "aika_direct"
+            # Fallback metadata — used by the frontend to render a warning bubble.
+            state["is_fallback"] = True
+            state["fallback_type"] = "rate_limit"
+            state["retry_after_ms"] = 60_000  # Conservative 60 s cooldown
             state["agent_reasoning"] = f"System overloaded (Rate Limit), returning graceful fallback: {error_str}"
             
             if execution_id:
@@ -917,6 +1006,10 @@ want to die, mau mati, ingin mati, etc.
                 )
                 state["final_response"] = state["aika_direct_response"]
                 state["response_source"] = "aika_direct"
+                # Fallback metadata — frontend renders a warning bubble with a retry button.
+                state["is_fallback"] = True
+                state["fallback_type"] = "model_error"
+                state["retry_after_ms"] = 0  # No enforced cooldown for transient errors
             
             if execution_id:
                 execution_tracker.fail_node(execution_id, "aika::decision", str(e))
@@ -1176,6 +1269,112 @@ async def execute_sta_subgraph(
     return state
 
 
+# =============================================================================
+# NOTE: execute_sta_subgraph above is DEPRECATED in the live orchestrator graph.
+# STA now runs exclusively as a background post-conversation task via
+# trigger_sta_conversation_analysis_background(). It may also be invoked
+# manually by counselors/admins through the trigger_conversation_analysis tool.
+# =============================================================================
+
+
+@trace_agent("ParallelCrisis")
+async def parallel_crisis_node(
+    state: AikaOrchestratorState,
+    db: AsyncSession,
+) -> AikaOrchestratorState:
+    """Parallel crisis node - run TCA and CMA concurrently for high/critical risk.
+
+    Both subgraphs are independent at this point: CMA creates a case and notifies
+    a counselor, while TCA generates an immediate coping plan for the student.
+    Running them in parallel reduces end-to-end latency from:
+        TCA_time + CMA_time  →  max(TCA_time, CMA_time)
+
+    Args:
+        state: Current orchestrator state (immediate_risk_level must be high/critical).
+        db:    Database session shared across both subgraph calls.
+
+    Returns:
+        Updated state with merged TCA and CMA outputs.
+    """
+    import copy
+
+    execution_id = state.get("execution_id")
+    if execution_id:
+        execution_tracker.start_node(execution_id, "aika::parallel_crisis", "aika")
+
+    try:
+        logger.warning(
+            "🚨 Parallel Crisis: launching TCA ∥ CMA (risk=%s, keywords=%s)",
+            state.get("immediate_risk_level"),
+            state.get("crisis_keywords_detected"),
+        )
+
+        # Deep-copy state for each subgraph to prevent concurrent mutation.
+        tca_input = copy.deepcopy(cast(dict[str, Any], state))
+        cma_input = copy.deepcopy(cast(dict[str, Any], state))
+
+        tca_result, cma_result = await asyncio.gather(
+            execute_sca_subgraph(cast(AikaOrchestratorState, tca_input), db),
+            execute_sda_subgraph(cast(AikaOrchestratorState, cma_input), db),
+            return_exceptions=True,
+        )
+
+        # --- Merge TCA outputs (non-blocking: log failure and continue) ---
+        if isinstance(tca_result, Exception):
+            logger.error("TCA failed in parallel crisis path: %s", tca_result, exc_info=True)
+            state.setdefault("errors", []).append(f"TCA parallel failure: {tca_result}")
+        else:
+            tca_dict = cast(dict[str, Any], tca_result)
+            for key, val in tca_dict.items():
+                if key in ("agents_invoked", "execution_path", "errors"):
+                    continue
+                if val is not None:
+                    cast(dict[str, Any], state)[key] = val
+            state.setdefault("agents_invoked", []).extend(tca_dict.get("agents_invoked", []))
+
+        # --- Merge CMA outputs ---
+        if isinstance(cma_result, Exception):
+            logger.error("CMA failed in parallel crisis path: %s", cma_result, exc_info=True)
+            state.setdefault("errors", []).append(f"CMA parallel failure: {cma_result}")
+        else:
+            cma_dict = cast(dict[str, Any], cma_result)
+            for key, val in cma_dict.items():
+                if key in ("agents_invoked", "execution_path", "errors"):
+                    continue
+                if val is not None:
+                    cast(dict[str, Any], state)[key] = val
+            state.setdefault("agents_invoked", []).extend(cma_dict.get("agents_invoked", []))
+
+        state.setdefault("execution_path", []).append("parallel_crisis")
+
+        if execution_id:
+            execution_tracker.complete_node(
+                execution_id,
+                "aika::parallel_crisis",
+                metrics={
+                    "tca_success": not isinstance(tca_result, Exception),
+                    "cma_success": not isinstance(cma_result, Exception),
+                    "case_created": state.get("case_created", False),
+                    "plan_created": state.get("should_intervene", False),
+                },
+            )
+
+        logger.warning(
+            "✅ Parallel Crisis complete: case_created=%s, plan_created=%s",
+            state.get("case_created"),
+            state.get("should_intervene"),
+        )
+
+    except Exception as e:
+        error_msg = f"Parallel crisis node failed: {e}"
+        logger.error(error_msg, exc_info=True)
+        state.setdefault("errors", []).append(error_msg)
+        if execution_id:
+            execution_tracker.fail_node(execution_id, "aika::parallel_crisis", str(e))
+
+    return state
+
+
 @trace_agent("TCA_Subgraph")
 async def execute_sca_subgraph(
     state: AikaOrchestratorState,
@@ -1201,7 +1400,51 @@ async def execute_sca_subgraph(
         cast(dict[str, Any], state).update(sca_result)
         state.setdefault("agents_invoked", []).append("TCA")
         state.setdefault("execution_path", []).append("sca_subgraph")
-        
+
+        # ---------------------------------------------------------------------------
+        # Merge synthesize into TCA (moderate-path optimisation)
+        # ---------------------------------------------------------------------------
+        # synthesize_final_response short-circuits immediately when
+        # aika_direct_response is already set.  By composing a warm template
+        # response here we avoid that extra downstream LLM call for the TCA-only
+        # (moderate distress) path.
+        #
+        # We guard with `not state.get("aika_direct_response")` so that the
+        # high/critical crisis path — where aika_decision_node pre-sets a holding
+        # message — is not overwritten here.
+        if not state.get("aika_direct_response"):
+            plan_id = state.get("intervention_plan_id")
+            intent  = state.get("intent", "emotional_support")
+            plan_mention = (
+                "Aku sudah buatkan rencana dukungan yang disesuaikan buat kamu — "
+                "cek di sidebar ya! "
+                if plan_id
+                else ""
+            )
+
+            if state.get("should_intervene"):
+                direct = (
+                    f"Makasih banget udah mau cerita ke aku. "
+                    f"Aku dengerin dan peduli sama kamu. "
+                    f"{plan_mention}"
+                    f"Perasaanmu itu valid, dan kita bisa hadapin ini bareng. 💙"
+                )
+            elif intent == "appointment_scheduling":
+                direct = (
+                    "Aku di sini dan siap bantu. "
+                    "Kalau kamu mau lanjut cerita atau butuh dukungan lebih, bilang aja ya."
+                )
+            else:
+                direct = (
+                    "Aku dengar kamu. "
+                    "Perasaan itu wajar banget — kamu nggak harus hadapin ini sendiri. "
+                    "Cerita lebih kalau mau, aku di sini."
+                )
+
+            state["aika_direct_response"] = direct
+            state["final_response"] = direct
+            state["response_source"] = "agents"  # An agent (TCA) ran; synthesize is skipped.
+
         if execution_id:
             execution_tracker.complete_node(
                 execution_id,
@@ -1500,14 +1743,14 @@ def should_invoke_agents(state: AikaOrchestratorState) -> str:
         if execution_id:
             execution_tracker.trigger_edge(
                 execution_id,
-                "aika::decision->cma",
+                "aika::decision->parallel_crisis",
                 condition_result=True
             )
         logger.warning(
-            f"🚨 Routing after Aika: IMMEDIATE CMA ESCALATION "
-            f"(risk={state.get('immediate_risk_level')})"
+            "🚨 Routing after Aika: PARALLEL CRISIS (TCA ∥ CMA) risk=%s",
+            state.get("immediate_risk_level"),
         )
-        return "invoke_cma"
+        return "invoke_crisis_parallel"
     
     if next_step == "tca":
         if execution_id:
@@ -1529,16 +1772,6 @@ def should_invoke_agents(state: AikaOrchestratorState) -> str:
         logger.info(f"🔀 Routing after Aika: IA (Analytics)")
         return "invoke_ia"
 
-    if next_step == "sta":
-        if execution_id:
-            execution_tracker.trigger_edge(
-                execution_id,
-                "aika::decision->sta",
-                condition_result=True
-            )
-        logger.info(f"🔀 Routing after Aika: STA (Manual Invocation)")
-        return "invoke_sta"
-
     # Fallback: only route when a valid signal exists.
     # Avoid defaulting to TCA for ambiguous states (prevents over-triggering).
     if needs_agents:
@@ -1547,10 +1780,10 @@ def should_invoke_agents(state: AikaOrchestratorState) -> str:
             if execution_id:
                 execution_tracker.trigger_edge(
                     execution_id,
-                    "aika::decision->cma",
+                    "aika::decision->parallel_crisis",
                     condition_result=True
                 )
-            return "invoke_cma"
+            return "invoke_crisis_parallel"
 
         if immediate_risk == "moderate":
             if execution_id:
@@ -1637,22 +1870,10 @@ def should_route_to_sca(state: AikaOrchestratorState) -> str:
     return "synthesize"
 
 
-def should_route_to_sda_after_sca(state: AikaOrchestratorState) -> str:
-    """Conditional edge after TCA.
-    
-    Currently always routes to synthesize (TCA doesn't escalate to CMA).
-    Future: Could check if TCA detected escalation need.
-    """
-    execution_id = state.get("execution_id")
-    if execution_id:
-        execution_tracker.trigger_edge(
-            execution_id,
-            "aika::sca->synthesize",
-            condition_result=True
-        )
-    
-    logger.info("🔀 TCA routing: → Synthesize")
-    return "synthesize"
+# NOTE: should_route_to_sda_after_sca was removed — TCA (execute_sca) now has a
+# direct edge to synthesize. If TCA should ever escalate to CMA (e.g., severity
+# upgrade detected during plan generation), re-introduce this function and check
+# state.get("should_escalate_to_cma", False) set inside execute_sca_subgraph.
 
 
 # ============================================================================
@@ -1663,25 +1884,19 @@ def create_aika_unified_graph(db: AsyncSession) -> StateGraph:
     """Create unified Aika orchestrator graph.
     
     Graph Structure:
-        START → aika_decision_node → [needs_agents?]
-                                       ↓               ↓
-                                  [YES: STA]      [NO: END]
-                                       ↓
-                                  [Conditional: severity check]
-                                   ↓       ↓        ↓
-                              [High]  [Moderate]  [Low]
-                                ↓       ↓           ↓
-                              CMA     TCA      Synthesize
-                                ↓       ↓           ↓
-                            Synthesize Synthesize  END
-                                ↓       ↓
-                               END     END
-    
-    This is the ideal architecture combining:
-    - Aika's personality and intelligence (first node)
-    - LangGraph's deterministic routing
-    - Specialized agent subgraphs
-    - Smart conditional invocation
+        START → aika_decision_node
+                     │
+                     ├─[high/critical]──► parallel_crisis (TCA ∥ CMA async fan-out)
+                     │                          │
+                     ├─[moderate]──► execute_sca │
+                     │              (TCA only)  │
+                     ├─[analytics]─► execute_ia  │
+                     │                    │     │
+                     └─[direct]──► END    └─────┴─► synthesize ─► END
+
+    STA is NOT a node in this graph. It runs as a fire-and-forget background
+    task (trigger_sta_conversation_analysis_background) when a conversation ends,
+    and can be manually triggered via the trigger_conversation_analysis tool.
     
     Args:
         db: Database session for all subgraph operations
@@ -1696,9 +1911,10 @@ def create_aika_unified_graph(db: AsyncSession) -> StateGraph:
     # Add nodes - use functools.partial to bind db parameter to async functions
     # LangGraph will handle the async execution properly
     workflow.add_node("aika_decision", partial(aika_decision_node, db=db))
-    workflow.add_node("execute_sta", partial(execute_sta_subgraph, db=db))
+    workflow.add_node("parallel_crisis", partial(parallel_crisis_node, db=db))  # TCA ∥ CMA fan-out
     workflow.add_node("execute_sca", partial(execute_sca_subgraph, db=db))
-    workflow.add_node("execute_sda", partial(execute_sda_subgraph, db=db))
+    # execute_sda is intentionally not registered here. CMA is invoked exclusively
+    # through parallel_crisis_node (asyncio.gather fan-out with TCA).
     workflow.add_node("execute_ia", partial(execute_ia_subgraph, db=db))
     workflow.add_node("synthesize", partial(synthesize_final_response, db=db))
     
@@ -1710,37 +1926,19 @@ def create_aika_unified_graph(db: AsyncSession) -> StateGraph:
         "aika_decision",
         should_invoke_agents,
         {
-            "invoke_cma": "execute_sda",  # Direct to CMA
-            "invoke_tca": "execute_sca",  # Direct to TCA
-            "invoke_ia": "execute_ia",    # Direct to IA
-            "invoke_sta": "execute_sta",  # Manual STA invocation
-            "end": END
+            "invoke_crisis_parallel": "parallel_crisis",  # High/critical: TCA ∥ CMA fan-out
+            "invoke_tca": "execute_sca",                  # Moderate: TCA only
+            "invoke_ia": "execute_ia",                    # Analytics query
+            "end": END,
         }
     )
     
-    # Conditional routing after STA
-    workflow.add_conditional_edges(
-        "execute_sta",
-        should_route_to_sca,
-        {
-            "invoke_sca": "execute_sca",
-            "route_sda": "execute_sda",
-            "synthesize": "synthesize"
-        }
-    )
+    # TCA (moderate risk) flows directly to synthesize — no CMA escalation from TCA.
+    # Crisis escalation to CMA happens exclusively in parallel_crisis_node.
+    workflow.add_edge("execute_sca", "synthesize")
     
-    # Conditional routing after TCA
-    workflow.add_conditional_edges(
-        "execute_sca",
-        should_route_to_sda_after_sca,
-        {
-            "invoke_sda": "execute_sda",
-            "synthesize": "synthesize"
-        }
-    )
-    
-    # Terminal nodes → END
-    workflow.add_edge("execute_sda", "synthesize")
+    # Terminal nodes → synthesize → END
+    workflow.add_edge("parallel_crisis", "synthesize")
     workflow.add_edge("execute_ia", "synthesize")
     workflow.add_edge("synthesize", END)
     

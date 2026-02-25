@@ -57,6 +57,7 @@ _AIKA_ROLE_TOOL_ALLOWLISTS: Dict[str, Set[str]] = {
         "get_active_safety_cases",
         "get_risk_assessment_history",
         "get_escalation_protocol",
+        "trigger_conversation_analysis",  # Manual STA analysis on demand
     },
     "admin": {
         "get_conversation_stats",
@@ -65,6 +66,7 @@ _AIKA_ROLE_TOOL_ALLOWLISTS: Dict[str, Set[str]] = {
         "get_user_cases",
         "get_active_safety_cases",
         "get_crisis_resources",
+        "trigger_conversation_analysis",  # Manual STA analysis on demand
     },
 }
 

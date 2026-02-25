@@ -5,9 +5,11 @@ from datetime import datetime, timedelta
 import json
 
 from langgraph.graph import StateGraph, END
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from google.genai import types
+
+from app.models.user import User as AppUser
 
 from app.agents.graph_state import SDAState
 from app.agents.execution_tracker import execution_tracker
@@ -254,9 +256,20 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
         if not case_id:
             raise ValueError("No case_id found for assignment")
         
-        # Step 1: Query all available counsellors from psychologists table
-        counsellors_stmt = select(Psychologist).where(
-            Psychologist.is_available == True  # noqa: E712
+        # Step 1: Query all available counsellors from psychologists table.
+        # Guard: only include profiles whose linked User account is active with
+        # a counselor or admin role. Profiles without a linked user_id are kept
+        # to support legacy/standalone records — they should be rare in production.
+        counsellors_stmt = (
+            select(Psychologist)
+            .join(AppUser, AppUser.id == Psychologist.user_id, isouter=True)
+            .where(
+                Psychologist.is_available == True,  # noqa: E712
+                or_(
+                    Psychologist.user_id.is_(None),
+                    AppUser.role.in_(["counselor", "admin"]),
+                ),
+            )
         )
         counsellors_result = await db.execute(counsellors_stmt)
         counsellors = counsellors_result.scalars().all()
@@ -359,6 +372,85 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
                 "previous_assignee": None,
             },
         )
+
+        # Record an immutable audit trail for this system-driven assignment.
+        # AttestationRecord requires a human counselor_id, so the CMA tier uses
+        # ComplianceAuditLog (actor_id=None, actor_role="cma") for the DB layer
+        # and enqueues an AutopilotAction(publish_attestation) to anchor the
+        # assignment hash on-chain — providing full traceability without
+        # misattributing a system action to a human actor.
+        try:
+            from app.services.compliance_service import record_audit_event
+            from app.domains.mental_health.services.autopilot_action_service import (
+                enqueue_action,
+                hash_payload,
+                build_idempotency_key,
+            )
+            from app.domains.mental_health.models.autopilot_actions import (
+                AutopilotActionType,
+            )
+
+            severity_val = state.get("case_severity", "high")
+            att_payload: dict = {
+                "schema": "aicare.case.auto_assignment.v1",
+                "attestation_type": "case_auto_assignment",
+                "case_id": str(case_id),
+                "assigned_to": assigned_counsellor_id_str,
+                "assignment_id": str(assignment.id),
+                "severity": severity_val,
+                "user_hash": state.get("user_hash", ""),
+                "session_id": state.get("session_id"),
+                "assigned_at": datetime.now().isoformat(),
+                "assignment_reason": "auto_assigned_lowest_workload",
+                "workload_at_assignment": int(assigned_workload),
+                "agent": "cma",
+            }
+            payload_hash = hash_payload(att_payload)
+
+            att_action = await enqueue_action(
+                db,
+                action_type=AutopilotActionType.publish_attestation,
+                risk_level=severity_val,
+                idempotency_key=build_idempotency_key(
+                    f"cma-auto-assignment:{case_id}:{assignment.id}"
+                ),
+                payload_json={
+                    **att_payload,
+                    "payload_hash": f"0x{payload_hash}",
+                    "metadata_uri": "",
+                },
+                commit=False,
+            )
+
+            await record_audit_event(
+                db,
+                actor_id=None,
+                actor_role="cma",
+                action="cma.case_auto_assigned",
+                entity_type="case",
+                entity_id=str(case_id),
+                extra_data={
+                    "assignment_id": str(assignment.id),
+                    "assigned_to": assigned_counsellor_id_str,
+                    "severity": severity_val,
+                    "autopilot_action_id": int(att_action.id),
+                    "payload_hash": payload_hash,
+                },
+            )
+
+            state["assignment_attestation_action_id"] = int(att_action.id)
+            logger.info(
+                "CMA assignment audit + attestation action queued: action_id=%s, case=%s",
+                att_action.id,
+                case_id,
+            )
+        except Exception as att_err:
+            # Attestation pipeline failure must never block the core assignment.
+            logger.warning(
+                "Failed to queue CMA assignment attestation for case %s: %s",
+                case_id,
+                att_err,
+            )
 
         execution_path = state.get("execution_path", [])
         execution_path.append("auto_assign")

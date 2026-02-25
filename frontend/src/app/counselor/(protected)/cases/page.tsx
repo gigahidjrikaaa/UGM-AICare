@@ -70,11 +70,12 @@ interface CaseStatusUpdateResponse {
   case_id: string;
   status: string;
   message: string;
-  critical_case_attestation?: {
+  case_attestation?: {
     record_id: number;
     autopilot_action_id: number;
     schema: string;
     decision: 'accepted' | 'rejected';
+    severity: string;
   };
 }
 
@@ -228,10 +229,10 @@ export default function CounselorCasesPage() {
       await loadStats();
       toast.success(response.data.message || 'Case updated');
 
-      if (response.data.critical_case_attestation) {
-        const info = response.data.critical_case_attestation;
+      if (response.data.case_attestation) {
+        const info = response.data.case_attestation;
         setLastAttestationMessage(
-          `Critical-case attestation queued: decision=${info.decision}, action #${info.autopilot_action_id}`,
+          `Case attestation queued (${info.severity}): decision=${info.decision}, action #${info.autopilot_action_id}`,
         );
         await loadLatestAttestation(caseItem.id);
       }

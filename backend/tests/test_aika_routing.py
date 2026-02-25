@@ -6,7 +6,6 @@ from app.agents.aika_orchestrator_graph import (
     _is_smalltalk_message,
     _normalize_user_role,
     should_invoke_agents,
-    should_route_to_sca,
 )
 
 
@@ -45,10 +44,14 @@ def test_format_personal_memory_block_caps_at_20_and_strips() -> None:
 @pytest.mark.agents
 @pytest.mark.unit
 def test_should_invoke_agents_routes_by_next_step() -> None:
-    assert should_invoke_agents({"next_step": "cma", "needs_agents": True}) == "invoke_cma"
+    # High/critical risk: fan-out TCA ∥ CMA
+    assert should_invoke_agents({"next_step": "cma", "needs_agents": True}) == "invoke_crisis_parallel"
+    # Moderate risk: TCA only
     assert should_invoke_agents({"next_step": "tca", "needs_agents": True}) == "invoke_tca"
+    # Analytics
     assert should_invoke_agents({"next_step": "ia", "needs_agents": True}) == "invoke_ia"
-    assert should_invoke_agents({"next_step": "sta", "needs_agents": True}) == "invoke_sta"
+    # STA no longer routes synchronously — next_step="sta" falls through to end
+    assert should_invoke_agents({"next_step": "sta", "needs_agents": True}) == "end"
 
 
 @pytest.mark.agents
@@ -61,7 +64,8 @@ def test_should_invoke_agents_fallbacks_to_tca_when_needs_agents_true() -> None:
 @pytest.mark.unit
 def test_should_invoke_agents_fallback_uses_risk_context() -> None:
     assert should_invoke_agents({"needs_agents": True, "immediate_risk_level": "moderate"}) == "invoke_tca"
-    assert should_invoke_agents({"needs_agents": True, "immediate_risk_level": "high"}) == "invoke_cma"
+    # High/critical falls through to parallel crisis fan-out
+    assert should_invoke_agents({"needs_agents": True, "immediate_risk_level": "high"}) == "invoke_crisis_parallel"
 
 
 @pytest.mark.agents
@@ -82,15 +86,6 @@ def test_should_invoke_agents_fallback_uses_admin_analytics_context() -> None:
 @pytest.mark.unit
 def test_should_invoke_agents_ends_when_needs_agents_false() -> None:
     assert should_invoke_agents({"needs_agents": False}) == "end"
-
-
-@pytest.mark.agents
-@pytest.mark.unit
-def test_should_route_to_sca_routes_high_to_sda_and_tca_to_sca() -> None:
-    assert should_route_to_sca({"severity": "high"}) == "route_sda"
-    assert should_route_to_sca({"severity": "critical"}) == "route_sda"
-    assert should_route_to_sca({"severity": "moderate", "next_step": "tca"}) == "invoke_sca"
-    assert should_route_to_sca({"severity": "low"}) == "synthesize"
 
 
 @pytest.mark.agents

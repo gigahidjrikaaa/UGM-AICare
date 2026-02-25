@@ -6,7 +6,6 @@ import { AnimatePresence, motion } from "framer-motion";
 import { toast } from "react-hot-toast";
 import {
   FiActivity,
-  FiAlertTriangle,
   FiArrowLeft,
   FiAward,
   FiCheck,
@@ -36,7 +35,6 @@ const ACTION_TYPE_LABELS: Record<string, string> = {
 
 const POLICY_LABELS: Record<string, string> = {
   allow: "Auto-approved",
-  require_approval: "Human reviewed",
   deny: "Blocked",
 };
 
@@ -60,10 +58,6 @@ function statusStyle(status: string): ColorSet & { label: string } {
       return { label: "Confirmed", text: "text-emerald-300", bg: "bg-emerald-400/10", border: "border-emerald-400/30" };
     case "running":
       return { label: "Running", text: "text-blue-300", bg: "bg-blue-400/10", border: "border-blue-400/30" };
-    case "approved":
-      return { label: "Approved", text: "text-sky-300", bg: "bg-sky-400/10", border: "border-sky-400/30" };
-    case "awaiting_approval":
-      return { label: "Awaiting Review", text: "text-yellow-300", bg: "bg-yellow-400/10", border: "border-yellow-400/30" };
     case "queued":
       return { label: "Queued", text: "text-white/60", bg: "bg-white/5", border: "border-white/10" };
     case "failed":
@@ -79,8 +73,6 @@ function policyStyle(decision: string): ColorSet {
   switch (decision) {
     case "allow":
       return { text: "text-emerald-300", bg: "bg-emerald-400/10", border: "border-emerald-400/30" };
-    case "require_approval":
-      return { text: "text-yellow-300", bg: "bg-yellow-400/10", border: "border-yellow-400/30" };
     case "deny":
       return { text: "text-red-300", bg: "bg-red-400/10", border: "border-red-400/30" };
     default:
@@ -89,7 +81,7 @@ function policyStyle(decision: string): ColorSet {
 }
 
 function isPending(status: string): boolean {
-  return ["queued", "awaiting_approval", "approved", "running"].includes(status);
+  return ["queued", "running"].includes(status);
 }
 
 function isFailed(status: string): boolean {
@@ -113,7 +105,6 @@ function TimelineDot({ status }: { status: string }) {
   let Icon = FiClock;
   if (status === "confirmed") Icon = FiCheck;
   else if (isFailed(status)) Icon = FiX;
-  else if (status === "awaiting_approval") Icon = FiAlertTriangle;
 
   return (
     <div
@@ -280,7 +271,7 @@ function ProofInfoModal({ onClose }: { onClose: () => void }) {
             </div>
             <p className="text-sm leading-relaxed text-white/70">
               Every consequential action that Aika takes — creating an escalation case, minting a
-              badge, publishing an attestation — passes through a three-tier policy engine before
+              badge, publishing an attestation — passes through a policy engine before
               it executes. This page records the entire lifecycle of each action:
             </p>
             <ul className="mt-3 space-y-2 text-sm text-white/60">
@@ -289,12 +280,12 @@ function ProofInfoModal({ onClose }: { onClose: () => void }) {
                 <span><span className="text-white/80">Queued</span> — Aika decides an action is warranted and submits it.</span>
               </li>
               <li className="flex items-start gap-2">
-                <span className="mt-0.5 rounded-full border border-yellow-400/20 bg-yellow-400/5 px-1.5 py-px text-[10px] text-yellow-400 shrink-0">2</span>
-                <span><span className="text-white/80">Policy evaluated</span> — Low-risk actions auto-approve. Moderate risk waits for human review. High-risk is denied.</span>
+                <span className="mt-0.5 rounded-full border border-emerald-400/20 bg-emerald-400/5 px-1.5 py-px text-[10px] text-emerald-400 shrink-0">2</span>
+                <span><span className="text-white/80">Policy evaluated</span> — Actions are automatically allowed or denied based on action type and risk level.</span>
               </li>
               <li className="flex items-start gap-2">
                 <span className="mt-0.5 rounded-full border border-emerald-400/20 bg-emerald-400/5 px-1.5 py-px text-[10px] text-emerald-400 shrink-0">3</span>
-                <span><span className="text-white/80">Executed &amp; confirmed</span> — Approved actions run, and the transaction hash is stored permanently.</span>
+                <span><span className="text-white/80">Executed &amp; confirmed</span> — Allowed actions run, and the transaction hash is stored permanently.</span>
               </li>
             </ul>
             <p className="mt-3 text-sm text-white/50">

@@ -21,8 +21,6 @@ interface PolicyFormState {
   autopilot_enabled: boolean;
   onchain_placeholder: boolean;
   worker_interval_seconds: number;
-  require_approval_high_risk: boolean;
-  require_approval_critical_risk: boolean;
 }
 
 const ToggleRow = ({
@@ -92,9 +90,7 @@ export default function AdminAutopilotPolicyPage() {
     return (
       policy.autopilot_enabled !== form.autopilot_enabled ||
       policy.onchain_placeholder !== form.onchain_placeholder ||
-      policy.worker_interval_seconds !== form.worker_interval_seconds ||
-      policy.require_approval_high_risk !== form.require_approval_high_risk ||
-      policy.require_approval_critical_risk !== form.require_approval_critical_risk
+      policy.worker_interval_seconds !== form.worker_interval_seconds
     );
   }, [policy, form]);
 
@@ -110,8 +106,6 @@ export default function AdminAutopilotPolicyPage() {
         autopilot_enabled: form.autopilot_enabled,
         onchain_placeholder: form.onchain_placeholder,
         worker_interval_seconds: form.worker_interval_seconds,
-        require_approval_high_risk: form.require_approval_high_risk,
-        require_approval_critical_risk: form.require_approval_critical_risk,
       });
       setPolicy(updated);
       setForm({ ...updated });
@@ -151,8 +145,8 @@ export default function AdminAutopilotPolicyPage() {
         <h2 className="text-lg font-medium text-white">Flow and Decision Policy</h2>
         <ol className="mt-3 list-decimal space-y-2 pl-5 text-sm text-white/70">
           <li>Agent proposes an action with risk metadata.</li>
-          <li>Policy evaluates action type + risk to allow, require approval, or deny.</li>
-          <li>Queue executes approved actions; review-required actions wait for human decision.</li>
+          <li>Policy evaluates action type + risk to allow or deny.</li>
+          <li>Queue executes allowed actions; denied actions are recorded as failed.</li>
           <li>If on-chain placeholder is off, execution attempts real blockchain transactions.</li>
         </ol>
       </section>
@@ -178,20 +172,6 @@ export default function AdminAutopilotPolicyPage() {
               description="When enabled, on-chain actions are simulated using synthetic transaction hashes."
               checked={form.onchain_placeholder}
               onChange={(value) => updateForm("onchain_placeholder", value)}
-            />
-
-            <ToggleRow
-              label="Require Approval: High Risk Check-ins"
-              description="If enabled, high-risk check-in actions are blocked until manually approved."
-              checked={form.require_approval_high_risk}
-              onChange={(value) => updateForm("require_approval_high_risk", value)}
-            />
-
-            <ToggleRow
-              label="Require Approval: Critical Risk Check-ins"
-              description="If enabled, critical-risk check-in actions are blocked until manually approved."
-              checked={form.require_approval_critical_risk}
-              onChange={(value) => updateForm("require_approval_critical_risk", value)}
             />
 
             <div className="rounded-lg border border-white/10 bg-white/5 p-4">

@@ -125,6 +125,7 @@ export default function AikaEnhancedPage() {
     messages,
     inputValue,
     isLoading,
+    retryCooldownMs,
     activeAgents,
     currentThinking,
     thinkingTrace,
@@ -505,7 +506,7 @@ export default function AikaEnhancedPage() {
                     onInputChange={handleInputChange}
                     onSendMessage={handleSendMessage}
                     onStartModule={() => { }} // Disabled for now
-                    isLoading={isLoading}
+                    isLoading={isLoading || retryCooldownMs > 0}
                     currentMode="standard"
                     availableModules={[]}
                     isLiveTalkActive={false}

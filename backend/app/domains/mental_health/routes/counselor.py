@@ -19,7 +19,6 @@ from app.domains.blockchain.nft.chain_registry import get_chain_config
 from app.domains.mental_health.models.autopilot_actions import (
     AutopilotAction,
     AutopilotActionType,
-    AutopilotPolicyDecision,
 )
 from app.domains.mental_health.models import (
     Psychologist as CounselorProfile,
@@ -57,7 +56,6 @@ router = APIRouter(prefix="/counselor", tags=["Counselor"])
 class CounselorAgentDecisionItem(BaseModel):
     id: int
     action_type: str
-    policy_decision: str
     risk_level: str
     status: str
     created_at: datetime
@@ -68,10 +66,6 @@ class CounselorAgentDecisionItem(BaseModel):
     intent: Optional[str] = None
     next_step: Optional[str] = None
     agent_reasoning: Optional[str] = None
-
-    requires_human_review: bool
-    approved_by: Optional[int] = None
-    approval_notes: Optional[str] = None
 
     chain_id: Optional[int] = None
     tx_hash: Optional[str] = None
@@ -445,9 +439,6 @@ async def list_counselor_agent_decisions(
                 intent=_to_str(payload.get("intent")),
                 next_step=_to_str(payload.get("next_step")),
                 agent_reasoning=_to_str(payload.get("reasoning")),
-                requires_human_review=bool(row.requires_human_review),
-                approved_by=row.approved_by,
-                approval_notes=row.approval_notes,
                 chain_id=row.chain_id,
                 tx_hash=row.tx_hash,
                 explorer_tx_url=_build_explorer_url(row.chain_id, row.tx_hash),
@@ -1128,8 +1119,12 @@ async def update_my_case_status(
         )
         db.add(note)
 
-    critical_case_attestation: dict[str, Any] | None = None
-    if case.severity == CaseSeverityEnum.critical and decision_event in {'accepted', 'rejected'}:
+    # Attest counselor decisions for both critical AND high-severity cases.
+    # The schema version is v1 for both; the severity field distinguishes them.
+    case_attestation: dict[str, Any] | None = None
+    if case.severity in {CaseSeverityEnum.critical, CaseSeverityEnum.high} and decision_event in {'accepted', 'rejected'}:
+        severity_val = case.severity.value if hasattr(case.severity, "value") else str(case.severity)
+
         linked_user_id: int | None = None
         if case.session_id:
             linked_user_id = (
@@ -1145,13 +1140,13 @@ async def update_my_case_status(
         feedback_redacted = prelog_redact(note_text) if note_text else None
 
         attestation_context = {
-            "schema": "aicare.critical_case.decision.v1",
-            "attestation_type": "critical_case_decision",
+            "schema": "aicare.case.decision.v1",
+            "attestation_type": "case_decision",
             "decision": decision_event,
             "case_id": str(case.id),
             "status_before": old_status,
             "status_after": payload.status,
-            "severity": "critical",
+            "severity": severity_val,
             "session_id": case.session_id,
             "user_hash": case.user_hash,
             "user_id": linked_user_id,
@@ -1177,7 +1172,7 @@ async def update_my_case_status(
 
         action_payload = {
             "attestation_record_id": int(record.id),
-            "schema": "aicare.critical_case.decision.v1",
+            "schema": "aicare.case.decision.v1",
             "payload_hash": f"0x{payload_hash_hex}",
             "metadata_uri": "",
             "case_id": str(case.id),
@@ -1185,20 +1180,18 @@ async def update_my_case_status(
             "user_hash": case.user_hash,
             "user_id": linked_user_id,
             "decision": decision_event,
-            "anonymized_result": f"critical_case_{decision_event}",
+            "anonymized_result": f"case_{severity_val}_{decision_event}",
             "feedback_redacted": feedback_redacted,
         }
 
         action = await enqueue_action(
             db,
             action_type=AutopilotActionType.publish_attestation,
-            risk_level="critical",
-            policy_decision=AutopilotPolicyDecision.allow,
+            risk_level=severity_val,
             idempotency_key=build_idempotency_key(
-                f"critical-case-attestation:{case.id}:{old_status}:{payload.status}:{record.id}"
+                f"case-decision-attestation:{case.id}:{old_status}:{payload.status}:{record.id}"
             ),
             payload_json=action_payload,
-            requires_human_review=False,
             commit=False,
         )
 
@@ -1210,21 +1203,23 @@ async def update_my_case_status(
             db,
             actor_id=current_user.id,
             actor_role=current_user.role,
-            action="autopilot.critical_case_attestation_queued",
+            action="autopilot.case_attestation_queued",
             entity_type="case",
             entity_id=str(case.id),
             extra_data={
                 "attestation_record_id": int(record.id),
                 "autopilot_action_id": int(action.id),
                 "decision": decision_event,
+                "severity": severity_val,
             },
         )
 
-        critical_case_attestation = {
+        case_attestation = {
             "record_id": int(record.id),
             "autopilot_action_id": int(action.id),
-            "schema": "aicare.critical_case.decision.v1",
+            "schema": "aicare.case.decision.v1",
             "decision": decision_event,
+            "severity": severity_val,
         }
 
     await db.commit()
@@ -1235,8 +1230,8 @@ async def update_my_case_status(
         "status": case.status.value if hasattr(case.status, 'value') else str(case.status),
         "message": f"Status updated to {payload.status}",
     }
-    if critical_case_attestation is not None:
-        response_payload["critical_case_attestation"] = critical_case_attestation
+    if case_attestation is not None:
+        response_payload["case_attestation"] = case_attestation
     return response_payload
 
 

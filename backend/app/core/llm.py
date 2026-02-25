@@ -875,9 +875,6 @@ async def generate_gemini_content_with_fallback(
         if _is_model_open(current_model) and not all_models_open:
             logger.warning("Skipping model %s due to open circuit breaker", current_model)
             continue
-        if _is_model_open(current_model) and not all_models_open:
-            logger.warning("Skipping model %s due to open circuit breaker", current_model)
-            continue
         max_retries_per_model = max(3, len(GEMINI_API_KEYS))
 
         for retry_attempt in range(max_retries_per_model):
@@ -1034,16 +1031,28 @@ async def generate_gemini_response_with_fallback(
     
     # Build model list: requested model + fallback chain (deduplicated)
     models_to_try = [model] + [m for m in GEMINI_FALLBACK_CHAIN if m != model]
-    
+    # Pre-check: if ALL models have an open circuit breaker we still attempt them so
+    # the real API error propagates — silence would be worse than a loud failure.
+    all_models_breaker_open = all(_is_model_open(m) for m in models_to_try)
+
     last_error: Exception | None = None
     last_error_model: str | None = None
     last_error_key: tuple[int, str] | None = None
     last_error_retry_after_s: float | None = None
     for idx, current_model in enumerate(models_to_try):
+        # Skip models whose circuit breaker is currently open, unless every model in
+        # the chain is tripped — in that case we have no choice but to try anyway.
+        if _is_model_open(current_model) and not all_models_breaker_open:
+            logger.warning(
+                "⚡ Skipping model %s — circuit breaker open. Trying next fallback.",
+                current_model,
+            )
+            continue
+
         # Retry loop for the SAME model if we get a rate limit with a suggested delay
         # We'll try up to 3 times per model, OR enough times to cycle through all keys
         max_retries_per_model = max(3, len(GEMINI_API_KEYS))
-        
+
         for retry_attempt in range(max_retries_per_model):
             try:
                 logger.info(f"🔄 Attempting Gemini request with model: {current_model} (model_idx={idx}, retry={retry_attempt})")

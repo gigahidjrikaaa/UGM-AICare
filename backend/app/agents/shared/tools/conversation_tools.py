@@ -433,3 +433,181 @@ async def get_conversation_stats(
             "error": str(e),
             "user_id": user_id
         }
+
+
+# =============================================================================
+# STA MANUAL TRIGGER TOOL
+# =============================================================================
+
+@register_tool(
+    name="trigger_conversation_analysis",
+    description="""Manually trigger a full clinical analysis of a past conversation using the Safety Triage Agent (STA).
+
+\u2705 CALL WHEN (Counselor/Admin only):
+- Asked to analyse or assess a specific conversation: "analyze conversation #xyz", "run risk assessment on user X's last session"
+- Need deep clinical insights about a student's conversation: risk trend, symptoms, psychologist report
+- Want to check screening dimensions (PHQ-9/GAD-7/DASS-21 alignment) for a past session
+- Want to force-refresh an existing assessment with updated model
+
+Returns a structured clinical report including:
+- Overall risk level and trend (stable / escalating / de-escalating)
+- Detected mental health indicators (depression, anxiety, stress, sleep quality, social isolation, etc.)
+- Conversation summary and key themes for psychologist review
+- Recommendation on whether a Case Management (CMA) referral is warranted
+- Assessment record ID for dashboard reference
+""",
+    parameters={
+        "type": "object",
+        "properties": {
+            "conversation_id": {
+                "type": "string",
+                "description": "The conversation ID to analyse. Either this or user_id must be provided."
+            },
+            "user_id": {
+                "type": "integer",
+                "description": "Analyse the most recent conversation for this user ID. Used when conversation_id is unknown."
+            },
+            "force_refresh": {
+                "type": "boolean",
+                "description": "If true, re-analyses even if an assessment already exists. Default false.",
+                "default": False
+            }
+        },
+        "required": []
+    },
+    category="conversation",
+    requires_db=True,
+    requires_user_id=False,
+)
+async def trigger_conversation_analysis(
+    db: AsyncSession,
+    conversation_id: Optional[str] = None,
+    user_id: Optional[int] = None,
+    force_refresh: bool = False,
+    **kwargs,
+) -> Dict[str, Any]:
+    """Manually trigger STA conversation analysis and return the clinical report.
+
+    Fetches the conversation from the database, runs analyze_conversation_risk(),
+    persists the result, and returns a structured clinical summary.
+    """
+    try:
+        from app.agents.sta.conversation_analyzer import analyze_conversation_risk
+        from app.domains.mental_health.services.conversation_assessments import (
+            upsert_conversation_assessment,
+        )
+
+        if not conversation_id and not user_id:
+            return {
+                "success": False,
+                "error": "Provide at least one of: conversation_id or user_id.",
+            }
+
+        # Resolve conversation_id from user_id if not supplied directly.
+        resolved_conversation_id = conversation_id
+        if not resolved_conversation_id and user_id:
+            latest_query = (
+                select(Conversation.conversation_id)
+                .where(Conversation.user_id == user_id)
+                .order_by(desc(Conversation.timestamp))
+                .limit(1)
+            )
+            result = await db.execute(latest_query)
+            resolved_conversation_id = result.scalar_one_or_none()
+            if not resolved_conversation_id:
+                return {
+                    "success": False,
+                    "error": f"No conversations found for user {user_id}.",
+                }
+
+        # Fetch all turns for the conversation.
+        turns_query = (
+            select(Conversation)
+            .where(Conversation.conversation_id == resolved_conversation_id)
+            .order_by(Conversation.timestamp.asc())
+        )
+        turns_result = await db.execute(turns_query)
+        turns = turns_result.scalars().all()
+
+        if not turns:
+            return {
+                "success": False,
+                "error": f"No messages found for conversation {resolved_conversation_id}.",
+            }
+
+        # Reconstruct history in the format expected by analyze_conversation_risk.
+        # All turns except the last go into history; the last becomes current_message.
+        history: List[Dict[str, Any]] = []
+        for turn in turns[:-1]:
+            history.append({"role": "user", "content": turn.message or ""})
+            history.append({"role": "assistant", "content": turn.response or ""})
+
+        last_turn = turns[-1]
+        current_message = last_turn.message or ""
+        conversation_start = turns[0].timestamp.timestamp() if turns[0].timestamp else None
+
+        if not history and not current_message:
+            return {
+                "success": False,
+                "error": "Conversation has insufficient content for analysis.",
+            }
+
+        # Run STA deep analysis.
+        assessment = await analyze_conversation_risk(
+            conversation_history=history,
+            current_message=current_message,
+            user_context={},
+            conversation_start_time=conversation_start,
+        )
+
+        # Persist (or force-refresh) the assessment record.
+        resolved_user_id = user_id or (turns[0].user_id if turns else None)
+        assessment_record = await upsert_conversation_assessment(
+            db,
+            conversation_id=resolved_conversation_id,
+            session_id=turns[0].session_id if turns else None,
+            user_id=resolved_user_id,
+            assessment=assessment,
+            force_refresh=force_refresh,
+        )
+
+        logger.info(
+            "\u2705 Manual STA analysis complete for conversation=%s: risk=%s, trend=%s",
+            resolved_conversation_id,
+            assessment.overall_risk_level,
+            assessment.risk_trend,
+        )
+
+        # Build a compact screening summary from dimension scores.
+        screening_summary: Dict[str, Any] = {}
+        if assessment.screening:
+            for dim in (
+                "depression", "anxiety", "stress", "sleep",
+                "social", "academic", "self_worth", "substance", "crisis",
+            ):
+                dim_score = getattr(assessment.screening, dim, None)
+                if dim_score is not None:
+                    screening_summary[dim] = {
+                        "score": round(dim_score.score, 2),
+                        "is_protective": dim_score.is_protective,
+                        "evidence_count": len(dim_score.evidence),
+                    }
+
+        return {
+            "success": True,
+            "conversation_id": resolved_conversation_id,
+            "messages_analyzed": assessment.message_count_analyzed,
+            "overall_risk_level": assessment.overall_risk_level,
+            "risk_trend": assessment.risk_trend,
+            "crisis_detected": assessment.crisis_detected,
+            "conversation_summary": assessment.conversation_summary,
+            "reasoning": assessment.reasoning,
+            "should_invoke_cma": assessment.should_invoke_cma,
+            "duration_seconds": round(assessment.conversation_duration_seconds, 0),
+            "screening_dimensions": screening_summary,
+            "assessment_id": assessment_record.id if assessment_record else None,
+        }
+
+    except Exception as e:
+        logger.error("\u274c trigger_conversation_analysis failed: %s", e, exc_info=True)
+        return {"success": False, "error": str(e)}

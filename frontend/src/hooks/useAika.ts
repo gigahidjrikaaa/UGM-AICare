@@ -46,6 +46,12 @@ export interface AikaMetadata {
   llm_request_count?: number;
   llm_requests_by_model?: Record<string, number>;
   tools_used?: string[];
+
+  // Fallback signalling — present when the response was produced by an error-recovery branch.
+  is_fallback?: boolean;
+  fallback_type?: 'rate_limit' | 'model_error';
+  /** Suggested client-side cooldown in milliseconds before retrying. */
+  retry_after_ms?: number;
 }
 
 export interface AikaResponse {
@@ -53,6 +59,8 @@ export interface AikaResponse {
   response: string;
   metadata: AikaMetadata;
   error?: string;
+  /** True when the response came from an error-recovery branch (rate-limit or model error). */
+  isFallback?: boolean;
 }
 
 export interface AikaRequest {
@@ -290,6 +298,11 @@ export function useAika(options: UseAikaOptions = {}) {
                     llm_request_count: data.metadata.llm_request_count,
                     llm_requests_by_model: data.metadata.llm_requests_by_model,
                     tools_used: data.metadata.tools_used,
+
+                    // Fallback signalling — surfaced directly from the orchestrator state.
+                    is_fallback: data.metadata.is_fallback || false,
+                    fallback_type: data.metadata.fallback_type,
+                    retry_after_ms: data.metadata.retry_after_ms ?? 0,
                   };
                   setLastMetadata(finalMetadata);
                 }
@@ -316,6 +329,7 @@ export function useAika(options: UseAikaOptions = {}) {
         success: true,
         response: finalResponse,
         metadata: finalMetadata,
+        isFallback: finalMetadata.is_fallback === true,
       };
 
       // Handle risk detection

@@ -512,10 +512,7 @@ class AikaOrchestratorState(TypedDict, total=False):
     """Autopilot action type selected from intervention and risk context."""
 
     autopilot_policy_decision: Optional[str]
-    """Policy decision for autopilot action (e.g., approved, review_required, denied)."""
-
-    autopilot_requires_human_review: bool
-    """Whether autopilot policy requires human review before execution."""
+    """Policy decision for autopilot action (allow or deny)."""
 
     decision_event_id: Optional[int]
     """Database ID of recorded decision audit event for this message turn."""
@@ -531,6 +528,26 @@ class AikaOrchestratorState(TypedDict, total=False):
     
     response_source: Optional[Literal["aika_direct", "agents", "aika_react_tools"]]
     """Source of final response: 'aika_direct', 'agents', or 'aika_react_tools'."""
+
+    # ============================================================================
+    # FALLBACK / DEGRADED-MODE SIGNALLING
+    # ============================================================================
+    is_fallback: Optional[bool]
+    """True when the response was produced by an error-recovery branch (rate-limit or
+    model error), not by normal orchestration.  Used by the frontend to render the
+    message with a distinct warning style and offer a retry action."""
+
+    fallback_type: Optional[Literal["rate_limit", "model_error"]]
+    """Reason for the fallback.
+    
+    - ``rate_limit``: All Gemini API keys were exhausted (HTTP 429 / RESOURCE_EXHAUSTED).
+    - ``model_error``: An unexpected LLM or graph error occurred.
+    """
+
+    retry_after_ms: Optional[int]
+    """Suggested client-side cooldown before retrying, in milliseconds.  Derived from
+    the ``Retry-After`` header when available; defaults to 60 000 ms (60 s) for
+    rate-limit fallbacks and 0 for model errors."""
     
     # ============================================================================
     # METADATA & EXECUTION TRACKING

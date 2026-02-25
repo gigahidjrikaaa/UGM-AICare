@@ -12,7 +12,6 @@ from app.domains.mental_health.models.autopilot_actions import (
     AutopilotAction,
     AutopilotActionStatus,
     AutopilotActionType,
-    AutopilotPolicyDecision,
 )
 
 
@@ -91,10 +90,8 @@ async def enqueue_action(
     *,
     action_type: AutopilotActionType,
     risk_level: str,
-    policy_decision: AutopilotPolicyDecision,
     idempotency_key: str,
     payload_json: dict[str, Any],
-    requires_human_review: bool,
     commit: bool = True,
 ) -> AutopilotAction:
     existing = (
@@ -105,82 +102,15 @@ async def enqueue_action(
     if existing:
         return existing
 
-    status = AutopilotActionStatus.queued
-    error_message = None
-
-    if policy_decision == AutopilotPolicyDecision.require_approval:
-        status = AutopilotActionStatus.awaiting_approval
-    elif policy_decision == AutopilotPolicyDecision.deny:
-        status = AutopilotActionStatus.failed
-        error_message = "Denied by autopilot policy"
-
     action = AutopilotAction(
         action_type=action_type,
         risk_level=risk_level,
-        policy_decision=policy_decision,
-        status=status,
+        status=AutopilotActionStatus.queued,
         idempotency_key=idempotency_key,
         payload_hash=hash_payload(payload_json),
         payload_json=payload_json,
-        requires_human_review=requires_human_review,
-        error_message=error_message,
     )
     db.add(action)
-    await db.flush()
-    if commit:
-        await db.commit()
-        await db.refresh(action)
-    return action
-
-
-async def mark_awaiting_approval(
-    db: AsyncSession,
-    action: AutopilotAction,
-    *,
-    commit: bool = True,
-) -> AutopilotAction:
-    action.status = AutopilotActionStatus.awaiting_approval
-    await db.flush()
-    if commit:
-        await db.commit()
-        await db.refresh(action)
-    return action
-
-
-async def mark_approved(
-    db: AsyncSession,
-    action: AutopilotAction,
-    *,
-    approved_by: Optional[int],
-    approval_notes: Optional[str] = None,
-    commit: bool = True,
-) -> AutopilotAction:
-    action.status = AutopilotActionStatus.approved
-    action.requires_human_review = False
-    action.approved_by = approved_by
-    action.approval_notes = approval_notes
-    action.next_retry_at = None
-    action.error_message = None
-    await db.flush()
-    if commit:
-        await db.commit()
-        await db.refresh(action)
-    return action
-
-
-async def mark_rejected(
-    db: AsyncSession,
-    action: AutopilotAction,
-    *,
-    approved_by: Optional[int],
-    reason: str,
-    commit: bool = True,
-) -> AutopilotAction:
-    action.status = AutopilotActionStatus.failed
-    action.requires_human_review = True
-    action.approved_by = approved_by
-    action.approval_notes = reason
-    action.error_message = reason
     await db.flush()
     if commit:
         await db.commit()

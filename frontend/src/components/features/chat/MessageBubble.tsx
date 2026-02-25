@@ -8,13 +8,13 @@ import { cn } from '@/lib/utils';
 import Image from 'next/image';
 import { motion, Variants } from 'framer-motion';
 import { LoadingDots } from '@/components/ui/LoadingDots';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useLiveTalkStore } from '@/store/useLiveTalkStore';
 import { InterventionPlan } from './InterventionPlan';
 import { AppointmentCard } from './AppointmentCard';
 import { AgentActivityLog } from './AgentActivityLog';
 import { AikaThinkingCompact } from './AikaThinkingIndicator';
-import { Copy, Check, RotateCcw } from 'lucide-react';
+import { Copy, Check, RotateCcw, Clock } from 'lucide-react';
 
 import CounselorCard from "./CounselorCard";
 import TimeSlotCard from "./TimeSlotCard";
@@ -81,8 +81,21 @@ export function MessageBubble({
   const isError = message.isError;
   const isContinuation = message.isContinuation;
 
+  // Countdown for rate-limit fallbacks: counts down from retryAfterMs to 0.
+  const [countdownSecs, setCountdownSecs] = useState(
+    message.retryAfterMs ? Math.ceil(message.retryAfterMs / 1000) : 0
+  );
+  useEffect(() => {
+    if (countdownSecs <= 0) return;
+    const id = window.setTimeout(() => setCountdownSecs((s) => Math.max(0, s - 1)), 1000);
+    return () => window.clearTimeout(id);
+  }, [countdownSecs]);
+
   const canShowActions = !isUser && !isSystem && !message.isLoading && !message.isStreaming;
-  const canRegenerate = Boolean(retryText && onRegenerate && !isError);
+  // Allow the retry button on fallback error messages (retryAfterMs is present) as well as normal messages.
+  const canRegenerate = Boolean(
+    retryText && onRegenerate && (!isError || message.retryAfterMs !== undefined)
+  );
 
   const handleCopy = async () => {
     try {
@@ -182,53 +195,62 @@ export function MessageBubble({
       );
     }
     return (
-      <div className={cn(
-        // Enhanced prose styling for better readability
-        'prose prose-sm max-w-none',
-        // Paragraph spacing
-        'prose-p:my-1.5 prose-p:leading-relaxed',
-        // List styling - better spacing and bullets
-        'prose-ul:my-2 prose-ul:pl-4 prose-ul:space-y-1',
-        'prose-ol:my-2 prose-ol:pl-4 prose-ol:space-y-1',
-        'prose-li:my-0.5 prose-li:leading-relaxed',
-        // Headers styling
-        'prose-headings:font-semibold prose-headings:text-ugm-gold prose-headings:mt-3 prose-headings:mb-1.5',
-        'prose-h1:text-base prose-h2:text-sm prose-h3:text-sm',
-        // Strong/Bold styling
-        'prose-strong:text-ugm-gold prose-strong:font-semibold',
-        // Code/Pre styling
-        'prose-code:text-ugm-gold/90 prose-code:bg-white/5 prose-code:px-1 prose-code:rounded prose-code:text-xs',
-        // Blockquote styling
-        'prose-blockquote:border-l-2 prose-blockquote:border-ugm-gold/50 prose-blockquote:pl-3 prose-blockquote:italic prose-blockquote:text-white/70',
-        // Text colors
-        isUser ? 'prose-invert' : isError ? 'text-red-200' : 'text-white/90',
-        // Link styling
-        'prose-a:font-medium prose-a:transition-colors prose-a:underline prose-a:underline-offset-2',
-        isUser ? 'prose-a:text-ugm-gold hover:prose-a:text-ugm-gold/80' : 'prose-a:text-ugm-gold hover:prose-a:text-ugm-gold/80'
-      )}>
-        <ReactMarkdown
-          components={{
-            a: ({ ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" className="break-all" />,
-            // Enhanced heading rendering
-            h1: ({ children, ...props }) => <h2 {...props} className="text-base font-semibold text-ugm-gold mt-3 mb-1.5">{children}</h2>,
-            h2: ({ children, ...props }) => <h3 {...props} className="text-sm font-semibold text-ugm-gold mt-2.5 mb-1">{children}</h3>,
-            h3: ({ children, ...props }) => <h4 {...props} className="text-sm font-medium text-ugm-gold/90 mt-2 mb-1">{children}</h4>,
-            // Better list rendering
-            ul: ({ children, ...props }) => <ul {...props} className="my-2 pl-4 space-y-1 list-disc marker:text-ugm-gold/60">{children}</ul>,
-            ol: ({ children, ...props }) => <ol {...props} className="my-2 pl-4 space-y-1 list-decimal marker:text-ugm-gold/60">{children}</ol>,
-            li: ({ children, ...props }) => <li {...props} className="my-0.5 leading-relaxed">{children}</li>,
-            // Paragraph with proper spacing
-            p: ({ children, ...props }) => <p {...props} className="my-1.5 leading-relaxed">{children}</p>,
-            // Better strong/emphasis
-            strong: ({ children, ...props }) => <strong {...props} className="font-semibold text-ugm-gold">{children}</strong>,
-            em: ({ children, ...props }) => <em {...props} className="italic text-white/80">{children}</em>,
-            // Horizontal rule as section divider
-            hr: ({ ...props }) => <hr {...props} className="my-3 border-white/10" />,
-          }}
-        >
-          {message.content}
-        </ReactMarkdown>
-      </div>
+      <>
+        <div className={cn(
+          // Enhanced prose styling for better readability
+          'prose prose-sm max-w-none',
+          // Paragraph spacing
+          'prose-p:my-1.5 prose-p:leading-relaxed',
+          // List styling - better spacing and bullets
+          'prose-ul:my-2 prose-ul:pl-4 prose-ul:space-y-1',
+          'prose-ol:my-2 prose-ol:pl-4 prose-ol:space-y-1',
+          'prose-li:my-0.5 prose-li:leading-relaxed',
+          // Headers styling
+          'prose-headings:font-semibold prose-headings:text-ugm-gold prose-headings:mt-3 prose-headings:mb-1.5',
+          'prose-h1:text-base prose-h2:text-sm prose-h3:text-sm',
+          // Strong/Bold styling
+          'prose-strong:text-ugm-gold prose-strong:font-semibold',
+          // Code/Pre styling
+          'prose-code:text-ugm-gold/90 prose-code:bg-white/5 prose-code:px-1 prose-code:rounded prose-code:text-xs',
+          // Blockquote styling
+          'prose-blockquote:border-l-2 prose-blockquote:border-ugm-gold/50 prose-blockquote:pl-3 prose-blockquote:italic prose-blockquote:text-white/70',
+          // Text colors
+          isUser ? 'prose-invert' : isError ? 'text-red-200' : 'text-white/90',
+          // Link styling
+          'prose-a:font-medium prose-a:transition-colors prose-a:underline prose-a:underline-offset-2',
+          isUser ? 'prose-a:text-ugm-gold hover:prose-a:text-ugm-gold/80' : 'prose-a:text-ugm-gold hover:prose-a:text-ugm-gold/80'
+        )}>
+          <ReactMarkdown
+            components={{
+              a: ({ ...props }) => <a {...props} target="_blank" rel="noopener noreferrer" className="break-all" />,
+              // Enhanced heading rendering
+              h1: ({ children, ...props }) => <h2 {...props} className="text-base font-semibold text-ugm-gold mt-3 mb-1.5">{children}</h2>,
+              h2: ({ children, ...props }) => <h3 {...props} className="text-sm font-semibold text-ugm-gold mt-2.5 mb-1">{children}</h3>,
+              h3: ({ children, ...props }) => <h4 {...props} className="text-sm font-medium text-ugm-gold/90 mt-2 mb-1">{children}</h4>,
+              // Better list rendering
+              ul: ({ children, ...props }) => <ul {...props} className="my-2 pl-4 space-y-1 list-disc marker:text-ugm-gold/60">{children}</ul>,
+              ol: ({ children, ...props }) => <ol {...props} className="my-2 pl-4 space-y-1 list-decimal marker:text-ugm-gold/60">{children}</ol>,
+              li: ({ children, ...props }) => <li {...props} className="my-0.5 leading-relaxed">{children}</li>,
+              // Paragraph with proper spacing
+              p: ({ children, ...props }) => <p {...props} className="my-1.5 leading-relaxed">{children}</p>,
+              // Better strong/emphasis
+              strong: ({ children, ...props }) => <strong {...props} className="font-semibold text-ugm-gold">{children}</strong>,
+              em: ({ children, ...props }) => <em {...props} className="italic text-white/80">{children}</em>,
+              // Horizontal rule as section divider
+              hr: ({ ...props }) => <hr {...props} className="my-3 border-white/10" />,
+            }}
+          >
+            {message.content}
+          </ReactMarkdown>
+        </div>
+        {/* Countdown hint — only visible while the retry cooldown is active. */}
+        {isError && countdownSecs > 0 && (
+          <p className="mt-1 flex items-center gap-1 text-xs text-amber-300/80">
+            <Clock className="h-3 w-3 shrink-0" />
+            Coba lagi dalam {countdownSecs} detik...
+          </p>
+        )}
+      </>
     );
   };
 
@@ -263,9 +285,11 @@ export function MessageBubble({
           'px-3 py-2 rounded-2xl max-w-xs md:max-w-md lg:max-w-lg text-sm relative',
           isUser
             ? 'bg-ugm-blue text-white rounded-br-sm'
-            : isError 
-              ? 'bg-red-500/20 backdrop-blur-sm text-red-200 rounded-bl-sm border border-red-500/30'
-              : 'bg-white/10 backdrop-blur-sm text-white/90 border border-white/10',
+            : isError && message.fallbackType === 'rate_limit'
+              ? 'bg-amber-500/15 backdrop-blur-sm text-amber-200 rounded-bl-sm border border-amber-500/30'
+              : isError
+                ? 'bg-red-500/20 backdrop-blur-sm text-red-200 rounded-bl-sm border border-red-500/30'
+                : 'bg-white/10 backdrop-blur-sm text-white/90 border border-white/10',
           // Adjust rounding for continuation bubbles
           !isUser && isContinuation ? 'rounded-tl-lg rounded-bl-sm' : !isUser && 'rounded-bl-sm',
           message.isLoading && 'p-0 bg-white/10 backdrop-blur-sm w-35'

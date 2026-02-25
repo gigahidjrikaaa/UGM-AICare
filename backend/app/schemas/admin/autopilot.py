@@ -10,14 +10,10 @@ class AutopilotActionResponse(BaseModel):
     id: int
     action_type: str
     risk_level: str
-    policy_decision: str
     status: str
     idempotency_key: str
     payload_hash: str
     payload_json: dict[str, Any]
-    requires_human_review: bool
-    approved_by: Optional[int] = None
-    approval_notes: Optional[str] = None
     tx_hash: Optional[str] = None
     explorer_tx_url: Optional[str] = None
     chain_id: Optional[int] = None
@@ -32,12 +28,3 @@ class AutopilotActionResponse(BaseModel):
 class AutopilotActionListResponse(BaseModel):
     items: list[AutopilotActionResponse]
     total: int
-
-
-class AutopilotActionReviewRequest(BaseModel):
-    note: Optional[str] = None
-
-
-class AutopilotActionReviewResponse(BaseModel):
-    status: str
-    action_id: int

@@ -46,8 +46,19 @@ export function useAikaChat({
   const lastConversationIdRef = useRef<string | null>(null);
   const [lastMetadata, setLastMetadata] = useState<AikaMetadata | null>(null);
 
+  // Retry cooldown after a rate-limit fallback (ms remaining until the user can resend).
+  const [retryCooldownMs, setRetryCooldownMs] = useState(0);
+
+  // Count down the retry cooldown every second.
+  useEffect(() => {
+    if (retryCooldownMs <= 0) return;
+    const id = window.setTimeout(() => {
+      setRetryCooldownMs((prev) => Math.max(0, prev - 1000));
+    }, 1000);
+    return () => window.clearTimeout(id);
+  }, [retryCooldownMs]);
+
   // Track streaming state for multi-bubble support
-  const streamingBufferRef = useRef<string>('');
   const currentBubbleIdRef = useRef<string | null>(null);
   const bubbleCountRef = useRef<number>(0);
 
@@ -301,9 +312,24 @@ export function useAikaChat({
         // Store metadata for UI display
         setLastMetadata(aikaResponse.metadata);
 
+        // If this was a degraded-mode response, start the retry cooldown so the
+        // input is briefly disabled and the user knows to wait before retrying.
+        if (aikaResponse.isFallback && aikaResponse.metadata.retry_after_ms) {
+          setRetryCooldownMs(aikaResponse.metadata.retry_after_ms);
+        }
+
         // Reset bubble tracking
         bubbleCountRef.current = 0;
         currentBubbleIdRef.current = null;
+
+        // Fallback-message decoration helpers
+        const fallbackProps: Partial<Message> = aikaResponse.isFallback
+          ? {
+              isError: true,
+              retryAfterMs: aikaResponse.metadata.retry_after_ms ?? 0,
+              fallbackType: aikaResponse.metadata.fallback_type,
+            }
+          : {};
 
         // Update or Add assistant response - split into multiple bubbles
         setMessages((prev) => {
@@ -330,6 +356,7 @@ export function useAikaChat({
               isStreaming: false,
               isContinuation: idx > 0, // Mark all but first as continuation
               aikaMetadata: idx === sections.length - 1 ? aikaResponse.metadata : undefined, // Only last gets metadata
+              ...fallbackProps,
             }));
             
             return [...beforeStreaming, ...newMessages, ...afterStreaming];
@@ -348,6 +375,7 @@ export function useAikaChat({
               updated_at: new Date().toISOString(),
               isContinuation: idx > 0,
               aikaMetadata: idx === sections.length - 1 ? aikaResponse.metadata : undefined,
+              ...fallbackProps,
             }));
             
             return [...prev, ...newMessages];
@@ -399,6 +427,8 @@ export function useAikaChat({
     messages,
     inputValue,
     isLoading: isLoading || aikaLoading,
+    /** Milliseconds remaining in the post-fallback retry cooldown. 0 when no cooldown is active. */
+    retryCooldownMs,
     activeAgents,
     currentThinking,
     thinkingTrace,

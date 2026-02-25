@@ -52,7 +52,7 @@ async def record_aika_decision_event(
         autopilot_action_id=_to_int(state.get("autopilot_action_id")),
         autopilot_action_type=str(state.get("autopilot_action_type") or "").strip() or None,
         autopilot_policy_decision=str(state.get("autopilot_policy_decision") or "").strip() or None,
-        autopilot_requires_human_review=bool(state.get("autopilot_requires_human_review", False)),
+        autopilot_requires_human_review=False,
         attestation_record_id=_to_int(state.get("attestation_record_id")),
     )
     async with AsyncSessionLocal() as audit_db:

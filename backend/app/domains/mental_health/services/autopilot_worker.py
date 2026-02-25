@@ -358,9 +358,6 @@ async def process_autopilot_queue_once(batch_limit: int = 20) -> int:
                 action.status.value,
                 int(action.retry_count or 0),
             )
-            if action.status == AutopilotActionStatus.awaiting_approval:
-                continue
-
             if action.status == AutopilotActionStatus.failed and int(action.retry_count or 0) >= max_retries:
                 await mark_dead_letter(
                     db,

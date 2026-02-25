@@ -83,12 +83,15 @@ function SummaryCard({
   value,
   sub,
   accent = false,
+  progress,
 }: {
   icon: React.ReactNode;
   label: string;
   value: string | number;
   sub?: string;
   accent?: boolean;
+  /** Optional 0–100 fill bar rendered below the sub-label. */
+  progress?: number;
 }) {
   return (
     <div
@@ -105,6 +108,18 @@ function SummaryCard({
       </div>
       <p className="text-3xl font-bold text-white">{value}</p>
       {sub && <p className="mt-1 text-xs text-white/40">{sub}</p>}
+      {progress !== undefined && (
+        <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-white/10">
+          <div
+            className="h-full rounded-full transition-all duration-700"
+            style={{
+              width: `${Math.min(progress, 100)}%`,
+              backgroundColor:
+                progress > 25 ? "#f87171" : progress > 10 ? "#fbbf24" : "#34d399",
+            }}
+          />
+        </div>
+      )}
     </div>
   );
 }
@@ -138,6 +153,98 @@ function CooldownBar({ remaining }: { remaining: number }) {
         />
       </div>
       <span className="text-xs text-red-300">{Math.ceil(remaining)}s</span>
+    </div>
+  );
+}
+
+/** Tiny SVG donut ring that represents a 0–100% fill. */
+function SuccessRateRing({
+  rate,
+  size = 32,
+}: {
+  rate: number;
+  size?: number;
+}) {
+  const r = (size - 6) / 2;
+  const circ = 2 * Math.PI * r;
+  const fill = Math.min(Math.max(rate, 0), 100);
+  const color =
+    fill >= 90 ? "#34d399" : fill >= 70 ? "#fbbf24" : "#f87171";
+  return (
+    <svg
+      width={size}
+      height={size}
+      viewBox={`0 0 ${size} ${size}`}
+      className="shrink-0"
+    >
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke="rgba(255,255,255,0.08)"
+        strokeWidth="3"
+      />
+      <circle
+        cx={size / 2}
+        cy={size / 2}
+        r={r}
+        fill="none"
+        stroke={color}
+        strokeWidth="3"
+        strokeDasharray={`${(fill / 100) * circ} ${circ}`}
+        strokeLinecap="round"
+        transform={`rotate(-90 ${size / 2} ${size / 2})`}
+      />
+    </svg>
+  );
+}
+
+/**
+ * Three-column micro bar chart for a key's hourly activity snapshot.
+ * Columns: requests last hour (blue), errors last hour (red), rate-limit hits (yellow).
+ */
+function ActivityMiniChart({ snapshot }: { snapshot: KeySnapshot }) {
+  const bars = [
+    { label: "Req/hr", value: snapshot.requests_last_hour, color: "#60a5fa" },
+    { label: "Err/hr", value: snapshot.errors_last_hour, color: "#f87171" },
+    { label: "Limits", value: snapshot.rate_limited_hits, color: "#fbbf24" },
+  ];
+  const maxVal = Math.max(...bars.map((b) => b.value), 1);
+  const chartH = 28;
+
+  return (
+    <div className="mb-3 rounded-lg bg-white/5 px-3 py-2">
+      <p className="mb-1.5 text-[10px] uppercase tracking-wider text-white/30">
+        Activity
+      </p>
+      <div className="flex items-end gap-2">
+        {bars.map((bar) => {
+          const barH = Math.max((bar.value / maxVal) * chartH, 2);
+          return (
+            <div
+              key={bar.label}
+              className="flex flex-1 flex-col items-center gap-1"
+            >
+              <span
+                className="text-[10px] font-mono tabular-nums"
+                style={{ color: bar.color }}
+              >
+                {bar.value}
+              </span>
+              <div
+                className="w-full rounded-sm transition-all duration-500"
+                style={{
+                  height: `${barH}px`,
+                  backgroundColor: bar.color,
+                  opacity: 0.7,
+                }}
+              />
+              <span className="text-[9px] text-white/30">{bar.label}</span>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -189,9 +296,14 @@ function KeyCard({ snapshot }: { snapshot: KeySnapshot }) {
         </div>
         <div>
           <p className="text-white/40">Success</p>
-          <p className="font-mono text-lg font-bold text-emerald-400">
-            {successRate}%
-          </p>
+          <div className="flex items-center gap-2">
+            {successRate !== "N/A" && (
+              <SuccessRateRing rate={parseFloat(successRate)} />
+            )}
+            <p className="font-mono text-lg font-bold text-emerald-400">
+              {successRate}%
+            </p>
+          </div>
         </div>
         <div>
           <p className="text-white/40">Last Hour</p>
@@ -211,6 +323,9 @@ function KeyCard({ snapshot }: { snapshot: KeySnapshot }) {
           </p>
         </div>
       </div>
+
+      {/* Activity micro chart */}
+      <ActivityMiniChart snapshot={snapshot} />
 
       {/* Model distribution */}
       {modelEntries.length > 0 && (
@@ -756,6 +871,7 @@ export default function AdminApiKeysPage() {
               label="Errors"
               value={data.summary.total_errors}
               sub={`${data.summary.error_rate}% error rate`}
+              progress={data.summary.error_rate}
             />
             <SummaryCard
               icon={<FiActivity size={16} />}

@@ -4,14 +4,10 @@ export interface AdminAutopilotAction {
   id: number;
   action_type: string;
   risk_level: string;
-  policy_decision: string;
   status: string;
   idempotency_key: string;
   payload_hash: string;
   payload_json: Record<string, unknown>;
-  requires_human_review: boolean;
-  approved_by?: number | null;
-  approval_notes?: string | null;
   tx_hash?: string | null;
   explorer_tx_url?: string | null;
   chain_id?: number | null;
@@ -38,16 +34,12 @@ export interface AdminAutopilotPolicy {
   autopilot_enabled: boolean;
   onchain_placeholder: boolean;
   worker_interval_seconds: number;
-  require_approval_high_risk: boolean;
-  require_approval_critical_risk: boolean;
 }
 
 export interface UpdateAdminAutopilotPolicyPayload {
   autopilot_enabled?: boolean;
   onchain_placeholder?: boolean;
   worker_interval_seconds?: number;
-  require_approval_high_risk?: boolean;
-  require_approval_critical_risk?: boolean;
 }
 
 export const listAutopilotActions = async (params: {
@@ -65,14 +57,6 @@ export const listAutopilotActions = async (params: {
   if (params.limit !== undefined) query.set('limit', String(params.limit));
   const response = await apiClient.get<AdminAutopilotListResponse>(`/admin/autopilot/actions?${query.toString()}`);
   return response.data;
-};
-
-export const approveAutopilotAction = async (actionId: number, note?: string): Promise<void> => {
-  await apiClient.post(`/admin/autopilot/actions/${actionId}/approve`, { note });
-};
-
-export const rejectAutopilotAction = async (actionId: number, note: string): Promise<void> => {
-  await apiClient.post(`/admin/autopilot/actions/${actionId}/reject`, { note });
 };
 
 export const getAutopilotStatus = async (): Promise<AdminAutopilotStatus> => {

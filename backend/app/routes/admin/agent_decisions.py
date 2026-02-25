@@ -35,7 +35,7 @@ class AgentDecisionItem(BaseModel):
     next_step: Optional[str] = None
     agent_reasoning: Optional[str] = None
 
-    requires_human_review: bool
+    requires_human_review: bool = False
     approved_by: Optional[int] = None
     approval_notes: Optional[str] = None
 
@@ -237,13 +237,6 @@ async def list_agent_decisions(
                     intent=_to_str(event.intent) or _to_str((linked_payload or {}).get("intent")),
                     next_step=_to_str(event.next_step) or _to_str((linked_payload or {}).get("next_step")),
                     agent_reasoning=_to_str(event.reasoning) or _to_str((linked_payload or {}).get("reasoning")),
-                    requires_human_review=(
-                        bool(linked_action.requires_human_review)
-                        if linked_action is not None
-                        else bool(event.autopilot_requires_human_review)
-                    ),
-                    approved_by=(linked_action.approved_by if linked_action is not None else None),
-                    approval_notes=(linked_action.approval_notes if linked_action is not None else None),
                     chain_id=(linked_action.chain_id if linked_action is not None else None),
                     tx_hash=(linked_action.tx_hash if linked_action is not None else None),
                     explorer_tx_url=_build_explorer_url(
@@ -297,9 +290,6 @@ async def list_agent_decisions(
                     intent=_to_str(payload.get("intent")),
                     next_step=_to_str(payload.get("next_step")),
                     agent_reasoning=_to_str(payload.get("reasoning")),
-                    requires_human_review=bool(row.requires_human_review),
-                    approved_by=row.approved_by,
-                    approval_notes=row.approval_notes,
                     chain_id=row.chain_id,
                     tx_hash=row.tx_hash,
                     explorer_tx_url=_build_explorer_url(row.chain_id, row.tx_hash),

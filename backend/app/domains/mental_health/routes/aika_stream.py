@@ -490,6 +490,10 @@ async def stream_aika_execution(
             'llm_request_count': llm_stats.total_requests,
             'llm_requests_by_model': llm_stats.requests_by_model,
             'tools_used': tools_used,
+            # Fallback signalling — consumed by the frontend to render warning bubbles.
+            'is_fallback': result.get('is_fallback', False),
+            'fallback_type': result.get('fallback_type'),
+            'retry_after_ms': result.get('retry_after_ms', 0),
         }
         if not metadata_dict.get('risk_level'):
             metadata_dict['risk_level'] = result.get('severity')

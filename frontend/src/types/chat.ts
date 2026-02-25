@@ -63,6 +63,10 @@ export interface Message {
   interventionPlan?: InterventionPlan; // TCA-generated support plan
   appointment?: Appointment; // Scheduling confirmation
   isError?: boolean; // For error messages
+  /** Milliseconds to wait before retrying after a fallback response. 0 = no enforced cooldown. */
+  retryAfterMs?: number;
+  /** Reason for the fallback: 'rate_limit' | 'model_error'. Present only when isError=true. */
+  fallbackType?: 'rate_limit' | 'model_error';
   isStreaming?: boolean; // For streaming messages
   isContinuation?: boolean; // For multi-bubble responses (continuation of previous message)
   agentActivity?: {
@@ -94,6 +98,10 @@ export interface Message {
     };
     escalation_triggered: boolean;
     case_id?: string;
+    // Fallback signalling
+    is_fallback?: boolean;
+    fallback_type?: 'rate_limit' | 'model_error';
+    retry_after_ms?: number;
   };
 }
 

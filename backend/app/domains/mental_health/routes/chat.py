@@ -225,6 +225,10 @@ async def process_chat_message(
             "intent": result.get("intent"),
             "risk_level": result.get("sta_risk_assessment", {}).get("risk_level") or result.get("severity"),
             "risk_score": result.get("sta_risk_assessment", {}).get("risk_score") or result.get("risk_score"),
+            # Fallback signalling — consumed by the frontend to render warning bubbles.
+            "is_fallback": result.get("is_fallback", False),
+            "fallback_type": result.get("fallback_type"),
+            "retry_after_ms": result.get("retry_after_ms", 0),
         }
 
         # Attach per-user-prompt LLM request totals (includes tool-call followups).

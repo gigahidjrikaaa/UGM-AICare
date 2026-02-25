@@ -992,11 +992,8 @@ async def simulate_full_user_flow(
         {
             "id": int(row.id),
             "action_type": row.action_type.value,
-            "policy_decision": row.policy_decision.value,
             "status": row.status.value,
             "risk_level": row.risk_level,
-            "requires_human_review": bool(row.requires_human_review),
-            "approved_by": row.approved_by,
             "error_message": row.error_message,
             "created_at": row.created_at.isoformat() if row.created_at else None,
         }
