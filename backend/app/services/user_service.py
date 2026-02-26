@@ -1,7 +1,8 @@
 # backend/app/services/user_service.py (New File)
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from fastapi import HTTPException, status # type: ignore
+from sqlalchemy.exc import IntegrityError
+from fastapi import HTTPException, status  # type: ignore
 from typing import Optional
 import logging
 
@@ -73,16 +74,48 @@ async def async_get_or_create_user(db: AsyncSession, google_sub: str, plain_emai
         try:
             await db.commit()
             await db.refresh(user)
-        except Exception as e:
+        except IntegrityError as exc:
             await db.rollback()
-            logger.error(f"ASYNC_SERVICE: db.commit() FAILED for user related to sub {google_sub[:10]}: {e}", exc_info=True)
-            # Check if it's a unique constraint violation on email
-            if "UniqueViolationError" in str(e) and "ix_users_email" in str(e):
-                 raise HTTPException(
-                    status_code=status.HTTP_409_CONFLICT,
-                    detail="An account with this email already exists but could not be linked automatically. Please log in with your original method and link your account in settings."
+            # Narrow the conflict check to the email unique index via the
+            # underlying driver exception, not fragile string inspection of
+            # the wrapper exception type name.
+            orig_msg = str(getattr(exc, "orig", exc)).lower()
+            if "ix_users_email" in orig_msg or "unique" in orig_msg and "email" in orig_msg:
+                logger.warning(
+                    "ASYNC_SERVICE: email conflict for sub %s: %s",
+                    google_sub[:10],
+                    exc,
                 )
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Could not save user record due to database error.")
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail=(
+                        "An account with this email already exists but could not be linked "
+                        "automatically. Please log in with your original method and link "
+                        "your account in settings."
+                    ),
+                )
+            logger.error(
+                "ASYNC_SERVICE: db.commit() FAILED for user related to sub %s: %s",
+                google_sub[:10],
+                exc,
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not save user record due to database error.",
+            )
+        except Exception as exc:
+            await db.rollback()
+            logger.error(
+                "ASYNC_SERVICE: unexpected error committing user for sub %s: %s",
+                google_sub[:10],
+                exc,
+                exc_info=True,
+            )
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Could not save user record due to an unexpected error.",
+            )
 
     return user
 

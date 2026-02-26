@@ -35,15 +35,27 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None) -
     encoded_jwt = jwt.encode(to_encode, JWT_SECRET, algorithm=ALGORITHM)
     return encoded_jwt
 
-# --- Input Validation ---
-if not JWT_SECRET:
-    logger.error("CRITICAL: JWT_SECRET_KEY environment variable is not set!")
-    raise ValueError("JWT_SECRET_KEY must be set in the environment")
+def validate_auth_config() -> None:
+    """Validate required authentication configuration at application startup.
 
-# Ensure JWT_SECRET is long enough for JWE (e.g., 32 bytes for A256CBC-HS512)
-if len(JWT_SECRET) < 32:
-    logger.error(f"CRITICAL: JWT_SECRET_KEY is too short ({len(JWT_SECRET)} chars). Must be at least 32 characters for JWE.")
-    raise ValueError("JWT_SECRET_KEY must be at least 32 characters long.")
+    Call this from the FastAPI lifespan context manager so that a config error
+    raises at startup (with a clear message) rather than crashing at the first
+    authenticated request, and rather than at module-import time (which breaks
+    unit tests that mock the environment).
+    """
+    if not JWT_SECRET:
+        logger.error("CRITICAL: JWT_SECRET_KEY environment variable is not set.")
+        raise ValueError("JWT_SECRET_KEY must be set in the environment.")
+
+    if len(JWT_SECRET) < 32:
+        logger.error(
+            "CRITICAL: JWT_SECRET_KEY is too short (%d chars). Minimum 32 characters required.",
+            len(JWT_SECRET),
+        )
+        raise ValueError("JWT_SECRET_KEY must be at least 32 characters long.")
+
+    logger.info("Auth configuration validated successfully.")
+
 
 class TokenPayload(BaseModel):
     """Pydantic model for expected JWT payload structure AFTER decryption"""

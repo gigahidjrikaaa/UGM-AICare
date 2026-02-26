@@ -115,6 +115,14 @@ async def lifespan(app: FastAPI):
     db_retry_delay_seconds = max(1.0, float(os.getenv("STARTUP_DB_RETRY_DELAY_SECONDS", "2")))
     db_init_error: Exception | None = None
 
+    # Validate auth configuration before the server accepts any requests.
+    from app.auth_utils import validate_auth_config
+    try:
+        validate_auth_config()
+    except ValueError as exc:
+        logger.error("Auth configuration is invalid; refusing to start: %s", exc)
+        raise
+
     for attempt in range(1, db_max_retries + 1):
         try:
             db_result = init_db()
@@ -421,8 +429,8 @@ async def health_check():
         "allowed_origins": os.getenv("ALLOWED_ORIGINS", "*").split(","),
         "environment": os.getenv("APP_ENV", "development"),
         "database": {
-            "status": "connected" if os.getenv("DATABASE_URL") else "not connected",
-            "url": os.getenv("DATABASE_URL", "Not set"),
+            # Never surface the raw DATABASE_URL — it contains credentials.
+            "status": "configured" if os.getenv("DATABASE_URL") else "not configured",
         },
     }
 
@@ -432,20 +440,13 @@ async def db_health_check():
     logger.info("Database health check endpoint accessed")
     from app.database import check_db_health
     try:
-        # Use the async health check function
         is_healthy = await check_db_health()
         if is_healthy:
-            return {
-            "status": "healthy",
-            "db_status": "connected",
-            "db_url": os.getenv("DATABASE_URL", "Not set"),
-            }
-        else:
-            return {"status": "unhealthy", "db_status": "not connected"}
+            return {"status": "healthy", "db_status": "connected"}
+        return {"status": "unhealthy", "db_status": "not connected"}
     except Exception as e:
-        logger.error(f"Database health check failed: {e}")
-        return {"status": "unhealthy", "db_status": str(e)}
-    raise HTTPException(status_code=403, detail="Invalid API key")
+        logger.error("Database health check failed: %s", e)
+        return {"status": "unhealthy", "db_status": "check failed"}
 
 @app.get("/health/redis")
 async def redis_health_check():
