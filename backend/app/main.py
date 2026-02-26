@@ -11,6 +11,7 @@ from app.core.logging_config import configure_logging, get_logger
 from app.routes import (
     auth,
     link_did,
+    link_ocid,
     internal,
     profile,
     admin,
@@ -309,6 +310,7 @@ app.include_router(auth.router)
 app.include_router(chat.router)
 app.include_router(feedback.router)
 app.include_router(link_did.router)
+app.include_router(link_ocid.router)
 
 app.include_router(journal.router)
 app.include_router(journal_prompts.router)

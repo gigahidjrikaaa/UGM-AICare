@@ -4,6 +4,7 @@ import { Inter } from 'next/font/google'
 import ClientProvider from "@/components/auth/ClientProvider";
 import QueryProvider from "@/components/providers/QueryProvider";
 import { Web3Provider } from "@/providers/Web3Provider";
+import OCConnectWrapper from "@/components/OCConnectWrapper";
 import { Suspense } from "react";
 import GlobalSkeleton from "@/components/ui/GlobalSkeleton";
 import { ClientOnlyToaster } from "@/components/ui/ClientOnlyToaster";
@@ -127,6 +128,7 @@ export default async function RootLayout({
         suppressHydrationWarning={true}
       >
         <Web3Provider>
+          <OCConnectWrapper>
           <ClientProvider>
             <QueryProvider>
               <HydrationSafeWrapper>
@@ -148,6 +150,7 @@ export default async function RootLayout({
               </HydrationSafeWrapper>
             </QueryProvider>
           </ClientProvider>
+          </OCConnectWrapper>
         </Web3Provider>
       </body>
     </html>

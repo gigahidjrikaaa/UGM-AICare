@@ -16,6 +16,7 @@
     "@headlessui/react": "^2.2.1",
     "@heroicons/react": "^2.2.0",
     "@microsoft/fetch-event-source": "^2.0.1",
+    "@opencampus/ocid-connect-js": "^2.0.7",
     "@radix-ui/react-slot": "^1.2.0",
     "@rainbow-me/rainbowkit": "^2.2.9",
     "@ricky0123/vad-web": "^0.0.13",

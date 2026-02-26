@@ -20,6 +20,7 @@ class User(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     google_sub: Mapped[Optional[str]] = mapped_column(String, unique=True, index=True, nullable=True)
     twitter_id: Mapped[Optional[str]] = mapped_column(String, unique=True, index=True, nullable=True)
+    ocid_username: Mapped[Optional[str]] = mapped_column(String, unique=True, index=True, nullable=True)
     email: Mapped[str] = mapped_column(String, unique=True, index=True, nullable=False)
     name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     first_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)

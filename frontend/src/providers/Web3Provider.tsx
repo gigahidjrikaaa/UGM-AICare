@@ -66,11 +66,35 @@ const somniaMainnet = defineChain({
   testnet: false,
 });
 
+// Define Open Campus CodeX (EDU Chain Testnet, Chain ID: 656476)
+// This is the chain used by the OCID badge smart contracts.
+const eduChainTestnet = defineChain({
+  id: 656476,
+  name: 'Open Campus Codex Sepolia',
+  network: 'edu-chain-testnet',
+  nativeCurrency: {
+    decimals: 18,
+    name: 'EDU',
+    symbol: 'EDU',
+  },
+  rpcUrls: {
+    default: { http: ['https://rpc.open-campus-codex.gelato.digital'] },
+    public: { http: ['https://rpc.open-campus-codex.gelato.digital'] },
+  },
+  blockExplorers: {
+    default: {
+      name: 'Open Campus Explorer',
+      url: 'https://opencampus-codex.blockscout.com',
+    },
+  },
+  testnet: true,
+});
+
 // Wagmi configuration with SOMNIA chains
 const config = getDefaultConfig({
   appName: 'UGM-AICare',
   projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID || 'YOUR_PROJECT_ID_HERE',
-  chains: [somniaTestnet, somniaMainnet],
+  chains: [eduChainTestnet, somniaTestnet, somniaMainnet],
   ssr: true, // Enable Server-Side Rendering for Next.js
 });
 

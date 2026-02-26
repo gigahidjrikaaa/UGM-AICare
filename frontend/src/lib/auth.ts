@@ -11,6 +11,8 @@ declare module "next-auth" {
       id?: string | null;
       role?: string | null;
       google_sub?: string | null;
+      wallet_address?: string | null;
+      ocid_username?: string | null;
     } & User;
   }
 
@@ -18,6 +20,8 @@ declare module "next-auth" {
     role?: string | null;
     accessToken?: string;
     google_sub?: string | null;
+    wallet_address?: string | null;
+    ocid_username?: string | null;
   }
 }
 
@@ -27,6 +31,8 @@ declare module "next-auth/jwt" {
     role?: string;
     accessToken?: string;
     google_sub?: string;
+    wallet_address?: string;
+    ocid_username?: string;
     accessTokenExpires?: number;
     error?: "BackendTokenExpired";
   }
@@ -159,8 +165,16 @@ export const authOptions: NextAuthOptions = {
   },
 
   callbacks: {
-    async jwt({ token, user, account }) {
+    async jwt({ token, user, account, trigger, session: updateSession }) {
       const typedUser = (user ?? {}) as NextAuthUserInfo;
+
+      // Handle client-side session updates (e.g. after wallet/OCID linkage).
+      if (trigger === 'update' && updateSession) {
+        const upd = updateSession as { wallet_address?: string; ocid_username?: string };
+        if (upd.wallet_address) token.wallet_address = upd.wallet_address;
+        if (upd.ocid_username) token.ocid_username = upd.ocid_username;
+        return token;
+      }
 
       if (account?.provider === "google" && account?.providerAccountId) {
         const exchange = await exchangeGoogleAccountToken(
@@ -221,6 +235,8 @@ export const authOptions: NextAuthOptions = {
         }
         session.user.role = token.role ?? session.user.role ?? null;
         session.user.google_sub = token.google_sub ?? session.user.google_sub ?? null;
+        session.user.wallet_address = token.wallet_address ?? session.user.wallet_address ?? null;
+        session.user.ocid_username = token.ocid_username ?? session.user.ocid_username ?? null;
       }
 
       if (token.accessToken) {

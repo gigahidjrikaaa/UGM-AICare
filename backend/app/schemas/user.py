@@ -10,15 +10,31 @@ class LinkDIDRequest(BaseModel):
     wallet_address: str
 
 
+class OCIDLinkRequest(BaseModel):
+    """Payload sent from the frontend after a successful OCID OAuth flow.
+    The `id_token` is the raw JWT issued by Open Campus; the backend will
+    verify it against the Open Campus JWKS endpoint and extract the wallet
+    address and OCId claim from its payload.
+    """
+    id_token: str
+
+
 class EarnedBadgeInfo(BaseModel):
     model_config = ConfigDict(from_attributes=True)
-    
+
     badge_id: int
     awarded_at: datetime
     transaction_hash: str
     contract_address: str
     name: Optional[str] = None
     image_url: Optional[str] = None
+
+
+class OCIDLinkResponse(BaseModel):
+    status: str
+    wallet_address: str
+    ocid_username: str
+    newly_minted_badges: List[EarnedBadgeInfo] = []
 
 
 class EmergencyContact(BaseModel):
