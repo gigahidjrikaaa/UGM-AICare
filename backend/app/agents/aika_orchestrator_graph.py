@@ -61,205 +61,58 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
-_CRISIS_KEYWORDS: tuple[str, ...] = (
-    "suicide",
-    "bunuh diri",
-    "kill myself",
-    "end my life",
-    "tidak ingin hidup lagi",
-    "self-harm",
-    "menyakiti diri",
-    "overdose",
-    "mau mati",
-    "ingin mati",
+# ---------------------------------------------------------------------------
+# Extracted modules — each concern now lives in its own file under
+# app/agents/aika/.  Underscore aliases keep all existing call sites in the
+# remaining subgraph nodes unchanged.
+# ---------------------------------------------------------------------------
+from app.agents.aika.constants import MAX_HISTORY_TURNS as _MAX_HISTORY_TURNS
+from app.agents.aika.message_classifier import (
+    detect_crisis_keywords as _detect_crisis_keywords,
+    is_smalltalk_message as _is_smalltalk_message,
+    requests_structured_support as _requests_structured_support,
+    tool_iterations_for_intent as _tool_iterations_for_intent,
 )
-
-_SMALLTALK_EXACT: frozenset[str] = frozenset({
-    # English greetings / acks
-    "hi", "hello", "hey", "yo", "sup",
-    "ok", "okay", "okey", "okk", "alright", "sure", "yep", "nope", "noted",
-    "thanks", "thank you", "thx", "ty",
-    "bye", "bye bye", "see you", "good morning", "good night", "good afternoon",
-    "p", "ping",
-    # Indonesian greetings / acks
-    "halo", "hai", "hey",
-    "oke", "oke deh", "sip", "siap", "iya", "ya", "yap", "nggak", "nope",
-    "makasih", "terima kasih", "trims",
-    "baik", "baik baik",
-    "dadah", "sampai jumpa",
-    "selamat pagi", "selamat siang", "selamat sore", "selamat malam",
-    "selamat tidur",
-    # Filler / acknowledgment
-    "hmm", "hm", "oh", "oh oke", "oh okay", "oh baik", "ooh",
-})
-
-# Short-prefix + Aika-name variants (max 22 chars)
-_SMALLTALK_AIKA_PREFIX: frozenset[str] = frozenset({
-    "hi aika", "halo aika", "hai aika", "hello aika", "hey aika",
-    "thank you aika", "makasih ya", "terima kasih ya",
-    "oke aika", "ok aika", "sip aika", "noted aika", "bye aika",
-})
-
-# Maximum number of conversation *turns* (user+model pairs) to include in the
-# context window sent to Gemini on each non-crisis direct-response call.
-# Keeping this at 10 turns (20 messages) caps per-request input token cost for
-# long conversations while preserving enough recency for coherent replies.
-_MAX_HISTORY_TURNS: int = 10
-
-
-def _tool_iterations_for_intent(intent: str) -> int:
-    """Map routing intent to a tool-calling iteration budget.
-
-    Fewer iterations = fewer API round-trips.  The budget is chosen to be
-    just enough for each intent class:
-
-    - casual_chat      : 1 — single pass, no tool calls expected.
-    - information_inquiry: 2 — at most one tool look-up then a reply.
-    - appointment_scheduling: 4 — get counselors → slots → book → confirm.
-    - Everything else  : 3 — emotional support may call create_intervention_plan
-                             or get_user_profile once then respond.
-    """
-    if intent == "casual_chat":
-        return 1
-    if intent == "information_inquiry":
-        return 2
-    if intent == "appointment_scheduling":
-        return 4
-    return 3
-
-
-def _detect_crisis_keywords(text: str) -> list[str]:
-    lowered = (text or "").lower()
-    return [keyword for keyword in _CRISIS_KEYWORDS if keyword in lowered]
-
-
-def _is_smalltalk_message(text: str) -> bool:
-    """Return True when the message is a short social/ack phrase with no distress content.
-
-    Three tiers (cheapest first):
-    1. Exact match against _SMALLTALK_EXACT.
-    2. Short (<= 22 chars) match against _SMALLTALK_AIKA_PREFIX variants.
-    3. Regex: single-emoji, pure-punctuation, or very short repeated-char fillers.
-    """
-    cleaned = re.sub(r"\s+", " ", (text or "").strip().lower())
-    if not cleaned:
-        return False
-    # Tier 1 — exact set lookup (O(1))
-    if cleaned in _SMALLTALK_EXACT:
-        return True
-    # Tier 2 — Aika-name prefix variants (max 22 chars)
-    if len(cleaned) <= 22 and cleaned in _SMALLTALK_AIKA_PREFIX:
-        return True
-    # Tier 3 — structural patterns that are never distress signals
-    # e.g. pure emoji, single punctuation, "hahaha", "wkwkwk"
-    if re.fullmatch(
-        r"[^\w\s]{1,4}"                   # pure punctuation / emoji surrogates
-        r"|[\U00010000-\U0010FFFF]{1,3}"   # actual emoji codepoints
-        r"|(ha){2,6}|(wk){2,6}|(heh)+"    # laughter fillers
-        r"|oh\s+(iya|okay|oke|i see|gitu)" # short realizations
-        r"|hmm+|hm+",
-        cleaned,
-    ):
-        return True
-    return False
-
-
-def _requests_structured_support(text: str) -> bool:
-    lowered = (text or "").lower()
-    structured_support_triggers = (
-        "rencana",
-        "langkah",
-        "step by step",
-        "strategi",
-        "coping plan",
-        "buatkan plan",
-        "bikin rencana",
-        "cara mengatasi",
-    )
-    return any(trigger in lowered for trigger in structured_support_triggers)
-
-
-def _build_smalltalk_response(role: str) -> str:
-    if role == "admin":
-        return "Halo! Aku siap bantu untuk cek data atau operasional platform. Mau mulai dari apa?"
-    if role == "counselor":
-        return "Halo! Aku siap bantu kebutuhan case management atau insight klinis. Ada yang ingin dicek dulu?"
-    return "Halo! Aku Aika. Senang ketemu kamu. Lagi pengin ngobrol tentang apa hari ini?"
+from app.agents.aika.prompt_builder import (
+    get_aika_system_prompts as _get_aika_prompts,
+    normalize_role as _normalize_user_role,
+    format_personal_memory_block as _format_personal_memory_block,
+    build_smalltalk_response as _build_smalltalk_response,
+)
+from app.agents.aika.decision_node import aika_decision_node
+from app.agents.aika.background_tasks import (
+    trigger_sta_conversation_analysis_background,
+)
 
 
 class _AsyncInvokable(Protocol):
     async def ainvoke(self, input: Any, *args: Any, **kwargs: Any) -> Any: ...
 
 
-def _get_aika_prompts():
-    """Lazy load Aika system prompts to avoid circular imports."""
-    try:
-        from app.agents.aika.identity import AIKA_SYSTEM_PROMPTS
-        return AIKA_SYSTEM_PROMPTS
-    except ImportError:
-        # Fallback prompts if import fails
-        return {
-            "user": "You are Aika, a warm and empathetic mental health assistant for Indonesian university students and lecturers.",
-            "counselor": "You are Aika, an AI assistant helping counselors with case management and clinical insights.",
-            "admin": "You are Aika, providing analytics and insights for platform administrators."
-        }
+# _get_aika_prompts, _normalize_user_role, _format_personal_memory_block are now
+# imported from app.agents.aika.prompt_builder (see import block above).
+# aika_decision_node is imported from app.agents.aika.decision_node.
 
 
-def _normalize_user_role(role: str) -> str:
-    """Normalize user role to the canonical form expected by AIKA_SYSTEM_PROMPTS.
-
-    Delegates to the shared role_utils module so alias resolution is consistent
-    across the entire codebase.  'therapist' is now a legacy alias for 'counselor'.
-    """
-    from app.core.role_utils import normalize_role  # local import avoids circular deps
-    return normalize_role(role)
-
-
-def _format_personal_memory_block(state: AikaOrchestratorState) -> str:
-    """Format user-consented memory facts for prompt injection.
-
-    The source of truth is `state["personal_context"]["remembered_facts"]`.
-    """
-    personal_context = state.get("personal_context") or {}
-    facts = personal_context.get("remembered_facts") or []
-    if not isinstance(facts, list) or not facts:
-        return ""
-
-    # Keep it compact; the user can inspect/delete these in Profile.
-    rendered = [str(f).strip() for f in facts if str(f).strip()]
-    rendered = rendered[:20]
-    if not rendered:
-        return ""
-
-    return (
-        "User memory (user-provided, reviewable in Profile; use only if relevant):\n"
-        + "\n".join(f"- {f}" for f in rendered)
-    )
-
-
-@trace_agent("AikaDecision")
-async def aika_decision_node(
+# ---------------------------------------------------------------------------
+# aika_decision_node has been moved to app/agents/aika/decision_node.py and is
+# re-imported at the top of this file.  The body below is retained temporarily
+# for rollback/diff purposes.
+# TODO(refactor-step8): Remove this entire block once the decomposition is validated.
+# ---------------------------------------------------------------------------
+async def _aika_decision_node_DEPRECATED(
     state: AikaOrchestratorState,
-    db: AsyncSession
-) -> AikaOrchestratorState:
-    """Aika Decision Node - First node in the unified orchestrator.
-    
-    This node embodies Aika's personality and intelligence:
-    1. Analyzes user message with role-aware system prompt
-    2. Classifies intent and determines urgency
-    3. Decides if specialized agents are needed
-    4. Provides direct response if agents not needed
-    
-    Decision Logic:
-    - Simple greetings/casual chat → Direct response (no agents)
-    - Emotional distress/crisis signals → Invoke agents (STA → TCA/CMA)
-    - Complex queries (admin analytics) → Invoke agents (IA)
-    - Appointment requests → Direct response with tool calling
-    
+    db: AsyncSession,
+) -> AikaOrchestratorState:  # type: ignore[override]
+    """DEPRECATED — the active implementation lives in app/agents/aika/decision_node.py.
+
+    This copy is kept for incremental-refactor reference only.  The graph uses
+    the imported ``aika_decision_node`` from that module.
+
     Args:
         state: Current orchestrator state
         db: Database session
-        
+
     Returns:
         Updated state with:
         - intent: Classified user intent
@@ -1017,15 +870,22 @@ want to die, mau mati, ingin mati, etc.
     return state
 
 
-async def trigger_sta_conversation_analysis_background(
+# ---------------------------------------------------------------------------
+# trigger_sta_conversation_analysis_background has been moved to
+# app/agents/aika/background_tasks.py and is re-imported above.
+# The body below is retained temporarily for rollback/diff purposes.
+# TODO(refactor-step8): Remove this entire block once the decomposition is validated.
+# ---------------------------------------------------------------------------
+async def _trigger_sta_background_DEPRECATED(
     state: AikaOrchestratorState,
-    db: AsyncSession
+    db: AsyncSession,
 ) -> None:
-    """Background task to analyze conversation when it ends (fire-and-forget).
-    
-    This runs asynchronously without blocking the user's response.
-    Analyzes full conversation history and stores assessment in database.
-    
+    """DEPRECATED — the active implementation lives in app/agents/aika/background_tasks.py.
+
+    This copy is kept for incremental-refactor reference only.  The
+    trigger_sta_conversation_analysis_background name at module level now
+    refers to the imported version from that module.
+
     Args:
         state: Current orchestrator state with conversation history
         db: Database session for storing assessment
