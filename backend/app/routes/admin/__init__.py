@@ -31,7 +31,7 @@ from .attestations import router as attestations_router
 from .agent_decisions import router as agent_decisions_router
 
 # Router-level dependency: runs on every admin route before the route handler.
-# - admin / therapist: unrestricted (read + write).
+# - admin / counselor: unrestricted (read + write).
 # - admin_viewer: read-only (GET/HEAD/OPTIONS only); any other method → 403.
 router = APIRouter(
     prefix="/api/v1/admin",

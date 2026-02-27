@@ -1,0 +1,142 @@
+/* Homepage module styles */
+
+.heroBanner {
+  padding: 5rem 0 4rem;
+  text-align: center;
+  position: relative;
+  overflow: hidden;
+}
+
+.heroButtons {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 2rem;
+  flex-wrap: wrap;
+}
+
+.heroButtonOutline {
+  border-color: rgba(255, 255, 255, 0.7) !important;
+  color: #fff !important;
+}
+
+.heroButtonOutline:hover {
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+
+.heroBadges {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+  margin-top: 2rem;
+}
+
+.badge {
+  background: rgba(255, 255, 255, 0.18);
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  border-radius: 999px;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.8rem;
+  color: #fff;
+  font-weight: 500;
+}
+
+/* ============================================================
+   Features grid
+   ============================================================ */
+.features {
+  padding: 4rem 0 3rem;
+}
+
+.sectionHeader {
+  text-align: center;
+  margin-bottom: 2.5rem;
+}
+
+.sectionHeader p {
+  max-width: 640px;
+  margin: 0.5rem auto 0;
+  font-size: 1.05rem;
+  color: var(--ifm-color-emphasis-700);
+}
+
+.featureCol {
+  margin-bottom: 1.5rem;
+}
+
+.featureCard {
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 12px;
+  padding: 1.5rem;
+  height: 100%;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  background: var(--ifm-background-color);
+}
+
+.featureCard:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.09);
+  transform: translateY(-3px);
+}
+
+.featureIcon {
+  font-size: 2.25rem;
+  display: block;
+  margin-bottom: 0.75rem;
+}
+
+.featureTitle {
+  font-size: 1.1rem !important;
+  margin-bottom: 0.5rem !important;
+}
+
+.featureDesc {
+  font-size: 0.95rem;
+  color: var(--ifm-color-emphasis-700);
+  margin: 0;
+  line-height: 1.6;
+}
+
+/* ============================================================
+   Quick links section
+   ============================================================ */
+.quickLinks {
+  padding: 3rem 0 4rem;
+  background: var(--ifm-color-emphasis-100);
+}
+
+.quickLinks h2 {
+  text-align: center;
+  margin-bottom: 2rem;
+}
+
+.quickLink {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  padding: 1.25rem 1.5rem;
+  border: 1px solid var(--ifm-color-emphasis-300);
+  border-radius: 10px;
+  background: var(--ifm-background-color);
+  text-decoration: none !important;
+  color: inherit !important;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
+
+.quickLink:hover {
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.08);
+  transform: translateY(-2px);
+  border-color: var(--ifm-color-primary-light);
+}
+
+.quickLink strong {
+  font-size: 1rem;
+  color: var(--ifm-color-primary);
+}
+
+.quickLink span {
+  font-size: 0.9rem;
+  color: var(--ifm-color-emphasis-700);
+  line-height: 1.5;
+}

@@ -21,17 +21,18 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 # Import NEW registry functions (decorator pattern)
 from app.agents.shared.tools import (
-    generate_gemini_tools,
     execute_tool,
+    generate_gemini_tools,
     get_all_tools,
-    get_tools_by_category
+    get_tools_by_category,
 )
+from app.core.role_utils import normalize_agent_role
 
 logger = logging.getLogger(__name__)
 
 
 _AIKA_ROLE_TOOL_ALLOWLISTS: Dict[str, Set[str]] = {
-    "student": {
+    "user": {
         "get_user_profile",
         "get_user_preferences",
         "update_user_profile",
@@ -71,17 +72,6 @@ _AIKA_ROLE_TOOL_ALLOWLISTS: Dict[str, Set[str]] = {
 }
 
 
-def _normalize_role(user_role: Optional[str]) -> str:
-    role = (user_role or "student").strip().lower()
-    if role in {"user", "student"}:
-        return "student"
-    if role in {"counselor", "therapist"}:
-        return "counselor"
-    if role in {"admin", "administrator", "superadmin", "super-admin"}:
-        return "admin"
-    return "student"
-
-
 def get_aika_tools(
     allowed_tool_names: Optional[Set[str]] = None,
     user_role: Optional[str] = None,
@@ -112,8 +102,8 @@ def get_aika_tools(
             "general_query",
         }
 
-        normalized_role = _normalize_role(user_role)
-        role_allowlist = _AIKA_ROLE_TOOL_ALLOWLISTS.get(normalized_role, _AIKA_ROLE_TOOL_ALLOWLISTS["student"])
+        normalized_role = normalize_agent_role(user_role)
+        role_allowlist = _AIKA_ROLE_TOOL_ALLOWLISTS.get(normalized_role, _AIKA_ROLE_TOOL_ALLOWLISTS["user"])
         active_allowlist: Set[str] = set(role_allowlist)
         if allowed_tool_names is not None:
             active_allowlist &= set(allowed_tool_names)
@@ -160,7 +150,7 @@ def get_aika_tools(
         return filtered_tools
         
     except Exception as e:
-        logger.error(f"Error loading Aika tools: {e}")
+        logger.error("Error loading Aika tools: %s", e)
         return []
 
 
@@ -185,8 +175,8 @@ async def execute_tool_call(
         Dict with tool execution result
     """
     try:
-        logger.info(f"🔧 Executing tool '{tool_name}' for user {user_id}")
-        
+        logger.info("Executing tool '%s' for user %s", tool_name, user_id)
+
         # Execute through NEW registry (decorator pattern)
         result = await execute_tool(
             tool_name=tool_name,
@@ -194,16 +184,16 @@ async def execute_tool_call(
             db=db,
             user_id=int(user_id) if isinstance(user_id, str) else user_id
         )
-        
+
         if result.get("success") or result.get("status") == "completed":
-            logger.info(f"✅ Tool '{tool_name}' executed successfully")
+            logger.info("Tool '%s' executed successfully", tool_name)
         else:
-            logger.warning(f"⚠️ Tool '{tool_name}' returned error: {result.get('error')}")
-        
+            logger.warning("Tool '%s' returned error: %s", tool_name, result.get("error"))
+
         return result
-        
+
     except Exception as e:
-        logger.error(f"Error executing tool '{tool_name}': {e}", exc_info=True)
+        logger.error("Error executing tool '%s': %s", tool_name, e, exc_info=True)
         return {
             "success": False,
             "error": f"Tool execution failed: {str(e)}",

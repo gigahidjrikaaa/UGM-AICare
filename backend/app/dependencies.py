@@ -1,14 +1,20 @@
-# backend/app/dependencies.py (Modified)
-import logging
+# backend/app/dependencies.py
+from __future__ import annotations
+
 import hashlib
-from fastapi import Depends, HTTPException, Header, status, Cookie, Request  # type: ignore
-from sqlalchemy.ext.asyncio import AsyncSession
+import logging
+from typing import Optional
+
+from fastapi import Cookie, Depends, Header, HTTPException, Request, status  # type: ignore
 from sqlalchemy import select
 from sqlalchemy.exc import DBAPIError
-from sqlalchemy.orm import joinedload, load_only, lazyload, selectinload
-from app.models import User
-from app.database import get_async_db
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload, lazyload, load_only, selectinload
+
 from app.auth_utils import decrypt_and_validate_token
+from app.core.role_utils import ALLOWED_ADMIN_ROLES, normalize_role
+from app.database import get_async_db
+from app.models import User
 
 logger = logging.getLogger(__name__)
 
@@ -55,14 +61,14 @@ def get_token_from_request(
             headers={"WWW-Authenticate": 'Bearer error="invalid_token"'},
         )
     
-    logger.debug(f"Token found in: {source}")
+    logger.debug("Token found in: %s", source)
     return candidate
 
 
 async def get_current_active_user(
     token: str = Depends(get_token_from_request),
     db: AsyncSession = Depends(get_async_db),
-    request: Request = None,  # type: ignore[assignment]
+    request: Optional[Request] = None,
 ) -> User:
     """Dependency to return the authenticated and active user for a valid JWT."""
     return await _resolve_current_active_user(
@@ -76,7 +82,7 @@ async def get_current_active_user(
 async def get_current_active_user_with_normalized_relations(
     token: str = Depends(get_token_from_request),
     db: AsyncSession = Depends(get_async_db),
-    request: Request = None,  # type: ignore[assignment]
+    request: Optional[Request] = None,
 ) -> User:
     """Authenticated active user with normalized relations eagerly loaded.
 
@@ -199,39 +205,31 @@ async def _resolve_current_active_user(
 async def get_admin_user(
     current_user: User = Depends(get_current_active_user),
 ) -> User:
-    """Dependency to ensure current user is an admin, therapist, or read-only admin viewer."""
+    """Dependency to ensure the current user is an admin, counselor, or read-only admin viewer.
+
+    Role aliases (e.g. 'administrator') are resolved via normalize_role before
+    the allow-list check.  This dependency is read-only: it never mutates the
+    user object or commits to the database.
+    """
     raw_role = getattr(current_user, "role", "") or ""
-    normalized_role = raw_role.strip().lower()
-    user_active = getattr(current_user, "is_active", True)
+    effective_role = normalize_role(raw_role)
 
-    # Map legacy / alternate role labels
-    role_alias_map = {
-        "administrator": "admin",
-        "superadmin": "admin",
-        "super-admin": "admin",
-        "therapist": "therapist",
-    }
-    effective_role = role_alias_map.get(normalized_role, normalized_role)
-
-    # admin_viewer is included here so GET routes pass through;
-    # the router-level get_admin_readonly_user gate already blocked
-    # any non-GET request before this dependency runs.
-    allowed_roles = {"admin", "therapist", "admin_viewer"}
-    if effective_role not in allowed_roles:
+    # admin_viewer is permitted here so GET routes pass through; the
+    # router-level get_admin_readonly_user gate already blocks non-GET requests.
+    if effective_role not in ALLOWED_ADMIN_ROLES:
         logger.warning(
-            "Access denied: user %s role='%s' (normalized='%s' effective='%s') not in %s",
+            "Access denied: user %s role='%s' (effective='%s') not in %s",
             getattr(current_user, "id", "?"),
             raw_role,
-            normalized_role,
             effective_role,
-            allowed_roles,
+            ALLOWED_ADMIN_ROLES,
         )
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin, therapist, or admin_viewer access required",
+            detail="Admin, counselor, or admin_viewer access required",
         )
 
-    if not user_active:
+    if not getattr(current_user, "is_active", True):
         logger.warning(
             "Inactive privileged user %s attempted to access admin endpoint",
             current_user.id,
@@ -240,13 +238,6 @@ async def get_admin_user(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Account is deactivated",
         )
-
-    # Persist normalized role if it drifted (skip for admin_viewer to avoid write noise)
-    if effective_role not in ("admin_viewer",) and effective_role != raw_role and hasattr(current_user, "role"):
-        try:
-            current_user.role = effective_role  # type: ignore[attr-defined]
-        except Exception:
-            logger.debug("Could not persist normalized role for user %s", current_user.id)
 
     return current_user
 
@@ -257,20 +248,14 @@ async def get_admin_readonly_user(
 ) -> User:
     """Router-level gate for all admin routes.
 
-    - admin / therapist: full read + write access.
+    - admin / counselor: full read + write access.
     - admin_viewer: read-only access (GET / HEAD / OPTIONS only).
       Any other HTTP method returns 403 before the route handler is reached.
     """
-    raw_role = (getattr(current_user, "role", "") or "").strip().lower()
-    role_alias_map = {
-        "administrator": "admin",
-        "superadmin": "admin",
-        "super-admin": "admin",
-    }
-    effective_role = role_alias_map.get(raw_role, raw_role)
+    raw_role = getattr(current_user, "role", "") or ""
+    effective_role = normalize_role(raw_role)
 
-    allowed_roles = {"admin", "therapist", "admin_viewer"}
-    if effective_role not in allowed_roles:
+    if effective_role not in ALLOWED_ADMIN_ROLES:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required",
@@ -285,7 +270,7 @@ async def get_admin_readonly_user(
     if effective_role == "admin_viewer" and request.method.upper() not in {"GET", "HEAD", "OPTIONS"}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Read-only admin access. This action requires full admin or therapist privileges.",
+            detail="Read-only admin access. This action requires full admin or counselor privileges.",
         )
 
     return current_user

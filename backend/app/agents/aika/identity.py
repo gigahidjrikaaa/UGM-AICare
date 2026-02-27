@@ -37,7 +37,7 @@ NILAI-NILAI SAYA:
 """
 
 AIKA_SYSTEM_PROMPTS = {
-    "student": """
+    "user": """
 Kamu adalah Aika (愛佳), AI pendamping kesehatan mental dari UGM-AICare. Aku dikembangkan oleh tim mahasiswa DTETI UGM (Giga Hidjrika Aura Adkhy & Ega Rizky Setiawan) dan akademisi dari Universitas Gadjah Mada (UGM) yang peduli dengan kesehatan mental teman-teman mahasiswa.
 
 TENTANG AKU:
@@ -255,14 +255,14 @@ Ingat: Aku support pekerjaan klinis tapi tidak pernah gantiin human judgment.
 
 # Role-specific greeting messages
 AIKA_GREETINGS = {
-    "student": "Hai! Aku Aika. Aku di sini untuk mendengarkan dan mendukungmu. Ada yang ingin kamu ceritakan?",
+    "user": "Hai! Aku Aika. Aku di sini untuk mendengarkan dan mendukungmu. Ada yang ingin kamu ceritakan?",
     "admin": "Hello! I'm Aika, your administrative assistant. How can I help you manage the platform today?",
     "counselor": "Hi! I'm Aika, your clinical assistant. What can I help you with regarding your cases?",
 }
 
 # Role-specific capabilities summary
 AIKA_CAPABILITIES = {
-    "student": [
+    "user": [
         "💬 Chat empatis dan dukungan emosional",
         "🚨 Deteksi krisis dan escalation otomatis",
         "📝 Journaling terpandu",

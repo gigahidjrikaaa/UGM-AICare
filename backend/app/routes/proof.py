@@ -64,7 +64,8 @@ async def list_proof_actions(
         requested_user_id = current_user.id
     elif requested_user_id != current_user.id:
         role = (current_user.role or "").strip().lower()
-        if role not in {"admin", "therapist", "administrator", "superadmin", "super-admin"}:
+        from app.core.role_utils import normalize_role, ALLOWED_ADMIN_ROLES
+        if normalize_role(role) not in ALLOWED_ADMIN_ROLES - {"admin_viewer"}:
             raise HTTPException(status_code=403, detail="Insufficient permission for requested user_id")
 
     # user_id is stored inside payload_json to preserve flexibility across action types.

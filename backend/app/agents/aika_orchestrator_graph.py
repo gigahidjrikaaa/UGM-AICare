@@ -199,32 +199,20 @@ def _get_aika_prompts():
     except ImportError:
         # Fallback prompts if import fails
         return {
-            "student": "You are Aika, a warm and empathetic mental health assistant for Indonesian university students.",
+            "user": "You are Aika, a warm and empathetic mental health assistant for Indonesian university students and lecturers.",
             "counselor": "You are Aika, an AI assistant helping counselors with case management and clinical insights.",
             "admin": "You are Aika, providing analytics and insights for platform administrators."
         }
 
 
 def _normalize_user_role(role: str) -> str:
-    """Normalize user role to match AIKA_SYSTEM_PROMPTS keys.
-    
-    Maps frontend role values to Aika's expected role keys:
-    - "user" -> "student" (most common case)
-    - "counselor" -> "counselor" (unchanged)
-    - "admin" -> "admin" (unchanged)
-    
-    Args:
-        role: Raw role from request
-        
-    Returns:
-        Normalized role that matches AIKA_SYSTEM_PROMPTS keys
+    """Normalize user role to the canonical form expected by AIKA_SYSTEM_PROMPTS.
+
+    Delegates to the shared role_utils module so alias resolution is consistent
+    across the entire codebase.  'therapist' is now a legacy alias for 'counselor'.
     """
-    role_mapping = {
-        "user": "student",
-        "counselor": "counselor",
-        "admin": "admin"
-    }
-    return role_mapping.get(role, "student")  # Default to student
+    from app.core.role_utils import normalize_role  # local import avoids circular deps
+    return normalize_role(role)
 
 
 def _format_personal_memory_block(state: AikaOrchestratorState) -> str:
@@ -299,7 +287,7 @@ async def aika_decision_node(
 
         # Deterministic smalltalk short-circuit to avoid unnecessary LLM/tool latency
         # and prevent over-routing (e.g., greeting -> TCA).
-        if normalized_role == "student" and _is_smalltalk_message(current_message):
+        if normalized_role == "user" and _is_smalltalk_message(current_message):
             state["intent"] = "casual_chat"
             state["intent_confidence"] = 1.0
             state["needs_agents"] = False
@@ -533,8 +521,8 @@ want to die, mau mati, ingin mati, etc.
             # Parse next_step from decision
             next_step = decision.get("next_step", "none").lower()
             
-            # Logic for Students: Direct routing, NO STA synchronous
-            if normalized_role == "student":
+            # Logic for regular users (students, lecturers, staff): Direct routing, NO STA synchronous
+            if normalized_role == "user":
                 if next_step in ("tca", "cma"):
                     state["needs_agents"] = True
                     state["next_step"] = next_step
@@ -689,7 +677,7 @@ want to die, mau mati, ingin mati, etc.
 
                     candidate_action_type = None
                     next_step = str(state.get("next_step") or "").lower()
-                    if normalized_role == "student":
+                    if normalized_role == "user":
                         if next_step == "cma":
                             candidate_action_type = AutopilotActionType.create_case
                         elif next_step == "tca":
@@ -800,7 +788,7 @@ want to die, mau mati, ingin mati, etc.
                 gap_analysis = None
                 
                 user_id = state.get("user_id")
-                if normalized_role == "student" and isinstance(user_id, int) and user_id > 0:
+                if normalized_role == "user" and isinstance(user_id, int) and user_id > 0:
                     try:
                         from app.agents.aika.screening_awareness import (
                             get_screening_aware_prompt_addition
@@ -1611,7 +1599,7 @@ async def synthesize_final_response(
         AIKA_SYSTEM_PROMPTS = _get_aika_prompts()
         user_role = state.get("user_role", "user")
         normalized_role = _normalize_user_role(user_role)
-        system_instruction = AIKA_SYSTEM_PROMPTS.get(normalized_role, AIKA_SYSTEM_PROMPTS["student"])
+        system_instruction = AIKA_SYSTEM_PROMPTS.get(normalized_role, AIKA_SYSTEM_PROMPTS["user"])
 
         personal_memory_block = _format_personal_memory_block(state)
         

@@ -93,7 +93,7 @@ def _derive_encryption_key(secret: str) -> bytes:
              raise ValueError(f"Derived key length is incorrect. Expected {key_length_bytes}, got {len(derived_key)}.")
         return derived_key
     except Exception as e:
-        logger.error(f"Failed to derive encryption key using HKDF: {e}")
+        logger.error("Failed to derive encryption key using HKDF: %s", e)
         raise RuntimeError("Could not derive necessary encryption key.")
 
 def _try_decode_jwt(token: str) -> TokenPayload | None:
@@ -103,16 +103,16 @@ def _try_decode_jwt(token: str) -> TokenPayload | None:
         return None
     try:
         payload_dict = jwt.decode(token, JWT_SECRET, algorithms=[ALGORITHM])
-        logger.debug(f"Successfully decoded JWT. Payload keys: {list(payload_dict.keys())}")
+        logger.debug("Successfully decoded JWT. Payload keys: %s", list(payload_dict.keys()))
         return TokenPayload(**payload_dict)
     except JWTError as e:
-        logger.warning(f"JWT decode failed: {type(e).__name__}: {e}")
+        logger.warning("JWT decode failed: %s: %s", type(e).__name__, e)
         return None
     except ValidationError as e:
-        logger.warning(f"JWT payload validation failed: {e}")
+        logger.warning("JWT payload validation failed: %s", e)
         return None
     except Exception as e:
-        logger.error(f"Unexpected error decoding JWT: {type(e).__name__}: {e}")
+        logger.error("Unexpected error decoding JWT: %s: %s", type(e).__name__, e)
         return None
 
 
@@ -156,23 +156,23 @@ def decrypt_and_validate_token(token: str) -> TokenPayload:
          )
 
     parts = token.split(".")
-    logger.debug(f"Token has {len(parts)} segments (first 20 chars: {token[:20]}...)")
-    
+    logger.debug("Token has %d segments (first 20 chars: %s...)", len(parts), token[:20])
+
     payload: TokenPayload | None = None
     if len(parts) == 3:
         # HS256 JWT
         logger.debug("Attempting to decode as HS256 JWT (3 segments)")
         payload = _try_decode_jwt(token)
         if payload:
-            logger.debug(f"Successfully validated JWT for user: {payload.sub}")
+            logger.debug("Successfully validated JWT for user: %s", payload.sub)
     elif len(parts) == 5:
         # Likely NextAuth JWE
         logger.debug("Attempting to decrypt as NextAuth JWE (5 segments)")
         payload = _try_decrypt_nextauth_jwe(token)
         if payload:
-            logger.debug(f"Successfully decrypted NextAuth JWE for user: {payload.sub}")
+            logger.debug("Successfully decrypted NextAuth JWE for user: %s", payload.sub)
     else:
-        logger.warning(f"Unsupported token format with {len(parts)} segments")
+        logger.warning("Unsupported token format with %d segments", len(parts))
 
     if not payload:
         logger.error("Token validation failed for all attempted methods")

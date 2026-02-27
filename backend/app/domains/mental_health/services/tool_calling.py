@@ -134,7 +134,7 @@ def _should_use_tools(message: str, user_role: Optional[str]) -> bool:
     if not text:
         return False
 
-    role = (user_role or "student").strip().lower()
+    role = (user_role or "user").strip().lower()
     common_triggers = (
         "profil", "profile", "siapa aku", "data aku", "riwayat",
         "jurnal", "journal", "progress", "rencana", "intervensi",
@@ -145,7 +145,8 @@ def _should_use_tools(message: str, user_role: Optional[str]) -> bool:
     if any(trigger in text for trigger in common_triggers):
         return True
 
-    if role in {"admin", "administrator", "superadmin", "super-admin", "counselor", "therapist"}:
+    from app.core.role_utils import normalize_role, ALLOWED_PRIVILEGED_ROLES
+    if normalize_role(role) in ALLOWED_PRIVILEGED_ROLES:
         privileged_triggers = (
             "case", "kasus", "trend", "analytics", "statistik", "conversation stats",
             "risk", "risiko", "escalation", "eskalasi",

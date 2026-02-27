@@ -86,7 +86,7 @@ async def get_psychologists(
             badge_count_sq.label("badge_count"),
             appointment_count_sq.label("appointment_count"),
         )
-        .where(User.role == "therapist")
+        .where(User.role.in_(["counselor", "therapist"]))  # therapist is a legacy alias for counselor
         .order_by(User.created_at.asc())
     )
 

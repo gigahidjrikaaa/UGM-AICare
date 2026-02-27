@@ -15,7 +15,7 @@ async def async_get_or_create_user(db: AsyncSession, google_sub: str, plain_emai
     Asynchronously finds a user by google_sub or email, or creates a new one.
     If a user exists with the email but not the google_sub, it links them.
     """
-    logger.info(f"ASYNC_SERVICE: Attempting to get/create user for sub: {google_sub[:10]}")
+    logger.info("ASYNC_SERVICE: get/create user for sub: %s", google_sub[:10])
     
     # 1. Try to find user by google_sub
     stmt = select(User).where(User.google_sub == google_sub)
@@ -24,14 +24,14 @@ async def async_get_or_create_user(db: AsyncSession, google_sub: str, plain_emai
     needs_commit = False
 
     if user:
-        logger.info(f"Found user by google_sub: {user.id}")
+        logger.info("Found user by google_sub: %s", user.id)
         # If user found by sub, but email is not set, try to set it
         if not user.email and plain_email:
             setattr(user, 'email', plain_email)
             db.add(user)
             needs_commit = True
     else:
-        logger.info(f"User not found by google_sub. Checking by email: {plain_email}")
+        logger.info("User not found by google_sub. Checking by email: %s", plain_email)
         # 2. If not found by sub, try by email
         if plain_email:
             stmt_email = select(User).where(User.email == plain_email)
@@ -40,14 +40,14 @@ async def async_get_or_create_user(db: AsyncSession, google_sub: str, plain_emai
 
             if user_by_email:
                 # 3. User exists with this email, link google_sub
-                logger.info(f"User found by email ({plain_email}). Linking google_sub.")
+                logger.info("User found by email (%s). Linking google_sub.", plain_email)
                 user = user_by_email
                 setattr(user, 'google_sub', google_sub)
                 db.add(user)
                 needs_commit = True
             else:
                 # 4. No user found by sub or email, create new user
-                logger.info(f"No user found by email. Creating new user for sub {google_sub[:10]}.")
+                logger.info("No user found by email. Creating new user for sub %s.", google_sub[:10])
                 try:
                     user = User(
                         google_sub=google_sub,
@@ -56,17 +56,27 @@ async def async_get_or_create_user(db: AsyncSession, google_sub: str, plain_emai
                     db.add(user)
                     needs_commit = True
                 except Exception as e:
-                    logger.error(f"ASYNC_SERVICE: Error INSTANTIATING User object for sub {google_sub[:10]}: {e}", exc_info=True)
+                    logger.error(
+                        "ASYNC_SERVICE: Error instantiating User for sub %s: %s",
+                        google_sub[:10],
+                        e,
+                        exc_info=True,
+                    )
                     raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to prepare user record.")
         else:
             # Cannot find by email, and no user by sub, so create a new one without email
-            logger.info(f"No plain_email provided. Creating new user for sub {google_sub[:10]} without email.")
+            logger.info("No plain_email provided. Creating new user for sub %s without email.", google_sub[:10])
             try:
                 user = User(google_sub=google_sub)
                 db.add(user)
                 needs_commit = True
             except Exception as e:
-                logger.error(f"ASYNC_SERVICE: Error INSTANTIATING User object for sub {google_sub[:10]}: {e}", exc_info=True)
+                logger.error(
+                    "ASYNC_SERVICE: Error instantiating User for sub %s: %s",
+                    google_sub[:10],
+                    e,
+                    exc_info=True,
+                )
                 raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Failed to prepare user record.")
 
 

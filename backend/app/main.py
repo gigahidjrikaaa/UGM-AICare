@@ -305,14 +305,44 @@ startup_log(f"CORS configured with origins: {origins}")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,   # Allow specific origins for security
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS", "PATCH"],
-    allow_headers=["*"],
-    expose_headers=["*"]
+    # Enumerate concrete headers rather than wildcard to avoid leaking
+    # server-side headers and to satisfy strict CORS policy audits.
+    allow_headers=[
+        "Authorization",
+        "Content-Type",
+        "X-Request-ID",
+        "X-Requested-With",
+        "Accept",
+    ],
+    expose_headers=[
+        "X-Request-ID",
+        "X-Response-Time",
+        "Content-Length",
+        "Content-Type",
+    ],
 )
 
 startup_log("Including API routers...")
+
+# ============================================
+# ROUTER REGISTRATION CONVENTION
+# ============================================
+# Prefix strategy — two patterns exist; follow whichever is already set for a
+# given router and document the exception inline:
+#
+# A) Prefix defined INSIDE the router module (most domain routers):
+#      app.include_router(chat.router)          # prefix lives in routes/chat.py
+#
+# B) Prefix injected HERE at registration (used when a router is owned by a
+#    third-party agent module or when the prefix must vary per environment):
+#      app.include_router(sta_router, prefix="/api/v1/agents/sta")
+#
+# New routers should prefer pattern A so the full route path is visible in
+# one place (the router module), not split across two files.
+# ============================================
 
 app.include_router(auth.router)
 app.include_router(chat.router)

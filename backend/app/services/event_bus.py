@@ -93,7 +93,7 @@ class EventBus:
         """
         async with self._lock:
             self._subscribers[event_type].append(handler)
-            logger.info(f"Subscribed handler to {event_type.value}")
+            logger.info("Subscribed handler to %s", event_type.value)
 
         await self._ensure_redis_listener()
     
@@ -119,7 +119,7 @@ class EventBus:
         """
         if handler in self._subscribers[event_type]:
             self._subscribers[event_type].remove(handler)
-            logger.info(f"Unsubscribed handler from {event_type.value}")
+            logger.info("Unsubscribed handler from %s", event_type.value)
     
     def clear_all(self) -> None:
         """Clear all subscriptions (useful for testing)."""
@@ -130,12 +130,14 @@ class EventBus:
         handlers = self._subscribers.get(event.event_type, [])
 
         if not handlers:
-            logger.debug(f"No subscribers for event {event.event_type.value}")
+            logger.debug("No subscribers for event %s", event.event_type.value)
             return
 
         logger.info(
-            f"Publishing event {event.event_type.value} from {event.source_agent} "
-            f"to {len(handlers)} subscriber(s)"
+            "Publishing event %s from %s to %d subscriber(s)",
+            event.event_type.value,
+            event.source_agent,
+            len(handlers),
         )
 
         tasks = [handler(event) for handler in handlers]
@@ -144,8 +146,11 @@ class EventBus:
         for idx, result in enumerate(results):
             if isinstance(result, Exception):
                 logger.error(
-                    f"Handler {idx} for {event.event_type.value} failed: {result}",
-                    exc_info=result
+                    "Handler %d for %s failed: %s",
+                    idx,
+                    event.event_type.value,
+                    result,
+                    exc_info=result,
                 )
 
     async def _publish_redis(self, event: Event) -> None:

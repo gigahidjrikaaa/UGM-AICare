@@ -12,10 +12,17 @@ from app.agents.aika_orchestrator_graph import (
 @pytest.mark.agents
 @pytest.mark.unit
 def test_normalize_user_role_maps_expected_values() -> None:
-    assert _normalize_user_role("user") == "student"
+    assert _normalize_user_role("user") == "user"
     assert _normalize_user_role("admin") == "admin"
     assert _normalize_user_role("counselor") == "counselor"
-    assert _normalize_user_role("unknown") == "student"
+    assert _normalize_user_role("unknown") == "user"   # fallback is 'user'
+    # student is a legacy alias for user (lecturers also use the app)
+    assert _normalize_user_role("student") == "user"
+    # therapist is a legacy alias for counselor
+    assert _normalize_user_role("therapist") == "counselor"
+    # All admin aliases must resolve
+    assert _normalize_user_role("administrator") == "admin"
+    assert _normalize_user_role("superadmin") == "admin"
 
 
 @pytest.mark.agents

@@ -7,7 +7,21 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 
-UserRole = Literal["user", "counselor", "admin", "therapist", "guest"]
+# Canonical roles accepted by the API.
+# Legacy aliases ("therapist" → counselor, "student" → user) are still accepted
+# so older clients do not break, but new code should emit only canonical names.
+UserRole = Literal[
+    # Canonical
+    "admin",
+    "counselor",
+    "user",
+    "admin_viewer",
+    # Legacy aliases — resolved to canonical by normalize_role() before persistence
+    "student",     # → user  (any authenticated app user, incl. lecturers)
+    "therapist",   # → counselor
+    # Edge-case OAuth role for non-UGM sign-ins (auth.py only)
+    "guest",
+]
 
 
 class UserListItem(BaseModel):

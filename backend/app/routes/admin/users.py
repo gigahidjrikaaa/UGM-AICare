@@ -35,16 +35,13 @@ from app.services.user_normalization import check_in_code as check_in_code_for_u
 from app.services.user_normalization import clinical_snapshot
 from app.services.user_normalization import ensure_user_normalized_tables
 from app.services.user_normalization import set_checkins_opt_in
+from app.core.role_utils import normalize_role as _normalize_role
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Admin - Users"])
 
 _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-
-
-def _normalize_role(role: str) -> str:
-    return (role or "").strip().lower()
 
 
 def _ensure_admin_only(admin_user: User) -> None:

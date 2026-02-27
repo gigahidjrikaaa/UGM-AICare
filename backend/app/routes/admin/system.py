@@ -15,7 +15,7 @@ from app.schemas.admin.system import (
     SystemSettingsCategory,
     SystemSettingsResponse,
 )
-from app.services.code_cleanup import CodeCleanupService
+from app.utils.code_cleanup import CodeCleanupService
 from app.services.database_monitoring import get_monitoring_service
 from app.services.api_performance import get_performance_service
 

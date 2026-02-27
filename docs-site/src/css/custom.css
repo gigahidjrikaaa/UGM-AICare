@@ -1,0 +1,107 @@
+/* UGM-AICare Documentation — Custom Styles */
+
+/* ============================================================
+   Brand Colours
+   ============================================================ */
+:root {
+  /* Primary blue inspired by UGM's institutional palette */
+  --ifm-color-primary: #1a6fb5;
+  --ifm-color-primary-dark: #175f9e;
+  --ifm-color-primary-darker: #155a95;
+  --ifm-color-primary-darkest: #104a7a;
+  --ifm-color-primary-light: #1d7fcc;
+  --ifm-color-primary-lighter: #1f84d5;
+  --ifm-color-primary-lightest: #2b90de;
+
+  --ifm-code-font-size: 90%;
+  --docusaurus-highlighted-code-line-bg: rgba(26, 111, 181, 0.08);
+
+  /* Slightly warmer background for readability */
+  --ifm-background-color: #fafbfc;
+}
+
+[data-theme='dark'] {
+  --ifm-color-primary: #4da6ff;
+  --ifm-color-primary-dark: #2994ff;
+  --ifm-color-primary-darker: #1a8eff;
+  --ifm-color-primary-darkest: #0078f5;
+  --ifm-color-primary-light: #71b8ff;
+  --ifm-color-primary-lighter: #80beff;
+  --ifm-color-primary-lightest: #aad4ff;
+  --docusaurus-highlighted-code-line-bg: rgba(77, 166, 255, 0.10);
+}
+
+/* ============================================================
+   Hero Section
+   ============================================================ */
+.hero--primary {
+  background: linear-gradient(135deg, #0d47a1 0%, #1565c0 40%, #1976d2 70%, #2196f3 100%);
+}
+
+.hero__title {
+  font-size: 3rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.hero__subtitle {
+  font-size: 1.25rem;
+  opacity: 0.90;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+/* ============================================================
+   Feature Cards on Homepage
+   ============================================================ */
+.feature-card {
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 12px;
+  padding: 1.5rem;
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+  background: var(--ifm-background-color);
+}
+
+.feature-card:hover {
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.10);
+  transform: translateY(-2px);
+}
+
+.feature-card__icon {
+  font-size: 2.5rem;
+  margin-bottom: 0.75rem;
+  display: block;
+}
+
+/* ============================================================
+   Mermaid Diagrams: add a subtle box
+   ============================================================ */
+.docusaurus-mermaid-container {
+  border: 1px solid var(--ifm-color-emphasis-200);
+  border-radius: 8px;
+  padding: 1.25rem;
+  background: var(--ifm-background-surface-color);
+  overflow-x: auto;
+}
+
+/* ============================================================
+   Admonitions — softer accents
+   ============================================================ */
+.alert--info {
+  --ifm-alert-border-color: var(--ifm-color-primary);
+}
+
+/* ============================================================
+   Navbar logo breathing room
+   ============================================================ */
+.navbar__logo {
+  height: 28px;
+  margin-right: 4px;
+}
+
+/* ============================================================
+   Footer
+   ============================================================ */
+.footer {
+  border-top: 1px solid var(--ifm-color-emphasis-200);
+}
