@@ -9,6 +9,7 @@ import { useState, useCallback, useRef, useEffect } from 'react';
 import { useSession } from 'next-auth/react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAika, type AikaMessage, type AikaMetadata, type ReasoningTrace } from './useAika';
+import { useThinkingSteps } from '@/hooks/useThinkingSteps';
 import type { Message } from '@/types/chat';
 
 // Activity log entry type for tool/API tracking
@@ -423,15 +424,25 @@ export function useAikaChat({
     lastConversationIdRef.current = null;
   }, []);
 
+  const isChatLoading = isLoading || aikaLoading;
+
+  const { steps: thinkingSteps, elapsedSeconds } = useThinkingSteps({
+    thinkingTrace,
+    activeAgents,
+    isActive: isChatLoading,
+  });
+
   return {
     messages,
     inputValue,
-    isLoading: isLoading || aikaLoading,
+    isLoading: isChatLoading,
     /** Milliseconds remaining in the post-fallback retry cooldown. 0 when no cooldown is active. */
     retryCooldownMs,
     activeAgents,
     currentThinking,
     thinkingTrace,
+    thinkingSteps,
+    elapsedSeconds,
     error: aikaError,
     lastMetadata,
     handleInputChange,

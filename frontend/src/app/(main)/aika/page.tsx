@@ -129,6 +129,8 @@ export default function AikaEnhancedPage() {
     activeAgents,
     currentThinking,
     thinkingTrace,
+    thinkingSteps,
+    elapsedSeconds,
     error,
     lastMetadata,
     handleInputChange,
@@ -492,10 +494,11 @@ export default function AikaEnhancedPage() {
                 isLoading={isLoading}
                 activeAgents={activeAgents}
                 currentThinking={showThinkingTrace ? currentThinking : null}
+                thinkingSteps={thinkingSteps}
+                elapsedSeconds={elapsedSeconds}
                 onCardSelect={handleSendMessage}
                 onRegenerate={handleSendMessage}
                 userDisplayName={session?.user?.name ?? session?.user?.email ?? 'You'}
-                userImageUrl={session?.user?.image ?? null}
               />
 
               {/* Chat Input - using original component */}

@@ -4,7 +4,8 @@ import { Message } from "@/types/chat";
 import { MessageBubble } from "./MessageBubble";
 
 import { AikaLoadingBubble } from "../aika/AikaLoadingBubble";
-
+import { AgentThinkingBubble } from "../aika/AgentThinkingBubble";
+import { ThinkingStep } from "@/types/thinking";
 interface ChatWindowProps {
   messages: Message[];
   chatContainerRef: React.RefObject<HTMLDivElement | null>;
@@ -16,9 +17,12 @@ interface ChatWindowProps {
   onCardSelect?: (text: string) => void;
   onRegenerate?: (text: string) => void;
 
-  /** Optional: used to show names and avatar for user messages */
   userDisplayName?: string;
   userImageUrl?: string | null;
+
+  /** New structured thinking steps props */
+  thinkingSteps?: ThinkingStep[];
+  elapsedSeconds?: number;
 }
 
 export function ChatWindow({
@@ -33,6 +37,8 @@ export function ChatWindow({
   onRegenerate,
   userDisplayName,
   userImageUrl,
+  thinkingSteps,
+  elapsedSeconds,
 }: ChatWindowProps) {
   const bottomRef = useRef<HTMLDivElement>(null);
 
@@ -94,7 +100,19 @@ export function ChatWindow({
         })}
 
         {/* Loading Indicator inside the centered column */}
-        {isLoading && <AikaLoadingBubble activeAgents={activeAgents} currentThinking={currentThinking} />}
+        {isLoading && (
+          <>
+            <AgentThinkingBubble
+              steps={thinkingSteps ?? []}
+              activeAgents={activeAgents}
+              isActive={true}
+              elapsedSeconds={elapsedSeconds ?? 0}
+            />
+            {/* Fallback AikaLoadingBubble:
+              <AikaLoadingBubble activeAgents={activeAgents} currentThinking={currentThinking} />
+            */}
+          </>
+        )}
       </div>
 
       {/* Scroll anchor for auto-scroll */}
