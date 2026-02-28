@@ -16,20 +16,27 @@ import logging
 from typing import Optional
 
 import aiofiles  # type: ignore
-from web3 import Web3  # type: ignore
-
-# web3.py v7+ renamed the middleware; graceful fallback for older versions
-try:
-    from web3.middleware import ExtraDataToPOAMiddleware as geth_poa_middleware
-except ImportError:
-    try:
-        from web3.middleware import geth_poa_middleware  # type: ignore
-    except ImportError:
-        geth_poa_middleware = None  # type: ignore
-
-from app.domains.blockchain.nft.chain_registry import ChainConfig
 
 logger = logging.getLogger(__name__)
+
+try:
+    from web3 import Web3  # type: ignore
+    # web3.py v7+ renamed the middleware; graceful fallback for older versions
+    try:
+        from web3.middleware import ExtraDataToPOAMiddleware as geth_poa_middleware
+    except ImportError:
+        try:
+            from web3.middleware import geth_poa_middleware  # type: ignore
+        except ImportError:
+            geth_poa_middleware = None  # type: ignore
+    _WEB3_AVAILABLE = True
+except (ImportError, Exception) as _web3_err:
+    Web3 = None  # type: ignore
+    geth_poa_middleware = None  # type: ignore
+    _WEB3_AVAILABLE = False
+    logger.warning("web3 unavailable in base_nft_client — NFT features disabled: %s", _web3_err)
+
+from app.domains.blockchain.nft.chain_registry import ChainConfig
 
 # Path to the shared ABI (same contract on every chain)
 _ABI_PATH = os.path.join(

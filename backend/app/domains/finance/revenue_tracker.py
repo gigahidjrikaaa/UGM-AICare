@@ -115,16 +115,24 @@ class RevenueTrackerService:
     """Service for tracking and reporting platform revenue"""
     
     def __init__(self):
-        """Initialize revenue tracker with blockchain oracle client"""
-        self.oracle_client = OracleClient()
-        
-        logger.info(f"✅ RevenueTrackerService initialized")
-        logger.info(f"   Oracle: {self.oracle_client.oracle_address}")
-        if self.oracle_client.finance_account:
-            # Web3 Account objects have .address attribute (from eth_account.Account)
-            # Type ignore to bypass Pylance false positive
-            wallet_address = self.oracle_client.finance_account.address  # type: ignore
-            logger.info(f"   Finance wallet: {wallet_address}")
+        """Initialize revenue tracker with blockchain oracle client."""
+        try:
+            self.oracle_client = OracleClient()
+            logger.info("✅ RevenueTrackerService initialized")
+            logger.info("   Oracle: %s", self.oracle_client.oracle_address)
+            if self.oracle_client.finance_account:
+                wallet_address = self.oracle_client.finance_account.address  # type: ignore
+                logger.info("   Finance wallet: %s", wallet_address)
+        except (RuntimeError, ImportError, Exception) as exc:
+            # Blockchain package is not available (e.g., eth_utils version mismatch).
+            # Revenue tracker starts in a degraded mode — blockchain reporting is
+            # disabled but other service methods remain operational.
+            self.oracle_client = None  # type: ignore
+            logger.warning(
+                "RevenueTrackerService started WITHOUT blockchain oracle "
+                "(blockchain reporting disabled): %s",
+                exc,
+            )
     
     async def calculate_wellness_fees(
         self, 
@@ -460,7 +468,14 @@ class RevenueTrackerService:
         logger.info(f"   Revenue: {breakdown.total} USDC")
         logger.info(f"   Expenses: {total_expenses} USDC")
         
-        # Submit via oracle client
+        # Submit via oracle client — unavailable when blockchain package is not installed.
+        if self.oracle_client is None:
+            logger.warning(
+                "submit_monthly_report skipped — blockchain oracle is not available "
+                "(degraded mode)."
+            )
+            return None
+
         result = await self.oracle_client.submit_monthly_report(
             month_yyyymm,
             total_revenue_wei,

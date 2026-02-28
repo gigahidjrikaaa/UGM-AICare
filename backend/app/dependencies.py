@@ -66,9 +66,9 @@ def get_token_from_request(
 
 
 async def get_current_active_user(
+    request: Request,
     token: str = Depends(get_token_from_request),
     db: AsyncSession = Depends(get_async_db),
-    request: Optional[Request] = None,
 ) -> User:
     """Dependency to return the authenticated and active user for a valid JWT."""
     return await _resolve_current_active_user(
@@ -80,9 +80,9 @@ async def get_current_active_user(
 
 
 async def get_current_active_user_with_normalized_relations(
+    request: Request,
     token: str = Depends(get_token_from_request),
     db: AsyncSession = Depends(get_async_db),
-    request: Optional[Request] = None,
 ) -> User:
     """Authenticated active user with normalized relations eagerly loaded.
 
@@ -123,7 +123,7 @@ def _build_auth_user_query(user_id: int, eager_normalized_relations: bool):
 async def _resolve_current_active_user(
     token: str,
     db: AsyncSession,
-    request: Request | None,
+    request: Request,
     eager_normalized_relations: bool,
 ) -> User:
     """Resolve authenticated active user with optional eager relation loading."""
@@ -190,14 +190,13 @@ async def _resolve_current_active_user(
 
     # Expose request-scoped context for non-DI layers (e.g., middleware).
     # Never store raw tokens; use a deterministic hash.
-    if request is not None:
-        try:
-            request.state.user_id = int(user.id)
-            request.state.session_id = hashlib.sha256(token.encode("utf-8")).hexdigest()
-            request.state.analytics_allowed = True
-        except Exception:
-            # Non-fatal; auth should still succeed.
-            pass
+    try:
+        request.state.user_id = int(user.id)
+        request.state.session_id = hashlib.sha256(token.encode("utf-8")).hexdigest()
+        request.state.analytics_allowed = True
+    except Exception:
+        # Non-fatal; auth should still succeed.
+        pass
 
     return user
 

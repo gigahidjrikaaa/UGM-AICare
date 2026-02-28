@@ -12,16 +12,29 @@ import asyncio
 import os
 import json
 from typing import Optional
-from web3 import Web3  # type: ignore
-# web3.py v7+: geth_poa_middleware renamed, use try/except for compatibility
+import logging
+
+logger = logging.getLogger(__name__)
+
 try:
-    from web3.middleware import ExtraDataToPOAMiddleware as geth_poa_middleware
-except ImportError:
+    from web3 import Web3  # type: ignore
+    # web3.py v7+: geth_poa_middleware renamed, use try/except for compatibility
     try:
-        from web3.middleware import geth_poa_middleware  # type: ignore
+        from web3.middleware import ExtraDataToPOAMiddleware as geth_poa_middleware
     except ImportError:
-        # Fallback for newer versions
-        geth_poa_middleware = None  # type: ignore
+        try:
+            from web3.middleware import geth_poa_middleware  # type: ignore
+        except ImportError:
+            geth_poa_middleware = None  # type: ignore
+    _WEB3_AVAILABLE = True
+except (ImportError, Exception) as _web3_err:
+    Web3 = None  # type: ignore
+    geth_poa_middleware = None  # type: ignore
+    _WEB3_AVAILABLE = False
+    logger.warning(
+        "web3 unavailable in edu_chain nft_client — NFT features disabled: %s",
+        _web3_err,
+    )
 
 from dotenv import load_dotenv, find_dotenv
 import logging

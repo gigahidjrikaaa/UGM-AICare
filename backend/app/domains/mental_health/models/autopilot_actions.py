@@ -30,6 +30,7 @@ class AutopilotActionStatus(str, enum.Enum):
     queued = "queued"
     awaiting_approval = "awaiting_approval"
     approved = "approved"
+    rejected = "rejected"
     running = "running"
     confirmed = "confirmed"
     failed = "failed"

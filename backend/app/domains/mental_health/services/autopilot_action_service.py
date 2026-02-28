@@ -153,6 +153,53 @@ async def mark_confirmed(
     return action
 
 
+async def review_action(
+    db: AsyncSession,
+    action: AutopilotAction,
+    *,
+    decision: str,
+    reviewer_id: int,
+    reviewer_note: Optional[str] = None,
+    commit: bool = True,
+) -> AutopilotAction:
+    """Approve or reject an action that is awaiting human review.
+
+    Args:
+        db:            Database session.
+        action:        The ``AutopilotAction`` to review.
+        decision:      ``"approve"`` or ``"reject"``.
+        reviewer_id:   ID of the admin performing the review.
+        reviewer_note: Optional audit note attached to the action.
+        commit:        Whether to commit the transaction immediately.
+
+    Raises:
+        ValueError: If the action is not in ``awaiting_approval`` state, or
+                    if ``decision`` is not one of the accepted values.
+    """
+    if action.status != AutopilotActionStatus.awaiting_approval:
+        raise ValueError(
+            f"Action {action.id} cannot be reviewed — current status is "
+            f"'{action.status.value}', expected 'awaiting_approval'."
+        )
+
+    if decision == "approve":
+        action.status = AutopilotActionStatus.approved
+    elif decision == "reject":
+        action.status = AutopilotActionStatus.rejected
+    else:
+        raise ValueError(
+            f"Invalid decision {decision!r}: must be 'approve' or 'reject'."
+        )
+
+    action.approved_by = reviewer_id
+    action.approval_notes = reviewer_note
+    await db.flush()
+    if commit:
+        await db.commit()
+        await db.refresh(action)
+    return action
+
+
 async def mark_failed(
     db: AsyncSession,
     action: AutopilotAction,

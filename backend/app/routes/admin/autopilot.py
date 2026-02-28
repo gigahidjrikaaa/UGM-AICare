@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import os
+from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
@@ -18,10 +19,13 @@ from app.domains.mental_health.models.autopilot_actions import (
 from app.domains.mental_health.services.autopilot_action_service import (
     get_action_by_id,
     list_actions,
+    review_action,
 )
 from app.schemas.admin.autopilot import (
     AutopilotActionListResponse,
     AutopilotActionResponse,
+    AutopilotActionReviewRequest,
+    AutopilotActionReviewResponse,
 )
 
 router = APIRouter(prefix="/autopilot", tags=["Admin - Autopilot"])
@@ -185,6 +189,43 @@ async def update_autopilot_policy(
         autopilot_enabled=_env_bool("AUTOPILOT_ENABLED", True),
         onchain_placeholder=_env_bool("AUTOPILOT_ONCHAIN_PLACEHOLDER", True),
         worker_interval_seconds=max(1, _env_int("AUTOPILOT_WORKER_INTERVAL_SECONDS", 5)),
+    )
+
+
+@router.post("/actions/{action_id}/review", response_model=AutopilotActionReviewResponse)
+async def review_autopilot_action(
+    action_id: int,
+    body: AutopilotActionReviewRequest,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user=Depends(get_admin_user),
+) -> AutopilotActionReviewResponse:
+    """Approve or reject a pending autopilot action.
+
+    The action must be in ``awaiting_approval`` status.  On approval the worker
+    will pick it up on its next cycle; on rejection it is permanently halted.
+    """
+    action = await get_action_by_id(db, action_id)
+    if not action:
+        raise HTTPException(status_code=404, detail="Autopilot action not found")
+
+    try:
+        updated = await review_action(
+            db,
+            action=action,
+            decision=body.decision,
+            reviewer_id=admin_user.id,
+            reviewer_note=body.reviewer_note,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
+
+    return AutopilotActionReviewResponse(
+        id=updated.id,
+        action_type=updated.action_type.value,
+        status=updated.status.value,
+        decision=body.decision,
+        reviewer_note=updated.approval_notes,
+        reviewed_at=datetime.now(timezone.utc),
     )
 
 

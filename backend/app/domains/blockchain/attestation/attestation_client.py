@@ -6,19 +6,28 @@ import os
 from datetime import datetime
 from typing import Any, Optional
 
-from web3 import Web3  # type: ignore
+logger = logging.getLogger(__name__)
 
 try:
-    from web3.middleware import ExtraDataToPOAMiddleware as geth_poa_middleware
-except ImportError:
+    from web3 import Web3  # type: ignore
     try:
-        from web3.middleware import geth_poa_middleware  # type: ignore
+        from web3.middleware import ExtraDataToPOAMiddleware as geth_poa_middleware
     except ImportError:
-        geth_poa_middleware = None  # type: ignore
+        try:
+            from web3.middleware import geth_poa_middleware  # type: ignore
+        except ImportError:
+            geth_poa_middleware = None  # type: ignore
+    _WEB3_AVAILABLE = True
+except (ImportError, Exception) as _web3_err:
+    Web3 = None  # type: ignore
+    geth_poa_middleware = None  # type: ignore
+    _WEB3_AVAILABLE = False
+    logger.warning(
+        "web3 unavailable in attestation_client — attestation features disabled: %s",
+        _web3_err,
+    )
 
 from app.domains.blockchain.attestation.chain_registry import AttestationChainConfig
-
-logger = logging.getLogger(__name__)
 
 
 _ABI_PATH = os.path.join(

@@ -9,16 +9,26 @@ Provides common functionality for all blockchain clients:
 - Retry logic
 """
 
-from web3 import Web3
-# web3.py v7+: geth_poa_middleware renamed, use try/except for compatibility
 try:
-    from web3.middleware import ExtraDataToPOAMiddleware as geth_poa_middleware
-except ImportError:
+    from web3 import Web3
+    # web3.py v7+: geth_poa_middleware renamed, use try/except for compatibility
     try:
-        from web3.middleware import geth_poa_middleware  # type: ignore
+        from web3.middleware import ExtraDataToPOAMiddleware as geth_poa_middleware
     except ImportError:
-        # Fallback for newer versions
-        geth_poa_middleware = None  # type: ignore
+        try:
+            from web3.middleware import geth_poa_middleware  # type: ignore
+        except ImportError:
+            geth_poa_middleware = None  # type: ignore
+    _WEB3_AVAILABLE = True
+except ImportError as _web3_import_err:
+    Web3 = None  # type: ignore
+    geth_poa_middleware = None  # type: ignore
+    _WEB3_AVAILABLE = False
+    import logging as _logging
+    _logging.getLogger(__name__).warning(
+        "web3 package failed to import (blockchain features disabled): %s",
+        _web3_import_err,
+    )
 
 from eth_account import Account
 from eth_typing import ChecksumAddress

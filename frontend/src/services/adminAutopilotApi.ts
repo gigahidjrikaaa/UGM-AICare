@@ -42,6 +42,37 @@ export interface UpdateAdminAutopilotPolicyPayload {
   worker_interval_seconds?: number;
 }
 
+export interface AdminAutopilotReviewResponse {
+  id: number;
+  action_type: string;
+  status: string;
+  decision: string;
+  reviewer_note?: string | null;
+  reviewed_at?: string | null;
+}
+
+export const approveAutopilotAction = async (
+  actionId: number,
+  reviewerNote?: string,
+): Promise<AdminAutopilotReviewResponse> => {
+  const response = await apiClient.post<AdminAutopilotReviewResponse>(
+    `/admin/autopilot/actions/${actionId}/review`,
+    { decision: 'approve', reviewer_note: reviewerNote ?? null },
+  );
+  return response.data;
+};
+
+export const rejectAutopilotAction = async (
+  actionId: number,
+  reviewerNote?: string,
+): Promise<AdminAutopilotReviewResponse> => {
+  const response = await apiClient.post<AdminAutopilotReviewResponse>(
+    `/admin/autopilot/actions/${actionId}/review`,
+    { decision: 'reject', reviewer_note: reviewerNote ?? null },
+  );
+  return response.data;
+};
+
 export const listAutopilotActions = async (params: {
   status?: string;
   action_type?: string;

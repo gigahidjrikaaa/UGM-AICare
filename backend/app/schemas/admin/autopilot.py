@@ -28,3 +28,25 @@ class AutopilotActionResponse(BaseModel):
 class AutopilotActionListResponse(BaseModel):
     items: list[AutopilotActionResponse]
     total: int
+
+
+class AutopilotActionReviewRequest(BaseModel):
+    """Request body for an admin reviewing a pending autopilot action.
+
+    Admins can approve or reject actions that are in a 'pending_review' state.
+    An optional ``reviewer_note`` can be attached for audit trail purposes.
+    """
+
+    decision: str  # "approve" | "reject"
+    reviewer_note: Optional[str] = None
+
+
+class AutopilotActionReviewResponse(BaseModel):
+    """Response returned after an admin review is submitted."""
+
+    id: int
+    action_type: str
+    status: str
+    decision: str
+    reviewer_note: Optional[str] = None
+    reviewed_at: Optional[datetime] = None
