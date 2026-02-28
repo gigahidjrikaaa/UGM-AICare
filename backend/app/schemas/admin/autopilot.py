@@ -10,6 +10,7 @@ class AutopilotActionResponse(BaseModel):
     id: int
     action_type: str
     risk_level: str
+    policy_decision: str
     status: str
     idempotency_key: str
     payload_hash: str

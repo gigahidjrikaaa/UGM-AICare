@@ -91,6 +91,7 @@ def _to_action_response(action: AutopilotAction) -> AutopilotActionResponse:
         id=action.id,
         action_type=action.action_type.value,
         risk_level=action.risk_level,
+        policy_decision=action.policy_decision.value,
         status=action.status.value,
         idempotency_key=action.idempotency_key,
         payload_hash=action.payload_hash,

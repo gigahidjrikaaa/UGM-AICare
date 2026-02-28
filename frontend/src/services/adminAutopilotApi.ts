@@ -4,6 +4,7 @@ export interface AdminAutopilotAction {
   id: number;
   action_type: string;
   risk_level: string;
+  policy_decision: string;
   status: string;
   idempotency_key: string;
   payload_hash: string;
