@@ -556,13 +556,28 @@ class AikaOrchestratorState(TypedDict, total=False):
     """Unique identifier for this graph execution."""
     
     execution_path: List[str]
-    """List of node names executed in order."""
-    
+    """List of node names executed in order.
+
+    Design note: intentionally plain List without an ``operator.add`` reducer.
+    All nodes receive the full accumulated state, mutate it, and return the
+    full dict.  A reducer would double-count entries on every sequential
+    update (current + full-mutated = duplicate).  Parallel fan-out (TCA ∥
+    CMA) happens inside a *single* LangGraph node (``parallel_crisis_node``)
+    via ``asyncio.gather`` with a hand-written merge loop, so LangGraph's
+    native reducer is not required here.
+    """
+
     agents_invoked: List[str]
-    """List of agents that were invoked (e.g., ['STA', 'TCA'])."""
-    
+    """List of agents that were invoked (e.g., ['STA', 'TCA']).
+
+    See ``execution_path`` design note — same rationale applies.
+    """
+
     errors: List[str]
-    """List of error messages encountered during execution."""
+    """List of error messages encountered during execution.
+
+    See ``execution_path`` design note — same rationale applies.
+    """
     
     started_at: Optional[datetime]
     """Timestamp when execution started."""

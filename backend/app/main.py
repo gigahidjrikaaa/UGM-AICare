@@ -158,6 +158,34 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.warning("LangGraph checkpointer init failed (non-blocking)", exc_info=True)
 
+    # Compile the Aika agent ONCE here so every request reuses the same
+    # compiled graph.  The per-request db session is injected later via
+    # config["configurable"]["db"], not baked in at compile time.
+    try:
+        from app.agents.aika_orchestrator_graph import (
+            create_aika_agent_with_checkpointing,
+            set_aika_agent,
+        )
+        from app.core.langgraph_checkpointer import get_langgraph_checkpointer
+
+        _checkpointer = get_langgraph_checkpointer()
+        if _checkpointer is None:
+            from langgraph.checkpoint.memory import MemorySaver
+            _checkpointer = MemorySaver()
+            logger.warning(
+                "Aika agent using in-memory MemorySaver "
+                "(no durable checkpointer — conversation history will not persist across restarts)."
+            )
+        _compiled_agent = create_aika_agent_with_checkpointing(checkpointer=_checkpointer)
+        set_aika_agent(_compiled_agent)
+        app.state.aika_agent = _compiled_agent
+        startup_log("Aika agent compiled and cached on app.state.aika_agent")
+    except Exception:
+        logger.error(
+            "Aika agent compilation failed at startup (non-blocking — requests will fail until fixed)",
+            exc_info=True,
+        )
+
     # Initialize blockchain connections (NFT + attestation registries)
     from app.domains.blockchain import init_nft_client
     nft_result = init_nft_client()

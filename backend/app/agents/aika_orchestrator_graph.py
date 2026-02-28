@@ -37,11 +37,9 @@ Sub-module map:
 from __future__ import annotations
 
 import logging
-from functools import partial
-from typing import Optional, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 
 from langgraph.graph import StateGraph, END
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.graph_state import AikaOrchestratorState
 
@@ -63,7 +61,6 @@ from app.agents.aika.subgraph_nodes import (
 )
 from app.agents.aika.routing import (
     should_invoke_agents,
-    should_route_to_sca,
     ROUTE_CRISIS_PARALLEL,
     ROUTE_TCA,
     ROUTE_IA,
@@ -81,11 +78,47 @@ logger = logging.getLogger(__name__)
 
 
 # ============================================================================
+# MODULE-LEVEL AGENT SINGLETON
+# Compiled once at FastAPI startup (lifespan) and reused across all requests.
+# This avoids re-compiling the graph (and re-binding db sessions) on every
+# HTTP request, which was the previous per-request pattern.
+# ============================================================================
+
+_compiled_agent: Any = None
+
+
+def set_aika_agent(agent: Any) -> None:
+    """Store the app-lifetime compiled Aika agent.
+
+    Called exactly once from the FastAPI lifespan handler after the database
+    and checkpointer have been initialised.  Subsequent requests retrieve the
+    cached agent via ``get_aika_agent()`` and inject the per-request
+    ``db`` session via ``config["configurable"]["db"]``.
+    """
+    global _compiled_agent
+    _compiled_agent = agent
+    logger.info(
+        "Aika agent singleton registered: %s",
+        type(agent).__name__,
+    )
+
+
+def get_aika_agent() -> Any:
+    """Return the cached compiled Aika agent.
+
+    Returns ``None`` before the FastAPI lifespan has completed startup.
+    Call sites should guard against this (requests arriving before startup
+    are extremely unlikely but possible under heavy load during cold start).
+    """
+    return _compiled_agent
+
+
+# ============================================================================
 # GRAPH CONSTRUCTION
 # ============================================================================
 
-def create_aika_unified_graph(db: AsyncSession) -> StateGraph:
-    """Assemble and return the compiled Aika orchestrator StateGraph.
+def create_aika_unified_graph() -> StateGraph:
+    """Assemble and return the uncompiled Aika orchestrator StateGraph.
 
     Graph structure::
 
@@ -94,7 +127,7 @@ def create_aika_unified_graph(db: AsyncSession) -> StateGraph:
           +-- aika_decision --+-- [cma]   --> parallel_crisis --> synthesize --> END
                               |-- [tca]   --> execute_sca     --> synthesize --> END
                               |-- [ia]    --> execute_ia       --> synthesize --> END
-                              '-- [direct]                                    --> END
+                              '--[direct]                                     --> END
 
     STA is NOT a node in this graph.  It runs as a fire-and-forget background
     task (trigger_sta_conversation_analysis_background) when a conversation
@@ -102,21 +135,22 @@ def create_aika_unified_graph(db: AsyncSession) -> StateGraph:
     tool.  execute_sda (CMA) is not registered as a standalone node; it is
     invoked exclusively inside parallel_crisis_node via asyncio.gather.
 
-    Args:
-        db: Database session injected into every node via functools.partial.
+    ``db`` is no longer bound at compile time.  Each node receives it at
+    invocation time via ``config["configurable"]["db"]``, which allows this
+    compiled graph to be shared across all requests.
 
     Returns:
-        Compiled StateGraph ready for invocation with .ainvoke() or .astream().
+        Uncompiled StateGraph ready to be compiled with ``.compile()``.
     """
     workflow = StateGraph(AikaOrchestratorState)
 
-    # Bind the db session to each async node so LangGraph can call them as
-    # single-argument functions (state -> state).
-    workflow.add_node("aika_decision", partial(aika_decision_node, db=db))
-    workflow.add_node("parallel_crisis", partial(parallel_crisis_node, db=db))
-    workflow.add_node("execute_sca", partial(execute_sca_subgraph, db=db))
-    workflow.add_node("execute_ia", partial(execute_ia_subgraph, db=db))
-    workflow.add_node("synthesize", partial(synthesize_final_response, db=db))
+    # Nodes accept (state, config) — db is injected via config["configurable"],
+    # so no functools.partial binding is needed here.
+    workflow.add_node("aika_decision", aika_decision_node)
+    workflow.add_node("parallel_crisis", parallel_crisis_node)
+    workflow.add_node("execute_sca", execute_sca_subgraph)
+    workflow.add_node("execute_ia", execute_ia_subgraph)
+    workflow.add_node("synthesize", synthesize_final_response)
 
     # Entry point
     workflow.set_entry_point("aika_decision")
@@ -145,37 +179,42 @@ def create_aika_unified_graph(db: AsyncSession) -> StateGraph:
 
 
 def create_aika_agent_with_checkpointing(
-    db: AsyncSession,
-    checkpointer: Optional[object] = None,
-) -> object:
+    checkpointer: Optional[Any] = None,
+) -> Any:
     """Compile the Aika agent with optional conversation-persistent checkpointing.
 
-    Checkpointing is the recommended production configuration: LangGraph stores
-    the full orchestrator state after each node so conversations can resume
-    across requests (and even across server restarts when using an external
-    checkpointer such as AsyncSqliteSaver or AsyncPostgresSaver).
+    Intended to be called **once** at FastAPI startup (via the lifespan handler)
+    and stored as ``app.state.aika_agent`` or via ``set_aika_agent()``.
+    Subsequent requests retrieve the compiled agent with ``get_aika_agent()``
+    and inject the per-request ``db`` session through LangGraph's config::
 
-    Example — in-memory (testing)::
+        result = await aika_agent.ainvoke(
+            initial_state,
+            config={
+                "configurable": {
+                    "thread_id": f"user_{uid}_session_{sid}",
+                    "db": db,               # <-- injected here, not at compile time
+                }
+            },
+        )
+
+    Example — in-memory (testing / dev)::
 
         from langgraph.checkpoint.memory import MemorySaver
-        aika = create_aika_agent_with_checkpointing(db, MemorySaver())
-        result = await aika.ainvoke(state, config={"configurable": {"thread_id": f"user_{uid}"}})
+        aika = create_aika_agent_with_checkpointing(MemorySaver())
 
-    Example — SQLite (lightweight production)::
+    Example — Postgres (production)::
 
-        from langgraph.checkpoint.aiosqlite import AsyncSqliteSaver
-        memory = await AsyncSqliteSaver.from_conn_string("checkpoints.db")
-        aika = create_aika_agent_with_checkpointing(db, memory)
+        aika = create_aika_agent_with_checkpointing(get_langgraph_checkpointer())
 
     Args:
-        db:           Database session for all agent operations.
-        checkpointer: Optional LangGraph checkpointer.  When None, a stateless
-                      (no conversation memory) graph is returned.
+        checkpointer: Optional LangGraph checkpointer.  When ``None``, a
+                      stateless (no conversation memory) graph is returned.
 
     Returns:
         CompiledGraph ready for direct invocation.
     """
-    workflow = create_aika_unified_graph(db)
+    workflow = create_aika_unified_graph()
 
     if checkpointer:
         logger.info(

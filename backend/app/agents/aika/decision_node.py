@@ -41,6 +41,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.execution_tracker import execution_tracker
 from app.agents.graph_state import AikaOrchestratorState
+from langchain_core.runnables import RunnableConfig
 from app.agents.aika.constants import MAX_HISTORY_TURNS as _MAX_HISTORY_TURNS
 from app.agents.aika.message_classifier import (
     detect_crisis_keywords as _detect_crisis_keywords,
@@ -589,7 +590,7 @@ async def _record_decision_audit(
 @trace_agent("AikaDecision")
 async def aika_decision_node(
     state: AikaOrchestratorState,
-    db: AsyncSession,
+    config: RunnableConfig,
 ) -> AikaOrchestratorState:
     """First node of the unified Aika orchestrator graph.
 
@@ -598,7 +599,13 @@ async def aika_decision_node(
 
     Delegates all heavy logic to narrowly-scoped helpers so each phase can be
     reasoned about, tested, and modified in isolation.
+
+    ``db`` is injected at invocation time via ``config["configurable"]["db"]``
+    rather than being bound at graph-compile time, which allows the compiled
+    graph to be reused across every request (Fix: graph compiled once at
+    FastAPI startup rather than per HTTP request).
     """
+    db: AsyncSession = config["configurable"]["db"]
     execution_id = state.get("execution_id")
     if execution_id:
         execution_tracker.start_node(execution_id, "aika::decision", "aika")

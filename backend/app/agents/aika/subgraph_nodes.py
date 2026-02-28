@@ -32,6 +32,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.execution_tracker import execution_tracker
 from app.agents.graph_state import AikaOrchestratorState, IAState
+from langchain_core.runnables import RunnableConfig
 from app.agents.aika.prompt_builder import (
     get_aika_system_prompts as _get_aika_prompts,
     normalize_role as _normalize_user_role,
@@ -172,7 +173,7 @@ def _build_synthesis_prompt(
 @trace_agent("TCA_Subgraph")
 async def execute_sca_subgraph(
     state: AikaOrchestratorState,
-    db: AsyncSession,
+    config: RunnableConfig,
 ) -> AikaOrchestratorState:
     """Execute the Therapeutic Coach Agent (TCA) sub-graph.
 
@@ -180,13 +181,18 @@ async def execute_sca_subgraph(
     result into state, and pre-builds a warm direct response so that
     ``synthesize_final_response`` can short-circuit on the moderate-risk path.
 
+    ``db`` is pulled from ``config["configurable"]["db"]`` so the compiled
+    graph is independent of any particular database session.
+
     Args:
-        state: Orchestrator state; ``next_step`` must equal ``"tca"``.
-        db:    Database session passed down to the TCA graph.
+        state:  Orchestrator state; ``next_step`` must equal ``"tca"``.
+        config: LangGraph runtime config carrying ``db`` under
+                ``config["configurable"]["db"]``.
 
     Returns:
         Updated state with TCA outputs merged and ``aika_direct_response`` set.
     """
+    db: AsyncSession = config["configurable"]["db"]
     execution_id = state.get("execution_id")
     if execution_id:
         execution_tracker.start_node(execution_id, "aika::sca", "aika")
@@ -298,7 +304,7 @@ async def execute_sda_subgraph(
 @trace_agent("ParallelCrisis")
 async def parallel_crisis_node(
     state: AikaOrchestratorState,
-    db: AsyncSession,
+    config: RunnableConfig,
 ) -> AikaOrchestratorState:
     """Fan-out node: run TCA and CMA concurrently for high/critical risk.
 
@@ -310,14 +316,18 @@ async def parallel_crisis_node(
 
     State is deep-copied before each sub-graph invocation to prevent
     concurrent mutation across the two ``asyncio.gather`` branches.
+    ``db`` is extracted from ``config["configurable"]["db"]`` and forwarded
+    to each sub-graph directly.
 
     Args:
-        state: ``immediate_risk_level`` must be ``"high"`` or ``"critical"``.
-        db:    Database session shared across both sub-graph calls.
+        state:  ``immediate_risk_level`` must be ``"high"`` or ``"critical"``.
+        config: LangGraph runtime config; must contain ``db`` in
+                ``config["configurable"]``.
 
     Returns:
         Updated state with merged TCA and CMA outputs.
     """
+    db: AsyncSession = config["configurable"]["db"]
     execution_id = state.get("execution_id")
     if execution_id:
         execution_tracker.start_node(execution_id, "aika::parallel_crisis", "aika")
@@ -333,7 +343,7 @@ async def parallel_crisis_node(
         cma_input = copy.deepcopy(cast(dict[str, Any], state))
 
         tca_result, cma_result = await asyncio.gather(
-            execute_sca_subgraph(cast(AikaOrchestratorState, tca_input), db),
+            execute_sca_subgraph(cast(AikaOrchestratorState, tca_input), config),
             execute_sda_subgraph(cast(AikaOrchestratorState, cma_input), db),
             return_exceptions=True,
         )
@@ -389,7 +399,7 @@ async def parallel_crisis_node(
 
 async def execute_ia_subgraph(
     state: AikaOrchestratorState,
-    db: AsyncSession,
+    config: RunnableConfig,
 ) -> AikaOrchestratorState:
     """Execute the Insights Agent (IA) sub-graph and format the report.
 
@@ -397,14 +407,19 @@ async def execute_ia_subgraph(
     node, invokes the IA graph, and constructs a human-readable ``ia_report``
     string that ``synthesize_final_response`` can embed in the reply.
 
+    ``db`` is pulled from ``config["configurable"]["db"]`` rather than being
+    bound at graph-compile time.
+
     Args:
-        state: Orchestrator state; ``question_id``, ``start_date``, and
-               ``end_date`` should be set (decision_node sets defaults).
-        db:    Database session passed down to the IA graph.
+        state:  Orchestrator state; ``question_id``, ``start_date``, and
+                ``end_date`` should be set (decision_node sets defaults).
+        config: LangGraph runtime config carrying ``db`` under
+                ``config["configurable"]["db"]``.
 
     Returns:
         Updated state with IA outputs merged and ``ia_report`` populated.
     """
+    db: AsyncSession = config["configurable"]["db"]
     execution_id = state.get("execution_id")
     if execution_id:
         execution_tracker.start_node(execution_id, "aika::ia", "aika")
@@ -461,7 +476,6 @@ async def execute_ia_subgraph(
 
 async def synthesize_final_response(
     state: AikaOrchestratorState,
-    db: AsyncSession,
 ) -> AikaOrchestratorState:
     """Compose the final Aika reply when a sub-agent has run.
 
@@ -470,9 +484,11 @@ async def synthesize_final_response(
     Otherwise uses a synthesis prompt to ask Gemini to compose a warm,
     personality-consistent reply from the merged agent outputs.
 
+    This node does not require a database session — all necessary information
+    is already present in state from earlier nodes.
+
     Args:
         state: Orchestrator state after all sub-agents have run.
-        db:    Unused here; kept in signature for LangGraph ``partial`` binding.
 
     Returns:
         Updated state with ``final_response`` and ``response_source`` set.

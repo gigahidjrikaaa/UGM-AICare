@@ -14,8 +14,10 @@ Name meaning:
 - 愛 (Ai) = Love, affection
 - 佳 (Ka) = Excellent, beautiful
 
-⚠️ IMPORTANT: Use the unified orchestrator, NOT the legacy one!
-  from app.agents.aika_orchestrator_graph import create_aika_agent_with_checkpointing
+⚠️ IMPORTANT: Use the cached agent singleton, NOT per-request compilation!
+  from app.agents.aika_orchestrator_graph import get_aika_agent
+  aika = get_aika_agent()  # compiled once at startup, reused per request
+  result = await aika.ainvoke(state, config={"configurable": {"thread_id": "...", "db": db}})
 """
 
 # ✅ REMOVED: Legacy AikaOrchestrator - use aika_orchestrator_graph.py instead

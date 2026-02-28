@@ -8,9 +8,11 @@ No external I/O is performed - the only side effect is a call to
 execution_tracker.trigger_edge, which records the routing decision for
 observability dashboards.
 
-Public API:
+Public API (actively wired in the graph):
     should_invoke_agents    Conditional edge after 'aika_decision'.
-    should_route_to_sca     Conditional edge after the legacy STA node.
+
+Legacy (not wired — retained for manual tooling only):
+    should_route_to_sca     Post-STA routing; STA is now background-only.
 """
 from __future__ import annotations
 
@@ -124,9 +126,15 @@ def should_invoke_agents(state: AikaOrchestratorState) -> str:
 def should_route_to_sca(state: AikaOrchestratorState) -> str:
     """Conditional edge executed after the legacy STA sub-graph node.
 
-    execute_sta_subgraph is no longer wired in the active graph (STA is
-    background-only).  This function is retained for completeness and
-    potential future re-introduction of an inline STA path.
+    .. deprecated::
+        ``execute_sta_subgraph`` is no longer wired in the active graph — STA
+        runs exclusively as a background post-conversation task.  This function
+        is retained so counselors/admins can re-introduce an inline STA path in
+        future without losing the routing logic, and for integration tests that
+        exercise the legacy node manually.
+
+        It is NOT re-exported from ``aika_orchestrator_graph`` to keep the
+        public API surface clean.
 
     Returns:
         ROUTE_SDA:        High/critical severity — escalate to CMA.

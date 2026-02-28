@@ -28,7 +28,7 @@ from app import auth_utils
 from app.agents.aika.tools import get_aika_tools
 from app.agents.execution_tracker import execution_tracker
 # ✅ REMOVED: Legacy AikaOrchestrator - Now using unified orchestrator only
-from app.agents.aika_orchestrator_graph import create_aika_agent_with_checkpointing  # ✨ Direct LangGraph invocation
+from app.agents.aika_orchestrator_graph import get_aika_agent  # compiled once at startup
 from app.core import llm
 from app.core.llm_request_tracking import get_stats, prompt_context
 from app.core.rate_limiter import check_rate_limit_dependency, get_rate_limiter
@@ -49,7 +49,6 @@ from app.domains.mental_health.services.personal_context import (
 )
 from app.domains.mental_health.services.tool_calling import generate_with_tools
 
-from app.core.langgraph_checkpointer import get_langgraph_checkpointer
 from app.services.ai_memory_facts_service import (
     list_user_fact_texts_for_agent,
     remember_from_user_message,
@@ -149,13 +148,15 @@ async def process_chat_message(
             },
         )
         
-        # Create Aika agent with app-lifetime checkpointing (Postgres when available)
-        checkpointer = get_langgraph_checkpointer()
-        if checkpointer is None:
-            # Dev fallback
-            from langgraph.checkpoint.memory import MemorySaver
-            checkpointer = MemorySaver()
-        aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=checkpointer)
+        # Retrieve the app-lifetime compiled agent (compiled once in lifespan).
+        # The db session is NOT baked into the graph — it is injected per-request
+        # via config["configurable"]["db"] at invocation time.
+        aika_agent = get_aika_agent()
+        if aika_agent is None:
+            raise RuntimeError(
+                "Aika agent is not initialised yet. "
+                "The FastAPI lifespan startup may still be in progress."
+            )
 
         # Inject user-controlled cross-conversation memory facts (consent-gated for agent use)
         remembered_facts = await list_user_fact_texts_for_agent(db, current_user, limit=20)
@@ -172,14 +173,16 @@ async def process_chat_message(
             },
         }
         
-        # Invoke Aika agent directly (no wrapper needed - the graph IS the agent)
+        # Invoke Aika agent directly (no wrapper needed - the graph IS the agent).
+        # db is passed via configurable so it is scoped to this single request.
         llm_stats = None
         with prompt_context(prompt_id=prompt_id, user_id=current_user.id, session_id=session_id):
             result = await aika_agent.ainvoke(
                 initial_state,
                 config={
                     "configurable": {
-                        "thread_id": f"user_{current_user.id}_session_{session_id}"
+                        "thread_id": f"user_{current_user.id}_session_{session_id}",
+                        "db": db,
                     }
                 }
             )

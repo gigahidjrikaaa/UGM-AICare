@@ -22,10 +22,9 @@ from app.dependencies import get_current_active_user
 from app.models import User
 from app.domains.mental_health.models import Conversation
 from app.domains.mental_health.schemas.chat import AikaRequest
-from app.agents.aika_orchestrator_graph import create_aika_agent_with_checkpointing
+from app.agents.aika_orchestrator_graph import get_aika_agent  # compiled once at startup
 from app.core.rate_limiter import check_rate_limit_dependency
 from app.agents.execution_tracker import execution_tracker
-from app.core.langgraph_checkpointer import get_langgraph_checkpointer
 from app.services.ai_memory_facts_service import list_user_fact_texts_for_agent, remember_from_user_message
 from app.core.events import AgentEvent, emit_agent_event
 from app.domains.mental_health.models import AgentNameEnum
@@ -189,16 +188,20 @@ async def stream_aika_execution(
         
         logger.info(f"🌊 Starting streaming execution for user {current_user.id} with model: {request.preferred_model or 'default'} (exec_id={execution_id})")
         
-        # Create Aika agent with app-lifetime checkpointing (Postgres when available)
-        checkpointer = get_langgraph_checkpointer()
-        if checkpointer is None:
-            from langgraph.checkpoint.memory import MemorySaver
-            checkpointer = MemorySaver()
-        aika_agent = create_aika_agent_with_checkpointing(db, checkpointer=checkpointer)
+        # Retrieve the app-lifetime compiled agent (compiled once in lifespan).
+        # db is NOT baked in at compile time — it is injected per-request so
+        # sessions are properly scoped and the graph can be safely reused.
+        aika_agent = get_aika_agent()
+        if aika_agent is None:
+            raise RuntimeError(
+                "Aika agent is not initialised yet. "
+                "The FastAPI lifespan startup may still be in progress."
+            )
         
         config: dict = {
             "configurable": {
-                "thread_id": f"user_{current_user.id}_session_{request.session_id or 'default'}"
+                "thread_id": f"user_{current_user.id}_session_{request.session_id or 'default'}",
+                "db": db,
             }
         }
         
