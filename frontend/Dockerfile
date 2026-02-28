@@ -8,26 +8,24 @@ ARG NODE_IMAGE=node:20-bookworm-slim
 # 1. Development Stage ('development')
 FROM ${NODE_IMAGE} AS development
 
-# Set working directory
 WORKDIR /app
 
 # Disable Next telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Copy package.json and lock file
-COPY package.json package-lock.json ./
-# Install dependencies. Prefer npm ci for reproducibility, but fall back to npm install
-# if the lockfile is out of sync (avoids CI hard-fail during deployment).
-RUN --mount=type=cache,target=/root/.npm \
-	sh -lc "npm ci --no-audit --no-fund || npm install --no-audit --no-fund"
+# Copy package manifests first to maximise layer cache hits.
+COPY package.json package-lock.json .npmrc* ./
 
-# Copy the rest of the application code
+# Strict clean install — fail loudly on lock file drift so drift is caught in
+# development before it reaches production.  --legacy-peer-deps is required
+# because valtio@1.13.2 ships use-sync-external-store@1.2.0, which declares a
+# peer dep on React ≤18, conflicting with the React 19 root install.
+RUN --mount=type=cache,target=/root/.npm \
+	npm ci --legacy-peer-deps --no-audit --no-fund
+
 COPY . .
 
-# Expose the port Next.js runs on
 EXPOSE 22000
-
-# Default command for development (runs dev server)
 CMD ["npm", "run", "dev:docker"]
 
 
@@ -35,69 +33,63 @@ CMD ["npm", "run", "dev:docker"]
 
 
 # 2. Production Build Stage ('builder')
-# Use the development stage as a base or start fresh
 FROM ${NODE_IMAGE} AS builder
 
 WORKDIR /app
 
-# Disable Next telemetry
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Copy dependency manifests
-COPY package.json package-lock.json ./
+COPY package.json package-lock.json .npmrc* ./
 
-# Prefer clean install for exact versions, but fall back to npm install if lockfile drift exists.
+# Strict clean install — same flag rationale as the development stage above.
 RUN --mount=type=cache,target=/root/.npm \
-	sh -lc "npm ci --prefer-offline --no-audit --no-fund || npm install --prefer-offline --no-audit --no-fund"
+	npm ci --legacy-peer-deps --prefer-offline --no-audit --no-fund
 
-# Copy the rest of the source code
 COPY . .
 
-# Set build-time environment variables
-# These will be baked into the static assets by Next.js
+# Build-time env vars baked into the static bundle by Next.js.
 ARG NEXT_PUBLIC_API_URL
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
-# Add other NEXT_PUBLIC_ ARGs and ENVs here
 
-# Build the Next.js application
-# Disable Turbopack in production (use webpack for stability)
-# Increase Node memory limit to prevent OOM during build
-ENV NODE_OPTIONS="--max-old-space-size=3072"
-RUN npm run build
+# Scope NODE_OPTIONS to this RUN step only — do not leak into the runtime
+# image.  3 GiB heap prevents OOM kills on large Next.js builds.
+RUN NODE_OPTIONS="--max-old-space-size=3072" npm run build
 
 
 # ---
 
 
 # 3. Production Runtime Stage ('production')
-# Use a minimal Node.js image for the final production image
 FROM ${NODE_IMAGE} AS production
 
 WORKDIR /app
 
-# Set environment for production
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
 
-# Sensible defaults for platform runtimes (Coolify will typically override PORT)
+# Sensible defaults — Coolify / the platform will override PORT at runtime.
 ENV HOSTNAME=0.0.0.0
 ENV PORT=22000
 
-# Copy built artifacts from the 'builder' stage
+# Install curl for the HEALTHCHECK.  Use a cache mount so repeated builds
+# don't re-download the package index.
+ARG DEBIAN_FRONTEND=noninteractive
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    apt-get -o Acquire::Retries=3 update && \
+    apt-get install -y --no-install-recommends curl && \
+    rm -rf /var/lib/apt/lists/*
+
 COPY --from=builder /app/public ./public
 COPY --from=builder --chown=node:node /app/.next/standalone ./
 COPY --from=builder --chown=node:node /app/.next/static ./.next/static
 
-# Expose the port Next.js runs on
 EXPOSE 22000
 
-# Set user to non-root (good practice)
 USER node
 
-# Command to run the optimized production server
-CMD ["node", "server.js"]
+HEALTHCHECK --interval=30s --timeout=5s --start-period=45s --retries=3 \
+    CMD curl -fs http://127.0.0.1:${PORT:-22000}/api/health || exit 1
 
-# Note: Requires 'output: "standalone"' in next.config.ts for this setup
-# If not using standalone, adjust the copy steps and CMD accordingly
-# CMD ["npm", "start"] might work if standalone is not used,
-# but you need to copy node_modules from the builder stage as well.
+# Note: requires `output: "standalone"` in next.config.ts.
+CMD ["node", "server.js"]
