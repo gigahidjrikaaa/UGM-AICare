@@ -583,6 +583,7 @@ async def generate_gemini_response(
     tools: Optional[List[Any]] = None,
     return_full_response: bool = False,
     json_mode: bool = False,
+    json_schema: Optional[Dict[str, Any]] = None,
 ) -> str | Any:
     """Generates a response using the Google Gemini API with new google-genai SDK.
     
@@ -603,6 +604,7 @@ async def generate_gemini_response(
         tools: Optional list of Tool objects for function calling
         return_full_response: If True, returns full response object for tool calling
         json_mode: If True, forces the model to output valid JSON
+        json_schema: Optional JSON schema to enforce when json_mode=True
         
     Returns:
         Generated response text, or full response object if return_full_response=True
@@ -611,7 +613,7 @@ async def generate_gemini_response(
         call_index = llm_request_tracking.increment_request(model=model)
         client = get_gemini_client()
         logger.info(
-            f"Sending request to Gemini API (Model: {model}, Tools: {bool(tools)}, JSON: {json_mode})",
+            f"Sending request to Gemini API (Model: {model}, Tools: {bool(tools)}, JSON: {json_mode}, Schema: {bool(json_schema)})",
             extra={
                 "user_id": llm_request_tracking.get_user_id(),
                 "session_id": llm_request_tracking.get_session_id(),
@@ -640,6 +642,8 @@ async def generate_gemini_response(
         
         if json_mode:
             config.response_mime_type = "application/json"
+            if json_schema is not None:
+                config.response_schema = cast(Any, json_schema)
         
         # Add system prompt if provided
         if system_prompt:
@@ -1008,6 +1012,7 @@ async def generate_gemini_response_with_fallback(
     tools: Optional[List[Any]] = None,
     return_full_response: bool = False,
     json_mode: bool = False,
+    json_schema: Optional[Dict[str, Any]] = None,
     allow_retry_sleep: bool = True,
 ) -> str | Any:
     """Generate Gemini response with automatic fallback to alternative models.
@@ -1065,7 +1070,8 @@ async def generate_gemini_response_with_fallback(
                     system_prompt=system_prompt,
                     tools=tools,
                     return_full_response=return_full_response,
-                    json_mode=json_mode
+                    json_mode=json_mode,
+                    json_schema=json_schema,
                 )
                 
                 # Success! Track it.

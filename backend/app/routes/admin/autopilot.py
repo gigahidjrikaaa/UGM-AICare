@@ -100,6 +100,7 @@ def _to_action_response(action: AutopilotAction) -> AutopilotActionResponse:
         explorer_tx_url=explorer_tx_url,
         chain_id=action.chain_id,
         error_message=action.error_message,
+        approval_notes=action.approval_notes,
         retry_count=int(action.retry_count or 0),
         next_retry_at=action.next_retry_at,
         executed_at=action.executed_at,

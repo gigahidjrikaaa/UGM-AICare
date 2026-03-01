@@ -65,9 +65,9 @@ async function counselorApiCall<T>(path: string, options: RequestInit = {}): Pro
   const session = await getSession();
   const accessToken = (session as { accessToken?: string } | null)?.accessToken;
 
-  const headers: HeadersInit = {
+  const headers: Record<string, string> = {
     ...(options.body ? { 'Content-Type': 'application/json' } : {}),
-    ...(options.headers || {}),
+    ...(options.headers as Record<string, string> ?? {}),
   };
 
   if (accessToken) {

@@ -199,6 +199,19 @@ export interface AnalyticsOverviewResponse {
     successful_executions: number;
     success_rate_percent: number;
     average_execution_time_ms: number;
+    decision_parse_health?: {
+      period_days: number;
+      total_attempts: number;
+      failed_parses: number;
+      repaired_parses: number;
+      unrecovered_parses: number;
+      parse_failure_rate_percent: number;
+      unrecovered_rate_percent: number;
+      repair_recovery_rate_percent: number;
+      warning_threshold_percent: number;
+      critical_threshold_percent: number;
+      status: 'healthy' | 'degraded' | 'critical' | 'unknown';
+    };
     most_active_nodes: Array<{
       node_name: string;
       execution_count: number;

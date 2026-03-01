@@ -149,6 +149,48 @@ export function AnalyticsOverview({ days }: AnalyticsOverviewProps) {
         </div>
       </div>
 
+      {data.data.decision_parse_health && (
+        <div className="mb-8 rounded-xl border border-white/10 bg-white/5 p-4">
+          <div className="mb-3 flex items-center justify-between">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-white/60">Aika Decision JSON Health</h3>
+            <span
+              className={`rounded-full px-3 py-1 text-[10px] font-bold uppercase tracking-wider ${
+                data.data.decision_parse_health.status === 'healthy'
+                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                  : data.data.decision_parse_health.status === 'degraded'
+                    ? 'bg-[#FFCA40]/15 text-[#FFCA40] border border-[#FFCA40]/30'
+                    : data.data.decision_parse_health.status === 'critical'
+                      ? 'bg-red-500/15 text-red-400 border border-red-500/30'
+                      : 'bg-white/10 text-white/60 border border-white/20'
+              }`}
+            >
+              {data.data.decision_parse_health.status}
+            </span>
+          </div>
+          <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+            <div className="rounded-lg border border-white/10 bg-black/10 p-3">
+              <p className="text-[10px] uppercase tracking-wider text-white/50">Attempts</p>
+              <p className="text-lg font-bold text-white">{data.data.decision_parse_health.total_attempts.toLocaleString()}</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/10 p-3">
+              <p className="text-[10px] uppercase tracking-wider text-white/50">Parse Failure Rate</p>
+              <p className="text-lg font-bold text-white">{data.data.decision_parse_health.parse_failure_rate_percent.toFixed(2)}%</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/10 p-3">
+              <p className="text-[10px] uppercase tracking-wider text-white/50">Unrecovered Rate</p>
+              <p className="text-lg font-bold text-white">{data.data.decision_parse_health.unrecovered_rate_percent.toFixed(2)}%</p>
+            </div>
+            <div className="rounded-lg border border-white/10 bg-black/10 p-3">
+              <p className="text-[10px] uppercase tracking-wider text-white/50">Repair Recovery</p>
+              <p className="text-lg font-bold text-white">{data.data.decision_parse_health.repair_recovery_rate_percent.toFixed(2)}%</p>
+            </div>
+          </div>
+          <p className="mt-3 text-xs text-white/50">
+            Warning ≥ {data.data.decision_parse_health.warning_threshold_percent}% · Critical ≥ {data.data.decision_parse_health.critical_threshold_percent}%
+          </p>
+        </div>
+      )}
+
       {/* Most Active Nodes */}
       {data.data.most_active_nodes && data.data.most_active_nodes.length > 0 && (
         <div>

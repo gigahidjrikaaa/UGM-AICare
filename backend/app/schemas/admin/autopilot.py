@@ -19,6 +19,7 @@ class AutopilotActionResponse(BaseModel):
     explorer_tx_url: Optional[str] = None
     chain_id: Optional[int] = None
     error_message: Optional[str] = None
+    approval_notes: Optional[str] = None
     retry_count: int
     next_retry_at: Optional[datetime] = None
     executed_at: Optional[datetime] = None

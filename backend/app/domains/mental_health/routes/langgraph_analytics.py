@@ -31,6 +31,7 @@ async def get_analytics_overview(
     try:
         # Use the enhanced execution tracker analytics
         analytics = await execution_tracker.get_execution_analytics(days)
+        decision_parse_health = await execution_tracker.get_decision_parse_health(days)
         
         if not analytics:
             # Fallback to direct database query
@@ -54,7 +55,10 @@ async def get_analytics_overview(
         
         return {
             "success": True,
-            "data": analytics,
+            "data": {
+                **analytics,
+                "decision_parse_health": decision_parse_health,
+            },
             "generated_at": datetime.now().isoformat()
         }
         

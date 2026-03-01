@@ -13,6 +13,7 @@ export interface AdminAutopilotAction {
   explorer_tx_url?: string | null;
   chain_id?: number | null;
   error_message?: string | null;
+  approval_notes?: string | null;
   retry_count: number;
   next_retry_at?: string | null;
   executed_at?: string | null;

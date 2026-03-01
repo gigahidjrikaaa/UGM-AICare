@@ -33,6 +33,12 @@ export interface LangGraphHealthData {
   graphs: GraphHealthStatus[];
   overall_status: 'healthy' | 'degraded' | 'down';
   last_updated: string;
+  decision_parse_health?: {
+    status: 'healthy' | 'degraded' | 'critical' | 'unknown';
+    total_attempts: number;
+    parse_failure_rate_percent: number;
+    unrecovered_rate_percent: number;
+  };
 }
 
 export function useLangGraphHealth(autoRefreshSeconds: number = 30) {
@@ -77,12 +83,33 @@ export function useLangGraphHealth(autoRefreshSeconds: number = 30) {
       // Determine overall status
       const hasDown = graphs.some(g => g.status === 'down');
       const hasDegraded = graphs.some(g => g.status === 'degraded');
-      const overall_status = hasDown ? 'down' : hasDegraded ? 'degraded' : 'healthy';
+      const decisionParseHealth = overview.data.decision_parse_health;
+      const parseStatus = decisionParseHealth?.status;
+
+      let overall_status: 'healthy' | 'degraded' | 'down' = hasDown
+        ? 'down'
+        : hasDegraded
+          ? 'degraded'
+          : 'healthy';
+
+      if (parseStatus === 'critical') {
+        overall_status = 'down';
+      } else if (parseStatus === 'degraded' && overall_status === 'healthy') {
+        overall_status = 'degraded';
+      }
 
       setData({
         graphs,
         overall_status,
-        last_updated: new Date().toISOString()
+        last_updated: new Date().toISOString(),
+        decision_parse_health: decisionParseHealth
+          ? {
+              status: decisionParseHealth.status,
+              total_attempts: decisionParseHealth.total_attempts,
+              parse_failure_rate_percent: decisionParseHealth.parse_failure_rate_percent,
+              unrecovered_rate_percent: decisionParseHealth.unrecovered_rate_percent,
+            }
+          : undefined,
       });
       setLoading(false);
     } catch (err) {

@@ -3,7 +3,7 @@
 import asyncio
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Set, Callable, Any
 from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -77,8 +77,13 @@ class ExecutionStateTracker:
             "execution_time_warning_ms": 30000,  # 30 seconds
             "execution_time_critical_ms": 120000,  # 2 minutes
             "failure_rate_warning": 0.1,  # 10%
-            "failure_rate_critical": 0.25  # 25%
+            "failure_rate_critical": 0.25,  # 25%
+            "decision_parse_failure_warning_percent": 5.0,
+            "decision_parse_failure_critical_percent": 15.0,
+            "decision_parse_failure_min_samples": 20,
         }
+        self._decision_parse_alert_cooldown_s: int = 900  # 15 minutes
+        self._last_decision_parse_alert_ts: float = 0.0
         
     def start_execution(self, graph_id: str, agent_name: str, agent_run_id: Optional[int] = None, 
                        input_data: Optional[Dict] = None) -> str:
@@ -474,6 +479,126 @@ class ExecutionStateTracker:
         except Exception as e:
             print(f"Error persisting performance metric: {e}")
 
+    def record_custom_metric(
+        self,
+        execution_id: Optional[str],
+        metric_name: str,
+        metric_value: float,
+        *,
+        metric_unit: str = "count",
+        metric_category: str = "quality",
+        node_id: Optional[str] = None,
+    ) -> None:
+        """Record a custom LangGraph metric when an execution_id is available."""
+        if not execution_id:
+            return
+        asyncio.create_task(
+            self._persist_performance_metric(
+                execution_id=execution_id,
+                metric_name=metric_name,
+                metric_value=metric_value,
+                metric_unit=metric_unit,
+                metric_category=metric_category,
+                node_id=node_id,
+            )
+        )
+
+    def record_decision_parse_outcome(
+        self,
+        *,
+        execution_id: Optional[str],
+        initial_parse_failed: bool,
+        repaired: bool,
+    ) -> None:
+        """Record Aika decision-parse quality metrics and trigger threshold alerts."""
+        self.record_custom_metric(
+            execution_id,
+            "aika_decision_parse_attempt",
+            1.0,
+            metric_unit="count",
+            metric_category="quality",
+            node_id="aika_decision",
+        )
+
+        if initial_parse_failed:
+            self.record_custom_metric(
+                execution_id,
+                "aika_decision_parse_failed",
+                1.0,
+                metric_unit="count",
+                metric_category="quality",
+                node_id="aika_decision",
+            )
+
+        if repaired:
+            self.record_custom_metric(
+                execution_id,
+                "aika_decision_parse_repaired",
+                1.0,
+                metric_unit="count",
+                metric_category="quality",
+                node_id="aika_decision",
+            )
+
+        if initial_parse_failed and not repaired:
+            self.record_custom_metric(
+                execution_id,
+                "aika_decision_parse_unrecovered",
+                1.0,
+                metric_unit="count",
+                metric_category="quality",
+                node_id="aika_decision",
+            )
+
+        asyncio.create_task(self._check_decision_parse_failure_threshold(days=1))
+
+    async def _check_decision_parse_failure_threshold(self, *, days: int = 1) -> None:
+        """Create warning/critical alerts when parse-failure rate breaches thresholds."""
+        try:
+            summary = await self.get_decision_parse_health(days=days)
+            attempts = int(summary.get("total_attempts", 0))
+            failure_rate = float(summary.get("parse_failure_rate_percent", 0.0))
+
+            min_samples = int(self._alert_thresholds["decision_parse_failure_min_samples"])
+            if attempts < min_samples:
+                return
+
+            severity: Optional[str] = None
+            if failure_rate >= float(self._alert_thresholds["decision_parse_failure_critical_percent"]):
+                severity = "critical"
+            elif failure_rate >= float(self._alert_thresholds["decision_parse_failure_warning_percent"]):
+                severity = "warning"
+
+            if severity is None:
+                return
+
+            now_ts = time.time()
+            if (now_ts - self._last_decision_parse_alert_ts) < self._decision_parse_alert_cooldown_s:
+                return
+
+            self._last_decision_parse_alert_ts = now_ts
+            threshold_value = (
+                float(self._alert_thresholds["decision_parse_failure_critical_percent"])
+                if severity == "critical"
+                else float(self._alert_thresholds["decision_parse_failure_warning_percent"])
+            )
+
+            await self._create_alert(
+                alert_type="quality",
+                severity=severity,
+                title="Aika Decision Parse Failure Rate Elevated",
+                message=(
+                    f"Decision parse failure rate is {failure_rate:.2f}% over the last {days} day(s) "
+                    f"({summary.get('failed_parses', 0)}/{attempts} attempts)."
+                ),
+                execution_id=None,
+                threshold_value=threshold_value,
+                actual_value=failure_rate,
+                metric_name="aika_decision_parse_failure_rate_percent",
+            )
+        except Exception as e:
+            print(f"Error checking decision parse threshold: {e}")
+
     async def _create_alert(self, alert_type: str, severity: str, title: str,
                           message: str, execution_id: Optional[str] = None,
                           threshold_value: Optional[float] = None,
@@ -632,6 +757,70 @@ class ExecutionStateTracker:
         except Exception as e:
             print(f"Error getting execution analytics: {e}")
             return {}
+
+    async def get_decision_parse_health(self, days: int = 7) -> Dict[str, Any]:
+        """Return Aika decision JSON parse health summary for dashboard/alerts."""
+        try:
+            async with AsyncSessionLocal() as db:
+                cutoff_date = datetime.now() - timedelta(days=days)
+
+                async def _sum_metric(metric_name: str) -> float:
+                    result = await db.execute(
+                        select(func.coalesce(func.sum(LangGraphPerformanceMetric.metric_value), 0.0)).where(
+                            and_(
+                                LangGraphPerformanceMetric.metric_name == metric_name,
+                                LangGraphPerformanceMetric.recorded_at >= cutoff_date,
+                            )
+                        )
+                    )
+                    return float(result.scalar() or 0.0)
+
+                attempts = int(await _sum_metric("aika_decision_parse_attempt"))
+                failed = int(await _sum_metric("aika_decision_parse_failed"))
+                repaired = int(await _sum_metric("aika_decision_parse_repaired"))
+                unrecovered = int(await _sum_metric("aika_decision_parse_unrecovered"))
+
+                failure_rate = (failed / attempts * 100.0) if attempts > 0 else 0.0
+                unrecovered_rate = (unrecovered / attempts * 100.0) if attempts > 0 else 0.0
+                recovery_rate = (repaired / failed * 100.0) if failed > 0 else 0.0
+
+                warning = float(self._alert_thresholds["decision_parse_failure_warning_percent"])
+                critical = float(self._alert_thresholds["decision_parse_failure_critical_percent"])
+                status = "healthy"
+                if attempts >= int(self._alert_thresholds["decision_parse_failure_min_samples"]):
+                    if failure_rate >= critical:
+                        status = "critical"
+                    elif failure_rate >= warning:
+                        status = "degraded"
+
+                return {
+                    "period_days": days,
+                    "total_attempts": attempts,
+                    "failed_parses": failed,
+                    "repaired_parses": repaired,
+                    "unrecovered_parses": unrecovered,
+                    "parse_failure_rate_percent": round(failure_rate, 2),
+                    "unrecovered_rate_percent": round(unrecovered_rate, 2),
+                    "repair_recovery_rate_percent": round(recovery_rate, 2),
+                    "warning_threshold_percent": warning,
+                    "critical_threshold_percent": critical,
+                    "status": status,
+                }
+        except Exception as e:
+            print(f"Error getting decision parse health: {e}")
+            return {
+                "period_days": days,
+                "total_attempts": 0,
+                "failed_parses": 0,
+                "repaired_parses": 0,
+                "unrecovered_parses": 0,
+                "parse_failure_rate_percent": 0.0,
+                "unrecovered_rate_percent": 0.0,
+                "repair_recovery_rate_percent": 0.0,
+                "warning_threshold_percent": float(self._alert_thresholds["decision_parse_failure_warning_percent"]),
+                "critical_threshold_percent": float(self._alert_thresholds["decision_parse_failure_critical_percent"]),
+                "status": "unknown",
+            }
 
     async def get_recent_alerts(self, limit: int = 20) -> List[Dict[str, Any]]:
         """Get recent alerts."""

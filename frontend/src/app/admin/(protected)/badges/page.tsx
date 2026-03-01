@@ -10,7 +10,7 @@ import { Textarea } from '@/components/ui/TextArea';
 import { useI18n } from '@/i18n/I18nProvider';
 import { getIpfsUrl } from '@/lib/badgeConstants';
 import { adminBadgesApi } from '@/services/adminBadgesApi';
-import type { BadgeIssuance, BadgeTemplate, ChainInfo } from '@/types/admin/badges';
+import type { BadgeIssuance, BadgeTemplate, BadgeTemplateStatus, ChainInfo } from '@/types/admin/badges';
 
 const AUTO_AWARD_ACTION_OPTIONS = [
   'manual_sync',

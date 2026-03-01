@@ -18,6 +18,7 @@ import {
   FiBookOpen,
   FiActivity,
   FiEye,
+  FiPhone,
 } from 'react-icons/fi';
 import SidebarLink from '../admin/SidebarLink';
 
@@ -30,6 +31,7 @@ const navGroups = [
       { name: 'Appointments', icon: <FiCalendar size={18}/>, href: '/counselor/appointments' },
       { name: 'Escalations', icon: <FiAlertTriangle size={18}/>, href: '/counselor/escalations' },
       { name: 'My Patients', icon: <FiUsers size={18}/>, href: '/counselor/patients' },
+      { name: 'CRM Contacts', icon: <FiPhone size={18}/>, href: '/counselor/crm' },
     ]
   },
   {

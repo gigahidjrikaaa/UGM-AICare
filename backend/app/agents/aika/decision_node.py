@@ -81,6 +81,35 @@ _AUTOPILOT_DENIED_RESPONSE: str = (
     "Kita tetap bisa lanjut ngobrol dan cari langkah yang lebih aman ya."
 )
 
+_DECISION_JSON_SCHEMA: dict[str, Any] = {
+    "type": "object",
+    "properties": {
+        "intent": {"type": "string"},
+        "intent_confidence": {"type": "number"},
+        "needs_agents": {"type": "boolean"},
+        "next_step": {"type": "string", "enum": ["tca", "cma", "ia", "none"]},
+        "reasoning": {"type": "string"},
+        "immediate_risk": {
+            "type": "string",
+            "enum": ["none", "low", "moderate", "high", "critical"],
+        },
+        "crisis_keywords": {
+            "type": "array",
+            "items": {"type": "string"},
+        },
+        "risk_reasoning": {"type": "string"},
+        "analytics_params": {
+            "type": "object",
+            "properties": {
+                "question_id": {"type": "string"},
+                "start_date": {"type": "string"},
+                "end_date": {"type": "string"},
+            },
+        },
+    },
+    "required": ["intent", "needs_agents", "next_step", "immediate_risk"],
+}
+
 
 # ===========================================================================
 # PURE HELPERS — no I/O, no side effects, fully unit-testable
@@ -105,7 +134,15 @@ def _parse_llm_decision(response_text: str) -> dict[str, Any]:
         cleaned = re.sub(r"\s*```$", "", cleaned, flags=re.MULTILINE)
         cleaned = cleaned.strip()
 
-    decision = json.loads(cleaned)
+    try:
+        decision = json.loads(cleaned)
+    except json.JSONDecodeError:
+        # Recovery path: Gemini may prepend/append plain text even in JSON mode.
+        # Try to salvage the first JSON object block from the response.
+        match = re.search(r"\{[\s\S]*\}", cleaned)
+        if not match:
+            raise
+        decision = json.loads(match.group(0))
     if not isinstance(decision, dict):
         raise ValueError(
             "LLM decision must be a JSON object, got %s" % type(decision).__name__
@@ -350,6 +387,37 @@ async def _call_decision_llm(
         max_tokens=512,
         system_prompt=system_instruction,
         json_mode=True,
+        json_schema=_DECISION_JSON_SCHEMA,
+        allow_retry_sleep=False,
+    )
+
+
+async def _repair_decision_json_once(
+    raw_response_text: str,
+    preferred_model: str,
+) -> str:
+    """Ask Gemini to repair malformed decision output into strict JSON once.
+
+    This is intentionally isolated and only used after the primary decision parse
+    fails, to reduce user-facing fallback responses caused by minor formatting
+    drift (e.g., prose around JSON, markdown wrappers, trailing commentary).
+    """
+    from app.core.llm import generate_gemini_response_with_fallback
+
+    repair_prompt = (
+        "Convert the following model output into STRICT JSON only. "
+        "Do not add markdown, explanations, or extra text. "
+        "Ensure the result includes: intent, needs_agents, next_step, immediate_risk.\n\n"
+        f"RAW_OUTPUT:\n{raw_response_text}"
+    )
+
+    return await generate_gemini_response_with_fallback(
+        history=[{"role": "user", "content": repair_prompt}],
+        model=preferred_model,
+        temperature=0.0,
+        max_tokens=512,
+        json_mode=True,
+        json_schema=_DECISION_JSON_SCHEMA,
         allow_retry_sleep=False,
     )
 
@@ -708,20 +776,147 @@ async def aika_decision_node(
         except (json.JSONDecodeError, ValueError) as parse_err:
             logger.warning("Failed to parse Gemini decision JSON: %s", parse_err)
             logger.debug("Raw response: %.200s", response_text)
-            crisis_hits = _detect_crisis_keywords(current_message)
-            state.update({
-                "intent": "crisis_intervention" if crisis_hits else "casual_chat",
-                "needs_agents": bool(crisis_hits),
-                "next_step": "cma" if crisis_hits else "none",
-                "immediate_risk_level": "high" if crisis_hits else "none",
-                "crisis_keywords_detected": crisis_hits,
-                "agent_reasoning": (
-                    "Decision JSON parse failed; crisis keywords detected, escalating to CMA."
-                    if crisis_hits
-                    else "Decision JSON parse failed; using safe direct-response fallback."
-                ),
-            })
+            repaired_decision: Optional[dict[str, Any]] = None
+            try:
+                repaired_text = await _repair_decision_json_once(
+                    response_text,
+                    preferred_model,
+                )
+                repaired_decision = _parse_llm_decision(repaired_text)
+                logger.info("Decision JSON repair retry succeeded.")
+            except Exception as repair_err:
+                logger.warning("Decision JSON repair retry failed: %s", repair_err)
+
+            if repaired_decision is not None:
+                execution_tracker.record_decision_parse_outcome(
+                    execution_id=execution_id,
+                    initial_parse_failed=True,
+                    repaired=True,
+                )
+                decision = repaired_decision
+                raw_decision_payload = decision
+
+                routing = _compute_routing(decision, normalized_role, current_message)
+                holding_response: Optional[str] = routing.pop("_holding_response", None)
+
+                state.update(_parse_analytics_params(decision))
+                state.update(routing)
+
+                if holding_response and not state.get("aika_direct_response"):
+                    state["aika_direct_response"] = holding_response
+
+                now_ts = time.time()
+                state["conversation_ended"] = _detect_conversation_end(
+                    current_message,
+                    state.get("last_message_timestamp"),
+                    now_ts,
+                )
+                state["last_message_timestamp"] = now_ts
+
+                state.update({
+                    "autopilot_action_id": None,
+                    "autopilot_action_type": None,
+                    "autopilot_policy_decision": None,
+                })
+                autopilot_patches = await _evaluate_autopilot_policy(
+                    state, normalized_role, db
+                )
+                state.update(autopilot_patches)
+
+                if state.get("immediate_risk_level", "none") != "none":
+                    logger.info(
+                        "Immediate Risk: %s (reasoning: %.100s)",
+                        state["immediate_risk_level"],
+                        state.get("risk_reasoning", ""),
+                    )
+
+                if not state.get("needs_agents"):
+                    result = await _generate_direct_response(
+                        state,
+                        system_instruction,
+                        normalized_role,
+                        personal_memory_block,
+                        execution_id,
+                        db,
+                    )
+                    state["preferred_model"] = result.preferred_model
+                    state["aika_direct_response"] = result.response_text
+                    state["final_response"] = result.response_text
+                    state["response_source"] = result.response_source
+                    if result.tool_calls:
+                        state["agents_invoked"] = ["AikaTools"]
+                        state["tool_calls"] = result.tool_calls
+
+            else:
+                execution_tracker.record_decision_parse_outcome(
+                    execution_id=execution_id,
+                    initial_parse_failed=True,
+                    repaired=False,
+                )
+                crisis_hits = _detect_crisis_keywords(current_message)
+                state.update({
+                    "intent": "crisis_intervention" if crisis_hits else "casual_chat",
+                    "needs_agents": bool(crisis_hits),
+                    "next_step": "cma" if crisis_hits else "none",
+                    "immediate_risk_level": "high" if crisis_hits else "none",
+                    "crisis_keywords_detected": crisis_hits,
+                    "agent_reasoning": (
+                        "Decision JSON parse failed; crisis keywords detected, escalating to CMA."
+                        if crisis_hits
+                        else "Decision JSON parse failed; using safe direct-response fallback."
+                    ),
+                })
+
+                raw_decision_payload = {
+                    "decision_parse_error": str(parse_err),
+                    "raw_response_preview": (response_text or "")[:1000],
+                    "fallback": "crisis_escalation" if crisis_hits else "direct_response",
+                }
+
+                # Critical-risk messages still escalate to CMA directly.
+                # Non-crisis parse failures should still produce a helpful direct reply,
+                # not the generic route-level "Maaf, terjadi kesalahan." fallback.
+                if not crisis_hits:
+                    try:
+                        direct = await _generate_direct_response(
+                            state,
+                            system_instruction,
+                            normalized_role,
+                            personal_memory_block,
+                            execution_id,
+                            db,
+                        )
+                        state["preferred_model"] = direct.preferred_model
+                        state["aika_direct_response"] = direct.response_text
+                        state["final_response"] = direct.response_text
+                        state["response_source"] = direct.response_source
+                        if direct.tool_calls:
+                            state["agents_invoked"] = ["AikaTools"]
+                            state["tool_calls"] = direct.tool_calls
+                    except Exception as direct_err:
+                        logger.warning(
+                            "Direct response generation after decision parse fallback failed: %s",
+                            direct_err,
+                        )
+                        state.update({
+                            "aika_direct_response": (
+                                "Maaf, aku lagi sempat terkendala teknis sebentar. "
+                                "Coba kirim ulang pesanmu ya, aku tetap di sini buat bantu kamu."
+                            ),
+                            "final_response": (
+                                "Maaf, aku lagi sempat terkendala teknis sebentar. "
+                                "Coba kirim ulang pesanmu ya, aku tetap di sini buat bantu kamu."
+                            ),
+                            "response_source": "aika_direct",
+                            "is_fallback": True,
+                            "fallback_type": "decision_parse_error",
+                        })
         else:
+            execution_tracker.record_decision_parse_outcome(
+                execution_id=execution_id,
+                initial_parse_failed=False,
+                repaired=False,
+            )
             # -----------------------------------------------------------------
             # 5. Routing, analytics params, conversation-end, autopilot, response
             # -----------------------------------------------------------------
