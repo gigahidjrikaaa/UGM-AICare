@@ -5,6 +5,8 @@ from datetime import datetime, timedelta
 import json
 
 from langgraph.graph import StateGraph, END
+from langgraph.graph.state import CompiledStateGraph
+from langchain_core.runnables import RunnableConfig
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from google.genai import types
@@ -73,18 +75,19 @@ async def ingest_escalation_node(state: SDAState) -> SDAState:
 
 
 @trace_agent("CMA_CreateCase")
-async def create_case_node(state: SDAState, db: AsyncSession) -> SDAState:
+async def create_case_node(state: SDAState, config: RunnableConfig) -> SDAState:
     """Node: Create case record for manual intervention.
     
     Creates Case in database with appropriate severity and metadata.
     
     Args:
         state: Current graph state
-        db: Database session
+        config: LangGraph runtime config carrying ``db`` under ``config["configurable"]["db"]``
         
     Returns:
         Updated state with case_id and case_created=True
     """
+    db: AsyncSession = config["configurable"]["db"]
     execution_id = state.get("execution_id")
     if execution_id:
         execution_tracker.start_node(execution_id, "cma::create_case", "cma")
@@ -159,7 +162,7 @@ async def create_case_node(state: SDAState, db: AsyncSession) -> SDAState:
 
 
 @trace_agent("CMA_CalculateSLA")
-async def calculate_sla_node(state: SDAState, db: AsyncSession) -> SDAState:
+async def calculate_sla_node(state: SDAState, config: RunnableConfig) -> SDAState:
     """Node: Calculate SLA breach time based on severity.
     
     Critical cases: 30 minutes (default from settings)
@@ -167,11 +170,12 @@ async def calculate_sla_node(state: SDAState, db: AsyncSession) -> SDAState:
     
     Args:
         state: Current graph state
-        db: Database session
+        config: LangGraph runtime config carrying ``db`` under ``config["configurable"]["db"]``
         
     Returns:
         Updated state with sla_breach_at timestamp
     """
+    db: AsyncSession = config["configurable"]["db"]
     execution_id = state.get("execution_id")
     if execution_id:
         execution_tracker.start_node(execution_id, "cma::calculate_sla", "cma")
@@ -228,7 +232,7 @@ async def calculate_sla_node(state: SDAState, db: AsyncSession) -> SDAState:
 
 
 @trace_agent("CMA_AutoAssign")
-async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
+async def auto_assign_node(state: SDAState, config: RunnableConfig) -> SDAState:
     """Node: Auto-assign case to available counsellor with workload balancing.
     
     Assignment algorithm:
@@ -242,11 +246,12 @@ async def auto_assign_node(state: SDAState, db: AsyncSession) -> SDAState:
     
     Args:
         state: Current graph state with case_id
-        db: Database session
+        config: LangGraph runtime config carrying ``db`` under ``config["configurable"]["db"]``
         
     Returns:
         Updated state with assigned_to (if successful) and assignment_id
     """
+    db: AsyncSession = config["configurable"]["db"]
     execution_id = state.get("execution_id")
     if execution_id:
         execution_tracker.start_node(execution_id, "cma::auto_assign", "cma")
@@ -559,7 +564,7 @@ async def notify_counsellor_node(state: SDAState) -> SDAState:
 
 
 @trace_agent("CMA_ScheduleAppointment")
-async def schedule_appointment_node(state: SDAState, db: AsyncSession) -> SDAState:
+async def schedule_appointment_node(state: SDAState, config: RunnableConfig) -> SDAState:
     """Node: Schedule appointment with counselor (LLM-powered).
     
     This node uses Gemini 2.5 Flash to intelligently schedule appointments
@@ -576,11 +581,12 @@ async def schedule_appointment_node(state: SDAState, db: AsyncSession) -> SDASta
     
     Args:
         state: Current graph state with scheduling request
-        db: Database session
+        config: LangGraph runtime config carrying ``db`` under ``config["configurable"]["db"]``
         
     Returns:
         Updated state with appointment_id and confirmation
     """
+    db: AsyncSession = config["configurable"]["db"]
     execution_id = state.get("execution_id")
     if execution_id:
         execution_tracker.start_node(execution_id, "cma::schedule_appointment", "cma")
@@ -941,52 +947,48 @@ Return HANYA datetime string dalam ISO format (YYYY-MM-DDTHH:MM:SS) dari list di
         return None
 
 
-def create_cma_graph(db: AsyncSession) -> StateGraph:
-    """Create the CMA LangGraph state machine.
-    
+def _build_cma_graph() -> CompiledStateGraph:
+    """Build and compile the CMA LangGraph state machine.
+
     Graph structure:
-        START → ingest_escalation → create_case → calculate_sla → 
+        START → ingest_escalation → create_case → calculate_sla →
         auto_assign → schedule_appt (conditional) → notify_counsellor → END
-    
+
     The schedule_appt node is conditional based on state["schedule_appointment"] flag.
     If scheduling is not requested, it passes through without creating appointment.
-    
-    Args:
-        db: Database session for node operations
-        
+
     Returns:
         Compiled StateGraph ready for execution
     """
     workflow = StateGraph(SDAState)
-    
-    # Define async wrappers to properly await the nodes
-    async def create_case_wrapper(state: SDAState) -> SDAState:
-        return await create_case_node(state, db)
 
-    async def calculate_sla_wrapper(state: SDAState) -> SDAState:
-        return await calculate_sla_node(state, db)
-
-    async def auto_assign_wrapper(state: SDAState) -> SDAState:
-        return await auto_assign_node(state, db)
-
-    async def schedule_appt_wrapper(state: SDAState) -> SDAState:
-        return await schedule_appointment_node(state, db)
-
-    # Add nodes
+    # Add nodes (no wrappers needed — nodes read db from config)
     workflow.add_node("ingest_escalation", ingest_escalation_node)
-    workflow.add_node("create_case", create_case_wrapper)
-    workflow.add_node("calculate_sla", calculate_sla_wrapper)
-    workflow.add_node("auto_assign", auto_assign_wrapper)
-    workflow.add_node("schedule_appt", schedule_appt_wrapper)  # Renamed to avoid conflict with state key
+    workflow.add_node("create_case", create_case_node)
+    workflow.add_node("calculate_sla", calculate_sla_node)
+    workflow.add_node("auto_assign", auto_assign_node)
+    workflow.add_node("schedule_appt", schedule_appointment_node)
     workflow.add_node("notify_counsellor", notify_counsellor_node)
-    
+
     # Define flow with conditional scheduling
     workflow.set_entry_point("ingest_escalation")
     workflow.add_edge("ingest_escalation", "create_case")
     workflow.add_edge("create_case", "calculate_sla")
     workflow.add_edge("calculate_sla", "auto_assign")
-    workflow.add_edge("auto_assign", "schedule_appt")  # Always run, but conditionally executes
+    workflow.add_edge("auto_assign", "schedule_appt")
     workflow.add_edge("schedule_appt", "notify_counsellor")
     workflow.add_edge("notify_counsellor", END)
-    
+
     return workflow.compile()  # type: ignore[return-value]
+
+
+# Module-level cached compiled graph
+_cma_graph: CompiledStateGraph | None = None
+
+
+def get_cma_graph() -> CompiledStateGraph:
+    """Return the cached CMA compiled graph, building it on first call."""
+    global _cma_graph
+    if _cma_graph is None:
+        _cma_graph = _build_cma_graph()
+    return _cma_graph

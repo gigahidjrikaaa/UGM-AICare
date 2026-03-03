@@ -13,7 +13,7 @@ from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.graph_state import SDAState
-from app.agents.cma.cma_graph import create_cma_graph
+from app.agents.cma.cma_graph import get_cma_graph
 from app.agents.execution_tracker import execution_tracker
 
 logger = logging.getLogger(__name__)
@@ -52,7 +52,7 @@ class CMAGraphService:
             db: Database session for graph node operations
         """
         self.db = db
-        self.graph = create_cma_graph(db)  # CompiledStateGraph
+        self.graph = get_cma_graph()  # CompiledStateGraph
     
     async def execute(
         self,
@@ -142,7 +142,7 @@ class CMAGraphService:
             )
             
             # Note: self.graph is CompiledStateGraph at runtime, has ainvoke
-            final_state = await self.graph.ainvoke(initial_state)  # type: ignore[attr-defined]
+            final_state = await self.graph.ainvoke(initial_state, config={"configurable": {"db": self.db}})  # type: ignore[attr-defined]
             
             # Mark completion timestamp
             final_state["completed_at"] = datetime.now()

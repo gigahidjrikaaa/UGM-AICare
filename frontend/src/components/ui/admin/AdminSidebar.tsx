@@ -80,7 +80,7 @@ const navGroups = [
     label: 'Programs & Content',
     items: [
       { name: 'Intervention Plans', icon: <FiClipboard size={18} />, href: '/admin/interventions' },
-      { name: 'TCA Outreach', icon: <FiSend size={18} />, href: '/admin/campaigns' },
+      { name: 'Outreach', icon: <FiSend size={18} />, href: '/admin/outreach' },
       { name: 'CBT Modules', icon: <FiHeart size={18} />, href: '/admin/cbt-modules' },
       { name: 'Quest Templates', icon: <FiZap size={18} />, href: '/admin/quests' },
       { name: 'Content Resources', icon: <FiBookOpen size={18} />, href: '/admin/content-resources' },

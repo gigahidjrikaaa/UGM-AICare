@@ -24,6 +24,8 @@ from typing import Callable, Dict, Any, cast
 from datetime import datetime, timedelta
 
 from langgraph.graph import StateGraph, END
+from langgraph.graph.state import CompiledStateGraph
+from langchain_core.runnables import RunnableConfig
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.graph_state import IAState
@@ -192,7 +194,7 @@ def apply_k_anonymity_node(state: IAState) -> IAState:
 
 
 @trace_agent("IA_ExecuteAnalytics")
-async def execute_analytics_node(state: IAState, db: AsyncSession) -> IAState:
+async def execute_analytics_node(state: IAState, config: RunnableConfig) -> IAState:
     """Node: Execute analytics query with privacy safeguards.
     
     This node uses the InsightsAgentService to execute the allow-listed
@@ -200,11 +202,12 @@ async def execute_analytics_node(state: IAState, db: AsyncSession) -> IAState:
     
     Args:
         state: Current graph state
-        db: Database session
+        config: LangGraph runtime config carrying ``db`` under ``config["configurable"]["db"]``
         
     Returns:
         Updated state with query results
     """
+    db: AsyncSession = config["configurable"]["db"]
     execution_id = state.get("execution_id")
     if execution_id:
         execution_tracker.start_node(execution_id, "ia:execute_analytics", "ia")
@@ -417,66 +420,59 @@ async def export_pdf_node(state: IAState) -> IAState:
 # Graph Creation
 # ============================================================================
 
-def create_ia_graph(db: AsyncSession):
-    """Create and compile IA (Insights Agent) StateGraph.
-    
+def _build_ia_graph() -> CompiledStateGraph:
+    """Build and compile the IA (Insights Agent) StateGraph.
+
     This graph implements privacy-preserving analytics workflow with LLM intelligence:
-    
+
     Phase 1 - Data Collection:
     1. Ingest query request and validate parameters
     2. Validate user consent for data access
     3. Apply k-anonymity privacy enforcement
     4. Execute analytics query with safeguards
-    
+
     Phase 2 - Intelligence Layer:
     5. Interpret results using LLM (on k-anonymized data only)
     6. Export comprehensive PDF report
-    
-    Args:
-        db: Database session for graph node operations
-        
+
     Returns:
         Compiled StateGraph ready for execution via ainvoke()
-        
-    Example:
-        ```python
-        graph = create_ia_graph(db)
-        state = {
-            "question_id": "crisis_trend",
-            "start_date": datetime(2025, 1, 1),
-            "end_date": datetime(2025, 1, 31),
-            "execution_id": "exec-123",
-            "errors": [],
-            "execution_path": []
-        }
-        result = await graph.ainvoke(state)
-        print(result["interpretation"])  # LLM-generated insights
-        print(result["recommendations"])  # Actionable recommendations
-        ```
     """
     # Create workflow
     workflow = StateGraph(IAState)
-    
+
     # Phase 1: Add data collection nodes
     workflow.add_node("ingest_query", ingest_query_node)
     workflow.add_node("validate_consent", validate_consent_node)
     workflow.add_node("apply_k_anonymity", apply_k_anonymity_node)
-    workflow.add_node("execute_analytics", lambda state: execute_analytics_node(state, db))
-    
+    workflow.add_node("execute_analytics", execute_analytics_node)
+
     # Phase 2: Add LLM intelligence nodes
     workflow.add_node("interpret_results", interpret_results_node)
     workflow.add_node("export_pdf", export_pdf_node)
-    
+
     # Define workflow: Phase 1 → Phase 2 → END
     workflow.set_entry_point("ingest_query")
     workflow.add_edge("ingest_query", "validate_consent")
     workflow.add_edge("validate_consent", "apply_k_anonymity")
     workflow.add_edge("apply_k_anonymity", "execute_analytics")
-    
+
     # Connect Phase 1 to Phase 2
     workflow.add_edge("execute_analytics", "interpret_results")
     workflow.add_edge("interpret_results", "export_pdf")
     workflow.add_edge("export_pdf", END)
-    
+
     # Compile graph
     return workflow.compile()
+
+
+# Module-level cached compiled graph
+_ia_graph: CompiledStateGraph | None = None
+
+
+def get_ia_graph() -> CompiledStateGraph:
+    """Return the cached IA compiled graph, building it on first call."""
+    global _ia_graph
+    if _ia_graph is None:
+        _ia_graph = _build_ia_graph()
+    return _ia_graph

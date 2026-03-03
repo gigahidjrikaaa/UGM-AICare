@@ -1,14 +1,20 @@
 ---
+id: therapeutic-coach-agent
+title: Therapeutic Coach Agent
 sidebar_position: 3
 ---
 
-# TCA — Therapeutic Coach Agent
+# Therapeutic Coach Agent
+sidebar_position: 3
+---
+
+# TCA - Therapeutic Coach Agent
 
 ## What Is the TCA?
 
-The **Therapeutic Coach Agent (TCA)** is the system's evidence-based support layer. When the STA determines that a student needs more than empathetic conversation, the TCA is invoked to provide structured, clinically-guided interventions.
+The Therapeutic Coach Agent (TCA) provides evidence-based support within the system. When the STA determines that a student requires more than empathetic conversation, the TCA delivers structured, clinically guided interventions. The TCA is grounded in Cognitive Behavioral Therapy (CBT), a validated psychological approach. CBT operates on the principle that thoughts, feelings, and behaviors are interconnected, and that addressing unhelpful thought patterns can effectively reduce emotional distress.
 
-The TCA is grounded in **Cognitive Behavioural Therapy (CBT)** — one of the most empirically validated approaches in psychology. CBT works on the premise that thoughts, feelings, and behaviours are interconnected, and that changing unhelpful thought patterns can reduce emotional distress.
+The TCA is grounded in **Cognitive Behavioural Therapy (CBT)** - one of the most empirically validated approaches in psychology. CBT works on the premise that thoughts, feelings, and behaviours are interconnected, and that changing unhelpful thought patterns can reduce emotional distress.
 
 ---
 
@@ -19,13 +25,13 @@ The TCA is called by the orchestrator under two conditions:
 1. **Moderate risk** (`risk_level = 1`): The STA has detected distress signals that warrant structured support but not immediate clinical escalation.
 2. **High/Critical risk** (`risk_level ≥ 2`): The TCA runs in **parallel** with the CMA. Both agents start simultaneously, and their outputs are merged in the synthesis node.
 
-The TCA is *never* invoked for casual conversation or simple information queries — this preserves its clinical weight and avoids "therapy-washing" ordinary chat.
+The TCA is *never* invoked for casual conversation or simple information queries - this preserves its clinical weight and avoids "therapy-washing" ordinary chat.
 
 ---
 
 ## What the TCA Produces
 
-The TCA's primary output is an **intervention plan** — a structured object that Aika incorporates into its response and persists to the database.
+The TCA produces an intervention plan, which is a structured object integrated into Aika's response and maintained in the database. The personalization process is critical. The TCA reviews previously suggested coping strategies to avoid redundancy, ensuring the agent remains effective and engaging over long-term use.
 
 ```json
 {
@@ -62,7 +68,7 @@ flowchart TD
     J --> K[Persist to DB\nUserInterventionPlan table]
 ```
 
-The personalisation step (G → H) is important: the TCA checks what coping strategies have been suggested to this student before and avoids repeating ones they have already tried. This prevents the agent from feeling repetitive over long engagement periods.
+The personalization step is essential. The TCA monitors previously suggested coping strategies to avoid repetition, ensuring the agent remains engaging over extended periods.
 
 ---
 
@@ -84,9 +90,9 @@ Beyond the generated plan, the TCA has access to a curated catalogue of structur
 
 The TCA encourages students to maintain a digital journal within the platform. Journal entries serve as:
 
-1. **Therapeutic homework** — completing assigned reflective exercises
-2. **Longitudinal mood tracking** — the STA's background analysis can incorporate journal content for richer screening
-3. **Conversation starters** — Aika can reference recent journal entries to make follow-up conversations feel continuous
+1. **Therapeutic homework** - completing assigned reflective exercises
+2. **Longitudinal mood tracking** - the STA's background analysis can incorporate journal content for richer screening
+3. **Conversation starters** - Aika can reference recent journal entries to make follow-up conversations feel continuous
 
 ---
 

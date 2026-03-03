@@ -83,8 +83,8 @@ const config: Config = {
           title: 'Documentation',
           items: [
             {label: 'Introduction', to: '/docs/intro'},
-            {label: 'Architecture', to: '/docs/architecture/overview'},
-            {label: 'Agents', to: '/docs/agents/aika'},
+            {label: 'Architecture', to: '/docs/architecture/system-overview'},
+            {label: 'Aika Autopilot', to: '/docs/aika-autopilot/policy-governed-autonomy'},
           ],
         },
         {

@@ -12,7 +12,7 @@ from typing import Dict, Any, cast
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.graph_state import IAState
-from app.agents.ia.ia_graph import create_ia_graph
+from app.agents.ia.ia_graph import get_ia_graph
 from app.agents.execution_tracker import execution_tracker
 
 logger = logging.getLogger(__name__)
@@ -46,7 +46,7 @@ class IAGraphService:
             db: Database session for graph node operations
         """
         self.db = db
-        self.graph = create_ia_graph(db)
+        self.graph = get_ia_graph()
     
     async def execute(
         self,
@@ -117,7 +117,7 @@ class IAGraphService:
             )
             
             # Cast to IAState for type checker
-            final_state_raw = await self.graph.ainvoke(cast(IAState, initial_state))
+            final_state_raw = await self.graph.ainvoke(cast(IAState, initial_state), config={"configurable": {"db": self.db}})
             final_state = cast(Dict[str, Any], final_state_raw)
             
             # Mark completion timestamp

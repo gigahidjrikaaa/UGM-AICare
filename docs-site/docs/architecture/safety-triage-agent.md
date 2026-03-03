@@ -1,12 +1,18 @@
 ---
+id: safety-triage-agent
+title: Safety Triage Agent
 sidebar_position: 2
 ---
 
-# STA — Safety Triage Agent
+# Safety Triage Agent
+sidebar_position: 2
+---
+
+# STA - Safety Triage Agent
 
 ## What Is the STA?
 
-The **Safety Triage Agent (STA)** is the system's clinical risk layer. Its job is to assess the mental health risk present in a student's conversation — both at the level of individual messages (real-time) and at the level of a complete conversation (post-hoc).
+The Safety Triage Agent (STA) functions as the system's clinical risk layer. It assesses mental health risks within student conversations, analyzing both individual messages in real-time and completed conversations post-hoc. A significant design feature of the STA is its asynchronous execution. It runs after a conversation concludes, ensuring that comprehensive clinical analysis does not introduce latency to the student's experience.
 
 One design decision defines the STA more than any other: it runs **after** the conversation ends, not inside it. This means the STA never adds latency to a student's experience, and it can take as much time as it needs to do a thorough clinical analysis.
 
@@ -14,16 +20,16 @@ One design decision defines the STA more than any other: it runs **after** the c
 
 ## Two Modes of Operation
 
-### Mode 1 — Real-Time Signal Detection (embedded in Aika)
+### Mode 1 - Real-Time Signal Detection (embedded in Aika)
 
 Before the STA even runs as a standalone agent, Aika itself performs the fastest possible risk checks:
 
 1. **Keyword scan** (< 1 ms): Regex match against a list of crisis terms in English and Indonesian. A hit immediately escalates risk to `HIGH`.
-2. **LLM semantic check** (~150 ms): If no keyword matches but the message seems emotionally heavy, Gemini performs a deeper understanding of risk context.
+2. **LLM semantic classification** (~150 ms): Handled by the `aika_decision_node` using Gemini, which rapidly classifies intent and real-time risk level to ensure safe immediate routing.
 
-The result is a `risk_level` integer from 0 to 3 that is written to the shared `SafetyAgentState` and used to route the message through the orchestrator graph.
+The result is a `risk_level` integer from 0 to 3 that is written to the shared `AikaOrchestratorState` and used to route the message through the orchestrator graph.
 
-### Mode 2 — Post-Conversation Deep Analysis (background task)
+### Mode 2 - Post-Conversation Deep Analysis (background task)
 
 After a conversation ends (or at a counsellor's manual request), the full STA graph runs as an async background task. This is a multi-step pipeline:
 
@@ -61,7 +67,7 @@ The STA produces three risk artefacts per conversation:
 
 ## Covert Clinical Screening
 
-The STA extracts indicators aligned to three validated clinical instruments from the natural conversation text. Students never fill out a questionnaire; the STA infers their likely responses from what they say.
+The STA extracts indicators corresponding to three validated clinical instruments from natural conversation. Students are not required to complete formal questionnaires. Instead, the STA infers potential responses based on conversational content. These indicators are recorded in the student's `ScreeningProfile` over time, providing a longitudinal perspective on their mental health trajectory. This data is then presented to counselors as trend charts within their dashboard. Covert screening is intended to be indicative rather than diagnostic. The STA's outputs are designed to assist counselors in prioritization and should not replace formal clinical assessments.
 
 | Instrument | Measures | Items Tracked |
 | --- | --- | --- |
@@ -124,4 +130,4 @@ The STA produces a structured `ConversationRiskAssessment` record:
 }
 ```
 
-This record is visible to the assigned counsellor in their dashboard. The `user_hash` is a one-way hash of the student's ID — counsellors with the right access level can dereference the hash, but it appears anonymised in all IA analytics queries.
+This record is visible to the assigned counsellor in their dashboard. The `user_hash` is a one-way hash of the student's ID - counsellors with the right access level can dereference the hash, but it appears anonymised in all IA analytics queries.

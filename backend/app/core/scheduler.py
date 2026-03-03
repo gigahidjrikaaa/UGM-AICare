@@ -52,6 +52,7 @@ CHECKIN_JOB_ID = "proactive_checkin_job"
 TREND_DETECTION_JOB_ID = "trend_detection_job"
 WEEKLY_IA_REPORT_JOB_ID = "weekly_ia_report_job"
 RETENTION_COHORT_JOB_ID = "retention_cohort_job"
+COUNSELOR_REMINDER_JOB_ID = "counselor_reminder_job"
 
 
 def _parse_bool_env(name: str, default: bool = True) -> bool:
@@ -380,6 +381,133 @@ async def detect_screening_trends() -> None:
             await db.rollback()
 
 
+
+# =============================================================================
+# COUNSELOR REMINDER JOB
+# =============================================================================
+
+async def send_counselor_reminders() -> None:
+    """Scheduled job to remind assigned counselors about cases that need attention.
+
+    Finds active Cases (new/in_progress) that have an assigned counselor but
+    haven't been updated in 3+ days. Sends both an in-app alert and an email
+    to the assigned counselor.
+    """
+    logger.info("Scheduler: Running counselor reminder job...")
+    async with AsyncSessionLocal() as db:
+        try:
+            from app.services.alert_service import get_alert_service
+            from app.models.alerts import AlertType, AlertSeverity
+            from app.domains.mental_health.models.cases import Case, CaseStatusEnum
+            from app.domains.mental_health.models.appointments import Psychologist
+            from app.models.user import User
+            from sqlalchemy.orm import joinedload as _joinedload
+
+            now = datetime.now()
+            stale_threshold = now - timedelta(days=3)
+
+            # Query active cases with an assigned counselor that have gone stale
+            stmt = (
+                select(Case)
+                .where(
+                    Case.status.in_([CaseStatusEnum.new, CaseStatusEnum.in_progress]),
+                    Case.assigned_to.isnot(None),
+                    Case.updated_at < stale_threshold,
+                )
+            )
+            result = await db.execute(stmt)
+            stale_cases = result.scalars().all()
+
+            if not stale_cases:
+                logger.info("Scheduler: No stale cases found for counselor reminders.")
+                return
+
+            app_url = os.getenv("NEXTAUTH_URL", "http://localhost:4000")
+            reminders_sent = 0
+            alert_service = get_alert_service(db)
+
+            for case in stale_cases:
+                try:
+                    # Resolve counselor email: assigned_to (str) -> Psychologist.id ->
+                    # Psychologist.user_id -> User.email
+                    psych_stmt = (
+                        select(Psychologist)
+                        .options(_joinedload(Psychologist.user))
+                        .where(Psychologist.id == int(case.assigned_to))
+                    )
+                    psych_result = await db.execute(psych_stmt)
+                    psychologist = psych_result.scalar_one_or_none()
+
+                    if not psychologist or not psychologist.user:
+                        logger.warning(
+                            f"Scheduler: Cannot resolve counselor for case {case.id} "
+                            f"(assigned_to={case.assigned_to}) - skipping."
+                        )
+                        continue
+
+                    counselor_user = psychologist.user
+                    days_stale = max(1, int((now - case.updated_at).days))
+
+                    # --- In-app alert ---
+                    await alert_service.create_alert(
+                        alert_type=AlertType.SYSTEM_NOTIFICATION,
+                        severity=AlertSeverity.MEDIUM,
+                        title="Case Requires Your Attention",
+                        message=(
+                            f"Case {str(case.id)[:8]} (status: {case.status.value}, "
+                            f"severity: {case.severity.value}) has not been updated in "
+                            f"{days_stale} day(s). Please review and follow up with the student."
+                        ),
+                        alert_metadata={
+                            "case_id": str(case.id),
+                            "case_status": case.status.value,
+                            "case_severity": case.severity.value,
+                            "days_stale": days_stale,
+                            "counselor_id": case.assigned_to,
+                            "reminder_type": "counselor_case_reminder",
+                        },
+                    )
+
+                    # --- Email reminder ---
+                    if counselor_user.email:
+                        counselor_name = getattr(counselor_user, 'name', None) or psychologist.name or "Counselor"
+                        subject = f"[AICare] Reminder: Case {str(case.id)[:8]} needs follow-up"
+                        html_body = (
+                            f"<p>Dear {counselor_name},</p>"
+                            f"<p>This is a reminder that case <strong>{str(case.id)[:8]}</strong> "
+                            f"(severity: <strong>{case.severity.value}</strong>) assigned to you "
+                            f"has not been updated in <strong>{days_stale} day(s)</strong>.</p>"
+                            f"<p>Please log in to review and follow up with the student:</p>"
+                            f"<p><a href='{app_url}/admin/cases'>View Cases &rarr;</a></p>"
+                            f"<p>Thank you,<br/>UGM AICare System</p>"
+                        )
+                        send_email(
+                            recipient_email=counselor_user.email,
+                            subject=subject,
+                            html_content=html_body,
+                        )
+
+                    reminders_sent += 1
+                    logger.info(
+                        f"Scheduler: Sent counselor reminder for case {case.id} "
+                        f"to counselor {case.assigned_to} ({days_stale}d stale)."
+                    )
+
+                except Exception as e:
+                    logger.error(
+                        f"Scheduler: Failed to send reminder for case {case.id}: {e}",
+                        exc_info=True,
+                    )
+
+            logger.info(
+                f"Scheduler: Counselor reminder job complete. "
+                f"Stale cases: {len(stale_cases)}, Reminders sent: {reminders_sent}"
+            )
+
+        except Exception as e:
+            logger.error(f"Scheduler: Error during counselor reminder job: {e}", exc_info=True)
+            await db.rollback()
+
 # =============================================================================
 # WEEKLY IA REPORT JOB
 # =============================================================================
@@ -512,6 +640,18 @@ def start_scheduler() -> None:
         )
     else:
         logger.info("Retention cohort job disabled by ENABLE_RETENTION_COHORT_JOB")
+
+    # Schedule counselor reminders (daily at 9:00 AM WIB)
+    scheduler.add_job(
+        send_counselor_reminders,
+        trigger='cron',
+        hour=9,
+        minute=0,
+        id=COUNSELOR_REMINDER_JOB_ID,
+        replace_existing=True,
+        misfire_grace_time=3600,
+    )
+    logger.info(f"Scheduled job '{COUNSELOR_REMINDER_JOB_ID}' with trigger: cron[hour=9, minute=0]")
 
     try:
         scheduler.start()

@@ -35,7 +35,7 @@ import os
 import re
 import time
 from datetime import datetime, timedelta
-from typing import Any, NamedTuple, Optional
+from typing import Any, Literal, NamedTuple, Optional, cast
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -363,7 +363,7 @@ class _DirectResponseResult(NamedTuple):
     """Structured return value from ``_generate_direct_response``."""
     response_text: str
     tool_calls: list[Any]
-    response_source: str   # "aika_direct" or "aika_react_tools"
+    response_source: Literal["aika_direct", "aika_react_tools"]
     preferred_model: str
 
 
@@ -673,7 +673,11 @@ async def aika_decision_node(
     graph to be reused across every request (Fix: graph compiled once at
     FastAPI startup rather than per HTTP request).
     """
-    db: AsyncSession = config["configurable"]["db"]
+    configurable = cast(dict[str, Any], config).get("configurable")
+    db_candidate = configurable.get("db") if isinstance(configurable, dict) else None
+    if not isinstance(db_candidate, AsyncSession):
+        raise ValueError("Missing AsyncSession in config['configurable']['db']")
+    db: AsyncSession = db_candidate
     execution_id = state.get("execution_id")
     if execution_id:
         execution_tracker.start_node(execution_id, "aika::decision", "aika")
@@ -697,7 +701,7 @@ async def aika_decision_node(
         #    Bypasses the LLM call entirely for greetings and filler phrases.
         # -----------------------------------------------------------------
         if normalized_role == "user" and _is_smalltalk_message(current_message):
-            state.update({
+            cast(dict[str, Any], state).update({
                 "intent": "casual_chat",
                 "intent_confidence": 1.0,
                 "needs_agents": False,
@@ -711,7 +715,7 @@ async def aika_decision_node(
                 "aika_direct_response": _build_smalltalk_response(normalized_role),
                 "response_source": "aika_direct",
             })
-            state["final_response"] = state["aika_direct_response"]
+            state["final_response"] = state.get("aika_direct_response")
             state.setdefault("execution_path", []).append("aika_decision")
 
             elapsed_ms = (time.time() - start_time) * 1000
@@ -749,9 +753,11 @@ async def aika_decision_node(
         # -----------------------------------------------------------------
         # 3. LLM routing decision
         # -----------------------------------------------------------------
-        from app.core.llm import DEFAULT_GEMINI_MODEL
+        from app.core.llm import GEMINI_LITE_MODEL
 
-        preferred_model: str = state.get("preferred_model") or DEFAULT_GEMINI_MODEL
+        # Use the lite model for the classification/routing call itself — it only
+        # needs to produce a small JSON blob (<400 tokens), not a long response.
+        preferred_model: str = state.get("preferred_model") or GEMINI_LITE_MODEL
         logger.info("Aika decision using model: %s", preferred_model)
 
         tail_context = _build_tail_context_block(
@@ -799,8 +805,8 @@ async def aika_decision_node(
                 routing = _compute_routing(decision, normalized_role, current_message)
                 holding_response: Optional[str] = routing.pop("_holding_response", None)
 
-                state.update(_parse_analytics_params(decision))
-                state.update(routing)
+                cast(dict[str, Any], state).update(_parse_analytics_params(decision))
+                cast(dict[str, Any], state).update(routing)
 
                 if holding_response and not state.get("aika_direct_response"):
                     state["aika_direct_response"] = holding_response
@@ -813,7 +819,7 @@ async def aika_decision_node(
                 )
                 state["last_message_timestamp"] = now_ts
 
-                state.update({
+                cast(dict[str, Any], state).update({
                     "autopilot_action_id": None,
                     "autopilot_action_type": None,
                     "autopilot_policy_decision": None,
@@ -821,12 +827,12 @@ async def aika_decision_node(
                 autopilot_patches = await _evaluate_autopilot_policy(
                     state, normalized_role, db
                 )
-                state.update(autopilot_patches)
+                cast(dict[str, Any], state).update(autopilot_patches)
 
                 if state.get("immediate_risk_level", "none") != "none":
                     logger.info(
                         "Immediate Risk: %s (reasoning: %.100s)",
-                        state["immediate_risk_level"],
+                        state.get("immediate_risk_level"),
                         state.get("risk_reasoning", ""),
                     )
 
@@ -854,7 +860,7 @@ async def aika_decision_node(
                     repaired=False,
                 )
                 crisis_hits = _detect_crisis_keywords(current_message)
-                state.update({
+                cast(dict[str, Any], state).update({
                     "intent": "crisis_intervention" if crisis_hits else "casual_chat",
                     "needs_agents": bool(crisis_hits),
                     "next_step": "cma" if crisis_hits else "none",
@@ -898,7 +904,7 @@ async def aika_decision_node(
                             "Direct response generation after decision parse fallback failed: %s",
                             direct_err,
                         )
-                        state.update({
+                        cast(dict[str, Any], state).update({
                             "aika_direct_response": (
                                 "Maaf, aku lagi sempat terkendala teknis sebentar. "
                                 "Coba kirim ulang pesanmu ya, aku tetap di sini buat bantu kamu."
@@ -909,7 +915,7 @@ async def aika_decision_node(
                             ),
                             "response_source": "aika_direct",
                             "is_fallback": True,
-                            "fallback_type": "decision_parse_error",
+                            "fallback_type": "model_error",
                         })
         else:
             execution_tracker.record_decision_parse_outcome(
@@ -926,8 +932,8 @@ async def aika_decision_node(
             routing = _compute_routing(decision, normalized_role, current_message)
             holding_response: Optional[str] = routing.pop("_holding_response", None)
 
-            state.update(_parse_analytics_params(decision))
-            state.update(routing)
+            cast(dict[str, Any], state).update(_parse_analytics_params(decision))
+            cast(dict[str, Any], state).update(routing)
 
             # For high/critical risk, set a holding message only when absent —
             # the synthesize node will replace it with the full agent response.
@@ -944,7 +950,7 @@ async def aika_decision_node(
             state["last_message_timestamp"] = now_ts
 
             # Policy evaluation: enqueue autopilot action when applicable.
-            state.update({
+            cast(dict[str, Any], state).update({
                 "autopilot_action_id": None,
                 "autopilot_action_type": None,
                 "autopilot_policy_decision": None,
@@ -952,12 +958,12 @@ async def aika_decision_node(
             autopilot_patches = await _evaluate_autopilot_policy(
                 state, normalized_role, db
             )
-            state.update(autopilot_patches)
+            cast(dict[str, Any], state).update(autopilot_patches)
 
             if state.get("immediate_risk_level", "none") != "none":
                 logger.info(
                     "Immediate Risk: %s (reasoning: %.100s)",
-                    state["immediate_risk_level"],
+                    state.get("immediate_risk_level"),
                     state.get("risk_reasoning", ""),
                 )
 
@@ -1036,14 +1042,14 @@ async def aika_decision_node(
             logger.warning(
                 "Rate limit hit in decision node — returning graceful fallback."
             )
-            state.update(_build_rate_limit_fallback(error_str))
+            cast(dict[str, Any], state).update(_build_rate_limit_fallback(error_str))
             if execution_id:
                 execution_tracker.complete_node(
                     execution_id, "aika::decision", metrics={"fallback": "rate_limit"}
                 )
         else:
             crisis_hits = _detect_crisis_keywords(str(state.get("message") or ""))
-            state.update(_build_model_error_fallback(error_str, crisis_hits))
+            cast(dict[str, Any], state).update(_build_model_error_fallback(error_str, crisis_hits))
             if execution_id:
                 execution_tracker.fail_node(execution_id, "aika::decision", error_str)
 

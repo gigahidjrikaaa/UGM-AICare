@@ -1,64 +1,91 @@
 'use client';
 
-import { useEffect, useState, useCallback, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import Link from 'next/link';
+import { motion } from 'framer-motion';
 import {
-  ExclamationTriangleIcon,
-  HeartIcon,
-  ClockIcon,
-  BellAlertIcon,
-  UsersIcon,
   ArrowPathIcon,
-  FolderOpenIcon,
-  CheckCircleIcon,
-  CalendarIcon,
-  ArrowTrendingUpIcon,
-  ArrowTrendingDownIcon,
+  BellAlertIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline';
 import { KPICard } from '@/components/admin/dashboard/KPICard';
 import { InsightsPanelCard } from '@/components/admin/dashboard/InsightsPanelCard';
 import { AlertsFeed } from '@/components/admin/dashboard/AlertsFeed';
-import { TrendChart } from '@/components/admin/dashboard/TrendChart';
 import { GenerateReportModal } from '@/components/admin/dashboard/GenerateReportModal';
 import { Toast } from '@/components/admin/dashboard/Toast';
-import { ConnectionStatus } from '@/components/admin/dashboard/ConnectionStatus';
 import { InsightsCampaignModal } from '@/components/admin/campaigns';
-import LangGraphHealthWidget from '@/components/admin/dashboard/LangGraphHealthWidget';
+import { QuickLinksPanel } from '@/components/admin/dashboard/QuickLinksPanel';
+import { MicroTrendsGrid } from '@/components/admin/dashboard/MicroTrendsGrid';
+import { InteractiveMetricsCharts } from '@/components/admin/dashboard/InteractiveMetricsCharts';
+import { OnDutyCounselorsPanel } from '@/components/admin/dashboard/OnDutyCounselorsPanel';
 import type { GenerateReportParams } from '@/components/admin/dashboard/GenerateReportModal';
-import { getDashboardOverview, getDashboardTrends, getActiveUsers, generateInsightsReport } from '@/services/adminDashboardApi';
-import type { DashboardOverview, TrendsResponse, TimeRange, ActiveUsersSummary } from '@/types/admin/dashboard';
-import { useAdminSSE, useSSEEventHandler } from '@/contexts/AdminSSEContext';
+import {
+  generateInsightsReport,
+  getActiveUsers,
+  getDashboardOverview,
+  getDashboardTrends,
+} from '@/services/adminDashboardApi';
+import type {
+  ActiveUsersSummary,
+  DashboardOverview,
+  DashboardKPIs,
+  TimeRange,
+  TrendsResponse,
+} from '@/types/admin/dashboard';
+import { useSSEEventHandler } from '@/contexts/AdminSSEContext';
 import type { AlertData, IAReportGeneratedData } from '@/types/sse';
 
-/* ------------------------------------------------------------------ */
-/*  Compact stat block for the "Period Activity" row                   */
-/* ------------------------------------------------------------------ */
-function CompactStat({
-  label,
-  value,
-  icon,
-  color = 'text-white/80',
-}: {
-  label: string;
+const RANGE_OPTIONS: TimeRange[] = [7, 30, 90];
+
+interface DashboardCardModel {
+  title: string;
   value: string | number;
-  icon: React.ReactNode;
-  color?: string;
-}) {
+  subtitle?: string;
+  trend?: {
+    direction: 'up' | 'down';
+    value: number;
+  };
+  icon: ReactNode;
+  severity: 'critical' | 'warning' | 'success' | 'info';
+}
+
+/**
+ * Only the two "requires immediate action" KPIs live here.
+ * Well-being, Active Users, and Avg Resolution are surfaced in the
+ * Platform Health zone via MicroTrendsGrid (value + sparkline, no duplication).
+ */
+function buildCriticalStatusCards(kpis: DashboardKPIs): DashboardCardModel[] {
+  return [
+    {
+      title: 'Critical Cases',
+      value: kpis.active_critical_cases,
+      subtitle: 'Requiring immediate attention',
+      icon: <ExclamationTriangleIcon className="h-6 w-6 text-red-400" />,
+      severity: kpis.active_critical_cases > 0 ? 'critical' : 'success',
+    },
+    {
+      title: 'SLA Breaches',
+      value: kpis.sla_breach_count,
+      subtitle: 'Cases past response deadline',
+      icon: <BellAlertIcon className="h-6 w-6 text-yellow-400" />,
+      severity: kpis.sla_breach_count > 0 ? 'warning' : 'success',
+    },
+  ];
+}
+
+/** Horizontal divider with a floating zone label for scannable dashboard hierarchy. */
+function SectionLabel({ children }: { children: ReactNode }) {
   return (
-    <div className="flex items-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-3 backdrop-blur">
-      <div className="p-1.5 rounded-lg bg-white/5">{icon}</div>
-      <div>
-        <div className={`text-lg font-bold ${color}`}>{value}</div>
-        <div className="text-[11px] text-white/50 uppercase tracking-wide">{label}</div>
-      </div>
+    <div className="flex items-center gap-3 pt-2">
+      <span className="shrink-0 text-xs font-semibold uppercase tracking-widest text-white/35">
+        {children}
+      </span>
+      <div className="h-px flex-1 bg-white/8" />
     </div>
   );
 }
 
-/* ================================================================== */
-/*  Main Page Component                                                */
-/* ================================================================== */
 export default function AdminDashboardPage() {
   const [timeRange, setTimeRange] = useState<TimeRange>(7);
   const [overview, setOverview] = useState<DashboardOverview | null>(null);
@@ -72,14 +99,16 @@ export default function AdminDashboardPage() {
   const [showInsightsCampaignModal, setShowInsightsCampaignModal] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
 
-  /* ------ Data fetcher ------------------------------------------- */
   const loadDashboard = useCallback(async (silent = false) => {
-    if (!silent) setLoading(true);
-    else setRefreshing(true);
+    if (!silent) {
+      setLoading(true);
+    } else {
+      setRefreshing(true);
+    }
+
     setError(null);
 
     try {
-      // Use Promise.allSettled so a failure in trends/activeUsers doesn't block the dashboard
       const [overviewRes, trendsRes, activeUsersRes] = await Promise.allSettled([
         getDashboardOverview(timeRange),
         getDashboardTrends(timeRange),
@@ -89,7 +118,7 @@ export default function AdminDashboardPage() {
       if (overviewRes.status === 'fulfilled') {
         setOverview(overviewRes.value);
       } else {
-        throw new Error(overviewRes.reason?.message || 'Failed to load dashboard overview');
+        throw new Error(overviewRes.reason?.message ?? 'Failed to load dashboard overview');
       }
 
       if (trendsRes.status === 'fulfilled') {
@@ -102,20 +131,16 @@ export default function AdminDashboardPage() {
 
       setLastRefreshed(new Date());
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load dashboard';
-      setError(errorMessage);
+      const message = err instanceof Error ? err.message : 'Failed to load dashboard';
+      setError(message);
     } finally {
       setLoading(false);
       setRefreshing(false);
     }
   }, [timeRange]);
 
-  /* ------ Stable ref so SSE callbacks always invoke latest loader -- */
   const loadRef = useRef<((silent?: boolean) => Promise<void>) | undefined>(undefined);
   loadRef.current = loadDashboard;
-
-  /* ------ SSE handlers -------------------------------------------- */
-  const { isConnected, error: sseError, reconnect } = useAdminSSE();
 
   useSSEEventHandler('alert_created', useCallback((data: AlertData) => {
     if (data.severity === 'critical' || data.severity === 'high') {
@@ -147,7 +172,6 @@ export default function AdminDashboardPage() {
     loadRef.current?.(true);
   }, []));
 
-  /* ------ Report generation --------------------------------------- */
   const handleGenerateReport = async (params: GenerateReportParams) => {
     try {
       await generateInsightsReport(params);
@@ -167,33 +191,27 @@ export default function AdminDashboardPage() {
     }
   };
 
-  const handleGenerateCampaign = () => setShowInsightsCampaignModal(true);
-
-  const handleCampaignSuccess = () => {
-    setToast({ message: 'Campaign created successfully from insights!', type: 'success' });
-    loadRef.current?.(true);
-  };
-
-  /* ------ Initial load + time range change ------------------------ */
   useEffect(() => {
     loadDashboard();
   }, [loadDashboard]);
 
-  /* ------ Derived metrics ----------------------------------------- */
   const kpis = overview?.kpis;
-  const netCases = kpis
-    ? kpis.cases_opened_this_week - kpis.cases_closed_this_week
-    : 0;
 
-  /* ================================================================ */
-  /*  RENDER                                                           */
-  /* ================================================================ */
+  const criticalCards = useMemo(() => {
+    if (!kpis) return [];
+    return buildCriticalStatusCards(kpis);
+  }, [kpis]);
+
+  // True when any emergency metric is non-zero — drives the zone 1 tint.
+  const hasCriticalIssues = kpis
+    ? kpis.active_critical_cases > 0 || kpis.sla_breach_count > 0
+    : false;
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-[#00153a] via-[#001a47] to-[#00153a]">
-        <div className="text-center space-y-4">
-          <div className="w-12 h-12 border-4 border-white/20 border-t-[#FFCA40] rounded-full animate-spin mx-auto" />
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="space-y-4 text-center">
+          <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-[#FFCA40]" />
           <p className="text-white/60">Loading dashboard...</p>
         </div>
       </div>
@@ -202,16 +220,17 @@ export default function AdminDashboardPage() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-linear-to-br from-[#00153a] via-[#001a47] to-[#00153a]">
-        <div className="text-center space-y-4 max-w-md">
-          <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto">
-            <ExclamationTriangleIcon className="w-8 h-8 text-red-400" />
+      <div className="flex min-h-[60vh] items-center justify-center">
+        <div className="max-w-md space-y-4 text-center">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10">
+            <ExclamationTriangleIcon className="h-8 w-8 text-red-400" />
           </div>
           <h3 className="text-xl font-semibold text-white">Error Loading Dashboard</h3>
           <p className="text-white/60">{error}</p>
           <button
+            type="button"
             onClick={() => loadDashboard()}
-            className="px-6 py-3 bg-[#FFCA40] hover:bg-[#FFCA40]/90 text-[#00153a] font-semibold rounded-xl transition-all duration-200 shadow-lg shadow-[#FFCA40]/20"
+            className="rounded-xl bg-[#FFCA40] px-6 py-3 font-semibold text-[#00153a] shadow-lg shadow-[#FFCA40]/20 transition-all duration-200 hover:bg-[#FFCA40]/90"
           >
             Retry
           </button>
@@ -220,234 +239,156 @@ export default function AdminDashboardPage() {
     );
   }
 
-  if (!overview) {
+  if (!overview || !kpis) {
     return <div className="p-6 text-white/70">No data available</div>;
   }
 
   const { insights, alerts } = overview;
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-[#00153a] via-[#001a47] to-[#00153a] p-6 space-y-6">
-      {/* ============================================================ */}
-      {/*  1. HEADER                                                    */}
-      {/* ============================================================ */}
-      <motion.div
-        initial={{ opacity: 0, y: -20 }}
+    <div className="space-y-6 p-4 md:p-6 lg:p-8">
+      {/* ── Page Header ───────────────────────────────────────── */}
+      <motion.header
+        initial={{ opacity: 0, y: -16 }}
         animate={{ opacity: 1, y: 0 }}
-        className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4"
+        className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between"
       >
-        <div className="flex items-center gap-4">
-          <div>
-            <h1 className="text-3xl font-bold text-white mb-1">Mental Health Command Center</h1>
-            <div className="flex items-center gap-3 text-xs text-white/50">
-              {lastRefreshed && (
-                <span>
-                  Last refreshed: {lastRefreshed.toLocaleTimeString()}
-                </span>
-              )}
-              <ConnectionStatus
-                isConnected={isConnected}
-                error={sseError}
-                onReconnect={reconnect}
-                className="hidden sm:flex"
-              />
-            </div>
+        <div>
+          <h1 className="text-3xl font-bold text-white">Mental Health Admin Dashboard</h1>
+          <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-white/55">
+            {lastRefreshed && <span>Last refreshed: {lastRefreshed.toLocaleTimeString()}</span>}
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          <Link
-            href="/admin/contracts"
-            className="inline-flex items-center rounded-xl border border-white/15 bg-white/8 px-3 py-2 text-sm font-medium text-white hover:bg-white/12"
-          >
-            Contracts
-          </Link>
+        <div className="flex flex-wrap items-center gap-2">
           <Link
             href="/admin/agent-decisions"
-            className="inline-flex items-center rounded-xl border border-white/15 bg-white/8 px-3 py-2 text-sm font-medium text-white hover:bg-white/12"
+            className="rounded-xl border border-white/15 bg-white/8 px-3 py-2 text-sm font-medium text-white hover:bg-white/12"
           >
             Agent Decisions
           </Link>
           <Link
-            href="/admin/attestations"
-            className="inline-flex items-center rounded-xl border border-white/15 bg-white/8 px-3 py-2 text-sm font-medium text-white hover:bg-white/12"
-          >
-            Attestations
-          </Link>
-          <Link
-            href="/admin/autopilot"
-            className="inline-flex items-center rounded-xl border border-white/15 bg-white/8 px-3 py-2 text-sm font-medium text-white hover:bg-white/12"
-          >
-            Autopilot Queue
-          </Link>
-          <Link
             href="/admin/testing"
-            className="px-3 py-2 rounded-xl bg-white/5 border border-white/10 text-white/70 hover:bg-white/10 hover:text-white transition-all duration-200 text-sm"
+            className="rounded-xl border border-white/15 bg-white/8 px-3 py-2 text-sm font-medium text-white hover:bg-white/12"
           >
             Testing Console
           </Link>
-
-          {/* Mobile connection status */}
-          <ConnectionStatus
-            isConnected={isConnected}
-            error={sseError}
-            onReconnect={reconnect}
-            className="flex sm:hidden"
-          />
-
-          {/* Refresh button */}
           <button
+            type="button"
             onClick={() => loadDashboard(true)}
             disabled={refreshing}
-            className="p-2 rounded-xl bg-white/5 border border-white/10 text-white/60 hover:bg-white/10 hover:text-white/80 transition-all duration-200 disabled:opacity-50"
+            className="rounded-xl border border-white/10 bg-white/5 p-2 text-white/70 transition-all duration-200 hover:bg-white/10 hover:text-white disabled:opacity-60"
             title="Refresh dashboard"
           >
-            <ArrowPathIcon className={`w-5 h-5 ${refreshing ? 'animate-spin' : ''}`} />
+            <ArrowPathIcon className={`h-5 w-5 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
-
-          {/* Time range pills */}
-          {([7, 30, 90] as TimeRange[]).map((range) => (
+          {RANGE_OPTIONS.map((range) => (
             <button
               key={range}
+              type="button"
               onClick={() => setTimeRange(range)}
-              className={`
-                px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200
-                ${timeRange === range
+              className={`rounded-xl px-4 py-2 text-sm font-medium transition-all duration-200 ${
+                timeRange === range
                   ? 'bg-[#FFCA40] text-[#00153a] shadow-lg shadow-[#FFCA40]/30'
-                  : 'bg-white/5 text-white/60 hover:bg-white/10 hover:text-white/80 border border-white/10'
-                }
-              `}
+                  : 'border border-white/10 bg-white/5 text-white/65 hover:bg-white/10 hover:text-white'
+              }`}
             >
               {range}d
             </button>
           ))}
         </div>
-      </motion.div>
+      </motion.header>
 
-      {/* ============================================================ */}
-      {/*  2. KEY METRICS — 5 hero KPI cards                            */}
-      {/* ============================================================ */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
-        <KPICard
-          title="Critical Cases"
-          value={kpis!.active_critical_cases}
-          subtitle="Requiring immediate attention"
-          icon={<ExclamationTriangleIcon className="w-6 h-6 text-red-400" />}
-          severity={kpis!.active_critical_cases > 0 ? 'critical' : 'success'}
-        />
+      {/* ── Zone 1: Requires Immediate Attention ──────────────── */}
+      {/*
+       * Critical KPIs and the live alert feed are grouped together so an admin
+       * can answer "what needs my attention right now?" in a single glance.
+       * The zone gains a subtle red tint whenever active issues exist.
+       */}
+      <SectionLabel>Requires Immediate Attention</SectionLabel>
+      <section
+        aria-label="Critical status and live alerts"
+        className={`rounded-2xl border p-4 transition-colors duration-500 ${
+          hasCriticalIssues
+            ? 'border-red-500/20 bg-red-500/5'
+            : 'border-white/8 bg-white/3'
+        }`}
+      >
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          {/* Left column: two critical KPI cards stacked */}
+          <div className="grid grid-cols-2 gap-4 xl:grid-cols-1 xl:gap-4">
+            {criticalCards.map((item) => (
+              <KPICard
+                key={item.title}
+                title={item.title}
+                value={item.value}
+                subtitle={item.subtitle}
+                trend={item.trend}
+                icon={item.icon}
+                severity={item.severity}
+              />
+            ))}
+          </div>
+          {/* Right column: live alerts feed */}
+          <div className="xl:col-span-2">
+            <AlertsFeed alerts={alerts} maxItems={5} />
+          </div>
+        </div>
+      </section>
 
-        <KPICard
-          title="Well-being Index"
-          value={kpis!.overall_sentiment != null ? `${kpis!.overall_sentiment.toFixed(1)}%` : '\u2014'}
-          trend={kpis!.sentiment_delta != null ? {
-            direction: kpis!.sentiment_delta >= 0 ? 'up' : 'down',
-            value: Math.abs(kpis!.sentiment_delta),
-          } : undefined}
-          icon={<HeartIcon className="w-6 h-6 text-blue-400" />}
-          severity="info"
-        />
+      {/* ── Zone 2: Platform Health ────────────────────────────── */}
+      {/*
+       * Point-in-time values merged with their sparklines into a single card each.
+       * Eliminates duplication that previously existed between the KPI grid and
+       * the micro-trend strip.
+       */}
+      <SectionLabel>Platform Health</SectionLabel>
+      <MicroTrendsGrid
+        trends={trends}
+        sentimentValue={kpis.overall_sentiment}
+        avgResolutionHours={kpis.avg_case_resolution_time}
+        activeUsers={activeUsers}
+      />
 
-        <KPICard
-          title="Active Users (DAU)"
-          value={activeUsers?.dau ?? '\u2014'}
-          subtitle={activeUsers ? `WAU ${activeUsers.wau} / MAU ${activeUsers.mau}` : 'Unavailable'}
-          icon={<UsersIcon className="w-6 h-6 text-cyan-400" />}
-          severity="info"
-        />
+      {/* ── Zone 3: Trend Analysis ─────────────────────────────── */}
+      {/*
+       * Historical pattern charts for deeper diagnostic work. Positioned after
+       * current-state metrics so the admin first knows "where we are", then
+       * investigates "how we got here".
+       */}
+      <SectionLabel>Trend Analysis</SectionLabel>
+      <InteractiveMetricsCharts overview={overview} trends={trends} />
 
-        <KPICard
-          title="SLA Breaches"
-          value={kpis!.sla_breach_count}
-          subtitle="Cases past response time"
-          icon={<BellAlertIcon className="w-6 h-6 text-yellow-400" />}
-          severity={kpis!.sla_breach_count > 0 ? 'warning' : 'success'}
-        />
-
-        <KPICard
-          title="Avg Resolution"
-          value={kpis!.avg_case_resolution_time != null ? `${kpis!.avg_case_resolution_time.toFixed(1)}h` : '\u2014'}
-          subtitle="Time to resolve cases"
-          icon={<ClockIcon className="w-6 h-6 text-blue-400" />}
-          severity="info"
-        />
-      </div>
-
-      {/* ============================================================ */}
-      {/*  3. TREND CHARTS — always visible, side by side              */}
-      {/* ============================================================ */}
-      {trends && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
-          <TrendChart
-            title="Well-being Trend"
-            data={trends.sentiment_trend}
-            color="blue"
-            suffix="%"
-            height={200}
-            showGrid
-          />
-          <TrendChart
-            title="New Cases"
-            data={trends.cases_opened_trend}
-            color="purple"
-            height={200}
-            showGrid
+      {/* ── Zone 4: Operations & Intelligence ─────────────────── */}
+      {/*
+       * Two distinct but complementary management layers:
+       *   - On-duty counselors  →  who is available, how loaded, how effective
+       *   - AI Insights         →  what patterns and interventions the system recommends
+       * Pairing them reflects the "decide, then act" management workflow.
+       */}
+      <SectionLabel>Operations &amp; Intelligence</SectionLabel>
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-3" aria-label="Operations and AI intelligence">
+        <div className="xl:col-span-2">
+          <OnDutyCounselorsPanel />
+        </div>
+        <div>
+          <InsightsPanelCard
+            insights={insights}
+            onGenerateReport={() => setShowGenerateModal(true)}
+            onGenerateCampaign={() => setShowInsightsCampaignModal(true)}
           />
         </div>
-      )}
+      </section>
 
-      {/* ============================================================ */}
-      {/*  4. PERIOD ACTIVITY — compact stat blocks                    */}
-      {/* ============================================================ */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        <CompactStat
-          label="Cases Opened"
-          value={kpis!.cases_opened_this_week}
-          icon={<FolderOpenIcon className="w-5 h-5 text-purple-400" />}
-        />
-        <CompactStat
-          label="Cases Resolved"
-          value={kpis!.cases_closed_this_week}
-          icon={<CheckCircleIcon className="w-5 h-5 text-green-400" />}
-        />
-        <CompactStat
-          label="Appointments"
-          value={kpis!.appointments_this_week}
-          icon={<CalendarIcon className="w-5 h-5 text-blue-400" />}
-        />
-        <CompactStat
-          label="Case Flow"
-          value={`${netCases >= 0 ? '+' : ''}${netCases}`}
-          icon={
-            netCases > 0
-              ? <ArrowTrendingUpIcon className="w-5 h-5 text-orange-400" />
-              : <ArrowTrendingDownIcon className="w-5 h-5 text-green-400" />
-          }
-          color={netCases > 0 ? 'text-orange-400' : netCases < 0 ? 'text-green-400' : 'text-white/80'}
-        />
-      </div>
+      {/* ── Zone 5: Quick Navigation ───────────────────────────── */}
+      {/*
+       * Navigation links carry zero informational value and should not compete
+       * with operational content for visual attention. Placed last as a utility
+       * tier, styled smaller to signal secondary importance.
+       */}
+      <SectionLabel>Quick Navigation</SectionLabel>
+      <QuickLinksPanel />
 
-      {/* ============================================================ */}
-      {/*  5. AI INSIGHTS + ALERTS                                     */}
-      {/* ============================================================ */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <InsightsPanelCard
-          insights={insights}
-          onGenerateReport={() => setShowGenerateModal(true)}
-          onGenerateCampaign={handleGenerateCampaign}
-        />
-        <AlertsFeed alerts={alerts} maxItems={5} />
-      </div>
-
-      {/* ============================================================ */}
-      {/*  6. SYSTEM HEALTH — LangGraph at the bottom                  */}
-      {/* ============================================================ */}
-      <div className="w-full">
-        <LangGraphHealthWidget />
-      </div>
-
-      {/* ============================================================ */}
-      {/*  MODALS & TOAST                                              */}
-      {/* ============================================================ */}
       <GenerateReportModal
         isOpen={showGenerateModal}
         onClose={() => setShowGenerateModal(false)}
@@ -457,7 +398,10 @@ export default function AdminDashboardPage() {
       <InsightsCampaignModal
         isOpen={showInsightsCampaignModal}
         onClose={() => setShowInsightsCampaignModal(false)}
-        onSuccess={handleCampaignSuccess}
+        onSuccess={() => {
+          setToast({ message: 'Campaign created successfully from insights!', type: 'success' });
+          loadRef.current?.(true);
+        }}
         insightsSummary={insights.ia_summary || ''}
         trendingTopics={insights.trending_topics || []}
       />
@@ -471,19 +415,16 @@ export default function AdminDashboardPage() {
         />
       )}
 
-      {/* Footer */}
-      <motion.div
+      <motion.footer
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
-        transition={{ delay: 0.5 }}
-        className="text-center text-xs text-white/40 pt-4"
+        transition={{ delay: 0.35 }}
+        className="pt-2 text-center text-xs text-white/40"
       >
-        {lastRefreshed
-          ? `Data as of ${lastRefreshed.toLocaleString()}`
-          : 'Loading...'
-        }
-        {' '}&bull; Time range: Last {timeRange} days
-      </motion.div>
+        {lastRefreshed ? `Data as of ${lastRefreshed.toLocaleString()}` : 'Loading...'}
+        {' '}
+        &bull; Time range: Last {timeRange} days
+      </motion.footer>
     </div>
   );
 }

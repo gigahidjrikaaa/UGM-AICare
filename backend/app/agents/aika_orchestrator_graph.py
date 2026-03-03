@@ -70,9 +70,9 @@ from app.agents.aika.routing import (
 # Lazy TYPE_CHECKING imports kept for IDE/type-checker support only.
 if TYPE_CHECKING:
     from app.agents.sta.sta_graph import create_sta_graph
-    from app.agents.tca.tca_graph import create_tca_graph
-    from app.agents.cma.cma_graph import create_cma_graph
-    from app.agents.ia.ia_graph import create_ia_graph
+    from app.agents.tca.tca_graph import get_tca_graph
+    from app.agents.cma.cma_graph import get_cma_graph
+    from app.agents.ia.ia_graph import get_ia_graph
 
 logger = logging.getLogger(__name__)
 

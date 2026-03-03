@@ -13,7 +13,7 @@ from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.graph_state import SCAState
-from app.agents.tca.tca_graph import create_tca_graph
+from app.agents.tca.tca_graph import get_tca_graph
 from app.agents.execution_tracker import execution_tracker
 
 logger = logging.getLogger(__name__)
@@ -51,7 +51,7 @@ class TCAGraphService:
             db: Database session for graph node operations
         """
         self.db = db
-        self.graph = create_tca_graph(db)
+        self.graph = get_tca_graph()
     
     async def execute(
         self,
@@ -129,7 +129,7 @@ class TCAGraphService:
                 f"execution_id={execution_id}"
             )
             
-            final_state = await self.graph.ainvoke(initial_state)
+            final_state = await self.graph.ainvoke(initial_state, config={"configurable": {"db": self.db}})
             
             # Mark completion timestamp
             final_state["completed_at"] = datetime.now()

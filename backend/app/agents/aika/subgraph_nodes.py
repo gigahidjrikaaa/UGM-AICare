@@ -23,7 +23,6 @@ Shared Protocol:
 from __future__ import annotations
 
 import asyncio
-import copy
 import logging
 from datetime import datetime, timedelta
 from typing import Any, Protocol, cast
@@ -198,10 +197,10 @@ async def execute_sca_subgraph(
         execution_tracker.start_node(execution_id, "aika::sca", "aika")
 
     try:
-        from app.agents.tca.tca_graph import create_tca_graph
+        from app.agents.tca.tca_graph import get_tca_graph
 
-        tca_graph = cast(_AsyncInvokable, create_tca_graph(db))
-        sca_result = cast(dict[str, Any], await tca_graph.ainvoke(cast(dict[str, Any], state)))
+        tca_graph = cast(_AsyncInvokable, get_tca_graph())
+        sca_result = cast(dict[str, Any], await tca_graph.ainvoke(cast(dict[str, Any], state), config={"configurable": {"db": db}}))
 
         cast(dict[str, Any], state).update(sca_result)
         state.setdefault("agents_invoked", []).append("TCA")
@@ -266,10 +265,10 @@ async def execute_sda_subgraph(
         execution_tracker.start_node(execution_id, "aika::sda", "aika")
 
     try:
-        from app.agents.cma.cma_graph import create_cma_graph
+        from app.agents.cma.cma_graph import get_cma_graph
 
-        cma_graph = cast(_AsyncInvokable, create_cma_graph(db))
-        sda_result = cast(dict[str, Any], await cma_graph.ainvoke(cast(dict[str, Any], state)))
+        cma_graph = cast(_AsyncInvokable, get_cma_graph())
+        sda_result = cast(dict[str, Any], await cma_graph.ainvoke(cast(dict[str, Any], state), config={"configurable": {"db": db}}))
 
         cast(dict[str, Any], state).update(sda_result)
         state.setdefault("agents_invoked", []).append("CMA")
@@ -339,8 +338,12 @@ async def parallel_crisis_node(
             state.get("crisis_keywords_detected"),
         )
 
-        tca_input = copy.deepcopy(cast(dict[str, Any], state))
-        cma_input = copy.deepcopy(cast(dict[str, Any], state))
+        # Shallow-copy the state dict for each branch.  Both sub-graphs only
+        # *read* the shared mutable fields (e.g. conversation_history) and write
+        # disjoint keys (TCA → intervention_*, CMA → case_*), so a shallow copy
+        # is safe and avoids the cost of deep-copying the full conversation history.
+        tca_input = cast(dict[str, Any], state).copy()
+        cma_input = cast(dict[str, Any], state).copy()
 
         tca_result, cma_result = await asyncio.gather(
             execute_sca_subgraph(cast(AikaOrchestratorState, tca_input), config),
@@ -425,9 +428,9 @@ async def execute_ia_subgraph(
         execution_tracker.start_node(execution_id, "aika::ia", "aika")
 
     try:
-        from app.agents.ia.ia_graph import create_ia_graph
+        from app.agents.ia.ia_graph import get_ia_graph
 
-        ia_graph = cast(_AsyncInvokable, create_ia_graph(db))
+        ia_graph = cast(_AsyncInvokable, get_ia_graph())
 
         now = datetime.utcnow()
         ia_input: IAState = {
@@ -436,7 +439,7 @@ async def execute_ia_subgraph(
             "end_date": state.get("end_date") or now,
             "user_hash": state.get("user_hash") or "user_%s" % state.get("user_id", "unknown"),
         }
-        ia_result = cast(dict[str, Any], await ia_graph.ainvoke(ia_input))
+        ia_result = cast(dict[str, Any], await ia_graph.ainvoke(ia_input, config={"configurable": {"db": db}}))
 
         # Build a human-readable report string from IA outputs.
         if ia_result.get("interpretation"):
@@ -513,7 +516,16 @@ async def synthesize_final_response(
 
         synthesis_prompt = _build_synthesis_prompt(state, personal_memory_block)
 
-        from app.core.llm import generate_response
+        from app.core.llm import generate_response, select_gemini_model
+
+        # Choose the synthesis model based on intent and role so that high-stakes
+        # paths (crisis/analytics) get the pro model while routine paths stay fast.
+        synthesis_model = select_gemini_model(
+            intent=state.get("intent"),
+            role=normalized_role,
+            has_tools=False,
+            preferred_model=state.get("preferred_model"),
+        )
 
         final_response = await generate_response(
             history=[
@@ -522,7 +534,7 @@ async def synthesize_final_response(
             ],
             model="gemini_google",
             temperature=0.7,
-            preferred_gemini_model=state.get("preferred_model"),
+            preferred_gemini_model=synthesis_model,
         )
 
         state["final_response"] = final_response

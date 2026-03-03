@@ -2,7 +2,7 @@
 sidebar_position: 1
 ---
 
-# Backend — API Overview
+# Backend - API Overview
 
 ## Structure
 
@@ -83,7 +83,7 @@ The `role` field determines which API endpoints are accessible and which Aika to
 | `GET` | `/api/v1/analytics/screening` | Aggregate screening indicators |
 | `GET` | `/api/v1/analytics/intervention-funnel` | Stage funnel metrics |
 
-### STA (Manual triggers — Counsellor/Admin only)
+### STA (Manual triggers - Counsellor/Admin only)
 
 | Method | Path | Description |
 | --- | --- | --- |

@@ -16,11 +16,11 @@ UGM-AICare is built across five distinct layers, each with a deliberate set of t
 
 | Technology | Version | Role |
 | --- | --- | --- |
-| **Next.js** | 16.x | React framework — handles routing, SSR, and API proxy |
+| **Next.js** | 16.x | React framework - handles routing, SSR, and API proxy |
 | **TypeScript** | 5.x | Type safety across all components |
 | **Tailwind CSS** | 3.x | Utility-first styling |
 | **NextAuth.js** | 4.x | Authentication with JWT sessions |
-| **React Hook Form + Zod** | — | Form handling with schema validation |
+| **React Hook Form + Zod** | - | Form handling with schema validation |
 
 The frontend communicates with the backend over HTTPS REST and uses **Server-Sent Events (SSE)** to stream Aika's responses token-by-token, giving users the "typing" experience.
 
@@ -34,7 +34,7 @@ The frontend communicates with the backend over HTTPS REST and uses **Server-Sen
 | **SQLAlchemy** | 2.x | Async ORM for database access |
 | **Alembic** | 1.x | Database schema migrations |
 | **Pydantic** | 2.x | Request/response schema validation |
-| **Celery / asyncio tasks** | — | Background task execution (e.g., post-conversation STA) |
+| **Celery / asyncio tasks** | - | Background task execution (e.g., post-conversation STA) |
 
 FastAPI was chosen specifically for its native **async/await** support, which is critical given that every chat message triggers multiple concurrent LLM API calls. A synchronous framework like Flask would block the event loop and degrade performance significantly at modest concurrency.
 
@@ -44,18 +44,18 @@ FastAPI was chosen specifically for its native **async/await** support, which is
 
 | Technology | Role |
 | --- | --- |
-| **LangGraph** | Agent workflow graph — defines nodes, edges, and conditional routing |
+| **LangGraph** | Agent workflow graph - defines nodes, edges, and conditional routing |
 | **Google Gemini 2.5 Flash/Pro** | Core LLM for all agents |
 | **Google GenAI SDK** | Python client for Gemini API (function calling, streaming) |
-| **Langfuse** | Observability — traces every LLM call, tool invocation, and agent node |
+| **Langfuse** | Observability - traces every LLM call, tool invocation, and agent node |
 
 #### Why LangGraph?
 
 LangGraph was chosen over a simpler "chain" approach because it supports:
-- **Cyclic graphs** — agents can loop (e.g., tool call → result → another tool call) without manual recursion
-- **Parallel fan-out** — TCA and CMA can run concurrently using `asyncio.gather`
-- **State persistence** — the shared `SafetyAgentState` dict flows cleanly through every node
-- **Checkpointing** — the graph can resume from a checkpoint if a node fails
+- **Cyclic graphs** - agents can loop (e.g., tool call → result → another tool call) without manual recursion
+- **Parallel fan-out** - TCA and CMA can run concurrently using `asyncio.gather`
+- **State persistence** - the shared `SafetyAgentState` dict flows cleanly through every node
+- **Checkpointing** - the graph saves conversational state durably via `AsyncPostgresSaver`, allowing the graph to pause or recover without data loss
 
 #### Why Gemini?
 Gemini 2.5 Flash was selected for the real-time conversational path due to its low latency and strong Indonesian language support (important for culturally appropriate responses). Gemini 2.5 Pro is used for the post-conversation STA deep analysis where quality matters more than speed.
@@ -66,12 +66,11 @@ Gemini 2.5 Flash was selected for the real-time conversational path due to its l
 
 | Technology | Role |
 | --- | --- |
-| **PostgreSQL (Supabase)** | Primary relational database — users, conversations, cases, appointments |
-| **Redis** | Conversation context cache, rate limiting, session state |
+| **PostgreSQL (Supabase)** | Primary relational database AND LangGraph persistent Checkpointer (`AsyncPostgresSaver`) |
+| **Redis** | Semantic classification cache, rate limiting, and ephemeral session tracking |
 | **S3-compatible storage** | PDF report storage (STA clinical reports, IA exports) |
 
-Redis plays a particularly important role: conversation history is stored in Redis during an active session, avoiding a database round-trip on every message. History is flushed to PostgreSQL when the session ends.
-
+PostgreSQL is the system's absolute source of truth. Rather than storing conversational state in Redis, UGM-AICare leverages LangGraph's native `AsyncPostgresSaver` to durably persist the orchestrator's state (including conversation history) directly to the database. Redis is reserved strictly for high-speed ephemeral tasks (e.g. caching repeated semantic inferences in the STA pipeline to save API costs).
 ---
 
 ### 5. Infrastructure & Deployment
@@ -79,9 +78,9 @@ Redis plays a particularly important role: conversation history is stored in Red
 | Technology | Role |
 | --- | --- |
 | **Docker + Docker Compose** | Containerisation for all services |
-| **Railway / VPS** | Cloud hosting — backend and frontend run as separate containers |
+| **Railway / VPS** | Cloud hosting - backend and frontend run as separate containers |
 | **Nginx** | Reverse proxy, TLS termination |
-| **GitHub Actions** | CI/CD — lint, test, build, and deploy on push to `main` |
+| **GitHub Actions** | CI/CD - lint, test, build, and deploy on push to `main` |
 | **Grafana** | Infrastructure monitoring dashboards |
 
 ---
@@ -105,8 +104,8 @@ The CARE token is an ERC-20 token used for counsellor attestation. When a counse
 
 A single prompt attempting to do triage, coaching, case management, and analytics simultaneously would:
 1. Exceed context window limits on longer conversations
-2. Produce unpredictable behaviour — the model might prioritise one role at the expense of another
-3. Be untestable — you cannot unit-test a monolith prompt
+2. Produce unpredictable behaviour - the model might prioritise one role at the expense of another
+3. Be untestable - you cannot unit-test a monolith prompt
 
 Separate agents mean each component can be tested, upgraded, and benchmarked independently.
 

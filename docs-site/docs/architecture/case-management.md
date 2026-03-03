@@ -1,14 +1,20 @@
 ---
+id: case-management-agent
+title: Case Management Agent
 sidebar_position: 4
 ---
 
-# CMA — Case Management Agent
+# Case Management Agent
+sidebar_position: 4
+---
+
+# CMA - Case Management Agent
 
 ## What Is the CMA?
 
-The **Case Management Agent (CMA)** is the system's bridge between AI and human care. When the STA determines that a student's risk level warrants professional clinical support, the CMA takes over the operational work: opening a formal case, finding the right counsellor, scheduling an appointment, and tracking follow-up.
+The Case Management Agent (CMA) serves as the primary connection between artificial intelligence and human care. When the STA determines that a student's risk level necessitates professional clinical support, the CMA manages the operational requirements. These include initiating a formal case, identifying an appropriate counselor, scheduling appointments, and monitoring follow-up care. In clinical terms, the CMA facilitates care coordination, managing the logistical requirements that typically involve administrative staff.
 
-In clinical terms, the CMA handles **care coordination** — the logistical layer that, in a traditional service, would involve receptionists, administrative staff, and phone tag.
+In clinical terms, the CMA handles **care coordination** - the logistical layer that, in a traditional service, would involve receptionists, administrative staff, and phone tag.
 
 ---
 
@@ -44,7 +50,7 @@ Each state transition is persisted to the database and visible to both the stude
 
 ## Counsellor Assignment
 
-The CMA selects a counsellor using a priority scoring algorithm:
+CMA selects counselors using a priority scoring algorithm. The system first matches specializations based on identified intents, such as academic stress. It then prioritizes counselors with lower active caseloads to ensure balanced distribution. Finally, it considers counselor availability within the next 72 hours and language preferences. Students are presented with the top two or three counselor options for confirmation to ensure consent throughout the process.
 
 1. **Specialisation match**: If the STA's `intent` suggests a particular area (e.g., `academic_stress`), counsellors with matching specialisations are ranked higher.
 2. **Current caseload**: Counsellors with fewer active cases are preferred, distributing load fairly.
@@ -68,7 +74,7 @@ The CMA orchestrates a multi-step booking flow through Aika's tool-calling inter
 
 The entire flow happens conversationally. The student does not navigate to a separate booking page. Aika says something like:
 
-> *"I found two counsellors available this week — Bu Ratna specialises in academic stress, and Pak Andri has experience with anxiety. Which feels right? And would 10am tomorrow or 2pm Thursday work for you?"*
+> *"I found two counsellors available this week - Bu Ratna specialises in academic stress, and Pak Andri has experience with anxiety. Which feels right? And would 10am tomorrow or 2pm Thursday work for you?"*
 
 ---
 
@@ -89,13 +95,13 @@ If a case is not picked up within its SLA window, the system generates an alert 
 
 ## Blockchain Attestation
 
-When a counsellor closes a case, they submit a **session attestation** — a signed summary of the intervention delivered. This attestation is:
+When a counselor closes a case, they submit a session attestation, which is a signed summary of the delivered intervention. This attestation is hashed using SHA-256 and submitted as a transaction to the CARE token smart contract. The resulting transaction hash is stored in the `CaseAttestation` table. This process establishes an immutable audit trail, allowing institutions to verify that a session occurred without accessing clinical details. Actual session notes are maintained within the encrypted PostgreSQL database.
 
 1. Hashed (SHA-256)
 2. Submitted as a transaction to the CARE token smart contract on Ethereum
 3. The transaction hash is stored in the `CaseAttestation` table alongside the case record
 
-This creates an immutable audit trail. Institutions can verify that a session occurred without accessing any clinical details — they only see the hash and the timestamp. The actual session notes remain in the encrypted PostgreSQL database.
+This creates an immutable audit trail. Institutions can verify that a session occurred without accessing any clinical details - they only see the hash and the timestamp. The actual session notes remain in the encrypted PostgreSQL database.
 
 ```mermaid
 sequenceDiagram
@@ -121,5 +127,5 @@ The CMA does not:
 
 - Conduct therapy or psychological assessment
 - Override a student's appointment preferences without confirmation
-- Store clinical notes — those are written exclusively by the human counsellor
+- Store clinical notes - those are written exclusively by the human counsellor
 - Access any blockchain identity that could link to the student's personal data

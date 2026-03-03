@@ -29,6 +29,7 @@ from .autopilot import router as autopilot_router
 from .contracts import router as contracts_router
 from .attestations import router as attestations_router
 from .agent_decisions import router as agent_decisions_router
+from .scheduler import router as scheduler_router
 
 # Router-level dependency: runs on every admin route before the route handler.
 # - admin / counselor: unrestricted (read + write).
@@ -63,6 +64,7 @@ router.include_router(autopilot_router)
 router.include_router(contracts_router)
 router.include_router(attestations_router)
 router.include_router(agent_decisions_router)
+router.include_router(scheduler_router)
 
 __all__ = [
     "router",
@@ -83,4 +85,5 @@ __all__ = [
     "contracts",
     "attestations",
     "agent_decisions",
+    "scheduler",
 ]

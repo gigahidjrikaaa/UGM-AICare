@@ -38,7 +38,7 @@ REDIS_URL=redis://localhost:6379
 # Google AI
 GOOGLE_API_KEY=your_gemini_api_key
 
-# Langfuse (observability — optional but recommended)
+# Langfuse (observability - optional but recommended)
 LANGFUSE_PUBLIC_KEY=pk-lf-...
 LANGFUSE_SECRET_KEY=sk-lf-...
 LANGFUSE_HOST=https://cloud.langfuse.com
@@ -64,7 +64,7 @@ NEXT_PUBLIC_API_URL=http://localhost:22001
 
 ## Running with Docker Compose
 
-The full stack (backend + frontend) can be started with one command. The database and Redis are treated as **external services** configured via `.env` — they are not part of the Compose file.
+The full stack (backend + frontend) can be started with one command. The database and Redis are treated as **external services** configured via `.env` - they are not part of the Compose file.
 
 ```bash
 # Development mode (hot reload on both frontend and backend)
@@ -154,7 +154,7 @@ This script:
 1. Pulls the latest images from the container registry
 2. Runs `alembic upgrade head` as a pre-deploy step
 3. Performs a rolling restart (zero downtime)
-4. Runs a health check — rolls back automatically if the health endpoint fails
+4. Runs a health check - rolls back automatically if the health endpoint fails
 
 ---
 
@@ -166,4 +166,4 @@ Once deployed, system health is visible across three surfaces:
 | --- | --- | --- |
 | **FastAPI Swagger UI** | `/docs` | All API endpoints, schemas, try-it-now |
 | **Langfuse** | `cloud.langfuse.com` | Every LLM trace, tool call, latency, token cost |
-| **Grafana** | Internal dashboard | Infrastructure metrics — CPU, memory, DB connections, Redis latency |
+| **Grafana** | Internal dashboard | Infrastructure metrics - CPU, memory, DB connections, Redis latency |

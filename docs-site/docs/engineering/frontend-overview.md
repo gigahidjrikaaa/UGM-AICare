@@ -8,8 +8,8 @@ sidebar_position: 1
 
 The frontend is a **Next.js 16** application written in TypeScript. It serves two distinct user experiences from the same codebase:
 
-1. **The Chat Interface** — used by students to talk to Aika
-2. **The Dashboard** — used by counsellors and administrators to monitor cases, analytics, and system health
+1. **The Chat Interface** - used by students to talk to Aika
+2. **The Dashboard** - used by counsellors and administrators to monitor cases, analytics, and system health
 
 ---
 
@@ -62,7 +62,7 @@ Role-based UI rendering: counsellors and admins are redirected to the dashboard 
 
 | Component | Purpose |
 | --- | --- |
-| `ChatBubble` | Renders a single message — handles Markdown, code blocks, lists |
+| `ChatBubble` | Renders a single message - handles Markdown, code blocks, lists |
 | `TypingIndicator` | Animated dots shown while streaming is active |
 | `RiskBadge` | Colour-coded badge showing a conversation's risk level (counsellors only) |
 | `AppointmentCard` | Displays a scheduled appointment with reschedule/cancel actions |
@@ -73,6 +73,6 @@ Role-based UI rendering: counsellors and admins are redirected to the dashboard 
 
 ## Internationalisation
 
-The app supports both **English** and **Bahasa Indonesia**. Language selection is persisted in the user profile. All UI strings live in `messages/en.json` and `messages/id.json` — no hardcoded text in components.
+The app supports both **English** and **Bahasa Indonesia**. Language selection is persisted in the user profile. All UI strings live in `messages/en.json` and `messages/id.json` - no hardcoded text in components.
 
 Aika's conversational responses are in the language the student uses. If they write in Indonesian, Aika responds in Indonesian. This is handled at the LLM prompt level, not by the frontend.

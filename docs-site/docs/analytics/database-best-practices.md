@@ -1,12 +1,18 @@
 ---
+id: database-best-practices
+title: Database Schema & Best Practices
 sidebar_position: 2
 ---
 
-# Backend — Database Schema
+# Backend Database Schema
+sidebar_position: 2
+---
+
+# Backend - Database Schema
 
 ## Overview
 
-UGM-AICare uses **PostgreSQL** (hosted on Supabase) as its primary database. The schema is designed around the key entities of a mental health support system: users, conversations, risk assessments, cases, appointments, and blockchain records.
+UGM-AICare utilizes PostgreSQL, hosted on Supabase, as its primary database. The schema centers on essential mental health support system entities, including users, conversations, risk assessments, cases, appointments, and blockchain records.
 
 All schema migrations are managed via **Alembic**. Never modify the database schema directly; always generate a migration file.
 
@@ -124,11 +130,11 @@ erDiagram
 
 ## Privacy Design in the Schema
 
-The schema implements a **pseudonymisation** pattern:
+The schema employs a pseudonymization pattern. The `CONVERSATIONRISKASSESSMENT` and `SCREENINGPROFILE` tables store a `user_hash` instead of a `user_id` in columns used for analytics. This `user_hash` is a one-way HMAC-SHA256 hash of the `user_id` using a server-side secret. Analytics queries within the IA layer operate exclusively on the `user_hash` and do not join against the `USERS` table. The clinical layer, including the CMA and counselor dashboard, performs the reverse lookup from `user_hash` to `user_id` only for authorized roles. This design ensures that analytics tables remain disconnected from identifiable user records if accessed without authorization.
 
 - The `CONVERSATIONRISKASSESSMENT` and `SCREENINGPROFILE` tables store `user_hash` instead of `user_id` in the columns used for analytics.
 - `user_hash` is a one-way HMAC-SHA256 hash of the `user_id` with a server-side secret.
-- Analytics queries (IA layer) operate only on `user_hash` — they never join against the `USERS` table.
+- Analytics queries (IA layer) operate only on `user_hash` - they never join against the `USERS` table.
 - Only the clinical layer (CMA, counsellor dashboard) performs the reverse lookup from `user_hash` to `user_id`, and only for users with the appropriate role.
 
 This means even if the analytics tables are somehow accessed without authorisation, they cannot be directly linked to identifiable user records.
@@ -144,4 +150,4 @@ This means even if the analytics tables are somehow accessed without authorisati
 | `counsellors:available` | Available counsellors list | 5 minutes |
 | `ratelimit:{user_id}:{endpoint}` | Request counter | 60 seconds |
 
-Conversation history is the most critical cache — it avoids a database query on every message. The TTL of 24 hours covers a typical day of use; sessions inactive for longer are re-hydrated from PostgreSQL on the next message.
+Conversation history is the most critical cache - it avoids a database query on every message. The TTL of 24 hours covers a typical day of use; sessions inactive for longer are re-hydrated from PostgreSQL on the next message.

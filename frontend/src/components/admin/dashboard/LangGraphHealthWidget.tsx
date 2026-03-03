@@ -9,7 +9,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import Link from 'next/link';
 import { motion } from 'framer-motion';
+import axios from 'axios';
 import { ChartBarIcon, ExclamationTriangleIcon, ArrowPathIcon } from '@heroicons/react/24/outline';
+import { getAnalyticsOverview } from '@/services/langGraphApi';
 
 interface GraphHealth {
   graph_type: string;
@@ -51,34 +53,26 @@ export default function LangGraphHealthWidget() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
+  const [authUnavailable, setAuthUnavailable] = useState(false);
+
+  const isAuthError = (err: unknown): boolean => {
+    if (axios.isAxiosError(err)) {
+      return err.response?.status === 401;
+    }
+
+    if (err instanceof Error) {
+      const message = err.message.toLowerCase();
+      return message.includes('not authenticated') || message.includes('authentication required');
+    }
+
+    return false;
+  };
 
   const fetchHealth = useCallback(async (showRefresh = false) => {
     if (showRefresh) setIsRefreshing(true);
     
     try {
-      // Use relative URL - Next.js rewrites /api to backend
-      const token = localStorage.getItem('adminToken');
-      
-      if (!token) {
-        throw new Error('Not authenticated');
-      }
-
-      // Fetch analytics overview from the correct endpoint
-      const response = await fetch(`/api/v1/admin/langgraph/analytics/overview?days=1`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        if (response.status === 401) {
-          throw new Error('Authentication required');
-        }
-        throw new Error(`Failed to fetch health data: ${response.status}`);
-      }
-
-      const result = await response.json();
+      const result = await getAnalyticsOverview(1);
       
       if (result.success && result.data) {
         const analytics = result.data;
@@ -123,6 +117,7 @@ export default function LangGraphHealthWidget() {
           success_rate_percent: successRate,
         });
         setError(null);
+        setAuthUnavailable(false);
       } else {
         // No data available, show unknown state
         setHealthData({
@@ -137,10 +132,17 @@ export default function LangGraphHealthWidget() {
           total_executions: 0,
           success_rate_percent: 0,
         });
+        setError(null);
+        setAuthUnavailable(false);
       }
     } catch (err) {
-      console.error('LangGraph Health Widget error:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load');
+      if (isAuthError(err)) {
+        setAuthUnavailable(true);
+        setError('Unavailable');
+      } else {
+        console.error('LangGraph Health Widget error:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load');
+      }
     } finally {
       setLoading(false);
       setIsRefreshing(false);
@@ -149,9 +151,13 @@ export default function LangGraphHealthWidget() {
 
   useEffect(() => {
     fetchHealth();
+    if (authUnavailable) {
+      return undefined;
+    }
+
     const interval = setInterval(() => fetchHealth(), 30000); // Refresh every 30s
     return () => clearInterval(interval);
-  }, [fetchHealth]);
+  }, [authUnavailable, fetchHealth]);
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -186,19 +192,23 @@ export default function LangGraphHealthWidget() {
   }
 
   if (error) {
+    const isUnavailable = error === 'Unavailable';
+
     return (
-      <div className="bg-red-500/10 backdrop-blur-sm border border-red-500/30 rounded-xl p-4">
+      <div className={`${isUnavailable ? 'bg-white/5 border-white/10' : 'bg-red-500/10 border-red-500/30'} backdrop-blur-sm border rounded-xl p-4`}>
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2 text-red-300 text-sm">
-            <ExclamationTriangleIcon className="w-4 h-4" />
-            <span>LangGraph: {error}</span>
+          <div className={`flex items-center gap-2 text-sm ${isUnavailable ? 'text-white/65' : 'text-red-300'}`}>
+            {!isUnavailable && <ExclamationTriangleIcon className="w-4 h-4" />}
+            <span>{isUnavailable ? 'LangGraph: unavailable on this session' : `LangGraph: ${error}`}</span>
           </div>
-          <button
-            onClick={handleRefresh}
-            className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 transition-colors"
-          >
-            <ArrowPathIcon className={`w-4 h-4 text-red-300 ${isRefreshing ? 'animate-spin' : ''}`} />
-          </button>
+          {!isUnavailable && (
+            <button
+              onClick={handleRefresh}
+              className="p-1.5 rounded-lg bg-red-500/20 hover:bg-red-500/30 transition-colors"
+            >
+              <ArrowPathIcon className={`w-4 h-4 text-red-300 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
+          )}
         </div>
       </div>
     );

@@ -164,7 +164,7 @@ export function TrendChart({
           <div>
             <h4 className="text-sm font-medium text-white/70 mb-1">{title}</h4>
             <div className="flex items-baseline gap-3">
-              <span className={`text-2xl font-bold bg-gradient-to-r ${config.gradient} bg-clip-text text-transparent`}>
+              <span className={`text-2xl font-bold bg-linear-to-r ${config.gradient} bg-clip-text text-transparent`}>
                 {stats.current.toFixed(1)}{suffix}
               </span>
               {stats.change !== 0 && (

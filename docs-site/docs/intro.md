@@ -57,8 +57,8 @@ A student opens the app and starts a conversation with **Aika**, the system's fr
 
 ## Quick Links
 
-- [System Architecture Overview →](./architecture/overview)
-- [How the Agentic Framework Works →](./architecture/agentic-framework)
-- [Meet Aika →](./agents/aika)
-- [Technology Stack →](./architecture/tech-stack)
-- [Running the Project Locally →](./deployment/setup)
+- [System Architecture Overview](./architecture/system-overview)
+- [How the Agentic Framework Works](./architecture/agentic-framework)
+- [Meet Aika](./architecture/meta-agent-aika)
+- [Technology Stack](./engineering/tech-stack)
+- [Running the Project Locally](./deployment/setup)

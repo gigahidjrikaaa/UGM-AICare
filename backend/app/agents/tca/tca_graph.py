@@ -13,6 +13,8 @@ import logging
 from datetime import datetime
 
 from langgraph.graph import StateGraph, END
+from langgraph.graph.state import CompiledStateGraph
+from langchain_core.runnables import RunnableConfig
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.graph_state import SCAState
@@ -277,18 +279,19 @@ async def safety_review_node(state: SCAState) -> SCAState:
 
 
 @trace_agent("TCA_PersistPlan")
-async def persist_plan_node(state: SCAState, db: AsyncSession) -> SCAState:
+async def persist_plan_node(state: SCAState, config: RunnableConfig) -> SCAState:
     """Node: Persist intervention plan to database.
     
     Creates InterventionPlan record for tracking and follow-up.
     
     Args:
         state: Current graph state
-        db: Database session
+        config: LangGraph runtime config carrying ``db`` under ``config["configurable"]["db"]``
         
     Returns:
         Updated state with intervention_plan_id
     """
+    db: AsyncSession = config["configurable"]["db"]
     execution_id = state.get("execution_id")
     if execution_id:
         execution_tracker.start_node(execution_id, "tca::persist_plan", "tca")
@@ -400,32 +403,25 @@ async def persist_plan_node(state: SCAState, db: AsyncSession) -> SCAState:
     return state
 
 
-def create_tca_graph(db: AsyncSession) -> StateGraph:
-    """Create the TCA LangGraph state machine.
-    
+def _build_tca_graph() -> CompiledStateGraph:
+    """Build and compile the TCA LangGraph state machine.
+
     Graph structure:
-        START → ingest_triage_signal → determine_intervention_type → 
+        START → ingest_triage_signal → determine_intervention_type →
         generate_plan → safety_review → persist_plan → END
-    
-    Args:
-        db: Database session for node operations
-        
+
     Returns:
         Compiled StateGraph ready for execution
     """
     workflow = StateGraph(SCAState)
-    
-    # Create async wrapper for persist_plan_node with db dependency
-    async def persist_plan_with_db(state: SCAState) -> SCAState:
-        return await persist_plan_node(state, db)
-    
+
     # Add nodes
     workflow.add_node("ingest_triage_signal", ingest_triage_signal_node)
     workflow.add_node("determine_intervention_type", determine_intervention_type_node)
     workflow.add_node("generate_plan", generate_plan_node)
     workflow.add_node("safety_review", safety_review_node)
-    workflow.add_node("persist_plan", persist_plan_with_db)
-    
+    workflow.add_node("persist_plan", persist_plan_node)
+
     # Define linear flow
     workflow.set_entry_point("ingest_triage_signal")
     workflow.add_edge("ingest_triage_signal", "determine_intervention_type")
@@ -433,5 +429,17 @@ def create_tca_graph(db: AsyncSession) -> StateGraph:
     workflow.add_edge("generate_plan", "safety_review")
     workflow.add_edge("safety_review", "persist_plan")
     workflow.add_edge("persist_plan", END)
-    
+
     return workflow.compile()
+
+
+# Module-level cached compiled graph
+_tca_graph: CompiledStateGraph | None = None
+
+
+def get_tca_graph() -> CompiledStateGraph:
+    """Return the cached TCA compiled graph, building it on first call."""
+    global _tca_graph
+    if _tca_graph is None:
+        _tca_graph = _build_tca_graph()
+    return _tca_graph

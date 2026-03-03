@@ -44,7 +44,7 @@ export function KPICard({ title, value, subtitle, trend, icon, severity = 'info'
       `}
     >
       {/* Background gradient */}
-      <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-50" />
+      <div className="absolute inset-0 bg-linear-to-br from-white/5 to-transparent opacity-50" />
       
       <div className="relative space-y-3">
         {/* Header */}

@@ -1,23 +1,25 @@
 ---
+id: meta-agent-aika
+title: Aika - The Orchestrator
 sidebar_position: 1
 ---
 
-# Aika — The Orchestrator
+# Aika - The Orchestrator
 
 ## Who Is Aika?
 
 **Aika** (愛佳) is the central persona of UGM-AICare. The name carries deliberate meaning:
 
-- **愛 (Ai)** — Love, compassion
-- **佳 (Ka)** — Excellence, beauty
+- **愛 (Ai)** - Love, compassion
+- **佳 (Ka)** - Excellence, beauty
 
-Aika is the only agent students interact with directly. From a student's perspective, they are simply chatting with a supportive friend. Under the hood, Aika is a **meta-agent orchestrator**: it reads the student's message, decides which specialist agents need to be involved, coordinates them in parallel or sequence, and synthesises their outputs into a single coherent response.
+Aika is the primary interface for student interactions. To the student, Aika appears as a supportive peer. Internally, however, Aika functions as a meta-agent orchestrator. It processes student messages, identifies necessary specialist agents, coordinates their activities, and synthesizes their outputs into a coherent response.
 
 ---
 
 ## The Three Versions of Aika
 
-Aika presents differently depending on who is talking to it. This is not cosmetic — the underlying tool access, system prompt, and permitted operations genuinely differ.
+Aika presents differently depending on who is talking to it. This is not cosmetic - the underlying tool access, system prompt, and permitted operations genuinely differ.
 
 ### For Students
 Aika is an empathetic companion. It uses casual Indonesian (matching the student's register), avoids clinical jargon, and gently steers towards healthy coping behaviours. When the student needs a psychologist, Aika handles the entire booking flow conversationally.
@@ -34,7 +36,7 @@ Aika is a data and operations interface. Administrators can query conversation s
 
 Every message passes through three fast checks before any LLM call is made:
 
-### Step 1 — Crisis Keyword Scan (< 1 ms)
+### Step 1 - Crisis Keyword Scan (< 1 ms)
 
 Aika maintains a hardcoded list of crisis terms in English and Indonesian:
 
@@ -46,13 +48,11 @@ Aika maintains a hardcoded list of crisis terms in English and Indonesian:
 
 If any of these appear, the risk level is immediately set to `HIGH` before the LLM is even called. This guarantees that the system never underestimates a crisis due to an LLM miscalibration.
 
-### Step 2 — Small Talk Detection
+### Step 2 - Small Talk Detection
 
 Common greetings, acknowledgements, and filler phrases (`"halo"`, `"ok"`, `"makasih"`, `"hahaha"`) are matched against a lookup table. Small talk skips sub-agent invocation entirely and gets a direct, warm response in a single LLM call. This saves approximately 400 ms and meaningfully reduces API costs at scale.
 
-### Step 3 — LLM Intent Classification
-
-For everything else, Aika calls Gemini to classify the message intent:
+For everything else, Aika invokes Gemini inside the `aika_decision_node` to classify the message intent and determine the real-time risk level. This ensures that the orchestrator itself knows immediately if a crisis is occurring before delegating to sub-agents.
 
 | Intent | What Triggers It | Routing Decision |
 | --- | --- | --- |
@@ -101,16 +101,12 @@ The iteration budget is capped per intent type to prevent runaway tool-calling l
 
 ## Memory and Context
 
-Aika maintains two kinds of memory:
+Aika maintains conversational memory through LangGraph's native checkpointer:
 
-1. **Short-term (Redis):** The last 10 turns of the current conversation (20 messages). This is the "context window" sent to Gemini on each call. Keeping it at 10 turns caps input token cost while preserving conversational coherence.
+1. **Short-term Conversational Memory:** The state (including `conversation_history`) is durably saved via `AsyncPostgresSaver` after every graph iteration. This maintains strict continuity across the session. To cap input token costs, the history sent to the LLM is typically bounded to the last 10 turns (20 messages).
+2. **Long-term Context (Database):** The student's profile, journal entries, past interventions, and screening history reside in PostgreSQL. These are not eagerly loaded—Aika uses tools like `get_user_profile()` or `get_journal_entries()` to fetch them only when relevant.
 
-2. **Long-term (PostgreSQL):** The student's profile, journal entries, past interventions, and screening history. These are not loaded by default — Aika calls `get_user_profile()` or `get_journal_entries()` when relevant context needs to be fetched.
+## Screening - The Covert Layer
 
----
+Aika facilitates covert mental health screening within natural conversation. It identifies clinical indicators from student messages and maps them to validated instruments, such as PHQ-9 for depression, GAD-7 for anxiety, and DASS-21 for stress. These indicators are subsequently analyzed by the STA. This conversational approach to screening is designed to minimize dropout rates and reduce the stigma associated with formal psychological assessments.
 
-## Screening — The Covert Layer
-
-Aika embeds **covert mental health screening** into ordinary conversation. Without interrupting the flow of the chat, it maps what the student says against validated clinical instruments (PHQ-9 for depression, GAD-7 for anxiety, DASS-21 for stress/depression/anxiety). These extracted indicators are passed to the STA's post-conversation analysis.
-
-Crucially, students are never asked "please complete this PHQ-9 questionnaire." The screening is woven into conversational responses — a design choice to reduce dropout and stigma friction.
