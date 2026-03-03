@@ -62,7 +62,7 @@ const navGroups = [
       { name: 'Users', icon: <FiUsers size={18} />, href: '/admin/users' },
       { name: 'Counselors', icon: <FiUserCheck size={18} />, href: '/admin/counselors' },
       { name: 'Conversations', icon: <FiMessageSquare size={18} />, href: '/admin/conversations' },
-      { name: 'Screening Intel', icon: <FiEye size={18} />, href: '/admin/screening' },
+      { name: 'Screening', icon: <FiEye size={18} />, href: '/admin/screening' },
       { name: 'CRM Contacts', icon: <FiPhone size={18} />, href: '/admin/crm' },
       { name: 'Activities', icon: <FiActivity size={18} />, href: '/admin/activities' },
     ],

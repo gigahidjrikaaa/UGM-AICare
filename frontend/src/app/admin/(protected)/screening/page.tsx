@@ -144,10 +144,10 @@ export default function AdminScreeningPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#00153a] via-[#001a47] to-[#00153a]">
+      <div className="flex items-center justify-center min-h-screen bg-[#020617] bg-[radial-gradient(circle_at_20%_20%,rgba(251,191,36,0.12),transparent_38%),radial-gradient(circle_at_80%_10%,rgba(56,189,248,0.12),transparent_32%),radial-gradient(circle_at_90%_90%,rgba(168,85,247,0.12),transparent_36%)]">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-white/20 border-t-[#FFCA40] rounded-full animate-spin mx-auto" />
-          <p className="text-white/60">Loading screening intelligence...</p>
+          <p className="text-white/60">Loading screening overview...</p>
         </div>
       </div>
     );
@@ -155,12 +155,12 @@ export default function AdminScreeningPage() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-screen bg-gradient-to-br from-[#00153a] via-[#001a47] to-[#00153a]">
+      <div className="flex items-center justify-center min-h-screen bg-[#020617] bg-[radial-gradient(circle_at_20%_20%,rgba(251,191,36,0.12),transparent_38%),radial-gradient(circle_at_80%_10%,rgba(56,189,248,0.12),transparent_32%),radial-gradient(circle_at_90%_90%,rgba(168,85,247,0.12),transparent_36%)]">
         <div className="text-center space-y-4 max-w-md">
           <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto">
             <ExclamationTriangleIcon className="w-8 h-8 text-red-400" />
           </div>
-          <h3 className="text-xl font-semibold text-white">Error Loading Screening Data</h3>
+          <h3 className="text-xl font-semibold text-white">Error loading screening data</h3>
           <p className="text-white/60">{error}</p>
           <button
             onClick={loadData}
@@ -174,7 +174,7 @@ export default function AdminScreeningPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#00153a] via-[#001a47] to-[#00153a] p-6 space-y-6">
+    <div className="min-h-screen bg-[#020617] bg-[radial-gradient(circle_at_20%_20%,rgba(251,191,36,0.12),transparent_38%),radial-gradient(circle_at_80%_10%,rgba(56,189,248,0.12),transparent_32%),radial-gradient(circle_at_90%_90%,rgba(168,85,247,0.12),transparent_36%)] p-6 space-y-6">
       {/* Header */}
       <motion.div
         initial={{ opacity: 0, y: -20 }}
@@ -184,10 +184,10 @@ export default function AdminScreeningPage() {
         <div>
           <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
             <ShieldExclamationIcon className="w-8 h-8 text-[#FFCA40]" />
-            Screening Intelligence
+            Screening
           </h1>
           <p className="text-white/60 text-sm">
-            Evidence-based mental health monitoring using validated instruments
+            Population-level mental health screening from conversational indicators, mapped to validated instruments.
           </p>
         </div>
 
@@ -207,6 +207,34 @@ export default function AdminScreeningPage() {
             <ArrowPathIcon className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
+        </div>
+      </motion.div>
+
+      <motion.div
+        initial={{ opacity: 0, y: 12 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="grid grid-cols-1 xl:grid-cols-3 gap-4"
+      >
+        <div className="rounded-2xl border border-cyan-400/20 bg-cyan-500/5 p-5 backdrop-blur">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-cyan-300 mb-2">What is screened</h2>
+          <p className="text-sm text-white/80 leading-relaxed">
+            Student conversations are screened for 9 dimensions: depression, anxiety, stress, sleep, social isolation,
+            academic strain, self-worth, substance use, and crisis indicators.
+          </p>
+        </div>
+        <div className="rounded-2xl border border-purple-400/20 bg-purple-500/5 p-5 backdrop-blur">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-purple-300 mb-2">How it is screened</h2>
+          <p className="text-sm text-white/80 leading-relaxed">
+            Signals are extracted from conversation context and normalized per dimension. Each dimension is aligned to
+            validated instruments (PHQ-9, GAD-7, DASS-21, PSQI, UCLA-LS3, RSES, AUDIT, C-SSRS).
+          </p>
+        </div>
+        <div className="rounded-2xl border border-amber-400/20 bg-amber-500/5 p-5 backdrop-blur">
+          <h2 className="text-sm font-semibold uppercase tracking-wide text-amber-300 mb-2">Metrics used</h2>
+          <p className="text-sm text-white/80 leading-relaxed">
+            Net score is calculated as current_score - (protective_score × 0.5), then mapped into risk levels (none,
+            mild, moderate, severe, critical). Profiles are flagged for clinical attention based on risk and trajectory.
+          </p>
         </div>
       </motion.div>
 
@@ -278,6 +306,31 @@ export default function AdminScreeningPage() {
             severity={dashboard.profiles_requiring_attention > 5 ? 'warning' : 'info'}
           />
         </div>
+      )}
+
+      {dashboard && dashboard.top_concerns.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-2xl border border-white/10 bg-white/5 p-6 backdrop-blur"
+        >
+          <h2 className="text-lg font-semibold text-white mb-4">Top Screening Concerns</h2>
+          <div className="flex flex-wrap gap-2">
+            {dashboard.top_concerns.slice(0, 12).map((item) => {
+              const key = item.concern as ScreeningDimension;
+              const instrument = INSTRUMENT_CONFIG[key];
+              return (
+                <span
+                  key={`${item.concern}-${item.count}`}
+                  className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs border ${instrument?.borderColor || 'border-white/20'} ${instrument?.bgColor || 'bg-white/10'} ${instrument?.color || 'text-white/70'}`}
+                >
+                  <span className="font-mono">{instrument?.code || item.concern}</span>
+                  <span className="text-white/70">{item.count}</span>
+                </span>
+              );
+            })}
+          </div>
+        </motion.div>
       )}
 
       {/* Risk Distribution */}
@@ -360,112 +413,127 @@ export default function AdminScreeningPage() {
         </div>
       </div>
 
-      {/* Profiles Table */}
+      {/* Profiles */}
       <motion.div
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
-        className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur overflow-hidden"
+        className="rounded-2xl border border-white/10 bg-white/5 backdrop-blur p-5"
       >
-        <div className="p-4 border-b border-white/10">
+        <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-white">
-            Screening Profiles ({profiles.length})
+            Profiles ({profiles.length})
           </h2>
+          <span className="text-xs text-white/50">Sorted by last update</span>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className="border-b border-white/10">
-                <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">User</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Risk Level</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Sessions</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Trend</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Primary Concerns</th>
-                <th className="px-4 py-3 text-left text-xs font-medium text-white/60 uppercase">Last Updated</th>
-                <th className="px-4 py-3 text-right text-xs font-medium text-white/60 uppercase">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {profiles.length === 0 ? (
-                <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-white/50">
-                    No screening profiles found matching filters
-                  </td>
-                </tr>
-              ) : (
-                profiles.map((profile) => {
-                  const trend = getTrendLabel(profile.risk_trajectory);
-                  return (
-                    <tr
-                      key={profile.user_id}
-                      className="border-b border-white/5 hover:bg-white/5 transition-colors"
-                    >
-                      <td className="px-4 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[#FFCA40]/30 to-[#FFCA40]/10 flex items-center justify-center text-xs font-bold text-[#FFCA40]">
-                            {profile.user_email?.charAt(0).toUpperCase() || 'U'}
-                          </div>
-                          <div>
-                            <div className="text-sm font-medium text-white">{profile.user_name || 'Unknown'}</div>
-                            <div className="text-xs text-white/50">{profile.user_email}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-4 py-3">{renderRiskBadge(profile.overall_risk)}</td>
-                      <td className="px-4 py-3 text-sm text-white/70">{profile.total_sessions_analyzed}</td>
-                      <td className="px-4 py-3">
-                        <span className={`text-sm ${trend.color}`}>
-                          {trend.label}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3">
-                        <div className="flex flex-wrap gap-1">
-                          {profile.primary_concerns.slice(0, 3).map((concern, i) => {
-                            const instrument = INSTRUMENT_CONFIG[concern as ScreeningDimension];
-                            return (
-                              <span
-                                key={i}
-                                className={`px-2 py-0.5 rounded text-xs ${instrument?.bgColor || 'bg-white/10'} ${instrument?.color || 'text-white/70'}`}
-                              >
-                                {instrument?.code || concern}
-                              </span>
-                            );
-                          })}
-                        </div>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-white/50">
-                        {new Date(profile.updated_at).toLocaleDateString()}
-                      </td>
-                      <td className="px-4 py-3 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          <button
-                            onClick={() => setSelectedProfile(profile)}
-                            className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                            title="View Details"
+        {profiles.length === 0 ? (
+          <div className="rounded-xl border border-white/10 bg-black/20 p-8 text-center text-white/50">
+            No screening profiles found matching the current filters.
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {profiles.map((profile) => {
+              const trend = getTrendLabel(profile.risk_trajectory);
+              const topDimensions = [...profile.dimension_scores]
+                .sort((a, b) => b.net_score - a.net_score)
+                .slice(0, 3);
+
+              return (
+                <div
+                  key={profile.user_id}
+                  className="rounded-xl border border-white/10 bg-[#001D58]/25 p-4 hover:border-white/25 transition-all"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="w-10 h-10 rounded-full bg-linear-to-br from-[#FFCA40]/30 to-[#FFCA40]/10 flex items-center justify-center text-sm font-bold text-[#FFCA40]">
+                        {profile.user_email?.charAt(0).toUpperCase() || 'U'}
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-sm font-semibold text-white truncate">{profile.user_name || 'Unknown'}</div>
+                        <div className="text-xs text-white/50 truncate">{profile.user_email}</div>
+                      </div>
+                    </div>
+                    {renderRiskBadge(profile.overall_risk)}
+                  </div>
+
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-xs">
+                    <div className="rounded-md border border-white/10 bg-black/20 p-2">
+                      <p className="text-white/50">Sessions</p>
+                      <p className="text-white font-semibold">{profile.total_sessions_analyzed}</p>
+                    </div>
+                    <div className="rounded-md border border-white/10 bg-black/20 p-2">
+                      <p className="text-white/50">Trend</p>
+                      <p className={`font-semibold ${trend.color}`}>{trend.label}</p>
+                    </div>
+                    <div className="rounded-md border border-white/10 bg-black/20 p-2">
+                      <p className="text-white/50">Updated</p>
+                      <p className="text-white/80">{new Date(profile.updated_at).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+
+                  <div className="mt-3">
+                    <p className="text-[11px] uppercase tracking-wide text-white/50 mb-2">Primary concerns</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {profile.primary_concerns.slice(0, 4).map((concern, i) => {
+                        const instrument = INSTRUMENT_CONFIG[concern as ScreeningDimension];
+                        return (
+                          <span
+                            key={i}
+                            className={`px-2 py-0.5 rounded text-xs ${instrument?.bgColor || 'bg-white/10'} ${instrument?.color || 'text-white/70'}`}
                           >
-                            <EyeIcon className="w-4 h-4 text-white/60" />
-                          </button>
-                          {profile.requires_attention && (
-                            <button
-                              onClick={() => handleMarkReviewed(profile.user_id)}
-                              disabled={markingReviewed === profile.user_id}
-                              className="p-2 hover:bg-green-500/20 rounded-lg transition-colors"
-                              title="Mark as Reviewed"
-                            >
-                              <CheckCircleIcon className={`w-4 h-4 ${
-                                markingReviewed === profile.user_id ? 'animate-pulse' : ''
-                              } text-green-400`} />
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })
-              )}
-            </tbody>
-          </table>
-        </div>
+                            {instrument?.code || concern}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {topDimensions.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {topDimensions.map((dim) => {
+                        const instrument = INSTRUMENT_CONFIG[dim.dimension as ScreeningDimension];
+                        const barWidth = Math.min(dim.net_score * 100, 100);
+                        return (
+                          <div key={`${profile.user_id}-${dim.dimension}`}>
+                            <div className="flex items-center justify-between text-[11px] mb-1">
+                              <span className={instrument?.color || 'text-white/70'}>{instrument?.code || dim.dimension}</span>
+                              <span className="text-white/60">{(dim.net_score * 100).toFixed(0)}%</span>
+                            </div>
+                            <div className="h-1.5 rounded-full bg-white/10 overflow-hidden">
+                              <div className="h-full bg-[#FFCA40]/70" style={{ width: `${barWidth}%` }} />
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="mt-4 flex items-center justify-end gap-2">
+                    <button
+                      onClick={() => setSelectedProfile(profile)}
+                      className="inline-flex items-center gap-1.5 px-2.5 py-1.5 hover:bg-white/10 rounded-lg transition-colors text-xs text-white/80"
+                      title="View Details"
+                    >
+                      <EyeIcon className="w-4 h-4" />
+                      Details
+                    </button>
+                    {profile.requires_attention && (
+                      <button
+                        onClick={() => handleMarkReviewed(profile.user_id)}
+                        disabled={markingReviewed === profile.user_id}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg transition-colors text-xs bg-green-500/20 hover:bg-green-500/30 text-green-300 disabled:opacity-60"
+                        title="Mark as Reviewed"
+                      >
+                        <CheckCircleIcon className={`w-4 h-4 ${markingReviewed === profile.user_id ? 'animate-pulse' : ''}`} />
+                        Mark reviewed
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
       </motion.div>
 
       {/* Profile Detail Modal */}
@@ -479,7 +547,7 @@ export default function AdminScreeningPage() {
           <motion.div
             initial={{ scale: 0.95, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-gradient-to-br from-[#00153a] via-[#001a47] to-[#00153a] rounded-2xl border border-white/10 p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
+            className="bg-linear-to-br from-[#00153a] via-[#001a47] to-[#00153a] rounded-2xl border border-white/10 p-6 max-w-2xl w-full max-h-[90vh] overflow-y-auto"
             onClick={e => e.stopPropagation()}
           >
             <div className="flex items-start justify-between mb-6">

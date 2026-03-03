@@ -28,6 +28,7 @@ from app.models import User  # Core model
 from app.domains.mental_health.models import Conversation, Message
 from app.domains.mental_health.models.messages import MessageRoleEnum
 from app.domains.mental_health.models.appointments import Psychologist, AppointmentType
+from app.domains.mental_health.models.assessments import UserScreeningProfile
 from app.agents.sta.service import SafetyTriageService
 from app.domains.mental_health.schemas.chat import ChatRequest, ChatResponse
 # from app.domains.mental_health.services.chat_processing import process_chat_message
@@ -109,6 +110,23 @@ class SeedDatabaseResponse(BaseModel):
     users_created: int
     counselors_created: int
     admins_created: int
+    details: List[str]
+
+
+class SeedScreeningProfilesRequest(BaseModel):
+    """Request to seed synthetic screening profiles for test users."""
+    profiles_count: int = Field(default=12, ge=1, le=200)
+    include_critical: bool = Field(default=True)
+    requires_attention_ratio: float = Field(default=0.35, ge=0.0, le=1.0)
+
+
+class SeedScreeningProfilesResponse(BaseModel):
+    """Response after seeding synthetic screening profiles."""
+    requested_profiles: int
+    processed_profiles: int
+    created_profiles: int
+    updated_profiles: int
+    risk_distribution: Dict[str, int]
     details: List[str]
 
 
@@ -724,6 +742,153 @@ async def seed_database(
     )
 
 
+@router.post("/seed-screening", response_model=SeedScreeningProfilesResponse, status_code=status.HTTP_201_CREATED)
+async def seed_screening_profiles(
+    request: SeedScreeningProfilesRequest,
+    db: AsyncSession = Depends(get_async_db),
+    admin_user: User = Depends(get_admin_user),
+) -> SeedScreeningProfilesResponse:
+    """Seed synthetic screening profiles for test users so admin Screening page has realistic data."""
+    logger.info("Admin %s seeding screening profiles: %s", admin_user.id, request.model_dump())
+
+    users_result = await db.execute(
+        select(User)
+        .where(User.email.ilike("%test%"), User.role == "user")
+        .order_by(User.created_at.desc())
+    )
+    candidate_users = users_result.scalars().all()
+
+    if not candidate_users:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="No test student users found. Seed users first from Testing page.",
+        )
+
+    dimensions = [
+        "depression",
+        "anxiety",
+        "stress",
+        "sleep",
+        "social",
+        "academic",
+        "self_worth",
+        "substance",
+        "crisis",
+    ]
+    risk_levels = ["none", "mild", "moderate", "severe"]
+    if request.include_critical:
+        risk_levels.append("critical")
+
+    score_ranges: Dict[str, tuple[float, float]] = {
+        "none": (0.03, 0.18),
+        "mild": (0.20, 0.36),
+        "moderate": (0.38, 0.55),
+        "severe": (0.58, 0.74),
+        "critical": (0.80, 0.95),
+    }
+
+    selected_users = random.sample(candidate_users, min(request.profiles_count, len(candidate_users)))
+    created_profiles = 0
+    updated_profiles = 0
+    risk_distribution: Dict[str, int] = {"none": 0, "mild": 0, "moderate": 0, "severe": 0, "critical": 0}
+    details: List[str] = []
+
+    for user in selected_users:
+        risk = random.choice(risk_levels)
+        risk_distribution[risk] = risk_distribution.get(risk, 0) + 1
+
+        min_score, max_score = score_ranges[risk]
+        dimension_scores: Dict[str, Dict[str, Any]] = {}
+
+        for dim in dimensions:
+            current_score = round(random.uniform(min_score, max_score), 3)
+            if dim == "crisis" and risk in {"critical", "severe"}:
+                current_score = round(max(current_score, random.uniform(0.68, 0.96)), 3)
+            if dim == "substance" and risk in {"none", "mild"}:
+                current_score = round(random.uniform(0.02, 0.28), 3)
+
+            protective_score = round(random.uniform(0.02, 0.55), 3)
+            trend = random.choice(["improving", "stable", "worsening"])
+
+            dimension_scores[dim] = {
+                "current_score": current_score,
+                "protective_score": protective_score,
+                "indicator_count": random.randint(1, 12),
+                "last_updated": datetime.utcnow().isoformat(),
+                "trend": trend,
+            }
+
+        ranked_dimensions = sorted(
+            dimensions,
+            key=lambda dim: dimension_scores[dim]["current_score"] - (dimension_scores[dim]["protective_score"] * 0.5),
+            reverse=True,
+        )
+        primary_concerns = ranked_dimensions[:3]
+        protective_factors = [
+            dim
+            for dim in dimensions
+            if dimension_scores[dim]["protective_score"] >= 0.35 and dimension_scores[dim]["current_score"] < 0.45
+        ][:3]
+
+        requires_attention = (
+            risk in {"moderate", "severe", "critical"}
+            and random.random() < max(request.requires_attention_ratio, 0.2)
+        ) or (risk == "critical")
+
+        profile_data: Dict[str, Any] = {
+            "risk_trajectory": random.choice(["improving", "stable", "declining"]),
+            "dimension_scores": dimension_scores,
+            "primary_concerns": primary_concerns,
+            "protective_factors": protective_factors,
+            "intervention_history": [],
+            "screening_metadata": {
+                "seeded_by": admin_user.id,
+                "seeded_at": datetime.utcnow().isoformat(),
+                "seed_version": "v1",
+            },
+        }
+
+        existing_result = await db.execute(
+            select(UserScreeningProfile).where(UserScreeningProfile.user_id == user.id)
+        )
+        existing_profile = existing_result.scalar_one_or_none()
+
+        if existing_profile:
+            existing_profile.profile_data = profile_data
+            existing_profile.overall_risk = risk
+            existing_profile.requires_attention = requires_attention
+            existing_profile.total_messages_analyzed = random.randint(20, 220)
+            existing_profile.total_sessions_analyzed = random.randint(2, 30)
+            existing_profile.last_intervention_at = datetime.utcnow() - timedelta(days=random.randint(0, 14)) if requires_attention else None
+            existing_profile.updated_at = datetime.utcnow()
+            updated_profiles += 1
+            details.append(f"Updated profile for user #{user.id} ({user.email}) -> {risk}")
+        else:
+            profile = UserScreeningProfile(
+                user_id=user.id,
+                profile_data=profile_data,
+                overall_risk=risk,
+                requires_attention=requires_attention,
+                total_messages_analyzed=random.randint(20, 220),
+                total_sessions_analyzed=random.randint(2, 30),
+                last_intervention_at=datetime.utcnow() - timedelta(days=random.randint(0, 14)) if requires_attention else None,
+            )
+            db.add(profile)
+            created_profiles += 1
+            details.append(f"Created profile for user #{user.id} ({user.email}) -> {risk}")
+
+    await db.commit()
+
+    return SeedScreeningProfilesResponse(
+        requested_profiles=request.profiles_count,
+        processed_profiles=len(selected_users),
+        created_profiles=created_profiles,
+        updated_profiles=updated_profiles,
+        risk_distribution=risk_distribution,
+        details=details,
+    )
+
+
 @router.post("/chat-simulation", response_model=SimulateRealChatResponse, status_code=status.HTTP_201_CREATED)
 async def simulate_real_chat(
     request: SimulateRealChatRequest,
@@ -1231,6 +1396,14 @@ async def delete_test_data(
             conversations_deleted=0,
             messages_deleted=0
         )
+
+    # Delete screening profiles first to avoid FK conflicts when removing users
+    screening_result = await db.execute(
+        select(UserScreeningProfile).where(UserScreeningProfile.user_id.in_(user_ids_to_delete))
+    )
+    screening_profiles = screening_result.scalars().all()
+    for profile in screening_profiles:
+        await db.delete(profile)
 
     # Delete conversations first (if requested)
     if request.delete_conversations:

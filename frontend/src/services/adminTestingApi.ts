@@ -13,6 +13,21 @@ export interface SeedDatabaseResponse {
   details: string[];
 }
 
+export interface SeedScreeningProfilesRequest {
+  profiles_count: number;
+  include_critical: boolean;
+  requires_attention_ratio: number;
+}
+
+export interface SeedScreeningProfilesResponse {
+  requested_profiles: number;
+  processed_profiles: number;
+  created_profiles: number;
+  updated_profiles: number;
+  risk_distribution: Record<string, number>;
+  details: string[];
+}
+
 export interface ListTestUsersResponse {
   users: Array<Record<string, unknown>>;
   total: number;
@@ -174,6 +189,13 @@ export interface LogTailResponse {
 
 export async function seedTestingDatabase(payload: SeedDatabaseRequest): Promise<SeedDatabaseResponse> {
   return apiCall<SeedDatabaseResponse>('/api/v1/admin/testing/seed', {
+    method: 'POST',
+    body: JSON.stringify(payload),
+  });
+}
+
+export async function seedScreeningProfiles(payload: SeedScreeningProfilesRequest): Promise<SeedScreeningProfilesResponse> {
+  return apiCall<SeedScreeningProfilesResponse>('/api/v1/admin/testing/seed-screening', {
     method: 'POST',
     body: JSON.stringify(payload),
   });

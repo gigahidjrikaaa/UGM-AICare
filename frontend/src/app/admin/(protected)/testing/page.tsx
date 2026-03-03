@@ -31,6 +31,7 @@ import {
   runRQ2Validation,
   runRQ3Generate,
   runRQ3PrivacyTest,
+  seedScreeningProfiles,
   seedTestingDatabase,
   simulateFullUserFlow,
   simulateConversation,
@@ -120,6 +121,9 @@ export default function AdminTestingPage() {
   const [seedUsersCount, setSeedUsersCount] = useState(5);
   const [seedCounselorsCount, setSeedCounselorsCount] = useState(2);
   const [seedAdminsCount, setSeedAdminsCount] = useState(1);
+  const [seedScreeningProfilesCount, setSeedScreeningProfilesCount] = useState(12);
+  const [seedScreeningAttentionRatio, setSeedScreeningAttentionRatio] = useState(0.35);
+  const [seedScreeningIncludeCritical, setSeedScreeningIncludeCritical] = useState(true);
   const [replayTimeoutSeconds, setReplayTimeoutSeconds] = useState(240);
   const [autopilotScenario, setAutopilotScenario] = useState<AutopilotScenario>("attestation_pipeline");
   const [actionAType, setActionAType] = useState<AutopilotActionType>(SCENARIO_PRESETS.attestation_pipeline.actionAType);
@@ -225,6 +229,47 @@ export default function AdminTestingPage() {
       };
     });
   }, [runAction]);
+
+  const onSeedScreening = useCallback(async () => {
+    await runAction("seed screening profiles", () =>
+      seedScreeningProfiles({
+        profiles_count: seedScreeningProfilesCount,
+        include_critical: seedScreeningIncludeCritical,
+        requires_attention_ratio: seedScreeningAttentionRatio,
+      }),
+    );
+  }, [
+    runAction,
+    seedScreeningAttentionRatio,
+    seedScreeningIncludeCritical,
+    seedScreeningProfilesCount,
+  ]);
+
+  const applyScreeningSeedPreset = useCallback(
+    (preset: "balanced" | "elevated" | "critical_demo") => {
+      if (preset === "balanced") {
+        setSeedScreeningProfilesCount(Math.max(testUsers.length, 12));
+        setSeedScreeningAttentionRatio(0.3);
+        setSeedScreeningIncludeCritical(false);
+        appendTerminal("info", "Applied screening preset: Balanced cohort");
+        return;
+      }
+
+      if (preset === "elevated") {
+        setSeedScreeningProfilesCount(Math.max(testUsers.length, 16));
+        setSeedScreeningAttentionRatio(0.5);
+        setSeedScreeningIncludeCritical(true);
+        appendTerminal("info", "Applied screening preset: Elevated risk cohort");
+        return;
+      }
+
+      setSeedScreeningProfilesCount(Math.max(testUsers.length, 20));
+      setSeedScreeningAttentionRatio(0.75);
+      setSeedScreeningIncludeCritical(true);
+      appendTerminal("info", "Applied screening preset: Critical-heavy demo cohort");
+    },
+    [appendTerminal, testUsers.length],
+  );
 
   const onRunRQ1 = useCallback(async () => {
     await runAction("run RQ1 batch test", runRQ1BatchTest);
@@ -512,6 +557,80 @@ export default function AdminTestingPage() {
                 <button onClick={() => onCreateUser("counselor")} disabled={disabledAction} className="inline-flex items-center justify-center gap-2 rounded-lg border border-blue-400/30 bg-blue-400/10 px-3 py-2 text-sm text-blue-300 disabled:opacity-50"><FiLayers /> Create Counselor</button>
                 <button onClick={() => onCreateUser("admin")} disabled={disabledAction} className="inline-flex items-center justify-center gap-2 rounded-lg border border-purple-400/30 bg-purple-400/10 px-3 py-2 text-sm text-purple-300 disabled:opacity-50"><FiShield /> Create Admin</button>
                 <button onClick={onCleanup} disabled={disabledAction} className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-400/30 bg-red-400/10 px-3 py-2 text-sm text-red-300 disabled:opacity-50"><FiTrash2 /> Cleanup Test Data</button>
+              </div>
+
+              <div className="mt-4 rounded-lg border border-white/10 bg-[#001D58]/35 p-3">
+                <h3 className="mb-2 text-xs font-semibold uppercase tracking-wide text-white/70">Screening Data Seed</h3>
+                <p className="mb-3 text-xs text-white/60">
+                  Generates synthetic screening profiles for test students so /admin/screening has realistic risk distribution,
+                  concerns, trajectories, and attention flags for demo/testing.
+                </p>
+                <div className="mb-3 flex flex-wrap gap-2">
+                  <button
+                    onClick={() => applyScreeningSeedPreset("balanced")}
+                    disabled={disabledAction}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-cyan-400/30 bg-cyan-400/10 px-3 py-1.5 text-xs text-cyan-300 disabled:opacity-50"
+                  >
+                    Balanced Cohort
+                  </button>
+                  <button
+                    onClick={() => applyScreeningSeedPreset("elevated")}
+                    disabled={disabledAction}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-1.5 text-xs text-amber-300 disabled:opacity-50"
+                  >
+                    Elevated Risk Cohort
+                  </button>
+                  <button
+                    onClick={() => applyScreeningSeedPreset("critical_demo")}
+                    disabled={disabledAction}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-red-400/30 bg-red-400/10 px-3 py-1.5 text-xs text-red-300 disabled:opacity-50"
+                  >
+                    Critical Demo Cohort
+                  </button>
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <label className="text-xs text-white/60">
+                    Profiles
+                    <input
+                      type="number"
+                      min={1}
+                      max={200}
+                      value={seedScreeningProfilesCount}
+                      onChange={(event) => setSeedScreeningProfilesCount(Number(event.target.value) || 1)}
+                      className="mt-1 w-full rounded-md border border-white/20 bg-[#001D58] px-2 py-1.5 text-sm text-white"
+                    />
+                  </label>
+                  <label className="text-xs text-white/60">
+                    Attention Ratio (0-1)
+                    <input
+                      type="number"
+                      min={0}
+                      max={1}
+                      step={0.05}
+                      value={seedScreeningAttentionRatio}
+                      onChange={(event) => setSeedScreeningAttentionRatio(Number(event.target.value) || 0)}
+                      className="mt-1 w-full rounded-md border border-white/20 bg-[#001D58] px-2 py-1.5 text-sm text-white"
+                    />
+                  </label>
+                  <label className="inline-flex items-center gap-2 rounded-md border border-white/20 bg-[#001D58]/60 px-2 py-2 text-xs text-white/80 sm:mt-5">
+                    <input
+                      type="checkbox"
+                      checked={seedScreeningIncludeCritical}
+                      onChange={(event) => setSeedScreeningIncludeCritical(event.target.checked)}
+                    />
+                    Include critical cases
+                  </label>
+                </div>
+
+                <div className="mt-3">
+                  <button
+                    onClick={onSeedScreening}
+                    disabled={disabledAction}
+                    className="inline-flex items-center justify-center gap-2 rounded-lg border border-fuchsia-400/30 bg-fuchsia-400/10 px-3 py-2 text-sm text-fuchsia-300 disabled:opacity-50"
+                  >
+                    <FiActivity /> Seed Screening Profiles
+                  </button>
+                </div>
               </div>
             </div>
 
