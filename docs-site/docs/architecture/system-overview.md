@@ -16,61 +16,61 @@ UGM-AICare is structured as a multi-layer system where each component has a dist
 
 ```mermaid
 graph TB
-    subgraph "Users"
-        STU[🎓 Student]
-        CNS[👩‍⚕️ Counsellor]
-        ADM[🏛️ Administrator]
-    end
+ subgraph "Users"
+ STU[Student Student]
+ CNS[👩‍⚕️ Counsellor]
+ ADM[🏛️ Administrator]
+ end
 
-    subgraph "Frontend - Next.js"
-        UI[Chat Interface]
-        DASH[Admin & Counsellor Dashboard]
-    end
+ subgraph "Frontend - Next.js"
+ UI[Chat Interface]
+ DASH[Admin & Counsellor Dashboard]
+ end
 
-    subgraph "Backend - FastAPI"
-        API[REST API]
-        WS[WebSocket / SSE]
-        AUTH[Auth & RBAC]
-    end
+ subgraph "Backend - FastAPI"
+ API[REST API]
+ WS[WebSocket / SSE]
+ AUTH[Auth & RBAC]
+ end
 
-    subgraph "AI Agent Layer - LangGraph"
-        AIKA[🤖 Aika Orchestrator]
-        STA[🛡️ Safety Triage Agent]
-        TCA[🧠 Therapeutic Coach Agent]
-        CMA[📋 Case Management Agent]
-        IA[📊 Insights Agent]
-    end
+ subgraph "AI Agent Layer - LangGraph"
+ AIKA[AIKA Aika Orchestrator]
+ STA[🛡️ Safety Triage Agent]
+ TCA[TCA Therapeutic Coach Agent]
+ CMA[📋 Case Management Agent]
+ IA[IA Insights Agent]
+ end
 
-    subgraph "Data Layer"
-        PG[(PostgreSQL / Supabase)]
-        RD[(Redis Cache)]
-        S3[(Object Storage)]
-    end
+ subgraph "Data Layer"
+ PG[(PostgreSQL / Supabase)]
+ RD[(Redis Cache)]
+ S3[(Object Storage)]
+ end
 
-    subgraph "External Services"
-        GEM[Google Gemini 2.5]
-        LF[Langfuse Tracing]
-        ETH[Ethereum / CARE Token]
-    end
+ subgraph "External Services"
+ GEM[Google Gemini 2.5]
+ LF[Langfuse Tracing]
+ ETH[Ethereum / CARE Token]
+ end
 
-    STU --> UI
-    CNS --> DASH
-    ADM --> DASH
-    UI --> API
-    UI --> WS
-    DASH --> API
-    API --> AUTH
-    API --> AIKA
-    AIKA --> STA
-    AIKA --> TCA
-    AIKA --> CMA
-    AIKA --> IA
-    AIKA --> GEM
-    API --> PG
-    API --> RD
-    AIKA --> LF
-    CMA --> ETH
-    API --> S3
+ STU --> UI
+ CNS --> DASH
+ ADM --> DASH
+ UI --> API
+ UI --> WS
+ DASH --> API
+ API --> AUTH
+ API --> AIKA
+ AIKA --> STA
+ AIKA --> TCA
+ AIKA --> CMA
+ AIKA --> IA
+ AIKA --> GEM
+ API --> PG
+ API --> RD
+ AIKA --> LF
+ CMA --> ETH
+ API --> S3
 ```
 
 ---
@@ -109,34 +109,34 @@ Here is what happens in the time between a student pressing "send" and seeing Ai
 
 ```mermaid
 sequenceDiagram
-    participant S as 🎓 Student
-    participant FE as Frontend
-    participant API as FastAPI
-    participant AIKA as Aika Orchestrator
-    participant GEM as Gemini API
-    participant DB as PostgreSQL
-    participant REDIS as Redis
+ participant S as Student Student
+ participant FE as Frontend
+ participant API as FastAPI
+ participant AIKA as Aika Orchestrator
+ participant GEM as Gemini API
+ participant DB as PostgreSQL
+ participant REDIS as Redis
 
-    S->>FE: Types a message
-    FE->>API: POST /chat (message + session)
-    API->>REDIS: Load conversation history
-    API->>DB: Fetch user profile & context
-    API->>AIKA: Invoke orchestrator graph (compiled singleton)
-    AIKA->>AIKA: aika_decision_node
-    AIKA->>GEM: Classify intent & real-time risk
-    GEM-->>AIKA: Risk level + intent
-    alt Risk ≥ HIGH
-        AIKA->>AIKA: parallel_crisis_node (TCA + CMA async fan-out)
-    else Risk = MODERATE
-        AIKA->>AIKA: execute_sca_subgraph (TCA only)
-    else Risk = LOW
-        AIKA->>GEM: Generate empathetic reply (ReAct loop)
-    end
-    AIKA-->>API: Final synthesised response
-    API-->>FE: Stream response via SSE
-    FE-->>S: Response appears token-by-token
-    API->>DB: Persist message & risk data (async)
-    API->>AIKA: Trigger STA deep analysis (async background task)
+ S->>FE: Types a message
+ FE->>API: POST /chat (message + session)
+ API->>REDIS: Load conversation history
+ API->>DB: Fetch user profile & context
+ API->>AIKA: Invoke orchestrator graph (compiled singleton)
+ AIKA->>AIKA: aika_decision_node
+ AIKA->>GEM: Classify intent & real-time risk
+ GEM-->>AIKA: Risk level + intent
+ alt Risk ≥ HIGH
+ AIKA->>AIKA: parallel_crisis_node (TCA + CMA async fan-out)
+ else Risk = MODERATE
+ AIKA->>AIKA: execute_sca_subgraph (TCA only)
+ else Risk = LOW
+ AIKA->>GEM: Generate empathetic reply (ReAct loop)
+ end
+ AIKA-->>API: Final synthesised response
+ API-->>FE: Stream response via SSE
+ FE-->>S: Response appears token-by-token
+ API->>DB: Persist message & risk data (async)
+ API->>AIKA: Trigger STA deep analysis (async background task)
 ```
 
 The entire path from message receipt to first token of response typically completes in **300–600 ms** for low-risk conversations.
@@ -160,5 +160,5 @@ Privacy is not an afterthought in this system. Several mechanisms work in concer
 ## Next Steps
 
 - Understand [how the agents are orchestrated →](./agentic-framework)
-- See the [full technology stack →](./tech-stack)
-- Meet [Aika, the orchestrator →](../agents/aika)
+- See the [full technology stack](../engineering/tech-stack)
+- Meet [Aika, the orchestrator](./meta-agent-aika)

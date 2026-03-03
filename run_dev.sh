@@ -13,6 +13,7 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 BACKEND_PID=""
 FRONTEND_PID=""
+DOCS_PID=""
 CLEANUP_DONE=false
 PID_FILE="$PROJECT_DIR/.dev-pids"
 
@@ -138,6 +139,7 @@ resolve_python() {
 save_pids() {
   echo "BACKEND_PID=$BACKEND_PID" > "$PID_FILE"
   echo "FRONTEND_PID=$FRONTEND_PID" >> "$PID_FILE"
+  echo "DOCS_PID=$DOCS_PID" >> "$PID_FILE"
   echo "PARENT_PID=$$" >> "$PID_FILE"
 }
 
@@ -225,14 +227,20 @@ cleanup_all() {
     kill_process_tree "$FRONTEND_PID" "frontend"
   fi
 
+  if [[ -n "$DOCS_PID" ]]; then
+    kill_process_tree "$DOCS_PID" "docusaurus"
+  fi
+
   # Clean up PID file
   rm -f "$PID_FILE" 2>/dev/null || true
 
   # Kill any orphaned processes on the ports (safety net)
   local backend_port="${BACKEND_EXTERNAL_PORT:-22001}"
   local frontend_port="${FRONTEND_EXTERNAL_PORT:-22000}"
+  local docs_port="${DOCS_EXTERNAL_PORT:-22002}"
   kill_port_processes "$backend_port"
   kill_port_processes "$frontend_port"
+  kill_port_processes "$docs_port"
 
   log_ok "Cleanup complete."
 }
@@ -249,12 +257,16 @@ cleanup_stale_processes() {
     if [[ -n "${FRONTEND_PID:-}" ]]; then
       kill_process_tree "$FRONTEND_PID" "stale frontend" 2>/dev/null || true
     fi
+    if [[ -n "${DOCS_PID:-}" ]]; then
+      kill_process_tree "$DOCS_PID" "stale docusaurus" 2>/dev/null || true
+    fi
 
     rm -f "$PID_FILE"
 
     # Reset our tracking
     BACKEND_PID=""
     FRONTEND_PID=""
+    DOCS_PID=""
   fi
 }
 
@@ -317,11 +329,18 @@ monitor_processes() {
       cleanup_all
       exit 1
     fi
+
+    # Check if docs is still running
+    if [[ -n "$DOCS_PID" ]] && ! kill -0 "$DOCS_PID" 2>/dev/null; then
+      log_error "Docusaurus process died unexpectedly!"
+      cleanup_all
+      exit 1
+    fi
   done
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# LOCAL: Run backend + frontend directly (no Docker)
+# LOCAL: Run backend + frontend + docs directly (no Docker)
 # ─────────────────────────────────────────────────────────────────────────────
 
 run_local() {
@@ -333,14 +352,18 @@ run_local() {
 
   local backend_env_file="$PROJECT_DIR/backend/.env"
   local frontend_env_file="$PROJECT_DIR/frontend/.env.local"
+  local docs_env_file="$PROJECT_DIR/docs-site/.env"
 
   local backend_port
   local frontend_port
+  local docs_port
   backend_port="$(read_env_var "$backend_env_file" "PORT" "${BACKEND_EXTERNAL_PORT:-22001}")"
   frontend_port="$(read_env_var "$frontend_env_file" "PORT" "${FRONTEND_EXTERNAL_PORT:-22000}")"
+  docs_port="$(read_env_var "$docs_env_file" "PORT" "${DOCS_EXTERNAL_PORT:-22002}")"
 
   local backend_origin="http://localhost:${backend_port}"
   local frontend_origin="http://localhost:${frontend_port}"
+  local docs_origin="http://localhost:${docs_port}"
 
   # Rewrite Docker URLs to localhost
   rewrite_url() {
@@ -367,15 +390,21 @@ run_local() {
     exit 1
   fi
 
+  if [[ ! -d "$PROJECT_DIR/docs-site" ]]; then
+    log_error "docs-site directory not found at $PROJECT_DIR/docs-site"
+    exit 1
+  fi
+
   # Set Windows console to UTF-8 mode if on Windows (for emoji support in logs)
   if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "cygwin" || "$OSTYPE" == "win32" ]]; then
     chcp.com 65001 >/dev/null 2>&1 || true
   fi
 
   # Kill any existing processes on the ports
-  log_info "Cleaning up any existing processes on ports ${backend_port} and ${frontend_port}..."
+  log_info "Cleaning up any existing processes on ports ${backend_port}, ${frontend_port}, and ${docs_port}..."
   kill_port_processes "$backend_port"
   kill_port_processes "$frontend_port"
+  kill_port_processes "$docs_port"
 
   # Brief pause to ensure ports are released
   sleep 1
@@ -386,6 +415,7 @@ run_local() {
   echo "├─────────────────────────────────────────┤"
   echo "│  Backend:  http://localhost:${backend_port}      │"
   echo "│  Frontend: http://localhost:${frontend_port}      │"
+  echo "│  Docs:     http://localhost:${docs_port}      │"
   echo "├─────────────────────────────────────────┤"
   echo "│  Press Ctrl+C to stop all servers       │"
   echo "└─────────────────────────────────────────┘"
@@ -398,9 +428,9 @@ run_local() {
   fi
 
   if [[ "$use_separate_terminals" == "true" ]]; then
-    run_separate_terminals "$python_bin" "$backend_port" "$frontend_port" "$backend_env_file" "$frontend_env_file" "$backend_origin" "$frontend_origin"
+    run_separate_terminals "$python_bin" "$backend_port" "$frontend_port" "$docs_port" "$backend_env_file" "$frontend_env_file" "$docs_env_file" "$backend_origin" "$frontend_origin" "$docs_origin"
   else
-    run_inline "$python_bin" "$backend_port" "$frontend_port" "$backend_env_file" "$frontend_env_file" "$backend_origin" "$frontend_origin"
+    run_inline "$python_bin" "$backend_port" "$frontend_port" "$docs_port" "$backend_env_file" "$frontend_env_file" "$docs_env_file" "$backend_origin" "$frontend_origin" "$docs_origin"
   fi
 }
 
@@ -408,10 +438,13 @@ run_inline() {
   local python_bin="$1"
   local backend_port="$2"
   local frontend_port="$3"
-  local backend_env_file="$4"
-  local frontend_env_file="$5"
-  local backend_origin="$6"
-  local frontend_origin="$7"
+  local docs_port="$4"
+  local backend_env_file="$5"
+  local frontend_env_file="$6"
+  local docs_env_file="$7"
+  local backend_origin="$8"
+  local frontend_origin="$9"
+  local docs_origin="${10}"
 
   log_info "Starting servers in current terminal..."
   echo ""
@@ -456,11 +489,27 @@ run_inline() {
   FRONTEND_PID=$!
   log_ok "Frontend started (PID: $FRONTEND_PID)"
 
+  # Brief delay to let frontend start binding
+  sleep 2
+
+  # Start docusaurus docs in background with process group
+  (
+    cd "$PROJECT_DIR/docs-site"
+    load_env_file "$docs_env_file"
+    export INTERNAL_API_URL="$(rewrite_url "${INTERNAL_API_URL:-}" "$backend_origin")"
+    export NEXT_PUBLIC_API_URL="$(rewrite_url "${NEXT_PUBLIC_API_URL:-}" "$backend_origin")"
+    export NEXT_PUBLIC_BACKEND_BASE="$(rewrite_url "${NEXT_PUBLIC_BACKEND_BASE:-}" "$backend_origin")"
+
+    exec npm run start -- --port "$docs_port" --host 127.0.0.1
+  ) &
+  DOCS_PID=$!
+  log_ok "Docusaurus started (PID: $DOCS_PID)"
+
   # Save PIDs for recovery
   save_pids
 
   echo ""
-  log_info "Both servers are starting..."
+  log_info "All servers are starting..."
   log_info "Logs will appear below. Press Ctrl+C to stop."
   echo ""
 
@@ -472,10 +521,13 @@ run_separate_terminals() {
   local python_bin="$1"
   local backend_port="$2"
   local frontend_port="$3"
-  local backend_env_file="$4"
-  local frontend_env_file="$5"
-  local backend_origin="$6"
-  local frontend_origin="$7"
+  local docs_port="$4"
+  local backend_env_file="$5"
+  local frontend_env_file="$6"
+  local docs_env_file="$7"
+  local backend_origin="$8"
+  local frontend_origin="$9"
+  local docs_origin="${10}"
 
   log_info "Starting servers in separate terminals..."
 
@@ -483,8 +535,10 @@ run_separate_terminals() {
   if is_windows_shell && (has_cmd wt.exe || has_cmd wt); then
     local backend_script
     local frontend_script
+    local docs_script
     backend_script=$(mktemp --suffix=.sh)
     frontend_script=$(mktemp --suffix=.sh)
+    docs_script=$(mktemp --suffix=.sh)
 
     local venv_activate=""
     if [[ -f "$PROJECT_DIR/../.venv/Scripts/activate" ]]; then
@@ -580,7 +634,42 @@ echo ""
 npm run dev -- -p "$frontend_port"
 EOF
 
-    chmod +x "$backend_script" "$frontend_script"
+    cat > "$docs_script" <<EOF
+#!/usr/bin/env bash
+cd "$PROJECT_DIR/docs-site"
+chcp.com 65001 2>/dev/null || true
+
+cleanup() {
+  echo ""
+  echo "Shutting down docusaurus..."
+  pkill -P \$\$ 2>/dev/null || true
+  exit 0
+}
+trap cleanup EXIT INT TERM HUP
+
+if [[ -f "$docs_env_file" ]]; then
+  set -a
+  source "$docs_env_file"
+  set +a
+fi
+
+rewrite_url() {
+  local val="\${1:-}" fallback="\${2:-}"
+  [[ -z "\$val" || "\$val" == *"://backend"* || "\$val" == *"://frontend"* ]] && echo "\$fallback" || echo "\$val"
+}
+
+export INTERNAL_API_URL="\$(rewrite_url "\${INTERNAL_API_URL:-}" "$backend_origin")"
+export NEXT_PUBLIC_API_URL="\$(rewrite_url "\${NEXT_PUBLIC_API_URL:-}" "$backend_origin")"
+export NEXT_PUBLIC_BACKEND_BASE="\$(rewrite_url "\${NEXT_PUBLIC_BACKEND_BASE:-}" "$backend_origin")"
+
+echo "UGM-AICare Docusaurus Docs"
+echo "=============================="
+echo "URL: http://localhost:${docs_port}"
+echo ""
+npm run start -- --port "$docs_port" --host 127.0.0.1
+EOF
+
+    chmod +x "$backend_script" "$frontend_script" "$docs_script"
 
     # Best-effort: open in Windows Terminal. This assumes `bash` is available in PATH (Git Bash / MSYS).
     local wt_cmd=("wt.exe")
@@ -588,17 +677,19 @@ EOF
 
     "${wt_cmd[@]}" -w 0 \
       new-tab --title "UGM-AICare Backend" bash "$backend_script" \; \
-      split-pane -H bash "$frontend_script" &
+      new-tab --title "UGM-AICare Frontend" bash "$frontend_script" \; \
+      new-tab --title "UGM-AICare Docs" bash "$docs_script" &
 
     BACKEND_PID=$!
     FRONTEND_PID=""
+    DOCS_PID=""
     save_pids
 
     echo ""
-    log_ok "Opened backend + frontend in Windows Terminal panes."
+    log_ok "Opened backend + frontend + docs in Windows Terminal tabs."
     log_info "To stop them: close the panes/windows, or run ./run_dev.sh stop"
 
-    (sleep 10 && rm -f "$backend_script" "$frontend_script") &
+    (sleep 10 && rm -f "$backend_script" "$frontend_script" "$docs_script") &
     return 0
   fi
 
@@ -607,8 +698,10 @@ EOF
     # Create temporary scripts for each process
     local backend_script
     local frontend_script
+    local docs_script
     backend_script=$(mktemp --suffix=.sh)
     frontend_script=$(mktemp --suffix=.sh)
+    docs_script=$(mktemp --suffix=.sh)
 
     # Determine venv activation script path
     local venv_activate=""
@@ -705,7 +798,42 @@ echo ""
 npm run dev -- -p "$frontend_port"
 EOF
 
-    chmod +x "$backend_script" "$frontend_script"
+    cat > "$docs_script" <<EOF
+#!/usr/bin/env bash
+cd "$PROJECT_DIR/docs-site"
+chcp.com 65001 2>/dev/null || true
+
+cleanup() {
+  echo ""
+  echo "Shutting down docusaurus..."
+  pkill -P \$\$ 2>/dev/null || true
+  exit 0
+}
+trap cleanup EXIT INT TERM HUP
+
+if [[ -f "$docs_env_file" ]]; then
+  set -a
+  source "$docs_env_file"
+  set +a
+fi
+
+rewrite_url() {
+  local val="\${1:-}" fallback="\${2:-}"
+  [[ -z "\$val" || "\$val" == *"://backend"* || "\$val" == *"://frontend"* ]] && echo "\$fallback" || echo "\$val"
+}
+
+export INTERNAL_API_URL="\$(rewrite_url "\${INTERNAL_API_URL:-}" "$backend_origin")"
+export NEXT_PUBLIC_API_URL="\$(rewrite_url "\${NEXT_PUBLIC_API_URL:-}" "$backend_origin")"
+export NEXT_PUBLIC_BACKEND_BASE="\$(rewrite_url "\${NEXT_PUBLIC_BACKEND_BASE:-}" "$backend_origin")"
+
+echo "UGM-AICare Docusaurus Docs"
+echo "=============================="
+echo "URL: http://localhost:${docs_port}"
+echo ""
+npm run start -- --port "$docs_port" --host 127.0.0.1
+EOF
+
+    chmod +x "$backend_script" "$frontend_script" "$docs_script"
 
     # Launch in new mintty terminals
     mintty --title "UGM-AICare Backend" --exec bash "$backend_script" &
@@ -714,23 +842,27 @@ EOF
     mintty --title "UGM-AICare Frontend" --exec bash "$frontend_script" &
     FRONTEND_PID=$!
 
+    mintty --title "UGM-AICare Docs" --exec bash "$docs_script" &
+    DOCS_PID=$!
+
     save_pids
 
     echo ""
-    log_ok "Started backend and frontend in separate terminals."
+    log_ok "Started backend, frontend, and docs in separate terminals."
     echo ""
     echo "   Backend:  http://localhost:${backend_port}"
     echo "   Frontend: http://localhost:${frontend_port}"
+    echo "   Docs:     http://localhost:${docs_port}"
     echo ""
     log_info "Close the terminal windows to stop the servers."
     log_info "Or run: ./run_dev.sh stop"
 
     # Clean up temp scripts after a delay
-    (sleep 10 && rm -f "$backend_script" "$frontend_script") &
+    (sleep 10 && rm -f "$backend_script" "$frontend_script" "$docs_script") &
 
   else
     log_warn "Separate terminals not fully supported on this OS. Running inline."
-    run_inline "$python_bin" "$backend_port" "$frontend_port" "$backend_env_file" "$frontend_env_file" "$backend_origin" "$frontend_origin"
+    run_inline "$python_bin" "$backend_port" "$frontend_port" "$docs_port" "$backend_env_file" "$frontend_env_file" "$docs_env_file" "$backend_origin" "$frontend_origin" "$docs_origin"
   fi
 }
 
@@ -748,11 +880,14 @@ stop_servers() {
 
   local backend_env_file="$PROJECT_DIR/backend/.env"
   local frontend_env_file="$PROJECT_DIR/frontend/.env.local"
+  local docs_env_file="$PROJECT_DIR/docs-site/.env"
 
   local backend_port
   local frontend_port
+  local docs_port
   backend_port="$(read_env_var "$backend_env_file" "PORT" "${BACKEND_EXTERNAL_PORT:-22001}")"
   frontend_port="$(read_env_var "$frontend_env_file" "PORT" "${FRONTEND_EXTERNAL_PORT:-22000}")"
+  docs_port="$(read_env_var "$docs_env_file" "PORT" "${DOCS_EXTERNAL_PORT:-22002}")"
 
   # Kill by PID first
   if [[ -n "${BACKEND_PID:-}" ]]; then
@@ -761,10 +896,14 @@ stop_servers() {
   if [[ -n "${FRONTEND_PID:-}" ]]; then
     kill_process_tree "$FRONTEND_PID" "frontend"
   fi
+  if [[ -n "${DOCS_PID:-}" ]]; then
+    kill_process_tree "$DOCS_PID" "docusaurus"
+  fi
 
   # Then kill by port as safety net
   kill_port_processes "$backend_port"
   kill_port_processes "$frontend_port"
+  kill_port_processes "$docs_port"
 
   # Clean up PID file
   rm -f "$PID_FILE" 2>/dev/null || true
@@ -794,8 +933,8 @@ UGM-AICare Development Script
 Usage: ./run_dev.sh <command> [args]
 
 Main Commands:
-  local                    Start backend + frontend locally (unified terminal)
-  local --separate          Start backend + frontend in separate terminals (Windows Terminal if available)
+  local                    Start backend + frontend + docs locally (unified terminal)
+  local --separate         Start backend + frontend + docs in separate terminals (Windows Terminal if available)
   stop                     Stop all local dev servers started by this script
 
   docker dev <action>       Manage Docker development environment
@@ -821,7 +960,7 @@ Features:
   ✓ Graceful shutdown with timeout
 
 Examples:
-  ./run_dev.sh local          # Start local dev servers
+  ./run_dev.sh local          # Start local dev servers (backend/frontend/docs)
   ./run_dev.sh local --separate  # Separate terminals (Windows)
   ./run_dev.sh stop           # Stop all servers
   ./run_dev.sh docker dev up  # Start Docker dev

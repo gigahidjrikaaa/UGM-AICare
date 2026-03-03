@@ -13,7 +13,7 @@ from typing import AsyncGenerator, Dict, Any
 
 from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import StreamingResponse
-from sqlalchemy import func, select
+from sqlalchemy import func, select, update
 from sqlalchemy.exc import PendingRollbackError
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -21,6 +21,9 @@ from app.database import get_async_db
 from app.dependencies import get_current_active_user
 from app.models import User
 from app.domains.mental_health.models import Conversation
+from app.domains.mental_health.models.messages import Message, MessageRoleEnum
+from app.domains.mental_health.models.cases import Case
+from app.core.redaction import sanitize_text
 from app.domains.mental_health.schemas.chat import AikaRequest
 from app.agents.aika_orchestrator_graph import get_aika_agent  # compiled once at startup
 from app.core.rate_limiter import check_rate_limit_dependency
@@ -506,16 +509,76 @@ async def stream_aika_execution(
         
         # Save conversation to database
         try:
-            existing_count = (
+            # 1. Count total prior conversations for this user (for chat.first event)
+            total_user_convs = (
                 await db.execute(
                     select(func.count()).select_from(Conversation).where(Conversation.user_id == current_user.id)
                 )
             ).scalar() or 0
 
+            # 2. Find conversation_ids already persisted for this session (de-duplication)
+            existing_ids_result = await db.execute(
+                select(Conversation.conversation_id).where(
+                    Conversation.user_id == current_user.id,
+                    Conversation.session_id == session_id,
+                )
+            )
+            existing_conv_ids: set[str] = {row[0] for row in existing_ids_result.all()}
+
+            # 3. Backfill prior history turns that are not yet in DB.
+            #    conversation_history alternates [user, assistant, user, assistant, ...]
+            #    The current request.message is NOT included in this list.
+            history: list[dict[str, str]] = request.conversation_history or []
+            i = 0
+            while i + 1 < len(history):
+                user_item = history[i]
+                asst_item = history[i + 1]
+                if user_item.get("role") == "user" and asst_item.get("role") == "assistant":
+                    user_msg = user_item.get("content", "")
+                    asst_msg = asst_item.get("content", "")
+                    # Deterministic stable ID prevents duplicate rows on retries
+                    stable_id = hashlib.sha256(
+                        f"{session_id}:{user_msg}:{asst_msg}".encode()
+                    ).hexdigest()[:32]
+                    if stable_id not in existing_conv_ids:
+                        db.add(Conversation(
+                            user_id=current_user.id,
+                            session_id=session_id,
+                            conversation_id=stable_id,
+                            message=user_msg,
+                            response=asst_msg,
+                            timestamp=datetime.now(),
+                            llm_prompt_id=None,
+                            llm_request_count=None,
+                            llm_requests_by_model=None,
+                        ))
+                        # Persist PII-redacted Message rows for history pair
+                        hist_user_redacted, _ = sanitize_text(user_msg)
+                        hist_asst_redacted, _ = sanitize_text(asst_msg)
+                        db.add(Message(
+                            session_id=session_id,
+                            role=MessageRoleEnum.user,
+                            content_redacted=hist_user_redacted,
+                            tools_used=None,
+                            trace_id=request_id,
+                            ts=datetime.utcnow(),
+                        ))
+                        db.add(Message(
+                            session_id=session_id,
+                            role=MessageRoleEnum.assistant,
+                            content_redacted=hist_asst_redacted,
+                            tools_used=None,
+                            trace_id=request_id,
+                            ts=datetime.utcnow(),
+                        ))
+                i += 2
+
+            # 4. Persist current turn
+            current_conv_id = str(uuid.uuid4())
             conversation_entry = Conversation(
                 user_id=current_user.id,
                 session_id=session_id,
-                conversation_id=str(uuid.uuid4()),
+                conversation_id=current_conv_id,
                 message=request.message,
                 response=final_response,
                 timestamp=datetime.now(),
@@ -525,7 +588,28 @@ async def stream_aika_execution(
             )
             db.add(conversation_entry)
 
-            if existing_count == 0:
+            # 5. Persist PII-redacted Message rows for current turn
+            cur_user_redacted, _ = sanitize_text(request.message)
+            cur_asst_redacted, _ = sanitize_text(final_response)
+            db.add(Message(
+                session_id=session_id,
+                role=MessageRoleEnum.user,
+                content_redacted=cur_user_redacted,
+                tools_used=None,
+                trace_id=request_id,
+                ts=datetime.utcnow(),
+            ))
+            db.add(Message(
+                session_id=session_id,
+                role=MessageRoleEnum.assistant,
+                content_redacted=cur_asst_redacted,
+                tools_used=tools_used or None,
+                trace_id=request_id,
+                ts=datetime.utcnow(),
+            ))
+
+            # 6. Fire chat.first event if this is the user's very first conversation
+            if total_user_convs == 0:
                 await record_user_event(
                     db,
                     user_id=current_user.id,
@@ -539,8 +623,19 @@ async def stream_aika_execution(
                         "preferred_model": request.preferred_model,
                     },
                 )
+
+            # 7. Flush to obtain conversation_entry.id, then link Case if CMA created one
+            await db.flush()
+            case_id_from_result = result.get("case_id")
+            if case_id_from_result and conversation_entry.id:
+                await db.execute(
+                    update(Case)
+                    .where(Case.id == case_id_from_result)
+                    .values(conversation_id=conversation_entry.id),
+                )
+
             await db.commit()
-            logger.debug(f"💾 Saved conversation to database for user {current_user.id}")
+            logger.debug(f"\U0001f4be Saved conversation to database for user {current_user.id}")
         except Exception as save_error:
             logger.error(f"Failed to save conversation: {save_error}")
             try:

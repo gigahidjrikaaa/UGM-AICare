@@ -22,108 +22,108 @@ All schema migrations are managed via **Alembic**. Never modify the database sch
 
 ```mermaid
 erDiagram
-    USERS {
-        int id PK
-        string email
-        string hashed_password
-        string role
-        string full_name
-        string nim
-        string faculty
-        timestamp created_at
-    }
+ USERS {
+ int id PK
+ string email
+ string hashed_password
+ string role
+ string full_name
+ string nim
+ string faculty
+ timestamp created_at
+ }
 
-    CONVERSATIONS {
-        int id PK
-        int user_id FK
-        string session_id
-        timestamp started_at
-        timestamp ended_at
-        bool is_active
-    }
+ CONVERSATIONS {
+ int id PK
+ int user_id FK
+ string session_id
+ timestamp started_at
+ timestamp ended_at
+ bool is_active
+ }
 
-    MESSAGES {
-        int id PK
-        int conversation_id FK
-        string role
-        text content
-        timestamp created_at
-    }
+ MESSAGES {
+ int id PK
+ int conversation_id FK
+ string role
+ text content
+ timestamp created_at
+ }
 
-    CONVERSATIONRISKASSESSMENT {
-        int id PK
-        int conversation_id FK
-        string user_hash
-        int risk_level
-        float risk_score
-        string severity
-        string intent
-        jsonb phq9_indicators
-        jsonb gad7_indicators
-        string trend
-        text summary
-        text counsellor_recommendation
-        timestamp analysed_at
-    }
+ CONVERSATIONRISKASSESSMENT {
+ int id PK
+ int conversation_id FK
+ string user_hash
+ int risk_level
+ float risk_score
+ string severity
+ string intent
+ jsonb phq9_indicators
+ jsonb gad7_indicators
+ string trend
+ text summary
+ text counsellor_recommendation
+ timestamp analysed_at
+ }
 
-    SCREENINGPROFILE {
-        int id PK
-        int user_id FK
-        string user_hash
-        jsonb phq9_history
-        jsonb gad7_history
-        jsonb dass21_history
-        timestamp last_updated
-    }
+ SCREENINGPROFILE {
+ int id PK
+ int user_id FK
+ string user_hash
+ jsonb phq9_history
+ jsonb gad7_history
+ jsonb dass21_history
+ timestamp last_updated
+ }
 
-    CASES {
-        int id PK
-        int user_id FK
-        int counsellor_id FK
-        string status
-        int risk_level_at_creation
-        timestamp created_at
-        timestamp resolved_at
-    }
+ CASES {
+ int id PK
+ int user_id FK
+ int counsellor_id FK
+ string status
+ int risk_level_at_creation
+ timestamp created_at
+ timestamp resolved_at
+ }
 
-    APPOINTMENTS {
-        int id PK
-        int case_id FK
-        int user_id FK
-        int counsellor_id FK
-        timestamp scheduled_at
-        string status
-        string location_type
-    }
+ APPOINTMENTS {
+ int id PK
+ int case_id FK
+ int user_id FK
+ int counsellor_id FK
+ timestamp scheduled_at
+ string status
+ string location_type
+ }
 
-    CASEATTESTATION {
-        int id PK
-        int case_id FK
-        int counsellor_id FK
-        string content_hash
-        string tx_hash
-        timestamp attested_at
-    }
+ CASEATTESTATION {
+ int id PK
+ int case_id FK
+ int counsellor_id FK
+ string content_hash
+ string tx_hash
+ timestamp attested_at
+ }
 
-    USERINTERVENTIONPLAN {
-        int id PK
-        int user_id FK
-        string category
-        jsonb coping_strategies
-        text psychoeducation
-        text homework
-        timestamp created_at
-        bool completed
-    }
+ USERINTERVENTIONPLAN {
+ int id PK
+ int user_id FK
+ string category
+ jsonb coping_strategies
+ text psychoeducation
+ text homework
+ timestamp created_at
+ bool completed
+ }
 
-    USERS ||--o{ CONVERSATIONS : "has"
-    CONVERSATIONS ||--o{ MESSAGES : "contains"
-    CONVERSATIONS ||--o{ CONVERSATIONRISKASSESSMENT : "assessed by"
-    USERS ||--|| SCREENINGPROFILE : "has one"
-    USERS ||--o{ CASES : "has"
-    CASES ||--o{ APPOINTMENTS : "schedules"
-    CASES ||--o{ CASEATTESTATION : "attested by"
-    USERS ||--o{ USERINTERVENTIONPLAN : "has"
+ USERS ||--o{ CONVERSATIONS: "has"
+ CONVERSATIONS ||--o{ MESSAGES: "contains"
+ CONVERSATIONS ||--o{ CONVERSATIONRISKASSESSMENT: "assessed by"
+ USERS ||--|| SCREENINGPROFILE: "has one"
+ USERS ||--o{ CASES: "has"
+ CASES ||--o{ APPOINTMENTS: "schedules"
+ CASES ||--o{ CASEATTESTATION: "attested by"
+ USERS ||--o{ USERINTERVENTIONPLAN: "has"
 ```
 
 ---

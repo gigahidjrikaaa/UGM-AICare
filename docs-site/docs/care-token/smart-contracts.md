@@ -6,19 +6,19 @@ sidebar_position: 1
 
 # $CARE Token Implementation Summary
 
-## ✅ What Was Created
+## [Done] What Was Created
 
 ### 1. Smart Contract (`blockchain/contracts/CareToken.sol`)
 
 **ERC-20 Utility Token with Advanced Features:**
-- ✅ Standard ERC-20 functionality (transfer, approve, transferFrom)
-- ✅ Burnable tokens (users can burn to reduce supply)
-- ✅ Pausable transfers (emergency stop mechanism)
-- ✅ Role-based access control (ADMIN, MINTER, PAUSER)
-- ✅ EIP-2612 Permit (gasless approvals)
-- ✅ Capped supply at 1 billion CARE tokens
-- ✅ Transparent minting with on-chain reasons
-- ✅ Query functions (maxSupply, totalMinted, remainingMintable)
+- [Done] Standard ERC-20 functionality (transfer, approve, transferFrom)
+- [Done] Burnable tokens (users can burn to reduce supply)
+- [Done] Pausable transfers (emergency stop mechanism)
+- [Done] Role-based access control (ADMIN, MINTER, PAUSER)
+- [Done] EIP-2612 Permit (gasless approvals)
+- [Done] Capped supply at 1 billion CARE tokens
+- [Done] Transparent minting with on-chain reasons
+- [Done] Query functions (maxSupply, totalMinted, remainingMintable)
 
 **Security Features:**
 - OpenZeppelin battle-tested contracts
@@ -30,84 +30,84 @@ sidebar_position: 1
 ### 2. Hardhat Configuration (`blockchain/hardhat.config.ts`)
 
 **Added SOMNIA Network Support:**
-- ✅ SOMNIA Mainnet configuration (Chain ID: 5031)
-- ✅ SOMNIA Testnet configuration (Chain ID: 50312)
-- ✅ Existing EDUChain Testnet preserved
-- ✅ Separate private keys for testnet/mainnet
-- ✅ Gas optimization settings
-- ✅ Explorer verification setup (commented for future)
+- [Done] SOMNIA Mainnet configuration (Chain ID: 5031)
+- [Done] SOMNIA Testnet configuration (Chain ID: 50312)
+- [Done] Existing EDUChain Testnet preserved
+- [Done] Separate private keys for testnet/mainnet
+- [Done] Gas optimization settings
+- [Done] Explorer verification setup (commented for future)
 
 ### 3. Deployment Script (`blockchain/scripts/deployCareToken.ts`)
 
 **Professional Deployment Tool:**
-- ✅ Network detection (mainnet/testnet)
-- ✅ Balance checking before deployment
-- ✅ Comprehensive deployment logging
-- ✅ Automatic token info retrieval
-- ✅ Role verification
-- ✅ Explorer link generation
-- ✅ Deployment summary with JSON output
-- ✅ Next steps guidance
+- [Done] Network detection (mainnet/testnet)
+- [Done] Balance checking before deployment
+- [Done] Comprehensive deployment logging
+- [Done] Automatic token info retrieval
+- [Done] Role verification
+- [Done] Explorer link generation
+- [Done] Deployment summary with JSON output
+- [Done] Next steps guidance
 
 ### 4. Environment Configuration (`blockchain/.env.example`)
 
 **Complete Environment Template:**
-- ✅ SOMNIA Mainnet RPC URLs
-- ✅ SOMNIA Testnet RPC URLs
-- ✅ Private key management (testnet/mainnet)
-- ✅ Contract address tracking
-- ✅ Network selection variables
-- ✅ Security notes and best practices
+- [Done] SOMNIA Mainnet RPC URLs
+- [Done] SOMNIA Testnet RPC URLs
+- [Done] Private key management (testnet/mainnet)
+- [Done] Contract address tracking
+- [Done] Network selection variables
+- [Done] Security notes and best practices
 
 ### 5. Backend Integration (`backend/app/services/care_token_service.py`)
 
 **Python Service for Blockchain Interaction:**
-- ✅ Web3.py integration with SOMNIA
-- ✅ Automatic ABI loading from Hardhat artifacts
-- ✅ Balance checking functionality
-- ✅ Token minting with transaction confirmation
-- ✅ Token info queries
-- ✅ Singleton pattern for efficiency
-- ✅ Comprehensive error handling
-- ✅ Logging for debugging
-- ✅ Fallback minimal ABI
+- [Done] Web3.py integration with SOMNIA
+- [Done] Automatic ABI loading from Hardhat artifacts
+- [Done] Balance checking functionality
+- [Done] Token minting with transaction confirmation
+- [Done] Token info queries
+- [Done] Singleton pattern for efficiency
+- [Done] Comprehensive error handling
+- [Done] Logging for debugging
+- [Done] Fallback minimal ABI
 
 ### 6. API Endpoints (`backend/app/routes/care_token.py`)
 
 **RESTful API for Token Operations:**
-- ✅ `GET /api/v1/care-token/balance/{wallet}` - Check any wallet balance
-- ✅ `GET /api/v1/care-token/my-balance` - Get authenticated user balance
-- ✅ `GET /api/v1/care-token/info` - Get token contract information
-- ✅ `POST /api/v1/care-token/mint` - Mint tokens (admin only)
-- ✅ Pydantic models for validation
-- ✅ Dependency injection pattern
-- ✅ Explorer URL generation
-- ✅ Error handling
+- [Done] `GET /api/v1/care-token/balance/{wallet}` - Check any wallet balance
+- [Done] `GET /api/v1/care-token/my-balance` - Get authenticated user balance
+- [Done] `GET /api/v1/care-token/info` - Get token contract information
+- [Done] `POST /api/v1/care-token/mint` - Mint tokens (admin only)
+- [Done] Pydantic models for validation
+- [Done] Dependency injection pattern
+- [Done] Explorer URL generation
+- [Done] Error handling
 
 ### 7. Documentation (`blockchain/CARE_TOKEN_README.md`)
 
 **Comprehensive Guide Including:**
-- ✅ Token overview and specifications
-- ✅ Use cases (vouchers, events, rewards)
-- ✅ SOMNIA blockchain details
-- ✅ Deployment instructions
-- ✅ Backend integration guide (Python)
-- ✅ Frontend integration guide (Next.js)
-- ✅ Token economics and distribution plan
-- ✅ Reward schedule examples
-- ✅ Merchant voucher pricing
-- ✅ Security best practices
-- ✅ Useful commands
-- ✅ Resources and links
+- [Done] Token overview and specifications
+- [Done] Use cases (vouchers, events, rewards)
+- [Done] SOMNIA blockchain details
+- [Done] Deployment instructions
+- [Done] Backend integration guide (Python)
+- [Done] Frontend integration guide (Next.js)
+- [Done] Token economics and distribution plan
+- [Done] Reward schedule examples
+- [Done] Merchant voucher pricing
+- [Done] Security best practices
+- [Done] Useful commands
+- [Done] Resources and links
 
 ### 8. Dependencies Updated (`backend/requirements.txt`)
 
 **Added Blockchain Libraries:**
-- ✅ `web3>=6.0.0` - Ethereum/SOMNIA interaction
+- [Done] `web3>=6.0.0` - Ethereum/SOMNIA interaction
 
 ---
 
-##  Next Steps to Deploy
+## Next Steps to Deploy
 
 ### Step 1: Install Dependencies
 
@@ -128,7 +128,7 @@ pip install -r requirements.txt
 1. **Copy environment template:**
 ```bash
 cd blockchain
-cp .env.example .env
+cp.env.example.env
 ```
 
 2. **Set required variables in `.env`:**
@@ -145,14 +145,14 @@ MAINNET_PRIVATE_KEY=your_mainnet_private_key_without_0x
 ### Step 3: Get Testnet Tokens
 
 1. **Add SOMNIA Testnet to MetaMask:**
-   - Network Name: SOMNIA Testnet
-   - RPC URL: https://dream-rpc.somnia.network/
-   - Chain ID: 50312
-   - Currency Symbol: STT
+ - Network Name: SOMNIA Testnet
+ - RPC URL: https://dream-rpc.somnia.network/
+ - Chain ID: 50312
+ - Currency Symbol: STT
 
 2. **Get test tokens from faucet:**
-   - https://stakely.io/faucet/somnia-testnet-stt
-   - Or: https://cloud.google.com/application/web3/faucet/somnia/shannon
+ - https://stakely.io/faucet/somnia-testnet-stt
+ - Or: https://cloud.google.com/application/web3/faucet/somnia/shannon
 
 ### Step 4: Deploy to Testnet
 
@@ -164,15 +164,14 @@ npx hardhat run scripts/deployCareToken.ts --network somniaTestnet
 
 **Expected output:**
 ```
-🚀 Starting CareToken deployment on SOMNIA blockchain...
-📍 Deploying from account: 0x...
+[Start] Starting CareToken deployment on SOMNIA blockchain...
+[Address] Deploying from account: 0x...
 💰 Account balance: 100.0 STT
 🌐 Network: somniaTestnet
 🔗 Chain ID: 50312
-✅ Deploying to SOMNIA TESTNET (Shannon)
-...
-✅ CareToken deployed successfully!
-📍 Contract Address: 0x...
+[Done] Deploying to SOMNIA TESTNET (Shannon)...
+[Done] CareToken deployed successfully!
+[Address] Contract Address: 0x...
 🔍 View on Explorer: https://shannon-explorer.somnia.network/address/0x...
 ```
 
@@ -227,9 +226,9 @@ const token = await ethers.getContractAt("CareToken", "CONTRACT_ADDRESS")
 
 // Mint 100 CARE to a test wallet
 await token.mintTokens(
-  "0xTestWalletAddress",
-  100,
-  "Test reward"
+ "0xTestWalletAddress",
+ 100,
+ "Test reward"
 )
 
 // Check balance
@@ -274,7 +273,7 @@ npm install ethers wagmi viem @rainbow-me/rainbowkit
 
 ### Step 10: Deploy to Mainnet (When Ready)
 
-⚠️ **Only after thorough testing!**
+[Warning] **Only after thorough testing!**
 
 1. **Get real SOMI tokens** (SOMNIA's native token)
 2. **Use separate mainnet wallet** (preferably hardware wallet)
@@ -287,7 +286,7 @@ npx hardhat run scripts/deployCareToken.ts --network somniaMainnet
 
 ---
 
-##  Recommended Token Economics
+## Recommended Token Economics
 
 ### Initial Distribution (100M CARE)
 - **10M CARE** → Platform reserve
@@ -323,7 +322,7 @@ npx hardhat run scripts/deployCareToken.ts --network somniaMainnet
 
 ---
 
-##  Security Checklist
+## Security Checklist
 
 - [ ] Private keys stored securely (never in git)
 - [ ] Separate wallets for admin, minter, pauser
@@ -338,7 +337,7 @@ npx hardhat run scripts/deployCareToken.ts --network somniaMainnet
 
 ---
 
-##  Monitoring & Maintenance
+## Monitoring & Maintenance
 
 ### What to Monitor
 1. **Token Supply**: Track total minted vs. max supply
@@ -361,17 +360,17 @@ npx hardhat run scripts/deployCareToken.ts --network somniaMainnet
 
 ---
 
-##  Troubleshooting
+## Troubleshooting
 
 ### Common Issues
 
 **"Failed to connect to SOMNIA blockchain"**
-- Check RPC URL in .env
+- Check RPC URL in.env
 - Verify internet connection
 - Try alternative RPC (stakely.io)
 
 **"TESTNET_PRIVATE_KEY not set"**
-- Copy .env.example to .env
+- Copy.env.example to.env
 - Add your private key (without 0x prefix)
 
 **"Insufficient funds for gas"**
@@ -389,7 +388,7 @@ npx hardhat run scripts/deployCareToken.ts --network somniaMainnet
 
 ---
 
-##  Resources
+## Resources
 
 - **SOMNIA Docs**: https://docs.somnia.network/
 - **SOMNIA Discord**: https://discord.gg/Somnia
@@ -399,15 +398,15 @@ npx hardhat run scripts/deployCareToken.ts --network somniaMainnet
 
 ---
 
-## ✨ Congratulations!
+##  Congratulations!
 
 You've successfully created the $CARE token for UGM-AICare on SOMNIA blockchain! 🎉
 
 The token is now ready to:
-- ✅ Reward users for mental health activities
-- ✅ Enable real-world purchases (vouchers, tickets)
-- ✅ Power the entire UGM-AICare economy
-- ✅ Scale to millions of transactions (thanks to SOMNIA's 1M+ TPS)
+- [Done] Reward users for mental health activities
+- [Done] Enable real-world purchases (vouchers, tickets)
+- [Done] Power the entire UGM-AICare economy
+- [Done] Scale to millions of transactions (thanks to SOMNIA's 1M+ TPS)
 
 **Next**: Start testing on SOMNIA Testnet, then integrate with your reward system!
 
@@ -420,17 +419,17 @@ To incentivize proactive mental health engagement, the system issues on-chain ac
 
 ```mermaid
 sequenceDiagram
-    participant S as Student
-    participant AIKA as TCA Agent
-    participant BE as Backend System
-    participant SC as Smart Contract (EDU Chain)
-    participant W as Blockchain Wallet
+ participant S as Student
+ participant AIKA as TCA Agent
+ participant BE as Backend System
+ participant SC as Smart Contract (EDU Chain)
+ participant W as Blockchain Wallet
 
-    S->>AIKA: Completes Breathing Exercise
-    AIKA->>BE: Report Exercise Completion
-    BE->>BE: Verify Eligibility & Anti-Spam
-    BE->>SC: Mint Badge (ERC1155) via Meta-Tx
-    SC-->>BE: Tx Hash & Token ID
-    BE->>W: Update Internal User Balance
-    W-->>S: Notification: "Badge Earned!"
+ S->>AIKA: Completes Breathing Exercise
+ AIKA->>BE: Report Exercise Completion
+ BE->>BE: Verify Eligibility & Anti-Spam
+ BE->>SC: Mint Badge (ERC1155) via Meta-Tx
+ SC-->>BE: Tx Hash & Token ID
+ BE->>W: Update Internal User Balance
+ W-->>S: Notification: "Badge Earned!"
 ```

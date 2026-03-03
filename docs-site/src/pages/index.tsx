@@ -76,12 +76,12 @@ function HomepageHero(): ReactNode {
           <Link
             className="button button--secondary button--lg"
             to="/docs/intro">
-            Read the Docs &nbsp;📖
+            Read the Docs
           </Link>
           <Link
             className={clsx('button button--outline button--lg', styles.heroButtonOutline)}
-            to="/docs/architecture/overview">
-            Explore the Architecture &nbsp;🏗️
+            to="/docs/architecture/system-overview">
+            Explore the Architecture
           </Link>
         </div>
         <div className={styles.heroBadges}>
@@ -101,7 +101,7 @@ export default function Home(): ReactNode {
   return (
     <Layout
       title="UGM-AICare Documentation"
-      description="Technical documentation for the UGM-AICare agentic mental health support platform — architecture, agent design, API reference, and deployment guides.">
+      description="Technical documentation for the UGM-AICare agentic mental health support platform - architecture, agent design, API reference, and deployment guides.">
       <HomepageHero />
       <main>
         <section className={styles.features}>
@@ -128,20 +128,20 @@ export default function Home(): ReactNode {
             <div className="row">
               <div className="col col--4">
                 <Link to="/docs/intro" className={styles.quickLink}>
-                  <strong>👋 New here?</strong>
+                  <strong>New here?</strong>
                   <span>Start with the introduction to understand the problem this system solves.</span>
                 </Link>
               </div>
               <div className="col col--4">
-                <Link to="/docs/architecture/overview" className={styles.quickLink}>
-                  <strong>🏗️ Understand the design</strong>
-                  <span>Read the system architecture — how all the pieces fit together.</span>
+                <Link to="/docs/architecture/system-overview" className={styles.quickLink}>
+                  <strong>Understand the design</strong>
+                  <span>Read the system architecture - how all the pieces fit together.</span>
                 </Link>
               </div>
               <div className="col col--4">
-                <Link to="/docs/agents/aika" className={styles.quickLink}>
-                  <strong>🤖 Meet the agents</strong>
-                  <span>Deep-dive into each AI agent — what it does and how it thinks.</span>
+                <Link to="/docs/architecture/meta-agent-aika" className={styles.quickLink}>
+                  <strong>Meet the agents</strong>
+                  <span>Deep-dive into each AI agent - what it does and how it thinks.</span>
                 </Link>
               </div>
             </div>

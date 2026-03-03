@@ -14,9 +14,11 @@ interface ProfileDropdownProps {
   onClose: () => void;
   onSignOut: () => void;
   wellness?: WellnessState;
+  /** Resolved profile picture URL from useProfilePicture hook (avoids double fetch) */
+  profilePictureSrc?: string;
 }
 
-export default function ProfileDropdown({ isOpen, user, onClose, onSignOut, wellness }: ProfileDropdownProps) {
+export default function ProfileDropdown({ isOpen, user, onClose, onSignOut, wellness, profilePictureSrc }: ProfileDropdownProps) {
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -106,7 +108,7 @@ export default function ProfileDropdown({ isOpen, user, onClose, onSignOut, well
               <div className="flex items-center gap-3">
                 <div className="relative w-10 h-10 rounded-full overflow-hidden border border-white/20">
                   <Image
-                    src={user.image || "/default-avatar.png"}
+                    src={profilePictureSrc || user.image || "/default-avatar.png"}
                     alt={user.name || "User"}
                     fill
                     className="object-cover"

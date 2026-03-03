@@ -14,17 +14,17 @@ Before any user message is logged or passed to secondary analysis components lik
 
 ```mermaid
 graph LR
-    A[User Message: "I am feeling stressed. My name is Budi and my number is 0812345678"] --> B(STA: PII Redaction Engine)
-    B --> C{Rules & NLP Models}
-    C -->|Regex| D[Remove Numbers & Emails]
-    C -->|NER| E[Remove Names & Locations]
-    D --> F
-    E --> F[Sanitized Message]
-    F --> G[Database]
-    F --> H[Insights Agent]
-    
-    classDef safe fill:#d4edda,stroke:#333,stroke-width:2px;
-    class F,G,H safe;
+ A[User Message: "I am feeling stressed. My name is Budi and my number is 0812345678"] --> B(STA: PII Redaction Engine)
+ B --> C{Rules & NLP Models}
+ C -->|Regex| D[Remove Numbers & Emails]
+ C -->|NER| E[Remove Names & Locations]
+ D --> F
+ E --> F[Sanitized Message]
+ F --> G[Database]
+ F --> H[Insights Agent]
+ 
+ classDef safe fill:#d4edda,stroke:#333,stroke-width:2px;
+ class F,G,H safe;
 ```
 
 ## Anonymization vs. Pseudonymization

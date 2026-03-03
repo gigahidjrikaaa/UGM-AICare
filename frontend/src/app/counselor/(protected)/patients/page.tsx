@@ -11,6 +11,9 @@ import {
   FiMail,
   FiPhone,
   FiSend,
+  FiMessageSquare,
+  FiSearch,
+  FiEye,
 } from 'react-icons/fi';
 import apiClient from '@/services/api';
 import toast from 'react-hot-toast';
@@ -43,7 +46,7 @@ interface Patient {
   status: 'active' | 'inactive' | 'discharged';
 }
 
-const statusColors = {
+const statusColors: Record<string, string> = {
   active: 'bg-green-500/20 text-green-300 border-green-500/30',
   inactive: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
   discharged: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
@@ -183,13 +186,17 @@ export default function CounselorPatientsPage() {
   const activeCount = patients.filter((p) => p.status === 'active').length;
   const totalActiveCases = patients.reduce((sum, p) => sum + p.active_cases, 0);
   const totalCases = patients.reduce((sum, p) => sum + p.total_cases, 0);
+  const withEmailCount = patients.filter((p) => !!p.user_email).length;
+  const withPhoneOrTelegramCount = patients.filter(
+    (p) => !!p.user_phone || !!p.telegram_username
+  ).length;
 
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[60vh]">
         <div className="text-center">
           <div className="inline-block animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFCA40] mb-4"></div>
-          <p className="text-white/70">Loading patients...</p>
+          <p className="text-white/70">Loading patients & contacts...</p>
         </div>
       </div>
     );
@@ -222,31 +229,34 @@ export default function CounselorPatientsPage() {
         <div>
           <h1 className="text-3xl font-bold text-white mb-2 flex items-center gap-3">
             <FiUser className="w-8 h-8 text-[#FFCA40]" />
-            My Patients
+            Patients & Contacts
           </h1>
           <p className="text-white/60">
-            Patients derived from your assigned cases ({patients.length} unique patients)
+            Manage contacts and review cases for your assigned patients ({patients.length} total)
           </p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 flex-wrap">
           <button
             onClick={loadPatients}
-            className="p-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-white/70 hover:text-white transition-all"
+            className="p-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-white/70 hover:text-white transition-all shadow-sm"
             title="Refresh"
           >
             <FiRefreshCw className="w-4 h-4" />
           </button>
-          <input
-            type="text"
-            placeholder="Search patients..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="px-4 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:ring-1 focus:ring-[#FFCA40]"
-          />
+          <div className="relative">
+            <FiSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-white/40 w-4 h-4" />
+            <input
+              type="text"
+              placeholder="Search patients..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-9 pr-4 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white placeholder-white/40 focus:border-[#FFCA40] focus:ring-1 focus:ring-[#FFCA40] outline-none transition-all w-full md:w-64"
+            />
+          </div>
           <select
             value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value)}
-            className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white focus:border-[#FFCA40] focus:ring-1 focus:ring-[#FFCA40]"
+            className="px-3 py-2 bg-white/10 border border-white/20 rounded-lg text-sm text-white focus:border-[#FFCA40] focus:ring-1 focus:ring-[#FFCA40] outline-none transition-all"
             title="Filter by patient status"
           >
             <option value="all" className="bg-[#001d58]">All Status</option>
@@ -257,51 +267,59 @@ export default function CounselorPatientsPage() {
         </div>
       </div>
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
-          <div className="text-2xl font-bold text-white">{activeCount}</div>
-          <div className="text-xs text-white/60 mt-1">Active Patients</div>
+      {/* Stats - 6 cards */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4 transition-all hover:bg-white/10">
+          <div className="text-2xl font-bold text-[#FFCA40]">{activeCount}</div>
+          <div className="text-xs text-white/60 mt-1 uppercase tracking-wide">Active Patients</div>
         </div>
-        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
+        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4 transition-all hover:bg-white/10">
           <div className="text-2xl font-bold text-white">{patients.length}</div>
-          <div className="text-xs text-white/60 mt-1">Total Patients</div>
+          <div className="text-xs text-white/60 mt-1 uppercase tracking-wide">Total Patients</div>
         </div>
-        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
-          <div className="text-2xl font-bold text-white">{totalCases}</div>
-          <div className="text-xs text-white/60 mt-1">Total Cases</div>
-        </div>
-        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
+        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4 transition-all hover:bg-white/10">
           <div className="text-2xl font-bold text-white">{totalActiveCases}</div>
-          <div className="text-xs text-white/60 mt-1">Active Cases</div>
+          <div className="text-xs text-white/60 mt-1 uppercase tracking-wide">Active Cases</div>
+        </div>
+        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4 transition-all hover:bg-white/10">
+          <div className="text-2xl font-bold text-white">{totalCases}</div>
+          <div className="text-xs text-white/60 mt-1 uppercase tracking-wide">Total Cases</div>
+        </div>
+        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4 transition-all hover:bg-white/10">
+          <div className="text-2xl font-bold text-white">{withEmailCount}</div>
+          <div className="text-xs text-white/60 mt-1 uppercase tracking-wide">With Email</div>
+        </div>
+        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4 transition-all hover:bg-white/10">
+          <div className="text-2xl font-bold text-white">{withPhoneOrTelegramCount}</div>
+          <div className="text-xs text-white/60 mt-1 uppercase tracking-wide">With Phone/Telegram</div>
         </div>
       </div>
 
       {/* Patients Table */}
-      <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl overflow-hidden">
+      <div className="bg-white/5 backdrop-blur border border-white/10 rounded-2xl overflow-hidden shadow-xl shadow-black/20">
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-white/5 border-b border-white/10">
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">
                   Patient
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-white/70 uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-white/70 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-white/70 uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-white/70 uppercase tracking-wider">
                   Cases
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-white/70 uppercase tracking-wider">
+                <th className="px-6 py-4 text-center text-xs font-semibold text-white/70 uppercase tracking-wider">
                   Severity
                 </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-white/70 uppercase tracking-wider">
-                  Contact
+                <th className="px-6 py-4 text-center text-xs font-semibold text-white/70 uppercase tracking-wider">
+                  Contact Channels
                 </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">
+                <th className="px-6 py-4 text-left text-xs font-semibold text-white/70 uppercase tracking-wider">
                   Last Activity
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-white/70 uppercase tracking-wider">
+                <th className="px-6 py-4 text-right text-xs font-semibold text-white/70 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
@@ -309,9 +327,9 @@ export default function CounselorPatientsPage() {
             <tbody className="divide-y divide-white/10">
               {filteredPatients.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-12 text-center">
-                    <FiUser className="w-12 h-12 text-white/20 mx-auto mb-3" />
-                    <p className="text-white/60">
+                  <td colSpan={7} className="px-6 py-16 text-center">
+                    <FiUser className="w-12 h-12 text-white/20 mx-auto mb-4" />
+                    <p className="text-white/60 text-lg">
                       {patients.length === 0
                         ? 'No patients yet. Patients appear when cases are assigned to you.'
                         : 'No patients match your search criteria'}
@@ -322,105 +340,144 @@ export default function CounselorPatientsPage() {
                 filteredPatients.map((patient) => (
                   <tr
                     key={patient.user_hash}
-                    className="hover:bg-white/5 transition-colors"
+                    className="hover:bg-white/5 transition-colors group"
                   >
-                    <td className="px-4 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-[#FFCA40]/20 flex items-center justify-center">
-                          <span className="text-[#FFCA40] font-semibold">
+                    <td className="px-6 py-5">
+                      <div className="flex items-center gap-4">
+                        <div className="w-12 h-12 rounded-full bg-[#FFCA40]/20 flex items-center justify-center shrink-0 border border-[#FFCA40]/30 shadow-inner">
+                          <span className="text-[#FFCA40] font-bold text-lg">
                             {patient.user_email
                               ? patient.user_email.charAt(0).toUpperCase()
                               : patient.user_hash.charAt(0).toUpperCase()}
                           </span>
                         </div>
-                        <div>
-                          <div className="text-sm font-medium text-white">
+                        <div className="min-w-0">
+                          <div className="text-sm font-semibold text-white truncate">
                             {patient.user_email || 'Anonymous User'}
                           </div>
-                          <div className="text-xs text-white/50 font-mono truncate max-w-[180px]">
+                          <div className="text-xs text-white/50 font-mono mt-1 truncate max-w-[200px]" title={patient.user_hash}>
                             {patient.user_hash}
                           </div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-center whitespace-nowrap">
+                    <td className="px-6 py-5 text-center whitespace-nowrap">
                       <span
-                        className={`px-2 py-1 rounded text-xs font-medium border ${statusColors[patient.status]}`}
+                        className={`px-3 py-1.5 rounded-md text-xs font-medium border ${statusColors[patient.status]}`}
                       >
-                        {patient.status}
+                        {patient.status.charAt(0).toUpperCase() + patient.status.slice(1)}
                       </span>
                     </td>
-                    <td className="px-4 py-4 text-center whitespace-nowrap">
-                      <div className="flex flex-col items-center gap-0.5">
-                        <div className="flex items-center gap-1">
-                          <FiCalendar className="w-3 h-3 text-[#FFCA40]" />
-                          <span className="text-sm text-white/80">{patient.total_cases}</span>
+                    <td className="px-6 py-5 text-center whitespace-nowrap">
+                      <div className="flex flex-col items-center gap-1">
+                        <div className="flex items-center gap-1.5">
+                          <FiCalendar className="w-3.5 h-3.5 text-[#FFCA40]" />
+                          <span className="text-sm font-medium text-white/90">{patient.total_cases}</span>
                         </div>
                         {patient.active_cases > 0 && (
-                          <span className="text-[10px] text-orange-300">
+                          <span className="text-[10px] uppercase tracking-wider font-semibold text-orange-300">
                             {patient.active_cases} active
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-4 text-center whitespace-nowrap">
+                    <td className="px-6 py-5 text-center whitespace-nowrap">
                       <span
-                        className={`px-2 py-1 rounded text-xs font-medium ${severityColors[patient.highest_severity] || 'bg-gray-500/20 text-gray-300'}`}
+                        className={`px-3 py-1.5 rounded-md text-xs font-bold uppercase tracking-wide ${severityColors[patient.highest_severity] || 'bg-gray-500/20 text-gray-300'}`}
                       >
                         {patient.highest_severity}
                       </span>
                     </td>
-                    <td className="px-4 py-4 text-center whitespace-nowrap">
-                      <div className="flex items-center justify-center gap-2">
-                        {patient.user_email && (
+                    <td className="px-6 py-5 whitespace-nowrap">
+                      <div className="flex items-center justify-center gap-3">
+                        {patient.user_phone ? (
                           <a
-                            href={`mailto:${patient.user_email}`}
-                            className="p-1 hover:bg-white/10 rounded text-white/50 hover:text-white transition-colors"
-                            title={patient.user_email}
-                          >
-                            <FiMail className="w-3.5 h-3.5" />
-                          </a>
-                        )}
-                        {patient.user_phone && (
-                          <a
-                            href={`tel:${patient.user_phone}`}
-                            className="p-1 hover:bg-white/10 rounded text-white/50 hover:text-white transition-colors"
-                            title={patient.user_phone}
-                          >
-                            <FiPhone className="w-3.5 h-3.5" />
-                          </a>
-                        )}
-                        {patient.telegram_username && (
-                          <a
-                            href={`https://t.me/${patient.telegram_username}`}
+                            href={`https://wa.me/${patient.user_phone.replace(/[^0-9]/g, '')}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="p-1 hover:bg-white/10 rounded text-white/50 hover:text-white transition-colors"
-                            title={`@${patient.telegram_username}`}
+                            className="p-2 bg-green-500/10 hover:bg-green-500/20 border border-green-500/20 hover:border-green-500/40 rounded-lg text-green-400 transition-all shadow-sm group/btn"
+                            title={`WhatsApp: ${patient.user_phone}`}
                           >
-                            <FiSend className="w-3.5 h-3.5" />
+                            <FiMessageSquare className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
                           </a>
+                        ) : (
+                          <div className="p-2 bg-white/5 rounded-lg text-white/20 border border-transparent cursor-not-allowed">
+                            <FiMessageSquare className="w-4 h-4" />
+                          </div>
                         )}
-                        {!patient.user_email && !patient.user_phone && !patient.telegram_username && (
-                          <span className="text-xs text-white/30">N/A</span>
+
+                        {patient.telegram_username ? (
+                          <a
+                            href={`https://t.me/${patient.telegram_username.replace('@', '')}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 hover:border-blue-500/40 rounded-lg text-blue-400 transition-all shadow-sm group/btn"
+                            title={`Telegram: @${patient.telegram_username}`}
+                          >
+                            <FiSend className="w-4 h-4 group-hover/btn:scale-110 transition-transform -ml-0.5" />
+                          </a>
+                        ) : (
+                          <div className="p-2 bg-white/5 rounded-lg text-white/20 border border-transparent cursor-not-allowed">
+                            <FiSend className="w-4 h-4 -ml-0.5" />
+                          </div>
+                        )}
+
+                        {patient.user_email ? (
+                          <a
+                            href={`mailto:${patient.user_email}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/40 rounded-lg text-white/90 transition-all shadow-sm group/btn"
+                            title={`Email: ${patient.user_email}`}
+                          >
+                            <FiMail className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
+                          </a>
+                        ) : (
+                          <div className="p-2 bg-white/5 rounded-lg text-white/20 border border-transparent cursor-not-allowed">
+                            <FiMail className="w-4 h-4" />
+                          </div>
+                        )}
+
+                        {patient.user_phone ? (
+                          <a
+                            href={`tel:${patient.user_phone}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="p-2 bg-white/10 hover:bg-white/20 border border-white/20 hover:border-white/40 rounded-lg text-white/90 transition-all shadow-sm group/btn"
+                            title={`Call: ${patient.user_phone}`}
+                          >
+                            <FiPhone className="w-4 h-4 group-hover/btn:scale-110 transition-transform" />
+                          </a>
+                        ) : (
+                          <div className="p-2 bg-white/5 rounded-lg text-white/20 border border-transparent cursor-not-allowed">
+                            <FiPhone className="w-4 h-4" />
+                          </div>
                         )}
                       </div>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5 text-xs text-white/60">
-                        <FiClock className="w-3 h-3" />
+                    <td className="px-6 py-5 whitespace-nowrap">
+                      <div className="flex items-center gap-2 text-sm text-white/70">
+                        <div className="p-1.5 bg-white/5 rounded-md">
+                          <FiClock className="w-3.5 h-3.5" />
+                        </div>
                         {formatDate(patient.last_case_date)}
                       </div>
                     </td>
-                    <td className="px-4 py-4 whitespace-nowrap text-right">
+                    <td className="px-6 py-5 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() =>
-                            router.push(`/counselor/cases?search=${encodeURIComponent(patient.user_hash)}`)
-                          }
-                          className="px-3 py-1 bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 rounded text-xs font-medium text-[#FFCA40] transition-all"
+                          onClick={() => router.push(`/counselor/cases?search=${encodeURIComponent(patient.user_hash)}`)}
+                          className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs font-medium text-white/80 hover:text-white transition-all shadow-sm flex items-center gap-1.5"
                         >
-                          View Cases
+                          <FiCalendar className="w-3.5 h-3.5" />
+                          Cases
+                        </button>
+                        <button
+                          onClick={() => router.push(`/counselor/patients/${encodeURIComponent(patient.user_hash)}`)}
+                          className="px-3 py-1.5 bg-[#FFCA40]/20 hover:bg-[#FFCA40]/30 border border-[#FFCA40]/30 rounded-lg text-xs font-medium text-[#FFCA40] transition-all shadow-sm flex items-center gap-1.5"
+                        >
+                          <FiEye className="w-3.5 h-3.5" />
+                          View
                         </button>
                       </div>
                     </td>

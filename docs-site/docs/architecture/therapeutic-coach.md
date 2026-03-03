@@ -35,18 +35,18 @@ The TCA produces an intervention plan, which is a structured object integrated i
 
 ```json
 {
-  "plan_id": "tcp_8f3a2c",
-  "user_id": 1203,
-  "category": "academic_stress",
-  "coping_strategies": [
-    "5-4-3-2-1 grounding technique for acute anxiety",
-    "Pomodoro time-blocking for exam preparation",
-    "Scheduled worry time (15 min/day, then redirect)"
-  ],
-  "psychoeducation": "Exam anxiety is a normal physiological response...",
-  "homework": "Write down three thoughts about exams and identify the cognitive distortion in each.",
-  "follow_up_trigger": "3 days",
-  "evidence_base": "CBT for academic anxiety [Beck, 1979; Meichenbaum, 1985]"
+ "plan_id": "tcp_8f3a2c",
+ "user_id": 1203,
+ "category": "academic_stress",
+ "coping_strategies": [
+ "5-4-3-2-1 grounding technique for acute anxiety",
+ "Pomodoro time-blocking for exam preparation",
+ "Scheduled worry time (15 min/day, then redirect)"
+ ],
+ "psychoeducation": "Exam anxiety is a normal physiological response...",
+ "homework": "Write down three thoughts about exams and identify the cognitive distortion in each.",
+ "follow_up_trigger": "3 days",
+ "evidence_base": "CBT for academic anxiety [Beck, 1979; Meichenbaum, 1985]"
 }
 ```
 
@@ -56,16 +56,16 @@ The TCA produces an intervention plan, which is a structured object integrated i
 
 ```mermaid
 flowchart TD
-    A[Receive shared state\nrisk_level, intent, message] --> B{Intent Classification}
-    B -- "Academic stress" --> C[Generate study skills\n+ anxiety management plan]
-    B -- "Interpersonal conflict" --> D[Generate social skills\n+ assertiveness strategies]
-    B -- "Low mood / depression" --> E[Generate behavioural activation\n+ thought record exercises]
-    B -- "Panic / acute anxiety" --> F[Generate immediate\ngrounding techniques]
-    C & D & E & F --> G[Fetch student history\nfrom intervention plan DB]
-    G --> H[Personalise to student\navoid repeating used strategies]
-    H --> I[Generate via Gemini Pro\nwith CBT framework prompt]
-    I --> J[Write to SafetyAgentState\nintervention_plan field]
-    J --> K[Persist to DB\nUserInterventionPlan table]
+ A[Receive shared state\nrisk_level, intent, message] --> B{Intent Classification}
+ B -- "Academic stress" --> C[Generate study skills\n+ anxiety management plan]
+ B -- "Interpersonal conflict" --> D[Generate social skills\n+ assertiveness strategies]
+ B -- "Low mood / depression" --> E[Generate behavioural activation\n+ thought record exercises]
+ B -- "Panic / acute anxiety" --> F[Generate immediate\ngrounding techniques]
+ C & D & E & F --> G[Fetch student history\nfrom intervention plan DB]
+ G --> H[Personalise to student\navoid repeating used strategies]
+ H --> I[Generate via Gemini Pro\nwith CBT framework prompt]
+ I --> J[Write to SafetyAgentState\nintervention_plan field]
+ J --> K[Persist to DB\nUserInterventionPlan table]
 ```
 
 The personalization step is essential. The TCA monitors previously suggested coping strategies to avoid repetition, ensuring the agent remains engaging over extended periods.

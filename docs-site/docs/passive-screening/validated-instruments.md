@@ -13,7 +13,7 @@ The core of the passive screening engine relies on scientifically validated clin
 The system evaluates the following dimensions using established psychiatric scales:
 
 | Dimension | Instrument | Reference | Key Domains Assessed |
-| :--- | :--- | :--- | :--- |
+|:--- |:--- |:--- |:--- |
 | **Depression** | PHQ-9 (Patient Health Questionnaire-9) | Kroenke et al. (2001) | Anhedonia, depressed mood, sleep disturbances, fatigue, concentration issues. |
 | **Anxiety** | GAD-7 (Generalized Anxiety Disorder-7) | Spitzer et al. (2006) | Nervousness, uncontrollable worry, restlessness, irritability. |
 | **Stress** | DASS-21 (Stress Subscale) | Lovibond & Lovibond (1995) | Difficulty relaxing, nervous energy, agitation, impatience. |

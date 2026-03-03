@@ -68,13 +68,12 @@ The full stack (backend + frontend) can be started with one command. The databas
 
 ```bash
 # Development mode (hot reload on both frontend and backend)
-docker compose --env-file .env \
-  -f docker-compose.base.yml \
-  -f docker-compose.dev.yml \
-  up -d
+docker compose --env-file.env \
+ -f docker-compose.base.yml \
+ -f docker-compose.dev.yml \
+ up -d
 
-# Or using the convenience script
-./run_dev.sh
+# Or using the convenience script./run_dev.sh
 ```
 
 Once running:
@@ -92,8 +91,8 @@ Once running:
 cd backend
 
 # Create and activate a virtual environment
-python -m venv .venv
-source .venv/bin/activate      # Windows: .venv\Scripts\activate
+python -m venv.venv
+source.venv/bin/activate # Windows:.venv\Scripts\activate
 
 # Install dependencies
 pip install -r requirements.txt
@@ -140,14 +139,13 @@ The production deployment uses two separate containers behind Nginx:
 
 ```
 Internet → Nginx (TLS termination)
-              ├── aicare.sumbu.xyz      → Frontend container (Next.js, port 3000)
-              └── api.aicare.sumbu.xyz  → Backend container (FastAPI, port 8000)
+ ├── aicare.sumbu.xyz → Frontend container (Next.js, port 3000)
+ └── api.aicare.sumbu.xyz → Backend container (FastAPI, port 8000)
 ```
 
 Deploy to production using the provided script:
 
-```bash
-./deploy-prod.sh
+```bash./deploy-prod.sh
 ```
 
 This script:

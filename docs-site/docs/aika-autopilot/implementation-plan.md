@@ -6,8 +6,8 @@ sidebar_position: 1
 
 # Aika Autopilot Phased Implementation Plan
 
-**Date**: 2026-02-16  
-**Status**: Phases 0-5 implemented (demo-grade)  
+**Date**: 2026-02-16 
+**Status**: Phases 0-5 implemented (demo-grade) 
 This plan converts the current Aika orchestration into an autonomous onchain operations flow.
 **Track fit**: Agent (primary), Consumer (secondary)
 
@@ -200,8 +200,8 @@ Implement Phase 1 Action Control Plane:
 - Add SQLAlchemy model `AutopilotAction` and migration.
 - Add service with methods: `enqueue_action`, `mark_awaiting_approval`, `mark_running`, `mark_confirmed`, `mark_failed`, `mark_dead_letter`.
 - Add admin routes:
-  - GET `/api/v1/admin/autopilot/actions`
-  - GET `/api/v1/admin/autopilot/actions/{id}`
+ - GET `/api/v1/admin/autopilot/actions`
+ - GET `/api/v1/admin/autopilot/actions/{id}`
 Return Pydantic schemas with pagination and filters.
 Follow existing backend style and async patterns.
 """
@@ -323,9 +323,9 @@ Expose governance and proof to judges in UI.
 Implement Phase 4 approval and proof UX:
 
 - Backend endpoints:
-  - POST `/api/v1/admin/autopilot/actions/{id}/approve`
-  - POST `/api/v1/admin/autopilot/actions/{id}/reject`
-  - GET `/api/v1/proof/actions?user_id=...`
+ - POST `/api/v1/admin/autopilot/actions/{id}/approve`
+ - POST `/api/v1/admin/autopilot/actions/{id}/reject`
+ - GET `/api/v1/proof/actions?user_id=...`
 - Frontend admin queue page: list awaiting approvals, show risk, payload summary, approve/reject controls.
 - Frontend proof page: timeline of actions with status, tx hash, explorer URL, and chain label.
 Use existing UI patterns and API client style.
@@ -449,5 +449,5 @@ If targeting opBNB:
 
 ## 12) Recommended first execution command
 
-Start with Phase 1 prompt and ask your coding agent to implement only model + migration + admin list endpoints in one PR.  
+Start with Phase 1 prompt and ask your coding agent to implement only model + migration + admin list endpoints in one PR. 
 After that is merged or stable locally, continue to Phase 2.

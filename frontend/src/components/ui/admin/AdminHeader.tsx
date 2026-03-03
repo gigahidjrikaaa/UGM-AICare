@@ -6,11 +6,12 @@ import Link from 'next/link';
 import { useSession, signOut } from 'next-auth/react';
 import { FiSearch, FiBell, FiMenu, FiChevronDown, FiLogOut, FiUser, FiSettings, FiPieChart, FiCalendar, FiUsers } from 'react-icons/fi';
 import { Popover, Transition } from '@headlessui/react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import toast from 'react-hot-toast';
 import { useSSEEventHandler } from '@/contexts/AdminSSEContext';
 import { apiCall } from '@/utils/adminApi';
+import { useProfilePicture } from '@/hooks/useProfilePicture';
 import type { AlertData, AlertSeverity, IAReportGeneratedData, SLABreachData } from '@/types/sse';
 // Language switcher removed (next-intl reverted)
 
@@ -131,10 +132,12 @@ const mergeAlerts = (primary: AlertNotification[], secondary: AlertNotification[
   return merged.sort((a, b) => alertTimeValue(b.created_at) - alertTimeValue(a.created_at)).slice(0, MAX_ALERTS);
 };
 
-export default function AdminHeader() {
+export default function AdminHeader({ onMenuToggle }: { onMenuToggle?: () => void } = {}) {
   const { data: session } = useSession();
+  const { src: profilePictureSrc } = useProfilePicture();
   const [searchQuery, setSearchQuery] = useState('');
   const pathname = usePathname();
+  const router = useRouter();
   const [alerts, setAlerts] = useState<AlertNotification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isLoadingAlerts, setIsLoadingAlerts] = useState(false);
@@ -304,24 +307,46 @@ export default function AdminHeader() {
     setUnreadCount((count) => Math.max(count + 1, localUnread));
   }, []));
 
+  const submitSearch = useCallback(() => {
+    const trimmed = searchQuery.trim();
+    if (!trimmed) return;
+    router.push(`/admin/cases?search=${encodeURIComponent(trimmed)}`);
+    setSearchQuery('');
+  }, [searchQuery, router]);
+
+  const onSearchKeyDown: React.KeyboardEventHandler<HTMLInputElement> = useCallback((event) => {
+    if (event.key === 'Enter') {
+      event.preventDefault();
+      submitSearch();
+    }
+  }, [submitSearch]);
+
   return (
     <header className="bg-[#000c24]/80 backdrop-blur-md border-b border-white/10 sticky top-0 z-30">
       <div className="flex items-center justify-between h-16 px-4 md:px-6">
         {/* Left side: Mobile Menu Toggle & Search (optional) */}
         <div className="flex items-center">
           {/* Placeholder for a mobile menu toggle button if needed */}
-          <button className="mr-3 p-2 rounded-lg hover:bg-white/10 md:hidden" aria-label="Toggle mobile menu">
+          <button onClick={onMenuToggle} className="mr-3 p-2 rounded-lg hover:bg-white/10 md:hidden" aria-label="Toggle mobile menu">
             <FiMenu className="text-white" size={20} />
           </button>
-          <div className="hidden md:flex items-center bg-white/10 rounded-lg px-3 py-1.5 flex-1 max-w-xs">
+          <div className="hidden md:flex items-center bg-white/10 rounded-lg px-3 py-1.5 flex-1 max-w-xs relative">
             <FiSearch className="text-gray-400 mr-2" />
             <input 
               type="text" 
               placeholder="Search..." 
-              className="bg-transparent border-none outline-none text-white placeholder-gray-400 text-sm w-full"
+              className="bg-transparent border-none outline-none text-white placeholder-gray-400 text-sm w-full pr-8"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
+              onKeyDown={onSearchKeyDown}
             />
+            <button
+              type="button"
+              onClick={submitSearch}
+              className="absolute right-1.5 rounded-md px-2 py-0.5 text-xs bg-[#FFCA40]/20 text-[#FFCA40] hover:bg-[#FFCA40]/30 transition-colors"
+            >
+              Go
+            </button>
           </div>
         </div>
         
@@ -468,8 +493,8 @@ export default function AdminHeader() {
               <>
                 <Popover.Button className="flex items-center p-1 rounded-full hover:bg-white/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-white focus-visible:ring-opacity-75">
                   <div className="h-9 w-9 rounded-full bg-[#FFCA40]/30 flex items-center justify-center ring-1 ring-[#FFCA40]/50">
-                    {session?.user?.image ? (
-                        <Image src={session.user.image} alt="Admin" width={36} height={36} className="rounded-full" />
+                    {profilePictureSrc !== "/default-avatar.png" ? (
+                        <Image src={profilePictureSrc} alt="Admin" width={36} height={36} className="rounded-full" />
                     ) : (
                         <span className="font-medium text-sm text-[#FFCA40]">
                         {session?.user?.name?.charAt(0).toUpperCase() || 'A'}

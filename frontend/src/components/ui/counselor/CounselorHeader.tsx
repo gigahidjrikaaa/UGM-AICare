@@ -86,7 +86,7 @@ async function counselorApiCall<T>(path: string, options: RequestInit = {}): Pro
   return response.json() as Promise<T>;
 }
 
-export default function CounselorHeader() {
+export default function CounselorHeader({ onMenuToggle }: { onMenuToggle?: () => void } = {}) {
   const { data: session } = useSession();
   const router = useRouter();
   const pathname = usePathname();
@@ -214,6 +214,7 @@ export default function CounselorHeader() {
     <header className="h-16 bg-white/5 backdrop-blur-sm border-b border-white/10 px-4 md:px-6 flex items-center justify-between sticky top-0 z-10">
       <div className="flex items-center gap-4 min-w-0">
         <button
+          onClick={onMenuToggle}
           className="md:hidden text-white/80 hover:text-white"
           aria-label="Open sidebar menu"
           title="Open sidebar menu"

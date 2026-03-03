@@ -2,18 +2,17 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
-import { 
-  FiSearch, 
-  FiFilter, 
-  FiRefreshCw, 
-  FiUsers, 
-  FiMail, 
-  FiPhone, 
-  FiSend, 
-  FiMessageSquare, 
-  FiExternalLink 
-} from '@/icons';
-import { motion, AnimatePresence } from 'framer-motion';
+import {
+  FiSearch,
+  FiFilter,
+  FiRefreshCw,
+  FiUsers,
+  FiMail,
+  FiPhone,
+  FiMessageSquare,
+  FiSend,
+  FiExternalLink
+} from 'react-icons/fi';
 import toast from 'react-hot-toast';
 import { apiCall } from '@/utils/adminApi';
 
@@ -169,11 +168,7 @@ export default function AdminCRMPage() {
       {/* Statistics Cards */}
       {stats && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-6"
-          >
+          <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-400">Total Contacts</p>
@@ -183,14 +178,9 @@ export default function AdminCRMPage() {
                 <FiUsers className="h-6 w-6 text-[#FFCA40]" />
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.1 }}
-            className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-6"
-          >
+          <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-400">Active (30d)</p>
@@ -200,14 +190,9 @@ export default function AdminCRMPage() {
                 <FiUsers className="h-6 w-6 text-green-400" />
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.2 }}
-            className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-6"
-          >
+          <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-400">With Email</p>
@@ -217,14 +202,9 @@ export default function AdminCRMPage() {
                 <FiMail className="h-6 w-6 text-blue-400" />
               </div>
             </div>
-          </motion.div>
+          </div>
 
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.3 }}
-            className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-6"
-          >
+          <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-6">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-400">With Phone</p>
@@ -234,60 +214,53 @@ export default function AdminCRMPage() {
                 <FiPhone className="h-6 w-6 text-purple-400" />
               </div>
             </div>
-          </motion.div>
+          </div>
         </div>
       )}
 
       {/* Filters Panel */}
-      <AnimatePresence>
-        {showFilters && (
-          <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: 'auto' }}
-            exit={{ opacity: 0, height: 0 }}
-            className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 p-6"
-          >
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Search Contacts
-                </label>
-                <div className="relative">
-                  <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                  <input
-                    type="text"
-                    placeholder="Search by name, email, or phone..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-300 mb-2">
-                  Filter
-                </label>
-                <div className="flex items-center h-10">
-                  <input
-                    type="checkbox"
-                    id="activeOnly"
-                    checked={activeOnly}
-                    onChange={(e) => setActiveOnly(e.target.checked)}
-                    className="h-4 w-4 text-[#FFCA40] focus:ring-[#FFCA40] bg-white/10 border-white/20 rounded"
-                  />
-                  <label htmlFor="activeOnly" className="ml-2 text-sm text-gray-300">
-                    Active users only
-                  </label>
-                </div>
+      {showFilters && (
+        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Search Contacts
+              </label>
+              <div className="relative">
+                <FiSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <input
+                  type="text"
+                  placeholder="Search by name, email, or phone..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full pl-10 pr-4 py-2 bg-white/10 border border-white/20 rounded-lg text-white placeholder-gray-400 focus:ring-2 focus:ring-[#FFCA40] focus:border-[#FFCA40] transition-colors"
+                />
               </div>
             </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+
+            <div>
+              <label className="block text-sm font-medium text-gray-300 mb-2">
+                Filter
+              </label>
+              <div className="flex items-center h-10">
+                <input
+                  type="checkbox"
+                  id="activeOnly"
+                  checked={activeOnly}
+                  onChange={(e) => setActiveOnly(e.target.checked)}
+                  className="h-4 w-4 text-[#FFCA40] focus:ring-[#FFCA40] bg-white/10 border-white/20 rounded"
+                />
+                <label htmlFor="activeOnly" className="ml-2 text-sm text-gray-300">
+                  Active users only
+                </label>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Users Table */}
-      <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 overflow-hidden">
+      <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-white/20">
             <thead className="bg-white/5">
@@ -314,12 +287,7 @@ export default function AdminCRMPage() {
             </thead>
             <tbody className="bg-transparent divide-y divide-white/20">
               {users.map((user) => (
-                <motion.tr
-                  key={user.id}
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  className="hover:bg-white/5 transition-colors"
-                >
+                <tr className="hover:bg-white/5 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="relative h-10 w-10 rounded-full overflow-hidden border border-white/15 bg-white/5 flex-shrink-0">
@@ -426,7 +394,7 @@ export default function AdminCRMPage() {
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm text-gray-400">
                     {formatDate(user.last_activity_date)}
                   </td>
-                </motion.tr>
+                </tr>
               ))}
               
               {users.length === 0 && !loading && (

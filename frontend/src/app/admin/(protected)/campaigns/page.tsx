@@ -321,7 +321,7 @@ export default function CampaignsPage() {
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left text-sm whitespace-nowrap">
-                <thead className="bg-white/[0.02] text-xs uppercase tracking-wider text-white/40 border-b border-white/10">
+                <thead className="bg-white/2 text-xs uppercase tracking-wider text-white/40 border-b border-white/10">
                   <tr>
                     <th className="px-6 py-4 font-medium">Campaign Name</th>
                     <th className="px-6 py-4 font-medium">Status</th>
@@ -339,18 +339,18 @@ export default function CampaignsPage() {
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         key={campaign.id}
-                        className="group transition-colors hover:bg-white/[0.04] cursor-pointer"
+                        className="group transition-colors hover:bg-white/4 cursor-pointer"
                         onClick={() => handleEditCampaign(campaign)}
                       >
                         <td className="px-6 py-4">
                           <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-500/20 to-purple-500/20 border border-white/5 group-hover:border-white/20 transition-colors">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-linear-to-br from-indigo-500/20 to-purple-500/20 border border-white/5 group-hover:border-white/20 transition-colors">
                               <RocketLaunchIcon className="h-5 w-5 text-indigo-300" />
                             </div>
                             <div>
                               <div className="font-semibold text-white group-hover:text-[#FFCA40] transition-colors">{campaign.name}</div>
                               {campaign.description && (
-                                <div className="mt-0.5 text-xs text-white/40 max-w-[240px] truncate">
+                                <div className="mt-0.5 text-xs text-white/40 max-w-60 truncate">
                                   {campaign.description}
                                 </div>
                               )}
@@ -423,7 +423,7 @@ export default function CampaignsPage() {
 
           {/* Pagination Footer */}
           {data && data.total > (filters.page_size || 20) && (
-            <div className="flex items-center justify-between border-t border-white/10 bg-white/[0.02] px-6 py-4">
+            <div className="flex items-center justify-between border-t border-white/10 bg-white/2 px-6 py-4">
               <div className="text-sm text-white/50">
                 Showing <span className="font-medium text-white">{((filters.page || 1) - 1) * (filters.page_size || 20) + 1}</span> to{' '}
                 <span className="font-medium text-white">{Math.min((filters.page || 1) * (filters.page_size || 20), data.total)}</span> of{' '}

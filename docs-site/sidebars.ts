@@ -27,8 +27,8 @@ const sidebars: SidebarsConfig = {
         'architecture/agentic-framework',
         'architecture/meta-agent-aika',
         'architecture/safety-triage-agent',
-        'architecture/therapeutic-coach',
-        'architecture/case-management',
+        'architecture/therapeutic-coach-agent',
+        'architecture/case-management-agent',
         'architecture/insights-agent',
       ],
     },
@@ -89,61 +89,6 @@ const sidebars: SidebarsConfig = {
         'deployment/infrastructure-map',
         'deployment/ci-cd-flow',
         'deployment/monitoring',
-        'deployment/setup',
-      ],
-    },
-  ],
-};
-  docsSidebar: [
-    {
-      type: 'doc',
-      id: 'intro',
-      label: '👋 Introduction',
-    },
-    {
-      type: 'category',
-      label: '🏗️ Architecture',
-      collapsed: false,
-      items: [
-        'architecture/overview',
-        'architecture/agentic-framework',
-        'architecture/tech-stack',
-      ],
-    },
-    {
-      type: 'category',
-      label: '🤖 Agents',
-      collapsed: false,
-      items: [
-        'agents/aika',
-        'agents/sta',
-        'agents/tca',
-        'agents/cma',
-        'agents/ia',
-      ],
-    },
-    {
-      type: 'category',
-      label: '🔧 Backend',
-      collapsed: true,
-      items: [
-        'backend/api-overview',
-        'backend/database',
-      ],
-    },
-    {
-      type: 'category',
-      label: '🖥️ Frontend',
-      collapsed: true,
-      items: [
-        'frontend/overview',
-      ],
-    },
-    {
-      type: 'category',
-      label: '🚀 Deployment',
-      collapsed: true,
-      items: [
         'deployment/setup',
       ],
     },

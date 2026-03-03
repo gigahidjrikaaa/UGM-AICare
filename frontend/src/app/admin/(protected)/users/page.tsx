@@ -19,6 +19,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
 import { apiCall } from '@/utils/adminApi';
 
+import ConfirmDialog from '@/components/ui/ConfirmDialog';
+
 interface User {
   id: number;
   email: string | null;
@@ -86,6 +88,7 @@ export default function UserManagementPage() {
   const [userLogs, setUserLogs] = useState<UserLog[]>([]); // State for user logs
 
   const [showCreateUser, setShowCreateUser] = useState(false);
+  const [confirmDialog, setConfirmDialog] = useState<{ open: boolean; title: string; message: string; onConfirm: () => void }>({ open: false, title: '', message: '', onConfirm: () => {} });
   const [createUserForm, setCreateUserForm] = useState({
     email: '',
     name: '',
@@ -199,22 +202,26 @@ export default function UserManagementPage() {
   };
 
   // Delete user
+  // Note: There are other window.confirm calls in this file (e.g. resetUserPassword) and other pages that should be updated to use ConfirmDialog.
   const deleteUser = async (userId: number, permanent: boolean = false) => {
-    if (!confirm(`Are you sure you want to ${permanent ? 'permanently delete' : 'deactivate'} this user?`)) {
-      return;
-    }
+    setConfirmDialog({
+      open: true,
+      title: permanent ? 'Delete User Permanently' : 'Deactivate User',
+      message: `Are you sure you want to ${permanent ? 'permanently delete' : 'deactivate'} this user? This action cannot be undone.`,
+      onConfirm: async () => {
+        try {
+          await apiCall(`/api/v1/admin/users/${userId}?permanent=${permanent}`, {
+            method: 'DELETE'
+          });
 
-    try {
-      await apiCall(`/api/v1/admin/users/${userId}?permanent=${permanent}`, {
-        method: 'DELETE'
-      });
-
-      toast.success(`User ${permanent ? 'permanently deleted' : 'deactivated'}`);
-      fetchUsers(); // Refresh data
-    } catch (error) {
-      console.error('Error deleting user:', error);
-      toast.error(error instanceof Error ? error.message : 'Failed to delete user');
-    }
+          toast.success(`User ${permanent ? 'permanently deleted' : 'deactivated'}`);
+          fetchUsers(); // Refresh data
+        } catch (error) {
+          console.error('Error deleting user:', error);
+          toast.error(error instanceof Error ? error.message : 'Failed to delete user');
+        }
+      }
+    });
   };
 
   // Reset user password
@@ -445,6 +452,17 @@ export default function UserManagementPage() {
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+        <ConfirmDialog
+          isOpen={confirmDialog.open}
+          title={confirmDialog.title}
+          message={confirmDialog.message}
+          variant="danger"
+          onConfirm={() => {
+            confirmDialog.onConfirm();
+            setConfirmDialog(prev => ({ ...prev, open: false }));
+          }}
+          onCancel={() => setConfirmDialog(prev => ({ ...prev, open: false }))}
+        />
         <div>
           <h1 className="text-3xl font-bold text-white flex items-center">
             <Users className="mr-3 text-[#FFCA40]" />

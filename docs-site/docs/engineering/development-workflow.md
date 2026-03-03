@@ -14,28 +14,28 @@ This project includes a `docker-compose.override.yml` file that automatically en
 
 1. **Start services in development mode:**
 
-   ```bash
-   docker compose up
-   ```
+ ```bash
+ docker compose up
+ ```
 
-   The override file is automatically loaded and enables:
-   - Backend hot-reload on code changes
-   - Frontend hot-reload with Next.js dev server
-   - Volume mounts for instant code updates
+ The override file is automatically loaded and enables:
+ - Backend hot-reload on code changes
+ - Frontend hot-reload with Next.js dev server
+ - Volume mounts for instant code updates
 
 2. **Rebuild only when dependencies change:**
 
-   ```bash
-   # Only needed when package.json or requirements.txt changes
-   docker compose up --build
-   ```
+ ```bash
+ # Only needed when package.json or requirements.txt changes
+ docker compose up --build
+ ```
 
 3. **View logs:**
 
-   ```bash
-   docker compose logs -f backend
-   docker compose logs -f frontend
-   ```
+ ```bash
+ docker compose logs -f backend
+ docker compose logs -f frontend
+ ```
 
 ### What's Different in Development Mode?
 

@@ -12,80 +12,80 @@ title: CI/CD Pipeline Flow with Test Failure Handling
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│                        TRIGGER: Push to main                        │
+│ TRIGGER: Push to main │
 └────────────────────────────┬────────────────────────────────────────┘
-                             │
-        ┌────────────────────┴────────────────────┐
-        │                                         │
-        ▼                                         ▼
-┌───────────────────┐                    ┌───────────────────┐
-│  validate-env     │                    │  detect-changes   │
-│  ✓ Check secrets  │                    │  ✓ Backend files  │
-│  ✓ Validate vars  │                    │  ✓ Frontend files │
-└────────┬──────────┘                    └────────┬──────────┘
-         │                                         │
-         ▼                                         ▼
-    ┌────────┐                          ┌─────────┴─────────┐
-    │ PASS?  │                          │                   │
-    └───┬────┘                          │                   │
-        │                               ▼                   ▼
-        │ YES                   ┌──────────────┐    ┌──────────────┐
-        │                       │ test-backend │    │test-frontend │
-        │                       │ continue-on- │    │ continue-on- │
-        │                       │ error: true  │    │ error: true  │
-        │                       └──────┬───────┘    └──────┬───────┘
-        │                              │                   │
-        │                              ▼                   ▼
-        │                       ┌──────────────┐    ┌──────────────┐
-        │                       │ TESTS FAIL?  │    │ TESTS FAIL?  │
-        │                       └──┬───────┬───┘    └──┬───────┬───┘
-        │                          │       │           │       │
-        │                   PASS ──┘       └── FAIL   │       └── FAIL
-        │                          │           │      │           │
-        │                          ▼           ▼      ▼           ▼
-        │                       ┌─────────────────────────────────┐
-        │                       │   Generate Test Summary         │
-        │                       │   • Show passed/failed counts   │
-        │                       │   • Display failure details     │
-        │                       │   • Upload artifacts            │
-        │                       └────────────┬────────────────────┘
-        │                                    │
-        │                    ┌───────────────┴───────────────┐
-        │                    │                               │
-        ▼                    ▼                               ▼
-┌───────────────────┐  ┌──────────────┐           ┌──────────────┐
-│  All jobs pass    │  │build-backend │           │build-frontend│
-│  or continue on   │  │ Checks test  │           │ Checks test  │
-│  failure          │  │ status, adds │           │ status, adds │
-│                   │  │ warning if   │           │ warning if   │
-│                   │  │ failed       │           │ failed       │
-└─────────┬─────────┘  └──────┬───────┘           └──────┬───────┘
-          │                   │                          │
-          │                   ▼                          ▼
-          │            ┌──────────────┐          ┌──────────────┐
-          │            │ scan-backend │          │scan-frontend │
-          │            │ Trivy scan   │          │ Trivy scan   │
-          │            └──────┬───────┘          └──────┬───────┘
-          │                   │                          │
-          └───────────────────┴──────────────────────────┘
-                              │
-                              ▼
-                      ┌───────────────┐
-                      │    deploy     │
-                      │ • Deploy app  │
-                      │ • Show test   │
-                      │   status      │
-                      │ • Warning if  │
-                      │   tests failed│
-                      └───────┬───────┘
-                              │
-                              ▼
-                      ┌───────────────┐
-                      │   Summary     │
-                      │ ✅ Deployed   │
-                      │ ⚠️  Test      │
-                      │    warnings   │
-                      └───────────────┘
+ │
+ ┌────────────────────┴────────────────────┐
+ │ │
+ ▼ ▼
+┌───────────────────┐ ┌───────────────────┐
+│ validate-env │ │ detect-changes │
+│ ✓ Check secrets │ │ ✓ Backend files │
+│ ✓ Validate vars │ │ ✓ Frontend files │
+└────────┬──────────┘ └────────┬──────────┘
+ │ │
+ ▼ ▼
+ ┌────────┐ ┌─────────┴─────────┐
+ │ PASS? │ │ │
+ └───┬────┘ │ │
+ │ ▼ ▼
+ │ YES ┌──────────────┐ ┌──────────────┐
+ │ │ test-backend │ │test-frontend │
+ │ │ continue-on- │ │ continue-on- │
+ │ │ error: true │ │ error: true │
+ │ └──────┬───────┘ └──────┬───────┘
+ │ │ │
+ │ ▼ ▼
+ │ ┌──────────────┐ ┌──────────────┐
+ │ │ TESTS FAIL? │ │ TESTS FAIL? │
+ │ └──┬───────┬───┘ └──┬───────┬───┘
+ │ │ │ │ │
+ │ PASS ──┘ └── FAIL │ └── FAIL
+ │ │ │ │ │
+ │ ▼ ▼ ▼ ▼
+ │ ┌─────────────────────────────────┐
+ │ │ Generate Test Summary │
+ │ │ • Show passed/failed counts │
+ │ │ • Display failure details │
+ │ │ • Upload artifacts │
+ │ └────────────┬────────────────────┘
+ │ │
+ │ ┌───────────────┴───────────────┐
+ │ │ │
+ ▼ ▼ ▼
+┌───────────────────┐ ┌──────────────┐ ┌──────────────┐
+│ All jobs pass │ │build-backend │ │build-frontend│
+│ or continue on │ │ Checks test │ │ Checks test │
+│ failure │ │ status, adds │ │ status, adds │
+│ │ │ warning if │ │ warning if │
+│ │ │ failed │ │ failed │
+└─────────┬─────────┘ └──────┬───────┘ └──────┬───────┘
+ │ │ │
+ │ ▼ ▼
+ │ ┌──────────────┐ ┌──────────────┐
+ │ │ scan-backend │ │scan-frontend │
+ │ │ Trivy scan │ │ Trivy scan │
+ │ └──────┬───────┘ └──────┬───────┘
+ │ │ │
+ └───────────────────┴──────────────────────────┘
+ │
+ ▼
+ ┌───────────────┐
+ │ deploy │
+ │ • Deploy app │
+ │ • Show test │
+ │ status │
+ │ • Warning if │
+ │ tests failed│
+ └───────┬───────┘
+ │
+ ▼
+ ┌───────────────┐
+ │ Summary │
+ │ [Done] Deployed │
+ │ [Warning] Test │
+ │ warnings │
+ └───────────────┘
 ```
 
 ## Detailed Stage Breakdown
@@ -156,14 +156,14 @@ npm test -- --verbose --json --outputFile=test-results.json
 
 **Outputs:**
 1. **Test Summary** (GitHub Actions UI):
-   - Pass/fail counts
-   - Failed test names
-   - Error details (first 50 lines)
-   - Warning message
+ - Pass/fail counts
+ - Failed test names
+ - Error details (first 50 lines)
+ - Warning message
 
 2. **Test Artifacts** (30-day retention):
-   - `test-results.xml` / `test-results.json`
-   - `test-output.txt`
+ - `test-results.xml` / `test-results.json`
+ - `test-output.txt`
 
 **On Failure:** Job marked as failed, but pipeline continues
 
@@ -193,15 +193,15 @@ Duration: 3-5 minutes per job
 **Build Conditions:**
 ```yaml
 if: |
-  always() && 
-  (needs.test-backend.result == 'success' || 
-   needs.test-backend.result == 'failure' || 
-   needs.test-backend.result == 'skipped')
+ always() && 
+ (needs.test-backend.result == 'success' || 
+ needs.test-backend.result == 'failure' || 
+ needs.test-backend.result == 'skipped')
 ```
 
 **On Test Failure:** Adds this to summary:
 ```
-⚠️ WARNING: Building despite test failures. 
+[Warning] WARNING: Building despite test failures. 
 Review test results before deploying.
 ```
 
@@ -247,37 +247,37 @@ needs.validate-env.result == 'success' &&
 **Deployment Steps:**
 1. SSH to production VM
 2. Pull latest code
-3. Write .env file
+3. Write.env file
 4. Run `deploy.sh` with commit SHA
 5. Optionally deploy monitoring stack
 
 **Post-Deploy:**
 1. **Generate Deployment Summary**:
-   ```markdown
-   # ��� Deployment Summary
-   
-   **Environment:** Production
-   **SHA:** abc123def456
-   **Monitoring:** true
-   
-   ## Test Status
-   - ✅ Backend Tests: PASSED
-   - ⚠️ Frontend Tests: FAILED (deployment continued)
-   
-   ## ⚠️ Warning
-   Deployment proceeded despite test failures. Please:
-   1. Review test failure details
-   2. Download test artifacts
-   3. Monitor production logs
-   4. Consider rollback if critical
-   5. Fix tests in next commit
-   ```
+ ```markdown
+ # ��� Deployment Summary
+ 
+ **Environment:** Production
+ **SHA:** abc123def456
+ **Monitoring:** true
+ 
+ ## Test Status
+ - [Done] Backend Tests: PASSED
+ - [Warning] Frontend Tests: FAILED (deployment continued)
+ 
+ ## [Warning] Warning
+ Deployment proceeded despite test failures. Please:
+ 1. Review test failure details
+ 2. Download test artifacts
+ 3. Monitor production logs
+ 4. Consider rollback if critical
+ 5. Fix tests in next commit
+ ```
 
 2. **Verify Monitoring Stack** (if enabled):
-   - Check Prometheus health
-   - Check Grafana health
-   - Check Elasticsearch health
-   - Check Langfuse health
+ - Check Prometheus health
+ - Check Grafana health
+ - Check Elasticsearch health
+ - Check Langfuse health
 
 ---
 
@@ -286,13 +286,13 @@ needs.validate-env.result == 'success' &&
 ### Scenario 1: Backend Tests Fail
 
 ```
-test-backend: ❌ FAILURE
-  ↓ (continues anyway)
-build-backend: ⚠️ BUILDS WITH WARNING
-  ↓
-scan-backend: ✅ PASS
-  ↓
-deploy: ⚠️ DEPLOYS WITH WARNING
+test-backend: [Missing] FAILURE
+ ↓ (continues anyway)
+build-backend: [Warning] BUILDS WITH WARNING
+ ↓
+scan-backend: [Done] PASS
+ ↓
+deploy: [Warning] DEPLOYS WITH WARNING
 
 Summary shows:
 - Backend Tests: FAILED (deployment continued)
@@ -302,13 +302,13 @@ Summary shows:
 ### Scenario 2: Frontend Tests Fail
 
 ```
-test-frontend: ❌ FAILURE
-  ↓ (continues anyway)
-build-frontend: ⚠️ BUILDS WITH WARNING
-  ↓
-scan-frontend: ✅ PASS
-  ↓
-deploy: ⚠️ DEPLOYS WITH WARNING
+test-frontend: [Missing] FAILURE
+ ↓ (continues anyway)
+build-frontend: [Warning] BUILDS WITH WARNING
+ ↓
+scan-frontend: [Done] PASS
+ ↓
+deploy: [Warning] DEPLOYS WITH WARNING
 
 Summary shows:
 - Frontend Tests: FAILED (deployment continued)
@@ -318,15 +318,15 @@ Summary shows:
 ### Scenario 3: Both Tests Fail
 
 ```
-test-backend: ❌ FAILURE
-test-frontend: ❌ FAILURE
-  ↓ (both continue)
-build-backend: ⚠️ BUILDS WITH WARNING
-build-frontend: ⚠️ BUILDS WITH WARNING
-  ↓
-scan-*: ✅ PASS
-  ↓
-deploy: ⚠️⚠️ DEPLOYS WITH MULTIPLE WARNINGS
+test-backend: [Missing] FAILURE
+test-frontend: [Missing] FAILURE
+ ↓ (both continue)
+build-backend: [Warning] BUILDS WITH WARNING
+build-frontend: [Warning] BUILDS WITH WARNING
+ ↓
+scan-*: [Done] PASS
+ ↓
+deploy: [Warning][Warning] DEPLOYS WITH MULTIPLE WARNINGS
 
 Summary shows:
 - Backend Tests: FAILED (deployment continued)
@@ -338,12 +338,12 @@ Summary shows:
 ### Scenario 4: Security Scan Fails
 
 ```
-test-*: ✅ PASS
-  ↓
-build-*: ✅ PASS
-  ↓
-scan-backend: ❌ CRITICAL VULNERABILITIES
-  ↓
+test-*: [Done] PASS
+ ↓
+build-*: [Done] PASS
+ ↓
+scan-backend: [Missing] CRITICAL VULNERABILITIES
+ ↓
 deploy: ��� BLOCKED
 
 Pipeline stops - no deployment
@@ -370,12 +370,12 @@ Security issues must be fixed first
 
 **Available Downloads:**
 - `backend-test-results.zip`
-  - test-results.xml (JUnit format)
-  - test-output.txt (full pytest output)
+ - test-results.xml (JUnit format)
+ - test-output.txt (full pytest output)
 
 - `frontend-test-results.zip`
-  - test-results.json (Jest format)
-  - test-output.txt (full test output)
+ - test-results.json (Jest format)
+ - test-output.txt (full test output)
 
 **Retention:** 30 days
 
@@ -407,8 +407,7 @@ Security issues must be fixed first
 
 ```bash
 ssh user@production-server
-cd /path/to/UGM-AICare
-./deploy-prod.sh rollback abc123def456
+cd /path/to/UGM-AICare./deploy-prod.sh rollback abc123def456
 ```
 
 ### Find Previous Working SHA
@@ -431,30 +430,30 @@ Edit `.github/workflows/ci.yml`:
 
 ```yaml
 - name: Run backend tests (pytest)
-  id: backend-tests
-  # Remove this line to make tests blocking:
-  # continue-on-error: true
-  run: pytest
+ id: backend-tests
+ # Remove this line to make tests blocking:
+ # continue-on-error: true
+ run: pytest
 ```
 
 ### Adjust Artifact Retention
 
 ```yaml
 - name: Upload Backend Test Results
-  uses: actions/upload-artifact@v4
-  with:
-    retention-days: 90  # Change from 30 to 90 days
+ uses: actions/upload-artifact@v4
+ with:
+ retention-days: 90 # Change from 30 to 90 days
 ```
 
 ### Add Critical Test Job
 
 ```yaml
 test-critical:
-  runs-on: ubuntu-latest
-  steps:
-    - name: Run critical tests
-      run: pytest tests/critical/ --maxfail=1
-      # No continue-on-error - must pass
+ runs-on: ubuntu-latest
+ steps:
+ - name: Run critical tests
+ run: pytest tests/critical/ --maxfail=1
+ # No continue-on-error - must pass
 ```
 
 ---
@@ -466,20 +465,20 @@ test-critical:
 Track in your team:
 
 1. **Test Pass Rate**
-   - % of runs with all tests passing
-   - Target: >95%
+ - % of runs with all tests passing
+ - Target: >95%
 
 2. **Test Execution Time**
-   - Average duration per job
-   - Watch for slowdowns
+ - Average duration per job
+ - Watch for slowdowns
 
 3. **Failure Recovery Time**
-   - Time from failure to fix
-   - Target: <24 hours
+ - Time from failure to fix
+ - Target: `&lt;24` hours
 
 4. **Artifact Download Rate**
-   - How often devs download artifacts
-   - Indicates engagement with failures
+ - How often devs download artifacts
+ - Indicates engagement with failures
 
 ### GitHub Insights
 
@@ -494,14 +493,14 @@ Track in your team:
 
 ## Best Practices Summary
 
-✅ **DO:**
+[Done] **DO:**
 - Review test summaries after every deployment
 - Download artifacts for investigation
 - Fix failing tests within 24 hours
 - Monitor production after deploying with failures
-- Keep tests fast (<3 minutes)
+- Keep tests fast (`&lt;3` minutes)
 
-❌ **DON'T:**
+[Missing] **DON'T:**
 - Ignore test failures
 - Let broken tests accumulate
 - Deploy without checking summary
@@ -511,10 +510,11 @@ Track in your team:
 ---
 
 **Related Documentation:**
-- [CI/CD Test Behavior Guide](./CI_CD_TEST_BEHAVIOR.md)
-- [Monitoring (conceptual guide)](PRODUCTION_MONITORING.md)
-- [Production monitoring strategy](./PRODUCTION_MONITORING.md)
-- [Development Workflow](./development-workflow.md)
+
+- CI/CD Test Behavior Guide (internal document)
+- [Monitoring (conceptual guide)](./monitoring)
+- [Production monitoring strategy](./monitoring)
+- [Development Workflow](../engineering/development-workflow)
 
 ---
 

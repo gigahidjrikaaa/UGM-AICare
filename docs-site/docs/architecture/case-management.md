@@ -32,16 +32,16 @@ The CMA is triggered when:
 
 ```mermaid
 stateDiagram-v2
-    [*] --> Open : CMA creates case
-    Open --> Assigned : Counsellor accepts
-    Assigned --> AppointmentScheduled : CMA books slot
-    AppointmentScheduled --> InSession : Counsellor marks session started
-    InSession --> PendingAttestation : Session ends
-    PendingAttestation --> Closed : Counsellor submits attestation
-    Closed --> [*]
-    Open --> Closed : Student cancels / resolved without session
-    Assigned --> Reassigned : Original counsellor unavailable
-    Reassigned --> AppointmentScheduled
+ [*] --> Open: CMA creates case
+ Open --> Assigned: Counsellor accepts
+ Assigned --> AppointmentScheduled: CMA books slot
+ AppointmentScheduled --> InSession: Counsellor marks session started
+ InSession --> PendingAttestation: Session ends
+ PendingAttestation --> Closed: Counsellor submits attestation
+ Closed --> [*]
+ Open --> Closed: Student cancels / resolved without session
+ Assigned --> Reassigned: Original counsellor unavailable
+ Reassigned --> AppointmentScheduled
 ```
 
 Each state transition is persisted to the database and visible to both the student (simplified view) and the counsellor (full case details).
@@ -66,9 +66,9 @@ The student is shown the top two to three counsellor options and asked to confir
 The CMA orchestrates a multi-step booking flow through Aika's tool-calling interface:
 
 ```
-1. get_available_counselors()   →  Returns ranked list of counsellors
-2. suggest_appointment_times()  →  Returns available slots for chosen counsellor
-3. book_appointment()           →  Creates appointment record in DB
+1. get_available_counselors() → Returns ranked list of counsellors
+2. suggest_appointment_times() → Returns available slots for chosen counsellor
+3. book_appointment() → Creates appointment record in DB
 4. (Optional) Sends confirmation notification via SSE to frontend
 ```
 
@@ -105,18 +105,18 @@ This creates an immutable audit trail. Institutions can verify that a session oc
 
 ```mermaid
 sequenceDiagram
-    participant CNS as Counsellor
-    participant API as Backend API
-    participant DB as PostgreSQL
-    participant SC as CARE Token Contract
+ participant CNS as Counsellor
+ participant API as Backend API
+ participant DB as PostgreSQL
+ participant SC as CARE Token Contract
 
-    CNS->>API: Submit session attestation
-    API->>DB: Save attestation record
-    API->>API: Hash attestation content
-    API->>SC: attest(caseId, hash, timestamp)
-    SC-->>API: Transaction hash
-    API->>DB: Store tx_hash in CaseAttestation
-    API-->>CNS: Attestation confirmed
+ CNS->>API: Submit session attestation
+ API->>DB: Save attestation record
+ API->>API: Hash attestation content
+ API->>SC: attest(caseId, hash, timestamp)
+ SC-->>API: Transaction hash
+ API->>DB: Store tx_hash in CaseAttestation
+ API-->>CNS: Attestation confirmed
 ```
 
 ---

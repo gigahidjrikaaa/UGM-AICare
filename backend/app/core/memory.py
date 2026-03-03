@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 # Global client instance (or use a dependency injection pattern)
 redis_pool = None
 mock_redis_instance = None
+redis_retry_not_before = 0.0
 
 
 def _parse_bool_env(var_name: str) -> Optional[bool]:
@@ -127,7 +128,7 @@ async def get_redis_client() -> Any:
     Initializes the pool if it doesn't exist.
     Returns a MockRedis instance if REDIS_HOST is not set.
     """
-    global redis_pool, mock_redis_instance
+    global redis_pool, mock_redis_instance, redis_retry_not_before
 
     redis_url = os.getenv("REDIS_URL")
     redis_host_env = os.getenv("REDIS_HOST")
@@ -136,6 +137,10 @@ async def get_redis_client() -> Any:
     redis_username_env = os.getenv("REDIS_USERNAME")
     redis_password_env = os.getenv("REDIS_PASSWORD")
     redis_ssl_env = _parse_bool_env("REDIS_SSL")
+    redis_fail_open = _parse_bool_env("REDIS_FAIL_OPEN")
+    if redis_fail_open is None:
+        redis_fail_open = True
+    retry_cooldown_s = int(os.getenv("REDIS_RETRY_COOLDOWN_SECONDS", "60"))
 
     # Convenience: allow REDIS_HOST to be a full URL.
     if not redis_url and redis_host_env and "://" in redis_host_env:
@@ -143,6 +148,12 @@ async def get_redis_client() -> Any:
 
     # Check if Redis is configured
     if not redis_url and not redis_host_env:
+        if mock_redis_instance is None:
+            mock_redis_instance = MockRedis()
+        return mock_redis_instance
+
+    now_ts = time.time()
+    if redis_fail_open and now_ts < redis_retry_not_before:
         if mock_redis_instance is None:
             mock_redis_instance = MockRedis()
         return mock_redis_instance
@@ -177,6 +188,16 @@ async def get_redis_client() -> Any:
                 logger.info("Initializing Redis connection pool with explicit host/port config")
                 redis_pool = redis.ConnectionPool(**connection_args)
         except Exception as e:
+            redis_retry_not_before = time.time() + retry_cooldown_s
+            if redis_fail_open:
+                logger.warning(
+                    "Redis pool init failed, using MockRedis for %ss: %s",
+                    retry_cooldown_s,
+                    e,
+                )
+                if mock_redis_instance is None:
+                    mock_redis_instance = MockRedis()
+                return mock_redis_instance
             logger.error(f"Failed to initialize Redis connection pool: {e}", exc_info=True)
             raise ConnectionError("Could not connect to Redis") from e
 
@@ -186,6 +207,18 @@ async def get_redis_client() -> Any:
         await client.ping() # Verify connection
         return client
     except Exception as e:
+        redis_retry_not_before = time.time() + retry_cooldown_s
+        # Force pool re-init on next attempt after cooldown.
+        redis_pool = None
+        if redis_fail_open:
+            logger.warning(
+                "Redis ping failed, switching to MockRedis for %ss: %s",
+                retry_cooldown_s,
+                e,
+            )
+            if mock_redis_instance is None:
+                mock_redis_instance = MockRedis()
+            return mock_redis_instance
         logger.error(f"Failed to get Redis client or ping failed: {e}", exc_info=True)
         raise ConnectionError("Could not connect to Redis client or ping failed") from e
 

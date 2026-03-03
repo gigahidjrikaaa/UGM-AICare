@@ -22,6 +22,8 @@ import {
 } from 'react-icons/fi';
 import SidebarLink from '../admin/SidebarLink';
 
+import MobileNavDrawer from '../MobileNavDrawer';
+
 const navGroups = [
   {
     label: 'Clinical Workflow',
@@ -30,8 +32,7 @@ const navGroups = [
       { name: 'My Cases', icon: <FiClipboard size={18}/>, href: '/counselor/cases' },
       { name: 'Appointments', icon: <FiCalendar size={18}/>, href: '/counselor/appointments' },
       { name: 'Escalations', icon: <FiAlertTriangle size={18}/>, href: '/counselor/escalations' },
-      { name: 'My Patients', icon: <FiUsers size={18}/>, href: '/counselor/patients' },
-      { name: 'CRM Contacts', icon: <FiPhone size={18}/>, href: '/counselor/crm' },
+      { name: 'Patients & Contacts', icon: <FiUsers size={18}/>, href: '/counselor/patients' },
     ]
   },
   {
@@ -51,9 +52,15 @@ const secondaryNavItems = [
   { name: 'Settings', icon: <FiSettings size={18}/>, href: '/counselor/settings' },
 ];
 
-export default function CounselorSidebar() {
-  return (
-    <aside className="w-64 bg-[#000c24] h-screen sticky top-0 shrink-0 overflow-y-auto hidden md:flex flex-col border-r border-white/10">
+export default function CounselorSidebar({
+  isMobileOpen = false,
+  onMobileClose = () => {},
+}: {
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
+}) {
+  const sidebarContent = (
+    <>
       {/* Logo/Header */}
       <div className="p-4 border-b border-white/10 h-16 flex items-center shrink-0">
         <Link href="/counselor/dashboard" className="flex items-center group">
@@ -117,6 +124,17 @@ export default function CounselorSidebar() {
           <span className="truncate">Sign Out</span>
         </button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      <aside className="w-64 bg-[#000c24] h-screen sticky top-0 shrink-0 overflow-y-auto hidden md:flex flex-col border-r border-white/10">
+        {sidebarContent}
+      </aside>
+      <MobileNavDrawer isOpen={isMobileOpen} onClose={onMobileClose}>
+        {sidebarContent}
+      </MobileNavDrawer>
+    </>
   );
 }

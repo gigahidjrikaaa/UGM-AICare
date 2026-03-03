@@ -96,15 +96,15 @@ export default function LangGraphHealthWidget() {
         const graphs: GraphHealth[] = graphTypes.map(graphType => {
           // Check if we have specific metrics for this graph
           const nodeMetrics = analytics.most_active_nodes?.find(
-            (n: { node_id: string }) => n.node_id.toLowerCase().includes(graphType)
+            (n) => n.node_name.toLowerCase().includes(graphType)
           );
           
           return {
             graph_type: graphType,
             status: nodeMetrics 
-              ? (nodeMetrics.success_rate >= 95 ? 'healthy' : nodeMetrics.success_rate >= 70 ? 'degraded' : 'down')
+              ? (nodeMetrics.success_rate_percent >= 95 ? 'healthy' : nodeMetrics.success_rate_percent >= 70 ? 'degraded' : 'down')
               : (analytics.total_executions > 0 ? overallStatus : 'unknown'),
-            success_rate: nodeMetrics?.success_rate || successRate,
+            success_rate: nodeMetrics?.success_rate_percent || successRate,
             total_executions: nodeMetrics?.execution_count || 0,
           };
         });

@@ -23,6 +23,7 @@ import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { Activity, Eye, EyeOff, X } from 'lucide-react';
 import { useAikaChat, type ToolActivityLog } from '@/hooks/useAikaChat';
+import { useProfilePicture } from '@/hooks/useProfilePicture';
 import { ChatWindow } from '@/components/features/chat/ChatWindow';
 import { ChatInput } from '@/components/features/chat/ChatInput';
 import { AIKA_MEMORY_NOTE } from '@/constants/chat';
@@ -55,6 +56,7 @@ const LoadingIndicator = () => (
 export default function AikaEnhancedPage() {
   const [mounted, setMounted] = useState(false);
   const { data: session, status } = useSession();
+  const { src: profilePictureSrc } = useProfilePicture();
   const router = useRouter();
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
@@ -499,6 +501,7 @@ export default function AikaEnhancedPage() {
                 onCardSelect={handleSendMessage}
                 onRegenerate={handleSendMessage}
                 userDisplayName={session?.user?.name ?? session?.user?.email ?? 'You'}
+                userImageUrl={profilePictureSrc}
               />
 
               {/* Chat Input - using original component */}

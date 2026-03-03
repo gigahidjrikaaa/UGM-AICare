@@ -64,13 +64,13 @@ The IA node is reached when Aika's intent classifier routes a message to `analyt
 
 ```mermaid
 flowchart LR
-    A[Analytics intent\ndetected by Aika] --> B[IA Node\nparse query intent]
-    B --> C[Build parameterised\nSQL query]
-    C --> D[Execute against\nread replica DB]
-    D --> E[k-anonymity\nenforcement]
-    E --> F[Differential privacy\nnoise injection]
-    F --> G[Format result\ntext + JSON]
-    G --> H[Synthesis node\nAika delivers answer]
+ A[Analytics intent\ndetected by Aika] --> B[IA Node\nparse query intent]
+ B --> C[Build parameterised\nSQL query]
+ C --> D[Execute against\nread replica DB]
+ D --> E[k-anonymity\nenforcement]
+ E --> F[Differential privacy\nnoise injection]
+ F --> G[Format result\ntext + JSON]
+ G --> H[Synthesis node\nAika delivers answer]
 ```
 
 ---

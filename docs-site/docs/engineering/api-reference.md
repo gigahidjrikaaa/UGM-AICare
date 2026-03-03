@@ -10,21 +10,21 @@ The backend is a **FastAPI** application organised around the Domain-Driven Desi
 
 ```
 backend/app/
-├── agents/          # All AI agent graphs and logic
-│   ├── aika/        # Aika identity, tools, activity logger
-│   ├── sta/         # Safety Triage Agent graph
-│   ├── tca/         # Therapeutic Coach Agent graph
-│   ├── cma/         # Case Management Agent graph
-│   ├── ia/          # Insights Agent graph
-│   └── shared/      # Tool registry, shared utilities
+├── agents/ # All AI agent graphs and logic
+│ ├── aika/ # Aika identity, tools, activity logger
+│ ├── sta/ # Safety Triage Agent graph
+│ ├── tca/ # Therapeutic Coach Agent graph
+│ ├── cma/ # Case Management Agent graph
+│ ├── ia/ # Insights Agent graph
+│ └── shared/ # Tool registry, shared utilities
 ├── domains/
-│   ├── mental_health/   # Appointments, cases, conversations
-│   ├── finance/         # CARE token, blockchain
-│   └── blockchain/      # Contract interaction layer
-├── auth_utils.py        # JWT verification, role extraction
-├── dependencies.py      # FastAPI dependency injection
-├── main.py              # Application entrypoint, router registration
-└── middleware/          # Rate limiting, CORS, logging
+│ ├── mental_health/ # Appointments, cases, conversations
+│ ├── finance/ # CARE token, blockchain
+│ └── blockchain/ # Contract interaction layer
+├── auth_utils.py # JWT verification, role extraction
+├── dependencies.py # FastAPI dependency injection
+├── main.py # Application entrypoint, router registration
+└── middleware/ # Rate limiting, CORS, logging
 ```
 
 ---
@@ -37,10 +37,10 @@ Roles are encoded in the JWT payload:
 
 ```json
 {
-  "sub": "1203",
-  "role": "user",
-  "email": "student@mail.ugm.ac.id",
-  "exp": 1740700000
+ "sub": "1203",
+ "role": "user",
+ "email": "student@mail.ugm.ac.id",
+ "exp": 1740700000
 }
 ```
 
@@ -113,11 +113,11 @@ All errors follow a consistent JSON structure:
 
 ```json
 {
-  "detail": {
-    "code": "RATE_LIMIT_EXCEEDED",
-    "message": "You have exceeded the request limit. Try again in 45 seconds.",
-    "retry_after": 45
-  }
+ "detail": {
+ "code": "RATE_LIMIT_EXCEEDED",
+ "message": "You have exceeded the request limit. Try again in 45 seconds.",
+ "retry_after": 45
+ }
 }
 ```
 

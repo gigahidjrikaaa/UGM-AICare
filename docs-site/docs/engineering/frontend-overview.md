@@ -17,21 +17,21 @@ The frontend is a **Next.js 16** application written in TypeScript. It serves tw
 
 ```
 frontend/src/
-├── app/                   # Next.js App Router
-│   ├── (auth)/            # Login, registration pages
-│   ├── (chat)/            # The student chat interface
-│   ├── (dashboard)/       # Counsellor & admin dashboard
-│   └── api/               # Next.js API routes (auth callbacks)
+├── app/ # Next.js App Router
+│ ├── (auth)/ # Login, registration pages
+│ ├── (chat)/ # The student chat interface
+│ ├── (dashboard)/ # Counsellor & admin dashboard
+│ └── api/ # Next.js API routes (auth callbacks)
 ├── components/
-│   ├── chat/              # Chat bubbles, input bar, typing indicator
-│   ├── dashboard/         # Charts, case cards, risk tables
-│   ├── ui/                # Reusable primitives (buttons, inputs, modals)
-│   └── layout/            # Navbar, sidebar, page wrappers
-├── hooks/                 # Custom React hooks (useSSE, useConversation, …)
+│ ├── chat/ # Chat bubbles, input bar, typing indicator
+│ ├── dashboard/ # Charts, case cards, risk tables
+│ ├── ui/ # Reusable primitives (buttons, inputs, modals)
+│ └── layout/ # Navbar, sidebar, page wrappers
+├── hooks/ # Custom React hooks (useSSE, useConversation, …)
 ├── lib/
-│   ├── api.ts             # Typed API client (wraps fetch with auth headers)
-│   └── auth.ts            # NextAuth configuration
-└── messages/              # i18n string files (en, id)
+│ ├── api.ts # Typed API client (wraps fetch with auth headers)
+│ └── auth.ts # NextAuth configuration
+└── messages/ # i18n string files (en, id)
 ```
 
 ---

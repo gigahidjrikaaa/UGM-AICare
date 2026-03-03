@@ -23,11 +23,11 @@ This document summarizes the implementation of six privacy-preserving analytics 
 
 **All Queries Feature**:
 
-- ✅ K-anonymity enforcement (`HAVING COUNT(*) >= 5`)
-- ✅ Date range parameters (`:start_date`, `:end_date`)
-- ✅ Aggregate-only data (no individual user identification)
-- ✅ Privacy-preserving calculations (no PII exposure)
-- ✅ Complex aggregations (JOINs, subqueries, CASE expressions)
+- [Done] K-anonymity enforcement (`HAVING COUNT(*) >= 5`)
+- [Done] Date range parameters (`:start_date`, `:end_date`)
+- [Done] Aggregate-only data (no individual user identification)
+- [Done] Privacy-preserving calculations (no PII exposure)
+- [Done] Complex aggregations (JOINs, subqueries, CASE expressions)
 
 #### 2. `backend/app/agents/ia/service.py` (Major Refactor - 275 lines)
 
@@ -50,12 +50,12 @@ This document summarizes the implementation of six privacy-preserving analytics 
 
 ```sql
 SELECT DATE(created_at) as date, COUNT(*) as crisis_count, severity,
-       COUNT(DISTINCT user_hash) as unique_users_affected
+ COUNT(DISTINCT user_hash) as unique_users_affected
 FROM cases
-WHERE created_at >= :start_date AND created_at < :end_date
-  AND severity IN ('high', 'critical')
+WHERE created_at >=:start_date AND created_at <:end_date
+ AND severity IN ('high', 'critical')
 GROUP BY DATE(created_at), severity
-HAVING COUNT(*) >= 5  -- k-anonymity
+HAVING COUNT(*) >= 5 -- k-anonymity
 ORDER BY date DESC
 ```
 
@@ -75,17 +75,17 @@ ORDER BY date DESC
 
 ```sql
 SELECT DATE(c.created_at) as date,
-       COUNT(DISTINCT c.id) as total_sessions,
-       COUNT(DISTINCT CASE WHEN (msg_count <= 2) THEN c.id END) as early_dropoffs,
-       ROUND((early_dropoffs / total_sessions) * 100, 2) as dropoff_percentage,
-       AVG(msg_count) as avg_messages_per_conversation
+ COUNT(DISTINCT c.id) as total_sessions,
+ COUNT(DISTINCT CASE WHEN (msg_count <= 2) THEN c.id END) as early_dropoffs,
+ ROUND((early_dropoffs / total_sessions) * 100, 2) as dropoff_percentage,
+ AVG(msg_count) as avg_messages_per_conversation
 FROM conversations c
 LEFT JOIN (
-  SELECT conversation_id, COUNT(*) as msg_count
-  FROM messages
-  GROUP BY conversation_id
+ SELECT conversation_id, COUNT(*) as msg_count
+ FROM messages
+ GROUP BY conversation_id
 ) m ON m.conversation_id = c.id
-WHERE c.created_at >= :start_date
+WHERE c.created_at >=:start_date
 GROUP BY DATE(c.created_at)
 HAVING COUNT(DISTINCT c.id) >= 5
 ```
@@ -108,17 +108,17 @@ HAVING COUNT(DISTINCT c.id) >= 5
 
 ```sql
 SELECT DATE(ipr.created_at) as date,
-       COUNT(DISTINCT ipr.id) as total_plans_created,
-       COUNT(DISTINCT ipr.user_id) as unique_users,
-       COUNT(DISTINCT CASE 
-         WHEN ipr.last_viewed_at IS NOT NULL 
-           AND ipr.last_viewed_at > ipr.created_at 
-         THEN ipr.id 
-       END) as plans_revisited,
-       ROUND((plans_revisited / total_plans) * 100, 2) as revisit_rate,
-       AVG(ipr.completed_steps::NUMERIC / NULLIF(ipr.total_steps, 0) * 100) as avg_completion_percentage
+ COUNT(DISTINCT ipr.id) as total_plans_created,
+ COUNT(DISTINCT ipr.user_id) as unique_users,
+ COUNT(DISTINCT CASE 
+ WHEN ipr.last_viewed_at IS NOT NULL 
+ AND ipr.last_viewed_at > ipr.created_at 
+ THEN ipr.id 
+ END) as plans_revisited,
+ ROUND((plans_revisited / total_plans) * 100, 2) as revisit_rate,
+ AVG(ipr.completed_steps::NUMERIC / NULLIF(ipr.total_steps, 0) * 100) as avg_completion_percentage
 FROM intervention_plan_records ipr
-WHERE ipr.created_at >= :start_date AND ipr.status = 'active'
+WHERE ipr.created_at >=:start_date AND ipr.status = 'active'
 GROUP BY DATE(ipr.created_at)
 HAVING COUNT(DISTINCT ipr.id) >= 5
 ```
@@ -141,18 +141,18 @@ HAVING COUNT(DISTINCT ipr.id) >= 5
 
 ```sql
 SELECT DATE(c.created_at) as date,
-       COUNT(DISTINCT c.id) as total_conversations,
-       COUNT(DISTINCT CASE 
-         WHEN EXISTS (SELECT 1 FROM cases cs WHERE cs.conversation_id = c.id) 
-         THEN c.id 
-       END) as escalated_to_human,
-       COUNT(DISTINCT CASE 
-         WHEN NOT EXISTS (SELECT 1 FROM cases cs WHERE cs.conversation_id = c.id) 
-         THEN c.id 
-       END) as handled_by_ai,
-       ROUND((handled_by_ai / total_conversations) * 100, 2) as ai_resolution_rate
+ COUNT(DISTINCT c.id) as total_conversations,
+ COUNT(DISTINCT CASE 
+ WHEN EXISTS (SELECT 1 FROM cases cs WHERE cs.conversation_id = c.id) 
+ THEN c.id 
+ END) as escalated_to_human,
+ COUNT(DISTINCT CASE 
+ WHEN NOT EXISTS (SELECT 1 FROM cases cs WHERE cs.conversation_id = c.id) 
+ THEN c.id 
+ END) as handled_by_ai,
+ ROUND((handled_by_ai / total_conversations) * 100, 2) as ai_resolution_rate
 FROM conversations c
-WHERE c.created_at >= :start_date
+WHERE c.created_at >=:start_date
 GROUP BY DATE(c.created_at)
 HAVING COUNT(DISTINCT c.id) >= 5
 ```
@@ -175,20 +175,20 @@ HAVING COUNT(DISTINCT c.id) >= 5
 
 ```sql
 SELECT DATE(ta.created_at) as date,
-       COUNT(DISTINCT ta.id) as total_assessments,
-       AVG(ta.processing_time_ms) as avg_processing_time_ms,
-       COUNT(DISTINCT CASE 
-         WHEN ta.severity_level IN ('low', 'moderate')
-           AND EXISTS (
-             SELECT 1 FROM intervention_plan_records ipr
-             WHERE ipr.user_id = ta.user_id
-               AND ipr.created_at BETWEEN ta.created_at AND ta.created_at + INTERVAL '1 hour'
-           )
-         THEN ta.id
-       END) as successful_interventions,
-       ROUND((successful_interventions / total_assessments) * 100, 2) as success_rate_percentage
+ COUNT(DISTINCT ta.id) as total_assessments,
+ AVG(ta.processing_time_ms) as avg_processing_time_ms,
+ COUNT(DISTINCT CASE 
+ WHEN ta.severity_level IN ('low', 'moderate')
+ AND EXISTS (
+ SELECT 1 FROM intervention_plan_records ipr
+ WHERE ipr.user_id = ta.user_id
+ AND ipr.created_at BETWEEN ta.created_at AND ta.created_at + INTERVAL '1 hour'
+ )
+ THEN ta.id
+ END) as successful_interventions,
+ ROUND((successful_interventions / total_assessments) * 100, 2) as success_rate_percentage
 FROM triage_assessments ta
-WHERE ta.created_at >= :start_date
+WHERE ta.created_at >=:start_date
 GROUP BY DATE(ta.created_at)
 HAVING COUNT(DISTINCT ta.id) >= 5
 ```
@@ -211,20 +211,20 @@ HAVING COUNT(DISTINCT ta.id) >= 5
 
 ```sql
 SELECT EXTRACT(HOUR FROM c.created_at) as hour_of_day,
-       EXTRACT(DOW FROM c.created_at) as day_of_week,  -- 0=Sunday, 6=Saturday
-       COUNT(DISTINCT c.id) as conversation_count,
-       COUNT(DISTINCT c.user_id) as unique_users,
-       AVG((SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id)) as avg_messages_per_conversation,
-       COUNT(DISTINCT CASE 
-         WHEN EXISTS (
-           SELECT 1 FROM triage_assessments ta 
-           WHERE ta.conversation_id = c.id 
-             AND ta.severity_level IN ('high', 'critical')
-         )
-         THEN c.id
-       END) as high_risk_conversations
+ EXTRACT(DOW FROM c.created_at) as day_of_week, -- 0=Sunday, 6=Saturday
+ COUNT(DISTINCT c.id) as conversation_count,
+ COUNT(DISTINCT c.user_id) as unique_users,
+ AVG((SELECT COUNT(*) FROM messages m WHERE m.conversation_id = c.id)) as avg_messages_per_conversation,
+ COUNT(DISTINCT CASE 
+ WHEN EXISTS (
+ SELECT 1 FROM triage_assessments ta 
+ WHERE ta.conversation_id = c.id 
+ AND ta.severity_level IN ('high', 'critical')
+ )
+ THEN c.id
+ END) as high_risk_conversations
 FROM conversations c
-WHERE c.created_at >= :start_date
+WHERE c.created_at >=:start_date
 GROUP BY EXTRACT(HOUR FROM c.created_at), EXTRACT(DOW FROM c.created_at)
 HAVING COUNT(DISTINCT c.id) >= 5
 ORDER BY day_of_week, hour_of_day
@@ -273,8 +273,8 @@ All queries include `HAVING COUNT(*) >= 5` to ensure minimum group size of 5, pr
 ```python
 # User request → IAQueryRequest
 request = IAQueryRequest(
-    question_id="crisis_trend",
-    params=QueryParams(start=start_date, end=end_date)
+ question_id="crisis_trend",
+ params=QueryParams(start=start_date, end=end_date)
 )
 
 # Service executes raw SQL
@@ -283,24 +283,24 @@ result = await session.execute(text(sql_query), {"start_date": start, "end_date"
 rows = result.fetchall()
 
 # Format results
-response = formatter(rows, start, end)  # → IAQueryResponse
+response = formatter(rows, start, end) # → IAQueryResponse
 ```
 
 ### 2. LangGraph IA Workflow Integration
 
 ```
 User Query
-  ↓
+ ↓
 ingest_query_node (validate structure, date ranges)
-  ↓
+ ↓
 validate_consent_node (check allow-listed queries)
-  ↓
+ ↓
 apply_k_anonymity_node (set k_threshold=5)
-  ↓
+ ↓
 execute_analytics_node (call InsightsAgentService.query())
-  ↓
+ ↓
 state["analytics_result"] = IAQueryResponse
-  ↓
+ ↓
 END
 ```
 
@@ -311,11 +311,11 @@ POST /api/v1/agents/ia/query
 Content-Type: application/json
 
 {
-  "question_id": "crisis_trend",
-  "params": {
-    "start": "2025-01-01T00:00:00Z",
-    "end": "2025-02-01T00:00:00Z"
-  }
+ "question_id": "crisis_trend",
+ "params": {
+ "start": "2025-01-01T00:00:00Z",
+ "end": "2025-02-01T00:00:00Z"
+ }
 }
 ```
 
@@ -323,22 +323,22 @@ Content-Type: application/json
 
 ## Testing & Validation
 
-### Syntax Validation (✅ PASSED)
+### Syntax Validation ([Done] PASSED)
 
 ```bash
 $ python backend/test_ia_queries_syntax.py
 
-✅ VALID: crisis_trend (486 chars)
-✅ VALID: dropoffs (1212 chars)
-✅ VALID: resource_reuse (1133 chars)
-✅ VALID: fallback_reduction (1306 chars)
-✅ VALID: cost_per_helpful (1504 chars)
-✅ VALID: coverage_windows (1112 chars)
+[Done] VALID: crisis_trend (486 chars)
+[Done] VALID: dropoffs (1212 chars)
+[Done] VALID: resource_reuse (1133 chars)
+[Done] VALID: fallback_reduction (1306 chars)
+[Done] VALID: cost_per_helpful (1504 chars)
+[Done] VALID: coverage_windows (1112 chars)
 
-✅ ALL QUERIES VALIDATED SUCCESSFULLY
+[Done] ALL QUERIES VALIDATED SUCCESSFULLY
 ```
 
-### Type Checking (✅ PASSED)
+### Type Checking ([Done] PASSED)
 
 - All formatter functions use `Sequence[Row[Any]]` type annotations
 - No type errors reported by Pylance/mypy
@@ -349,7 +349,7 @@ Requires testing with sample data in PostgreSQL database:
 
 1. Create sample conversations, cases, assessments, intervention plans
 2. Execute queries via InsightsAgentService
-3. Verify k-anonymity enforcement (test with <5 rows)
+3. Verify k-anonymity enforcement (test with `&lt;5` rows)
 4. Check result format matches IAQueryResponse schema
 
 ---
@@ -368,25 +368,25 @@ end_date = datetime.now()
 start_date = end_date - timedelta(days=30)
 
 request = IAQueryRequest(
-    question_id="crisis_trend",
-    params=QueryParams(start=start_date, end=end_date)
+ question_id="crisis_trend",
+ params=QueryParams(start=start_date, end=end_date)
 )
 
 async with AsyncSession(...) as session:
-    service = InsightsAgentService(session)
-    response = await service.query(request)
-    
-    # response.chart: Line chart data for Grafana
-    # response.table: Raw data for CSV export
-    # response.notes: Context for interpretation
+ service = InsightsAgentService(session)
+ response = await service.query(request)
+ 
+ # response.chart: Line chart data for Grafana
+ # response.table: Raw data for CSV export
+ # response.notes: Context for interpretation
 ```
 
 ### Example 2: AI Resolution Rate
 
 ```python
 request = IAQueryRequest(
-    question_id="fallback_reduction",
-    params=QueryParams(start=start_date, end=end_date)
+ question_id="fallback_reduction",
+ params=QueryParams(start=start_date, end=end_date)
 )
 
 response = await service.query(request)
@@ -398,8 +398,8 @@ response = await service.query(request)
 
 ```python
 request = IAQueryRequest(
-    question_id="coverage_windows",
-    params=QueryParams(start=start_date, end=end_date)
+ question_id="coverage_windows",
+ params=QueryParams(start=start_date, end=end_date)
 )
 
 response = await service.query(request)
@@ -439,7 +439,7 @@ response = await service.query(request)
 
 ### Immediate (Phase 1)
 
-- ✅ **Task 1: IA Analytics Queries** - COMPLETED
+- [Done] **Task 1: IA Analytics Queries** - COMPLETED
 - ⏳ **Task 2: SDA Auto-Assignment** - Implement counselor workload balancing
 - ⏳ **Task 3: Redis Caching** - Implement Gemini response caching
 
@@ -447,7 +447,7 @@ response = await service.query(request)
 
 - [ ] Create sample data fixtures (conversations, cases, assessments, plans)
 - [ ] Test queries with sample data in backend container
-- [ ] Verify k-anonymity enforcement (test with <5 rows, should return empty)
+- [ ] Verify k-anonymity enforcement (test with `&lt;5` rows, should return empty)
 - [ ] Test date range validation (max 365 days)
 
 ### Frontend Integration
@@ -461,7 +461,7 @@ response = await service.query(request)
 
 - [ ] Instrument IA query execution time
 - [ ] Track query success/failure rates
-- [ ] Monitor k-anonymity filter hits (queries returning empty due to <5 rows)
+- [ ] Monitor k-anonymity filter hits (queries returning empty due to `&lt;5` rows)
 
 ---
 
@@ -491,11 +491,11 @@ response = await service.query(request)
 
 **Phase 1, Task 1 (IA Analytics Queries) is now COMPLETE**. All 6 privacy-preserving analytics queries are implemented with k-anonymity enforcement, ready for integration testing and frontend dashboard development. The implementation follows best practices for SQL security (parameterized queries), privacy (k-anonymity, aggregate-only), and maintainability (clear formatting, comprehensive documentation).
 
-**Status**: ✅ **PRODUCTION-READY** (pending database integration testing)
+**Status**: [Done] **PRODUCTION-READY** (pending database integration testing)
 
 ---
 
-**Document Version**: 1.0  
-**Date**: 2025-01-27  
-**Author**: AI Agent (GitHub Copilot)  
+**Document Version**: 1.0 
+**Date**: 2025-01-27 
+**Author**: AI Agent (GitHub Copilot) 
 **Review Status**: Awaiting user confirmation

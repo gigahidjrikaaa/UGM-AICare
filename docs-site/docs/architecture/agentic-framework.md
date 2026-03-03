@@ -34,34 +34,34 @@ The system uses **LangGraph**, a library built on top of LangChain, to define th
 
 ```mermaid
 flowchart TD
-    START([User Message])
-    AIKA[🤖 Aika Decision Node\nIntent classification + risk pre-check]
-    CRISIS{Risk Level?}
-    PAR[Parallel Fan-out\nTCA + CMA simultaneously]
-    TCA_N[🧠 TCA Node\nTherapeutic coaching plan]
-    CMA_N[📋 CMA Node\nCase & counsellor assignment]
-    IA_N[📊 IA Node\nAnalytics query]
-    SYNTH[Synthesis Node\nMerge sub-agent outputs]
-    DIRECT[Direct Response\nEmpathetic reply]
-    END_N([Response to Student])
+ START([User Message])
+ AIKA[AIKA Aika Decision Node\nIntent classification + risk pre-check]
+ CRISIS{Risk Level?}
+ PAR[Parallel Fan-out\nTCA + CMA simultaneously]
+ TCA_N[TCA TCA Node\nTherapeutic coaching plan]
+ CMA_N[📋 CMA Node\nCase & counsellor assignment]
+ IA_N[IA IA Node\nAnalytics query]
+ SYNTH[Synthesis Node\nMerge sub-agent outputs]
+ DIRECT[Direct Response\nEmpathetic reply]
+ END_N([Response to Student])
 
-    STA_BG([🛡️ STA - Background Task\nPost-conversation clinical analysis])
+ STA_BG([🛡️ STA - Background Task\nPost-conversation clinical analysis])
 
-    START --> AIKA
-    AIKA --> CRISIS
-    CRISIS -- "HIGH / CRITICAL" --> PAR
-    PAR --> TCA_N
-    PAR --> CMA_N
-    TCA_N --> SYNTH
-    CMA_N --> SYNTH
-    CRISIS -- "MODERATE" --> TCA_N
-    TCA_N --> SYNTH
-    CRISIS -- "ANALYTICS\n(admin/counsellor)" --> IA_N
-    IA_N --> SYNTH
-    CRISIS -- "LOW / CASUAL" --> DIRECT
-    SYNTH --> END_N
-    DIRECT --> END_N
-    END_N -.->|async, non-blocking| STA_BG
+ START --> AIKA
+ AIKA --> CRISIS
+ CRISIS -- "HIGH / CRITICAL" --> PAR
+ PAR --> TCA_N
+ PAR --> CMA_N
+ TCA_N --> SYNTH
+ CMA_N --> SYNTH
+ CRISIS -- "MODERATE" --> TCA_N
+ TCA_N --> SYNTH
+ CRISIS -- "ANALYTICS\n(admin/counsellor)" --> IA_N
+ IA_N --> SYNTH
+ CRISIS -- "LOW / CASUAL" --> DIRECT
+ SYNTH --> END_N
+ DIRECT --> END_N
+ END_N -.->|async, non-blocking| STA_BG
 ```
 
 ### Reading the Graph
@@ -102,28 +102,28 @@ All agents communicate through a shared `AikaOrchestratorState` object (which ex
 ```python
 # Simplified view of what the state carries
 class SafetyAgentState(TypedDict):
-    # Input context
-    user_id: int
-    message: str
-    conversation_id: int
+ # Input context
+ user_id: int
+ message: str
+ conversation_id: int
 
-    # STA outputs
-    risk_level: int           # 0=low, 1=moderate, 2=high, 3=critical
-    risk_score: float         # 0.0 – 1.0
-    severity: str             # "low" | "moderate" | "high" | "critical"
-    intent: str               # "casual_chat" | "crisis" | "academic_stress" …
+ # STA outputs
+ risk_level: int # 0=low, 1=moderate, 2=high, 3=critical
+ risk_score: float # 0.0 – 1.0
+ severity: str # "low" | "moderate" | "high" | "critical"
+ intent: str # "casual_chat" | "crisis" | "academic_stress" …
 
-    # TCA outputs
-    intervention_plan: dict
-    coping_strategies: list[str]
+ # TCA outputs
+ intervention_plan: dict
+ coping_strategies: list[str]
 
-    # CMA outputs
-    case_id: Optional[int]
-    counsellor_id: Optional[int]
-    appointment_scheduled: bool
+ # CMA outputs
+ case_id: Optional[int]
+ counsellor_id: Optional[int]
+ appointment_scheduled: bool
 
-    # Final
-    final_response: str
+ # Final
+ final_response: str
 ```
 
 This design means any agent can be replaced, upgraded, or tested independently - as long as it reads and writes the same fields, the rest of the graph is unaffected.
@@ -138,18 +138,18 @@ Tool access is role-scoped: a student's Aika instance can call `book_appointment
 
 ```
 Student Aika Tools:
-  get_user_profile    get_journal_entries      get_activity_streak
-  create_intervention_plan                     get_available_counselors
-  suggest_appointment_times  book_appointment  cancel_appointment
-  reschedule_appointment     get_crisis_resources
+ get_user_profile get_journal_entries get_activity_streak
+ create_intervention_plan get_available_counselors
+ suggest_appointment_times book_appointment cancel_appointment
+ reschedule_appointment get_crisis_resources
 
 Counsellor Aika Tools:
-  get_case_details          get_conversation_summary
-  get_risk_assessment_history   trigger_conversation_analysis
-  get_active_safety_cases   get_escalation_protocol
+ get_case_details get_conversation_summary
+ get_risk_assessment_history trigger_conversation_analysis
+ get_active_safety_cases get_escalation_protocol
 
 Admin Aika Tools:
-  All counsellor tools  +  get_conversation_stats  +  search_conversations
+ All counsellor tools + get_conversation_stats + search_conversations
 ```
 
 ---

@@ -7,6 +7,7 @@ import { useSession, signOut } from 'next-auth/react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useGameStore } from '@/store/gameStore';
 import { useWellnessState } from '@/hooks/useQuests';
+import { useProfilePicture } from '@/hooks/useProfilePicture';
 import { Home, Sword, Users, ShoppingBag, Activity, Sparkles, Crown, Shield, Menu, X, ChevronDown } from 'lucide-react';
 import ParticleBackground from '@/components/ui/ParticleBackground';
 import ProfileDropdown from '@/components/ui/ProfileDropdown';
@@ -30,6 +31,7 @@ export default function CareQuestLayout({
   const pathname = usePathname();
   const { data: session, status } = useSession();
   const { data: wellness } = useWellnessState();
+  const { src: profilePictureSrc } = useProfilePicture();
   const { joy, care, harmony, setWellnessState } = useGameStore();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isProfileOpen, setIsProfileOpen] = useState(false);
@@ -66,7 +68,7 @@ export default function CareQuestLayout({
   const xpProgress = (xpInCurrentLevel / 100) * 100;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#001D58] via-[#00308F] to-[#002A7A] relative overflow-hidden">
+    <div className="min-h-screen bg-linear-to-br from-[#001D58] via-[#00308F] to-[#002A7A] relative overflow-hidden">
       {/* Animated Background Effects */}
       <div className="fixed inset-0 pointer-events-none overflow-hidden opacity-30">
         <ParticleBackground count={60} colors={["#FFCA40", "#B8A4FF", "#50E3C2"]} minSize={2} maxSize={8} speed={0.5} />
@@ -84,10 +86,10 @@ export default function CareQuestLayout({
           initial={{ y: -100, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 100, damping: 15 }}
-          className="sticky top-0 z-50 backdrop-blur-xl bg-gradient-to-r from-[#001D58]/95 via-[#00308F]/95 to-[#001D58]/95 border-b-2 border-[#FFCA40]/50 shadow-2xl"
+          className="sticky top-0 z-50 backdrop-blur-xl bg-linear-to-r from-[#001D58]/95 via-[#00308F]/95 to-[#001D58]/95 border-b-2 border-[#FFCA40]/50 shadow-2xl"
         >
           {/* Top decorative border */}
-          <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-[#FFCA40] to-transparent" />
+          <div className="absolute top-0 inset-x-0 h-1 bg-linear-to-r from-transparent via-[#FFCA40] to-transparent" />
           
           <div className="container mx-auto px-4 md:px-6 py-3">
             <div className="flex items-center justify-between">
@@ -109,7 +111,7 @@ export default function CareQuestLayout({
 
                 {/* Compact Logo */}
                 <Link href="/carequest" className="flex items-center gap-2 group relative">
-                  <div className="relative w-10 h-10 rounded-lg overflow-hidden shadow-lg bg-gradient-to-br from-[#FFCA40]/20 via-white/10 to-[#B8A4FF]/20 backdrop-blur-md border border-[#FFCA40]/50">
+                  <div className="relative w-10 h-10 rounded-lg overflow-hidden shadow-lg bg-linear-to-br from-[#FFCA40]/20 via-white/10 to-[#B8A4FF]/20 backdrop-blur-md border border-[#FFCA40]/50">
                     <Image
                       src="/carequest-logo.png"
                       alt="CareQuest Logo"
@@ -118,7 +120,7 @@ export default function CareQuestLayout({
                     />
                   </div>
                   <div className="hidden md:block">
-                    <h1 className="text-xl font-black text-transparent bg-clip-text bg-gradient-to-r from-[#FFCA40] via-[#FFD700] to-[#FFCA40]">
+                    <h1 className="text-xl font-black text-transparent bg-clip-text bg-linear-to-r from-[#FFCA40] via-[#FFD700] to-[#FFCA40]">
                       CareQuest
                     </h1>
                     <p className="text-[9px] text-[#FFCA40]/70 font-semibold tracking-wide leading-none">
@@ -230,8 +232,8 @@ export default function CareQuestLayout({
                     >
                       <div className="relative h-7 w-7 rounded-xl overflow-hidden border border-white/15">
                         <Image
-                          src={session.user.image || "/default-avatar.png"}
-                          alt={session.user.name || "User"} 
+                          src={profilePictureSrc}
+                          alt={session.user.name || "User"}
                           fill 
                           className="object-cover"
                         />
@@ -251,6 +253,7 @@ export default function CareQuestLayout({
                       isOpen={isProfileOpen}
                       user={session.user}
                       wellness={wellness}
+                      profilePictureSrc={profilePictureSrc}
                       onClose={() => setIsProfileOpen(false)}
                       onSignOut={handleSignOut}
                     />
@@ -317,15 +320,15 @@ export default function CareQuestLayout({
 
                   {/* Mobile Resources */}
                   <div className="flex items-center justify-center gap-2 pb-4 border-t border-white/10 pt-4">
-                    <div className="flex items-center gap-1.5 bg-gradient-to-br from-[#FF6B9D]/20 to-[#FFCA40]/20 backdrop-blur-md px-3 py-2 rounded-lg border border-[#FFCA40]/50">
+                    <div className="flex items-center gap-1.5 bg-linear-to-br from-[#FF6B9D]/20 to-[#FFCA40]/20 backdrop-blur-md px-3 py-2 rounded-lg border border-[#FFCA40]/50">
                       <Sparkles className="w-4 h-4 text-[#FFCA40]" />
                       <span className="text-sm font-bold text-white">{joy.toFixed(0)}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 bg-gradient-to-br from-[#50E3C2]/20 to-[#2DD4BF]/20 backdrop-blur-md px-3 py-2 rounded-lg border border-[#50E3C2]/50">
+                    <div className="flex items-center gap-1.5 bg-linear-to-br from-[#50E3C2]/20 to-[#2DD4BF]/20 backdrop-blur-md px-3 py-2 rounded-lg border border-[#50E3C2]/50">
                       <span className="text-base">💎</span>
                       <span className="text-sm font-bold text-white">{care.toFixed(0)}</span>
                     </div>
-                    <div className="flex items-center gap-1.5 bg-gradient-to-br from-[#B8A4FF]/20 to-[#9F7AEA]/20 backdrop-blur-md px-3 py-2 rounded-lg border border-[#B8A4FF]/50">
+                    <div className="flex items-center gap-1.5 bg-linear-to-br from-[#B8A4FF]/20 to-[#9F7AEA]/20 backdrop-blur-md px-3 py-2 rounded-lg border border-[#B8A4FF]/50">
                       <Shield className="w-4 h-4 text-[#B8A4FF]" />
                       <span className="text-sm font-bold text-white">Lv.{playerLevel}</span>
                     </div>
@@ -336,7 +339,7 @@ export default function CareQuestLayout({
           </div>
 
           {/* Bottom decorative border */}
-          <div className="absolute bottom-0 inset-x-0 h-1 bg-gradient-to-r from-transparent via-[#FFCA40]/50 to-transparent" />
+          <div className="absolute bottom-0 inset-x-0 h-1 bg-linear-to-r from-transparent via-[#FFCA40]/50 to-transparent" />
         </motion.header>
       )}
 

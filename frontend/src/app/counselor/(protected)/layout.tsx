@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import CounselorHeader from '@/components/ui/counselor/CounselorHeader';
 import CounselorSidebar from '@/components/ui/counselor/CounselorSidebar';
 import CounselorFooter from '@/components/ui/counselor/CounselorFooter';
@@ -44,11 +44,13 @@ export default function CounselorLayout({ children }: { children: ReactNode }) {
     return null;
   }
 
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F] text-white flex">
-      <CounselorSidebar />
+      <CounselorSidebar isMobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
       <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden relative">
-        <CounselorHeader />
+        <CounselorHeader onMenuToggle={() => setMobileNavOpen(!mobileNavOpen)} />
         <main className="flex-1 overflow-y-auto bg-[#001030]/30 p-4 md:p-6 lg:p-8">
           {children}
         </main>

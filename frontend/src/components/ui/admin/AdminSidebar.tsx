@@ -35,6 +35,8 @@ import {
 } from 'react-icons/fi';
 import SidebarLink from './SidebarLink';
 
+import MobileNavDrawer from '../MobileNavDrawer';
+
 // Reorganized navigation: clearer operational categories for admin workflows
 const navGroups = [
   {
@@ -71,9 +73,7 @@ const navGroups = [
       { name: 'Agent Decisions', icon: <FiEye size={18} />, href: '/admin/agent-decisions' },
       { name: 'Autopilot Queue', icon: <FiZap size={18} />, href: '/admin/autopilot' },
       { name: 'Autopilot Policy', icon: <FiShield size={18} />, href: '/admin/policy' },
-      { name: 'Attestation Monitor', icon: <FiLink size={18} />, href: '/admin/attestations' },
-      { name: 'Smart Contracts', icon: <FiLink size={18} />, href: '/admin/contracts' },
-      { name: 'EDU Badges', icon: <FiAward size={18} />, href: '/admin/badges' },
+      { name: 'Blockchain Hub', icon: <FiLink size={18} />, href: '/admin/blockchain' },
     ],
   },
   {
@@ -103,9 +103,15 @@ const secondaryNavItems = [
   { name: 'System Settings', icon: <FiSettings size={18} />, href: '/admin/settings' },
 ];
 
-export default function AdminSidebar() {
-  return (
-    <aside className="w-64 bg-[#000c24] h-screen sticky top-0 shrink-0 overflow-y-auto hidden md:flex flex-col border-r border-white/10">
+export default function AdminSidebar({
+  isMobileOpen = false,
+  onMobileClose = () => {},
+}: {
+  isMobileOpen?: boolean;
+  onMobileClose?: () => void;
+}) {
+  const sidebarContent = (
+    <>
       {/* Logo/Header */}
       <div className="p-4 border-b border-white/10 h-16 flex items-center shrink-0">
         <Link href="/admin/dashboard" className="flex items-center group">
@@ -169,6 +175,17 @@ export default function AdminSidebar() {
           <span className="truncate">Sign Out</span>
         </button>
       </div>
-    </aside>
+    </>
+  );
+
+  return (
+    <>
+      <aside className="w-64 bg-[#000c24] h-screen sticky top-0 shrink-0 overflow-y-auto hidden md:flex flex-col border-r border-white/10">
+        {sidebarContent}
+      </aside>
+      <MobileNavDrawer isOpen={isMobileOpen} onClose={onMobileClose}>
+        {sidebarContent}
+      </MobileNavDrawer>
+    </>
   );
 }

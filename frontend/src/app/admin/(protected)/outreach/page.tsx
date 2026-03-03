@@ -54,7 +54,7 @@ export default function OutreachPage() {
             href="/admin/campaigns"
             className="group relative flex items-center gap-2 px-6 py-3 bg-white/5 hover:bg-white/10 text-[#FFCA40] border border-white/10 hover:border-[#FFCA40]/50 rounded-2xl font-medium transition-all duration-300 backdrop-blur-md overflow-hidden"
           >
-            <div className="absolute inset-0 bg-gradient-to-r from-[#FFCA40]/0 via-[#FFCA40]/10 to-[#FFCA40]/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-700"></div>
+            <div className="absolute inset-0 bg-linear-to-r from-[#FFCA40]/0 via-[#FFCA40]/10 to-[#FFCA40]/0 -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
             <SparklesIcon className="w-5 h-5" />
             Manage Campaigns
             <span className="transition-transform group-hover:translate-x-1 ml-1">→</span>
@@ -96,7 +96,7 @@ export default function OutreachPage() {
         </div>
 
         {/* Content Area */}
-        <div className="pt-2 min-h-[500px]">
+        <div className="pt-2 min-h-125">
           <AnimatePresence mode="wait">
             <motion.div
               key={activeTab}
@@ -130,7 +130,7 @@ function AutomationsTab({ jobs, isLoading, error }: { jobs?: SchedulerJob[], isL
   if (error) {
     return (
       <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-6 rounded-2xl flex items-start gap-4 backdrop-blur-md">
-        <ExclamationCircleIcon className="w-6 h-6 flex-shrink-0 mt-0.5" />
+        <ExclamationCircleIcon className="w-6 h-6 shrink-0 mt-0.5" />
         <div>
           <h3 className="font-semibold text-lg text-red-300">Failed to load scheduler jobs</h3>
           <p className="text-red-400/70 mt-1">Please try refreshing the page or check your connection.</p>
@@ -251,7 +251,7 @@ function JobCard({ job }: { job: SchedulerJob }) {
       {/* Status indicator glow */}
       <div className={`absolute top-0 left-0 w-full h-1 transition-colors duration-500 ${job.enabled ? 'bg-[#FFCA40] shadow-[0_0_15px_#FFCA40]' : 'bg-transparent'}`} />
 
-      <div className="p-6 flex-grow flex flex-col">
+      <div className="p-6 grow flex flex-col">
         {/* Header Area */}
         <div className="flex justify-between items-start mb-6">
           <div className="pr-4">
@@ -267,7 +267,7 @@ function JobCard({ job }: { job: SchedulerJob }) {
           <button 
             onClick={handleToggle}
             disabled={toggleMutation.isPending}
-            className={`relative inline-flex h-8 w-14 flex-shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#FFCA40] focus:ring-offset-2 focus:ring-offset-[#00153a] ${
+            className={`relative inline-flex h-8 w-14 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-300 ease-in-out focus:outline-none focus:ring-2 focus:ring-[#FFCA40] focus:ring-offset-2 focus:ring-offset-[#00153a] ${
               job.enabled ? 'bg-[#FFCA40]' : 'bg-white/10 hover:bg-white/20'
             } ${toggleMutation.isPending ? 'opacity-50 cursor-not-allowed' : ''}`}
             role="switch"
@@ -283,7 +283,7 @@ function JobCard({ job }: { job: SchedulerJob }) {
         </div>
 
         {/* Info Pills */}
-        <div className="space-y-3 mb-6 flex-grow">
+        <div className="space-y-3 mb-6 grow">
           <div className={`flex items-center gap-4 bg-black/20 p-4 rounded-2xl border transition-colors ${job.enabled ? 'border-white/5' : 'border-transparent opacity-60'}`}>
             <div className={`p-2.5 rounded-xl ${job.enabled ? 'bg-[#FFCA40]/10 text-[#FFCA40]' : 'bg-white/5 text-white/40'}`}>
               <ClockIcon className="w-5 h-5" />
@@ -329,9 +329,9 @@ function JobCard({ job }: { job: SchedulerJob }) {
                 runStatus === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
                 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
               }`}>
-                {runStatus === 'success' && <CheckCircleIcon className="w-5 h-5 flex-shrink-0" />}
-                {runStatus === 'error' && <XCircleIcon className="w-5 h-5 flex-shrink-0" />}
-                {runStatus === 'loading' && <div className="w-5 h-5 flex-shrink-0 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />}
+                {runStatus === 'success' && <CheckCircleIcon className="w-5 h-5 shrink-0" />}
+                {runStatus === 'error' && <XCircleIcon className="w-5 h-5 shrink-0" />}
+                {runStatus === 'loading' && <div className="w-5 h-5 shrink-0 border-2 border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />}
                 <span className="truncate">{runStatus === 'loading' ? 'Executing job...' : runMessage}</span>
               </div>
             </motion.div>
@@ -478,7 +478,7 @@ function CheckinsTab() {
 
   return (
     <div className="max-w-3xl">
-      <div className="bg-white/5 border border-white/10 rounded-[2rem] p-8 md:p-12 backdrop-blur-md shadow-2xl relative overflow-hidden">
+      <div className="bg-white/5 border border-white/10 rounded-4xl p-8 md:p-12 backdrop-blur-md shadow-2xl relative overflow-hidden">
         {/* Decorative elements */}
         <div className="absolute top-0 right-0 w-64 h-64 bg-[#FFCA40]/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/3 pointer-events-none"></div>
         <div className="absolute bottom-0 left-0 w-64 h-64 bg-blue-500/5 rounded-full blur-3xl translate-y-1/2 -translate-x-1/3 pointer-events-none"></div>
@@ -514,9 +514,9 @@ function CheckinsTab() {
                     status === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
                     'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                   }`}>
-                    {status === 'success' && <CheckCircleIcon className="w-6 h-6 flex-shrink-0 mt-0.5" />}
-                    {status === 'error' && <XCircleIcon className="w-6 h-6 flex-shrink-0 mt-0.5" />}
-                    {status === 'loading' && <div className="w-6 h-6 flex-shrink-0 mt-0.5 border-[3px] border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />}
+                    {status === 'success' && <CheckCircleIcon className="w-6 h-6 shrink-0 mt-0.5" />}
+                    {status === 'error' && <XCircleIcon className="w-6 h-6 shrink-0 mt-0.5" />}
+                    {status === 'loading' && <div className="w-6 h-6 shrink-0 mt-0.5 border-[3px] border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />}
                     <div>
                       <div className="font-bold text-base mb-1">{status === 'success' ? 'Success' : status === 'error' ? 'Error' : 'Processing'}</div>
                       <div className="opacity-90">{status === 'loading' ? 'Queuing check-in request...' : message}</div>
@@ -610,7 +610,7 @@ function CounselorRemindersTab() {
 
   return (
     <div className="max-w-3xl">
-      <div className="bg-white/5 border border-white/10 rounded-[2rem] p-8 md:p-12 backdrop-blur-md shadow-2xl relative overflow-hidden text-center flex flex-col items-center">
+      <div className="bg-white/5 border border-white/10 rounded-4xl p-8 md:p-12 backdrop-blur-md shadow-2xl relative overflow-hidden text-center flex flex-col items-center">
         {/* Decorative elements */}
         <div className="absolute top-0 right-0 w-80 h-80 bg-purple-500/5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/4 pointer-events-none"></div>
         
@@ -644,9 +644,9 @@ function CounselorRemindersTab() {
                     status === 'error' ? 'bg-red-500/10 text-red-400 border border-red-500/20' :
                     'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                   }`}>
-                    {status === 'success' && <CheckCircleIcon className="w-6 h-6 flex-shrink-0 mt-0.5" />}
-                    {status === 'error' && <XCircleIcon className="w-6 h-6 flex-shrink-0 mt-0.5" />}
-                    {status === 'loading' && <div className="w-6 h-6 flex-shrink-0 mt-0.5 border-[3px] border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />}
+                    {status === 'success' && <CheckCircleIcon className="w-6 h-6 shrink-0 mt-0.5" />}
+                    {status === 'error' && <XCircleIcon className="w-6 h-6 shrink-0 mt-0.5" />}
+                    {status === 'loading' && <div className="w-6 h-6 shrink-0 mt-0.5 border-[3px] border-blue-400/30 border-t-blue-400 rounded-full animate-spin" />}
                     <div>
                       <div className="font-bold text-base mb-1">{status === 'success' ? 'Success' : status === 'error' ? 'Error' : 'Processing'}</div>
                       <div className="opacity-90">{status === 'loading' ? 'Triggering reminder job...' : message}</div>

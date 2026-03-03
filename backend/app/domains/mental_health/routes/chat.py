@@ -478,7 +478,7 @@ async def get_chat_history(
             )
 
         history_items.sort(key=lambda item: item["timestamp"], reverse=False)
-        paginated_history = history_items[skip : skip + limit]
+        paginated_history = history_items
         return [ConversationHistoryItem(**item) for item in paginated_history]
 
     except Exception as exc:  # pragma: no cover - defensive logging

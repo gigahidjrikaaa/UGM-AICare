@@ -14,15 +14,15 @@ The DSR methodology is executed through an iterative cycle consisting of three p
 
 ```mermaid
 graph TD
-    A[Environment] -->|Relevance Cycle: Needs & Requirements| B(Design Cycle)
-    C[Knowledge Base] -->|Rigor Cycle: Foundations & Theory| B
-    B -->|Build Artifact| D(UGM-AICare Prototype)
-    D -->|Evaluate against metrics| E{Evaluation Phase}
-    E -->|Refine & Adjust| B
-    E -->|Successful Outcome| F[Final Implementation]
-    
-    classDef primary fill:#f9f9f9,stroke:#333,stroke-width:2px;
-    class B,D,E primary;
+ A[Environment] -->|Relevance Cycle: Needs & Requirements| B(Design Cycle)
+ C[Knowledge Base] -->|Rigor Cycle: Foundations & Theory| B
+ B -->|Build Artifact| D(UGM-AICare Prototype)
+ D -->|Evaluate against metrics| E{Evaluation Phase}
+ E -->|Refine & Adjust| B
+ E -->|Successful Outcome| F[Final Implementation]
+ 
+ classDef primary fill:#f9f9f9,stroke:#333,stroke-width:2px;
+ class B,D,E primary;
 ```
 
 ### 1. The Relevance Cycle

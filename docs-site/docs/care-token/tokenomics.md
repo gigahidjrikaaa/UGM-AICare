@@ -12,20 +12,20 @@ sidebar_position: 2
 
 ---
 
-##  Current State (v1.0 - Basic Model)
+## Current State (v1.0 - Basic Model)
 
-### ✅ What's Already Implemented in Smart Contract
+### [Done] What's Already Implemented in Smart Contract
 
 | Feature | Status | Description |
 |---------|--------|-------------|
-| Max Supply Cap | ✅ Enforced | 1 billion CARE tokens (hard-coded) |
-| Controlled Minting | ✅ Enforced | Only MINTER_ROLE can create tokens |
-| Burnable | ✅ Enforced | Users can voluntarily burn tokens |
-| Initial Supply | ✅ Set | 100M tokens (10% of max) |
-| Role-Based Access | ✅ Enforced | Admin, Minter, Pauser roles |
-| Pausable | ✅ Enforced | Emergency stop functionality |
+| Max Supply Cap | [Done] Enforced | 1 billion CARE tokens (hard-coded) |
+| Controlled Minting | [Done] Enforced | Only MINTER_ROLE can create tokens |
+| Burnable | [Done] Enforced | Users can voluntarily burn tokens |
+| Initial Supply | [Done] Set | 100M tokens (10% of max) |
+| Role-Based Access | [Done] Enforced | Admin, Minter, Pauser roles |
+| Pausable | [Done] Enforced | Emergency stop functionality |
 
-### ❌ Missing Elements for Value Appreciation
+### [Missing] Missing Elements for Value Appreciation
 
 - No automatic deflationary pressure
 - No staking/locking incentives
@@ -40,7 +40,7 @@ sidebar_position: 2
 
 ---
 
-##  Recommended Model: "Utility + Deflationary Hybrid"
+## Recommended Model: "Utility + Deflationary Hybrid"
 
 ### **Core Philosophy**
 
@@ -52,29 +52,29 @@ sidebar_position: 2
 
 ---
 
-##  Phase 1: Enhanced Deflationary Mechanics
+## Phase 1: Enhanced Deflationary Mechanics
 
 ### 1.1 Transaction Burn (Optional - User-Friendly Approach)
 
-**❌ NOT Recommended for $CARE**: Standard transaction tax (2-5% burn on every transfer)
+**[Missing] NOT Recommended for $CARE**: Standard transaction tax (2-5% burn on every transfer)
 
 - **Why Not**: Confuses users, reduces utility, feels like a "tax"
 - Students won't understand why they lose tokens when sending
 
-**✅ RECOMMENDED Instead**: **Selective Burn on Redemption**
+**[Done] RECOMMENDED Instead**: **Selective Burn on Redemption**
 
 ```solidity
 // Burn tokens when users redeem for real-world value
 function redeemForVoucher(uint256 amount) external {
-    uint256 burnAmount = amount * 100 / 100; // 100% burned
-    _burn(msg.sender, burnAmount);
-    emit TokensRedeemed(msg.sender, amount, "Voucher redemption");
+ uint256 burnAmount = amount * 100 / 100; // 100% burned
+ _burn(msg.sender, burnAmount);
+ emit TokensRedeemed(msg.sender, amount, "Voucher redemption");
 }
 
 function redeemForTicket(uint256 amount) external {
-    uint256 burnAmount = amount * 100 / 100; // 100% burned
-    _burn(msg.sender, burnAmount);
-    emit TokensRedeemed(msg.sender, amount, "Event ticket");
+ uint256 burnAmount = amount * 100 / 100; // 100% burned
+ _burn(msg.sender, burnAmount);
+ emit TokensRedeemed(msg.sender, amount, "Event ticket");
 }
 ```
 
@@ -90,9 +90,9 @@ function redeemForTicket(uint256 amount) external {
 ```solidity
 // Burn small amounts for premium features
 function unlockPremiumFeature(string memory featureId) external {
-    uint256 burnAmount = 10 * 10**18; // 10 CARE tokens
-    _burn(msg.sender, burnAmount);
-    emit FeatureUnlocked(msg.sender, featureId, burnAmount);
+ uint256 burnAmount = 10 * 10**18; // 10 CARE tokens
+ _burn(msg.sender, burnAmount);
+ emit FeatureUnlocked(msg.sender, featureId, burnAmount);
 }
 ```
 
@@ -106,7 +106,7 @@ function unlockPremiumFeature(string memory featureId) external {
 
 ---
 
-##  Phase 2: Staking System
+## Phase 2: Staking System
 
 ### 2.1 Time-Locked Staking
 
@@ -115,27 +115,27 @@ function unlockPremiumFeature(string memory featureId) external {
 ```solidity
 // Staking contract (separate from token contract)
 contract CareStaking {
-    struct Stake {
-        uint256 amount;
-        uint256 startTime;
-        uint256 lockPeriod; // 30, 90, 180, 365 days
-        uint256 rewardRate; // APY %
-    }
-    
-    mapping(address => Stake[]) public stakes;
-    
-    // Staking tiers with increasing rewards
-    uint256 public constant TIER_30D_APY = 5;   // 5% APY for 30 days
-    uint256 public constant TIER_90D_APY = 12;  // 12% APY for 90 days
-    uint256 public constant TIER_180D_APY = 20; // 20% APY for 180 days
-    uint256 public constant TIER_365D_APY = 35; // 35% APY for 365 days
-    
-    function stakeTokens(uint256 amount, uint256 lockPeriod) external {
-        require(amount >= 100 * 10**18, "Minimum stake: 100 CARE");
-        // Transfer tokens to staking contract
-        // Lock for specified period
-        // Calculate rewards based on tier
-    }
+ struct Stake {
+ uint256 amount;
+ uint256 startTime;
+ uint256 lockPeriod; // 30, 90, 180, 365 days
+ uint256 rewardRate; // APY %
+ }
+ 
+ mapping(address => Stake[]) public stakes;
+ 
+ // Staking tiers with increasing rewards
+ uint256 public constant TIER_30D_APY = 5; // 5% APY for 30 days
+ uint256 public constant TIER_90D_APY = 12; // 12% APY for 90 days
+ uint256 public constant TIER_180D_APY = 20; // 20% APY for 180 days
+ uint256 public constant TIER_365D_APY = 35; // 35% APY for 365 days
+ 
+ function stakeTokens(uint256 amount, uint256 lockPeriod) external {
+ require(amount >= 100 * 10**18, "Minimum stake: 100 CARE");
+ // Transfer tokens to staking contract
+ // Lock for specified period
+ // Calculate rewards based on tier
+ }
 }
 ```
 
@@ -176,7 +176,7 @@ Option B: **Platform Revenue Buyback**
 
 ---
 
-##  Phase 3: Token Distribution & Vesting
+## Phase 3: Token Distribution & Vesting
 
 ### 3.1 Supply Allocation
 
@@ -196,26 +196,26 @@ Option B: **Platform Revenue Buyback**
 ```solidity
 // Vesting contract for team tokens
 contract CareVesting {
-    struct VestingSchedule {
-        address beneficiary;
-        uint256 totalAmount;
-        uint256 startTime;
-        uint256 duration; // 4 years = 1461 days
-        uint256 released;
-    }
-    
-    mapping(address => VestingSchedule) public schedules;
-    
-    function release(address beneficiary) external {
-        VestingSchedule storage schedule = schedules[beneficiary];
-        uint256 elapsed = block.timestamp - schedule.startTime;
-        uint256 vested = (schedule.totalAmount * elapsed) / schedule.duration;
-        uint256 releasable = vested - schedule.released;
-        
-        require(releasable > 0, "No tokens to release");
-        schedule.released += releasable;
-        careToken.transfer(beneficiary, releasable);
-    }
+ struct VestingSchedule {
+ address beneficiary;
+ uint256 totalAmount;
+ uint256 startTime;
+ uint256 duration; // 4 years = 1461 days
+ uint256 released;
+ }
+ 
+ mapping(address => VestingSchedule) public schedules;
+ 
+ function release(address beneficiary) external {
+ VestingSchedule storage schedule = schedules[beneficiary];
+ uint256 elapsed = block.timestamp - schedule.startTime;
+ uint256 vested = (schedule.totalAmount * elapsed) / schedule.duration;
+ uint256 releasable = vested - schedule.released;
+ 
+ require(releasable > 0, "No tokens to release");
+ schedule.released += releasable;
+ careToken.transfer(beneficiary, releasable);
+ }
 }
 ```
 
@@ -228,7 +228,7 @@ contract CareVesting {
 
 ---
 
-##  Phase 4: Value Appreciation Mechanisms
+## Phase 4: Value Appreciation Mechanisms
 
 ### 4.1 Buyback & Burn Program
 
@@ -237,29 +237,29 @@ contract CareVesting {
 ```solidity
 // Automated buyback contract
 contract CareBuyback {
-    IUniswapV2Router public router;
-    address public careToken;
-    
-    // Called when platform generates revenue
-    function buybackAndBurn() external payable {
-        // Swap revenue (STT/SOMI) for CARE tokens
-        address[] memory path = new address[](2);
-        path[0] = router.WETH(); // STT/SOMI wrapped
-        path[1] = careToken;
-        
-        router.swapExactETHForTokens{value: msg.value}(
-            0,
-            path,
-            address(this),
-            block.timestamp
-        );
-        
-        // Burn all purchased CARE tokens
-        uint256 balance = IERC20(careToken).balanceOf(address(this));
-        CareToken(careToken).burn(balance);
-        
-        emit BuybackAndBurn(msg.value, balance);
-    }
+ IUniswapV2Router public router;
+ address public careToken;
+ 
+ // Called when platform generates revenue
+ function buybackAndBurn() external payable {
+ // Swap revenue (STT/SOMI) for CARE tokens
+ address[] memory path = new address[](2);
+ path[0] = router.WETH(); // STT/SOMI wrapped
+ path[1] = careToken;
+ 
+ router.swapExactETHForTokens{value: msg.value}(
+ 0,
+ path,
+ address(this),
+ block.timestamp
+ );
+ 
+ // Burn all purchased CARE tokens
+ uint256 balance = IERC20(careToken).balanceOf(address(this));
+ CareToken(careToken).burn(balance);
+ 
+ emit BuybackAndBurn(msg.value, balance);
+ }
 }
 ```
 
@@ -282,21 +282,21 @@ contract CareBuyback {
 // - 1% redistributed to holders proportionally
 
 function _transfer(address from, address to, uint256 amount) internal override {
-    if (from != owner() && to != owner()) {
-        uint256 burnFee = amount * 1 / 100;
-        uint256 reflectionFee = amount * 1 / 100;
-        uint256 netAmount = amount - burnFee - reflectionFee;
-        
-        _burn(from, burnFee);
-        _reflect(reflectionFee); // Distribute to all holders
-        super._transfer(from, to, netAmount);
-    } else {
-        super._transfer(from, to, amount);
-    }
+ if (from!= owner() && to!= owner()) {
+ uint256 burnFee = amount * 1 / 100;
+ uint256 reflectionFee = amount * 1 / 100;
+ uint256 netAmount = amount - burnFee - reflectionFee;
+ 
+ _burn(from, burnFee);
+ _reflect(reflectionFee); // Distribute to all holders
+ super._transfer(from, to, netAmount);
+ } else {
+ super._transfer(from, to, amount);
+ }
 }
 ```
 
-**⚠️ Caution**: This adds complexity and gas costs. Only recommend if:
+**[Warning] Caution**: This adds complexity and gas costs. Only recommend if:
 
 - Users are crypto-savvy (not true for students)
 - Platform has high transaction volume
@@ -306,7 +306,7 @@ function _transfer(address from, address to, uint256 amount) internal override {
 
 ---
 
-##  Phase 5: Gamification & Engagement
+## Phase 5: Gamification & Engagement
 
 ### 5.1 Achievement-Based Rewards
 
@@ -319,8 +319,8 @@ uint256 public rewardHalvingInterval = 365 days;
 uint256 public lastHalvingTime;
 
 function calculateReward() public view returns (uint256) {
-    uint256 halvings = (block.timestamp - lastHalvingTime) / rewardHalvingInterval;
-    return baseReward / (2 ** halvings);
+ uint256 halvings = (block.timestamp - lastHalvingTime) / rewardHalvingInterval;
+ return baseReward / (2 ** halvings);
 }
 ```
 
@@ -345,29 +345,29 @@ mapping(address => uint256) public streakDays;
 mapping(address => uint256) public lastActivityDate;
 
 function claimActivityReward() external {
-    uint256 baseReward = calculateReward();
-    
-    // Check streak
-    if (block.timestamp - lastActivityDate[msg.sender] <= 1 days) {
-        streakDays[msg.sender]++;
-    } else {
-        streakDays[msg.sender] = 1;
-    }
-    
-    // Bonus multiplier
-    uint256 bonus = 0;
-    if (streakDays[msg.sender] >= 30) bonus = 50; // 50% bonus for 30-day streak
-    else if (streakDays[msg.sender] >= 14) bonus = 25; // 25% bonus for 14-day streak
-    else if (streakDays[msg.sender] >= 7) bonus = 10; // 10% bonus for 7-day streak
-    
-    uint256 finalReward = baseReward + (baseReward * bonus / 100);
-    mint(msg.sender, finalReward, "Activity streak reward");
+ uint256 baseReward = calculateReward();
+ 
+ // Check streak
+ if (block.timestamp - lastActivityDate[msg.sender] <= 1 days) {
+ streakDays[msg.sender]++;
+ } else {
+ streakDays[msg.sender] = 1;
+ }
+ 
+ // Bonus multiplier
+ uint256 bonus = 0;
+ if (streakDays[msg.sender] >= 30) bonus = 50; // 50% bonus for 30-day streak
+ else if (streakDays[msg.sender] >= 14) bonus = 25; // 25% bonus for 14-day streak
+ else if (streakDays[msg.sender] >= 7) bonus = 10; // 10% bonus for 7-day streak
+ 
+ uint256 finalReward = baseReward + (baseReward * bonus / 100);
+ mint(msg.sender, finalReward, "Activity streak reward");
 }
 ```
 
 ---
 
-##  Economic Projections
+## Economic Projections
 
 ### Scenario Analysis: Token Value Growth
 
@@ -398,29 +398,29 @@ function claimActivityReward() external {
 ### Value Drivers
 
 1. **Deflationary Pressure**:
-   - 30% of rewards burned through redemptions
-   - Buyback & burn from revenue
-   - **Result**: -2-5% supply per year
+ - 30% of rewards burned through redemptions
+ - Buyback & burn from revenue
+ - **Result**: -2-5% supply per year
 
 2. **Reduced Circulation**:
-   - 40-50% of tokens staked long-term
-   - **Result**: 50-60% less supply available
+ - 40-50% of tokens staked long-term
+ - **Result**: 50-60% less supply available
 
 3. **Increasing Demand**:
-   - User growth (10%/month = 214% annualized)
-   - More activities = more rewards = more burns
-   - **Result**: Constant buying/earning pressure
+ - User growth (10%/month = 214% annualized)
+ - More activities = more rewards = more burns
+ - **Result**: Constant buying/earning pressure
 
 4. **Network Effects**:
-   - More users → More merchant partnerships → More utility
-   - More utility → Higher token value → More users
-   - **Result**: Exponential growth potential
+ - More users → More merchant partnerships → More utility
+ - More utility → Higher token value → More users
+ - **Result**: Exponential growth potential
 
 ---
 
 ## ️ Implementation Roadmap
 
-### Phase 1: Foundation (Month 1-2) ✅ DONE
+### Phase 1: Foundation (Month 1-2) [Done] DONE
 
 - [x] Basic ERC-20 token with cap
 - [x] Burnable functionality
@@ -464,55 +464,55 @@ function claimActivityReward() external {
 
 ---
 
-##  Recommended Next Steps
+## Recommended Next Steps
 
 ### Immediate Actions
 
 1. **Add Redemption Burn Functions**
-   - Update `CareToken.sol` with redemption functions
-   - Create `RedemptionManager.sol` for voucher/ticket burns
-   - Test on testnet
+ - Update `CareToken.sol` with redemption functions
+ - Create `RedemptionManager.sol` for voucher/ticket burns
+ - Test on testnet
 
 2. **Deploy Staking Contract**
-   - Create `CareStaking.sol`
-   - Implement 4-tier system
-   - Build staking UI
+ - Create `CareStaking.sol`
+ - Implement 4-tier system
+ - Build staking UI
 
 3. **Document Tokenomics**
-   - Update whitepaper with tokenomics
-   - Create user-friendly explainer
-   - Publish on website
+ - Update whitepaper with tokenomics
+ - Create user-friendly explainer
+ - Publish on website
 
 4. **Set Up Treasury**
-   - Create multi-sig wallet for team tokens
-   - Implement vesting schedule
-   - Establish buyback fund
+ - Create multi-sig wallet for team tokens
+ - Implement vesting schedule
+ - Establish buyback fund
 
 ### Long-Term Strategy
 
 1. **Monitor & Adjust**
-   - Track burn rates monthly
-   - Adjust reward amounts based on token price
-   - Optimize staking APY for 40-50% lock rate
+ - Track burn rates monthly
+ - Adjust reward amounts based on token price
+ - Optimize staking APY for 40-50% lock rate
 
 2. **Expand Utility**
-   - Partner with local merchants (10+ in Year 1)
-   - Add more premium features
-   - Create token-gated content
+ - Partner with local merchants (10+ in Year 1)
+ - Add more premium features
+ - Create token-gated content
 
 3. **Build Liquidity**
-   - List on DEX (Uniswap-style on SOMNIA)
-   - Provide initial liquidity
-   - Incentivize liquidity provision
+ - List on DEX (Uniswap-style on SOMNIA)
+ - Provide initial liquidity
+ - Incentivize liquidity provision
 
 4. **Governance Transition**
-   - Introduce governance voting (Year 2)
-   - Decentralize decision-making
-   - Build DAO structure
+ - Introduce governance voting (Year 2)
+ - Decentralize decision-making
+ - Build DAO structure
 
 ---
 
-##  Reference: Successful Models
+## Reference: Successful Models
 
 ### Case Study 1: BNB (Binance Coin)
 
@@ -534,14 +534,14 @@ function claimActivityReward() external {
 
 ### What NOT to Do: Failed Models
 
-❌ **SafeMoon** (Reflection Tax Model)
+[Missing] **SafeMoon** (Reflection Tax Model)
 
 - 10% tax on every transaction
 - Complex UX, confused users
 - Whale manipulation, pump-and-dump
 - **Lesson**: Don't over-complicate
 
-❌ **Unlimited Supply Tokens**
+[Missing] **Unlimited Supply Tokens**
 
 - No cap = continuous inflation
 - Value dilution over time
@@ -549,11 +549,11 @@ function claimActivityReward() external {
 
 ---
 
-##  $CARE-Specific Recommendations
+## $CARE-Specific Recommendations
 
 Given your target audience (Indonesian university students) and use case (mental health platform):
 
-### ✅ DO Implement
+### [Done] DO Implement
 
 1. **Redemption Burns** - Simple, clear value destruction
 2. **Staking (Simple Tiers)** - Familiar concept, passive income
@@ -561,14 +561,14 @@ Given your target audience (Indonesian university students) and use case (mental
 4. **Vesting for Team** - Prevents dumps, shows commitment
 5. **Halving Rewards** - Creates urgency, early adopter advantage
 
-### ❌ DON'T Implement (Yet)
+### [Missing] DON'T Implement (Yet)
 
 1. **Transaction Taxes** - Confusing for non-crypto users
 2. **Complex Reflection** - High gas costs, UX friction
 3. **Aggressive Deflation** - Can hurt utility if too extreme
 4. **Short-Term Gimmicks** - Focus on sustainable growth
 
-###  Target Metrics (Year 1)
+### Target Metrics (Year 1)
 
 - **Burn Rate**: 3-5% of circulating supply/year
 - **Staking Rate**: 40-50% of supply locked
@@ -578,7 +578,7 @@ Given your target audience (Indonesian university students) and use case (mental
 
 ---
 
-##  Questions to Answer Before Implementation
+## Questions to Answer Before Implementation
 
 1. **Reward Budget**: How many tokens to allocate per user action?
 2. **Staking APY**: What % can we sustainably offer?
@@ -590,7 +590,7 @@ Given your target audience (Indonesian university students) and use case (mental
 
 ---
 
-##  Final Recommendation
+## Final Recommendation
 
 **Implement This Tokenomics Stack**:
 
@@ -629,12 +629,12 @@ Layer 5: GOVERNANCE (Year 2+)
 
 **This model balances**:
 
-- ✅ Utility (students can use tokens for real value)
-- ✅ Sustainability (not a pump-and-dump)
-- ✅ Simplicity (easy to understand)
-- ✅ Value Growth (multiple appreciation mechanisms)
-- ✅ Community (rewards long-term holders)
+- [Done] Utility (students can use tokens for real value)
+- [Done] Sustainability (not a pump-and-dump)
+- [Done] Simplicity (easy to understand)
+- [Done] Value Growth (multiple appreciation mechanisms)
+- [Done] Community (rewards long-term holders)
 
 ---
 
-**Ready to implement?** Start with Phase 2 (Deflationary Mechanics) next week! 🚀
+**Ready to implement?** Start with Phase 2 (Deflationary Mechanics) next week! [Start]

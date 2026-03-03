@@ -35,13 +35,13 @@ After a conversation ends (or at a counsellor's manual request), the full STA gr
 
 ```mermaid
 flowchart LR
-    A[Load conversation\nfull transcript] --> B[PII Redaction\nnames, IDs, phones stripped]
-    B --> C[Gemini semantic\nrisk analysis]
-    C --> D[Clinical instrument\nindicator extraction]
-    D --> E[Longitudinal trend\nanalysis across history]
-    E --> F[Psychologist report\ngeneration]
-    F --> G[CMA referral\nrecommendation]
-    G --> H[Persist to DB\nConversationRiskAssessment\nScreeningProfile]
+ A[Load conversation\nfull transcript] --> B[PII Redaction\nnames, IDs, phones stripped]
+ B --> C[Gemini semantic\nrisk analysis]
+ C --> D[Clinical instrument\nindicator extraction]
+ D --> E[Longitudinal trend\nanalysis across history]
+ E --> F[Psychologist report\ngeneration]
+ F --> G[CMA referral\nrecommendation]
+ G --> H[Persist to DB\nConversationRiskAssessment\nScreeningProfile]
 ```
 
 ---
@@ -75,11 +75,8 @@ The STA extracts indicators corresponding to three validated clinical instrument
 | **GAD-7** | Anxiety severity | Worry frequency, restlessness, irritability, control difficulty |
 | **DASS-21** | Depression, Anxiety, and Stress | Combined 21-item indicator set |
 
-These extracted indicators are accumulated in the student's `ScreeningProfile` table over time, building a longitudinal view of their mental health trajectory. Counsellors see this as a trend chart in their dashboard.
-
-:::info Note on validity
-Covert screening from conversational text is **indicative, not diagnostic**. The STA's screening outputs are intended to assist counsellors in prioritisation, not to replace formal clinical assessment.
-:::
+These extracted indicators are accumulated in the student's `ScreeningProfile` table over time, building a longitudinal view of their mental health trajectory. Counsellors see this as a trend chart in their dashboard.:::info Note on validity
+Covert screening from conversational text is **indicative, not diagnostic**. The STA's screening outputs are intended to assist counsellors in prioritisation, not to replace formal clinical assessment.:::
 
 ---
 
@@ -115,18 +112,18 @@ The STA produces a structured `ConversationRiskAssessment` record:
 
 ```json
 {
-  "conversation_id": 4812,
-  "user_hash": "u_a3f8c1b2",
-  "risk_level": 2,
-  "risk_score": 0.71,
-  "severity": "high",
-  "intent": "academic_stress_with_hopelessness",
-  "phq9_indicators": ["anhedonia", "low_energy", "concentration_difficulty"],
-  "gad7_indicators": ["excessive_worry", "restlessness"],
-  "trend": "worsening",
-  "counsellor_recommendation": "Priority referral to clinical psychologist within 48h",
-  "summary": "Student expressed persistent hopelessness about academic performance...",
-  "analysed_at": "2026-02-27T14:23:11Z"
+ "conversation_id": 4812,
+ "user_hash": "u_a3f8c1b2",
+ "risk_level": 2,
+ "risk_score": 0.71,
+ "severity": "high",
+ "intent": "academic_stress_with_hopelessness",
+ "phq9_indicators": ["anhedonia", "low_energy", "concentration_difficulty"],
+ "gad7_indicators": ["excessive_worry", "restlessness"],
+ "trend": "worsening",
+ "counsellor_recommendation": "Priority referral to clinical psychologist within 48h",
+ "summary": "Student expressed persistent hopelessness about academic performance...",
+ "analysed_at": "2026-02-27T14:23:11Z"
 }
 ```
 

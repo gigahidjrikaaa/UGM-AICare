@@ -495,9 +495,11 @@ export default function ProfilePage() {
       return "/default-avatar.png";
     }
     if (isEditing && form) {
+      // While editing, show the URL the user is typing; fall back to server-resolved avatar
       return form.profile_photo_url.trim() || profile.header.avatar_url || "/default-avatar.png";
     }
-    return profile.header.profile_photo_url || profile.header.avatar_url || "/default-avatar.png";
+    // avatar_url is always resolved server-side (DB photo OR DiceBear fallback)
+    return profile.header.avatar_url || "/default-avatar.png";
   }, [form, isEditing, profile]);
 
   const academicSummary = useMemo(() => {

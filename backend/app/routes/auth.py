@@ -1,3 +1,4 @@
+import asyncio
 import logging
 import os
 import uuid
@@ -89,6 +90,9 @@ def serialize_user(
     fallback_name: Optional[str] = None,
 ) -> dict:
     """Return a safe representation of the user for API responses."""
+    profile_photo_url: Optional[str] = None
+    if hasattr(user, "profile") and user.profile is not None:
+        profile_photo_url = user.profile.profile_photo_url
     return {
         "id": str(user.id),
         "email": user.email or fallback_email,
@@ -96,6 +100,7 @@ def serialize_user(
         "role": user.role,
         "google_sub": user.google_sub,
         "allow_email_checkins": bool(allow_email_checkins_for_user(user)),
+        "profile_photo_url": profile_photo_url,
     }
 
 
@@ -179,6 +184,15 @@ async def exchange_oauth_token(
                 check_in_code=uuid.uuid4().hex,
             )
             db.add(user)
+            await db.flush()  # Ensure user.id is available for UserProfile FK
+
+            # Create UserProfile and store OAuth picture on first login
+            from app.models import UserProfile
+            user_profile = UserProfile(
+                user_id=user.id,
+                profile_photo_url=payload.picture,
+            )
+            db.add(user_profile)
         else:
             updated = False
             if user.google_sub != provider_account_id:
@@ -199,6 +213,24 @@ async def exchange_oauth_token(
                 updated = True
             if updated:
                 db.add(user)
+
+            # Store OAuth picture only if UserProfile has no photo yet
+            if payload.picture:
+                from app.models import UserProfile
+                from sqlalchemy import select as _select
+                profile_result = await db.execute(
+                    _select(UserProfile).where(UserProfile.user_id == user.id)
+                )
+                existing_profile = profile_result.scalar_one_or_none()
+                if existing_profile is None:
+                    new_profile = UserProfile(
+                        user_id=user.id,
+                        profile_photo_url=payload.picture,
+                    )
+                    db.add(new_profile)
+                elif not existing_profile.profile_photo_url:
+                    existing_profile.profile_photo_url = payload.picture
+                    db.add(existing_profile)
 
         user.last_login = datetime.utcnow()
         db.add(user)

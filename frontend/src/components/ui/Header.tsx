@@ -7,6 +7,7 @@ import Link from "next/link";
 import { HiMenu, HiViewGrid } from "react-icons/hi"; // Added HiViewGrid for Dashboard icon
 import { FiShield } from "react-icons/fi";
 import { useWellnessState } from "@/hooks/useQuests";
+import { useProfilePicture } from "@/hooks/useProfilePicture";
 import MobileNavMenu from "./MobileNavMenu";
 import ProfileDropdown from "./ProfileDropdown";
 
@@ -17,6 +18,7 @@ interface HeaderProps {
 export default function Header({ onToggleSidebar }: HeaderProps) {
   const { data: session, status } = useSession();
   const { data: wellness } = useWellnessState();
+  const { src: profilePictureSrc } = useProfilePicture();
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
@@ -169,7 +171,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
                         }`}
                     >
                       <Image
-                        src={session.user?.image || "/default-avatar.png"}
+                        src={profilePictureSrc}
                         alt="Profile"
                         fill
                         className="object-cover"
@@ -180,6 +182,7 @@ export default function Header({ onToggleSidebar }: HeaderProps) {
                       user={session.user}
                       isOpen={isProfileOpen}
                       wellness={wellness}
+                      profilePictureSrc={profilePictureSrc}
                       onClose={() => setIsProfileOpen(false)}
                       onSignOut={handleSignOut}
                     />

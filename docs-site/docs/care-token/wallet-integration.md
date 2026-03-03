@@ -23,33 +23,33 @@ title: Wallet Integration Analysis & Recommendations
 ```typescript
 // WalletLinkButton.tsx - Current Implementation
 if (!window.ethereum) {
-  toast.error("MetaMask not found. Please install MetaMask to continue.");
-  return;
+ toast.error("MetaMask not found. Please install MetaMask to continue.");
+ return;
 }
 const provider = new BrowserProvider(window.ethereum, "any");
 ```
 
 ### Issues with Current Approach
 
-1. **Vendor Lock-In** ❌
-   - Hardcoded error message: "MetaMask not found"
-   - Only works with MetaMask browser extension
-   - Excludes users with other wallets (Coinbase Wallet, Trust Wallet, Rainbow, etc.)
+1. **Vendor Lock-In** [Missing]
+ - Hardcoded error message: "MetaMask not found"
+ - Only works with MetaMask browser extension
+ - Excludes users with other wallets (Coinbase Wallet, Trust Wallet, Rainbow, etc.)
 
-2. **Poor User Experience** ❌
-   - No wallet selection UI
-   - No detection of available wallets
-   - Generic "No wallet found" errors
+2. **Poor User Experience** [Missing]
+ - No wallet selection UI
+ - No detection of available wallets
+ - Generic "No wallet found" errors
 
-3. **Limited Protocol Support** ❌
-   - No WalletConnect support (mobile wallets)
-   - No Coinbase Smart Wallet support
-   - No multi-chain wallet support
+3. **Limited Protocol Support** [Missing]
+ - No WalletConnect support (mobile wallets)
+ - No Coinbase Smart Wallet support
+ - No multi-chain wallet support
 
-4. **Maintenance Burden** ❌
-   - Manual handling of window.ethereum edge cases
-   - Custom connection state management
-   - No built-in error recovery
+4. **Maintenance Burden** [Missing]
+ - Manual handling of window.ethereum edge cases
+ - Custom connection state management
+ - No built-in error recovery
 
 ---
 
@@ -67,16 +67,16 @@ const provider = new BrowserProvider(window.ethereum, "any");
 | Feature | wagmi + RainbowKit | wagmi + ConnectKit | Web3Modal | web3-onboard |
 |---------|-------------------|-------------------|-----------|--------------|
 | **UI/UX Quality** | ⭐⭐⭐⭐⭐ Beautiful | ⭐⭐⭐⭐ Clean | ⭐⭐⭐ Basic | ⭐⭐⭐ Functional |
-| **TypeScript Support** | ✅ Excellent | ✅ Excellent | ✅ Good | ✅ Good |
-| **Next.js Optimization** | ✅ Yes | ✅ Yes | ⚠️ Partial | ⚠️ Partial |
+| **TypeScript Support** | [Done] Excellent | [Done] Excellent | [Done] Good | [Done] Good |
+| **Next.js Optimization** | [Done] Yes | [Done] Yes | [Warning] Partial | [Warning] Partial |
 | **Wallet Support** | 100+ wallets | 100+ wallets | 200+ wallets | 35+ wallets |
-| **WalletConnect v2** | ✅ Built-in | ✅ Built-in | ✅ Built-in | ✅ Built-in |
-| **Mobile Support** | ✅ Excellent | ✅ Excellent | ✅ Good | ✅ Good |
+| **WalletConnect v2** | [Done] Built-in | [Done] Built-in | [Done] Built-in | [Done] Built-in |
+| **Mobile Support** | [Done] Excellent | [Done] Excellent | [Done] Good | [Done] Good |
 | **Customization** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐⭐ | ⭐⭐⭐ | ⭐⭐⭐⭐ |
 | **Bundle Size** | 📦 Medium (95kb) | 📦 Small (60kb) | 📦 Large (150kb) | 📦 Large (120kb) |
-| **Active Maintenance** | ✅ Very Active | ✅ Active | ✅ Active | ⚠️ Moderate |
+| **Active Maintenance** | [Done] Very Active | [Done] Active | [Done] Active | [Warning] Moderate |
 | **Documentation** | ⭐⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐⭐ | ⭐⭐⭐ |
-| **Community Size** | 🔥 Largest | 🔥 Growing | 🔥 Large | 🔥 Medium |
+| **Community Size** |  Largest |  Growing |  Large |  Medium |
 
 ---
 
@@ -84,19 +84,19 @@ const provider = new BrowserProvider(window.ethereum, "any");
 
 ### Why RainbowKit?
 
-✅ **Best-in-Class UX**
+[Done] **Best-in-Class UX**
 - Beautiful, polished UI out of the box
 - Smooth animations and transitions
 - Mobile-optimized modal
 - Dark/light theme support
 
-✅ **Developer Experience**
+[Done] **Developer Experience**
 - Built specifically for React/Next.js
 - TypeScript-first with excellent types
 - React hooks for all operations
 - Minimal boilerplate code
 
-✅ **Comprehensive Wallet Support**
+[Done] **Comprehensive Wallet Support**
 - **MetaMask** - Browser extension
 - **WalletConnect** - Mobile wallets (200+ wallets)
 - **Coinbase Wallet** - Smart Wallet support
@@ -104,13 +104,13 @@ const provider = new BrowserProvider(window.ethereum, "any");
 - **Trust Wallet, Argent, Ledger Live** - All major wallets
 - **Safe** - Multi-sig wallet support
 
-✅ **Production-Ready**
+[Done] **Production-Ready**
 - Used by top DeFi protocols (Uniswap, Aave, Compound)
 - Battle-tested with millions of users
 - Regular security audits
 - Active maintenance by Rainbow team
 
-✅ **Perfect for Your Stack**
+[Done] **Perfect for Your Stack**
 - Next.js 15 App Router support
 - Works seamlessly with ethers.js or viem
 - Built on wagmi (same team as viem)
@@ -120,32 +120,32 @@ const provider = new BrowserProvider(window.ethereum, "any");
 
 ```
 ┌─────────────────────────────────────────┐
-│         Your Next.js App                │
-│  (Components, Pages, Hooks)             │
+│ Your Next.js App │
+│ (Components, Pages, Hooks) │
 └─────────────┬───────────────────────────┘
-              │
+ │
 ┌─────────────▼───────────────────────────┐
-│      RainbowKit (UI Layer)              │
-│  - ConnectButton component              │
-│  - Wallet selection modal               │
-│  - Account modal                        │
-│  - Chain switcher UI                    │
+│ RainbowKit (UI Layer) │
+│ - ConnectButton component │
+│ - Wallet selection modal │
+│ - Account modal │
+│ - Chain switcher UI │
 └─────────────┬───────────────────────────┘
-              │
+ │
 ┌─────────────▼───────────────────────────┐
-│      wagmi (React Hooks)                │
-│  - useAccount() - Get connected account │
-│  - useConnect() - Connect wallet        │
-│  - useDisconnect() - Disconnect         │
-│  - useSignMessage() - Sign messages     │
-│  - 50+ other hooks                      │
+│ wagmi (React Hooks) │
+│ - useAccount() - Get connected account │
+│ - useConnect() - Connect wallet │
+│ - useDisconnect() - Disconnect │
+│ - useSignMessage() - Sign messages │
+│ - 50+ other hooks │
 └─────────────┬───────────────────────────┘
-              │
+ │
 ┌─────────────▼───────────────────────────┐
-│      viem/ethers.js (Ethereum Client)   │
-│  - Low-level blockchain interactions    │
-│  - Transaction signing                  │
-│  - Contract calls                       │
+│ viem/ethers.js (Ethereum Client) │
+│ - Low-level blockchain interactions │
+│ - Transaction signing │
+│ - Contract calls │
 └─────────────────────────────────────────┘
 ```
 
@@ -181,69 +181,69 @@ import { defineChain } from 'viem';
 
 // Define SOMNIA Testnet
 const somniaTestnet = defineChain({
-  id: 50312,
-  name: 'SOMNIA Testnet',
-  network: 'somnia-testnet',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'SOMNIA',
-    symbol: 'STT',
-  },
-  rpcUrls: {
-    default: { http: ['https://rpc-testnet.somnia.network'] },
-    public: { http: ['https://rpc-testnet.somnia.network'] },
-  },
-  blockExplorers: {
-    default: { 
-      name: 'Shannon Explorer', 
-      url: 'https://shannon-explorer.somnia.network' 
-    },
-  },
-  testnet: true,
+ id: 50312,
+ name: 'SOMNIA Testnet',
+ network: 'somnia-testnet',
+ nativeCurrency: {
+ decimals: 18,
+ name: 'SOMNIA',
+ symbol: 'STT',
+ },
+ rpcUrls: {
+ default: { http: ['https://rpc-testnet.somnia.network'] },
+ public: { http: ['https://rpc-testnet.somnia.network'] },
+ },
+ blockExplorers: {
+ default: { 
+ name: 'Shannon Explorer', 
+ url: 'https://shannon-explorer.somnia.network' 
+ },
+ },
+ testnet: true,
 });
 
 // Define SOMNIA Mainnet
 const somniaMainnet = defineChain({
-  id: 5031,
-  name: 'SOMNIA',
-  network: 'somnia',
-  nativeCurrency: {
-    decimals: 18,
-    name: 'SOMNIA',
-    symbol: 'SOMNIA',
-  },
-  rpcUrls: {
-    default: { http: ['https://rpc.somnia.network'] },
-    public: { http: ['https://rpc.somnia.network'] },
-  },
-  blockExplorers: {
-    default: { 
-      name: 'SOMNIA Explorer', 
-      url: 'https://explorer.somnia.network' 
-    },
-  },
-  testnet: false,
+ id: 5031,
+ name: 'SOMNIA',
+ network: 'somnia',
+ nativeCurrency: {
+ decimals: 18,
+ name: 'SOMNIA',
+ symbol: 'SOMNIA',
+ },
+ rpcUrls: {
+ default: { http: ['https://rpc.somnia.network'] },
+ public: { http: ['https://rpc.somnia.network'] },
+ },
+ blockExplorers: {
+ default: { 
+ name: 'SOMNIA Explorer', 
+ url: 'https://explorer.somnia.network' 
+ },
+ },
+ testnet: false,
 });
 
 const config = getDefaultConfig({
-  appName: 'UGM-AICare',
-  projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!, // Get from WalletConnect Cloud
-  chains: [somniaTestnet, somniaMainnet],
-  ssr: true, // Enable Server-Side Rendering for Next.js
+ appName: 'UGM-AICare',
+ projectId: process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID!, // Get from WalletConnect Cloud
+ chains: [somniaTestnet, somniaMainnet],
+ ssr: true, // Enable Server-Side Rendering for Next.js
 });
 
 const queryClient = new QueryClient();
 
 export function Web3Provider({ children }: { children: React.ReactNode }) {
-  return (
-    <WagmiProvider config={config}>
-      <QueryClientProvider client={queryClient}>
-        <RainbowKitProvider>
-          {children}
-        </RainbowKitProvider>
-      </QueryClientProvider>
-    </WagmiProvider>
-  );
+ return (
+ <WagmiProvider config={config}>
+ <QueryClientProvider client={queryClient}>
+ <RainbowKitProvider>
+ {children}
+ </RainbowKitProvider>
+ </QueryClientProvider>
+ </WagmiProvider>
+ );
 }
 ```
 
@@ -255,19 +255,19 @@ export function Web3Provider({ children }: { children: React.ReactNode }) {
 import { Web3Provider } from '@/providers/Web3Provider';
 
 export default function RootLayout({
-  children,
+ children,
 }: {
-  children: React.ReactNode;
+ children: React.ReactNode;
 }) {
-  return (
-    <html lang="en">
-      <body>
-        <Web3Provider>
-          {children}
-        </Web3Provider>
-      </body>
-    </html>
-  );
+ return (
+ <html lang="en">
+ <body>
+ <Web3Provider>
+ {children}
+ </Web3Provider>
+ </body>
+ </html>
+ );
 }
 ```
 
@@ -284,118 +284,118 @@ import { useEffect, useState } from 'react';
 import { toast } from 'react-hot-toast';
 
 export function WalletLinkButton() {
-  const { address, isConnected } = useAccount();
-  const { signMessageAsync } = useSignMessage();
-  const [isLinking, setIsLinking] = useState(false);
-  const [isLinked, setIsLinked] = useState(false);
+ const { address, isConnected } = useAccount();
+ const { signMessageAsync } = useSignMessage();
+ const [isLinking, setIsLinking] = useState(false);
+ const [isLinked, setIsLinked] = useState(false);
 
-  // Check if wallet is already linked on mount
-  useEffect(() => {
-    if (isConnected && address) {
-      checkIfLinked(address);
-    }
-  }, [isConnected, address]);
+ // Check if wallet is already linked on mount
+ useEffect(() => {
+ if (isConnected && address) {
+ checkIfLinked(address);
+ }
+ }, [isConnected, address]);
 
-  const checkIfLinked = async (walletAddress: string) => {
-    try {
-      const response = await fetch('/api/check-wallet-link', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ address: walletAddress }),
-      });
-      const data = await response.json();
-      setIsLinked(data.isLinked);
-    } catch (error) {
-      console.error('Error checking wallet link:', error);
-    }
-  };
+ const checkIfLinked = async (walletAddress: string) => {
+ try {
+ const response = await fetch('/api/check-wallet-link', {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({ address: walletAddress }),
+ });
+ const data = await response.json();
+ setIsLinked(data.isLinked);
+ } catch (error) {
+ console.error('Error checking wallet link:', error);
+ }
+ };
 
-  const handleLinkWallet = async () => {
-    if (!address) {
-      toast.error('Please connect your wallet first');
-      return;
-    }
+ const handleLinkWallet = async () => {
+ if (!address) {
+ toast.error('Please connect your wallet first');
+ return;
+ }
 
-    setIsLinking(true);
+ setIsLinking(true);
 
-    try {
-      // Sign message to prove wallet ownership
-      const message = 'Linking DID to UGM-AICare';
-      const signature = await signMessageAsync({ message });
+ try {
+ // Sign message to prove wallet ownership
+ const message = 'Linking DID to UGM-AICare';
+ const signature = await signMessageAsync({ message });
 
-      // Send to backend
-      const response = await fetch('/api/link-did', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          address,
-          signature,
-          message,
-        }),
-      });
+ // Send to backend
+ const response = await fetch('/api/link-did', {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({
+ address,
+ signature,
+ message,
+ }),
+ });
 
-      if (!response.ok) {
-        throw new Error('Failed to link wallet');
-      }
+ if (!response.ok) {
+ throw new Error('Failed to link wallet');
+ }
 
-      const data = await response.json();
-      
-      setIsLinked(true);
-      toast.success('Wallet linked successfully!');
-      
-      // Update session
-      if (data.user) {
-        // Trigger session refresh or update global state
-        window.dispatchEvent(new Event('wallet-linked'));
-      }
-    } catch (error: any) {
-      console.error('Error linking wallet:', error);
-      toast.error(error.message || 'Failed to link wallet');
-    } finally {
-      setIsLinking(false);
-    }
-  };
+ const data = await response.json();
+ 
+ setIsLinked(true);
+ toast.success('Wallet linked successfully!');
+ 
+ // Update session
+ if (data.user) {
+ // Trigger session refresh or update global state
+ window.dispatchEvent(new Event('wallet-linked'));
+ }
+ } catch (error: any) {
+ console.error('Error linking wallet:', error);
+ toast.error(error.message || 'Failed to link wallet');
+ } finally {
+ setIsLinking(false);
+ }
+ };
 
-  return (
-    <div className="flex flex-col gap-3">
-      {/* RainbowKit Connect Button */}
-      <ConnectButton 
-        accountStatus={{
-          smallScreen: 'avatar',
-          largeScreen: 'full',
-        }}
-        chainStatus={{
-          smallScreen: 'icon',
-          largeScreen: 'full',
-        }}
-        showBalance={{
-          smallScreen: false,
-          largeScreen: true,
-        }}
-      />
+ return (
+ <div className="flex flex-col gap-3">
+ {/* RainbowKit Connect Button */}
+ <ConnectButton 
+ accountStatus={{
+ smallScreen: 'avatar',
+ largeScreen: 'full',
+ }}
+ chainStatus={{
+ smallScreen: 'icon',
+ largeScreen: 'full',
+ }}
+ showBalance={{
+ smallScreen: false,
+ largeScreen: true,
+ }}
+ />
 
-      {/* Link Button (only show if connected but not linked) */}
-      {isConnected && !isLinked && (
-        <button
-          onClick={handleLinkWallet}
-          disabled={isLinking}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
-        >
-          {isLinking ? 'Linking...' : 'Link Digital Identity'}
-        </button>
-      )}
+ {/* Link Button (only show if connected but not linked) */}
+ {isConnected &&!isLinked && (
+ <button
+ onClick={handleLinkWallet}
+ disabled={isLinking}
+ className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-50"
+ >
+ {isLinking? 'Linking...': 'Link Digital Identity'}
+ </button>
+ )}
 
-      {/* Linked Status */}
-      {isConnected && isLinked && (
-        <div className="flex items-center gap-2 text-green-600">
-          <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
-            <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-          </svg>
-          <span>Wallet Linked</span>
-        </div>
-      )}
-    </div>
-  );
+ {/* Linked Status */}
+ {isConnected && isLinked && (
+ <div className="flex items-center gap-2 text-green-600">
+ <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 20 20">
+ <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+ </svg>
+ <span>Wallet Linked</span>
+ </div>
+ )}
+ </div>
+ );
 }
 ```
 
@@ -410,66 +410,66 @@ import { useAccount, useSignMessage } from 'wagmi';
 import { useState } from 'react';
 
 export function useDIDLogin() {
-  const { address, isConnected } = useAccount();
-  const { signMessageAsync } = useSignMessage();
-  const [isLoggingIn, setIsLoggingIn] = useState(false);
+ const { address, isConnected } = useAccount();
+ const { signMessageAsync } = useSignMessage();
+ const [isLoggingIn, setIsLoggingIn] = useState(false);
 
-  const loginWithDID = async () => {
-    if (!isConnected || !address) {
-      throw new Error('Wallet not connected');
-    }
+ const loginWithDID = async () => {
+ if (!isConnected ||!address) {
+ throw new Error('Wallet not connected');
+ }
 
-    setIsLoggingIn(true);
+ setIsLoggingIn(true);
 
-    try {
-      // Create message with timestamp
-      const timestamp = Date.now();
-      const message = `Login to UGM-AICare as ${address} at ${timestamp}`;
+ try {
+ // Create message with timestamp
+ const timestamp = Date.now();
+ const message = `Login to UGM-AICare as ${address} at ${timestamp}`;
 
-      // Sign message
-      const signature = await signMessageAsync({ message });
+ // Sign message
+ const signature = await signMessageAsync({ message });
 
-      // Send to backend
-      const response = await fetch('/api/did-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          address,
-          signature,
-          message,
-          timestamp,
-        }),
-      });
+ // Send to backend
+ const response = await fetch('/api/did-login', {
+ method: 'POST',
+ headers: { 'Content-Type': 'application/json' },
+ body: JSON.stringify({
+ address,
+ signature,
+ message,
+ timestamp,
+ }),
+ });
 
-      if (!response.ok) {
-        throw new Error('Login failed');
-      }
+ if (!response.ok) {
+ throw new Error('Login failed');
+ }
 
-      const data = await response.json();
+ const data = await response.json();
 
-      // Store token
-      if (data.token) {
-        localStorage.setItem('aicare_token', data.token);
-      }
+ // Store token
+ if (data.token) {
+ localStorage.setItem('aicare_token', data.token);
+ }
 
-      return {
-        token: data.token,
-        address,
-      };
-    } catch (error: any) {
-      console.error('DID login error:', error);
-      throw error;
-    } finally {
-      setIsLoggingIn(false);
-    }
-  };
+ return {
+ token: data.token,
+ address,
+ };
+ } catch (error: any) {
+ console.error('DID login error:', error);
+ throw error;
+ } finally {
+ setIsLoggingIn(false);
+ }
+ };
 
-  return {
-    loginWithDID,
-    isLoggingIn,
-    isConnected,
-    address,
-  };
+ return {
+ loginWithDID,
+ isLoggingIn,
+ isConnected,
+ address,
+ };
 }
 ```
 
@@ -497,11 +497,11 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id_here
 | Aspect | Before | After |
 |--------|--------|-------|
 | **Supported Wallets** | 1 (MetaMask only) | 100+ (MetaMask, WalletConnect, Coinbase, etc.) |
-| **Mobile Support** | ❌ None | ✅ Full mobile wallet support |
+| **Mobile Support** | [Missing] None | [Done] Full mobile wallet support |
 | **Code Complexity** | 173 lines custom code | ~80 lines with built-in UI |
-| **Error Handling** | Manual try/catch | ✅ Built-in error recovery |
+| **Error Handling** | Manual try/catch | [Done] Built-in error recovery |
 | **UX Quality** | ⭐⭐ Basic | ⭐⭐⭐⭐⭐ Professional |
-| **Type Safety** | ⚠️ Partial | ✅ Full TypeScript support |
+| **Type Safety** | [Warning] Partial | [Done] Full TypeScript support |
 | **Maintenance** | High (custom code) | Low (library maintained) |
 | **User Adoption** | Limited (MetaMask users only) | High (all wallet users) |
 
@@ -522,9 +522,9 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id_here
 
 ### Licensing & Cost
 
-- **RainbowKit:** ✅ Free & Open Source (MIT License)
-- **wagmi:** ✅ Free & Open Source (MIT License)
-- **WalletConnect:** ✅ Free tier (unlimited connections)
+- **RainbowKit:** [Done] Free & Open Source (MIT License)
+- **wagmi:** [Done] Free & Open Source (MIT License)
+- **WalletConnect:** [Done] Free tier (unlimited connections)
 
 **Total Cost:** $0 💰
 
@@ -534,22 +534,22 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id_here
 
 ### RainbowKit Security Features
 
-✅ **Signature Verification**
+[Done] **Signature Verification**
 - Built-in SIWE (Sign-In with Ethereum) support
 - Message signing for authentication
 - Replay attack prevention
 
-✅ **Wallet Detection**
+[Done] **Wallet Detection**
 - Safe wallet provider detection
 - No reliance on window.ethereum injection order
 - Prevents phishing wallet extensions
 
-✅ **Regular Audits**
+[Done] **Regular Audits**
 - Maintained by professional security team
 - Regular third-party security audits
 - Bug bounty program active
 
-✅ **Privacy**
+[Done] **Privacy**
 - No tracking or analytics by default
 - User data stays in your control
 - GDPR compliant
@@ -570,45 +570,45 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id_here
 ### Phase 1: Local Testing
 
 1. **Install & Configure** (30 mins)
-   - Install dependencies
-   - Set up providers
-   - Get WalletConnect Project ID
+ - Install dependencies
+ - Set up providers
+ - Get WalletConnect Project ID
 
 2. **Test Wallet Connections** (1 hour)
-   - MetaMask (browser extension)
-   - WalletConnect (scan QR with mobile)
-   - Coinbase Wallet
-   - Rainbow Wallet
+ - MetaMask (browser extension)
+ - WalletConnect (scan QR with mobile)
+ - Coinbase Wallet
+ - Rainbow Wallet
 
 3. **Test Existing Features** (2 hours)
-   - Wallet linking flow
-   - DID login flow
-   - Sign message functionality
-   - Backend signature verification
+ - Wallet linking flow
+ - DID login flow
+ - Sign message functionality
+ - Backend signature verification
 
 ### Phase 2: Testnet Deployment
 
 1. **Deploy to SOMNIA Testnet** (1 hour)
-   - Verify chain configuration
-   - Test network switching
-   - Verify contract interactions
+ - Verify chain configuration
+ - Test network switching
+ - Verify contract interactions
 
 2. **Mobile Testing** (2 hours)
-   - Test WalletConnect QR flow
-   - Test in-app browsers (MetaMask mobile, Trust Wallet)
-   - Test responsive UI
+ - Test WalletConnect QR flow
+ - Test in-app browsers (MetaMask mobile, Trust Wallet)
+ - Test responsive UI
 
 ### Phase 3: User Acceptance Testing
 
 1. **Internal Team Testing** (1 week)
-   - Test all wallet types
-   - Collect feedback on UX
-   - Fix any edge cases
+ - Test all wallet types
+ - Collect feedback on UX
+ - Fix any edge cases
 
 2. **Beta User Testing** (1-2 weeks)
-   - Small group of real users
-   - Multiple wallet types
-   - Monitor error rates
+ - Small group of real users
+ - Multiple wallet types
+ - Monitor error rates
 
 ---
 
@@ -660,7 +660,7 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id_here
 
 ## Recommendation Summary
 
-### ✅ GO with wagmi + RainbowKit
+### [Done] GO with wagmi + RainbowKit
 
 **Reasons:**
 1. **Best UX** - Beautiful, professional UI that users expect
@@ -676,7 +676,7 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id_here
 - **Deployment:** Same day
 - **Total:** 3-5 days to full migration
 
-**Risk Level:** ⚠️ LOW
+**Risk Level:** [Warning] LOW
 - No breaking changes to backend
 - Can deploy gradually (feature flag)
 - Easy rollback if needed
@@ -688,47 +688,47 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id_here
 ### Immediate Actions (This Week)
 
 1. **Get WalletConnect Project ID** (5 mins)
-   - Sign up at https://cloud.walletconnect.com
-   - Create project
-   - Copy Project ID
+ - Sign up at https://cloud.walletconnect.com
+ - Create project
+ - Copy Project ID
 
 2. **Install Dependencies** (10 mins)
-   ```bash
-   cd frontend
-   npm install @rainbow-me/rainbowkit wagmi viem@2.x @tanstack/react-query
-   ```
+ ```bash
+ cd frontend
+ npm install @rainbow-me/rainbowkit wagmi viem@2.x @tanstack/react-query
+ ```
 
 3. **Create Web3Provider** (30 mins)
-   - Copy the provider code above
-   - Configure SOMNIA chains
-   - Add to layout.tsx
+ - Copy the provider code above
+ - Configure SOMNIA chains
+ - Add to layout.tsx
 
 4. **Test Locally** (1 hour)
-   - Connect with MetaMask
-   - Test WalletConnect QR
-   - Verify signature flow
+ - Connect with MetaMask
+ - Test WalletConnect QR
+ - Verify signature flow
 
 ### Follow-Up Actions (Next Week)
 
 5. **Migrate Components** (2-3 hours)
-   - Replace WalletLinkButton
-   - Update useDIDLogin hook
-   - Update any components using wallet state
+ - Replace WalletLinkButton
+ - Update useDIDLogin hook
+ - Update any components using wallet state
 
 6. **Backend Verification** (1 hour)
-   - Ensure signature verification works with any wallet
-   - Update error messages
-   - Add wallet type logging
+ - Ensure signature verification works with any wallet
+ - Update error messages
+ - Add wallet type logging
 
 7. **Integration Testing** (1 day)
-   - Test all user flows
-   - Test multiple wallet types
-   - Test mobile wallets
+ - Test all user flows
+ - Test multiple wallet types
+ - Test mobile wallets
 
 8. **Deploy to Staging** (1 day)
-   - Deploy to testnet environment
-   - Beta user testing
-   - Monitor error logs
+ - Deploy to testnet environment
+ - Beta user testing
+ - Monitor error logs
 
 ---
 
@@ -751,14 +751,14 @@ NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=your_project_id_here
 
 ---
 
-**Status:** ✅ Ready to Implement  
-**Confidence Level:** 🔥 HIGH  
-**Recommended Solution:** wagmi + RainbowKit  
-**Estimated Migration Time:** 3-5 days  
-**Risk Level:** LOW ⚠️
+**Status:** [Done] Ready to Implement 
+**Confidence Level:**  HIGH 
+**Recommended Solution:** wagmi + RainbowKit 
+**Estimated Migration Time:** 3-5 days 
+**Risk Level:** LOW [Warning]
 
 ---
 
-*Document Created: October 27, 2025*  
-*Last Updated: October 27, 2025*  
+*Document Created: October 27, 2025* 
+*Last Updated: October 27, 2025* 
 *Version: 1.0*

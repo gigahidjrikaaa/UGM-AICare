@@ -1,6 +1,6 @@
 "use client";
 
-import { ReactNode } from 'react';
+import { ReactNode, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import AdminHeader from '@/components/ui/admin/AdminHeader';
 import AdminSidebar from '@/components/ui/admin/AdminSidebar';
@@ -56,14 +56,16 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     pathname?.includes('/screening') ||
     pathname?.includes('/retention');
 
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   // Render layout if authenticated as admin
   return (
     <AdminSSEProvider>
       <I18nProvider storageKey="admin_locale">
         <div className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F] text-white flex">
-          <AdminSidebar />
+          <AdminSidebar isMobileOpen={mobileNavOpen} onMobileClose={() => setMobileNavOpen(false)} />
           <div className="flex-1 flex flex-col min-h-screen overflow-x-hidden relative">
-            <AdminHeader />
+            <AdminHeader onMenuToggle={() => setMobileNavOpen(!mobileNavOpen)} />
             <main className={`flex-1 overflow-y-auto bg-[#001030]/30 ${isFullWidthPage ? '' : 'p-4 md:p-6 lg:p-8'}`}>
               {children}
             </main>

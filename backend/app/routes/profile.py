@@ -134,21 +134,26 @@ async def _build_timeline(user_id: int, db: AsyncSession) -> List[TimelineEntry]
     timeline: List[TimelineEntry] = []
 
     journal_stmt = (
-        select(JournalEntry)
+        select(
+            JournalEntry.id,
+            JournalEntry.entry_date,
+            JournalEntry.content,
+            JournalEntry.created_at,
+        )
         .where(JournalEntry.user_id == user_id)
         .order_by(JournalEntry.created_at.desc())
         .limit(10)
     )
-    journal_entries = (await db.execute(journal_stmt)).scalars().all()
-    for entry in journal_entries:
-        description = (entry.content[:160] + "...") if len(entry.content) > 160 else entry.content
+    journal_entries = (await db.execute(journal_stmt)).all()
+    for entry_id, entry_date, content, created_at in journal_entries:
+        description = (content[:160] + "...") if len(content) > 160 else content
         timeline.append(
             TimelineEntry(
                 kind="journal",
                 title="Journal entry submitted",
                 description=description,
-                timestamp=entry.created_at,
-                metadata={"entry_id": entry.id, "entry_date": date.fromisoformat(str(entry.entry_date)).isoformat()},
+                timestamp=created_at,
+                metadata={"entry_id": entry_id, "entry_date": date.fromisoformat(str(entry_date)).isoformat()},
             )
         )
 

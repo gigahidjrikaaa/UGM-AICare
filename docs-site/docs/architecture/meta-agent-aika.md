@@ -73,19 +73,19 @@ The tool-calling loop looks like this:
 
 ```mermaid
 sequenceDiagram
-    participant AIKA as Aika
-    participant GEM as Gemini
-    participant TOOL as Tool Registry
-    participant DB as Database
+ participant AIKA as Aika
+ participant GEM as Gemini
+ participant TOOL as Tool Registry
+ participant DB as Database
 
-    AIKA->>GEM: Send message + available tool schemas
-    GEM-->>AIKA: Function call request: get_available_counselors()
-    AIKA->>TOOL: Execute get_available_counselors()
-    TOOL->>DB: Query counsellors with availability
-    DB-->>TOOL: List of counsellors + slots
-    TOOL-->>AIKA: Tool result
-    AIKA->>GEM: Re-prompt with tool result
-    GEM-->>AIKA: Natural language response incorporating real data
+ AIKA->>GEM: Send message + available tool schemas
+ GEM-->>AIKA: Function call request: get_available_counselors()
+ AIKA->>TOOL: Execute get_available_counselors()
+ TOOL->>DB: Query counsellors with availability
+ DB-->>TOOL: List of counsellors + slots
+ TOOL-->>AIKA: Tool result
+ AIKA->>GEM: Re-prompt with tool result
+ GEM-->>AIKA: Natural language response incorporating real data
 ```
 
 The iteration budget is capped per intent type to prevent runaway tool-calling loops:
@@ -104,7 +104,7 @@ The iteration budget is capped per intent type to prevent runaway tool-calling l
 Aika maintains conversational memory through LangGraph's native checkpointer:
 
 1. **Short-term Conversational Memory:** The state (including `conversation_history`) is durably saved via `AsyncPostgresSaver` after every graph iteration. This maintains strict continuity across the session. To cap input token costs, the history sent to the LLM is typically bounded to the last 10 turns (20 messages).
-2. **Long-term Context (Database):** The student's profile, journal entries, past interventions, and screening history reside in PostgreSQL. These are not eagerly loaded—Aika uses tools like `get_user_profile()` or `get_journal_entries()` to fetch them only when relevant.
+2. **Long-term Context (Database):** The student's profile, journal entries, past interventions, and screening history reside in PostgreSQL. These are not eagerly loaded - Aika uses tools like `get_user_profile()` or `get_journal_entries()` to fetch them only when relevant.
 
 ## Screening - The Covert Layer
 

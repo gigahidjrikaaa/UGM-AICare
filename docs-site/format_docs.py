@@ -1,57 +1,62 @@
-import os
+from __future__ import annotations
+
+from pathlib import Path
 import re
 
-directories = {
-    'research': ['problem-statement.md', 'methodology.md', 'evaluation.md', 'ethics.md'],
-    'architecture': ['system-overview.md', 'agentic-framework.md', 'meta-agent-aika.md', 'safety-triage-agent.md', 'therapeutic-coach.md', 'case-management.md', 'insights-agent.md'],
-    'passive-screening': ['methodology.md', 'validated-instruments.md', 'data-safety.md'],
-    'aika-autopilot': ['policy-governed-autonomy.md', 'implementation-plan.md'],
-    'care-token': ['tokenomics.md', 'smart-contracts.md', 'wallet-integration.md'],
-    'analytics': ['privacy-first-data.md', 'database-best-practices.md'],
-    'engineering': ['tech-stack.md', 'development-workflow.md', 'api-reference.md', 'frontend-overview.md'],
-    'deployment': ['infrastructure-map.md', 'ci-cd-flow.md', 'monitoring.md', 'setup.md']
+
+DOCS_ROOT = Path(__file__).resolve().parent / "docs"
+
+# Reduce visual noise while preserving meaning.
+EMOJI_REPLACEMENTS: dict[str, str] = {
+    "✅": "[Done]",
+    "⚠️": "[Warning]",
+    "⚠": "[Warning]",
+    "❌": "[Missing]",
+    "🟡": "[Optional]",
+    "🚀": "[Start]",
+    "🔧": "[Setup]",
+    "📝": "[Note]",
+    "📍": "[Address]",
+    "✨": "",
+    "🔥": "",
+    "🤖": "AIKA",
+    "🧠": "TCA",
+    "📊": "IA",
+    "🎓": "Student",
 }
 
-emoji_pattern = re.compile(r'[\U00010000-\U0010ffff]', flags=re.UNICODE)
-dash_pattern = re.compile(r'—')
 
-for d, files in directories.items():
-    for idx, f in enumerate(files):
-        path = os.path.join('UGM-AICare/docs-site/docs', d, f)
-        if not os.path.exists(path):
-            print(f"File not found: {path}")
-            continue
-            
-        with open(path, 'r', encoding='utf-8') as file:
-            content = file.read()
-            
-        # Check if already has frontmatter
-        if not content.startswith('---'):
-            # Generate title
-            title = f.replace('.md', '').replace('-', ' ').title()
-            # Try to extract title from first # heading
-            first_heading = re.search(r'^#\s+(.+)$', content, re.MULTILINE)
-            if first_heading:
-                title = first_heading.group(1).strip()
-                # Remove emojis from title
-                title = emoji_pattern.sub('', title).strip()
-            
-            frontmatter = f"---\nsidebar_position: {idx + 1}\nid: {f.replace('.md', '')}\ntitle: {title}\n---\n\n"
-            content = frontmatter + content
-            
-        # Remove emojis and em dashes (replace em dash with simple dash or comma based on context, here let's just use regular dash)
-        # Actually replacing em dash with spaced en dash
-        content = content.replace('—', '-')
-        
-        # We don't completely strip emojis because some might be in mermaid, but actually emojis in mermaid are fine. 
-        # But we remove them from headings.
-        lines = content.split('\n')
-        for i in range(len(lines)):
-            if lines[i].startswith('#'):
-                lines[i] = emoji_pattern.sub('', lines[i]).strip()
-                
-        # Write back
-        with open(path, 'w', encoding='utf-8') as file:
-            file.write('\n'.join(lines))
+def _normalize_text(content: str) -> str:
+    content = content.replace("—", " - ")
 
-print("Formatting complete.")
+    # Collapse extra spaces from replacement pass.
+    content = re.sub(r" {2,}", " ", content)
+
+    for emoji, replacement in EMOJI_REPLACEMENTS.items():
+        content = content.replace(emoji, replacement)
+
+    # Tidy spaces before punctuation introduced by replacements.
+    content = re.sub(r"\s+([,.;:!?])", r"\1", content)
+    # Tidy duplicated brackets from repeated replacements.
+    content = re.sub(r"\[(Done|Warning|Missing|Optional)\]\s+\[(Done|Warning|Missing|Optional)\]", r"[\1] [\2]", content)
+
+    return content
+
+
+def format_docs() -> int:
+    files = sorted(DOCS_ROOT.rglob("*.md")) + sorted(DOCS_ROOT.rglob("*.mdx"))
+    changed = 0
+
+    for path in files:
+        original = path.read_text(encoding="utf-8")
+        updated = _normalize_text(original)
+        if updated != original:
+            path.write_text(updated, encoding="utf-8")
+            changed += 1
+
+    return changed
+
+
+if __name__ == "__main__":
+    changed_files = format_docs()
+    print(f"Formatting complete. Updated {changed_files} file(s).")
