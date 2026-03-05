@@ -54,9 +54,8 @@ The `role` field determines which API endpoints are accessible and which Aika to
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `POST` | `/api/v1/chat` | Send a message, receive text response |
-| `GET` | `/api/v1/chat/stream/{session_id}` | SSE stream for real-time token streaming |
-| `GET` | `/api/v1/chat/history/{conversation_id}` | Fetch full conversation history |
+| `POST` | `/api/v1/aika` | Send a message and receive SSE stream response |
+| `GET` | `/api/v1/history` | Fetch authenticated user's conversation history |
 
 ### Appointments
 
@@ -87,8 +86,8 @@ The `role` field determines which API endpoints are accessible and which Aika to
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `POST` | `/api/v1/sta/analyze/{conversation_id}` | Manually trigger STA analysis |
-| `GET` | `/api/v1/sta/assessment/{conversation_id}` | Fetch STA report for a conversation |
+| `POST` | `/api/v1/admin/conversation-assessments/{conversation_id}/trigger` | Manually trigger STA analysis |
+| `GET` | `/api/v1/admin/conversation-assessments/{conversation_id}` | Fetch STA report for a conversation |
 
 ---
 
@@ -98,7 +97,7 @@ API endpoints are rate-limited via Redis to prevent abuse:
 
 | Endpoint Group | Limit |
 | --- | --- |
-| Chat (`/api/v1/chat`) | 30 requests / minute per user |
+| Aika (`/api/v1/aika`) | 30 requests / minute per user |
 | Analytics | 60 requests / minute per user |
 | Auth | 10 requests / minute per IP |
 | All others | 120 requests / minute per user |

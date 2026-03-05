@@ -5,10 +5,8 @@ sidebar_position: 5
 ---
 
 # Insights Agent
-sidebar_position: 5
----
 
-# IA - Insights Agent
+## IA - Insights Agent
 
 ## What Is the IA?
 

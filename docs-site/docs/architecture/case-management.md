@@ -5,10 +5,8 @@ sidebar_position: 4
 ---
 
 # Case Management Agent
-sidebar_position: 4
----
 
-# CMA - Case Management Agent
+## CMA - Case Management Agent
 
 ## What Is the CMA?
 

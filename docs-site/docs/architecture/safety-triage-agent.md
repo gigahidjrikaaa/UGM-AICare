@@ -5,10 +5,8 @@ sidebar_position: 2
 ---
 
 # Safety Triage Agent
-sidebar_position: 2
----
 
-# STA - Safety Triage Agent
+## STA - Safety Triage Agent
 
 ## What Is the STA?
 
@@ -76,7 +74,10 @@ The STA extracts indicators corresponding to three validated clinical instrument
 | **DASS-21** | Depression, Anxiety, and Stress | Combined 21-item indicator set |
 
 These extracted indicators are accumulated in the student's `ScreeningProfile` table over time, building a longitudinal view of their mental health trajectory. Counsellors see this as a trend chart in their dashboard.:::info Note on validity
-Covert screening from conversational text is **indicative, not diagnostic**. The STA's screening outputs are intended to assist counsellors in prioritisation, not to replace formal clinical assessment.:::
+
+:::info Note on validity
+Covert screening from conversational text is **indicative, not diagnostic**. The STA's screening outputs are intended to assist counsellors in prioritisation, not to replace formal clinical assessment.
+:::
 
 ---
 
@@ -96,10 +97,10 @@ This ensures that even if conversation logs are used for model fine-tuning or an
 
 ## Manual Trigger
 
-Counsellors and administrators can manually trigger the STA analysis on any conversation via Aika's `trigger_conversation_analysis` tool, or directly through the API at:
+Counsellors and administrators can manually trigger the STA analysis on any conversation via Aika's `trigger_conversation_analysis` tool, or directly through the admin API at:
 
 ```
-POST /api/v1/sta/analyze/{conversation_id}
+POST /api/v1/admin/conversation-assessments/{conversation_id}/trigger
 ```
 
 This is useful when a counsellor is reviewing a historical conversation and wants a fresh clinical summary without waiting for the automated background task.

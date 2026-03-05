@@ -23,7 +23,7 @@ const features: FeatureItem[] = [
     icon: '🛡️',
     title: 'Real-Time Safety Triage',
     description:
-      'Every message is scanned in milliseconds. The Safety Triage Agent (STA) checks for crisis signals — from keyword patterns to deep semantic understanding — before any response reaches you.',
+      'Every message is scanned in milliseconds. The Safety Triage Agent (STA) combines keyword checks with Gemini-based intent and risk classification before any response reaches you.',
   },
   {
     icon: '🧠',

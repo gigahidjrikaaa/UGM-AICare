@@ -163,7 +163,7 @@ HAVING COUNT(DISTINCT c.id) >= 5
 - Table: date, total_conversations, escalated_to_human, handled_by_ai, ai_resolution_rate
 - Privacy: Minimum 5 conversations per day
 
-**Key Metric**: Escalation = case created for conversation (SDA intervention)
+**Key Metric**: Escalation = case created for conversation (CMA intervention)
 
 ---
 
@@ -419,7 +419,7 @@ response = await service.query(request)
 
 ### Performance Metrics
 
-4. **Cost Per Helpful**: Efficiency of STA → SCA workflow
+4. **Cost Per Helpful**: Efficiency of STA → TCA workflow
 5. **Dropoff Rate**: User engagement and satisfaction proxy
 6. **Resource Reuse**: Long-term intervention value
 
@@ -440,7 +440,7 @@ response = await service.query(request)
 ### Immediate (Phase 1)
 
 - [Done] **Task 1: IA Analytics Queries** - COMPLETED
-- ⏳ **Task 2: SDA Auto-Assignment** - Implement counselor workload balancing
+- ⏳ **Task 2: CMA Auto-Assignment** - Implement counselor workload balancing
 - ⏳ **Task 3: Redis Caching** - Implement Gemini response caching
 
 ### Testing
@@ -481,7 +481,7 @@ response = await service.query(request)
 
 ### Analytics Expansion
 
-- [ ] Add more queries (sentiment trends, SCA intervention types, SDA SLA metrics)
+- [ ] Add more queries (sentiment trends, TCA intervention types, CMA SLA metrics)
 - [ ] Implement custom query builder (admin-only, privacy-restricted)
 - [ ] Add export functionality (CSV, JSON, PDF reports)
 

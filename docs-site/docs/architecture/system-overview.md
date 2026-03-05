@@ -5,10 +5,6 @@ sidebar_position: 1
 ---
 
 # System Architecture Overview
-sidebar_position: 1
----
-
-# System Architecture Overview
 
 ## The Big Picture
 
@@ -95,7 +91,7 @@ The backend is a **FastAPI** (Python) application. It handles:
 - **Agent invocation** - when a student sends a message, the backend constructs the context payload and invokes the Aika orchestrator graph
 - **Scheduled tasks** - background jobs (e.g., post-conversation STA analysis, retention reminders)
 
-The backend is stateless; the conversational state checkpointer lives in **PostgreSQL** via LangGraph's `AsyncPostgresSaver`, and high-speed semantic caching lives in **Redis**.
+The backend is stateless; the conversational state checkpointer lives in **PostgreSQL** via LangGraph's `AsyncPostgresSaver`, and high-speed runtime caching / rate limiting lives in **Redis**.
 
 ### 3. AI Agent Layer (Where the Intelligence Lives)
 
@@ -113,13 +109,12 @@ sequenceDiagram
  participant FE as Frontend
  participant API as FastAPI
  participant AIKA as Aika Orchestrator
+ participant STA as STA Background Task
  participant GEM as Gemini API
  participant DB as PostgreSQL
- participant REDIS as Redis
 
  S->>FE: Types a message
- FE->>API: POST /chat (message + session)
- API->>REDIS: Load conversation history
+ FE->>API: POST /api/v1/aika (message + session)
  API->>DB: Fetch user profile & context
  API->>AIKA: Invoke orchestrator graph (compiled singleton)
  AIKA->>AIKA: aika_decision_node
@@ -128,7 +123,7 @@ sequenceDiagram
  alt Risk ≥ HIGH
  AIKA->>AIKA: parallel_crisis_node (TCA + CMA async fan-out)
  else Risk = MODERATE
- AIKA->>AIKA: execute_sca_subgraph (TCA only)
+ AIKA->>AIKA: execute_sca node (TCA only)
  else Risk = LOW
  AIKA->>GEM: Generate empathetic reply (ReAct loop)
  end
@@ -136,7 +131,8 @@ sequenceDiagram
  API-->>FE: Stream response via SSE
  FE-->>S: Response appears token-by-token
  API->>DB: Persist message & risk data (async)
- API->>AIKA: Trigger STA deep analysis (async background task)
+ AIKA-->>STA: Trigger deep analysis (async, non-blocking)
+ STA->>DB: Persist assessment + screening profile updates
 ```
 
 The entire path from message receipt to first token of response typically completes in **300–600 ms** for low-risk conversations.

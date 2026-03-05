@@ -35,12 +35,12 @@ The system uses **LangGraph**, a library built on top of LangChain, to define th
 ```mermaid
 flowchart TD
  START([User Message])
- AIKA[AIKA Aika Decision Node\nIntent classification + risk pre-check]
- CRISIS{Risk Level?}
+ AIKA[Aika Decision Node\nIntent classification + risk pre-check]
+ CRISIS{Route Decision}
  PAR[Parallel Fan-out\nTCA + CMA simultaneously]
- TCA_N[TCA TCA Node\nTherapeutic coaching plan]
- CMA_N[📋 CMA Node\nCase & counsellor assignment]
- IA_N[IA IA Node\nAnalytics query]
+ TCA_N[TCA Node\nTherapeutic coaching plan]
+ CMA_N[CMA Node\nCase and counsellor assignment]
+ IA_N[IA Node\nAnalytics query]
  SYNTH[Synthesis Node\nMerge sub-agent outputs]
  DIRECT[Direct Response\nEmpathetic reply]
  END_N([Response to Student])
@@ -49,16 +49,16 @@ flowchart TD
 
  START --> AIKA
  AIKA --> CRISIS
- CRISIS -- "HIGH / CRITICAL" --> PAR
+ CRISIS -- "risk=high/critical" --> PAR
  PAR --> TCA_N
  PAR --> CMA_N
  TCA_N --> SYNTH
  CMA_N --> SYNTH
- CRISIS -- "MODERATE" --> TCA_N
+ CRISIS -- "risk=moderate" --> TCA_N
  TCA_N --> SYNTH
- CRISIS -- "ANALYTICS\n(admin/counsellor)" --> IA_N
+ CRISIS -- "next_step=ia\n(admin/counsellor)" --> IA_N
  IA_N --> SYNTH
- CRISIS -- "LOW / CASUAL" --> DIRECT
+ CRISIS -- "direct response" --> DIRECT
  SYNTH --> END_N
  DIRECT --> END_N
  END_N -.->|async, non-blocking| STA_BG
@@ -71,7 +71,7 @@ Aika serves as the primary router, classifying intent and performing a rapid key
 Key workflow decisions:
 - **High/Critical risk** triggers a **parallel fan-out** - TCA and CMA run concurrently (`asyncio.gather`) so the student gets a complete response faster.
 - **Moderate risk** routes to TCA only - deep coaching support without opening a formal clinical case.
-- **Analytics requests** (from counsellors or admins) reach the IA node.
+- **Analytics requests** (classified as `analytics_query`, counsellor/admin roles) reach the IA node.
 - **Low risk / casual conversation** returns a direct empathetic reply from Aika without invoking sub-agents via a ReAct tool loop.
 - **STA** is deliberately *outside* the real-time graph. It is triggered as a non-blocking background task (`trigger_sta_conversation_analysis_background`) after the conversation, so it never adds latency to the student's experience.
 
@@ -89,7 +89,7 @@ To avoid the high overhead of compiling the LangGraph workflow and binding datab
 
 ### 3. Redis Caching
 While PostgreSQL acts as the primary checkpointer, high-speed ephemeral data is managed by **Redis**:
-- **Semantic Classification Cache:** Frequent or repetitive inferences (especially inside the STA) are hashed and cached to reduce Gemini API calls.
+- **Operational Cache:** Short-lived keys for runtime coordination and performance-sensitive lookups.
 - **Rate Limiting & Triage:** Prevents API abuse and ensures stability.
 - **Session Tracking:** Fast retrieval of ongoing session statuses.
 

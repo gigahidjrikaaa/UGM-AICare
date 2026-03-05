@@ -40,11 +40,10 @@ frontend/src/
 
 Aika's responses stream token-by-token using **Server-Sent Events (SSE)**. The sequence is:
 
-1. The frontend sends the user's message to `POST /api/v1/chat`
-2. The backend returns a `stream_id` immediately (< 50 ms)
-3. The frontend opens an SSE connection to `GET /api/v1/chat/stream/{stream_id}`
-4. As the backend generates tokens from Gemini, it pushes them through the SSE connection
-5. The frontend appends each token to the current message bubble in real-time
+1. The frontend sends the user's message to `POST /api/v1/aika`
+2. The backend immediately opens an SSE stream (`text/event-stream`) on the same response
+3. As the backend executes the orchestrator and Gemini calls, it pushes progressive events/tokens through that stream
+4. The frontend appends each token to the current message bubble in real-time
 
 This produces the "typing" effect that makes Aika feel responsive rather than like a slow batch process.
 

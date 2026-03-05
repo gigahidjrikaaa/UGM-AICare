@@ -5,10 +5,8 @@ sidebar_position: 3
 ---
 
 # Therapeutic Coach Agent
-sidebar_position: 3
----
 
-# TCA - Therapeutic Coach Agent
+## TCA - Therapeutic Coach Agent
 
 ## What Is the TCA?
 

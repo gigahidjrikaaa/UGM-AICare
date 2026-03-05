@@ -336,7 +336,7 @@ Access Kibana at: `http://localhost:5601`
 1. **Request Rate**: Requests per second
 2. **Response Time**: P50, P95, P99 latencies
 3. **Error Rate**: 4xx/5xx errors
-4. **Agent Processing Time**: Time taken by each agent (STA, SCA, SDA, IA)
+4. **Agent Processing Time**: Time taken by each agent (STA, TCA, CMA, IA)
 5. **LLM API Latency**: Gemini API response times
 6. **Database Query Time**: Slow query detection
 7. **Tool Execution Time**: Time for each tool call
@@ -1214,8 +1214,8 @@ curl 'http://localhost:9090/api/v1/query?query=agent_processing_time_seconds'
 # Find all errors
 level: ERROR
 
-# Find slow agent processing
-app.agent: "SCA" AND app.processing_time_ms: >5000
+# Find slow therapeutic-coach processing (TCA path)
+app.agent: "aika::sca" AND app.processing_time_ms: >5000
 
 # Find crisis escalations
 message: "crisis" AND app.risk_level: "critical"

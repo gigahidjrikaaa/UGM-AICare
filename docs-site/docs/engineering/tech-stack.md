@@ -67,10 +67,10 @@ Gemini 2.5 Flash was selected for the real-time conversational path due to its l
 | Technology | Role |
 | --- | --- |
 | **PostgreSQL (Supabase)** | Primary relational database AND LangGraph persistent Checkpointer (`AsyncPostgresSaver`) |
-| **Redis** | Semantic classification cache, rate limiting, and ephemeral session tracking |
+| **Redis** | Runtime cache, rate limiting, and ephemeral session tracking |
 | **S3-compatible storage** | PDF report storage (STA clinical reports, IA exports) |
 
-PostgreSQL is the system's absolute source of truth. Rather than storing conversational state in Redis, UGM-AICare leverages LangGraph's native `AsyncPostgresSaver` to durably persist the orchestrator's state (including conversation history) directly to the database. Redis is reserved strictly for high-speed ephemeral tasks (e.g. caching repeated semantic inferences in the STA pipeline to save API costs).
+PostgreSQL is the system's absolute source of truth. Rather than storing conversational state in Redis, UGM-AICare leverages LangGraph's native `AsyncPostgresSaver` to durably persist the orchestrator's state (including conversation history) directly to the database. Redis is reserved strictly for high-speed ephemeral tasks (for example, rate limiting and short-lived runtime/session keys).
 ---
 
 ### 5. Infrastructure & Deployment
