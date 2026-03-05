@@ -28,6 +28,9 @@ const activityComponents: Record<string, React.LazyExoticComponent<React.Compone
   'four-seven-eight': lazy(() => import('./breathing/FourSevenEight')),
   // Grounding
   'five-four-three-two-one': lazy(() => import('./grounding/FiveFourThreeTwoOne')),
+  'three-three-three': lazy(() => import('./grounding/ThreeThreeThree')),
+  // Mindfulness
+  'body-scan': lazy(() => import('./mindfulness/BodyScan')),
 };
 
 interface ActivityPlayerProps {
@@ -42,7 +45,7 @@ interface ActivityPlayerProps {
 
 function LoadingSpinner() {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] p-6">
+    <div className="flex flex-col items-center justify-center min-h-100 p-6">
       <div className="w-16 h-16 border-4 border-primary/20 border-t-primary rounded-full animate-spin" />
       <p className="mt-4 text-muted-foreground">Loading activity...</p>
     </div>
@@ -51,7 +54,7 @@ function LoadingSpinner() {
 
 function ActivityNotFound({ activityId, onExit }: { activityId: string; onExit?: () => void }) {
   return (
-    <div className="flex flex-col items-center justify-center min-h-[400px] p-6 text-center">
+    <div className="flex flex-col items-center justify-center min-h-100 p-6 text-center">
       <div className="text-6xl mb-4">🔍</div>
       <h2 className="text-xl font-bold text-foreground mb-2">Activity Not Found</h2>
       <p className="text-muted-foreground mb-6">

@@ -1,6 +1,6 @@
 /**
  * Grounding Activities Export
- * 
+ *
  * This file exports all grounding activities for registration.
  * Grounding techniques help anchor users to the present moment.
  */
@@ -8,6 +8,7 @@
 import type { ActivityMetadata } from '../types';
 
 export { default as FiveFourThreeTwoOne } from './FiveFourThreeTwoOne';
+export { default as ThreeThreeThree } from './ThreeThreeThree';
 
 // Activity metadata for the registry
 export const groundingActivities: ActivityMetadata[] = [
@@ -21,5 +22,16 @@ export const groundingActivities: ActivityMetadata[] = [
     tags: ['anxiety', 'panic', 'present-moment', 'sensory'],
     icon: '🌿',
     component: 'FiveFourThreeTwoOne',
+  },
+  {
+    id: 'three-three-three',
+    name: '3-3-3 Grounding',
+    description: 'A quick and easy technique to center yourself: name 3 things you see, 3 things you hear, and move 3 body parts.',
+    category: 'grounding',
+    estimatedDuration: 120,
+    difficulty: 'beginner',
+    tags: ['anxiety', 'grounding', 'focus', 'present-moment'],
+    icon: '🧘‍♀️',
+    component: 'ThreeThreeThree',
   },
 ];

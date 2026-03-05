@@ -13,11 +13,13 @@
 import { ActivityMetadata } from './types';
 import { breathingActivities } from './breathing';
 import { groundingActivities } from './grounding';
+import { mindfulnessActivities } from './mindfulness';
 
 // Combine all activities from different categories
 const allActivities: ActivityMetadata[] = [
   ...breathingActivities,
   ...groundingActivities,
+  ...mindfulnessActivities,
 ];
 
 /**

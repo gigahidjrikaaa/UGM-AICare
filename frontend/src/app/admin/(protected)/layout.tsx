@@ -13,6 +13,8 @@ import { I18nProvider } from '@/i18n/I18nProvider';
 
 export default function AdminLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
+
   // Monitor for backend token expiry and auto sign-out
   useAdminSessionExpiry();
 
@@ -55,8 +57,6 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     pathname?.includes('/dashboard') ||
     pathname?.includes('/screening') ||
     pathname?.includes('/retention');
-
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // Render layout if authenticated as admin
   return (

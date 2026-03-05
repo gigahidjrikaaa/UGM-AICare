@@ -32,3 +32,5 @@ export type {
 // Individual activities (for direct import if needed)
 export { BoxBreathing, FourSevenEight, breathingActivities } from './breathing';
 export { FiveFourThreeTwoOne, groundingActivities } from './grounding';
+
+export { BodyScan, mindfulnessActivities } from './mindfulness';

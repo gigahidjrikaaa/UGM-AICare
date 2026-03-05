@@ -1,4 +1,8 @@
-'use client';
+import os
+
+file_path = "frontend/src/app/admin/(protected)/screening/page.tsx"
+
+content = """'use client';
 
 import { useEffect, useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -743,3 +747,9 @@ export default function AdminScreeningPage() {
     </div>
   );
 }
+"""
+
+with open(file_path, "w", encoding="utf-8") as f:
+    f.write(content)
+
+print(f"Successfully updated {file_path}")

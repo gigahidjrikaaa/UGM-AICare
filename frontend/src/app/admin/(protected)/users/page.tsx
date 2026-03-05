@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
+import Link from 'next/link';
 import { 
   FiSearch as Search, 
   FiFilter as Filter, 
@@ -13,7 +14,8 @@ import {
   FiRefreshCw as RefreshCw, 
   FiUsers as Users, 
   FiActivity as Activity, 
-  FiAward as Award 
+  FiAward as Award,
+  FiExternalLink as ExternalLink
 } from '@/icons';
 import { motion, AnimatePresence } from 'framer-motion';
 import toast from 'react-hot-toast';
@@ -310,6 +312,22 @@ export default function UserManagementPage() {
       case 'recent': return 'text-yellow-600 bg-yellow-50';
       default: return 'text-gray-600 bg-gray-50';
     }
+  };
+
+  const getSentimentLabel = (score: number) => {
+    if (score >= 0.7) return 'Positive';
+    if (score >= 0.3) return 'Neutral';
+    return 'Low';
+  };
+
+  const handleTableSort = (field: string) => {
+    setCurrentPage(1);
+    if (sortBy === field) {
+      setSortOrder(prev => (prev === 'asc' ? 'desc' : 'asc'));
+      return;
+    }
+    setSortBy(field);
+    setSortOrder('desc');
   };
 
   if (loading && users.length === 0) {
@@ -794,37 +812,107 @@ export default function UserManagementPage() {
 
       {/* Users Table */}
       <div className="bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 overflow-hidden">
+        <div className="px-6 py-3 bg-white/5 border-b border-white/20 flex flex-wrap items-center gap-2 text-xs text-gray-300">
+          <span className="font-semibold text-white">Sort by:</span>
+          <button
+            onClick={() => handleTableSort('id')}
+            className={`px-2.5 py-1 rounded-md border transition-colors ${
+              sortBy === 'id'
+                ? 'border-[#FFCA40]/60 bg-[#FFCA40]/20 text-[#FFCA40]'
+                : 'border-white/20 bg-white/5 hover:bg-white/10 text-gray-200'
+            }`}
+          >
+            ID {sortBy === 'id' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+          </button>
+          <button
+            onClick={() => handleTableSort('last_activity_date')}
+            className={`px-2.5 py-1 rounded-md border transition-colors ${
+              sortBy === 'last_activity_date'
+                ? 'border-[#FFCA40]/60 bg-[#FFCA40]/20 text-[#FFCA40]'
+                : 'border-white/20 bg-white/5 hover:bg-white/10 text-gray-200'
+            }`}
+          >
+            Last Activity {sortBy === 'last_activity_date' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+          </button>
+          <button
+            onClick={() => handleTableSort('current_streak')}
+            className={`px-2.5 py-1 rounded-md border transition-colors ${
+              sortBy === 'current_streak'
+                ? 'border-[#FFCA40]/60 bg-[#FFCA40]/20 text-[#FFCA40]'
+                : 'border-white/20 bg-white/5 hover:bg-white/10 text-gray-200'
+            }`}
+          >
+            Streak {sortBy === 'current_streak' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+          </button>
+          <button
+            onClick={() => handleTableSort('sentiment_score')}
+            className={`px-2.5 py-1 rounded-md border transition-colors ${
+              sortBy === 'sentiment_score'
+                ? 'border-[#FFCA40]/60 bg-[#FFCA40]/20 text-[#FFCA40]'
+                : 'border-white/20 bg-white/5 hover:bg-white/10 text-gray-200'
+            }`}
+          >
+            Sentiment {sortBy === 'sentiment_score' ? (sortOrder === 'asc' ? '↑' : '↓') : ''}
+          </button>
+        </div>
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-white/20">
             <thead className="bg-white/5">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                  User
+                <th className="px-4 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  #
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                  Activity
+                  <button
+                    onClick={() => handleTableSort('id')}
+                    className="inline-flex items-center gap-1 hover:text-white transition-colors"
+                  >
+                    User
+                    {sortBy === 'id' ? <span>{sortOrder === 'asc' ? '↑' : '↓'}</span> : null}
+                  </button>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                  Engagement
+                  <button
+                    onClick={() => handleTableSort('last_activity_date')}
+                    className="inline-flex items-center gap-1 hover:text-white transition-colors"
+                  >
+                    Status & Access
+                    {sortBy === 'last_activity_date' ? <span>{sortOrder === 'asc' ? '↑' : '↓'}</span> : null}
+                  </button>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                  Sentiment
+                  <button
+                    onClick={() => handleTableSort('current_streak')}
+                    className="inline-flex items-center gap-1 hover:text-white transition-colors"
+                  >
+                    Engagement
+                    {sortBy === 'current_streak' ? <span>{sortOrder === 'asc' ? '↑' : '↓'}</span> : null}
+                  </button>
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
-                  Settings
+                  <button
+                    onClick={() => handleTableSort('sentiment_score')}
+                    className="inline-flex items-center gap-1 hover:text-white transition-colors"
+                  >
+                    Risk Signals
+                    {sortBy === 'sentiment_score' ? <span>{sortOrder === 'asc' ? '↑' : '↓'}</span> : null}
+                  </button>
                 </th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-300 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
+                  Quick Links
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-300 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
             <tbody className="bg-transparent divide-y divide-white/20">
-              {users.map((user) => (
+              {users.map((user, rowIndex) => (
                 <motion.tr
                   key={user.id}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="hover:bg-white/5 transition-colors cursor-pointer"
+                  className="hover:bg-white/5 transition-colors cursor-pointer align-top"
                   onClick={async () => {
                     setLoading(true); // Set loading for the modal
                     try {
@@ -840,9 +928,14 @@ export default function UserManagementPage() {
                     }
                   }}
                 >
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-4 py-4 align-top">
+                    <div className="text-sm font-semibold text-gray-300">
+                      {(currentPage - 1) * ITEMS_PER_PAGE + rowIndex + 1}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4 align-top">
                     <div className="flex items-center">
-                      <div className="relative h-10 w-10 rounded-full overflow-hidden border border-white/15 bg-white/5 flex-shrink-0">
+                      <div className="relative h-10 w-10 rounded-full overflow-hidden border border-white/15 bg-white/5 shrink-0">
                         {user.avatar_url ? (
                           <Image
                             src={user.avatar_url}
@@ -857,68 +950,109 @@ export default function UserManagementPage() {
                           </div>
                         )}
                       </div>
-                      <div className="ml-4">
+                      <div className="ml-4 space-y-1.5">
                         <div className="text-sm font-medium text-white">
+                          {user.name || user.email || `User ${user.id}`}
+                        </div>
+                        <div className="text-sm text-gray-300">
                           {user.email || 'No email'}
                         </div>
-                        <div className="text-sm text-gray-400">
-                          ID: {user.id} • {user.wallet_address ? 'Has wallet' : 'No wallet'}
+                        <div className="text-xs text-gray-400 border-t border-white/10 pt-1.5">
+                          ID: {user.id} • {user.wallet_address ? 'Wallet linked' : 'No wallet'} • Joined: {formatDate(user.created_at)}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm text-white">
-                      <div className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getActivityColor(getActivityStatus(user.last_activity_date))}`}>
+                  <td className="px-6 py-4 align-top">
+                    <div className="flex flex-wrap gap-2 mb-2">
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          user.role === 'admin'
+                            ? 'bg-red-500/20 text-red-400'
+                            : user.role === 'counselor'
+                              ? 'bg-blue-500/20 text-blue-400'
+                              : 'bg-gray-500/20 text-gray-300'
+                        }`}
+                      >
+                        {user.role === 'counselor' ? 'Counselor' : user.role || 'User'}
+                      </span>
+                      <span
+                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
+                          user.is_active ?? true
+                            ? 'bg-green-500/20 text-green-400'
+                            : 'bg-red-500/20 text-red-400'
+                        }`}
+                      >
+                        {user.is_active ?? true ? 'Active' : 'Inactive'}
+                      </span>
+                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getActivityColor(getActivityStatus(user.last_activity_date))}`}>
                         {getActivityStatus(user.last_activity_date)}
-                      </div>
+                      </span>
                     </div>
-                    <div className="text-sm text-gray-400">
+                    <div className="text-sm text-gray-300 border-t border-white/10 pt-1.5">
                       Last: {formatDate(user.last_activity_date)}
                     </div>
                     <div className="text-sm text-gray-400">
-                      Streak: {user.current_streak} (max: {user.longest_streak})
+                      Last login: {formatDate(user.last_login)}
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-white">
-                    <div className="space-y-1">
+                  <td className="px-6 py-4 align-top text-sm text-white">
+                    <div className="space-y-1.5">
                       <div>📝 {user.total_journal_entries} entries</div>
                       <div>💬 {user.total_conversations} chats</div>
                       <div>🏆 {user.total_badges} badges</div>
+                      <div>📅 {user.total_appointments} appointments</div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                  <td className="px-6 py-4 align-top">
                     <div className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getSentimentColor(user.sentiment_score)}`}>
-                      {(user.sentiment_score * 100).toFixed(0)}%
+                      {getSentimentLabel(user.sentiment_score)} {(user.sentiment_score * 100).toFixed(0)}%
+                    </div>
+                    <div className="text-sm text-gray-300 mt-2 border-t border-white/10 pt-1.5">
+                      Streak: {user.current_streak} (max: {user.longest_streak})
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleEmailCheckins(user.id, !user.allow_email_checkins);
-                      }}
-                      className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium transition-colors ${
-                        user.allow_email_checkins
-                          ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
-                          : 'bg-gray-500/20 text-gray-400 hover:bg-gray-500/30'
-                      }`}
-                    >
-                      {user.allow_email_checkins ? (
-                        <>
-                          <Mail className="h-3 w-3 mr-1" />
-                          Enabled
-                        </>
-                      ) : (
-                        <>
-                          <MailOff className="h-3 w-3 mr-1" />
-                          Disabled
-                        </>
-                      )}
-                    </button>
+                  <td className="px-6 py-4 align-top">
+                    <div className="flex flex-wrap gap-2">
+                      <Link
+                        href={`/admin/conversations?user_id=${user.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-white/10 text-white hover:bg-white/20 transition-colors"
+                      >
+                        Chats <ExternalLink className="h-3 w-3" />
+                      </Link>
+                      <Link
+                        href={`/admin/cases?user_id=${user.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-white/10 text-white hover:bg-white/20 transition-colors"
+                      >
+                        Cases <ExternalLink className="h-3 w-3" />
+                      </Link>
+                      <Link
+                        href={`/admin/flags?user_id=${user.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-white/10 text-white hover:bg-white/20 transition-colors"
+                      >
+                        Flags <ExternalLink className="h-3 w-3" />
+                      </Link>
+                      <Link
+                        href={`/admin/interventions?user_id=${user.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-white/10 text-white hover:bg-white/20 transition-colors"
+                      >
+                        Interventions <ExternalLink className="h-3 w-3" />
+                      </Link>
+                      <Link
+                        href={`/admin/appointments?user_id=${user.id}`}
+                        onClick={(e) => e.stopPropagation()}
+                        className="inline-flex items-center gap-1 px-2 py-1 rounded-md text-xs bg-white/10 text-white hover:bg-white/20 transition-colors"
+                      >
+                        Appointments <ExternalLink className="h-3 w-3" />
+                      </Link>
+                    </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <div className="flex items-center justify-end space-x-2">
+                  <td className="px-6 py-4 align-top text-sm font-medium">
+                    <div className="flex items-center gap-2 flex-wrap">
                       <button
                         onClick={(e) => {
                           e.stopPropagation();
@@ -931,20 +1065,31 @@ export default function UserManagementPage() {
                       >
                         <Eye className="h-4 w-4" />
                       </button>
-                      
-                      {/* Role Badge */}
-                      <span 
-                        onClick={(e) => e.stopPropagation()}
-                        className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${
-                          user.role === 'admin' 
-                            ? 'bg-red-500/20 text-red-400' 
-                            : user.role === 'counselor'
-                            ? 'bg-blue-500/20 text-blue-400'
-                            : 'bg-gray-500/20 text-gray-400'
+
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleEmailCheckins(user.id, !user.allow_email_checkins);
+                        }}
+                        className={`inline-flex items-center px-2 py-1 rounded-md text-xs font-medium transition-colors ${
+                          user.allow_email_checkins
+                            ? 'bg-green-500/20 text-green-400 hover:bg-green-500/30'
+                            : 'bg-gray-500/20 text-gray-400 hover:bg-gray-500/30'
                         }`}
+                        title={user.allow_email_checkins ? 'Disable email check-ins' : 'Enable email check-ins'}
                       >
-                        {user.role === 'counselor' ? 'Counselor' : user.role || 'user'}
-                      </span>
+                        {user.allow_email_checkins ? (
+                          <>
+                            <Mail className="h-3 w-3 mr-1" />
+                            Check-ins On
+                          </>
+                        ) : (
+                          <>
+                            <MailOff className="h-3 w-3 mr-1" />
+                            Check-ins Off
+                          </>
+                        )}
+                      </button>
                       
                       {/* Status Toggle */}
                       <button
@@ -959,7 +1104,7 @@ export default function UserManagementPage() {
                         }`}
                         title={`${user.is_active ?? true ? 'Deactivate' : 'Activate'} User`}
                       >
-                        {user.is_active ?? true ? 'Active' : 'Inactive'}
+                        {user.is_active ?? true ? 'Deactivate' : 'Activate'}
                       </button>
                       
                       {/* Actions Dropdown */}
@@ -990,7 +1135,7 @@ export default function UserManagementPage() {
                                 break;
                             }
                           }}
-                          className="bg-gradient-to-r from-white/10 to-white/5 text-white text-xs border border-white/30 rounded-lg px-3 py-1.5 hover:from-white/20 hover:to-white/10 focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40] cursor-pointer transition-all shadow-sm backdrop-blur-sm"
+                          className="bg-linear-to-r from-white/10 to-white/5 text-white text-xs border border-white/30 rounded-lg px-3 py-1.5 hover:from-white/20 hover:to-white/10 focus:outline-none focus:ring-2 focus:ring-[#FFCA40]/50 focus:border-[#FFCA40] cursor-pointer transition-all shadow-sm backdrop-blur-sm"
                           title="User Actions Menu"
                           aria-label="User Actions Menu"
                         >
@@ -1153,7 +1298,7 @@ export default function UserManagementPage() {
                       </div>
                     </div>
                     <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
-                      <div className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-full overflow-hidden border border-white/20 bg-white/5 flex-shrink-0">
+                      <div className="relative h-16 w-16 sm:h-20 sm:w-20 rounded-full overflow-hidden border border-white/20 bg-white/5 shrink-0">
                         {selectedUser.avatar_url ? (
                           <Image
                             src={selectedUser.avatar_url}

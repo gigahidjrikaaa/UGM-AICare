@@ -9,55 +9,21 @@
  * - See activity metadata and statistics
  */
 
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   FiActivity, 
   FiPlay, 
   FiClock, 
-  FiTag, 
   FiEye,
   FiX,
   FiHeart,
   FiWind,
   FiTarget,
 } from 'react-icons/fi';
+import { activityRegistry, ActivityPlayer, type ActivityMetadata } from '@/components/activities';
 
-// Activity data - mirrors backend catalog
-const ACTIVITIES_CATALOG = [
-  {
-    id: 'box-breathing',
-    name: 'Box Breathing',
-    description: 'Teknik pernapasan 4-4-4-4 yang dipakai Navy SEALs untuk menenangkan pikiran dan mengurangi stres.',
-    category: 'breathing',
-    estimated_duration: 240,
-    difficulty: 'beginner',
-    tags: ['anxiety', 'stress', 'focus', 'calming', 'panic'],
-    icon: '🔲',
-  },
-  {
-    id: 'four-seven-eight',
-    name: '4-7-8 Breathing',
-    description: 'Teknik napas relaksasi dari Dr. Andrew Weil untuk tidur lebih nyenyak dan mengurangi kecemasan.',
-    category: 'breathing',
-    estimated_duration: 300,
-    difficulty: 'beginner',
-    tags: ['sleep', 'relaxation', 'anxiety', 'calming', 'insomnia'],
-    icon: '💜',
-  },
-  {
-    id: 'five-four-three-two-one',
-    name: '5-4-3-2-1 Grounding',
-    description: 'Teknik grounding sensorik yang menggunakan 5 indera untuk membawa kamu kembali ke saat ini.',
-    category: 'grounding',
-    estimated_duration: 180,
-    difficulty: 'beginner',
-    tags: ['anxiety', 'panic', 'dissociation', 'grounding', 'present-moment'],
-    icon: '🌿',
-  },
-];
-
-const CATEGORY_CONFIG: Record<string, { label: string; color: string; icon: React.ReactNode }> = {
+const CATEGORY_CONFIG: Record<string, { label: string; color: string; icon: ReactNode }> = {
   breathing: { 
     label: 'Breathing', 
     color: 'bg-blue-500/20 text-blue-300 border-blue-500/30',
@@ -83,13 +49,14 @@ const DIFFICULTY_CONFIG: Record<string, { label: string; color: string }> = {
 
 export default function AdminActivitiesPage() {
   const [previewActivity, setPreviewActivity] = useState<string | null>(null);
-  const [filterCategory, setFilterCategory] = useState<string>('all');
+  const [filterCategory, setFilterCategory] = useState('all');
 
+  const allActivities = activityRegistry.getAll();
   const filteredActivities = filterCategory === 'all' 
-    ? ACTIVITIES_CATALOG 
-    : ACTIVITIES_CATALOG.filter(a => a.category === filterCategory);
+    ? allActivities 
+    : allActivities.filter(a => a.category === filterCategory);
 
-  const categories = ['all', ...new Set(ACTIVITIES_CATALOG.map(a => a.category))];
+  const categories = ['all', ...Array.from(new Set(allActivities.map(a => a.category)))];
 
   const formatDuration = (seconds: number) => {
     const minutes = Math.floor(seconds / 60);
@@ -112,11 +79,11 @@ export default function AdminActivitiesPage() {
         
         {/* Stats */}
         <div className="flex gap-3">
-          <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-center">
-            <div className="text-2xl font-bold text-[#FFCA40]">{ACTIVITIES_CATALOG.length}</div>
-            <div className="text-xs text-gray-400">Total Activities</div>
+          <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-center shadow-lg">
+            <div className="text-2xl font-bold text-[#FFCA40]">{allActivities.length}</div>
+            <div className="text-xs text-gray-400">Total</div>
           </div>
-          <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-center">
+          <div className="px-4 py-2 bg-white/5 border border-white/10 rounded-lg text-center shadow-lg">
             <div className="text-2xl font-bold text-blue-400">{categories.length - 1}</div>
             <div className="text-xs text-gray-400">Categories</div>
           </div>
@@ -131,19 +98,19 @@ export default function AdminActivitiesPage() {
             onClick={() => setFilterCategory(cat)}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
               filterCategory === cat
-                ? 'bg-[#FFCA40] text-[#001D58]'
+                ? 'bg-[#FFCA40] text-[#001D58] shadow-md'
                 : 'bg-white/5 text-gray-300 hover:bg-white/10 border border-white/10'
             }`}
           >
-            {cat === 'all' ? 'All Activities' : CATEGORY_CONFIG[cat]?.label || cat}
+            {cat === 'all' ? 'All Activities' : (CATEGORY_CONFIG[cat]?.label || cat)}
           </button>
         ))}
       </div>
 
       {/* Activities Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
         {filteredActivities.map((activity, index) => {
-          const categoryConfig = CATEGORY_CONFIG[activity.category] || { 
+          const categoryConfig = CATEGORY_CONFIG[activity.category] || {
             label: activity.category, 
             color: 'bg-gray-500/20 text-gray-300 border-gray-500/30',
             icon: <FiActivity className="w-4 h-4" />
@@ -159,67 +126,69 @@ export default function AdminActivitiesPage() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: index * 0.05 }}
-              className="bg-white/5 border border-white/10 rounded-xl p-5 hover:border-[#FFCA40]/30 transition-all group"
+              className="bg-white/5 border border-white/10 rounded-2xl p-5 hover:border-[#FFCA40]/40 transition-all group shadow-xl flex flex-col h-full"
             >
               {/* Header */}
-              <div className="flex items-start justify-between mb-3">
-                <div className="text-4xl">{activity.icon}</div>
+              <div className="flex items-start justify-between mb-4">
+                <div className="w-12 h-12 rounded-xl bg-white/5 flex items-center justify-center text-2xl shadow-inner border border-white/10 group-hover:scale-110 transition-transform">
+                  {activity.icon}
+                </div>
                 <div className="flex gap-2">
-                  <span className={`px-2 py-1 rounded-md text-xs font-medium border ${categoryConfig.color}`}>
+                  <span className={`px-2 py-1 rounded-md text-[11px] uppercase tracking-wider font-bold border ${categoryConfig.color}`}>
                     {categoryConfig.label}
                   </span>
                 </div>
               </div>
 
               {/* Title & Description */}
-              <h3 className="text-lg font-semibold text-white mb-2 group-hover:text-[#FFCA40] transition-colors">
+              <h3 className="text-lg font-bold text-white mb-2 group-hover:text-[#FFCA40] transition-colors">
                 {activity.name}
               </h3>
-              <p className="text-sm text-gray-400 mb-4 line-clamp-2">
+              <p className="text-sm text-gray-400 mb-5 line-clamp-3 flex-1 grow">
                 {activity.description}
               </p>
 
               {/* Metadata */}
-              <div className="flex flex-wrap items-center gap-3 mb-4 text-xs text-gray-400">
-                <span className="flex items-center gap-1">
-                  <FiClock className="w-3.5 h-3.5" />
-                  {formatDuration(activity.estimated_duration)}
+              <div className="flex justify-between items-center bg-black/20 p-3 rounded-xl mb-4 border border-white/5">
+                <span className="flex items-center gap-1.5 text-xs text-white/70 font-medium">
+                  <FiClock className="w-4 h-4 text-[#FFCA40]" />
+                  {formatDuration(activity.estimatedDuration)}
                 </span>
-                <span className={`px-2 py-0.5 rounded ${difficultyConfig.color}`}>
+                <span className={`px-2 py-0.5 rounded text-[11px] font-bold tracking-wide uppercase ${difficultyConfig.color}`}>
                   {difficultyConfig.label}
                 </span>
               </div>
 
               {/* Tags */}
-              <div className="flex flex-wrap gap-1 mb-4">
+              <div className="flex flex-wrap gap-1.5 mb-5 h-12 overflow-hidden">
                 {activity.tags.slice(0, 4).map(tag => (
                   <span 
                     key={tag}
-                    className="px-2 py-0.5 bg-white/5 text-gray-400 text-xs rounded"
+                    className="px-2 py-1 bg-white/5 hover:bg-white/10 text-gray-400 text-[10px] uppercase font-semibold tracking-wide rounded-md border border-white/10 cursor-default transition-colors"
                   >
                     #{tag}
                   </span>
                 ))}
                 {activity.tags.length > 4 && (
-                  <span className="text-xs text-gray-500">+{activity.tags.length - 4}</span>
+                  <span className="px-2 py-1 text-[10px] text-gray-500 font-semibold bg-transparent">+{activity.tags.length - 4} more</span>
                 )}
               </div>
 
               {/* Actions */}
-              <div className="flex gap-2">
+              <div className="flex gap-3 mt-auto">
                 <button
                   onClick={() => setPreviewActivity(activity.id)}
-                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-[#FFCA40] hover:bg-[#FFD770] text-[#001D58] font-semibold rounded-lg transition-colors"
+                  className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-white/10 hover:bg-[#FFCA40] hover:text-[#001D58] text-white font-semibold rounded-xl transition-all shadow-md group-hover:shadow-[0_0_15px_rgba(255,202,64,0.3)]"
                 >
                   <FiPlay className="w-4 h-4" />
-                  Preview
+                  Live Preview
                 </button>
                 <button
                   onClick={() => window.open(`/activities?play=${activity.id}`, '_blank')}
-                  className="px-4 py-2 bg-white/10 hover:bg-white/20 text-white rounded-lg transition-colors"
+                  className="p-2.5 bg-white/5 hover:bg-white/15 text-white/70 hover:text-white rounded-xl transition-all border border-white/10"
                   title="Open in new tab"
                 >
-                  <FiEye className="w-4 h-4" />
+                  <FiEye className="w-5 h-5" />
                 </button>
               </div>
             </motion.div>
@@ -229,9 +198,10 @@ export default function AdminActivitiesPage() {
 
       {/* Empty State */}
       {filteredActivities.length === 0 && (
-        <div className="text-center py-12">
-          <div className="text-5xl mb-4">🔍</div>
-          <p className="text-gray-400">No activities found in this category.</p>
+        <div className="text-center py-16 bg-white/5 rounded-2xl border border-white/10">
+          <div className="text-6xl mb-4 opacity-50">#</div>
+          <h3 className="text-xl font-bold text-white mb-2">No Activities Found</h3>
+          <p className="text-gray-400">Try selecting a different category.</p>
         </div>
       )}
 
@@ -242,34 +212,47 @@ export default function AdminActivitiesPage() {
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-black/80 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+            className="fixed inset-0 bg-[#00081c]/90 backdrop-blur-md z-100 flex items-center justify-center p-4 sm:p-6"
             onClick={() => setPreviewActivity(null)}
           >
             <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className="bg-[#001D58] border border-white/20 rounded-2xl max-w-3xl w-full max-h-[90vh] overflow-hidden"
+              initial={{ scale: 0.95, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.95, opacity: 0, y: 20 }}
+              className="bg-[#001030] overflow-hidden rounded-3xl max-w-4xl w-full max-h-[90vh] flex flex-col shadow-2xl shadow-black border border-white/20 relative"
               onClick={e => e.stopPropagation()}
             >
               {/* Modal Header */}
-              <div className="flex items-center justify-between p-4 border-b border-white/10">
-                <h2 className="text-lg font-semibold text-white">Activity Preview</h2>
+              <div className="flex items-center justify-between p-5 border-b border-white/10 bg-white/5 relative z-10">
+                <div className="flex items-center gap-3">
+                  <div className="w-8 h-8 rounded-lg bg-[#FFCA40]/20 flex items-center justify-center border border-[#FFCA40]/30 text-[#FFCA40]">
+                    <FiActivity className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white leading-none">Live Component Preview</h2>
+                    <p className="text-xs text-white/50 mt-1">Native playback decoupled from main layout</p>
+                  </div>
+                </div>
                 <button
                   onClick={() => setPreviewActivity(null)}
-                  className="p-2 hover:bg-white/10 rounded-lg transition-colors"
+                  className="p-2 bg-white/5 hover:bg-white/20 rounded-xl transition-colors text-gray-400 hover:text-white"
                 >
-                  <FiX className="w-5 h-5 text-gray-400" />
+                  <FiX className="w-5 h-5" />
                 </button>
               </div>
               
-              {/* Modal Content - Embed the activity */}
-              <div className="p-4 overflow-y-auto max-h-[calc(90vh-80px)]">
-                <iframe
-                  src={`/activities?play=${previewActivity}`}
-                  className="w-full h-[600px] rounded-xl border border-white/10"
-                  title="Activity Preview"
-                />
+              {/* Modal Content */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar relative bg-linear-to-b from-transparent to-black/20">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-blue-500/10 rounded-full blur-[80px] pointer-events-none" />
+                <div className="absolute bottom-0 left-0 w-64 h-64 bg-purple-500/10 rounded-full blur-[80px] pointer-events-none" />
+                
+                <div className="min-h-125 flex flex-col relative z-10 w-full h-full max-h-[70vh]">
+                  <ActivityPlayer 
+                    activityId={previewActivity} 
+                    onExit={() => setPreviewActivity(null)}
+                    showHeader={false}
+                  />
+                </div>
               </div>
             </motion.div>
           </motion.div>
