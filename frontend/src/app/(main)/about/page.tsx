@@ -3,7 +3,7 @@
 import { motion } from "framer-motion";
 import Image from "next/image";
 import Link from "next/link";
-import { FiHeart, FiShield, FiUsers, FiZap } from "react-icons/fi";
+import { FiHeart, FiShield, FiUsers, FiZap, FiBookOpen } from "react-icons/fi";
 import { FaGraduationCap, FaStar } from "react-icons/fa";
 import ParticleBackground from '@/components/ui/ParticleBackground';
 
@@ -125,7 +125,7 @@ export default function AboutPage() {
             </div>
             <h2 className="text-3xl md:text-4xl font-bold text-white">Our Mission</h2>
           </div>
-          
+
           <p className="text-white/90 text-lg leading-relaxed mb-6">
             Many campus mental health services are forced into a reactive posture: help arrives late, workflows are fragmented, and risk signals are easy to miss.
             UGM-AICare is built to shift the default from crisis response to earlier support.
@@ -269,7 +269,7 @@ export default function AboutPage() {
           transition={{ duration: 0.6, delay: 0.4 }}
         >
           <h2 className="text-3xl font-bold text-white mb-8 text-center">Explore More</h2>
-          
+
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[
               {
@@ -278,6 +278,13 @@ export default function AboutPage() {
                 title: "Meet Aika",
                 description: "Learn about your AI companion",
                 color: "from-[#FFCA40] to-[#FFB700]"
+              },
+              {
+                href: "/about/instruments",
+                icon: <FiBookOpen />,
+                title: "Clinical Instruments",
+                description: "Our validated methodologies",
+                color: "from-[#FF6B9D] to-[#B8A4FF]"
               },
               {
                 href: "/about/features",

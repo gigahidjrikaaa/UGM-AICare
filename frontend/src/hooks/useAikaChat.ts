@@ -240,6 +240,9 @@ export function useAikaChat({
           conversation_id: conversationId,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
+          metadata: {
+            isSeedGreeting: true,
+          },
         },
       ]);
     }
@@ -289,7 +292,7 @@ export function useAikaChat({
       try {
         // Prepare conversation history for Aika
         const historyForAika: AikaMessage[] = [...messages, newUserMessage]
-          .filter((m) => m.role === 'user' || m.role === 'assistant')
+          .filter((m) => (m.role === 'user' || m.role === 'assistant') && !m.metadata?.isSeedGreeting)
           .slice(-10) // Last 10 messages
           .map((m) => ({
             role: m.role as 'user' | 'assistant',

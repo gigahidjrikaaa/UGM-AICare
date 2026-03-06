@@ -31,10 +31,8 @@ from app.domains.mental_health.models.appointments import Psychologist, Appointm
 from app.domains.mental_health.models.assessments import UserScreeningProfile
 from app.agents.sta.service import SafetyTriageService
 from app.domains.mental_health.schemas.chat import ChatRequest, ChatResponse
-# from app.domains.mental_health.services.chat_processing import process_chat_message
+from app.domains.mental_health.services.chat_processing import process_chat_message
 from app.domains.mental_health.services.personal_context import build_user_personal_context
-
-from app.domains.mental_health.routes.chat import process_chat_message
 from app.agents.tca.service import TherapeuticCoachService
 from app.agents.tca.schemas import TCAInterveneRequest
 

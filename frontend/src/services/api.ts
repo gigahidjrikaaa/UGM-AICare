@@ -2,8 +2,6 @@
 
 import axios from 'axios';
 import type {
-  ChatRequestPayload,
-  ChatResponsePayload,
   JournalPromptResponse,
   JournalEntryItem,
   JournalReflectionPointResponse,
@@ -94,27 +92,6 @@ export const fetchUserAIMemoryFacts = async (): Promise<AIMemoryFact[]> => {
 
 export const deleteUserAIMemoryFact = async (factId: number): Promise<void> => {
   await apiClient.delete(`/profile/ai-memory/facts/${factId}`);
-};
-
-/**
- * Sends conversation history to the backend chat endpoint and retrieves the AI response.
- * @param payload - The chat request payload including history and provider choice.
- * @returns A promise that resolves with the chat response payload.
- */
-export const sendMessage = async (payload: ChatRequestPayload): Promise<ChatResponsePayload> => {
-  try {
-    const response = await apiClient.post<ChatResponsePayload>('/chat', payload);
-    return response.data;
-  } catch (error) {
-    console.error('Error sending message to backend:', error);
-    let errorMessage = 'Failed to get response from AICare assistant.';
-    if (axios.isAxiosError(error) && error.response) {
-      errorMessage = error.response.data?.detail || `API Error (${error.response.status}): ${error.message}`;
-    } else if (error instanceof Error) {
-      errorMessage = error.message;
-    }
-    throw new Error(errorMessage);
-  }
 };
 
 // --- Journal Prompts API ---

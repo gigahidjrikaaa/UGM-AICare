@@ -10,12 +10,13 @@ import Link from 'next/link';
 import { User, UsersResponse, UserLog, UserStats } from '@/types/admin/users';
 import { getScreeningDashboard, listScreeningProfiles } from '@/services/adminScreeningApi';
 import { ScreeningDashboard, ScreeningProfile, RISK_CONFIG, RiskLevel } from '@/types/admin/screening';
-import UserProfileDrawer from '@/components/admin/UserProfileDrawer';
+import PatientProfileDrawer from '@/components/admin/PatientProfileDrawer';
+import { AreaChart, Area, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
 // Mock types to cover any missing ones in this simplified version
 const ITEMS_PER_PAGE = 20;
 
-export default function UserManagementPage() {
+export default function PatientManagementPage() {
   const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<UserStats | null>(null);
   const [totalCount, setTotalCount] = useState(0);
@@ -98,84 +99,6 @@ export default function UserManagementPage() {
     // Let useCallback dependency trigger refetch
   };
 
-  const toggleUserStatus = async (userId: number, currentStatus: boolean) => {
-    try {
-      if (!confirm(`Are you sure you want to ${currentStatus ? 'deactivate' : 'activate'} this user?`)) return;
-
-      await apiCall(`/api/v1/admin/users/${userId}/status`, {
-        method: 'PUT',
-        body: JSON.stringify({ is_active: !currentStatus })
-      });
-      toast.success(`User ${!currentStatus ? 'activated' : 'deactivated'} successfully`);
-      fetchUsers();
-    } catch (error) {
-      toast.error('Failed to update user status');
-    }
-  };
-
-  const updateUserRole = async (userId: number, newRole: string) => {
-    try {
-      if (!confirm(`Are you sure you want to change this user's role to ${newRole}?`)) return;
-
-      await apiCall(`/api/v1/admin/users/${userId}/role`, {
-        method: 'PUT',
-        body: JSON.stringify({ role: newRole })
-      });
-      toast.success(`User role updated to ${newRole}`);
-      fetchUsers();
-    } catch (error) {
-      toast.error('Failed to update user role');
-    }
-  };
-
-  const toggleEmailCheckins = async (userId: number, allow: boolean) => {
-    try {
-      await apiCall(`/api/v1/admin/users/${userId}`, {
-        method: 'PUT',
-        body: JSON.stringify({ allow_email_checkins: allow })
-      });
-      toast.success(`Email check-ins ${allow ? 'enabled' : 'disabled'}`);
-      fetchUsers();
-    } catch (error) {
-      toast.error('Failed to update email check-in preferences');
-    }
-  };
-
-  const deleteUser = async (userId: number, permanent = false) => {
-    try {
-      if (!confirm(`Are you absolutely sure you want to ${permanent ? 'PERMANENTLY DELETE' : 'soft delete'} user ${userId}? ${permanent ? 'This cannot be undone!' : ''}`)) return;
-
-      const endpoint = permanent
-        ? `/api/v1/admin/users/${userId}?permanent=true`
-        : `/api/v1/admin/users/${userId}`;
-
-      await apiCall(endpoint, { method: 'DELETE' });
-      toast.success(`User ${permanent ? 'permanently deleted' : 'deleted'}`);
-
-      if (selectedUser?.id === userId) {
-        setIsDrawerOpen(false);
-      }
-      fetchUsers();
-    } catch (error) {
-      toast.error('Failed to delete user');
-    }
-  };
-
-  const resetUserPassword = async (userId: number) => {
-    try {
-      if (!confirm(`Generate a temporary password for user ${userId}? They will be forced to change it on next login.`)) return;
-
-      const response = await apiCall<{ temp_password?: string }>(`/api/v1/admin/users/${userId}/reset-password`, {
-        method: 'POST'
-      });
-
-      // In a real app we might email this to them, but for admin we can show it
-      toast.success(`Password reset to: ${response.temp_password || 'temporary123'}`, { duration: 10000 });
-    } catch (error) {
-      toast.error('Failed to reset password');
-    }
-  };
-
   const handleExport = () => {
     // Basic CSV export of current page data
     const csvContent = [
@@ -236,8 +159,11 @@ export default function UserManagementPage() {
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Command Center</h1>
-          <p className="text-gray-400 mt-1">Unified User, CRM & Screening Dashboard</p>
+          <h1 className="text-3xl font-bold text-white flex items-center">
+            <Users className="mr-3 text-[#FFCA40]" />
+            Patient Clinical Command Center
+          </h1>
+          <p className="text-gray-400 mt-1">Monitor screening progress and engagement of active patients</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -272,9 +198,12 @@ export default function UserManagementPage() {
               <BarChart2 className="w-6 h-6 text-blue-400" />
             </div>
           </div>
-          <div className="mt-4 flex items-center text-sm">
-            <span className="text-green-400 font-medium">+{stats?.new_7d || 0}</span>
-            <span className="text-gray-400 ml-2">new users this week</span>
+          <div className="mt-4 flex items-center h-10 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={mockActivityTrend}>
+                <Area type="monotone" dataKey="value" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </motion.div>
 
@@ -293,8 +222,12 @@ export default function UserManagementPage() {
               <AlertTriangle className="w-6 h-6 text-red-400" />
             </div>
           </div>
-          <div className="mt-4 flex items-center text-sm">
-            <span className="text-gray-300">Across screening signals</span>
+          <div className="mt-4 flex items-center h-10 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={mockIssuesTrend}>
+                <Bar dataKey="value" fill="#ef4444" radius={[2, 2, 0, 0]} opacity={0.8} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </motion.div>
 
@@ -315,10 +248,12 @@ export default function UserManagementPage() {
               <ShieldAlert className="w-6 h-6 text-orange-400" />
             </div>
           </div>
-          <div className="mt-4 flex items-center text-sm">
-            <span className="text-orange-400">{screeningDashboard?.risk_distribution['critical'] || 0} Critical</span>
-            <span className="text-gray-400 mx-2">•</span>
-            <span className="text-yellow-400">{screeningDashboard?.risk_distribution['severe'] || 0} Severe</span>
+          <div className="mt-4 flex items-center h-10 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <AreaChart data={mockSentimentTrend}>
+                <Area type="monotone" dataKey="value" stroke="#f97316" fill="#f97316" fillOpacity={0.2} strokeWidth={2} />
+              </AreaChart>
+            </ResponsiveContainer>
           </div>
         </motion.div>
 
@@ -337,8 +272,12 @@ export default function UserManagementPage() {
               <RefreshCw className="w-6 h-6 text-green-400" />
             </div>
           </div>
-          <div className="mt-4 flex items-center text-sm text-gray-400">
-            Active users within the last 7 days
+          <div className="mt-4 flex items-center h-10 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={mockActivityTrend}>
+                <Bar dataKey="value" fill="#4ade80" radius={[2, 2, 0, 0]} opacity={0.8} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </motion.div>
       </div>
@@ -421,8 +360,7 @@ export default function UserManagementPage() {
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Access & Role</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Screening Risk</th>
                 <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">Engagement</th>
-                <th className="px-6 py-4 text-left text-xs font-semibold text-gray-300 uppercase tracking-wider">CRM Output</th>
-                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-300 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-4 text-right text-xs font-semibold text-gray-300 uppercase tracking-wider">CRM Actions</th>
               </tr>
             </thead>
             <tbody className="bg-transparent divide-y divide-white/10">
@@ -493,19 +431,29 @@ export default function UserManagementPage() {
 
                     {/* Engagement Tracker */}
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex flex-col gap-1">
-                        <div className={`inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-bold uppercase rounded border border-white/10 bg-white/5 tooltip relative group`}>
-                          {user.current_streak} Day Streak
+                      <div className="flex flex-col gap-2">
+                        <div className="flex justify-between items-center w-32">
+                          <div className={`inline-flex items-center justify-center px-2 py-0.5 text-[10px] font-bold uppercase rounded border border-white/10 bg-white/5`}>
+                            {user.current_streak} Day Streak
+                          </div>
+                          <div className={`inline-flex px-2 py-0.5 text-[10px] font-bold uppercase rounded border ${getSentimentColor(user.sentiment_score)}`}>
+                            S: {(user.sentiment_score * 100).toFixed(0)}%
+                          </div>
                         </div>
-                        <div className={`inline-flex px-2 py-0.5 text-[10px] font-bold uppercase rounded border ${getSentimentColor(user.sentiment_score)}`}>
-                          Sentiment {(user.sentiment_score * 100).toFixed(0)}%
+                        {/* Sparkline for Activity */}
+                        <div className="h-6 w-32 mt-1">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <AreaChart data={mockActivityTrend}>
+                              <Area type="monotone" dataKey="value" stroke="#3b82f6" fill="#3b82f6" fillOpacity={0.2} strokeWidth={1.5} />
+                            </AreaChart>
+                          </ResponsiveContainer>
                         </div>
                       </div>
                     </td>
 
                     {/* CRM Contact */}
-                    <td className="px-6 py-4 whitespace-nowrap" onClick={(e) => e.stopPropagation()}>
-                      <div className="flex gap-2.5">
+                    <td className="px-6 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
+                      <div className="flex gap-2.5 justify-end">
                         {user.phone ? (
                           <a href={formatWhatsAppLink(user.phone, user.name || 'User')} target="_blank" rel="noopener noreferrer" className="p-1.5 bg-[#25D366]/20 text-[#25D366] rounded-md hover:bg-[#25D366]/30 transition-colors border border-[#25D366]/30">
                             <Phone className="w-4 h-4" />
@@ -519,50 +467,6 @@ export default function UserManagementPage() {
                           <Mail className="w-4 h-4" />
                         </a>
                       </div>
-                    </td>
-
-                    {/* Actions Menu */}
-                    <td className="px-6 py-4 whitespace-nowrap text-right" onClick={(e) => e.stopPropagation()}>
-                      <select
-                        onChange={(e) => {
-                          const action = e.target.value;
-                          e.target.value = '';
-
-                          switch (action) {
-                            case 'toggle-status':
-                              toggleUserStatus(user.id, user.is_active ?? true);
-                              break;
-                            case 'make-admin':
-                              updateUserRole(user.id, 'admin');
-                              break;
-                            case 'make-counselor':
-                              updateUserRole(user.id, 'counselor');
-                              break;
-                            case 'make-user':
-                              updateUserRole(user.id, 'user');
-                              break;
-                            case 'reset-password':
-                              resetUserPassword(user.id);
-                              break;
-                            case 'delete':
-                              deleteUser(user.id, false);
-                              break;
-                            case 'delete-permanent':
-                              deleteUser(user.id, true);
-                              break;
-                          }
-                        }}
-                        className="bg-black/40 text-white text-xs border border-white/20 rounded pl-2 pr-6 py-1.5 hover:bg-black/60 focus:outline-none focus:border-[#FFCA40] cursor-pointer"
-                      >
-                        <option value="">Actions...</option>
-                        <option value="toggle-status">{user.is_active ? 'Deactivate' : 'Activate'}</option>
-                        <option value="make-admin">Make Admin</option>
-                        <option value="make-counselor">Make Counselor</option>
-                        <option value="make-user">Make User</option>
-                        <option value="reset-password">Reset Password</option>
-                        <option value="delete">Deactivate</option>
-                        <option value="delete-permanent">Delete Permanently</option>
-                      </select>
                     </td>
                   </tr>
                 );
@@ -611,7 +515,7 @@ export default function UserManagementPage() {
         )}
       </div>
 
-      <UserProfileDrawer
+      <PatientProfileDrawer
         isOpen={isDrawerOpen}
         onClose={() => {
           setIsDrawerOpen(false);

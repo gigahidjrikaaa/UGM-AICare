@@ -57,6 +57,7 @@ export function MessageBubble({
   const messageSoundsEnabled = useLiveTalkStore((state) => state.messageSoundsEnabled);
   const hasPlayedRef = React.useRef(false);
   const [copied, setCopied] = React.useState(false);
+  const [userAvatarFailed, setUserAvatarFailed] = React.useState(false);
 
   useEffect(() => {
     // Only play sound once per message and when not loading
@@ -145,18 +146,23 @@ export function MessageBubble({
   };
 
   const senderName = isUser ? (userDisplayName?.trim() || 'You') : 'Aika';
+  const normalizedUserImageUrl =
+    typeof userImageUrl === 'string' && userImageUrl.trim() && userImageUrl !== 'null' && userImageUrl !== 'undefined'
+      ? userImageUrl.trim()
+      : null;
 
   const renderAvatar = () => {
     if (isUser) {
-      if (userImageUrl) {
+      if (normalizedUserImageUrl && !userAvatarFailed) {
         return (
           <div className="shrink-0 w-8 h-8 rounded-full overflow-hidden border border-white/20 bg-black/20 shadow-sm backdrop-blur-sm">
             <Image
-              src={userImageUrl}
+              src={normalizedUserImageUrl}
               alt={senderName}
               width={32}
               height={32}
               className="object-cover w-full h-full"
+              onError={() => setUserAvatarFailed(true)}
             />
           </div>
         );

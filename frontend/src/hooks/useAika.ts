@@ -102,6 +102,107 @@ interface UseAikaOptions {
   showToasts?: boolean;
 }
 
+type AikaStreamEventType =
+  | 'agent'
+  | 'tool_start'
+  | 'tool_end'
+  | 'tool_use'
+  | 'partial_response'
+  | 'status'
+  | 'thinking'
+  | 'reasoning'
+  | 'agent_activity'
+  | 'intervention_plan'
+  | 'appointment'
+  | 'complete'
+  | 'error';
+
+interface AikaStreamEventPayload {
+  type: AikaStreamEventType;
+  agent?: string;
+  tool?: string;
+  tools?: string[];
+  text?: string;
+  message?: string;
+  data?: Record<string, unknown>;
+  response?: string;
+  metadata?: Record<string, unknown>;
+  error?: string;
+}
+
+const SSE_DATA_PREFIX = 'data: ';
+
+function buildAikaEndpoint(): string {
+  const apiOrigin = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
+  return apiOrigin ? `${apiOrigin}/api/v1/aika` : '/api/v1/aika';
+}
+
+function splitSseFrames(buffer: string): { frames: string[]; remainder: string } {
+  const chunks = buffer.split('\n\n');
+  return {
+    frames: chunks.slice(0, -1),
+    remainder: chunks[chunks.length - 1] || '',
+  };
+}
+
+function parseSseFrame(frame: string): AikaStreamEventPayload | null {
+  if (!frame.startsWith(SSE_DATA_PREFIX)) {
+    return null;
+  }
+
+  const jsonRaw = frame.slice(SSE_DATA_PREFIX.length).trim();
+  if (!jsonRaw) {
+    return null;
+  }
+
+  return JSON.parse(jsonRaw) as AikaStreamEventPayload;
+}
+
+function buildReasoningTrace(event: AikaStreamEventPayload): ReasoningTrace {
+  const reasoningData = (event.data || {}) as Record<string, unknown>;
+
+  return {
+    id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+    stage: String(reasoningData.stage || 'unknown'),
+    summary: String(reasoningData.summary || event.message || 'Reasoning update'),
+    sourceNode: String(reasoningData.source_node || 'unknown'),
+    timestamp: String(reasoningData.timestamp || new Date().toISOString()),
+    intent: typeof reasoningData.intent === 'string' ? reasoningData.intent : undefined,
+    confidence: typeof reasoningData.confidence === 'number' ? reasoningData.confidence : undefined,
+    needsAgents: typeof reasoningData.needs_agents === 'boolean' ? reasoningData.needs_agents : undefined,
+    riskLevel: typeof reasoningData.risk_level === 'string' ? reasoningData.risk_level : undefined,
+  };
+}
+
+function buildAikaMetadataFromComplete(
+  metadata: Record<string, unknown> | undefined,
+  invokedAgents: Set<string>
+): AikaMetadata | null {
+  if (!metadata) {
+    return null;
+  }
+
+  return {
+    session_id: typeof metadata.session_id === 'string' ? metadata.session_id : '',
+    user_role: (metadata.user_role as 'user' | 'admin' | 'counselor') || 'user',
+    intent: typeof metadata.intent === 'string' ? metadata.intent : 'unknown',
+    agents_invoked: (metadata.agents_invoked as string[]) || Array.from(invokedAgents),
+    actions_taken: (metadata.actions_taken as string[]) || [],
+    processing_time_ms: typeof metadata.processing_time_ms === 'number' ? metadata.processing_time_ms : 0,
+    risk_assessment: metadata.risk_assessment as AikaRiskAssessment | undefined,
+    escalation_triggered: Boolean(metadata.escalation_triggered),
+    case_id: metadata.case_id as string | undefined,
+    activity_logs: metadata.activity_logs as any[] | undefined,
+    llm_prompt_id: metadata.llm_prompt_id as string | undefined,
+    llm_request_count: metadata.llm_request_count as number | undefined,
+    llm_requests_by_model: metadata.llm_requests_by_model as Record<string, number> | undefined,
+    tools_used: metadata.tools_used as string[] | undefined,
+    is_fallback: Boolean(metadata.is_fallback),
+    fallback_type: metadata.fallback_type as 'rate_limit' | 'model_error' | undefined,
+    retry_after_ms: typeof metadata.retry_after_ms === 'number' ? metadata.retry_after_ms : 0,
+  };
+}
+
 export function useAika(options: UseAikaOptions = {}) {
   const { data: session } = useSession();
   const [loading, setLoading] = useState(false);
@@ -120,10 +221,10 @@ export function useAika(options: UseAikaOptions = {}) {
   } = options;
 
   /**
-   * Send a message to Aika Meta-Agent
-   */
-  /**
-   * Send a message to Aika Meta-Agent (Streaming Support)
+   * Send a message to Aika Meta-Agent over an SSE stream.
+   *
+   * Stream events are normalized through small helpers above so the main logic
+   * stays readable and easier to maintain.
    */
   const sendMessage = useCallback(async (
     message: string,
@@ -145,8 +246,7 @@ export function useAika(options: UseAikaOptions = {}) {
     setError(null);
 
     try {
-      const apiOrigin = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
-      const endpoint = apiOrigin ? `${apiOrigin}/api/v1/aika` : '/api/v1/aika';
+      const endpoint = buildAikaEndpoint();
 
       const requestBody: AikaRequest = {
         user_id: parseInt(session.user.id),
@@ -192,130 +292,91 @@ export function useAika(options: UseAikaOptions = {}) {
         if (done) break;
 
         buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split('\n\n');
-        buffer = lines.pop() || '';
+        const { frames, remainder } = splitSseFrames(buffer);
+        buffer = remainder;
 
-        for (const line of lines) {
-          // Backend sends: data: {"type": "...", ...}
-          if (line.startsWith('data: ')) {
-            const dataStr = line.replace('data: ', '').trim();
-            if (!dataStr) continue;
+        for (const frame of frames) {
+          try {
+            const event = parseSseFrame(frame);
+            if (!event) {
+              continue;
+            }
 
-            try {
-              const data = JSON.parse(dataStr);
-              const eventType = data.type;
-
-              if (eventType === 'agent') {
-                // Agent invocation
-                const agentName = data.agent;
+            switch (event.type) {
+              case 'agent': {
+                const agentName = event.agent;
+                if (!agentName) {
+                  break;
+                }
                 invokedAgents.add(agentName);
-                if (onAgentActivity) {
-                  onAgentActivity(Array.from(invokedAgents));
-                }
-              } else if (eventType === 'tool_start') {
-                // Tool starting - can be used for UI feedback
-                console.log('🔧 Tool Start:', data.tool);
-                if (onToolEvent) {
-                  onToolEvent({ type: 'tool_start', tool: data.tool, timestamp: new Date().toISOString() });
-                }
-              } else if (eventType === 'tool_end') {
-                // Tool completed
-                console.log('✅ Tool End:', data.tool);
-                if (onToolEvent) {
-                  onToolEvent({ type: 'tool_end', tool: data.tool, timestamp: new Date().toISOString() });
-                }
-              } else if (eventType === 'tool_use') {
-                // Multiple tools being used
-                console.log('🔧 Tool Use:', data.tools);
-                if (onToolEvent) {
-                  onToolEvent({ type: 'tool_use', tools: data.tools, timestamp: new Date().toISOString() });
-                }
-              } else if (eventType === 'partial_response') {
-                // Streaming partial response - for real-time updates
-                if (onPartialResponse) {
-                  onPartialResponse(data.text);
-                }
-              } else if (eventType === 'status') {
-                // Node status update - can be used for UI
-                console.log('🔄 Status:', data.message);
-                if (onStatusUpdate) {
-                  onStatusUpdate(data.message);
-                }
-              } else if (eventType === 'thinking') {
-                // Thinking indicator
-                console.log('🤔 Thinking:', data.message);
-                if (onStatusUpdate) {
-                  onStatusUpdate(`Thinking: ${data.message}`);
-                }
-              } else if (eventType === 'reasoning') {
-                const reasoningData = data.data || {};
-                const trace: ReasoningTrace = {
-                  id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-                  stage: String(reasoningData.stage || 'unknown'),
-                  summary: String(reasoningData.summary || data.message || 'Reasoning update'),
-                  sourceNode: String(reasoningData.source_node || 'unknown'),
-                  timestamp: String(reasoningData.timestamp || new Date().toISOString()),
-                  intent: typeof reasoningData.intent === 'string' ? reasoningData.intent : undefined,
-                  confidence: typeof reasoningData.confidence === 'number' ? reasoningData.confidence : undefined,
-                  needsAgents: typeof reasoningData.needs_agents === 'boolean' ? reasoningData.needs_agents : undefined,
-                  riskLevel: typeof reasoningData.risk_level === 'string' ? reasoningData.risk_level : undefined,
-                };
-
-                if (onReasoning) {
-                  onReasoning(trace);
-                }
-
-                if (onStatusUpdate) {
-                  onStatusUpdate(`Reasoning: ${trace.summary}`);
-                }
-              } else if (eventType === 'agent_activity') {
-                // Agent activity data with risk assessment
-                console.log('📊 Agent Activity:', data.data);
-              } else if (eventType === 'intervention_plan') {
-                // Intervention plan created
-                console.log('📋 Intervention Plan:', data.data);
-              } else if (eventType === 'appointment') {
-                // Appointment scheduled
-                console.log('📅 Appointment:', data.data);
-              } else if (eventType === 'complete') {
-                // Final response with metadata
-                finalResponse = data.response;
-                if (data.metadata) {
-                  // Build full metadata from complete event + agent_activity
-                  finalMetadata = {
-                    session_id: data.metadata.session_id || '',
-                    user_role: data.metadata.user_role || 'user',
-                    intent: data.metadata.intent || 'unknown',
-                    agents_invoked: data.metadata.agents_invoked || Array.from(invokedAgents),
-                    actions_taken: data.metadata.actions_taken || [],
-                    processing_time_ms: data.metadata.processing_time_ms || 0,
-                    risk_assessment: data.metadata.risk_assessment,
-                    escalation_triggered: data.metadata.escalation_triggered || false,
-                    case_id: data.metadata.case_id,
-                    activity_logs: data.metadata.activity_logs,
-
-                    llm_prompt_id: data.metadata.llm_prompt_id,
-                    llm_request_count: data.metadata.llm_request_count,
-                    llm_requests_by_model: data.metadata.llm_requests_by_model,
-                    tools_used: data.metadata.tools_used,
-
-                    // Fallback signalling — surfaced directly from the orchestrator state.
-                    is_fallback: data.metadata.is_fallback || false,
-                    fallback_type: data.metadata.fallback_type,
-                    retry_after_ms: data.metadata.retry_after_ms ?? 0,
-                  };
-                  setLastMetadata(finalMetadata);
-                }
-              } else if (eventType === 'error') {
-                throw new Error(data.message || data.error || 'Unknown error');
+                onAgentActivity?.(Array.from(invokedAgents));
+                break;
               }
-            } catch (e) {
-              // Only log if it's a real parsing error, not an intentional throw
-              if (e instanceof SyntaxError) {
-                console.error('Error parsing SSE data:', e, 'Raw line:', line);
-              } else {
-                throw e; // Re-throw intentional errors
+
+              case 'tool_start':
+                if (event.tool) {
+                  onToolEvent?.({ type: 'tool_start', tool: event.tool, timestamp: new Date().toISOString() });
+                }
+                break;
+
+              case 'tool_end':
+                if (event.tool) {
+                  onToolEvent?.({ type: 'tool_end', tool: event.tool, timestamp: new Date().toISOString() });
+                }
+                break;
+
+              case 'tool_use':
+                onToolEvent?.({ type: 'tool_use', tools: event.tools, timestamp: new Date().toISOString() });
+                break;
+
+              case 'partial_response':
+                if (typeof event.text === 'string') {
+                  onPartialResponse?.(event.text);
+                }
+                break;
+
+              case 'status':
+                if (typeof event.message === 'string') {
+                  onStatusUpdate?.(event.message);
+                }
+                break;
+
+              case 'thinking':
+                if (typeof event.message === 'string') {
+                  onStatusUpdate?.(`Thinking: ${event.message}`);
+                }
+                break;
+
+              case 'reasoning': {
+                const trace = buildReasoningTrace(event);
+                onReasoning?.(trace);
+                onStatusUpdate?.(`Reasoning: ${trace.summary}`);
+                break;
               }
+
+              case 'agent_activity':
+              case 'intervention_plan':
+              case 'appointment':
+                break;
+
+              case 'complete': {
+                finalResponse = event.response || '';
+                const mapped = buildAikaMetadataFromComplete(event.metadata, invokedAgents);
+                if (mapped) {
+                  finalMetadata = mapped;
+                  setLastMetadata(mapped);
+                }
+                break;
+              }
+
+              case 'error':
+                throw new Error(event.message || event.error || 'Unknown error');
+            }
+          } catch (parseOrEventError) {
+            if (parseOrEventError instanceof SyntaxError) {
+              console.error('Error parsing SSE frame:', parseOrEventError, 'Raw frame:', frame);
+            } else {
+              throw parseOrEventError;
             }
           }
         }
@@ -393,7 +454,17 @@ export function useAika(options: UseAikaOptions = {}) {
     } finally {
       setLoading(false);
     }
-  }, [session, onAgentActivity, onRiskDetected, onEscalation, showToasts]);
+  }, [
+    session,
+    onAgentActivity,
+    onEscalation,
+    onPartialResponse,
+    onReasoning,
+    onRiskDetected,
+    onStatusUpdate,
+    onToolEvent,
+    showToasts,
+  ]);
 
   /**
    * Get risk level color for UI
