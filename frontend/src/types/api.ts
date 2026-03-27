@@ -22,7 +22,9 @@ export interface JournalEntryItem {
   prompt_id?: number | null;
   prompt?: JournalPromptResponse | null; // Include the prompt object
   reflection_points?: JournalReflectionPointResponse[];
-  mood?: number | null; // 1-5 scale
+  mood?: number | null; // 1-5 scale (Deprecated)
+  valence?: number | null; // -1.0 to 1.0
+  arousal?: number | null; // -1.0 to 1.0
   word_count: number;
   tags?: JournalTagResponse[];
 }
@@ -48,6 +50,8 @@ export interface JournalEntryCreate {
   content: string;
   prompt_id?: number | null;
   mood?: number | null;
+  valence?: number | null;
+  arousal?: number | null;
   tags: string[];
 }
 
@@ -55,6 +59,10 @@ export interface JournalEntryFilter {
   search_query?: string;
   mood_min?: number;
   mood_max?: number;
+  valence_min?: number;
+  valence_max?: number;
+  arousal_min?: number;
+  arousal_max?: number;
   tags?: string[];
   date_from?: string;
   date_to?: string;

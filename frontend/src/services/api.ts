@@ -117,6 +117,8 @@ export interface JournalEntryPayload {
   content: string;
   prompt_id?: number | null;
   mood?: number | null;
+  valence?: number | null;
+  arousal?: number | null;
   tags: string[];
 }
 
