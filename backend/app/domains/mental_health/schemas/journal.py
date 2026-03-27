@@ -27,7 +27,9 @@ class JournalEntryBase(BaseModel):
     entry_date: date
     content: str
     prompt_id: Optional[int] = None
-    mood: Optional[int] = None # 1-5 scale
+    mood: Optional[int] = None # 1-5 scale (Deprecated)
+    valence: Optional[float] = None # -1.0 to 1.0
+    arousal: Optional[float] = None # -1.0 to 1.0
     tags: List[str] = [] # List of tag names
 
 class JournalEntryCreate(JournalEntryBase):
@@ -37,12 +39,18 @@ class JournalEntryUpdate(BaseModel):
     content: Optional[str] # Allow updating only content for a specific date
     prompt_id: Optional[int] = None # Allow updating prompt_text too, if desired
     mood: Optional[int] = None
+    valence: Optional[float] = None
+    arousal: Optional[float] = None
     tags: Optional[List[str]] = None
 
 class JournalEntryFilter(BaseModel):
     search_query: Optional[str] = None
     mood_min: Optional[int] = None
     mood_max: Optional[int] = None
+    valence_min: Optional[float] = None
+    valence_max: Optional[float] = None
+    arousal_min: Optional[float] = None
+    arousal_max: Optional[float] = None
     tags: Optional[List[str]] = None
     date_from: Optional[date] = None
     date_to: Optional[date] = None

@@ -27,6 +27,9 @@ def _serialize_assessment(assessment: ConversationAssessment) -> dict:
         "message_count": assessment.message_count_analyzed,
         "conversation_duration_seconds": assessment.conversation_duration_seconds,
         "analysis_timestamp": assessment.analysis_timestamp or datetime.utcnow(),
+        "pleasure": assessment.pleasure,
+        "arousal": assessment.arousal,
+        "dominance": assessment.dominance,
         "raw_assessment": assessment.model_dump(mode='json'),
     }
 

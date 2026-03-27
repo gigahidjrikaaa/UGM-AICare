@@ -115,6 +115,20 @@ class ConversationAssessment(BaseModel):
         description="Detailed chain-of-thought explanation of the assessment"
     )
     
+    # Affective State (PAD Model)
+    pleasure: Optional[float] = Field(
+        default=None, ge=-1.0, le=1.0,
+        description="Pleasure/Valence: -1.0 (negative) to 1.0 (positive)"
+    )
+    arousal: Optional[float] = Field(
+        default=None, ge=-1.0, le=1.0,
+        description="Arousal: -1.0 (calm) to 1.0 (excited)"
+    )
+    dominance: Optional[float] = Field(
+        default=None, ge=-1.0, le=1.0,
+        description="Dominance: -1.0 (overwhelmed) to 1.0 (in control)"
+    )
+    
     # Metadata
     message_count_analyzed: int = Field(
         description="Number of messages included in this analysis"
