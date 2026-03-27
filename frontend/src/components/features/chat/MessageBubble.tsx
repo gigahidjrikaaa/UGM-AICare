@@ -13,6 +13,7 @@ import { useLiveTalkStore } from '@/store/useLiveTalkStore';
 import { InterventionPlan } from './InterventionPlan';
 import { AppointmentCard } from './AppointmentCard';
 import { AgentActivityLog } from './AgentActivityLog';
+import { AikaSchedulingWidget } from './AikaSchedulingWidget';
 import { AikaThinkingCompact } from './AikaThinkingIndicator';
 import { Copy, Check, RotateCcw, Clock } from 'lucide-react';
 
@@ -58,6 +59,7 @@ export function MessageBubble({
   const hasPlayedRef = React.useRef(false);
   const [copied, setCopied] = React.useState(false);
   const [userAvatarFailed, setUserAvatarFailed] = React.useState(false);
+  const [widgetAppointment, setWidgetAppointment] = React.useState<Message['appointment'] | null>(null);
 
   useEffect(() => {
     // Only play sound once per message and when not loading
@@ -126,6 +128,24 @@ export function MessageBubble({
   const toolCalls = (!isUser && message.metadata?.tool_calls && Array.isArray(message.metadata.tool_calls))
     ? (message.metadata.tool_calls as any[])
     : [];
+
+  const shouldShowSchedulingWidget = React.useMemo(() => {
+    if (isUser || message.isLoading || message.appointment || widgetAppointment) {
+      return false;
+    }
+
+    const intent = message.aikaMetadata?.intent?.toLowerCase() || '';
+    const actions = message.aikaMetadata?.actions_taken || [];
+    const keywords = ['schedule', 'scheduling', 'appointment', 'booking', 'counselor', 'konseling'];
+
+    const intentTriggered = keywords.some((keyword) => intent.includes(keyword));
+    const actionTriggered = actions.some((action) => {
+      const normalized = action.toLowerCase();
+      return keywords.some((keyword) => normalized.includes(keyword));
+    });
+
+    return intentTriggered || actionTriggered;
+  }, [isUser, message.isLoading, message.appointment, message.aikaMetadata, widgetAppointment]);
 
   if (isSystem) {
     return (
@@ -342,12 +362,24 @@ export function MessageBubble({
         )}
         
         {/* Appointment Card Display */}
-        {!isUser && message.appointment && !message.isLoading && (
+        {!isUser && (message.appointment || widgetAppointment) && !message.isLoading && (
           <div className="max-w-xs md:max-w-md lg:max-w-lg mt-2">
             <AppointmentCard 
-              appointment={message.appointment}
+              appointment={(message.appointment || widgetAppointment)!}
               onCancel={onCancelAppointment}
               onReschedule={onRescheduleAppointment}
+            />
+          </div>
+        )}
+
+        {/* Interactive Scheduling Widget */}
+        {!isUser && shouldShowSchedulingWidget && (
+          <div className="max-w-xs md:max-w-md lg:max-w-lg mt-2">
+            <AikaSchedulingWidget
+              onScheduled={(appointment) => {
+                setWidgetAppointment(appointment);
+              }}
+              onAikaFollowup={(text) => onCardSelect?.(text)}
             />
           </div>
         )}

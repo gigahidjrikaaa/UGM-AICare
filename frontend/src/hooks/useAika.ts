@@ -96,6 +96,9 @@ interface UseAikaOptions {
   onRiskDetected?: (assessment: AikaRiskAssessment) => void;
   onEscalation?: (caseId: string) => void;
   onPartialResponse?: (text: string) => void;
+  onAgentActivityData?: (activity: Record<string, unknown>) => void;
+  onInterventionPlan?: (plan: Record<string, unknown>) => void;
+  onAppointment?: (appointment: Record<string, unknown>) => void;
   onToolEvent?: (event: ToolEvent) => void;
   onStatusUpdate?: (message: string) => void;
   onReasoning?: (trace: ReasoningTrace) => void;
@@ -211,8 +214,11 @@ export function useAika(options: UseAikaOptions = {}) {
 
   const {
     onAgentActivity,
+    onAgentActivityData,
     onRiskDetected,
     onEscalation,
+    onInterventionPlan,
+    onAppointment,
     onPartialResponse,
     onToolEvent,
     onStatusUpdate,
@@ -355,8 +361,21 @@ export function useAika(options: UseAikaOptions = {}) {
               }
 
               case 'agent_activity':
+                if (event.data) {
+                  onAgentActivityData?.(event.data);
+                }
+                break;
+
               case 'intervention_plan':
+                if (event.data) {
+                  onInterventionPlan?.(event.data);
+                }
+                break;
+
               case 'appointment':
+                if (event.data) {
+                  onAppointment?.(event.data);
+                }
                 break;
 
               case 'complete': {
@@ -457,7 +476,10 @@ export function useAika(options: UseAikaOptions = {}) {
   }, [
     session,
     onAgentActivity,
+    onAgentActivityData,
     onEscalation,
+    onInterventionPlan,
+    onAppointment,
     onPartialResponse,
     onReasoning,
     onRiskDetected,

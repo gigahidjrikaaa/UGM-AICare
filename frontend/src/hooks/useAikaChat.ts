@@ -10,7 +10,7 @@ import { useSession } from 'next-auth/react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAika, type AikaMessage, type AikaMetadata, type ReasoningTrace } from './useAika';
 import { useThinkingSteps } from '@/hooks/useThinkingSteps';
-import type { Message } from '@/types/chat';
+import type { Appointment, InterventionPlan, Message } from '@/types/chat';
 
 // Activity log entry type for tool/API tracking
 export interface ToolActivityLog {
@@ -62,6 +62,223 @@ export function useAikaChat({
   // Track streaming state for multi-bubble support
   const currentBubbleIdRef = useRef<string | null>(null);
   const bubbleCountRef = useRef<number>(0);
+  const partialResponseBufferRef = useRef<string>('');
+  const hasPartialResponseRef = useRef<boolean>(false);
+  const latestInterventionPlanRef = useRef<InterventionPlan | null>(null);
+  const latestAppointmentRef = useRef<Appointment | null>(null);
+  const latestAgentActivityRef = useRef<Message['agentActivity'] | null>(null);
+
+  const mapInterventionPlan = (payload: Record<string, unknown>): InterventionPlan | null => {
+    const rawSteps = Array.isArray(payload.plan_steps) ? payload.plan_steps : [];
+    const rawResources = Array.isArray(payload.resource_cards) ? payload.resource_cards : [];
+
+    const planSteps = rawSteps
+      .map((step, index) => {
+        if (!step || typeof step !== 'object') {
+          return null;
+        }
+
+        const obj = step as Record<string, unknown>;
+        const label =
+          (typeof obj.label === 'string' && obj.label.trim()) ||
+          (typeof obj.title === 'string' && obj.title.trim()) ||
+          (typeof obj.description === 'string' && obj.description.trim()) ||
+          '';
+
+        if (!label) {
+          return null;
+        }
+
+        return {
+          id: typeof obj.id === 'string' && obj.id.trim() ? obj.id : `step-${index + 1}`,
+          label,
+          duration_min: typeof obj.duration_min === 'number' ? obj.duration_min : undefined,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+
+    const resourceCards = rawResources
+      .map((resource, index) => {
+        if (!resource || typeof resource !== 'object') {
+          return null;
+        }
+
+        const obj = resource as Record<string, unknown>;
+        const title = typeof obj.title === 'string' ? obj.title : '';
+        const summary = typeof obj.summary === 'string'
+          ? obj.summary
+          : typeof obj.description === 'string'
+            ? obj.description
+            : '';
+
+        if (!title || !summary) {
+          return null;
+        }
+
+        return {
+          resource_id: typeof obj.resource_id === 'string' && obj.resource_id.trim()
+            ? obj.resource_id
+            : `resource-${index + 1}`,
+          title,
+          summary,
+          url: typeof obj.url === 'string' ? obj.url : undefined,
+          resource_type: typeof obj.resource_type === 'string'
+            ? obj.resource_type as 'link' | 'activity' | 'video' | 'article'
+            : undefined,
+          activity_id: typeof obj.activity_id === 'string' ? obj.activity_id : undefined,
+        };
+      })
+      .filter((item): item is NonNullable<typeof item> => item !== null);
+
+    if (planSteps.length === 0 && resourceCards.length === 0) {
+      return null;
+    }
+
+    return {
+      plan_steps: planSteps,
+      resource_cards: resourceCards,
+      next_check_in: typeof payload.next_check_in === 'string' ? payload.next_check_in : undefined,
+      intervention_reason: typeof payload.intervention_reason === 'string' ? payload.intervention_reason : undefined,
+    };
+  };
+
+  const mapAppointment = (payload: Record<string, unknown>): Appointment | null => {
+    if (typeof payload.id !== 'number' || typeof payload.appointment_datetime !== 'string') {
+      return null;
+    }
+
+    const psychologist = payload.psychologist;
+    const appointmentType = payload.appointment_type;
+
+    return {
+      id: payload.id,
+      student_id: typeof payload.student_id === 'number' ? payload.student_id : 0,
+      psychologist_id: typeof payload.psychologist_id === 'number' ? payload.psychologist_id : 0,
+      appointment_datetime: payload.appointment_datetime,
+      appointment_type_id: typeof payload.appointment_type_id === 'number' ? payload.appointment_type_id : 0,
+      status: (typeof payload.status === 'string' ? payload.status : 'scheduled') as Appointment['status'],
+      notes: typeof payload.notes === 'string' ? payload.notes : undefined,
+      location: typeof payload.location === 'string' ? payload.location : undefined,
+      psychologist: psychologist && typeof psychologist === 'object'
+        ? {
+            id: typeof (psychologist as Record<string, unknown>).id === 'number'
+              ? (psychologist as Record<string, unknown>).id as number
+              : 0,
+            full_name: typeof (psychologist as Record<string, unknown>).full_name === 'string'
+              ? (psychologist as Record<string, unknown>).full_name as string
+              : 'Psikolog',
+            specialization: Array.isArray((psychologist as Record<string, unknown>).specialization)
+              ? (psychologist as Record<string, unknown>).specialization as string[]
+              : undefined,
+            languages: Array.isArray((psychologist as Record<string, unknown>).languages)
+              ? (psychologist as Record<string, unknown>).languages as string[]
+              : undefined,
+          }
+        : undefined,
+      appointment_type: appointmentType && typeof appointmentType === 'object'
+        ? {
+            id: typeof (appointmentType as Record<string, unknown>).id === 'number'
+              ? (appointmentType as Record<string, unknown>).id as number
+              : 0,
+            name: typeof (appointmentType as Record<string, unknown>).name === 'string'
+              ? (appointmentType as Record<string, unknown>).name as string
+              : 'Konseling',
+            description: typeof (appointmentType as Record<string, unknown>).description === 'string'
+              ? (appointmentType as Record<string, unknown>).description as string
+              : undefined,
+          }
+        : undefined,
+    };
+  };
+
+  const mapAgentActivity = (payload: Record<string, unknown>): Message['agentActivity'] => ({
+    execution_path: Array.isArray(payload.execution_path) ? payload.execution_path as string[] : [],
+    agents_invoked: Array.isArray(payload.agents_invoked) ? payload.agents_invoked as string[] : [],
+    intent: typeof payload.intent === 'string' ? payload.intent : 'unknown',
+    intent_confidence: typeof payload.intent_confidence === 'number' ? payload.intent_confidence : 0,
+    needs_agents: Boolean(payload.needs_agents),
+    agent_reasoning: typeof payload.agent_reasoning === 'string' ? payload.agent_reasoning : '',
+    response_source: typeof payload.response_source === 'string' ? payload.response_source : 'unknown',
+    processing_time_ms: typeof payload.processing_time_ms === 'number' ? payload.processing_time_ms : 0,
+    risk_level: typeof payload.risk_level === 'string' ? payload.risk_level : undefined,
+    risk_score: typeof payload.risk_score === 'number' ? payload.risk_score : undefined,
+  });
+
+  const sanitizeAssistantResponse = (
+    rawText: string,
+    hasInterventionPlan: boolean,
+    hasAppointment: boolean
+  ): string => {
+    if (!rawText) {
+      return '';
+    }
+
+    let next = rawText;
+
+    next = next.replace(/```(?:json)?\s*([\s\S]*?)```/gi, (block, body) => {
+      if (/plan_steps|resource_cards|intervention_plan|appointment_datetime|psychologist_id|appointment_type_id/i.test(body)) {
+        return '';
+      }
+      return block;
+    });
+
+    const trimmed = next.trim();
+    if ((hasInterventionPlan || hasAppointment) && /^\{[\s\S]*\}$/.test(trimmed)) {
+      if (/plan_steps|resource_cards|intervention_plan|appointment_datetime|psychologist_id|appointment_type_id/i.test(trimmed)) {
+        return '';
+      }
+    }
+
+    return next.trim();
+  };
+
+  const findChunkBoundary = (text: string): number => {
+    const paragraphBreak = text.lastIndexOf('\n\n');
+    if (paragraphBreak >= 0) {
+      return paragraphBreak + 2;
+    }
+
+    const sentenceMarkers = ['. ', '! ', '? ', '。'];
+    let sentenceBoundary = -1;
+    for (const marker of sentenceMarkers) {
+      const index = text.lastIndexOf(marker);
+      if (index > sentenceBoundary) {
+        sentenceBoundary = index + marker.length;
+      }
+    }
+
+    if (sentenceBoundary >= 0 && sentenceBoundary >= 120) {
+      return sentenceBoundary;
+    }
+
+    if (text.length >= 240) {
+      const forcedBoundary = text.lastIndexOf(' ', 220);
+      return forcedBoundary >= 0 ? forcedBoundary + 1 : 220;
+    }
+
+    return -1;
+  };
+
+  const consumePartialChunks = (text: string): { chunks: string[]; remainder: string } => {
+    const chunks: string[] = [];
+    let remainder = text;
+
+    while (true) {
+      const boundary = findChunkBoundary(remainder);
+      if (boundary <= 0) {
+        break;
+      }
+
+      const chunk = remainder.slice(0, boundary).trim();
+      remainder = remainder.slice(boundary).trimStart();
+
+      if (chunk) {
+        chunks.push(chunk);
+      }
+    }
+
+    return { chunks, remainder };
+  };
 
   /**
    * Split content into logical sections for multiple message bubbles.
@@ -192,31 +409,55 @@ export function useAikaChat({
         return next;
       });
     },
+    onAgentActivityData: (activity) => {
+      latestAgentActivityRef.current = mapAgentActivity(activity);
+    },
+    onInterventionPlan: (planPayload) => {
+      const mapped = mapInterventionPlan(planPayload);
+      if (mapped) {
+        latestInterventionPlanRef.current = mapped;
+      }
+    },
+    onAppointment: (appointmentPayload) => {
+      const mapped = mapAppointment(appointmentPayload);
+      if (mapped) {
+        latestAppointmentRef.current = mapped;
+      }
+    },
     onPartialResponse: (text) => {
       setIsLoading(false);
-      
-      // Simple streaming: just accumulate in a single bubble
+
+      hasPartialResponseRef.current = true;
+      const merged = `${partialResponseBufferRef.current}${text}`;
+      const { chunks, remainder } = consumePartialChunks(merged);
+      partialResponseBufferRef.current = remainder;
+
+      if (chunks.length === 0) {
+        return;
+      }
+
       setMessages((prev) => {
-        const lastMsg = prev[prev.length - 1];
-        if (lastMsg?.role === 'assistant' && lastMsg.isStreaming) {
-          return prev.map((m, i) => 
-            i === prev.length - 1 ? { ...m, content: m.content + text } : m
-          );
-        } else {
-          const newMessage: Message = {
-            id: `streaming-${Date.now()}`,
+        const conversationId = lastConversationIdRef.current || uuidv4();
+        const nextMessages: Message[] = chunks.map((chunk) => {
+          const message: Message = {
+            id: uuidv4(),
             role: 'assistant',
-            content: text,
+            content: chunk,
             timestamp: new Date(),
             session_id: sessionId,
-            conversation_id: lastConversationIdRef.current || uuidv4(),
+            conversation_id: conversationId,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            isStreaming: true,
+            isContinuation: bubbleCountRef.current > 0,
             isLoading: false,
           };
-          return [...prev, newMessage];
-        }
+
+          bubbleCountRef.current += 1;
+          currentBubbleIdRef.current = message.id;
+          return message;
+        });
+
+        return [...prev, ...nextMessages];
       });
     },
   });
@@ -288,6 +529,13 @@ export function useAikaChat({
       setActiveAgents([]); // Reset active agents
       setCurrentThinking('Aika sedang menganalisis pesanmu...');
       setThinkingTrace([]);
+      partialResponseBufferRef.current = '';
+      hasPartialResponseRef.current = false;
+      bubbleCountRef.current = 0;
+      currentBubbleIdRef.current = null;
+      latestInterventionPlanRef.current = null;
+      latestAppointmentRef.current = null;
+      latestAgentActivityRef.current = null;
 
       try {
         // Prepare conversation history for Aika
@@ -322,10 +570,6 @@ export function useAikaChat({
           setRetryCooldownMs(aikaResponse.metadata.retry_after_ms);
         }
 
-        // Reset bubble tracking
-        bubbleCountRef.current = 0;
-        currentBubbleIdRef.current = null;
-
         // Fallback-message decoration helpers
         const fallbackProps: Partial<Message> = aikaResponse.isFallback
           ? {
@@ -335,56 +579,105 @@ export function useAikaChat({
             }
           : {};
 
-        // Update or Add assistant response - split into multiple bubbles
+        // Flush remaining partial buffer and attach metadata without rebuilding
+        // from the final full response when we already streamed chunks.
         setMessages((prev) => {
-          const streamingMsgIndex = prev.findIndex(m => m.isStreaming);
-          
-          if (streamingMsgIndex !== -1) {
-            // Get the streamed content and split it into sections
-            const streamedContent = prev[streamingMsgIndex].content;
-            const sections = splitContentIntoSections(streamedContent);
-            
-            // Remove the streaming message and add split messages
-            const beforeStreaming = prev.slice(0, streamingMsgIndex);
-            const afterStreaming = prev.slice(streamingMsgIndex + 1);
-            
-            const newMessages: Message[] = sections.map((section, idx) => ({
-              id: uuidv4(),
-              role: 'assistant' as const,
-              content: section,
-              timestamp: new Date(),
-              session_id: sessionId,
-              conversation_id: activeConversationId,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              isStreaming: false,
-              isContinuation: idx > 0, // Mark all but first as continuation
-              aikaMetadata: idx === sections.length - 1 ? aikaResponse.metadata : undefined, // Only last gets metadata
-              ...fallbackProps,
-            }));
-            
-            return [...beforeStreaming, ...newMessages, ...afterStreaming];
-          } else {
-            // No streaming happened, split the full response
-            const sections = splitContentIntoSections(aikaResponse.response);
-            
-            const newMessages: Message[] = sections.map((section, idx) => ({
-              id: uuidv4(),
-              role: 'assistant' as const,
-              content: section,
-              timestamp: new Date(),
-              session_id: sessionId,
-              conversation_id: activeConversationId,
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString(),
-              isContinuation: idx > 0,
-              aikaMetadata: idx === sections.length - 1 ? aikaResponse.metadata : undefined,
-              ...fallbackProps,
-            }));
-            
-            return [...prev, ...newMessages];
+          const hasStreamedPartials = hasPartialResponseRef.current;
+          const trailingPartial = partialResponseBufferRef.current.trim();
+          const interventionPlan = latestInterventionPlanRef.current;
+          const appointment = latestAppointmentRef.current;
+          const agentActivity = latestAgentActivityRef.current;
+
+          if (hasStreamedPartials) {
+            if (trailingPartial) {
+              const sanitizedTrailing = sanitizeAssistantResponse(
+                trailingPartial,
+                Boolean(interventionPlan),
+                Boolean(appointment)
+              );
+
+              if (!sanitizedTrailing && !interventionPlan && !appointment && !agentActivity) {
+                return prev;
+              }
+
+              const trailingMessage: Message = {
+                id: uuidv4(),
+                role: 'assistant',
+                content: sanitizedTrailing || 'Aku sudah menyiapkan detail dukungan untukmu.',
+                timestamp: new Date(),
+                session_id: sessionId,
+                conversation_id: activeConversationId,
+                created_at: new Date().toISOString(),
+                updated_at: new Date().toISOString(),
+                isContinuation: bubbleCountRef.current > 0,
+                aikaMetadata: aikaResponse.metadata,
+                interventionPlan: interventionPlan || undefined,
+                appointment: appointment || undefined,
+                agentActivity: agentActivity || undefined,
+                ...fallbackProps,
+              };
+
+              bubbleCountRef.current += 1;
+              return [...prev, trailingMessage];
+            }
+
+            if (bubbleCountRef.current > 0) {
+              for (let index = prev.length - 1; index >= 0; index -= 1) {
+                const item = prev[index];
+                if (item.role === 'assistant' && item.conversation_id === activeConversationId) {
+                  const next = [...prev];
+                  next[index] = {
+                    ...item,
+                    ...fallbackProps,
+                    aikaMetadata: aikaResponse.metadata,
+                    interventionPlan: interventionPlan || item.interventionPlan,
+                    appointment: appointment || item.appointment,
+                    agentActivity: agentActivity || item.agentActivity,
+                  };
+                  return next;
+                }
+              }
+            }
           }
+
+          const cleanedResponse = sanitizeAssistantResponse(
+            aikaResponse.response,
+            Boolean(interventionPlan),
+            Boolean(appointment)
+          );
+          const sections = splitContentIntoSections(cleanedResponse).filter((value) => value.trim().length > 0);
+
+          if (sections.length === 0 && (interventionPlan || appointment || agentActivity)) {
+            sections.push('Aku sudah menyiapkan detail dukungan untukmu.');
+          }
+
+          const newMessages: Message[] = sections.map((section, idx) => ({
+            id: uuidv4(),
+            role: 'assistant' as const,
+            content: section,
+            timestamp: new Date(),
+            session_id: sessionId,
+            conversation_id: activeConversationId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            isContinuation: idx > 0,
+            aikaMetadata: idx === sections.length - 1 ? aikaResponse.metadata : undefined,
+            interventionPlan: idx === sections.length - 1 ? interventionPlan || undefined : undefined,
+            appointment: idx === sections.length - 1 ? appointment || undefined : undefined,
+            agentActivity: idx === sections.length - 1 ? agentActivity || undefined : undefined,
+            ...fallbackProps,
+          }));
+
+          return [...prev, ...newMessages];
         });
+
+        partialResponseBufferRef.current = '';
+        hasPartialResponseRef.current = false;
+        bubbleCountRef.current = 0;
+        currentBubbleIdRef.current = null;
+        latestInterventionPlanRef.current = null;
+        latestAppointmentRef.current = null;
+        latestAgentActivityRef.current = null;
       } catch (error) {
         console.error('Aika chat error:', error);
 
@@ -406,6 +699,13 @@ export function useAikaChat({
         setIsLoading(false);
         setActiveAgents([]); // Clear active agents when done
         setCurrentThinking(null);
+        partialResponseBufferRef.current = '';
+        hasPartialResponseRef.current = false;
+        bubbleCountRef.current = 0;
+        currentBubbleIdRef.current = null;
+        latestInterventionPlanRef.current = null;
+        latestAppointmentRef.current = null;
+        latestAgentActivityRef.current = null;
       }
     },
     [

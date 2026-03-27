@@ -1,7 +1,7 @@
 """Journal and reflection models."""
 
 from typing import Optional, List, TYPE_CHECKING
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, Date, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, Date, UniqueConstraint, Float
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 from datetime import datetime
@@ -33,6 +33,10 @@ class JournalEntry(Base):
     prompt_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("journal_prompts.id"), nullable=True)
     mood: Mapped[Optional[int]] = mapped_column(Integer, nullable=True) # 1-5 scale (1: very negative, 5: very positive)
     word_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    
+    # Unified Affective Framework (2.5D PAD Model)
+    valence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    arousal: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="journal_entries")
     prompt: Mapped["JournalPrompt"] = relationship("JournalPrompt")

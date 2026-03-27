@@ -95,6 +95,11 @@ class ConversationRiskAssessment(Base):
     should_invoke_cma: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     reasoning: Mapped[str] = mapped_column(Text, nullable=False)
 
+    # Unified Affective Framework (2.5D PAD Model)
+    pleasure: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    arousal: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    dominance: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+
     message_count: Mapped[int] = mapped_column(Integer, nullable=False)
     conversation_duration_seconds: Mapped[float] = mapped_column(Float, nullable=True)
     analysis_timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
