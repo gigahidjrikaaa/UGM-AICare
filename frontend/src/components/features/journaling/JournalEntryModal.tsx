@@ -10,6 +10,7 @@ import ReflectionPointsPanel from './ReflectionPointsModal'; // Corrected import
 import { getActiveJournalPrompts, saveJournalEntry, getMyJournalReflections } from '@/services/api';
 import type { JournalPromptResponse, JournalEntryItem, JournalReflectionPointResponse } from '@/types/api';
 import { toast } from 'react-hot-toast';
+import AffectiveGrid from './AffectiveGrid';
 
 interface JournalEntryModalProps {
     isOpen: boolean;
@@ -38,6 +39,8 @@ export default function JournalEntryModal({
     const [isFetchingReflections, setIsFetchingReflections] = useState(false);
     
     const [mood, setMood] = useState<number | null>(null);
+    const [valence, setValence] = useState<number | null>(null);
+    const [arousal, setArousal] = useState<number | null>(null);
     const [tags, setTags] = useState<string[]>([]);
     const [newTag, setNewTag] = useState('');
 
@@ -56,12 +59,16 @@ export default function JournalEntryModal({
                 setContent(''); // No entry for this date, clear content
                 setSelectedPromptId(null); // Clear selected prompt
                 setMood(null); // Clear mood
+                setValence(null);
+                setArousal(null);
                 setTags([]); // Clear tags
                 toast("Journal is empty. Remember what you felt this day?", { duration: 4000, icon: '🤔', position: 'bottom-center' });
             } else if (response.status >= 200 && response.status < 300) {
                 setContent(response.data.content);
                 setSelectedPromptId(response.data.prompt?.id || null);
                 setMood(response.data.mood || null);
+                setValence(response.data.valence ?? null);
+                setArousal(response.data.arousal ?? null);
                 setTags(response.data.tags?.map(t => t.tag_name) || []);
             } else {
                 throw new Error(`Unexpected response status: ${response.status}`);
@@ -118,6 +125,8 @@ export default function JournalEntryModal({
             setError(null);
             setReflectionPoints([]);
             setMood(null);
+            setValence(null);
+            setArousal(null);
             setTags([]);
             setNewTag('');
         }
@@ -136,6 +145,8 @@ export default function JournalEntryModal({
                 content,
                 prompt_id: selectedPromptId,
                 mood,
+                valence,
+                arousal,
                 tags,
             });
             toast.success('Journal entry saved!');
@@ -204,34 +215,16 @@ export default function JournalEntryModal({
                                             <FiSmile className="mr-2 text-[#FFCA40]" />
                                             How are you feeling today?
                                         </label>
-                                        <div className="flex items-center justify-between gap-2">
-                                            {[1, 2, 3, 4, 5].map((moodValue) => (
-                                                <button
-                                                    key={moodValue}
-                                                    onClick={() => setMood(mood === moodValue ? null : moodValue)}
-                                                    className={`flex-1 py-3 px-2 rounded-lg text-center transition-all duration-200 ${
-                                                        mood === moodValue
-                                                            ? 'bg-[#FFCA40] text-slate-900 font-bold transform scale-105'
-                                                            : 'bg-slate-700/50 text-gray-400 hover:bg-slate-600/50 hover:text-white'
-                                                    }`}
-                                                    disabled={isFetchingEntry}
-                                                >
-                                                    <div className="text-2xl mb-1">
-                                                        {moodValue === 1 && '😢'}
-                                                        {moodValue === 2 && '😕'}
-                                                        {moodValue === 3 && '😐'}
-                                                        {moodValue === 4 && '😊'}
-                                                        {moodValue === 5 && '😄'}
-                                                    </div>
-                                                    <div className="text-xs">
-                                                        {moodValue === 1 && 'Very Low'}
-                                                        {moodValue === 2 && 'Low'}
-                                                        {moodValue === 3 && 'Okay'}
-                                                        {moodValue === 4 && 'Good'}
-                                                        {moodValue === 5 && 'Great'}
-                                                    </div>
-                                                </button>
-                                            ))}
+                                        <div className="p-4 bg-slate-700/30 rounded-xl border border-white/5">
+                                            <AffectiveGrid 
+                                                valence={valence} 
+                                                arousal={arousal} 
+                                                onChange={(v, a) => {
+                                                    setValence(v);
+                                                    setArousal(a);
+                                                }}
+                                                disabled={isFetchingEntry}
+                                            />
                                         </div>
                                     </div>
 
