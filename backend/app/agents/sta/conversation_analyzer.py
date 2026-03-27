@@ -107,6 +107,11 @@ PART 1: RISK ASSESSMENT (Clinical Safety Analysis)
    - true if: Critical risk, escalating pattern with high severity, user requests human help
    - false if: Manageable with AI support, user improving, low-moderate stable risk
 
+8. AFFECTIVE STATE (PAD Model): Extract numerical coordinates for the user's emotional state based on the conversation context:
+   - pleasure: -1.0 (very negative) to 1.0 (very positive)
+   - arousal: -1.0 (very calm/dull) to 1.0 (highly excited/tense)
+   - dominance: -1.0 (powerless/overwhelmed) to 1.0 (in control/empowered)
+
 ==============================================================================
 PART 2: SCREENING EXTRACTION (Covert Mental Health Profiling)
 ==============================================================================
@@ -155,6 +160,9 @@ Return ONLY valid JSON (no markdown, no code blocks):
   "recommended_actions": ["Specific action 1", "Specific action 2"],
   "should_invoke_cma": true or false,
   "reasoning": "Detailed chain-of-thought explanation: Why this risk level? Why this trend? Why CMA decision?",
+  "pleasure": 0.0,
+  "arousal": 0.0,
+  "dominance": 0.0,
   "screening": {{
     "depression": {{"score": 0.0-1.0, "evidence": ["quote 1"], "is_protective": false}},
     "anxiety": {{"score": 0.0-1.0, "evidence": ["quote 1"], "is_protective": false}},
