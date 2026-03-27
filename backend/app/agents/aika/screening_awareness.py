@@ -291,6 +291,10 @@ class ScreeningGapAnalysis:
     suggested_probe: Optional[NaturalProbe] = None
     last_probe_time: Optional[datetime] = None
     probes_this_session: int = 0
+    
+    # Affective Discordance (Unified Framework)
+    discordance_level: str = "none" # none, low, medium, high
+    discordance_reason: Optional[str] = None
 
 
 async def analyze_screening_gaps(
@@ -306,6 +310,7 @@ async def analyze_screening_gaps(
     1. Which dimensions have stale or missing information
     2. Which probe would be most appropriate given the conversation context
     3. Whether now is a good time to probe (based on conversation flow)
+    4. Affective Discordance (Delta between self-report and AI detection)
     
     Args:
         db: Database session
@@ -317,11 +322,49 @@ async def analyze_screening_gaps(
     Returns:
         ScreeningGapAnalysis with recommended probe
     """
-    from app.domains.mental_health.models.assessments import UserScreeningProfile
+    from app.domains.mental_health.models.assessments import UserScreeningProfile, ConversationRiskAssessment
+    from app.domains.mental_health.models.journal import JournalEntry
     
     analysis = ScreeningGapAnalysis(user_id=user_id)
     
-    # Fetch existing screening profile
+    # 1. Analyze Affective Discordance (Unified Framework)
+    # Fetch latest self-report (Journal) and latest AI assessment
+    latest_journal_stmt = (
+        select(JournalEntry)
+        .where(JournalEntry.user_id == user_id)
+        .order_by(JournalEntry.entry_date.desc())
+        .limit(1)
+    )
+    latest_assessment_stmt = (
+        select(ConversationRiskAssessment)
+        .where(ConversationRiskAssessment.user_id == user_id)
+        .order_by(ConversationRiskAssessment.created_at.desc())
+        .limit(1)
+    )
+    
+    journal_res = await db.execute(latest_journal_stmt)
+    assessment_res = await db.execute(latest_assessment_stmt)
+    
+    latest_journal = journal_res.scalar_one_or_none()
+    latest_assessment = assessment_res.scalar_one_or_none()
+    
+    if latest_journal and latest_assessment and latest_journal.valence is not None and latest_assessment.pleasure is not None:
+        # Calculate delta for Pleasure/Valence (-1 to 1 space)
+        p_delta = abs(latest_journal.valence - latest_assessment.pleasure)
+        a_delta = abs(latest_journal.arousal - latest_assessment.arousal) if (latest_journal.arousal is not None and latest_assessment.arousal is not None) else 0.0
+        
+        total_delta = (p_delta + a_delta) / 2
+        
+        if total_delta > 0.8:
+            analysis.discordance_level = "high"
+            analysis.discordance_reason = f"Significant gap: User reported {latest_journal.valence} pleasure but AI detected {latest_assessment.pleasure}."
+        elif total_delta > 0.4:
+            analysis.discordance_level = "medium"
+            analysis.discordance_reason = "Moderate gap between self-report and detected sentiment (Masking possible)."
+        elif total_delta > 0.2:
+            analysis.discordance_level = "low"
+
+    # 2. Fetch existing screening profile
     stmt = select(UserScreeningProfile).where(UserScreeningProfile.user_id == user_id)
     result = await db.execute(stmt)
     db_profile = result.scalar_one_or_none()
@@ -492,42 +535,54 @@ def generate_screening_guidance(
     Returns:
         Guidance text to append to system prompt
     """
-    if not gap_analysis.suggested_probe:
-        return ""
+    guidance_sections = []
     
-    if gap_analysis.probes_this_session >= max_probes_per_session:
-        return ""
-    
-    probe = gap_analysis.suggested_probe
-    
-    # Select a random variation to keep it fresh
-    import random
-    probe_text = random.choice(probe.probe_variations)
-    
-    guidance = f"""
-## Screening Awareness (Internal Guidance - DO NOT mention this to user)
+    # 1. Affective Discordance (Layered Strategy)
+    if gap_analysis.discordance_level != "none":
+        discordance_text = f"""
+## Unified Framework Awareness: Affective Discordance (INTERNAL)
+**Discordance Level:** {gap_analysis.discordance_level}
+**Reason:** {gap_analysis.discordance_reason}
 
-**Current Information Gap:** {probe.dimension.value}
+**Instructions for Aika:**
+"""
+        if gap_analysis.discordance_level == "high":
+            discordance_text += "- CRITICAL: User's self-report is significantly more positive than detected sentiment. Possible crisis masking.\n- STRATEGY: Use validating, deep-probing questions to explore the 'underlying' feelings."
+        elif gap_analysis.discordance_level == "medium":
+            discordance_text += "- STRATEGY: Gentle Inquiry. Acknowledge their positive report but tentatively mention the stressors they've discussed (e.g., 'You said you're doing okay, but I can feel how heavy these assignments are for you...')."
+        else: # low
+            discordance_text += "- STRATEGY: Silent Coaching. Be slightly more supportive/empathetic than usual, even if they claim to be fine."
+            
+        guidance_sections.append(discordance_text)
+
+    # 2. Information Gaps
+    if gap_analysis.suggested_probe and gap_analysis.probes_this_session < max_probes_per_session:
+        probe = gap_analysis.suggested_probe
+        import random
+        probe_text = random.choice(probe.probe_variations)
+        
+        gap_text = f"""
+## Screening Awareness (Information Gap - INTERNAL)
+**Dimension:** {probe.dimension.value}
 **Goal:** {probe.information_goal}
 
-**If natural in conversation, you may ask something like:**
-"{probe_text}"
-
-**If they share something concerning, follow up with:**
-"{probe.follow_up_if_negative}"
-
-**IMPORTANT RULES:**
-1. Only ask if it fits naturally - don't force it
-2. Maximum 1 probing question per response
-3. If they seem uncomfortable, back off immediately
-4. Never mention "screening" or "assessment"
-5. Prioritize being a genuine friend over gathering info
-6. If they're in crisis, skip probing and focus on support
-
-**You are gathering this naturally to better support them, not to diagnose.**
+**If natural, you may ask:** "{probe_text}"
 """
-    
-    return guidance
+        guidance_sections.append(gap_text)
+
+    if not guidance_sections:
+        return ""
+
+    header = "\n# INTERNAL SYSTEM GUIDANCE (DO NOT MENTION TO USER)\n"
+    footer = """
+**IMPORTANT RULES:**
+1. Only follow this if it fits naturally - don't force it.
+2. Maintain your persona as a genuine, non-clinical friend.
+3. If they seem uncomfortable, back off immediately.
+4. Never mention "screening", "assessment", or "discordance".
+5. If they're in crisis, skip gathering info and focus on immediate safety.
+"""
+    return header + "\n".join(guidance_sections) + footer
 
 
 # =============================================================================
