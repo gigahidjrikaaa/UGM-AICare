@@ -22,6 +22,7 @@ import {
 import WalletLinkButton from "@/components/ui/WalletLinkButton";
 import QuestBoard from "@/components/quests/QuestBoard";
 import apiClient, { fetchUserProfileOverview } from "@/services/api";
+import type { JournalEntryItem } from "@/types/api";
 import type { TimelineEntry, UserProfileOverviewResponse } from "@/types/profile";
 
 interface EarnedBadgeSummary {
@@ -33,7 +34,8 @@ interface JournalStats {
   todayHasEntry: boolean;
   currentStreak: number;
   entriesThisMonth: number;
-  recentMood: number | null;
+  recentAffectiveLabel: string | null;
+  recentPadSummary: string | null;
 }
 
 type DashboardTimelineEntry = TimelineEntry & { formattedTimestamp: string };
@@ -61,7 +63,7 @@ const quickActions: QuickAction[] = [
   {
     href: "/journaling",
     label: "Journal check-in",
-    description: "Capture thoughts and mood in a private space.",
+    description: "Capture thoughts and affective state in a private space.",
     icon: <FiActivity className="h-5 w-5" />,
   },
   {
@@ -78,6 +80,20 @@ function formatTimestamp(value: string) {
   } catch {
     return value;
   }
+}
+
+function describePadState(valence: number, arousal: number): string {
+  if (valence >= 0.2 && arousal >= 0.2) return "Energized Positive";
+  if (valence >= 0.2 && arousal <= -0.2) return "Calm Positive";
+  if (valence <= -0.2 && arousal >= 0.2) return "Tense Negative";
+  if (valence <= -0.2 && arousal <= -0.2) return "Low Negative";
+  if (arousal >= 0.3) return "Activated Neutral";
+  if (arousal <= -0.3) return "Calm Neutral";
+  return "Balanced Neutral";
+}
+
+function formatPadCoordinate(value: number): string {
+  return `${value >= 0 ? "+" : ""}${value.toFixed(2)}`;
 }
 
 function StreakCard({ type, value }: { type: "current" | "longest"; value: number }) {
@@ -120,7 +136,7 @@ function StreakCard({ type, value }: { type: "current" | "longest"; value: numbe
 function WellnessTrendCard({ score }: { score: number }) {
   const percentage = Math.round(score * 100);
 
-  const getMoodData = (s: number) => {
+  const getWellnessBand = (s: number) => {
     if (s >= 80) return { emoji: "😊", label: "Thriving", color: "emerald" };
     if (s >= 60) return { emoji: "🙂", label: "Doing Well", color: "green" };
     if (s >= 40) return { emoji: "😐", label: "Balanced", color: "yellow" };
@@ -128,7 +144,7 @@ function WellnessTrendCard({ score }: { score: number }) {
     return { emoji: "😢", label: "Need Support", color: "rose" };
   };
 
-  const mood = getMoodData(percentage);
+  const wellnessBand = getWellnessBand(percentage);
   const colorMap: Record<string, { text: string; bar: string; bg: string }> = {
     emerald: { text: "text-emerald-400", bar: "bg-emerald-400", bg: "bg-emerald-500/20" },
     green: { text: "text-green-400", bar: "bg-green-400", bg: "bg-green-500/20" },
@@ -136,17 +152,17 @@ function WellnessTrendCard({ score }: { score: number }) {
     orange: { text: "text-orange-400", bar: "bg-orange-400", bg: "bg-orange-500/20" },
     rose: { text: "text-rose-400", bar: "bg-rose-400", bg: "bg-rose-500/20" },
   };
-  const colors = colorMap[mood.color];
+  const colors = colorMap[wellnessBand.color];
 
   return (
     <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-white/3 p-4 shadow-lg backdrop-blur-sm transition-all duration-300 hover:border-[#FFCA40]/30 hover:bg-white/5">
       <div className="flex items-center justify-between">
         <div className="flex-1">
           <p className="text-xs uppercase tracking-wide text-white/60">Wellness Trend</p>
-          <p className={`mt-1 text-lg font-bold ${colors.text}`}>{mood.label}</p>
+          <p className={`mt-1 text-lg font-bold ${colors.text}`}>{wellnessBand.label}</p>
         </div>
         <span className={`inline-flex h-12 w-12 items-center justify-center rounded-xl text-2xl ${colors.bg}`}>
-          {mood.emoji}
+          {wellnessBand.emoji}
         </span>
       </div>
       <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-white/10">
@@ -238,8 +254,13 @@ function JournalWidget({ stats }: { stats: JournalStats | null }) {
             <p className="text-xs text-white/50 uppercase tracking-wide">Month</p>
           </div>
           <div className="text-center bg-white/5 rounded-xl p-3">
-            <p className="text-2xl">{stats.recentMood || '—'}</p>
-            <p className="text-xs text-white/50 uppercase tracking-wide">Mood</p>
+            <p className="text-xs font-semibold text-white leading-tight min-h-8 flex items-center justify-center text-center">
+              {stats.recentAffectiveLabel || "—"}
+            </p>
+            <p className="text-xs text-white/50 uppercase tracking-wide">State</p>
+            {stats.recentPadSummary && (
+              <p className="mt-1 text-[10px] text-white/40">{stats.recentPadSummary}</p>
+            )}
           </div>
         </div>
 
@@ -368,27 +389,36 @@ export default function DashboardPage() {
             currentStreak: number;
             longestStreak: number;
           }>(`/activity-summary/?month=${monthStr}`),
-          apiClient.get<any[]>('/journal/'),
+          apiClient.get<JournalEntryItem[]>('/journal/'),
         ]);
         
         const todayStr = today.toISOString().split('T')[0];
         const todayHasEntry = activityResponse.data.summary[todayStr]?.hasJournal || false;
         const entriesThisMonth = Object.values(activityResponse.data.summary).filter(d => d.hasJournal).length;
         
-        // Get most recent mood from entries
-        let recentMood: number | null = null;
+        let recentAffectiveLabel: string | null = null;
+        let recentPadSummary: string | null = null;
         if (entriesResponse.data && entriesResponse.data.length > 0) {
           const sortedEntries = entriesResponse.data.sort((a, b) => 
             new Date(b.entry_date).getTime() - new Date(a.entry_date).getTime()
           );
-          recentMood = sortedEntries[0].mood || null;
+          const latestEntry = sortedEntries[0];
+
+          if (
+            typeof latestEntry.valence === 'number'
+            && typeof latestEntry.arousal === 'number'
+          ) {
+            recentAffectiveLabel = describePadState(latestEntry.valence, latestEntry.arousal);
+            recentPadSummary = `V ${formatPadCoordinate(latestEntry.valence)} · A ${formatPadCoordinate(latestEntry.arousal)}`;
+          }
         }
         
         setJournalStats({
           todayHasEntry,
           currentStreak: activityResponse.data.currentStreak || 0,
           entriesThisMonth,
-          recentMood,
+          recentAffectiveLabel,
+          recentPadSummary,
         });
       } catch (error) {
         console.error("Failed to load journal stats", error);

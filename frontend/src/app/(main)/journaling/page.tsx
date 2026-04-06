@@ -11,7 +11,7 @@ import StreakDisplay from '@/components/features/journaling/StreakDisplay';
 import apiClient from '@/services/api';
 import { startOfMonth, format } from 'date-fns';
 import JournalEntryModal from '@/components/features/journaling/JournalEntryModal';
-import MoodTrackingDashboard from '@/components/features/journaling/MoodTrackingDashboard';
+import AffectiveTrackingDashboard from '@/components/features/journaling/MoodTrackingDashboard';
 import JournalSearchFilters from '@/components/features/journaling/JournalSearchFilters';
 import JournalExportButton from '@/components/features/journaling/JournalExportButton';
 import toast from 'react-hot-toast';
@@ -344,7 +344,7 @@ export default function JournalingPage() {
                   >
                     <Suspense fallback={<JournalingPageSkeleton />}>
                       {activeTab === 'analytics' && (
-                        <MoodTrackingDashboard days={30} />
+                        <AffectiveTrackingDashboard days={30} />
                       )}
                       {activeTab === 'daily' && (
                         <DailyJournal

@@ -54,14 +54,6 @@ export default function DailyJournal({
     const entriesToDisplay = displayMode === 'search' ? searchResults : allEntries;
     const title = displayMode === 'search' ? `Search Results (${entriesToDisplay.length})` : 'Your Journal Entries';
 
-    const MOOD_EMOJIS: { [key: number]: string } = {
-        1: '😢',
-        2: '😕',
-        3: '😐',
-        4: '😊',
-        5: '😄',
-    };
-
     const formatPadValue = (value?: number | null): string => {
         if (typeof value !== 'number') return 'N/A';
         return value.toFixed(2);
@@ -114,11 +106,6 @@ export default function DailyJournal({
                                 <h3 className="font-semibold text-[#FFCA40]">
                                     {format(parseISO(entry.entry_date), 'EEEE, MMMM d, yyyy', { locale: id })}
                                 </h3>
-                                {entry.mood && (
-                                    <span className="text-2xl ml-2" title={`Mood: ${entry.mood}/5`}>
-                                        {MOOD_EMOJIS[entry.mood]}
-                                    </span>
-                                )}
                             </div>
                             
                             {entry.tags && entry.tags.length > 0 && (

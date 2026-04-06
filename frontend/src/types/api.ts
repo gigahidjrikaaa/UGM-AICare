@@ -22,7 +22,6 @@ export interface JournalEntryItem {
   prompt_id?: number | null;
   prompt?: JournalPromptResponse | null; // Include the prompt object
   reflection_points?: JournalReflectionPointResponse[];
-  mood?: number | null; // 1-5 scale (Deprecated)
   valence?: number | null; // -1.0 to 1.0
   arousal?: number | null; // -1.0 to 1.0
   inferred_dominance?: number | null; // -1.0 to 1.0 (AI inferred)
@@ -50,7 +49,6 @@ export interface JournalEntryCreate {
   entry_date: string;
   content: string;
   prompt_id?: number | null;
-  mood?: number | null;
   valence?: number | null;
   arousal?: number | null;
   tags: string[];
@@ -58,8 +56,6 @@ export interface JournalEntryCreate {
 
 export interface JournalEntryFilter {
   search_query?: string;
-  mood_min?: number;
-  mood_max?: number;
   valence_min?: number;
   valence_max?: number;
   arousal_min?: number;
@@ -98,9 +94,7 @@ export interface JournalAnalyticsResponse {
   total_entries: number;
   total_word_count: number;
   avg_word_count: number;
-  mood_distribution: { [key: number]: number };
   most_used_tags: Array<{ tag: string; count: number }>;
-  mood_trend: Array<{ date: string; mood: number }>;
   writing_frequency: Array<{ date: string; count: number }>;
   pad_distribution: PadDistribution;
   pad_trend: JournalPadTrendPoint[];

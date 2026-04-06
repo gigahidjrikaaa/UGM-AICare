@@ -1,12 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { FiActivity, FiBarChart2, FiTrendingUp } from 'react-icons/fi';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { getJournalAnalytics } from '@/services/api';
 import type { JournalAnalyticsResponse } from '@/types/api';
 
-interface MoodTrackingDashboardProps {
+interface AffectiveTrackingDashboardProps {
   days?: number;
   className?: string;
 }
@@ -36,16 +36,12 @@ const formatPadValue = (value: number | null): string => {
   return value.toFixed(2);
 };
 
-export default function MoodTrackingDashboard({ days = 30, className = '' }: MoodTrackingDashboardProps) {
+export default function AffectiveTrackingDashboard({ days = 30, className = '' }: AffectiveTrackingDashboardProps) {
   const [analytics, setAnalytics] = useState<JournalAnalyticsResponse | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    fetchAnalytics();
-  }, [days]);
-
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = useCallback(async () => {
     setIsLoading(true);
     setError(null);
     try {
@@ -57,29 +53,17 @@ export default function MoodTrackingDashboard({ days = 30, className = '' }: Moo
     } finally {
       setIsLoading(false);
     }
-  };
-
-  if (isLoading) {
-    return (
-      <div className={`bg-white/3 backdrop-blur-xl rounded-2xl border border-white/10 p-6 ${className}`}>
-        <div className="flex items-center justify-center h-64">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFCA40]"></div>
-        </div>
-      </div>
-    );
-  }
-
-  if (error || !analytics) {
-    return (
-      <div className={`bg-white/3 backdrop-blur-xl rounded-2xl border border-white/10 p-6 ${className}`}>
-        <div className="flex items-center justify-center h-64">
-          <p className="text-red-400">{error || 'No data available'}</p>
-        </div>
-      </div>
-    );
-  }
+  }, [days]);
 
   const averagePad = useMemo(() => {
+    if (!analytics) {
+      return {
+        valence: null,
+        arousal: null,
+        inferred_dominance: null,
+      } as Record<PadAxis, number | null>;
+    }
+
     const totals: Record<PadAxis, number> = {
       valence: 0,
       arousal: 0,
@@ -112,7 +96,31 @@ export default function MoodTrackingDashboard({ days = 30, className = '' }: Moo
         inferred_dominance: null,
       } as Record<PadAxis, number | null>,
     );
-  }, [analytics.pad_trend]);
+  }, [analytics]);
+
+  useEffect(() => {
+    fetchAnalytics();
+  }, [fetchAnalytics]);
+
+  if (isLoading) {
+    return (
+      <div className={`bg-white/3 backdrop-blur-xl rounded-2xl border border-white/10 p-6 ${className}`}>
+        <div className="flex items-center justify-center h-64">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FFCA40]"></div>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !analytics) {
+    return (
+      <div className={`bg-white/3 backdrop-blur-xl rounded-2xl border border-white/10 p-6 ${className}`}>
+        <div className="flex items-center justify-center h-64">
+          <p className="text-red-400">{error || 'No data available'}</p>
+        </div>
+      </div>
+    );
+  }
 
   const padTrendData = analytics.pad_trend.map((item) => ({
     date: new Date(item.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }),

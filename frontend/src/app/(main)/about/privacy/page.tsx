@@ -8,7 +8,7 @@ import ParticleBackground from '@/components/ui/ParticleBackground';
 
 export default function AboutPrivacyPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] pt-24 pb-10 px-4 sm:px-6 relative">
+    <div className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F] pt-24 pb-10 px-4 sm:px-6 relative">
       <div className="absolute inset-0 z-0 opacity-40">
         <ParticleBackground count={60} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={0.8} />
       </div>
@@ -58,7 +58,7 @@ export default function AboutPrivacyPage() {
               {
                 icon: <FiUserCheck />,
                 title: "You Own Your Data",
-                description: "Your conversations, moods, and journals belong to you. Export or delete them anytime."
+                description: "Your conversations, affective check-ins, and journals belong to you. Export or delete them anytime."
               },
               {
                 icon: <FiLock />,
@@ -101,7 +101,7 @@ export default function AboutPrivacyPage() {
               className="bg-white/5 rounded-xl p-6 border border-white/10"
             >
               <div className="flex items-start gap-4 mb-4">
-                <div className="w-12 h-12 bg-[#FFCA40]/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-12 h-12 bg-[#FFCA40]/20 rounded-lg flex items-center justify-center shrink-0">
                   <FaUserShield className="text-[#FFCA40] text-2xl" />
                 </div>
                 <div>
@@ -129,7 +129,7 @@ export default function AboutPrivacyPage() {
               className="bg-white/5 rounded-xl p-6 border border-white/10"
             >
               <div className="flex items-start gap-4 mb-4">
-                <div className="w-12 h-12 bg-[#FFCA40]/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-12 h-12 bg-[#FFCA40]/20 rounded-lg flex items-center justify-center shrink-0">
                   <FiEye className="text-[#FFCA40] text-2xl" />
                 </div>
                 <div>
@@ -154,7 +154,7 @@ export default function AboutPrivacyPage() {
               className="bg-white/5 rounded-xl p-6 border border-white/10"
             >
               <div className="flex items-start gap-4 mb-4">
-                <div className="w-12 h-12 bg-[#FFCA40]/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-12 h-12 bg-[#FFCA40]/20 rounded-lg flex items-center justify-center shrink-0">
                   <FiShield className="text-[#FFCA40] text-2xl" />
                 </div>
                 <div>
@@ -188,13 +188,13 @@ export default function AboutPrivacyPage() {
               className="bg-white/5 rounded-xl p-6 border border-white/10"
             >
               <div className="flex items-start gap-4 mb-4">
-                <div className="w-12 h-12 bg-[#FFCA40]/20 rounded-lg flex items-center justify-center flex-shrink-0">
+                <div className="w-12 h-12 bg-[#FFCA40]/20 rounded-lg flex items-center justify-center shrink-0">
                   <FiLock className="text-[#FFCA40] text-2xl" />
                 </div>
                 <div>
                   <h3 className="text-2xl font-bold text-white mb-2">End-to-End Encryption</h3>
                   <p className="text-white/70">
-                    All conversations, mood entries, and journal data are encrypted at rest (AES-256) and in transit (TLS 1.3).
+                    All conversations, affective check-ins, and journal data are encrypted at rest (AES-256) and in transit (TLS 1.3).
                   </p>
                 </div>
               </div>
@@ -206,7 +206,7 @@ export default function AboutPrivacyPage() {
                   "Encrypted backups with separate keys"
                 ].map((item, idx) => (
                   <li key={idx} className="flex items-center gap-2 text-white/70">
-                    <FiCheck className="text-[#FFCA40] flex-shrink-0" />
+                    <FiCheck className="text-[#FFCA40] shrink-0" />
                     {item}
                   </li>
                 ))}
@@ -257,7 +257,7 @@ export default function AboutPrivacyPage() {
                   "Email confirmation of withdrawal"
                 ].map((item, idx) => (
                   <li key={idx} className="flex items-center gap-2 text-white/70">
-                    <div className="w-1.5 h-1.5 bg-[#FFCA40] rounded-full flex-shrink-0"></div>
+                    <div className="w-1.5 h-1.5 bg-[#FFCA40] rounded-full shrink-0"></div>
                     {item}
                   </li>
                 ))}
@@ -274,7 +274,7 @@ export default function AboutPrivacyPage() {
                   <p className="text-white font-semibold mb-2">What you can see:</p>
                   <ul className="space-y-1 text-sm text-white/70">
                     <li>• All conversations with Aika</li>
-                    <li>• Mood tracking history</li>
+                    <li>• Affective tracking history</li>
                     <li>• Journal entries</li>
                     <li>• Consent history</li>
                   </ul>
@@ -311,7 +311,7 @@ export default function AboutPrivacyPage() {
                 </span>
               </div>
               <p className="text-white/70">
-                Your conversations, moods, and journals are kept as long as your account is active, so you can reference them anytime.
+                Your conversations, affective check-ins, and journals are kept as long as your account is active, so you can reference them anytime.
               </p>
             </div>
 
@@ -339,7 +339,7 @@ export default function AboutPrivacyPage() {
               </p>
             </div>
 
-            <div className="bg-gradient-to-r from-[#FFCA40]/10 to-[#FFB700]/10 rounded-xl p-6 border border-[#FFCA40]/20">
+            <div className="bg-linear-to-r from-[#FFCA40]/10 to-[#FFB700]/10 rounded-xl p-6 border border-[#FFCA40]/20">
               <p className="text-white/90 text-sm">
                 <strong className="text-white">Note:</strong> Anonymized, aggregated analytics (with differential privacy applied) may be retained for research purposes, but cannot be traced back to you individually.
               </p>
@@ -399,7 +399,7 @@ export default function AboutPrivacyPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.7 }}
-          className="bg-gradient-to-r from-[#FFCA40]/20 to-[#FFB700]/20 backdrop-blur-xl rounded-2xl p-8 border border-[#FFCA40]/30 text-center"
+          className="bg-linear-to-r from-[#FFCA40]/20 to-[#FFB700]/20 backdrop-blur-xl rounded-2xl p-8 border border-[#FFCA40]/30 text-center"
         >
           <h2 className="text-3xl font-bold text-white mb-4">
             Questions About Privacy?
@@ -412,7 +412,7 @@ export default function AboutPrivacyPage() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.98 }}
-                className="px-8 py-3 bg-gradient-to-r from-[#FFCA40] to-[#FFB700] text-[#001D58] rounded-full font-bold shadow-lg"
+                className="px-8 py-3 bg-linear-to-r from-[#FFCA40] to-[#FFB700] text-[#001D58] rounded-full font-bold shadow-lg"
               >
                 Read Full Privacy Policy
               </motion.button>

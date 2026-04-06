@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 
 interface AffectiveGridProps {
   valence: number | null;
@@ -9,7 +9,7 @@ interface AffectiveGridProps {
   disabled?: boolean;
 }
 
-const getMoodLabel = (v: number, a: number) => {
+const getAffectiveLabel = (v: number, a: number) => {
   if (v === 0 && a === 0) return "Neutral";
   
   // Quadrant detection
@@ -32,7 +32,7 @@ export default function AffectiveGrid({ valence, arousal, onChange, disabled }: 
   const gridRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
-  const handlePointerAction = (e: React.PointerEvent | PointerEvent) => {
+  const handlePointerAction = useCallback((e: React.PointerEvent | PointerEvent) => {
     if (disabled || !gridRef.current) return;
 
     const rect = gridRef.current.getBoundingClientRect();
@@ -46,12 +46,12 @@ export default function AffectiveGrid({ valence, arousal, onChange, disabled }: 
     const a = Math.max(-1, Math.min(1, 1 - (y / rect.height) * 2));
 
     onChange(parseFloat(v.toFixed(2)), parseFloat(a.toFixed(2)));
-  };
+  }, [disabled, onChange]);
 
-  const onPointerDown = (e: React.PointerEvent) => {
+  const onPointerDown = useCallback((e: React.PointerEvent) => {
     setIsDragging(true);
     handlePointerAction(e);
-  };
+  }, [handlePointerAction]);
 
   useEffect(() => {
     const handlePointerMove = (e: PointerEvent) => {
@@ -67,7 +67,7 @@ export default function AffectiveGrid({ valence, arousal, onChange, disabled }: 
       window.removeEventListener('pointermove', handlePointerMove);
       window.removeEventListener('pointerup', handlePointerUp);
     };
-  }, [isDragging]);
+  }, [handlePointerAction, isDragging]);
 
   const displayValence = valence ?? 0;
   const displayArousal = arousal ?? 0;
@@ -107,7 +107,7 @@ export default function AffectiveGrid({ valence, arousal, onChange, disabled }: 
       
       <div className="text-center">
         <p className="text-sm font-semibold text-[#FFCA40]">
-          {valence !== null ? getMoodLabel(displayValence, displayArousal) : "Tap the grid to set mood"}
+          {valence !== null ? getAffectiveLabel(displayValence, displayArousal) : "Tap the grid to set affective state"}
         </p>
         <p className="text-[10px] text-gray-500 mt-1 uppercase tracking-widest">
           Valence: {displayValence} | Arousal: {displayArousal}

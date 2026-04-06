@@ -81,6 +81,28 @@ _AUTOPILOT_DENIED_RESPONSE: str = (
     "Kita tetap bisa lanjut ngobrol dan cari langkah yang lebih aman ya."
 )
 
+_CONCERNING_DISCORDANCE_INTENTS: frozenset[str] = frozenset({
+    "crisis",
+    "emotional_support",
+    "panic",
+    "self_harm",
+})
+
+_CONCERNING_DISCORDANCE_TERMS: frozenset[str] = frozenset({
+    "putus asa",
+    "hopeless",
+    "nggak sanggup",
+    "tidak sanggup",
+    "berat banget",
+    "hampa",
+    "empty",
+    "overwhelmed",
+    "nggak kuat",
+    "tidak kuat",
+    "kesepian",
+    "sendiri",
+})
+
 _DECISION_JSON_SCHEMA: dict[str, Any] = {
     "type": "object",
     "properties": {
@@ -302,6 +324,93 @@ def _compute_routing(
                 )
 
     return updates
+
+
+def _has_concerning_discordance_context(
+    *,
+    message: str,
+    intent: Optional[str],
+    crisis_keywords: list[str],
+) -> bool:
+    """Return True when context indicates elevated concern around discordance.
+
+    This intentionally ignores PAD deltas themselves and only checks contextual
+    signals (intent, crisis keywords, and language markers).
+    """
+    if crisis_keywords:
+        return True
+
+    normalized_intent = str(intent or "").lower()
+    if normalized_intent in _CONCERNING_DISCORDANCE_INTENTS:
+        return True
+
+    lowered_message = message.lower()
+    return any(term in lowered_message for term in _CONCERNING_DISCORDANCE_TERMS)
+
+
+def _compute_high_discordance_routing_override(
+    *,
+    discordance_level: str,
+    immediate_risk_level: Optional[str],
+    needs_agents: bool,
+    next_step: Optional[str],
+    intent: Optional[str],
+    message: str,
+    crisis_keywords: list[str],
+) -> dict[str, Any]:
+    """Derive deterministic routing override for high discordance scenarios.
+
+    Safety precedence is strict:
+    1) Explicit moderate/high/critical risk routing remains authoritative.
+    2) High discordance with concerning context escalates to TCA only when there
+       is no active safety escalation path.
+    """
+    patch: dict[str, Any] = {
+        "discordance_concerning_context": False,
+        "discordance_escalated": False,
+    }
+
+    if discordance_level != "high":
+        return patch
+
+    immediate_risk = str(immediate_risk_level or "none").lower()
+    concerning_context = (
+        immediate_risk in {"moderate", "high", "critical"}
+        or _has_concerning_discordance_context(
+            message=message,
+            intent=intent,
+            crisis_keywords=crisis_keywords,
+        )
+    )
+    patch["discordance_concerning_context"] = concerning_context
+
+    if not concerning_context:
+        return patch
+
+    # Preserve explicit safety routing whenever immediate risk is already elevated.
+    if immediate_risk in {"moderate", "high", "critical"}:
+        return patch
+
+    normalized_next_step = str(next_step or "none").lower()
+    if needs_agents and normalized_next_step in {"tca", "cma"}:
+        return patch
+
+    patch.update(
+        {
+            "needs_agents": True,
+            "next_step": "tca",
+            "discordance_escalated": True,
+        }
+    )
+    return patch
+
+
+def _normalize_discordance_level(value: Optional[str]) -> Literal["none", "low", "medium", "high"]:
+    """Normalize discordance level from free-form text into supported literals."""
+    lowered = str(value or "none").lower()
+    if lowered in {"none", "low", "medium", "high"}:
+        return cast(Literal["none", "low", "medium", "high"], lowered)
+    return "none"
 
 
 def _build_rate_limit_fallback(error_str: str) -> dict[str, Any]:
@@ -536,6 +645,73 @@ async def _evaluate_autopilot_policy(
         return {}
 
 
+async def _apply_screening_discordance_policy(
+    state: AikaOrchestratorState,
+    normalized_role: str,
+    db: AsyncSession,
+) -> None:
+    """Load screening-awareness context and apply deterministic discordance policy.
+
+    This helper enriches state with screening prompt guidance and discordance
+    metadata. It may also override routing to TCA for high discordance with
+    concerning context while preserving explicit safety escalation precedence.
+    """
+    user_id = state.get("user_id")
+    if normalized_role != "user" or not isinstance(user_id, int) or user_id <= 0:
+        return
+
+    try:
+        from app.agents.aika.screening_awareness import (
+            get_screening_aware_prompt_addition,
+        )
+
+        addition, gap_analysis = await get_screening_aware_prompt_addition(
+            db=db,
+            user_id=user_id,
+            conversation_history=state.get("conversation_history", []),
+            current_message=state.get("message", ""),
+            session_id=state.get("session_id"),
+        )
+    except Exception as exc:
+        logger.warning("Screening awareness failed (non-blocking): %s", exc)
+        return
+
+    discordance_level = _normalize_discordance_level(gap_analysis.discordance_level)
+
+    state["screening_prompt_addition"] = addition
+    state["discordance_level"] = discordance_level
+    state["discordance_reason"] = gap_analysis.discordance_reason
+
+    patch = _compute_high_discordance_routing_override(
+        discordance_level=discordance_level,
+        immediate_risk_level=state.get("immediate_risk_level"),
+        needs_agents=bool(state.get("needs_agents")),
+        next_step=state.get("next_step"),
+        intent=state.get("intent"),
+        message=state.get("message", ""),
+        crisis_keywords=state.get("crisis_keywords_detected") or [],
+    )
+
+    if patch.get("discordance_escalated"):
+        prior_reasoning = str(state.get("agent_reasoning") or "").strip()
+        policy_reason = (
+            "High affective discordance with concerning context; "
+            "deterministic escalation to TCA."
+        )
+        state["agent_reasoning"] = (
+            f"{prior_reasoning} | {policy_reason}"
+            if prior_reasoning
+            else policy_reason
+        )
+        logger.info(
+            "Discordance policy escalation applied for user %s: level=%s",
+            user_id,
+            gap_analysis.discordance_level,
+        )
+
+    cast(dict[str, Any], state).update(patch)
+
+
 async def _generate_direct_response(
     state: AikaOrchestratorState,
     system_instruction: str,
@@ -567,30 +743,47 @@ async def _generate_direct_response(
     enhanced_system = system_instruction
     user_id = state.get("user_id")
     if normalized_role == "user" and isinstance(user_id, int) and user_id > 0:
-        try:
-            from app.agents.aika.screening_awareness import (
-                get_screening_aware_prompt_addition,
-            )
-            addition, gap_analysis = await get_screening_aware_prompt_addition(
-                db=db,
-                user_id=user_id,
-                conversation_history=state.get("conversation_history", []),
-                current_message=state.get("message", ""),
-                session_id=state.get("session_id"),
-            )
-            if addition:
-                enhanced_system = f"{system_instruction}\n\n{addition}"
+        precomputed_addition = state.get("screening_prompt_addition")
+        if isinstance(precomputed_addition, str):
+            if precomputed_addition:
+                enhanced_system = f"{system_instruction}\n\n{precomputed_addition}"
                 logger.debug(
-                    "Screening awareness added for user %s: probe=%s",
+                    "Screening awareness reused for user %s: discordance=%s",
                     user_id,
-                    (
-                        gap_analysis.suggested_probe.dimension.value
-                        if gap_analysis and gap_analysis.suggested_probe
-                        else "none"
-                    ),
+                    state.get("discordance_level", "none"),
                 )
-        except Exception as exc:
-            logger.warning("Screening awareness failed (non-blocking): %s", exc)
+        else:
+            try:
+                from app.agents.aika.screening_awareness import (
+                    get_screening_aware_prompt_addition,
+                )
+
+                addition, gap_analysis = await get_screening_aware_prompt_addition(
+                    db=db,
+                    user_id=user_id,
+                    conversation_history=state.get("conversation_history", []),
+                    current_message=state.get("message", ""),
+                    session_id=state.get("session_id"),
+                )
+                if addition:
+                    discordance_level = _normalize_discordance_level(
+                        gap_analysis.discordance_level
+                    )
+                    enhanced_system = f"{system_instruction}\n\n{addition}"
+                    state["screening_prompt_addition"] = addition
+                    state["discordance_level"] = discordance_level
+                    state["discordance_reason"] = gap_analysis.discordance_reason
+                    logger.debug(
+                        "Screening awareness added for user %s: probe=%s",
+                        user_id,
+                        (
+                            gap_analysis.suggested_probe.dimension.value
+                            if gap_analysis and gap_analysis.suggested_probe
+                            else "none"
+                        ),
+                    )
+            except Exception as exc:
+                logger.warning("Screening awareness failed (non-blocking): %s", exc)
 
     if personal_memory_block:
         enhanced_system = f"{enhanced_system}\n\n{personal_memory_block}"
@@ -819,6 +1012,10 @@ async def aika_decision_node(
                 )
                 state["last_message_timestamp"] = now_ts
 
+                # Enrich screening context and apply deterministic discordance policy
+                # before evaluating autopilot and direct-response paths.
+                await _apply_screening_discordance_policy(state, normalized_role, db)
+
                 cast(dict[str, Any], state).update({
                     "autopilot_action_id": None,
                     "autopilot_action_type": None,
@@ -948,6 +1145,10 @@ async def aika_decision_node(
                 now_ts,
             )
             state["last_message_timestamp"] = now_ts
+
+            # Enrich screening context and apply deterministic discordance policy
+            # before evaluating autopilot and direct-response paths.
+            await _apply_screening_discordance_policy(state, normalized_role, db)
 
             # Policy evaluation: enqueue autopilot action when applicable.
             cast(dict[str, Any], state).update({

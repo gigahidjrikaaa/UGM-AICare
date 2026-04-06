@@ -117,7 +117,6 @@ export interface JournalEntryPayload {
   entry_date: string; // YYYY-MM-DD
   content: string;
   prompt_id?: number | null;
-  mood?: number | null;
   valence?: number | null;
   arousal?: number | null;
   tags: string[];
@@ -141,8 +140,6 @@ export const saveJournalEntry = async (payload: JournalEntryPayload): Promise<Jo
 
 export const searchJournalEntries = async (filters: {
   search_query?: string;
-  mood_min?: number;
-  mood_max?: number;
   valence_min?: number;
   valence_max?: number;
   arousal_min?: number;

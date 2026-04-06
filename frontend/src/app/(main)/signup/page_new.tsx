@@ -67,7 +67,7 @@ export default function SignUp() {
       image: "/images/student-testimonials/maya.jpg",
       university: "Universitas Indonesia",
       major: "Medical Student",
-      review: "Platform yang luar biasa! Aika membantu saya manage burnout selama masa koass. Fitur mood tracking dan mindfulness exercises sangat efektif."
+      review: "Platform yang luar biasa! Aika membantu saya manage burnout selama masa koass. Fitur affective tracking berbasis PAD dan mindfulness exercises sangat efektif." 
     },
     {
       name: "Rian Pratama",
@@ -221,7 +221,7 @@ export default function SignUp() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 flex relative">
+    <div className="min-h-screen bg-linear-to-br from-[#001d58]/95 via-[#0a2a6e]/95 to-[#173a7a]/95 flex relative">
       {/* Background Particles */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <ParticleBackground count={70} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={1} />
@@ -249,13 +249,13 @@ export default function SignUp() {
             className="relative flex flex-col items-center"
           >
             <div className="relative w-80 h-80 rounded-2xl overflow-hidden shadow-2xl group">
-              <div className="w-full h-full bg-gradient-to-br from-[#FFCA40]/20 to-[#001d58]/60 flex items-center justify-center">
+              <div className="w-full h-full bg-linear-to-br from-[#FFCA40]/20 to-[#001d58]/60 flex items-center justify-center">
                 <span className="text-white/40 font-bold text-8xl">
                   {studentTestimonials[testimonialIndex].name.charAt(0)}
                 </span>
               </div>
               
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
+              <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/40 to-transparent"></div>
               
               <div className="absolute bottom-0 left-0 right-0 p-6 text-white">
                 <h3 className="text-2xl font-bold mb-2 drop-shadow-lg">

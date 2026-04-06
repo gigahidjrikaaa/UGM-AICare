@@ -149,8 +149,8 @@ export default function AboutResearchPage() {
               {
                 id: "RQ3",
                 question: "Does CBT-informed coaching improve student mental health outcomes?",
-                hypothesis: "Students receiving structured CBT interventions show measurable improvements in mood scores over 4 weeks.",
-                methods: ["Pre/post PHQ-9 and GAD-7 assessments", "Longitudinal mood tracking", "Control group comparison"]
+                hypothesis: "Students receiving structured CBT interventions show measurable improvements in PAD-derived affective indicators over 4 weeks.",
+                methods: ["Pre/post PHQ-9 and GAD-7 assessments", "Longitudinal PAD signal tracking", "Control group comparison"]
               },
               {
                 id: "RQ4",

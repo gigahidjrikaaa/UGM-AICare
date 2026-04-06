@@ -67,7 +67,7 @@ export default function SignUp() {
       image: "/images/student-testimonials/maya.jpg",
       university: "Universitas Indonesia",
       major: "Medical Student",
-      review: "Platform yang luar biasa! Aika membantu saya manage burnout selama masa koass. Fitur mood tracking dan mindfulness exercises sangat efektif."
+      review: "Platform yang luar biasa! Aika membantu saya manage burnout selama masa koass. Fitur affective tracking berbasis PAD dan mindfulness exercises sangat efektif."
     },
     {
       name: "Rian Pratama",
@@ -221,7 +221,7 @@ export default function SignUp() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#001D58] via-[#00308F] to-[#002A7A] flex relative pt-24">
+    <div className="min-h-screen bg-linear-to-br from-[#001D58] via-[#00308F] to-[#002A7A] flex relative pt-24">
       {/* Background Particles */}
       <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
         <ParticleBackground count={60} colors={["#FFCA40", "#B8A4FF", "#50E3C2"]} minSize={2} maxSize={8} speed={0.8} />
@@ -252,7 +252,7 @@ export default function SignUp() {
             {/* Large Square Profile Image with Overlay */}
             <div className="relative w-80 h-80 rounded-2xl overflow-hidden shadow-2xl group">
               {/* Background placeholder with gradient */}
-              <div className="w-full h-full bg-gradient-to-br from-[#FFCA40]/20 to-[#001d58]/60 flex items-center justify-center">
+              <div className="w-full h-full bg-linear-to-br from-[#FFCA40]/20 to-[#001d58]/60 flex items-center justify-center">
                 {/* Using initials as placeholder for student photos */}
                 <span className="text-white/40 font-bold text-8xl">
                   {studentTestimonials[testimonialIndex].name.charAt(0)}
@@ -260,7 +260,7 @@ export default function SignUp() {
               </div>
               
               {/* Bottom gradient overlay for text readability */}
-              <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent"></div>
+              <div className="absolute inset-0 bg-linear-to-t from-black/80 via-black/40 to-transparent"></div>
               
               {/* Overlay content */}
               <div className="absolute bottom-0 left-0 right-0 p-6 text-white">

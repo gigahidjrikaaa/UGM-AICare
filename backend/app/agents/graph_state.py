@@ -502,6 +502,21 @@ class AikaOrchestratorState(TypedDict, total=False):
     screening_enhanced_response: Optional[str]
     """Response enhanced with intervention if applicable."""
 
+    screening_prompt_addition: Optional[str]
+    """Cached internal screening-awareness prompt addition for this turn."""
+
+    discordance_level: Optional[Literal["none", "low", "medium", "high"]]
+    """Latest affective discordance level from self-report vs detected PAD."""
+
+    discordance_reason: Optional[str]
+    """Human-readable explanation of the latest discordance level."""
+
+    discordance_concerning_context: Optional[bool]
+    """True when high discordance appears alongside concerning conversational context."""
+
+    discordance_escalated: Optional[bool]
+    """True when deterministic discordance policy promoted routing to TCA."""
+
     # ============================================================================
     # AUTOPILOT FIELDS
     # ============================================================================
