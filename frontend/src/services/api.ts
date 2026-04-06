@@ -2,6 +2,7 @@
 
 import axios from 'axios';
 import type {
+  JournalAnalyticsResponse,
   JournalPromptResponse,
   JournalEntryItem,
   JournalReflectionPointResponse,
@@ -142,6 +143,12 @@ export const searchJournalEntries = async (filters: {
   search_query?: string;
   mood_min?: number;
   mood_max?: number;
+  valence_min?: number;
+  valence_max?: number;
+  arousal_min?: number;
+  arousal_max?: number;
+  inferred_dominance_min?: number;
+  inferred_dominance_max?: number;
   tags?: string[];
   date_from?: string;
   date_to?: string;
@@ -163,9 +170,9 @@ export const searchJournalEntries = async (filters: {
   }
 };
 
-export const getJournalAnalytics = async (days: number = 30): Promise<any> => {
+export const getJournalAnalytics = async (days: number = 30): Promise<JournalAnalyticsResponse> => {
   try {
-    const response = await apiClient.get('/journal/analytics/overview', { params: { days } });
+    const response = await apiClient.get<JournalAnalyticsResponse>('/journal/analytics/overview', { params: { days } });
     return response.data;
   } catch (error) {
     console.error('Error fetching journal analytics:', error);

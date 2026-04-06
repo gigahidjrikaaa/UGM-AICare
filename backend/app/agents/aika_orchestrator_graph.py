@@ -50,6 +50,14 @@ from app.agents.graph_state import AikaOrchestratorState
 # ---------------------------------------------------------------------------
 from app.agents.aika.decision_node import aika_decision_node
 from app.agents.aika.background_tasks import trigger_sta_conversation_analysis_background
+from app.agents.aika.message_classifier import (
+    detect_crisis_keywords as _detect_crisis_keywords,
+    is_smalltalk_message as _is_smalltalk_message,
+)
+from app.agents.aika.prompt_builder import (
+    normalize_role as _normalize_user_role,
+    format_personal_memory_block as _format_personal_memory_block,
+)
 from app.agents.aika.subgraph_nodes import (
     _AsyncInvokable,
     parallel_crisis_node,

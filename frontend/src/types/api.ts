@@ -25,6 +25,7 @@ export interface JournalEntryItem {
   mood?: number | null; // 1-5 scale (Deprecated)
   valence?: number | null; // -1.0 to 1.0
   arousal?: number | null; // -1.0 to 1.0
+  inferred_dominance?: number | null; // -1.0 to 1.0 (AI inferred)
   word_count: number;
   tags?: JournalTagResponse[];
 }
@@ -63,11 +64,34 @@ export interface JournalEntryFilter {
   valence_max?: number;
   arousal_min?: number;
   arousal_max?: number;
+  inferred_dominance_min?: number;
+  inferred_dominance_max?: number;
   tags?: string[];
   date_from?: string;
   date_to?: string;
   skip?: number;
   limit?: number;
+}
+
+export interface PadAxisDistribution {
+  very_low: number;
+  low: number;
+  neutral: number;
+  high: number;
+  very_high: number;
+}
+
+export interface PadDistribution {
+  valence: PadAxisDistribution;
+  arousal: PadAxisDistribution;
+  inferred_dominance: PadAxisDistribution;
+}
+
+export interface JournalPadTrendPoint {
+  date: string;
+  valence?: number | null;
+  arousal?: number | null;
+  inferred_dominance?: number | null;
 }
 
 export interface JournalAnalyticsResponse {
@@ -78,6 +102,8 @@ export interface JournalAnalyticsResponse {
   most_used_tags: Array<{ tag: string; count: number }>;
   mood_trend: Array<{ date: string; mood: number }>;
   writing_frequency: Array<{ date: string; count: number }>;
+  pad_distribution: PadDistribution;
+  pad_trend: JournalPadTrendPoint[];
 }
 
 // --- Psychologist Appointment Types ---

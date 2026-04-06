@@ -81,7 +81,9 @@ def normalize_role(user_role: Optional[str]) -> str:
     role = (user_role or "").strip().lower()
     if not role:
         return ROLE_USER
-    return _ALIAS_MAP.get(role, role)
+    if role in CANONICAL_ROLES:
+        return role
+    return _ALIAS_MAP.get(role, ROLE_USER)
 
 
 # Backward-compatible alias used by agent/tool routing code.
