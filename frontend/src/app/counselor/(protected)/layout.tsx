@@ -12,6 +12,7 @@ import { useEffect } from 'react';
 export default function CounselorLayout({ children }: { children: ReactNode }) {
   // Monitor for backend token expiry
   useSessionExpiry();
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   const { isValid, isLoading } = useCounselorSessionGuard({
     redirectPath: '/counselor',
@@ -43,8 +44,6 @@ export default function CounselorLayout({ children }: { children: ReactNode }) {
   if (!isValid) {
     return null;
   }
-
-  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F] text-white flex">

@@ -37,6 +37,7 @@ class JournalEntry(Base):
     # Unified Affective Framework (2.5D PAD Model)
     valence: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     arousal: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    inferred_dominance: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     user: Mapped["User"] = relationship("User", back_populates="journal_entries")
     prompt: Mapped["JournalPrompt"] = relationship("JournalPrompt")

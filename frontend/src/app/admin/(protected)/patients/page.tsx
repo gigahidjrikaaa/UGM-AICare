@@ -2,19 +2,47 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Filter, Download, UserPlus, Eye, Mail, ExternalLink, RefreshCw, BarChart2, ShieldAlert, AlertTriangle, Phone } from 'lucide-react';
+import { Search, Filter, Download, Mail, RefreshCw, BarChart2, ShieldAlert, AlertTriangle, Phone, Users } from 'lucide-react';
 import { apiCall } from '@/utils/adminApi';
 import { toast } from 'react-hot-toast';
 import Image from 'next/image';
-import Link from 'next/link';
-import { User, UsersResponse, UserLog, UserStats } from '@/types/admin/users';
+import { User, UsersResponse, UserStats } from '@/types/admin/users';
 import { getScreeningDashboard, listScreeningProfiles } from '@/services/adminScreeningApi';
-import { ScreeningDashboard, ScreeningProfile, RISK_CONFIG, RiskLevel } from '@/types/admin/screening';
+import { ScreeningDashboard, ScreeningProfile, RISK_CONFIG } from '@/types/admin/screening';
 import PatientProfileDrawer from '@/components/admin/PatientProfileDrawer';
 import { AreaChart, Area, ResponsiveContainer, BarChart, Bar } from 'recharts';
 
-// Mock types to cover any missing ones in this simplified version
 const ITEMS_PER_PAGE = 20;
+
+const mockActivityTrend = [
+  { value: 42 },
+  { value: 51 },
+  { value: 47 },
+  { value: 56 },
+  { value: 61 },
+  { value: 58 },
+  { value: 64 },
+];
+
+const mockIssuesTrend = [
+  { value: 9 },
+  { value: 7 },
+  { value: 8 },
+  { value: 6 },
+  { value: 5 },
+  { value: 4 },
+  { value: 3 },
+];
+
+const mockSentimentTrend = [
+  { value: 0.12 },
+  { value: 0.06 },
+  { value: 0.14 },
+  { value: 0.19 },
+  { value: 0.16 },
+  { value: 0.24 },
+  { value: 0.21 },
+];
 
 export default function PatientManagementPage() {
   const [users, setUsers] = useState<User[]>([]);
@@ -126,13 +154,6 @@ export default function PatientManagementPage() {
     document.body.removeChild(link);
   };
 
-  const formatDate = (dateStr?: string | null) => {
-    if (!dateStr) return 'N/A';
-    return new Date(dateStr).toLocaleDateString('en-US', {
-      year: 'numeric', month: 'short', day: 'numeric'
-    });
-  };
-
   const getSentimentColor = (score: number) => {
     if (score >= 0.7) return 'text-green-400 bg-green-500/10 border-green-500/20';
     if (score >= 0.3) return 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20';
@@ -211,7 +232,7 @@ export default function PatientManagementPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.1 }}
-          className="bg-gradient-to-br from-red-500/10 to-transparent backdrop-blur-sm border border-red-500/20 rounded-xl p-5"
+          className="bg-linear-to-br from-red-500/10 to-transparent backdrop-blur-sm border border-red-500/20 rounded-xl p-5"
         >
           <div className="flex items-start justify-between">
             <div>

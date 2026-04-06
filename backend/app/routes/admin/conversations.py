@@ -16,6 +16,8 @@ from app.database import get_async_db
 from app.dependencies import get_admin_user
 from app.domains.mental_health.models import Conversation
 from app.domains.mental_health.models.assessments import ConversationRiskAssessment
+from app.domains.mental_health.models.journal import JournalEntry
+from app.domains.mental_health.services.affective_discordance import compute_affective_discordance
 from app.domains.mental_health.services.conversation_assessments import (
     upsert_conversation_assessment,
 )
@@ -38,6 +40,64 @@ from .utils import decrypt_user_email, hash_user_id
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["Admin - Conversations"])
+
+
+async def _fetch_latest_journal_entry(
+    db: AsyncSession,
+    user_id: Optional[int],
+) -> Optional[JournalEntry]:
+    if user_id is None:
+        return None
+    result = await db.execute(
+        select(JournalEntry)
+        .where(JournalEntry.user_id == user_id)
+        .order_by(desc(JournalEntry.entry_date), desc(JournalEntry.created_at))
+        .limit(1)
+    )
+    return result.scalars().first()
+
+
+def _build_assessment_response(
+    record: ConversationRiskAssessment,
+    latest_journal: Optional[JournalEntry],
+) -> ConversationRiskAssessmentResponse:
+    discordance = compute_affective_discordance(
+        journal_valence=latest_journal.valence if latest_journal else None,
+        journal_arousal=latest_journal.arousal if latest_journal else None,
+        assessment_pleasure=record.pleasure,
+        assessment_arousal=record.arousal,
+    )
+
+    return ConversationRiskAssessmentResponse(
+        id=record.id,
+        conversation_id=record.conversation_id,
+        session_id=record.session_id,
+        user_id=record.user_id,
+        overall_risk_level=record.overall_risk_level,
+        risk_trend=record.risk_trend,
+        conversation_summary=record.conversation_summary,
+        user_context=record.user_context,
+        protective_factors=record.protective_factors,
+        concerns=record.concerns,
+        recommended_actions=record.recommended_actions,
+        should_invoke_cma=record.should_invoke_cma,
+        reasoning=record.reasoning,
+        pleasure=record.pleasure,
+        arousal=record.arousal,
+        dominance=record.dominance,
+        journal_valence=latest_journal.valence if latest_journal else None,
+        journal_arousal=latest_journal.arousal if latest_journal else None,
+        journal_inferred_dominance=latest_journal.inferred_dominance if latest_journal else None,
+        discordance_score=discordance.score,
+        discordance_level=discordance.level,
+        discordance_reason=discordance.reason,
+        message_count=record.message_count,
+        conversation_duration_seconds=record.conversation_duration_seconds,
+        analysis_timestamp=record.analysis_timestamp,
+        raw_assessment=record.raw_assessment,
+        created_at=record.created_at,
+        updated_at=record.updated_at,
+    )
 
 
 @router.get("/conversations", response_model=ConversationsResponse)
@@ -334,10 +394,12 @@ async def list_conversation_assessments(
         )
     ).scalars().all()
 
-    return ConversationRiskAssessmentListResponse(
-        assessments=records,
-        total_count=total_count,
-    )
+    enriched_records: List[ConversationRiskAssessmentResponse] = []
+    for record in records:
+        latest_journal = await _fetch_latest_journal_entry(db, record.user_id)
+        enriched_records.append(_build_assessment_response(record, latest_journal))
+
+    return ConversationRiskAssessmentListResponse(assessments=enriched_records, total_count=total_count)
 
 
 @router.get("/conversations/{conversation_id}", response_model=ConversationDetailResponse)
@@ -397,7 +459,8 @@ async def get_conversation_assessment(
     if not record:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Assessment not found")
 
-    return record
+    latest_journal = await _fetch_latest_journal_entry(db, record.user_id)
+    return _build_assessment_response(record, latest_journal)
 
 
 @router.post(
@@ -428,7 +491,8 @@ async def trigger_conversation_assessment(
                 conversation_id,
                 existing.id,
             )
-            return existing
+            latest_journal = await _fetch_latest_journal_entry(db, existing.user_id)
+            return _build_assessment_response(existing, latest_journal)
 
     conversations = (
         await db.execute(
@@ -491,7 +555,8 @@ async def trigger_conversation_assessment(
         conversation_id,
     )
 
-    return record
+    latest_journal = await _fetch_latest_journal_entry(db, record.user_id)
+    return _build_assessment_response(record, latest_journal)
 
 
 @router.get("/conversation-session/{session_id}", response_model=SessionDetailResponse)

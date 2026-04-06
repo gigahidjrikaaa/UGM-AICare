@@ -8,7 +8,7 @@ import ParticleBackground from '@/components/ui/ParticleBackground';
 
 export default function AboutFeaturesPage() {
   return (
-    <div className="min-h-screen bg-gradient-to-b from-[#001D58] to-[#00308F] pt-24 pb-10 px-4 sm:px-6 relative">
+    <div className="min-h-screen bg-linear-to-b from-[#001D58] to-[#00308F] pt-24 pb-10 px-4 sm:px-6 relative">
       <div className="absolute inset-0 z-0 opacity-40">
         <ParticleBackground count={60} colors={["#FFCA40", "#6A98F0", "#ffffff"]} minSize={2} maxSize={8} speed={0.8} />
       </div>
@@ -76,7 +76,7 @@ export default function AboutFeaturesPage() {
                 features: [
                   "Evidence-based interventions",
                   "Personalized coping strategies",
-                  "Mood regulation techniques",
+                  "Affective regulation techniques",
                   "Interactive CBT modules"
                 ]
               },
@@ -120,7 +120,7 @@ export default function AboutFeaturesPage() {
                 <ul className="space-y-2">
                   {agent.features.map((feature, fIdx) => (
                     <li key={fIdx} className="flex items-center gap-2 text-white/70 text-sm">
-                      <div className="w-1.5 h-1.5 bg-[#FFCA40] rounded-full flex-shrink-0"></div>
+                      <div className="w-1.5 h-1.5 bg-[#FFCA40] rounded-full shrink-0"></div>
                       {feature}
                     </li>
                   ))}
@@ -129,7 +129,7 @@ export default function AboutFeaturesPage() {
             ))}
           </div>
 
-          <div className="bg-gradient-to-r from-[#FFCA40]/10 to-[#FFB700]/10 rounded-xl p-6 border border-[#FFCA40]/20">
+          <div className="bg-linear-to-r from-[#FFCA40]/10 to-[#FFB700]/10 rounded-xl p-6 border border-[#FFCA40]/20">
             <h3 className="text-xl font-bold text-white mb-4">How Agents Work Together</h3>
             <div className="flex flex-col md:flex-row items-center justify-center gap-4 text-center">
               <div className="bg-white/10 px-4 py-2 rounded-lg">
@@ -154,7 +154,7 @@ export default function AboutFeaturesPage() {
           </div>
         </motion.section>
 
-        {/* Mood Tracking & Journaling */}
+        {/* Affective Tracking & Journaling */}
         <motion.section
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -166,23 +166,23 @@ export default function AboutFeaturesPage() {
               <FiTrendingUp className="text-[#FFCA40] text-3xl" />
             </div>
             <div>
-              <h2 className="text-3xl font-bold text-white">Mood Tracking & Journaling</h2>
-              <p className="text-white/70">Understand your emotional patterns</p>
+              <h2 className="text-3xl font-bold text-white">Affective Tracking & Journaling</h2>
+              <p className="text-white/70">Understand your PAD patterns over time</p>
             </div>
           </div>
 
           <div className="grid md:grid-cols-2 gap-8">
             <div>
-              <h3 className="text-2xl font-bold text-white mb-4">Daily Mood Check-ins</h3>
+              <h3 className="text-2xl font-bold text-white mb-4">Daily Affective Check-ins</h3>
               <ul className="space-y-3">
                 {[
-                  "Log your mood with simple emoji selections",
-                  "Track intensity levels (1-10 scale)",
+                  "Capture valence and arousal using the affective grid",
+                  "Track PAD signal movement across sessions",
                   "Add contextual notes about your day",
                   "Identify triggers and patterns over time"
                 ].map((item, idx) => (
                   <li key={idx} className="flex items-start gap-3 text-white/80">
-                    <FiHeart className="text-[#FFCA40] mt-1 flex-shrink-0" />
+                    <FiHeart className="text-[#FFCA40] mt-1 shrink-0" />
                     {item}
                   </li>
                 ))}
@@ -193,13 +193,13 @@ export default function AboutFeaturesPage() {
               <h3 className="text-2xl font-bold text-white mb-4">Visual Analytics</h3>
               <ul className="space-y-3">
                 {[
-                  "Interactive mood charts and graphs",
+                  "Interactive PAD trend charts and distributions",
                   "Weekly and monthly trend analysis",
                   "Correlation insights (sleep, stress, etc.)",
                   "Exportable reports for counselors"
                 ].map((item, idx) => (
                   <li key={idx} className="flex items-start gap-3 text-white/80">
-                    <FiTrendingUp className="text-[#FFCA40] mt-1 flex-shrink-0" />
+                    <FiTrendingUp className="text-[#FFCA40] mt-1 shrink-0" />
                     {item}
                   </li>
                 ))}
@@ -269,7 +269,7 @@ export default function AboutFeaturesPage() {
                 transition={{ delay: 0.4 + idx * 0.1 }}
                 className="flex items-start gap-4 bg-white/5 rounded-xl p-6 border border-white/10 hover:bg-white/10 transition-all"
               >
-                <div className="w-12 h-12 bg-[#FFCA40]/20 rounded-lg flex items-center justify-center text-[#FFCA40] text-2xl flex-shrink-0">
+                <div className="w-12 h-12 bg-[#FFCA40]/20 rounded-lg flex items-center justify-center text-[#FFCA40] text-2xl shrink-0">
                   {resource.icon}
                 </div>
                 <div>
@@ -359,7 +359,7 @@ export default function AboutFeaturesPage() {
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.6, delay: 0.5 }}
-          className="bg-gradient-to-r from-[#FFCA40]/20 to-[#FFB700]/20 backdrop-blur-xl rounded-2xl p-8 md:p-12 border border-[#FFCA40]/30 mb-12"
+          className="bg-linear-to-r from-[#FFCA40]/20 to-[#FFB700]/20 backdrop-blur-xl rounded-2xl p-8 md:p-12 border border-[#FFCA40]/30 mb-12"
         >
           <div className="text-center mb-6">
             <h2 className="text-3xl font-bold text-white mb-4">Earn $CARE Tokens</h2>
@@ -373,7 +373,7 @@ export default function AboutFeaturesPage() {
               { activity: "Daily Check-in", reward: "10 $CARE" },
               { activity: "Complete Quest", reward: "25 $CARE" },
               { activity: "Journal Entry", reward: "15 $CARE" },
-              { activity: "Mood Tracking (7 days)", reward: "100 $CARE" },
+              { activity: "Affective Tracking (7 days)", reward: "100 $CARE" },
               { activity: "Help Others", reward: "50 $CARE" },
               { activity: "Achievements", reward: "Up to 500 $CARE" }
             ].map((item, idx) => (
@@ -395,7 +395,7 @@ export default function AboutFeaturesPage() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.98 }}
-                className="px-8 py-3 bg-gradient-to-r from-[#FFCA40] to-[#FFB700] text-[#001D58] rounded-full font-bold shadow-lg"
+                className="px-8 py-3 bg-linear-to-r from-[#FFCA40] to-[#FFB700] text-[#001D58] rounded-full font-bold shadow-lg"
               >
                 Learn More About $CARE Token
               </motion.button>
@@ -418,7 +418,7 @@ export default function AboutFeaturesPage() {
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.98 }}
-                className="px-10 py-4 bg-gradient-to-r from-[#FFCA40] to-[#FFB700] text-[#001D58] rounded-full font-bold text-lg shadow-2xl shadow-[#FFCA40]/50"
+                className="px-10 py-4 bg-linear-to-r from-[#FFCA40] to-[#FFB700] text-[#001D58] rounded-full font-bold text-lg shadow-2xl shadow-[#FFCA40]/50"
               >
                 Get Started Free
               </motion.button>

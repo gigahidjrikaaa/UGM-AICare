@@ -54,13 +54,16 @@ export default function DailyJournal({
     const entriesToDisplay = displayMode === 'search' ? searchResults : allEntries;
     const title = displayMode === 'search' ? `Search Results (${entriesToDisplay.length})` : 'Your Journal Entries';
 
-    const MOOD_EMOJIS: { [key: number]: string } = {
-        1: '😢',
-        2: '😕',
-        3: '😐',
-        4: '😊',
-        5: '😄',
+    const formatPadValue = (value?: number | null): string => {
+        if (typeof value !== 'number') return 'N/A';
+        return value.toFixed(2);
     };
+
+    const hasPadSignals = (entry: JournalEntryItem): boolean => (
+        typeof entry.valence === 'number'
+        || typeof entry.arousal === 'number'
+        || typeof entry.inferred_dominance === 'number'
+    );
 
     return (
         <div className="space-y-6">
@@ -103,11 +106,6 @@ export default function DailyJournal({
                                 <h3 className="font-semibold text-[#FFCA40]">
                                     {format(parseISO(entry.entry_date), 'EEEE, MMMM d, yyyy', { locale: id })}
                                 </h3>
-                                {entry.mood && (
-                                    <span className="text-2xl ml-2" title={`Mood: ${entry.mood}/5`}>
-                                        {MOOD_EMOJIS[entry.mood]}
-                                    </span>
-                                )}
                             </div>
                             
                             {entry.tags && entry.tags.length > 0 && (
@@ -123,10 +121,27 @@ export default function DailyJournal({
                                 </div>
                             )}
 
+                            {hasPadSignals(entry) && (
+                                <div className="grid grid-cols-3 gap-2 mb-2">
+                                    <div className="bg-white/5 border border-white/10 rounded-md px-2 py-1.5 text-center">
+                                        <p className="text-[10px] text-white/40 uppercase">Valence</p>
+                                        <p className="text-xs text-white/80 font-medium">{formatPadValue(entry.valence)}</p>
+                                    </div>
+                                    <div className="bg-white/5 border border-white/10 rounded-md px-2 py-1.5 text-center">
+                                        <p className="text-[10px] text-white/40 uppercase">Arousal</p>
+                                        <p className="text-xs text-white/80 font-medium">{formatPadValue(entry.arousal)}</p>
+                                    </div>
+                                    <div className="bg-white/5 border border-white/10 rounded-md px-2 py-1.5 text-center">
+                                        <p className="text-[10px] text-white/40 uppercase">Dominance</p>
+                                        <p className="text-xs text-white/80 font-medium">{formatPadValue(entry.inferred_dominance)}</p>
+                                    </div>
+                                </div>
+                            )}
+
                             {entry.prompt && entry.prompt.text && (
                                 <div className="mb-2 p-2 bg-white/5 rounded-md border border-white/10">
                                     <p className="text-xs text-gray-400 italic flex items-start">
-                                        <FiMessageSquare className="inline mr-2 mt-0.5 text-[#FFCA40] flex-shrink-0" size={14} />
+                                        <FiMessageSquare className="inline mr-2 mt-0.5 text-[#FFCA40] shrink-0" size={14} />
                                         <span>Prompt: {entry.prompt.text}</span>
                                     </p>
                                 </div>

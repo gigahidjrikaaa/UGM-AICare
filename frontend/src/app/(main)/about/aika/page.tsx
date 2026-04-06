@@ -158,7 +158,7 @@ export default function AboutAikaPage() {
               },
               {
                 title: "Daily Support",
-                items: ["Mood tracking", "Coping strategies", "Stress management", "Building resilience"]
+                items: ["Affective check-ins", "Coping strategies", "Stress management", "Building resilience"]
               }
             ].map((category, idx) => (
               <motion.div

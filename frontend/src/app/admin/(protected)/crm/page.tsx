@@ -287,7 +287,7 @@ export default function AdminCRMPage() {
             </thead>
             <tbody className="bg-transparent divide-y divide-white/20">
               {users.map((user) => (
-                <tr className="hover:bg-white/5 transition-colors">
+                <tr key={user.id} className="hover:bg-white/5 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="relative h-10 w-10 rounded-full overflow-hidden border border-white/15 bg-white/5 flex-shrink-0">

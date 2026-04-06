@@ -38,7 +38,6 @@ export default function JournalEntryModal({
     const [reflectionPoints, setReflectionPoints] = useState<JournalReflectionPointResponse[]>([]);
     const [isFetchingReflections, setIsFetchingReflections] = useState(false);
     
-    const [mood, setMood] = useState<number | null>(null);
     const [valence, setValence] = useState<number | null>(null);
     const [arousal, setArousal] = useState<number | null>(null);
     const [tags, setTags] = useState<string[]>([]);
@@ -58,7 +57,6 @@ export default function JournalEntryModal({
             if (response.status === 404) {
                 setContent(''); // No entry for this date, clear content
                 setSelectedPromptId(null); // Clear selected prompt
-                setMood(null); // Clear mood
                 setValence(null);
                 setArousal(null);
                 setTags([]); // Clear tags
@@ -66,7 +64,6 @@ export default function JournalEntryModal({
             } else if (response.status >= 200 && response.status < 300) {
                 setContent(response.data.content);
                 setSelectedPromptId(response.data.prompt?.id || null);
-                setMood(response.data.mood || null);
                 setValence(response.data.valence ?? null);
                 setArousal(response.data.arousal ?? null);
                 setTags(response.data.tags?.map(t => t.tag_name) || []);
@@ -124,7 +121,6 @@ export default function JournalEntryModal({
             setSelectedPromptId(null);
             setError(null);
             setReflectionPoints([]);
-            setMood(null);
             setValence(null);
             setArousal(null);
             setTags([]);
@@ -144,7 +140,6 @@ export default function JournalEntryModal({
                 entry_date: entryDate,
                 content,
                 prompt_id: selectedPromptId,
-                mood,
                 valence,
                 arousal,
                 tags,
@@ -209,9 +204,9 @@ export default function JournalEntryModal({
                                       
                                     {/* Left Side: Journal Entry Form */}
                                     <div className="flex-1 p-6 min-w-lg overflow-y-auto max-h-[80vh]">
-                                     {/* Mood Selection */}
+                                     {/* Affective State Selection */}
                                     <div className="mb-4">
-                                        <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center">
+                                        <label className="text-sm font-medium text-gray-300 mb-2 flex items-center">
                                             <FiSmile className="mr-2 text-[#FFCA40]" />
                                             How are you feeling today?
                                         </label>
@@ -230,7 +225,7 @@ export default function JournalEntryModal({
 
                                     {/* Tags Input */}
                                     <div className="mb-4">
-                                        <label className="block text-sm font-medium text-gray-300 mb-2 flex items-center">
+                                        <label className="text-sm font-medium text-gray-300 mb-2 flex items-center">
                                             <FiTag className="mr-2 text-[#FFCA40]" />
                                             Tags (optional)
                                         </label>
