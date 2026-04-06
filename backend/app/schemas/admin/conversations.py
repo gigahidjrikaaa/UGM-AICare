@@ -114,6 +114,15 @@ class ConversationRiskAssessmentResponse(BaseModel):
     recommended_actions: Optional[List[str]] = None
     should_invoke_cma: bool
     reasoning: str
+    pleasure: Optional[float] = None
+    arousal: Optional[float] = None
+    dominance: Optional[float] = None
+    journal_valence: Optional[float] = None
+    journal_arousal: Optional[float] = None
+    journal_inferred_dominance: Optional[float] = None
+    discordance_score: Optional[float] = None
+    discordance_level: Optional[str] = None
+    discordance_reason: Optional[str] = None
     message_count: int
     conversation_duration_seconds: Optional[float] = None
     analysis_timestamp: datetime

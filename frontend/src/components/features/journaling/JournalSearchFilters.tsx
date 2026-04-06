@@ -1,10 +1,9 @@
 "use client";
 
 import React, { useState, useEffect } from 'react';
-import { FiSearch, FiFilter, FiX, FiCalendar, FiTag, FiSmile } from 'react-icons/fi';
+import { FiSearch, FiFilter, FiX, FiCalendar, FiTag } from 'react-icons/fi';
 import { searchJournalEntries, getAllUserTags } from '@/services/api';
 import type { JournalEntryItem } from '@/types/api';
-import { format } from 'date-fns';
 
 interface JournalSearchFiltersProps {
   onResults: (entries: JournalEntryItem[]) => void;
@@ -14,8 +13,12 @@ interface JournalSearchFiltersProps {
 
 interface Filters {
   searchQuery: string;
-  moodMin: number | null;
-  moodMax: number | null;
+  valenceMin: number | null;
+  valenceMax: number | null;
+  arousalMin: number | null;
+  arousalMax: number | null;
+  dominanceMin: number | null;
+  dominanceMax: number | null;
   selectedTags: string[];
   dateFrom: string;
   dateTo: string;
@@ -32,8 +35,12 @@ export default function JournalSearchFilters({
   
   const [filters, setFilters] = useState<Filters>({
     searchQuery: '',
-    moodMin: null,
-    moodMax: null,
+    valenceMin: null,
+    valenceMax: null,
+    arousalMin: null,
+    arousalMax: null,
+    dominanceMin: null,
+    dominanceMax: null,
     selectedTags: [],
     dateFrom: '',
     dateTo: '',
@@ -48,7 +55,9 @@ export default function JournalSearchFilters({
   useEffect(() => {
     let count = 0;
     if (filters.searchQuery) count++;
-    if (filters.moodMin !== null || filters.moodMax !== null) count++;
+    if (filters.valenceMin !== null || filters.valenceMax !== null) count++;
+    if (filters.arousalMin !== null || filters.arousalMax !== null) count++;
+    if (filters.dominanceMin !== null || filters.dominanceMax !== null) count++;
     if (filters.selectedTags.length > 0) count++;
     if (filters.dateFrom || filters.dateTo) count++;
     setActiveFiltersCount(count);
@@ -71,8 +80,12 @@ export default function JournalSearchFilters({
     try {
       const results = await searchJournalEntries({
         search_query: filters.searchQuery || undefined,
-        mood_min: filters.moodMin || undefined,
-        mood_max: filters.moodMax || undefined,
+        valence_min: filters.valenceMin ?? undefined,
+        valence_max: filters.valenceMax ?? undefined,
+        arousal_min: filters.arousalMin ?? undefined,
+        arousal_max: filters.arousalMax ?? undefined,
+        inferred_dominance_min: filters.dominanceMin ?? undefined,
+        inferred_dominance_max: filters.dominanceMax ?? undefined,
         tags: filters.selectedTags.length > 0 ? filters.selectedTags : undefined,
         date_from: filters.dateFrom || undefined,
         date_to: filters.dateTo || undefined,
@@ -89,13 +102,41 @@ export default function JournalSearchFilters({
   const handleClearFilters = () => {
     setFilters({
       searchQuery: '',
-      moodMin: null,
-      moodMax: null,
+      valenceMin: null,
+      valenceMax: null,
+      arousalMin: null,
+      arousalMax: null,
+      dominanceMin: null,
+      dominanceMax: null,
       selectedTags: [],
       dateFrom: '',
       dateTo: '',
     });
     onResults([]);
+  };
+
+  const setPadFilterValue = (
+    field:
+      | 'valenceMin'
+      | 'valenceMax'
+      | 'arousalMin'
+      | 'arousalMax'
+      | 'dominanceMin'
+      | 'dominanceMax',
+    rawValue: string,
+  ) => {
+    if (rawValue === '') {
+      setFilters((prev) => ({ ...prev, [field]: null }));
+      return;
+    }
+
+    const parsed = Number.parseFloat(rawValue);
+    if (Number.isNaN(parsed)) {
+      return;
+    }
+
+    const clipped = Math.max(-1, Math.min(1, parsed));
+    setFilters((prev) => ({ ...prev, [field]: clipped }));
   };
 
   const toggleTag = (tag: string) => {
@@ -106,14 +147,6 @@ export default function JournalSearchFilters({
         : [...prev.selectedTags, tag]
     }));
   };
-
-  const MOOD_OPTIONS = [
-    { value: 1, label: '😢 Very Low', color: 'bg-red-500' },
-    { value: 2, label: '😕 Low', color: 'bg-orange-500' },
-    { value: 3, label: '😐 Neutral', color: 'bg-yellow-500' },
-    { value: 4, label: '😊 Good', color: 'bg-green-500' },
-    { value: 5, label: '😄 Great', color: 'bg-emerald-500' },
-  ];
 
   return (
     <div className={`bg-white/3 backdrop-blur-xl rounded-2xl border border-white/10 p-6 ${className}`}>
@@ -166,37 +199,82 @@ export default function JournalSearchFilters({
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
               <label className="text-sm font-medium text-white/70 mb-2 flex items-center gap-2">
-                <FiSmile className="text-[#FFCA40]" />
-                Mood Range
+                <FiFilter className="text-[#FFCA40]" />
+                PAD Range (-1 to 1)
               </label>
-              <div className="flex items-center gap-2">
-                <select
-                  value={filters.moodMin || ''}
-                  onChange={(e) => setFilters(prev => ({ 
-                    ...prev, 
-                    moodMin: e.target.value ? parseInt(e.target.value) : null 
-                  }))}
-                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#FFCA40] transition"
-                >
-                  <option value="">Min</option>
-                  {MOOD_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
-                <span className="text-white/50">to</span>
-                <select
-                  value={filters.moodMax || ''}
-                  onChange={(e) => setFilters(prev => ({ 
-                    ...prev, 
-                    moodMax: e.target.value ? parseInt(e.target.value) : null 
-                  }))}
-                  className="flex-1 bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#FFCA40] transition"
-                >
-                  <option value="">Max</option>
-                  {MOOD_OPTIONS.map(opt => (
-                    <option key={opt.value} value={opt.value}>{opt.label}</option>
-                  ))}
-                </select>
+              <div className="space-y-2">
+                <div className="grid grid-cols-[70px_1fr_auto_1fr] items-center gap-2">
+                  <span className="text-xs text-white/60">Valence</span>
+                  <input
+                    type="number"
+                    min={-1}
+                    max={1}
+                    step={0.1}
+                    value={filters.valenceMin ?? ''}
+                    onChange={(e) => setPadFilterValue('valenceMin', e.target.value)}
+                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#FFCA40] transition"
+                    placeholder="Min"
+                  />
+                  <span className="text-white/40">to</span>
+                  <input
+                    type="number"
+                    min={-1}
+                    max={1}
+                    step={0.1}
+                    value={filters.valenceMax ?? ''}
+                    onChange={(e) => setPadFilterValue('valenceMax', e.target.value)}
+                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#FFCA40] transition"
+                    placeholder="Max"
+                  />
+                </div>
+                <div className="grid grid-cols-[70px_1fr_auto_1fr] items-center gap-2">
+                  <span className="text-xs text-white/60">Arousal</span>
+                  <input
+                    type="number"
+                    min={-1}
+                    max={1}
+                    step={0.1}
+                    value={filters.arousalMin ?? ''}
+                    onChange={(e) => setPadFilterValue('arousalMin', e.target.value)}
+                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#FFCA40] transition"
+                    placeholder="Min"
+                  />
+                  <span className="text-white/40">to</span>
+                  <input
+                    type="number"
+                    min={-1}
+                    max={1}
+                    step={0.1}
+                    value={filters.arousalMax ?? ''}
+                    onChange={(e) => setPadFilterValue('arousalMax', e.target.value)}
+                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#FFCA40] transition"
+                    placeholder="Max"
+                  />
+                </div>
+                <div className="grid grid-cols-[70px_1fr_auto_1fr] items-center gap-2">
+                  <span className="text-xs text-white/60">Dominance</span>
+                  <input
+                    type="number"
+                    min={-1}
+                    max={1}
+                    step={0.1}
+                    value={filters.dominanceMin ?? ''}
+                    onChange={(e) => setPadFilterValue('dominanceMin', e.target.value)}
+                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#FFCA40] transition"
+                    placeholder="Min"
+                  />
+                  <span className="text-white/40">to</span>
+                  <input
+                    type="number"
+                    min={-1}
+                    max={1}
+                    step={0.1}
+                    value={filters.dominanceMax ?? ''}
+                    onChange={(e) => setPadFilterValue('dominanceMax', e.target.value)}
+                    className="bg-white/5 border border-white/10 rounded-lg px-3 py-2 text-white focus:outline-none focus:ring-2 focus:ring-[#FFCA40] transition"
+                    placeholder="Max"
+                  />
+                </div>
               </div>
             </div>
 
