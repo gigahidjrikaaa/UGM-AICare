@@ -31,6 +31,9 @@ async def test_analyze_conversation_risk_parses_json(monkeypatch: pytest.MonkeyP
         "recommended_actions": ["beri sumber daya self-help"],
         "should_invoke_cma": False,
         "reasoning": "Indikator risiko rendah dan stabil.",
+        "pleasure": 0.5,
+        "arousal": -0.2,
+        "dominance": 0.8,
         "screening": {
             "anxiety": {
                 "score": 0.3,
@@ -59,6 +62,9 @@ async def test_analyze_conversation_risk_parses_json(monkeypatch: pytest.MonkeyP
 
     assert result.overall_risk_level == "low"
     assert result.risk_trend == "stable"
+    assert result.pleasure == 0.5
+    assert result.arousal == -0.2
+    assert result.dominance == 0.8
     assert result.screening is not None
     assert result.screening.anxiety is not None
     assert result.screening.anxiety.score == 0.3
