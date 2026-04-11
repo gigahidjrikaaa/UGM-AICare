@@ -144,6 +144,12 @@ class CMAGraphService:
             # Note: self.graph is CompiledStateGraph at runtime, has ainvoke
             final_state = await self.graph.ainvoke(initial_state, config={"configurable": {"db": self.db}})  # type: ignore[attr-defined]
             
+            # Commit the transaction for standalone execution.
+            # When CMA runs inside parallel_crisis_node, the orchestrator owns
+            # the commit boundary.  But when invoked standalone (via this service),
+            # we must commit here or the Case / CaseAssignment records are lost.
+            await self.db.commit()
+            
             # Mark completion timestamp
             final_state["completed_at"] = datetime.now()
             

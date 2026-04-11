@@ -345,6 +345,11 @@ async def parallel_crisis_node(
         tca_input = cast(dict[str, Any], state).copy()
         cma_input = cast(dict[str, Any], state).copy()
 
+        # Flag TCA that it is running in parallel crisis mode so that its
+        # safety_review_node does NOT block plan persistence for high/critical
+        # severity — CMA handles the escalation, TCA provides coping support.
+        tca_input["parallel_crisis_mode"] = True
+
         tca_result, cma_result = await asyncio.gather(
             execute_sca_subgraph(cast(AikaOrchestratorState, tca_input), config),
             execute_sda_subgraph(cast(AikaOrchestratorState, cma_input), db),

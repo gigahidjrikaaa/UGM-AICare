@@ -107,6 +107,17 @@ class SafetyAgentState(TypedDict, total=False):
     """ISO timestamp of SLA breach deadline."""
     
     # ============================================================================
+    # ORCHESTRATION FLAGS
+    # ============================================================================
+    parallel_crisis_mode: bool
+    """Set to True when TCA runs inside parallel_crisis_node alongside CMA.
+    
+    When True, TCA safety_review_node skips the high/critical severity gate
+    because CMA is already handling the crisis escalation — TCA's role is to
+    provide immediate coping support, which is still appropriate in parallel mode.
+    """
+
+    # ============================================================================
     # EXECUTION METADATA (Used by ExecutionStateTracker)
     # ============================================================================
     execution_id: str
@@ -386,8 +397,8 @@ class AikaOrchestratorState(TypedDict, total=False):
     """Whether TCA plan passed safety review."""
     
     # CMA outputs
-    case_id: Optional[int]
-    """Database ID of created Case record (for high/critical escalations)."""
+    case_id: Optional[str]
+    """Database ID (UUID string) of created Case record (for high/critical escalations)."""
     
     case_created: bool
     """Flag indicating if a new case was created (default False)."""

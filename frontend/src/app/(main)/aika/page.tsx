@@ -459,7 +459,7 @@ export default function AikaEnhancedPage() {
               )}
 
               <div className="px-4 pt-3">
-                <div className="mx-auto w-full max-w-3xl flex justify-end">
+                <div className="mx-auto w-full max-w-3xl flex flex-wrap items-center justify-end gap-2">
                   <button
                     type="button"
                     onClick={() => setShowThinkingTrace((prev) => !prev)}

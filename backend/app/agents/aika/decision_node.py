@@ -481,23 +481,21 @@ async def _call_decision_llm(
     system_instruction: str,
     preferred_model: str,
 ) -> str:
-    """Call Gemini with the routing decision prompt and return the raw text.
+    """Call the configured LLM for routing decision and return raw text.
 
-    Uses the fallback model chain so transient failures are handled before
-    propagating to the caller.  Token cap: 512 (decision JSON is <400 tokens).
+    Token cap: 512 (decision JSON is <400 tokens).
     """
     # Late import — avoids circular dependency at module load time.
-    from app.core.llm import generate_gemini_response_with_fallback
+    from app.core.llm import generate_response
 
-    return await generate_gemini_response_with_fallback(
+    return await generate_response(
         history=[{"role": "user", "content": decision_prompt}],
-        model=preferred_model,
+        model="gemini_google",
         temperature=0.3,
         max_tokens=512,
         system_prompt=system_instruction,
+        preferred_gemini_model=preferred_model,
         json_mode=True,
-        json_schema=_DECISION_JSON_SCHEMA,
-        allow_retry_sleep=False,
     )
 
 
@@ -505,13 +503,13 @@ async def _repair_decision_json_once(
     raw_response_text: str,
     preferred_model: str,
 ) -> str:
-    """Ask Gemini to repair malformed decision output into strict JSON once.
+    """Ask the configured LLM to repair malformed decision output once.
 
     This is intentionally isolated and only used after the primary decision parse
     fails, to reduce user-facing fallback responses caused by minor formatting
     drift (e.g., prose around JSON, markdown wrappers, trailing commentary).
     """
-    from app.core.llm import generate_gemini_response_with_fallback
+    from app.core.llm import generate_response
 
     repair_prompt = (
         "Convert the following model output into STRICT JSON only. "
@@ -520,14 +518,13 @@ async def _repair_decision_json_once(
         f"RAW_OUTPUT:\n{raw_response_text}"
     )
 
-    return await generate_gemini_response_with_fallback(
+    return await generate_response(
         history=[{"role": "user", "content": repair_prompt}],
-        model=preferred_model,
+        model="gemini_google",
         temperature=0.0,
         max_tokens=512,
+        preferred_gemini_model=preferred_model,
         json_mode=True,
-        json_schema=_DECISION_JSON_SCHEMA,
-        allow_retry_sleep=False,
     )
 
 
@@ -973,7 +970,7 @@ async def aika_decision_node(
         try:
             decision = _parse_llm_decision(response_text)
         except (json.JSONDecodeError, ValueError) as parse_err:
-            logger.warning("Failed to parse Gemini decision JSON: %s", parse_err)
+            logger.warning("Failed to parse decision JSON: %s", parse_err)
             logger.debug("Raw response: %.200s", response_text)
             repaired_decision: Optional[dict[str, Any]] = None
             try:
@@ -1237,7 +1234,12 @@ async def aika_decision_node(
 
         is_rate_limit = any(
             token in error_str
-            for token in ("429", "RESOURCE_EXHAUSTED", "All Gemini models failed")
+            for token in (
+                "429",
+                "RESOURCE_EXHAUSTED",
+                "All Gemini models failed",
+                "OpenRouter rate limit",
+            )
         )
         if is_rate_limit:
             logger.warning(

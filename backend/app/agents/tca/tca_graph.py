@@ -247,14 +247,18 @@ async def safety_review_node(state: SCAState) -> SCAState:
     try:
         severity = state.get("severity", "low")
         
-        # Safety check: High/critical severity should not use TCA
-        # (should be routed to SDA instead)
-        if severity in ("high", "critical"):
+        # Safety check: High/critical severity should not use TCA *alone*.
+        # However, when running inside parallel_crisis_node alongside CMA,
+        # TCA is still needed for immediate coping support — CMA handles the
+        # crisis escalation, so TCA should persist its plan in that context.
+        if severity in ("high", "critical") and not state.get("parallel_crisis_mode"):
             state["should_intervene"] = False
             state["errors"].append(
-                "Safety review: High/critical severity should route to SDA, not TCA"
+                "Safety review: High/critical severity should route to CMA, not TCA alone"
             )
-            logger.warning(f"TCA safety review blocked: severity={severity}")
+            logger.warning(
+                "TCA safety review blocked (solo mode): severity=%s", severity
+            )
         
         state["execution_path"].append("safety_review")
         
@@ -375,10 +379,12 @@ async def persist_plan_node(state: SCAState, config: RunnableConfig) -> SCAState
         
         db.add(plan)
         await db.flush()
-        await db.commit()  # Explicit commit to ensure persistence
+        # NOTE: Only flush here — the outer orchestrator or chat route owns
+        # the final commit boundary.  This prevents premature commits when TCA
+        # runs inside parallel_crisis_node (shared db session with CMA).
         
         # DEBUG: Log plan creation details
-        logger.info(f"📋 TCA persisted intervention plan: ID={plan.id}, user_id={plan.user_id}, is_active={plan.is_active}, status={plan.status}")
+        logger.info(f"TCA persisted intervention plan: ID={plan.id}, user_id={plan.user_id}, is_active={plan.is_active}, status={plan.status}")
         
         state["intervention_plan_id"] = plan.id
         state["execution_path"].append("persist_plan")

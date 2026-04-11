@@ -3,7 +3,6 @@
 import os
 import httpx
 import asyncio
-import re
 import time
 import threading
 from typing import Any, AsyncIterator, cast
@@ -20,6 +19,28 @@ from typing import List, Dict, Literal, Optional, Tuple
 # Langfuse Tracing
 from app.core.langfuse_config import trace_llm_call
 from app.core import llm_request_tracking
+from app.core.zai_chat_completion import request_chat_completion
+from app.core.llm_active_model_registry import (
+    ActiveChatModelRegistry,
+    build_supported_chat_models,
+    is_zai_direct_model_name as _is_zai_direct_model_name,
+    is_zai_model_name as _is_zai_model_name,
+    normalize_active_chat_model as _normalize_active_chat_model_impl,
+    normalize_openrouter_model_alias as _normalize_openrouter_model_alias_impl,
+    normalize_zai_direct_model_alias as _normalize_zai_direct_model_alias_impl,
+    resolve_zai_direct_model_name as _resolve_zai_direct_model_name_impl,
+    resolve_zai_model_name as _resolve_zai_model_name_impl,
+)
+from app.core.llm_dispatch import classify_dispatch_target, resolve_dispatch_request
+from app.core.llm_gemini_fallback_policy import (
+    extract_error_code,
+    is_invalid_model_error,
+    is_resource_exhausted_error,
+    parse_retry_after_s,
+    should_fallback_on_error,
+)
+from app.core.llm_gemini_circuit_breaker import GeminiCircuitBreaker
+from app.core.llm_gemini_fallback_runner import run_gemini_fallback_chain
 
 # Load environment variables
 load_dotenv(find_dotenv())
@@ -48,30 +69,61 @@ GOOGLE_API_KEY: Optional[str] = GEMINI_API_KEYS[0] if GEMINI_API_KEYS else None
 
 # Gemini models for different use cases
 # NOTE: These are constrained to models confirmed usable in your AI Studio project.
-DEFAULT_GEMINI_MODEL = "gemini-3-flash-preview"  # Default for general use
-GEMINI_LITE_MODEL = "gemini-2.5-flash-lite"  # For high-volume conversational
-GEMINI_FLASH_MODEL = "gemini-3-flash-preview"  # For most agent tasks
-GEMINI_PRO_MODEL = "gemini-3-pro-preview"  # For advanced reasoning (use where it matters)
+GEMMA_4_31B_MODEL = os.environ.get("GEMMA_4_31B_MODEL", "gemma-4-31b-it")
+GEMMA_4_26B_MODEL = os.environ.get("GEMMA_4_26B_MODEL", "gemma-4-26b-a4b-it")
+GEMINI_BACKSTOP_MODEL = os.environ.get("GEMINI_BACKSTOP_MODEL", "gemini-3.1-flash-lite-preview")
+
+# Prioritize Gemma-family models by default, while keeping a Gemini model as final backstop.
+DEFAULT_GEMINI_MODEL = GEMMA_4_31B_MODEL
+GEMINI_LITE_MODEL = GEMMA_4_26B_MODEL
+GEMINI_FLASH_MODEL = GEMMA_4_26B_MODEL
+GEMINI_PRO_MODEL = GEMMA_4_31B_MODEL  # Legacy name kept for compatibility with existing call sites
 
 # Circuit breaker tuning
 _MODEL_FAILURE_WINDOW_S = 60.0
 _MODEL_FAILURE_THRESHOLD = 5
 _MODEL_COOLDOWN_S = 60.0
-_gemini_model_failures: dict[str, list[float]] = {}
-_gemini_model_open_until: dict[str, float] = {}
-_gemini_model_breaker_events: dict[str, dict[str, Any]] = {}
-_gemini_model_lock = threading.Lock()
+_gemini_circuit_breaker = GeminiCircuitBreaker(
+    failure_window_s=_MODEL_FAILURE_WINDOW_S,
+    failure_threshold=_MODEL_FAILURE_THRESHOLD,
+    cooldown_s=_MODEL_COOLDOWN_S,
+)
 
 # Fallback chain for Gemini models (in order of preference)
 # Keep this list limited to models you can actually call; otherwise the chain may abort early.
 GEMINI_FALLBACK_CHAIN = [
-    "gemini-3-flash-preview",
-    "gemini-2.5-flash",
-    "gemini-2.5-flash-lite",
-    "gemini-2.5-flash-preview-09-2025",
+    GEMMA_4_31B_MODEL,
+    GEMMA_4_26B_MODEL,
+    GEMINI_BACKSTOP_MODEL,
 ]
 
 DEFAULT_GEMMA_LOCAL_MODEL = "gemma-3-12b-it-gguf"  # Local inference via Ollama/vLLM
+
+# OpenRouter (for Z.AI model family)
+OPENROUTER_BASE_URL = os.environ.get("OPENROUTER_BASE_URL", "https://openrouter.ai/api/v1").rstrip("/")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY")
+OPENROUTER_TIMEOUT_S = float(os.environ.get("OPENROUTER_TIMEOUT_S", "90"))
+OPENROUTER_ZAI_MODEL = os.environ.get("OPENROUTER_ZAI_MODEL", "z-ai/glm-4.7")
+
+# Direct Z.AI Coding endpoint (GLM Coding Plan compatible)
+ZAI_API_KEY = os.environ.get("ZAI_API_KEY")
+ZAI_BASE_URL = os.environ.get("ZAI_BASE_URL", "https://api.z.ai/api/coding/paas/v4").rstrip("/")
+ZAI_TIMEOUT_S = float(os.environ.get("ZAI_TIMEOUT_S", "90"))
+ZAI_DIRECT_MODEL = os.environ.get("ZAI_DIRECT_MODEL", "glm-4.7")
+ZAI_ACCEPT_LANGUAGE = os.environ.get("ZAI_ACCEPT_LANGUAGE", "en-US,en")
+
+GEMINI_AUTO_MODEL_ALIAS = "gemini:auto"
+SUPPORTED_ZAI_CHAT_MODELS: tuple[str, ...] = (
+    "z-ai/glm-4.7",
+    "z-ai/glm-4.7-flash",
+)
+SUPPORTED_ZAI_DIRECT_MODELS: tuple[str, ...] = (
+    "glm-4.7",
+    "glm-4.7-flash",
+    "glm-4.6",
+    "glm-4.5",
+    "glm-4.5-air",
+)
 
 # --- Client Management ---
 _gemini_client: Optional[genai.Client] = None
@@ -138,6 +190,10 @@ def select_gemini_model(
     if preferred_model:
         return preferred_model
 
+    active_model = get_active_chat_model()
+    if active_model != GEMINI_AUTO_MODEL_ALIAS:
+        return active_model
+
     normalized_intent = (intent or "").lower()
     normalized_role = (role or "").lower()
 
@@ -161,105 +217,30 @@ def select_gemini_model(
     return GEMINI_LITE_MODEL
 
 
-def _get_breaker_event_entry(model: str) -> dict[str, Any]:
-    if model not in _gemini_model_breaker_events:
-        _gemini_model_breaker_events[model] = {
-            "total_opens": 0,
-            "total_closes": 0,
-            "last_opened_at": None,
-            "last_closed_at": None,
-        }
-    return _gemini_model_breaker_events[model]
-
-
-def _close_expired_breakers(now_mono: float, now_epoch: float) -> None:
-    for model, until in list(_gemini_model_open_until.items()):
-        if until <= now_mono:
-            _gemini_model_open_until.pop(model, None)
-            entry = _get_breaker_event_entry(model)
-            entry["total_closes"] = int(entry.get("total_closes", 0)) + 1
-            entry["last_closed_at"] = now_epoch
-
-
 def _record_model_failure(model: str) -> None:
-    now = time.monotonic()
-    now_epoch = time.time()
-    with _gemini_model_lock:
-        failures = _gemini_model_failures.get(model, [])
-        failures = [t for t in failures if now - t <= _MODEL_FAILURE_WINDOW_S]
-        failures.append(now)
-        _gemini_model_failures[model] = failures
-
-        if len(failures) >= _MODEL_FAILURE_THRESHOLD:
-            is_open = _gemini_model_open_until.get(model, 0.0) > now
-            if not is_open:
-                _gemini_model_open_until[model] = now + _MODEL_COOLDOWN_S
-                entry = _get_breaker_event_entry(model)
-                entry["total_opens"] = int(entry.get("total_opens", 0)) + 1
-                entry["last_opened_at"] = now_epoch
+    _gemini_circuit_breaker.record_failure(model)
 
 
 def _record_model_success(model: str) -> None:
-    now_epoch = time.time()
-    with _gemini_model_lock:
-        was_open = model in _gemini_model_open_until
-        _gemini_model_failures.pop(model, None)
-        _gemini_model_open_until.pop(model, None)
-        if was_open:
-            entry = _get_breaker_event_entry(model)
-            entry["total_closes"] = int(entry.get("total_closes", 0)) + 1
-            entry["last_closed_at"] = now_epoch
+    _gemini_circuit_breaker.record_success(model)
 
 
 def _is_model_open(model: str) -> bool:
-    now = time.monotonic()
-    with _gemini_model_lock:
-        return _gemini_model_open_until.get(model, 0.0) > now
+    return _gemini_circuit_breaker.is_open(model)
 
 
 def get_gemini_circuit_breaker_status(models: Optional[list[str]] = None) -> list[dict[str, Any]]:
     """Return circuit breaker status for observability."""
-    now_mono = time.monotonic()
-    now_epoch = time.time()
+    if models is None:
+        models = list({
+            DEFAULT_GEMINI_MODEL,
+            GEMINI_LITE_MODEL,
+            GEMINI_FLASH_MODEL,
+            GEMINI_PRO_MODEL,
+            *GEMINI_FALLBACK_CHAIN,
+        })
 
-    with _gemini_model_lock:
-        _close_expired_breakers(now_mono, now_epoch)
-
-        if models is None:
-            models = list({
-                DEFAULT_GEMINI_MODEL,
-                GEMINI_LITE_MODEL,
-                GEMINI_FLASH_MODEL,
-                GEMINI_PRO_MODEL,
-                *GEMINI_FALLBACK_CHAIN,
-            })
-
-        statuses: list[dict[str, Any]] = []
-        for model in models:
-            failures = _gemini_model_failures.get(model, [])
-            failures = [t for t in failures if now_mono - t <= _MODEL_FAILURE_WINDOW_S]
-            if failures:
-                _gemini_model_failures[model] = failures
-            else:
-                _gemini_model_failures.pop(model, None)
-
-            open_until = _gemini_model_open_until.get(model, 0.0)
-            is_open = open_until > now_mono
-            remaining_s = max(0.0, open_until - now_mono) if is_open else 0.0
-            entry = _get_breaker_event_entry(model)
-
-            statuses.append({
-                "model": model,
-                "is_open": is_open,
-                "open_remaining_s": round(remaining_s, 2),
-                "failures_in_window": len(failures),
-                "total_opens": int(entry.get("total_opens", 0)),
-                "total_closes": int(entry.get("total_closes", 0)),
-                "last_opened_at": entry["last_opened_at"],
-                "last_closed_at": entry["last_closed_at"],
-            })
-
-        return statuses
+    return _gemini_circuit_breaker.get_status(models)
 
 
 def _mark_gemini_key_cooldown(retry_after_s: float | None) -> None:
@@ -313,7 +294,193 @@ def get_gemini_client(force_rotate: bool = False) -> genai.Client:
         return client
 
 # --- Provider Type ---
-LLMProvider = Literal['gemini', 'gemma_local']
+LLMProvider = Literal['gemini', 'gemma_local', 'zai_openrouter', 'zai_direct']
+
+
+def _normalize_openrouter_model_alias(model_name: str) -> str:
+    """Normalize common Z.AI aliases into OpenRouter model IDs."""
+    return _normalize_openrouter_model_alias_impl(model_name, OPENROUTER_ZAI_MODEL)
+
+
+def is_zai_model_name(model_name: Optional[str]) -> bool:
+    """Return True when ``model_name`` points to a Z.AI model on OpenRouter."""
+    return _is_zai_model_name(model_name, OPENROUTER_ZAI_MODEL)
+
+
+def _normalize_zai_direct_model_alias(model_name: str) -> str:
+    """Normalize direct Z.AI model aliases used by Coding endpoint."""
+    return _normalize_zai_direct_model_alias_impl(model_name, ZAI_DIRECT_MODEL)
+
+
+def is_zai_direct_model_name(model_name: Optional[str]) -> bool:
+    """Return True when model name maps to a direct Z.AI Coding endpoint model."""
+    return _is_zai_direct_model_name(model_name, ZAI_DIRECT_MODEL)
+
+
+def _normalize_active_chat_model(model_name: Optional[str]) -> str:
+    """Normalize admin-selected active chat model into a canonical value."""
+    return _normalize_active_chat_model_impl(
+        model_name,
+        has_zai_api_key=bool(ZAI_API_KEY),
+        direct_default_model=ZAI_DIRECT_MODEL,
+        openrouter_default_model=OPENROUTER_ZAI_MODEL,
+        gemini_auto_alias=GEMINI_AUTO_MODEL_ALIAS,
+    )
+
+
+default_active_chat_model = GEMINI_AUTO_MODEL_ALIAS
+try:
+    _ACTIVE_CHAT_MODEL = _normalize_active_chat_model(
+        os.environ.get("ACTIVE_CHAT_MODEL", default_active_chat_model)
+    )
+except ValueError as exc:
+    logger.warning(
+        "Invalid ACTIVE_CHAT_MODEL value. Falling back to %s. Error: %s",
+        default_active_chat_model,
+        exc,
+    )
+    _ACTIVE_CHAT_MODEL = default_active_chat_model
+
+_active_chat_model_registry = ActiveChatModelRegistry(_ACTIVE_CHAT_MODEL)
+
+
+def _sync_active_model_from_legacy_global() -> None:
+    """Support legacy direct overrides of llm._ACTIVE_CHAT_MODEL in tests/tools."""
+    global _ACTIVE_CHAT_MODEL
+    registry_value = _active_chat_model_registry.get()
+    if _ACTIVE_CHAT_MODEL == registry_value:
+        return
+
+    try:
+        normalized = _normalize_active_chat_model(_ACTIVE_CHAT_MODEL)
+    except ValueError:
+        _ACTIVE_CHAT_MODEL = registry_value
+        return
+
+    _active_chat_model_registry.set(normalized)
+    _ACTIVE_CHAT_MODEL = normalized
+
+
+def get_active_chat_model() -> str:
+    """Get the runtime-active chat model used when request does not specify a model."""
+    _sync_active_model_from_legacy_global()
+    return _active_chat_model_registry.get()
+
+
+def get_active_chat_provider() -> str:
+    """Get the provider implied by the current active chat model."""
+    active_model = get_active_chat_model()
+    if is_zai_direct_model_name(active_model):
+        return "zai_coding_plan"
+    if is_zai_model_name(active_model):
+        return "zai_openrouter"
+    return "gemini_google"
+
+
+def set_active_chat_model(model_name: str) -> str:
+    """Set runtime-active chat model and return normalized value."""
+    normalized = _normalize_active_chat_model(model_name)
+    global _ACTIVE_CHAT_MODEL
+    _active_chat_model_registry.set(normalized)
+    _ACTIVE_CHAT_MODEL = normalized
+    return normalized
+
+
+def get_supported_chat_models() -> List[str]:
+    """Return deduplicated supported model list for admin controls."""
+    return build_supported_chat_models(
+        gemini_auto_alias=GEMINI_AUTO_MODEL_ALIAS,
+        direct_default_model=ZAI_DIRECT_MODEL,
+        supported_direct_models=SUPPORTED_ZAI_DIRECT_MODELS,
+        openrouter_default_model=OPENROUTER_ZAI_MODEL,
+        supported_openrouter_models=SUPPORTED_ZAI_CHAT_MODELS,
+        normalizer=_normalize_active_chat_model,
+    )
+
+
+def _resolve_zai_model_name(preferred_model: Optional[str]) -> str:
+    """Resolve target Z.AI model, falling back to the configured default."""
+    return _resolve_zai_model_name_impl(
+        preferred_model,
+        active_model=get_active_chat_model(),
+        openrouter_default_model=OPENROUTER_ZAI_MODEL,
+    )
+
+
+def _resolve_zai_direct_model_name(preferred_model: Optional[str]) -> str:
+    """Resolve target Z.AI direct model for Coding endpoint usage."""
+    return _resolve_zai_direct_model_name_impl(
+        preferred_model,
+        active_model=get_active_chat_model(),
+        direct_default_model=ZAI_DIRECT_MODEL,
+    )
+
+
+@trace_llm_call("openrouter-zai")
+async def generate_openrouter_response(
+    history: List[Dict[str, str]],
+    model: str = OPENROUTER_ZAI_MODEL,
+    max_tokens: int = 2048,
+    temperature: float = 0.7,
+    system_prompt: Optional[str] = None,
+    json_mode: bool = False,
+) -> str:
+    """Generate a response via OpenRouter (Z.AI model family)."""
+    if not OPENROUTER_API_KEY:
+        return "Error: OPENROUTER_API_KEY is not configured."
+
+    resolved_model = _resolve_zai_model_name(model)
+    endpoint = f"{OPENROUTER_BASE_URL}/chat/completions"
+    return await request_chat_completion(
+        endpoint=endpoint,
+        api_key=OPENROUTER_API_KEY,
+        timeout_s=OPENROUTER_TIMEOUT_S,
+        model=resolved_model,
+        history=history,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        system_prompt=system_prompt,
+        json_mode=json_mode,
+        empty_response_error="Received empty response from Z.AI model.",
+        request_failed_prefix="OpenRouter request failed",
+        connection_failed_prefix="Failed to connect to OpenRouter",
+        rate_limit_prefix="OpenRouter rate limit",
+        unexpected_failed_prefix="Z.AI request failed",
+    )
+
+
+@trace_llm_call("zai-direct-coding")
+async def generate_zai_direct_response(
+    history: List[Dict[str, str]],
+    model: str = ZAI_DIRECT_MODEL,
+    max_tokens: int = 2048,
+    temperature: float = 0.7,
+    system_prompt: Optional[str] = None,
+    json_mode: bool = False,
+) -> str:
+    """Generate a response via direct Z.AI Coding endpoint."""
+    if not ZAI_API_KEY:
+        return "Error: ZAI_API_KEY is not configured."
+
+    resolved_model = _resolve_zai_direct_model_name(model)
+    endpoint = f"{ZAI_BASE_URL}/chat/completions"
+    return await request_chat_completion(
+        endpoint=endpoint,
+        api_key=ZAI_API_KEY,
+        timeout_s=ZAI_TIMEOUT_S,
+        model=resolved_model,
+        history=history,
+        max_tokens=max_tokens,
+        temperature=temperature,
+        system_prompt=system_prompt,
+        json_mode=json_mode,
+        empty_response_error="Received empty response from Z.AI direct endpoint.",
+        request_failed_prefix="Z.AI direct endpoint request failed",
+        connection_failed_prefix="Failed to connect to Z.AI direct endpoint",
+        rate_limit_prefix="Z.AI direct endpoint rate limit",
+        unexpected_failed_prefix="Z.AI direct request failed",
+        accept_language=ZAI_ACCEPT_LANGUAGE,
+    )
 
 # --- Helper: Convert Generic History to New SDK Format ---
 def _convert_history_to_contents(history: List[Dict[str, str]]) -> List[types.Content]:
@@ -470,22 +637,7 @@ def _is_invalid_model_error(status_code: int, error_msg: str) -> bool:
     We treat these as a signal to try the next fallback model (not a hard failure),
     because AI Studio projects can have per-model allowlists.
     """
-    msg = (error_msg or "").lower()
-    if status_code == 404:
-        return True
-
-    # Some SDKs return 400 for invalid model names.
-    if status_code == 400:
-        keywords = [
-            "model",
-            "not found",
-            "not supported",
-            "invalid model",
-            "unknown model",
-        ]
-        return any(k in msg for k in keywords)
-
-    return any(k in msg for k in ["model not found", "not supported", "unknown model", "not_found"])
+    return is_invalid_model_error(status_code, error_msg)
 
 
 def _current_gemini_key_fingerprint() -> tuple[int, str]:
@@ -506,45 +658,16 @@ def _current_gemini_key_fingerprint() -> tuple[int, str]:
 
 def _parse_retry_after_s(error_msg: str) -> float | None:
     """Best-effort parse for SDK messages like: "Please retry in 45.63s"."""
-
-    msg = error_msg or ""
-    match = re.search(r"retry in (\d+(?:\.\d+)?)s", msg)
-    if not match:
-        return None
-    try:
-        return float(match.group(1))
-    except ValueError:
-        return None
+    return parse_retry_after_s(error_msg)
 
 
 def _extract_error_code(error: Exception) -> int:
     """Best-effort extract HTTP-like error code from SDK exceptions/messages."""
-    try:
-        status_code = getattr(error, "status_code", None)
-        if isinstance(status_code, int):
-            return status_code
-    except Exception:
-        pass
-
-    try:
-        code = getattr(error, "code", None)
-        if isinstance(code, int):
-            return code
-    except Exception:
-        pass
-
-    match = re.search(r"\b(4\d\d|5\d\d)\b", str(error or ""))
-    if match:
-        try:
-            return int(match.group(1))
-        except ValueError:
-            return 0
-    return 0
+    return extract_error_code(error)
 
 
 def _is_resource_exhausted_error(status_code: int, error_msg: str) -> bool:
-    msg = (error_msg or "")
-    return status_code == 429 or "RESOURCE_EXHAUSTED" in msg
+    return is_resource_exhausted_error(status_code, error_msg)
 
 
 class GeminiResourceExhaustedError(RuntimeError):
@@ -863,143 +986,36 @@ async def generate_gemini_content_with_fallback(
     allow_retry_sleep: bool = True,
 ) -> str | Any:
     """Generate Gemini response with automatic fallback, using pre-built contents."""
-    from google.genai.errors import ClientError, ServerError
-
     if config is None:
         config = types.GenerateContentConfig(max_output_tokens=2048, temperature=0.7)
 
-    models_to_try = [model] + [m for m in GEMINI_FALLBACK_CHAIN if m != model]
-    all_models_open = all(_is_model_open(m) for m in models_to_try)
-    last_error: Exception | None = None
-    last_error_model: str | None = None
-    last_error_key: tuple[int, str] | None = None
-    last_error_retry_after_s: float | None = None
-
-    for idx, current_model in enumerate(models_to_try):
-        if _is_model_open(current_model) and not all_models_open:
-            logger.warning("Skipping model %s due to open circuit breaker", current_model)
-            continue
-        max_retries_per_model = max(3, len(GEMINI_API_KEYS))
-
-        for retry_attempt in range(max_retries_per_model):
-            try:
-                logger.info(
-                    f"🔄 Attempting Gemini request with model: {current_model} "
-                    f"(model_idx={idx}, retry={retry_attempt}, contents_mode=True)"
-                )
-
-                response = await generate_gemini_content(
-                    contents=contents,
-                    model=current_model,
-                    config=config,
-                    return_full_response=return_full_response,
-                )
-
-                # Track successful request
-                key_idx, _ = _current_gemini_key_fingerprint()
-                gemini_tracker.record_request(key_index=key_idx, model=current_model, success=True)
-                _record_model_success(current_model)
-
-                if idx > 0 or retry_attempt > 0:
-                    logger.warning(f"✅ Fallback/Retry successful! Used model: {current_model}")
-                return response
-
-            except (ClientError, ServerError) as e:
-                last_error = e
-                last_error_model = current_model
-                last_error_key = _current_gemini_key_fingerprint()
-                last_error_retry_after_s = _parse_retry_after_s(str(e))
-                error_code = _extract_error_code(e)
-                error_msg = str(e)
-
-                _record_model_failure(current_model)
-
-                # Track failed request
-                key_idx_err, _ = _current_gemini_key_fingerprint()
-                is_rate_limited = (
-                    error_code == 429
-                    or "RESOURCE_EXHAUSTED" in error_msg
-                )
-                gemini_tracker.record_request(
-                    key_index=key_idx_err,
-                    model=current_model,
-                    success=False,
-                    is_rate_limited=is_rate_limited,
-                    error_message=error_msg[:200],
-                )
-
-                if _is_invalid_model_error(error_code, error_msg):
-                    logger.warning(
-                        f"⚠️ Model {current_model} not available (code={error_code}). "
-                        "Skipping to next fallback model..."
-                    )
-                    break
-
-                should_fallback = (
-                    error_code == 429
-                    or error_code == 503
-                    or "RESOURCE_EXHAUSTED" in error_msg
-                    or "overloaded" in error_msg.lower()
-                )
-
-                if should_fallback:
-                    _mark_gemini_key_cooldown(last_error_retry_after_s)
-                    key_idx, key_last4 = _current_gemini_key_fingerprint()
-                    logger.warning(
-                        "Gemini request throttled/quota-limited: model=%s code=%s key_idx=%s key_last4=%s retry=%s/%s contents_mode=True",
-                        current_model,
-                        error_code,
-                        key_idx,
-                        key_last4,
-                        retry_attempt,
-                        max_retries_per_model,
-                    )
-                    if len(GEMINI_API_KEYS) > 1 and retry_attempt < len(GEMINI_API_KEYS) - 1:
-                        logger.warning("🔑 Rotating Gemini API key and retrying immediately...")
-                        get_gemini_client(force_rotate=True)
-                        continue
-
-                    retry_after_s = _parse_retry_after_s(error_msg)
-                    if allow_retry_sleep and retry_after_s is not None and retry_attempt < max_retries_per_model - 1:
-                        delay_seconds = min(retry_after_s, 60.0)
-                        logger.warning(
-                            f"⏳ Rate limit hit. Sleeping for {delay_seconds:.2f}s before retrying same model..."
-                        )
-                        await asyncio.sleep(delay_seconds + 1.0)
-                        continue
-
-                    if idx < len(models_to_try) - 1:
-                        logger.warning(
-                            f"⚠️ Model {current_model} unavailable (code={error_code}). "
-                            f"Trying fallback model {models_to_try[idx + 1]}..."
-                        )
-                        break
-
-                    raise
-
-                logger.error(f"❌ Unexpected error with model {current_model}: {e}")
-                raise
-
-            except Exception as e:
-                last_error = e
-                logger.error(f"❌ Unexpected error with model {current_model}: {e}")
-                raise
-
-    logger.error(f"❌ All fallback models exhausted. Last error: {last_error}")
-    if last_error is not None and last_error_model is not None and last_error_key is not None:
-        error_code = _extract_error_code(last_error)
-        error_msg = str(last_error)
-        if _is_resource_exhausted_error(int(error_code), error_msg):
-            key_idx, key_last4 = last_error_key
-            raise GeminiResourceExhaustedError(
-                model=last_error_model,
-                api_key_index=key_idx,
-                api_key_last4=key_last4,
-                retry_after_s=last_error_retry_after_s,
-                message=error_msg,
-            ) from last_error
-        raise last_error
-    raise Exception("All Gemini models failed with unknown error")
+    return await run_gemini_fallback_chain(
+        model=model,
+        fallback_chain=GEMINI_FALLBACK_CHAIN,
+        key_count=len(GEMINI_API_KEYS),
+        allow_retry_sleep=allow_retry_sleep,
+        contents_mode=True,
+        call_model=lambda current_model: generate_gemini_content(
+            contents=contents,
+            model=current_model,
+            config=config,
+            return_full_response=return_full_response,
+        ),
+        is_model_open=_is_model_open,
+        record_model_success=_record_model_success,
+        record_model_failure=_record_model_failure,
+        record_request=gemini_tracker.record_request,
+        current_key_fingerprint=_current_gemini_key_fingerprint,
+        parse_retry_after_s=_parse_retry_after_s,
+        extract_error_code=_extract_error_code,
+        is_invalid_model_error=_is_invalid_model_error,
+        is_resource_exhausted_error=_is_resource_exhausted_error,
+        should_fallback_on_error=should_fallback_on_error,
+        mark_key_cooldown=_mark_gemini_key_cooldown,
+        rotate_key=lambda: get_gemini_client(force_rotate=True),
+        exhausted_error_factory=GeminiResourceExhaustedError,
+        logger=logger,
+    )
 
 
 @trace_llm_call("gemini-fallback-chain")
@@ -1031,169 +1047,38 @@ async def generate_gemini_response_with_fallback(
     Returns:
         Generated response or raises exception if all models fail
     """
-    from google.genai.errors import ClientError, ServerError
-    import asyncio
-    
-    # Build model list: requested model + fallback chain (deduplicated)
-    models_to_try = [model] + [m for m in GEMINI_FALLBACK_CHAIN if m != model]
-    # Pre-check: if ALL models have an open circuit breaker we still attempt them so
-    # the real API error propagates — silence would be worse than a loud failure.
-    all_models_breaker_open = all(_is_model_open(m) for m in models_to_try)
-
-    last_error: Exception | None = None
-    last_error_model: str | None = None
-    last_error_key: tuple[int, str] | None = None
-    last_error_retry_after_s: float | None = None
-    for idx, current_model in enumerate(models_to_try):
-        # Skip models whose circuit breaker is currently open, unless every model in
-        # the chain is tripped — in that case we have no choice but to try anyway.
-        if _is_model_open(current_model) and not all_models_breaker_open:
-            logger.warning(
-                "⚡ Skipping model %s — circuit breaker open. Trying next fallback.",
-                current_model,
-            )
-            continue
-
-        # Retry loop for the SAME model if we get a rate limit with a suggested delay
-        # We'll try up to 3 times per model, OR enough times to cycle through all keys
-        max_retries_per_model = max(3, len(GEMINI_API_KEYS))
-
-        for retry_attempt in range(max_retries_per_model):
-            try:
-                logger.info(f"🔄 Attempting Gemini request with model: {current_model} (model_idx={idx}, retry={retry_attempt})")
-                
-                response = await generate_gemini_response(
-                    history=history,
-                    model=current_model,
-                    max_tokens=max_tokens,
-                    temperature=temperature,
-                    system_prompt=system_prompt,
-                    tools=tools,
-                    return_full_response=return_full_response,
-                    json_mode=json_mode,
-                    json_schema=json_schema,
-                )
-                
-                # Success! Track it.
-                key_idx, _ = _current_gemini_key_fingerprint()
-                gemini_tracker.record_request(key_index=key_idx, model=current_model, success=True)
-                _record_model_success(current_model)
-
-                if idx > 0 or retry_attempt > 0:
-                    logger.warning(f"✅ Fallback/Retry successful! Used model: {current_model}")
-                return response
-                
-            except (ClientError, ServerError) as e:
-                last_error = e # Capture error immediately to ensure it's preserved if loop exits
-                last_error_model = current_model
-                last_error_key = _current_gemini_key_fingerprint()
-                last_error_retry_after_s = _parse_retry_after_s(str(e))
-                error_code = _extract_error_code(e)
-                error_msg = str(e)
-
-                _record_model_failure(current_model)
-
-                # Track failed request
-                key_idx_err, _ = _current_gemini_key_fingerprint()
-                is_rate_limited = (
-                    error_code == 429
-                    or "RESOURCE_EXHAUSTED" in error_msg
-                )
-                gemini_tracker.record_request(
-                    key_index=key_idx_err,
-                    model=current_model,
-                    success=False,
-                    is_rate_limited=is_rate_limited,
-                    error_message=error_msg[:200],
-                )
-                
-                if _is_invalid_model_error(error_code, error_msg):
-                    logger.warning(
-                        f"⚠️ Model {current_model} not available (code={error_code}). "
-                        "Skipping to next fallback model..."
-                    )
-                    break
-
-                # Check if this is a quota/rate limit error (429) or overload (503)
-                should_fallback = (
-                    error_code == 429 or  # RESOURCE_EXHAUSTED
-                    error_code == 503 or  # UNAVAILABLE
-                    "RESOURCE_EXHAUSTED" in error_msg or
-                    "overloaded" in error_msg.lower()
-                )
-                
-                if should_fallback:
-                    _mark_gemini_key_cooldown(last_error_retry_after_s)
-                    key_idx, key_last4 = _current_gemini_key_fingerprint()
-                    logger.warning(
-                        "Gemini request throttled/quota-limited: model=%s code=%s key_idx=%s key_last4=%s retry=%s/%s",
-                        current_model,
-                        error_code,
-                        key_idx,
-                        key_last4,
-                        retry_attempt,
-                        max_retries_per_model,
-                    )
-                    # KEY ROTATION STRATEGY
-                    # If we have multiple keys, try rotating first before waiting or changing models
-                    if len(GEMINI_API_KEYS) > 1:
-                        # We can try rotating keys up to N times (where N is number of keys)
-                        # We use a simple heuristic: if we haven't tried all keys for this model attempt yet
-                        if retry_attempt < len(GEMINI_API_KEYS) - 1:
-                            logger.warning("🔑 Rotating Gemini API key and retrying immediately...")
-                            get_gemini_client(force_rotate=True)
-                            continue
-
-                    # Check for retry delay in error message
-                    # Pattern: "Please retry in 45.63936562s." or similar
-                    retry_after_s = _parse_retry_after_s(error_msg)
-                    if allow_retry_sleep and retry_after_s is not None:
-                        delay_seconds = min(retry_after_s, 60.0)
-
-                        if retry_attempt < max_retries_per_model - 1:
-                            logger.warning(f"⏳ Rate limit hit. Sleeping for {delay_seconds:.2f}s before retrying same model...")
-                            await asyncio.sleep(delay_seconds + 1.0) # Add 1s buffer
-                            continue
-                    
-                    # If no delay found or retries exhausted for this model, try next model
-                    if idx < len(models_to_try) - 1:
-                        logger.warning(
-                            f"⚠️ Model {current_model} unavailable (code={error_code}). "
-                            f"Trying fallback model {models_to_try[idx + 1]}..."
-                        )
-                        break # Break inner loop to go to next model
-                    else:
-                        # No more fallbacks
-                        logger.error(f"❌ Model {current_model} failed with non-retriable error: {error_msg}")
-                        raise
-                else:
-                    # Non-retriable error
-                    logger.error(f"❌ Unexpected error with model {current_model}: {e}")
-                    raise
-            except Exception as e:
-                # Unexpected error - don't fallback
-                logger.error(f"❌ Unexpected error with model {current_model}: {e}")
-                raise
-    
-    # All models failed
-    logger.error(f"❌ All fallback models exhausted. Last error: {last_error}")
-
-    if last_error is not None and last_error_model is not None and last_error_key is not None:
-        error_code = _extract_error_code(last_error)
-        error_msg = str(last_error)
-        if _is_resource_exhausted_error(int(error_code), error_msg):
-            key_idx, key_last4 = last_error_key
-            raise GeminiResourceExhaustedError(
-                model=last_error_model,
-                api_key_index=key_idx,
-                api_key_last4=key_last4,
-                retry_after_s=last_error_retry_after_s,
-                message=error_msg,
-            ) from last_error
-
-        raise last_error
-
-    raise Exception("All Gemini models failed with unknown error")
+    return await run_gemini_fallback_chain(
+        model=model,
+        fallback_chain=GEMINI_FALLBACK_CHAIN,
+        key_count=len(GEMINI_API_KEYS),
+        allow_retry_sleep=allow_retry_sleep,
+        contents_mode=False,
+        call_model=lambda current_model: generate_gemini_response(
+            history=history,
+            model=current_model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system_prompt=system_prompt,
+            tools=tools,
+            return_full_response=return_full_response,
+            json_mode=json_mode,
+            json_schema=json_schema,
+        ),
+        is_model_open=_is_model_open,
+        record_model_success=_record_model_success,
+        record_model_failure=_record_model_failure,
+        record_request=gemini_tracker.record_request,
+        current_key_fingerprint=_current_gemini_key_fingerprint,
+        parse_retry_after_s=_parse_retry_after_s,
+        extract_error_code=_extract_error_code,
+        is_invalid_model_error=_is_invalid_model_error,
+        is_resource_exhausted_error=_is_resource_exhausted_error,
+        should_fallback_on_error=should_fallback_on_error,
+        mark_key_cooldown=_mark_gemini_key_cooldown,
+        rotate_key=lambda: get_gemini_client(force_rotate=True),
+        exhausted_error_factory=GeminiResourceExhaustedError,
+        logger=logger,
+    )
 
 
 
@@ -1421,18 +1306,34 @@ async def generate_response(
     Args:
         history: The conversation history (list of {'role': str, 'content': str}).
                  Must end with a 'user' message.
-        model: The LLM model ('gemma_local' or 'gemini_google').
+        model: The LLM model ('gemma_local', 'gemini_google', 'zai_openrouter', or 'zai_direct').
         max_tokens: Maximum number of tokens to generate.
         temperature: Controls randomness (0.0-1.0+).
         system_prompt: An optional system prompt.
-        preferred_gemini_model: Specific Gemini model to use (e.g., 'gemini-2.5-pro').
-                               Only used when model='gemini_google'.
-        json_mode: If True, forces the model to output valid JSON (Gemini only).
+        preferred_gemini_model: Preferred model identifier. For Gemini this is a Gemini model ID,
+                       while Z.AI requests can pass an OpenRouter model ID such as
+                       'z-ai/glm-4.7' or a direct coding model such as 'glm-4.7'.
+        json_mode: If True, asks the provider to return JSON where supported.
 
     Returns:
         The generated text response string or an error message.
     """
-    logger.info(f"Generating response using model: {model}, preferred Gemini: {preferred_gemini_model}")
+    resolved_request = resolve_dispatch_request(
+        model=model,
+        preferred_model=preferred_gemini_model,
+        active_model=get_active_chat_model(),
+        gemini_auto_alias=GEMINI_AUTO_MODEL_ALIAS,
+        is_zai_direct=is_zai_direct_model_name,
+        is_zai_openrouter=is_zai_model_name,
+    )
+    model = resolved_request.model
+    effective_preferred_model = resolved_request.effective_preferred_model
+
+    logger.info(
+        "Generating response using model: %s, preferred model: %s",
+        model,
+        effective_preferred_model,
+    )
 
     if not history or history[-1].get('role') != 'user':
         logger.error("Invalid history: Must not be empty and end with a 'user' message.")
@@ -1445,9 +1346,41 @@ async def generate_response(
             history=history, model=gemma_model, max_tokens=max_tokens, temperature=temperature, system_prompt=system_prompt
         )
 
+    is_zai_direct_requested, is_zai_openrouter_requested = classify_dispatch_target(
+        model=model,
+        preferred_model=effective_preferred_model,
+        is_zai_direct=is_zai_direct_model_name,
+        is_zai_openrouter=is_zai_model_name,
+    )
+    requested_model = (effective_preferred_model or "").strip()
+
+    if is_zai_direct_requested and not is_zai_openrouter_requested:
+        zai_direct_model = _resolve_zai_direct_model_name(requested_model)
+        logger.info("Direct request: Using Z.AI Coding endpoint model (Model: %s)", zai_direct_model)
+        return await generate_zai_direct_response(
+            history=history,
+            model=zai_direct_model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system_prompt=system_prompt,
+            json_mode=json_mode,
+        )
+
+    if is_zai_openrouter_requested:
+        zai_model = _resolve_zai_model_name(requested_model)
+        logger.info("Direct request: Using OpenRouter Z.AI model (Model: %s)", zai_model)
+        return await generate_openrouter_response(
+            history=history,
+            model=zai_model,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            system_prompt=system_prompt,
+            json_mode=json_mode,
+        )
+
     elif model == "gemini_google":
         # Use preferred model or default
-        gemini_model = preferred_gemini_model or DEFAULT_GEMINI_MODEL
+        gemini_model = effective_preferred_model or DEFAULT_GEMINI_MODEL
         logger.info(f"Direct request: Using gemini with fallback chain (Primary: {gemini_model})")
         try:
             return await generate_gemini_response_with_fallback(
@@ -1460,12 +1393,17 @@ async def generate_response(
     
     else:
         # This case should ideally be prevented by Pydantic/FastAPI validation
-        error_msg = f"Invalid LLM model: {model}. Choose 'gemma_local' or 'gemini_google'."
+        error_msg = (
+            f"Invalid LLM model: {model}. "
+            "Choose 'gemma_local', 'gemini_google', 'zai_openrouter', or 'zai_direct'."
+        )
         logger.error(error_msg)
         return error_msg
 
 # --- Constants for default models (can be imported elsewhere) ---
 DEFAULT_PROVIDERS = {
     "gemini": DEFAULT_GEMINI_MODEL,
-    "gemma_local": DEFAULT_GEMMA_LOCAL_MODEL
+    "gemma_local": DEFAULT_GEMMA_LOCAL_MODEL,
+    "zai_direct": ZAI_DIRECT_MODEL,
+    "zai_openrouter": OPENROUTER_ZAI_MODEL,
 }

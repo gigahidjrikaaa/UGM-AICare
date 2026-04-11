@@ -239,41 +239,54 @@ class ContextLogger:
         for key, value in self.context.items():
             setattr(record, key, value)
     
-    def _log(self, level: int, msg: str, **extra):
-        """Internal log method."""
-        record = self.logger.makeRecord(
-            self.logger.name,
+    def _log(self, level: int, msg: str, *args, **kwargs):
+        """Internal log method compatible with stdlib logging signatures.
+
+        Supports:
+        - printf-style interpolation via ``*args``
+        - standard logging kwargs (``exc_info``, ``stack_info``, ``stacklevel``)
+        - structured fields via remaining kwargs or ``extra={...}``
+        """
+        logging_kwargs = {}
+        for key in ("exc_info", "stack_info", "stacklevel"):
+            if key in kwargs:
+                logging_kwargs[key] = kwargs.pop(key)
+
+        provided_extra = kwargs.pop("extra", None)
+        merged_extra = dict(self.context)
+        if isinstance(provided_extra, dict):
+            merged_extra.update(provided_extra)
+
+        # Remaining kwargs are treated as structured log fields.
+        merged_extra.update(kwargs)
+
+        self.logger.log(
             level,
-            "(unknown file)",
-            0,
             msg,
-            (),
-            None
+            *args,
+            extra=merged_extra,
+            **logging_kwargs,
         )
-        self._add_context(record)
-        for key, value in extra.items():
-            setattr(record, key, value)
-        self.logger.handle(record)
-    
-    def debug(self, msg: str, **extra):
+
+    def debug(self, msg: str, *args, **kwargs):
         """Log debug message."""
-        self._log(logging.DEBUG, msg, **extra)
-    
-    def info(self, msg: str, **extra):
+        self._log(logging.DEBUG, msg, *args, **kwargs)
+
+    def info(self, msg: str, *args, **kwargs):
         """Log info message."""
-        self._log(logging.INFO, msg, **extra)
-    
-    def warning(self, msg: str, **extra):
+        self._log(logging.INFO, msg, *args, **kwargs)
+
+    def warning(self, msg: str, *args, **kwargs):
         """Log warning message."""
-        self._log(logging.WARNING, msg, **extra)
-    
-    def error(self, msg: str, **extra):
+        self._log(logging.WARNING, msg, *args, **kwargs)
+
+    def error(self, msg: str, *args, **kwargs):
         """Log error message."""
-        self._log(logging.ERROR, msg, **extra)
-    
-    def critical(self, msg: str, **extra):
+        self._log(logging.ERROR, msg, *args, **kwargs)
+
+    def critical(self, msg: str, *args, **kwargs):
         """Log critical message."""
-        self._log(logging.CRITICAL, msg, **extra)
+        self._log(logging.CRITICAL, msg, *args, **kwargs)
     
     def with_context(self, **additional_context) -> "ContextLogger":
         """

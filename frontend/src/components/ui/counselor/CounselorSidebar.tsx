@@ -14,6 +14,7 @@ import {
   FiHeart,
   FiAlertTriangle,
   FiMessageSquare,
+  FiFileText,
   FiBarChart2,
   FiBookOpen,
   FiActivity,
@@ -38,7 +39,8 @@ const navGroups = [
   {
     label: 'Support Tools',
     items: [
-      { name: 'Session Notes', icon: <FiMessageSquare size={18}/>, href: '/counselor/notes' },
+      { name: 'Conversations', icon: <FiMessageSquare size={18}/>, href: '/counselor/conversations' },
+      { name: 'Session Notes', icon: <FiFileText size={18}/>, href: '/counselor/notes' },
       { name: 'Treatment Plans', icon: <FiBookOpen size={18}/>, href: '/counselor/treatment-plans' },
       { name: 'Progress Tracking', icon: <FiBarChart2 size={18}/>, href: '/counselor/progress' },
       { name: 'Activities', icon: <FiActivity size={18}/>, href: '/counselor/activities' },

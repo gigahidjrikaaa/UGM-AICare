@@ -24,6 +24,7 @@ import type {
   ApiKeyStatusResponse,
   KeySnapshot,
   AddKeyResponse,
+  ActiveModelStatusResponse,
 } from "@/types/admin/apiKeys";
 
 // ---------------------------------------------------------------------------
@@ -43,6 +44,17 @@ function timeAgo(isoString: string | null): string {
 function timeAgoFromEpoch(epochSeconds: number | null): string {
   if (!epochSeconds) return "Never";
   return timeAgo(new Date(epochSeconds * 1000).toISOString());
+}
+
+function formatChatModelLabel(model: string): string {
+  const lower = model.toLowerCase();
+  if (lower === "gemini:auto") return "Gemini (Auto Routing)";
+  if (lower === "gemini-3.1-flash-lite-preview") return "Gemini 3.1 Flash-Lite (Preview)";
+  if (lower === "glm-4.7") return "Z.AI GLM-4.7 (Direct Coding Plan)";
+  if (lower === "glm-4.7-flash") return "Z.AI GLM-4.7 Flash (Direct Coding Plan)";
+  if (lower === "z-ai/glm-4.7") return "Z.AI GLM-4.7 (OpenRouter)";
+  if (lower === "z-ai/glm-4.7-flash") return "Z.AI GLM-4.7 Flash (OpenRouter)";
+  return model;
 }
 
 /** Format uptime seconds to human-readable string. */
@@ -770,7 +782,10 @@ export default function AdminApiKeysPage() {
   const [data, setData] = useState<ApiKeyStatusResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [activeModelDraft, setActiveModelDraft] = useState<string>("");
+  const [updatingActiveModel, setUpdatingActiveModel] = useState(false);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const modelSelectionDirtyRef = useRef(false);
 
   const fetchStatus = useCallback(async (silent = false) => {
     try {
@@ -779,6 +794,9 @@ export default function AdminApiKeysPage() {
         "/api/v1/admin/system/api-keys/status"
       );
       setData(res);
+      if (!modelSelectionDirtyRef.current) {
+        setActiveModelDraft(res.active_chat_model);
+      }
       setError(null);
     } catch (err) {
       const msg =
@@ -789,6 +807,44 @@ export default function AdminApiKeysPage() {
       setLoading(false);
     }
   }, []);
+
+  const updateActiveModel = useCallback(async () => {
+    if (!activeModelDraft.trim()) {
+      toast.error("Please choose a valid model.");
+      return;
+    }
+
+    try {
+      setUpdatingActiveModel(true);
+      const response = await apiCall<ActiveModelStatusResponse>(
+        "/api/v1/admin/system/api-keys/active-model",
+        {
+          method: "PUT",
+          body: JSON.stringify({ model: activeModelDraft.trim() }),
+        }
+      );
+
+      setData((prev) =>
+        prev
+          ? {
+              ...prev,
+              active_chat_model: response.active_chat_model,
+              active_chat_provider: response.active_chat_provider,
+              supported_chat_models: response.supported_chat_models,
+            }
+          : prev
+      );
+      modelSelectionDirtyRef.current = false;
+      setActiveModelDraft(response.active_chat_model);
+      toast.success(`Active AI set to ${formatChatModelLabel(response.active_chat_model)}.`);
+    } catch (err) {
+      const msg =
+        err instanceof Error ? err.message : "Failed to update active AI model";
+      toast.error(msg);
+    } finally {
+      setUpdatingActiveModel(false);
+    }
+  }, [activeModelDraft]);
 
   // Initial fetch + 15-second auto-refresh
   useEffect(() => {
@@ -808,7 +864,7 @@ export default function AdminApiKeysPage() {
             <FiKey className="h-7 w-7 text-[#FFCA40]" /> API Key Monitor
           </h1>
           <p className="text-sm text-white/60">
-            Real-time Gemini API key usage, health, and quota tracking.
+            Real-time API key usage, health, and quota tracking.
             Auto-refreshes every 15 seconds.
           </p>
         </div>
@@ -844,6 +900,57 @@ export default function AdminApiKeysPage() {
         <>
           {/* Alerts */}
           <AlertBanner data={data} />
+
+          <div className="rounded-xl border border-white/10 bg-white/5 p-5 backdrop-blur">
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-white/80">
+              <FiZap size={16} className="text-[#FFCA40]" /> Active AI Routing
+            </div>
+            <p className="mb-4 text-xs text-white/50">
+              Sets the default AI used by chat when a request does not provide a preferred model.
+              This is runtime-only and resets after backend restart.
+            </p>
+
+            <div className="flex flex-col gap-3 md:flex-row md:items-center">
+              <select
+                value={activeModelDraft}
+                onChange={(event) => {
+                  modelSelectionDirtyRef.current = true;
+                  setActiveModelDraft(event.target.value);
+                }}
+                className="w-full rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white outline-none transition focus:border-[#FFCA40]/40 focus:ring-1 focus:ring-[#FFCA40]/20 md:max-w-md"
+              >
+                {data.supported_chat_models.map((modelOption) => (
+                  <option key={modelOption} value={modelOption} className="bg-[#0d1d35]">
+                    {formatChatModelLabel(modelOption)}
+                  </option>
+                ))}
+              </select>
+
+              <button
+                type="button"
+                onClick={updateActiveModel}
+                disabled={
+                  updatingActiveModel ||
+                  !activeModelDraft ||
+                  activeModelDraft === data.active_chat_model
+                }
+                className="inline-flex items-center justify-center gap-2 rounded-lg bg-[#FFCA40] px-4 py-2 text-sm font-semibold text-[#000B1F] transition hover:bg-[#FFCA40]/90 disabled:opacity-40"
+              >
+                {updatingActiveModel ? (
+                  <FiRefreshCw size={14} className="animate-spin" />
+                ) : (
+                  <FiCheck size={14} />
+                )}
+                Apply
+              </button>
+            </div>
+
+            <p className="mt-3 text-xs text-white/50">
+              Active provider: <span className="font-medium text-white/80">{data.active_chat_provider}</span>
+              {" · "}
+              Active model: <span className="font-medium text-white/80">{formatChatModelLabel(data.active_chat_model)}</span>
+            </p>
+          </div>
 
           {/* Summary cards */}
           <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">

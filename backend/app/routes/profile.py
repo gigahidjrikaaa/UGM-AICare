@@ -127,7 +127,7 @@ async def _ensure_check_in_code(user: User, db: AsyncSession) -> None:
 
 def _build_avatar_url(full_name: str | None, check_in_code: str) -> str:
     seed = full_name or check_in_code
-    return f"https://api.dicebear.com/7.x/initials/svg?seed={quote(seed)}"
+    return f"https://api.dicebear.com/7.x/initials/png?seed={quote(seed)}"
 
 
 async def _build_timeline(user_id: int, db: AsyncSession) -> List[TimelineEntry]:

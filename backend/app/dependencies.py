@@ -114,7 +114,15 @@ def _build_auth_user_query(user_id: int, eager_normalized_relations: bool):
         select(User)
         .options(
             lazyload("*"),
-            load_only(User.id, User.is_active, User.role, User.google_sub),
+            load_only(
+                User.id,
+                User.is_active,
+                User.role,
+                User.google_sub,
+                User.preferred_name,
+                User.first_name,
+                User.name,
+            ),
         )
         .where(User.id == user_id)
     )

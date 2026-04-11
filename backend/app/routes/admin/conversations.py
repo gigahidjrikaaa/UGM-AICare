@@ -42,6 +42,34 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["Admin - Conversations"])
 
 
+async def _resolve_user_ids_for_hash(
+    db: AsyncSession,
+    user_id_hash: Optional[str],
+) -> Optional[list[int]]:
+    """Resolve hashed user identifier into concrete user IDs.
+
+    The hash is privacy-preserving and non-reversible, so we match by hashing the
+    set of distinct conversation user IDs and returning those that match.
+    """
+    if not user_id_hash:
+        return None
+
+    normalized_hash = user_id_hash.strip()
+    if not normalized_hash:
+        return None
+
+    user_ids = (
+        await db.execute(select(func.distinct(Conversation.user_id)).where(Conversation.user_id.isnot(None)))
+    ).scalars().all()
+
+    matched_ids = [
+        int(uid)
+        for uid in user_ids
+        if uid is not None and hash_user_id(int(uid)) == normalized_hash
+    ]
+    return matched_ids
+
+
 async def _fetch_latest_journal_entry(
     db: AsyncSession,
     user_id: Optional[int],
@@ -684,6 +712,7 @@ async def list_conversation_sessions(
     page: int = Query(1, ge=1),
     limit: int = Query(20, ge=1, le=100),
     session_search: Optional[str] = Query(None),
+    user_id_hash: Optional[str] = Query(None, description="Filter by privacy-preserving user hash"),
     date_from: Optional[date] = Query(None),
     date_to: Optional[date] = Query(None),
     db: AsyncSession = Depends(get_async_db),
@@ -700,6 +729,13 @@ async def list_conversation_sessions(
 
     if session_search:
         base = base.filter(Conversation.session_id.ilike(f"%{session_search}%"))
+
+    matched_user_ids = await _resolve_user_ids_for_hash(db, user_id_hash)
+    if matched_user_ids is not None:
+        if not matched_user_ids:
+            return SessionListResponse(sessions=[], total_count=0)
+        base = base.filter(Conversation.user_id.in_(matched_user_ids))
+
     if date_from:
         base = base.filter(func.date(Conversation.timestamp) >= date_from)
     if date_to:
@@ -760,6 +796,7 @@ async def list_conversation_sessions(
 
 @router.get("/conversation-sessions/export.csv")
 async def export_sessions_csv(
+    user_id_hash: Optional[str] = Query(None, description="Optional user hash filter"),
     db: AsyncSession = Depends(get_async_db),
     admin_user: User = Depends(get_admin_user),
 ) -> Response:
@@ -774,6 +811,17 @@ async def export_sessions_csv(
         func.min(Conversation.timestamp).label("first_time"),
         func.max(Conversation.timestamp).label("last_time"),
     ).group_by(Conversation.session_id, Conversation.user_id)
+
+    matched_user_ids = await _resolve_user_ids_for_hash(db, user_id_hash)
+    if matched_user_ids is not None:
+        if not matched_user_ids:
+            headers = {"Content-Disposition": "attachment; filename=sessions.csv"}
+            return Response(
+                content="session_id,user_hash,message_count,first_time,last_time\n",
+                media_type="text/csv",
+                headers=headers,
+            )
+        stmt = stmt.filter(Conversation.user_id.in_(matched_user_ids))
 
     rows = await db.execute(stmt)
 
