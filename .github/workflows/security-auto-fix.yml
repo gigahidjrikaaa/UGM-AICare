@@ -162,7 +162,7 @@ jobs:
 
       - name: Create Pull Request
         if: steps.check-changes.outputs.has_changes == 'true' && github.event.repository.fork == false
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: |
@@ -254,7 +254,7 @@ jobs:
 
       - name: Create Pull Request for NPM fixes
         if: steps.npm-fix.outputs.has_changes == 'true' && github.event.repository.fork == false
-        uses: peter-evans/create-pull-request@v6
+        uses: peter-evans/create-pull-request@v7
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           commit-message: |
