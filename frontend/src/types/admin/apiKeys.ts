@@ -37,6 +37,19 @@ export interface ApiKeyStatusResponse {
   fallback_chain: string[];
   circuit_breakers: CircuitBreakerPayload;
   model_history: ModelHistoryPayload;
+  active_chat_model: string;
+  active_chat_provider: string;
+  supported_chat_models: string[];
+}
+
+export interface ActiveModelStatusResponse {
+  active_chat_model: string;
+  active_chat_provider: string;
+  supported_chat_models: string[];
+}
+
+export interface UpdateActiveModelPayload {
+  model: string;
 }
 
 export interface CircuitBreakerModelStatus {

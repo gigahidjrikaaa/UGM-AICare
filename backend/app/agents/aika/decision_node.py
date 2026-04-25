@@ -282,12 +282,16 @@ def _compute_routing(
         "intent": intent,
         "intent_confidence": decision.get("intent_confidence", 0.5),
         "needs_agents": needs_agents,
-        "next_step": routed_to,
         "agent_reasoning": agent_reasoning,
         "immediate_risk_level": immediate_risk,
         "crisis_keywords_detected": decision.get("crisis_keywords", []),
         "risk_reasoning": decision.get("risk_reasoning", ""),
-        "needs_cma_escalation": False,  # Default; overridden below for high/critical.
+        "needs_cma_escalation": False,
+        "sta_context": {
+            "intent": intent,
+            "next_step": routed_to,
+            "severity": immediate_risk,
+        },
     }
 
     # --- Step 2: safety-first risk overrides (always takes precedence) ---
@@ -295,30 +299,50 @@ def _compute_routing(
         updates.update({
             "needs_cma_escalation": True,
             "needs_agents": True,
-            "next_step": "cma",
-            # Internal marker — coordinator applies this conditionally.
+            "sta_context": {
+                **updates.get("sta_context", {}),
+                "next_step": "cma",
+            },
             "_holding_response": _CRISIS_HOLDING_RESPONSE,
         })
     elif immediate_risk == "moderate":
-        updates.update({"needs_agents": True, "next_step": "tca"})
+        updates["sta_context"] = {
+            **updates.get("sta_context", {}),
+            "next_step": "tca",
+        }
+        updates["needs_agents"] = True
     elif immediate_risk == "low" and intent in ("emotional_support", "crisis"):
         if _requests_structured_support(message):
-            updates.update({"needs_agents": True, "next_step": "tca"})
+            updates["sta_context"] = {
+                **updates.get("sta_context", {}),
+                "next_step": "tca",
+            }
+            updates["needs_agents"] = True
         else:
-            updates.update({"needs_agents": False, "next_step": "none"})
+            updates["sta_context"] = {
+                **updates.get("sta_context", {}),
+                "next_step": "none",
+            }
+            updates["needs_agents"] = False
     elif intent == "analytics_query" and normalized_role in ("admin", "counselor"):
-        updates.update({"needs_agents": True, "next_step": "ia"})
+        updates["sta_context"] = {
+            **updates.get("sta_context", {}),
+            "next_step": "ia",
+        }
+        updates["needs_agents"] = True
     else:
         # Resolve the ambiguous case: needs_agents=True with no valid next_step.
-        if updates["needs_agents"] and not updates["next_step"]:
+        sta_next_step = updates.get("sta_context", {}).get("next_step", "none")
+        if updates["needs_agents"] and (not sta_next_step or sta_next_step == "none"):
             if immediate_risk in ("high", "critical"):
-                updates["next_step"] = "cma"
+                updates["sta_context"]["next_step"] = "cma"
             elif immediate_risk == "moderate":
-                updates["next_step"] = "tca"
+                updates["sta_context"]["next_step"] = "tca"
             elif normalized_role in ("admin", "counselor") and "analytics" in agent_reasoning.lower():
-                updates["next_step"] = "ia"
+                updates["sta_context"]["next_step"] = "ia"
             else:
-                updates.update({"needs_agents": False, "next_step": "none"})
+                updates["needs_agents"] = False
+                updates["sta_context"]["next_step"] = "none"
                 logger.warning(
                     "needs_agents=True with no valid next_step resolved; safe direct-response."
                 )
@@ -398,7 +422,9 @@ def _compute_high_discordance_routing_override(
     patch.update(
         {
             "needs_agents": True,
-            "next_step": "tca",
+            "sta_context": {
+                "next_step": "tca",
+            },
             "discordance_escalated": True,
         }
     )
@@ -481,23 +507,21 @@ async def _call_decision_llm(
     system_instruction: str,
     preferred_model: str,
 ) -> str:
-    """Call Gemini with the routing decision prompt and return the raw text.
+    """Call the configured LLM for routing decision and return raw text.
 
-    Uses the fallback model chain so transient failures are handled before
-    propagating to the caller.  Token cap: 512 (decision JSON is <400 tokens).
+    Token cap: 512 (decision JSON is <400 tokens).
     """
     # Late import — avoids circular dependency at module load time.
-    from app.core.llm import generate_gemini_response_with_fallback
+    from app.core.llm import generate_response
 
-    return await generate_gemini_response_with_fallback(
+    return await generate_response(
         history=[{"role": "user", "content": decision_prompt}],
-        model=preferred_model,
+        model="gemini_google",
         temperature=0.3,
         max_tokens=512,
         system_prompt=system_instruction,
+        preferred_gemini_model=preferred_model,
         json_mode=True,
-        json_schema=_DECISION_JSON_SCHEMA,
-        allow_retry_sleep=False,
     )
 
 
@@ -505,13 +529,13 @@ async def _repair_decision_json_once(
     raw_response_text: str,
     preferred_model: str,
 ) -> str:
-    """Ask Gemini to repair malformed decision output into strict JSON once.
+    """Ask the configured LLM to repair malformed decision output once.
 
     This is intentionally isolated and only used after the primary decision parse
     fails, to reduce user-facing fallback responses caused by minor formatting
     drift (e.g., prose around JSON, markdown wrappers, trailing commentary).
     """
-    from app.core.llm import generate_gemini_response_with_fallback
+    from app.core.llm import generate_response
 
     repair_prompt = (
         "Convert the following model output into STRICT JSON only. "
@@ -520,14 +544,13 @@ async def _repair_decision_json_once(
         f"RAW_OUTPUT:\n{raw_response_text}"
     )
 
-    return await generate_gemini_response_with_fallback(
+    return await generate_response(
         history=[{"role": "user", "content": repair_prompt}],
-        model=preferred_model,
+        model="gemini_google",
         temperature=0.0,
         max_tokens=512,
+        preferred_gemini_model=preferred_model,
         json_mode=True,
-        json_schema=_DECISION_JSON_SCHEMA,
-        allow_retry_sleep=False,
     )
 
 
@@ -563,7 +586,7 @@ async def _evaluate_autopilot_policy(
         from app.services.compliance_service import record_audit_event
 
         # Determine which autopilot action type applies to this routing.
-        next_step = str(state.get("next_step") or "").lower()
+        next_step = str(state.get("sta_context", {}).get("next_step") or "").lower()
         candidate: Optional[AutopilotActionType] = None
         if normalized_role == "user":
             if next_step == "cma":
@@ -578,8 +601,8 @@ async def _evaluate_autopilot_policy(
             risk_level=str(state.get("immediate_risk_level") or "none"),
             action_type=candidate,
             context={
-                "intent": state.get("intent"),
-                "next_step": state.get("next_step"),
+                "intent": state.get("sta_context", {}).get("intent"),
+                "next_step": state.get("sta_context", {}).get("next_step"),
                 "user_role": normalized_role,
                 "session_id": state.get("session_id"),
             },
@@ -599,8 +622,8 @@ async def _evaluate_autopilot_policy(
                 "user_id": state.get("user_id"),
                 "user_hash": state.get("user_hash"),
                 "session_id": state.get("session_id"),
-                "intent": state.get("intent"),
-                "next_step": state.get("next_step"),
+                "intent": state.get("sta_context", {}).get("intent"),
+                "next_step": state.get("sta_context", {}).get("next_step"),
                 "risk_level": state.get("immediate_risk_level"),
                 "reasoning": state.get("agent_reasoning"),
             },
@@ -686,8 +709,8 @@ async def _apply_screening_discordance_policy(
         discordance_level=discordance_level,
         immediate_risk_level=state.get("immediate_risk_level"),
         needs_agents=bool(state.get("needs_agents")),
-        next_step=state.get("next_step"),
-        intent=state.get("intent"),
+        next_step=state.get("sta_context", {}).get("next_step"),
+        intent=state.get("sta_context", {}).get("intent"),
         message=state.get("message", ""),
         crisis_keywords=state.get("crisis_keywords_detected") or [],
     )
@@ -709,6 +732,9 @@ async def _apply_screening_discordance_policy(
             gap_analysis.discordance_level,
         )
 
+    if patch.get("sta_context"):
+        state.setdefault("sta_context", {}).update(patch.pop("sta_context"))
+    
     cast(dict[str, Any], state).update(patch)
 
 
@@ -733,7 +759,7 @@ async def _generate_direct_response(
     from app.domains.mental_health.schemas.chat import ChatRequest
 
     preferred_model: str = select_gemini_model(
-        intent=state.get("intent"),
+        intent=state.get("sta_context", {}).get("intent"),
         role=normalized_role,
         has_tools=True,
         preferred_model=state.get("preferred_model"),
@@ -814,7 +840,7 @@ async def _generate_direct_response(
         user_id=state.get("user_id", 0),
         user_role=normalized_role,
         max_tool_iterations=_tool_iterations_for_intent(
-            state.get("intent") or "unknown"
+            state.get("sta_context", {}).get("intent") or "unknown"
         ),
         execution_id=execution_id,
     )
@@ -932,9 +958,9 @@ async def aika_decision_node(
                     "mode": "deterministic_smalltalk",
                     "message": current_message,
                     "decision": {
-                        "intent": state.get("intent"),
+                        "intent": state.get("sta_context", {}).get("intent"),
                         "needs_agents": state.get("needs_agents"),
-                        "next_step": state.get("next_step"),
+                        "next_step": state.get("sta_context", {}).get("next_step"),
                         "immediate_risk": state.get("immediate_risk_level"),
                     },
                 },
@@ -973,7 +999,7 @@ async def aika_decision_node(
         try:
             decision = _parse_llm_decision(response_text)
         except (json.JSONDecodeError, ValueError) as parse_err:
-            logger.warning("Failed to parse Gemini decision JSON: %s", parse_err)
+            logger.warning("Failed to parse decision JSON: %s", parse_err)
             logger.debug("Raw response: %.200s", response_text)
             repaired_decision: Optional[dict[str, Any]] = None
             try:
@@ -1197,14 +1223,14 @@ async def aika_decision_node(
                 execution_id,
                 "aika::decision",
                 metrics={
-                    "intent": state.get("intent"),
+                    "intent": state.get("sta_context", {}).get("intent"),
                     "needs_agents": state.get("needs_agents"),
                     "duration_ms": elapsed_ms,
                 },
             )
         logger.info(
             "Aika Decision: intent=%s, needs_agents=%s, duration=%.0fms",
-            state.get("intent"),
+            state.get("sta_context", {}).get("intent"),
             state.get("needs_agents"),
             elapsed_ms,
         )
@@ -1237,7 +1263,12 @@ async def aika_decision_node(
 
         is_rate_limit = any(
             token in error_str
-            for token in ("429", "RESOURCE_EXHAUSTED", "All Gemini models failed")
+            for token in (
+                "429",
+                "RESOURCE_EXHAUSTED",
+                "All Gemini models failed",
+                "OpenRouter rate limit",
+            )
         )
         if is_rate_limit:
             logger.warning(

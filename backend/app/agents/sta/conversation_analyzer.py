@@ -3,7 +3,7 @@
 This module performs deep analysis of entire conversations (not individual messages)
 to identify risk patterns, trends, and user context. Runs ONLY at conversation end.
 
-Now also performs SCREENING EXTRACTION (merged from SCA) to capture mental health
+Now also performs SCREENING EXTRACTION (merged from TCA) to capture mental health
 dimension scores in a single LLM call, avoiding redundant API calls.
 """
 import logging

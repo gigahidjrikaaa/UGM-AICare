@@ -7,10 +7,7 @@ from __future__ import annotations
 
 import json
 import logging
-from typing import Any, Dict, Optional
-
-from google import genai
-from google.genai import types
+from typing import Any, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -23,8 +20,13 @@ class AICampaignGenerator:
 
     def __init__(self):
         """Initialize the campaign generator with Gemini client."""
-        from app.core.llm import get_gemini_client
-        self.client = get_gemini_client()
+        self.client = None
+
+    async def _get_client(self):
+        if self.client is None:
+            from app.core.llm import get_gemini_client
+            self.client = await get_gemini_client()
+        return self.client
 
     async def generate_campaign_config(
         self,
@@ -127,7 +129,7 @@ Analyze the campaign name and description, then generate a complete campaign con
 Generate the campaign configuration now:"""
             
             # Use new google-genai SDK with client - Gemini 2.5 Flash for campaign generation
-            response = self.client.models.generate_content(
+            response = (await self._get_client()).models.generate_content(
                 model='gemini-2.5-flash',
                 contents=prompt,
             )

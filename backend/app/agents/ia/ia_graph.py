@@ -61,15 +61,15 @@ def ingest_query_node(state: IAState) -> IAState:
     
     try:
         # Validate required fields
-        if not state.get("question_id"):
+        if not state.get("ia_context", {}).get("question_id"):
             raise ValueError("question_id is required")
         
-        if not state.get("start_date") or not state.get("end_date"):
+        if not state.get("ia_context", {}).get("start_date") or not state.get("ia_context", {}).get("end_date"):
             raise ValueError("start_date and end_date are required")
         
         # Validate date range (prevent excessive historical queries)
-        start = state.get("start_date")
-        end = state.get("end_date")
+        start = state.get("ia_context", {}).get("start_date")
+        end = state.get("ia_context", {}).get("end_date")
         
         if not start or not end:
             raise ValueError("start_date and end_date must be provided")
@@ -83,12 +83,12 @@ def ingest_query_node(state: IAState) -> IAState:
             raise ValueError(f"Date range too large. Maximum {max_days} days allowed.")
         
         state.setdefault("execution_path", []).append("ia:ingest_query")
-        state["query_validated"] = True
+        state.setdefault("ia_context", {})["query_validated"] = True
         
         if execution_id:
             execution_tracker.complete_node(execution_id, "ia:ingest_query")
         
-        logger.info(f"IA ingested query: question_id={state.get('question_id')}, range={delta.days} days")
+        logger.info(f"IA ingested query: question_id={state.get("ia_context", {}).get("question_id")}, range={delta.days} days")
         
     except Exception as e:
         error_msg = f"Query ingestion failed: {str(e)}"
@@ -125,13 +125,13 @@ def validate_consent_node(state: IAState) -> IAState:
         
         # Check if query is in allow-listed analytics queries
         # (Allow-listed queries are pre-approved to access aggregate data only)
-        question_id = state.get("question_id")
+        question_id = state.get("ia_context", {}).get("question_id")
         
         # The IAQueryRequest will validate against ALLOWED_QUERIES
         # This node adds an additional layer of consent checking
         
         state.setdefault("execution_path", []).append("ia:validate_consent")
-        state["consent_validated"] = True
+        state.setdefault("ia_context", {})["consent_validated"] = True
         
         if execution_id:
             execution_tracker.complete_node(execution_id, "ia:validate_consent")
@@ -169,13 +169,13 @@ def apply_k_anonymity_node(state: IAState) -> IAState:
     try:
         # Set k-anonymity threshold
         k_threshold = 5  # Minimum group size for aggregated results
-        state["k_threshold"] = k_threshold
+        state.setdefault("ia_context", {})["k_threshold"] = k_threshold
         
         # Note: Actual k-anonymity enforcement happens in the query execution layer
         # This node documents the privacy requirement and tracks it
         
         state.setdefault("execution_path", []).append("ia:apply_k_anonymity")
-        state["privacy_enforced"] = True
+        state.setdefault("ia_context", {})["privacy_enforced"] = True
         
         if execution_id:
             execution_tracker.complete_node(execution_id, "ia:apply_k_anonymity")
@@ -217,12 +217,12 @@ async def execute_analytics_node(state: IAState, config: RunnableConfig) -> IASt
         ia_service = InsightsAgentService(db)
         
         # Get and cast question_id
-        question_id_str = state.get("question_id", "")
+        question_id_str = state.get("ia_context", {}).get("question_id", "")
         question_id = cast(QuestionId, question_id_str)
         
         # Build query request with proper datetime objects
-        start_date = state.get("start_date")
-        end_date = state.get("end_date")
+        start_date = state.get("ia_context", {}).get("start_date")
+        end_date = state.get("ia_context", {}).get("end_date")
         
         if not isinstance(start_date, datetime) or not isinstance(end_date, datetime):
             raise ValueError("start_date and end_date must be datetime objects")
@@ -248,7 +248,7 @@ async def execute_analytics_node(state: IAState, config: RunnableConfig) -> IASt
         total_records = len(response.table) if response.table else 0
         
         # Store results in state with privacy metadata
-        state["analytics_result"] = {
+        state.setdefault("ia_context", {})["analytics_result"] = {
             "data": response.table,  # Frontend expects 'data' instead of 'table'
             "chart": response.chart,
             "notes": response.notes,
@@ -257,13 +257,13 @@ async def execute_analytics_node(state: IAState, config: RunnableConfig) -> IASt
             "total_records_anonymized": total_records
         }
         state.setdefault("execution_path", []).append("ia:execute_analytics")
-        state["query_completed"] = True
+        state.setdefault("ia_context", {})["query_completed"] = True
         
         if execution_id:
             execution_tracker.complete_node(execution_id, "ia:execute_analytics")
         
         logger.info(
-            f"IA query completed: question_id={state.get('question_id')}, "
+            f"IA query completed: question_id={state.get("ia_context", {}).get("question_id")}, "
             f"rows={len(response.table) if response.table else 0}"
         )
         
@@ -304,19 +304,19 @@ async def interpret_results_node(state: IAState) -> IAState:
     
     try:
         # Check if analytics were successful
-        if not state.get("query_completed") or not state.get("analytics_result"):
+        if not state.get("ia_context", {}).get("query_completed") or not state.get("ia_context", {}).get("analytics_result"):
             raise ValueError("Analytics results not available for interpretation")
         
         # Extract analytics results
-        analytics = state.get("analytics_result", {})
+        analytics = state.get("ia_context", {}).get("analytics_result", {})
         data = analytics.get("data", [])
         chart = analytics.get("chart", {})
         notes = analytics.get("notes", [])
         
         # Get query metadata
-        question_id = state.get("question_id", "")
-        start_date = state.get("start_date")
-        end_date = state.get("end_date")
+        question_id = state.get("ia_context", {}).get("question_id", "")
+        start_date = state.get("ia_context", {}).get("start_date")
+        end_date = state.get("ia_context", {}).get("end_date")
         
         if not isinstance(start_date, datetime) or not isinstance(end_date, datetime):
             raise ValueError("Invalid date range for interpretation")
@@ -336,13 +336,13 @@ async def interpret_results_node(state: IAState) -> IAState:
         )
         
         # Store interpretation results in state
-        state["interpretation"] = interpretation_result.get("interpretation", "")
-        state["trends"] = interpretation_result.get("trends", [])
-        state["summary"] = interpretation_result.get("summary", "")
-        state["recommendations"] = interpretation_result.get("recommendations", [])
+        state.setdefault("ia_context", {})["interpretation"] = interpretation_result.get("interpretation", "")
+        state.setdefault("ia_context", {})["trends"] = interpretation_result.get("trends", [])
+        state.setdefault("ia_context", {})["summary"] = interpretation_result.get("summary", "")
+        state.setdefault("ia_context", {})["recommendations"] = interpretation_result.get("recommendations", [])
         
         state.setdefault("execution_path", []).append("ia:interpret_results")
-        state["interpretation_completed"] = True
+        state.setdefault("ia_context", {})["interpretation_completed"] = True
         
         if execution_id:
             execution_tracker.complete_node(execution_id, "ia:interpret_results")
@@ -358,10 +358,10 @@ async def interpret_results_node(state: IAState) -> IAState:
         state.setdefault("errors", []).append(error_msg)
         
         # Set fallback values
-        state["interpretation"] = "Interpretasi tidak tersedia saat ini."
-        state["trends"] = []
-        state["summary"] = ""
-        state["recommendations"] = []
+        state.setdefault("ia_context", {})["interpretation"] = "Interpretasi tidak tersedia saat ini."
+        state.setdefault("ia_context", {})["trends"] = []
+        state.setdefault("ia_context", {})["summary"] = ""
+        state.setdefault("ia_context", {})["recommendations"] = []
         
         if execution_id:
             execution_tracker.fail_node(execution_id, "ia:interpret_results", error_msg)
@@ -393,7 +393,7 @@ async def export_pdf_node(state: IAState) -> IAState:
         # Generate PDF
         pdf_url = generate_pdf_report(state)
         
-        state["pdf_url"] = pdf_url
+        state.setdefault("ia_context", {})["pdf_url"] = pdf_url
         state.setdefault("execution_path", []).append("ia:export_pdf")
         
         if execution_id:
@@ -408,7 +408,7 @@ async def export_pdf_node(state: IAState) -> IAState:
         error_msg = f"PDF export failed: {str(e)}"
         logger.error(error_msg, exc_info=True)
         state.setdefault("errors", []).append(error_msg)
-        state["pdf_url"] = None
+        state.setdefault("ia_context", {})["pdf_url"] = None
         
         if execution_id:
             execution_tracker.fail_node(execution_id, "ia:export_pdf", error_msg)

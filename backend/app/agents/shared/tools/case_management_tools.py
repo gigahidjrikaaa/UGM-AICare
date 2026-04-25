@@ -2,7 +2,7 @@
 Case Management Tools - Clinical Case Coordination
 
 This module provides tools for managing clinical cases, counselor coordination,
-and case notes. Used primarily by SDA agent.
+and case notes. Used primarily by CMA agent.
 
 Tools:
 - get_case_details: Get details of a specific case

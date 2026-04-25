@@ -238,7 +238,7 @@ async def send_proactive_checkins() -> None:
                             f"(risk={risk_level}, concerns={primary_concerns[:2]})"
                         )
                     else:
-                        send_email(recipient_email=user_email, subject=subject, html_content=html_body)
+                        await asyncio.to_thread(send_email, recipient_email=user_email, subject=subject, html_content=html_body)
                         logger.info(
                             f"Scheduler: Check-in sent to user {user.id} "
                             f"(risk={risk_level}, concerns={primary_concerns[:2]})"
@@ -481,7 +481,8 @@ async def send_counselor_reminders() -> None:
                             f"<p><a href='{app_url}/admin/cases'>View Cases &rarr;</a></p>"
                             f"<p>Thank you,<br/>UGM AICare System</p>"
                         )
-                        send_email(
+                        await asyncio.to_thread(
+                            send_email,
                             recipient_email=counselor_user.email,
                             subject=subject,
                             html_content=html_body,
@@ -725,7 +726,7 @@ async def trigger_immediate_checkin(user_id: int, reason: str = "manual") -> boo
             )
             
             # Send email
-            send_email(recipient_email=user_email, subject=subject, html_content=html_body)
+            await asyncio.to_thread(send_email, recipient_email=user_email, subject=subject, html_content=html_body)
             
             # Update tracking
             user.last_checkin_sent_at = datetime.now()

@@ -2,253 +2,134 @@
 
 import logging
 from typing import Dict, Any, Optional
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from app.models.user import User
-from app.database import get_async_db
+from sqlalchemy.dialects.postgresql import insert
+from app.models.system import SystemSettings
+from app.core.settings import settings
 
 logger = logging.getLogger(__name__)
 
 class SystemSettingsService:
-    """Service for managing system-wide configuration settings."""
+    """Service for managing system-wide configuration settings with DB persistence."""
     
-    def __init__(self):
-        self._settings_cache: Dict[str, Any] = {}
-        self._cache_valid = False
-    
-    async def get_theme_preferences(self, db: AsyncSession) -> Dict[str, Any]:
-        """Get theme and appearance preferences."""
-        return {
-            "theme_mode": "dark",  # Default to dark theme
-            "accent_color": "#FFCA40",  # UGM gold
-            "density": "comfortable",  # Navigation density
-            "animations_enabled": True,
-            "glass_morphism": True
-        }
-    
-    async def update_theme_preferences(
+    async def get_override(self, db: AsyncSession, key: str) -> Optional[Any]:
+        """Get a single setting override from DB."""
+        stmt = select(SystemSettings).where(SystemSettings.key == key)
+        result = await db.execute(stmt)
+        setting = result.scalar_one_or_none()
+        if setting:
+            return setting.value.get("value")
+        return None
+        
+    async def set_override(
         self, 
         db: AsyncSession, 
-        preferences: Dict[str, Any]
-    ) -> bool:
-        """Update theme and appearance preferences."""
-        try:
-            # In a real implementation, this would save to database
-            # For now, we'll use cache
-            valid_keys = {
-                "theme_mode", "accent_color", "density", 
-                "animations_enabled", "glass_morphism"
+        key: str, 
+        value: Any, 
+        category: str, 
+        admin_id: int
+    ) -> None:
+        """Set a single setting override in DB."""
+        stmt = insert(SystemSettings).values(
+            key=key,
+            value={"value": value},
+            category=category,
+            updated_by=admin_id,
+            updated_at=datetime.now(timezone.utc)
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=['key'],
+            set_={
+                'value': {"value": value},
+                'category': category,
+                'updated_by': admin_id,
+                'updated_at': datetime.now(timezone.utc)
             }
-            
-            for key, value in preferences.items():
-                if key in valid_keys:
-                    self._settings_cache[key] = value
-            
-            logger.info(f"Updated theme preferences: {preferences}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error updating theme preferences: {e}")
-            return False
-    
-    async def get_collaboration_settings(self, db: AsyncSession) -> Dict[str, Any]:
-        """Get team collaboration settings."""
-        return {
-            "dual_approval_required": True,  # Require dual approval for interventions
-            "notes_sharing": "counsellors",  # Who can see reviewer notes
-            "escalation_enabled": True,  # Enable escalation workflows
-            "review_timeout_hours": 24,  # Hours before auto-escalation
-            "emergency_contacts": [],  # Emergency contact list
-        }
-    
-    async def update_collaboration_settings(
+        )
+        await db.execute(stmt)
+        await db.commit()
+        
+    async def get_all_overrides(
         self, 
         db: AsyncSession, 
-        settings: Dict[str, Any]
-    ) -> bool:
-        """Update collaboration settings."""
-        try:
-            valid_keys = {
-                "dual_approval_required", "notes_sharing", "escalation_enabled",
-                "review_timeout_hours", "emergency_contacts"
-            }
+        category: Optional[str] = None
+    ) -> Dict[str, Any]:
+        """Get all setting overrides from DB, optionally filtered by category."""
+        stmt = select(SystemSettings)
+        if category:
+            stmt = stmt.where(SystemSettings.category == category)
             
-            for key, value in settings.items():
-                if key in valid_keys:
-                    self._settings_cache[f"collab_{key}"] = value
+        result = await db.execute(stmt)
+        settings_list = result.scalars().all()
+        
+        overrides = {}
+        for s in settings_list:
+            overrides[s.key] = s.value.get("value")
             
-            logger.info(f"Updated collaboration settings: {settings}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error updating collaboration settings: {e}")
-            return False
-    
-    async def get_notification_settings(self, db: AsyncSession) -> Dict[str, Any]:
-        """Get notification and alert settings."""
-        return {
-            "weekly_digest_enabled": True,  # Enable weekly wellbeing digest
-            "email_alerts_enabled": True,  # Enable email alerts
-            "sms_alerts_enabled": False,  # SMS alerts (requires configuration)
-            "webhook_url": None,  # Webhook for external integrations
-            "alert_thresholds": {
-                "high_risk_users": 5,  # Alert when 5+ users flagged as high risk
-                "system_load": 80,  # Alert at 80% system load
-                "response_time": 5000,  # Alert if response time > 5 seconds
-            },
-            "quiet_hours": {
-                "enabled": True,
-                "start": "22:00",  # 10 PM
-                "end": "08:00",    # 8 AM
-            }
-        }
-    
-    async def update_notification_settings(
+        return overrides
+        
+    async def update_category_settings(
         self, 
         db: AsyncSession, 
-        settings: Dict[str, Any]
+        category: str, 
+        settings_dict: Dict[str, Any], 
+        admin_id: int
     ) -> bool:
-        """Update notification settings."""
+        """Update multiple settings for a category."""
         try:
-            valid_keys = {
-                "weekly_digest_enabled", "email_alerts_enabled", 
-                "sms_alerts_enabled", "webhook_url", "alert_thresholds",
-                "quiet_hours"
-            }
-            
-            for key, value in settings.items():
-                if key in valid_keys:
-                    self._settings_cache[f"notif_{key}"] = value
-            
-            logger.info(f"Updated notification settings: {settings}")
+            for key, value in settings_dict.items():
+                await self.set_override(db, key, value, category, admin_id)
             return True
-            
         except Exception as e:
-            logger.error(f"Error updating notification settings: {e}")
+            logger.error(f"Error updating category settings: {e}")
+            await db.rollback()
             return False
-    
-    async def get_security_settings(self, db: AsyncSession) -> Dict[str, Any]:
-        """Get security and privacy settings."""
-        return {
-            "session_timeout_minutes": 1440,  # 24 hours
-            "password_policy": {
-                "min_length": 8,
-                "require_uppercase": True,
-                "require_lowercase": True,
-                "require_numbers": True,
-                "require_special_chars": False,
-                "password_history": 5,  # Remember last 5 passwords
-            },
-            "two_factor_enabled": False,  # 2FA (future feature)
-            "login_attempt_limit": 5,  # Max failed login attempts
-            "account_lockout_minutes": 30,  # Lockout duration
-            "data_retention_days": 365,  # How long to keep user data
-            "anonymization_enabled": True,  # Auto-anonymize old data
-        }
-    
-    async def update_security_settings(
-        self, 
-        db: AsyncSession, 
-        settings: Dict[str, Any]
-    ) -> bool:
-        """Update security settings."""
-        try:
-            valid_keys = {
-                "session_timeout_minutes", "password_policy", 
-                "two_factor_enabled", "login_attempt_limit",
-                "account_lockout_minutes", "data_retention_days",
-                "anonymization_enabled"
-            }
-            
-            for key, value in settings.items():
-                if key in valid_keys:
-                    self._settings_cache[f"security_{key}"] = value
-            
-            logger.info(f"Updated security settings: {settings}")
-            return True
-            
-        except Exception as e:
-            logger.error(f"Error updating security settings: {e}")
-            return False
-    
-    async def validate_settings(self, category: str, settings: Dict[str, Any]) -> Dict[str, str]:
-        """Validate settings before saving."""
-        errors = {}
-        
-        if category == "theme":
-            if "accent_color" in settings:
-                color = settings["accent_color"]
-                if not color.startswith("#") or len(color) != 7:
-                    errors["accent_color"] = "Must be a valid hex color code"
-        
-        elif category == "collaboration":
-            if "review_timeout_hours" in settings:
-                timeout = settings["review_timeout_hours"]
-                if not isinstance(timeout, int) or timeout < 1 or timeout > 168:  # 1 week max
-                    errors["review_timeout_hours"] = "Must be between 1 and 168 hours"
-        
-        elif category == "notifications":
-            if "webhook_url" in settings and settings["webhook_url"]:
-                url = settings["webhook_url"]
-                if not url.startswith(("http://", "https://")):
-                    errors["webhook_url"] = "Must be a valid HTTP/HTTPS URL"
-        
-        elif category == "security":
-            if "session_timeout_minutes" in settings:
-                timeout = settings["session_timeout_minutes"]
-                if not isinstance(timeout, int) or timeout < 15 or timeout > 10080:  # 1 week max
-                    errors["session_timeout_minutes"] = "Must be between 15 minutes and 1 week"
-        
-        return errors
-    
+
     async def export_settings(self, db: AsyncSession) -> Dict[str, Any]:
-        """Export all settings for backup or migration."""
+        """Export all settings overrides and current env defaults."""
+        overrides = await self.get_all_overrides(db)
+        
+        # We also export the current settings for context
+        env_settings = settings.model_dump(exclude={
+            "database_url", "secret_key", "internal_api_key",
+            "email_encryption_key", "backend_minter_private_key",
+            "google_genai_api_key", "azure_openai_api_key", 
+            "together_api_key", "n8n_api_key", "redis_password",
+            "email_password"
+        })
+        
         return {
-            "theme": await self.get_theme_preferences(db),
-            "collaboration": await self.get_collaboration_settings(db),
-            "notifications": await self.get_notification_settings(db),
-            "security": await self.get_security_settings(db),
-            "exported_at": "2025-09-25T00:00:00Z",
-            "version": "1.0"
+            "overrides": overrides,
+            "env_defaults": env_settings,
+            "exported_at": datetime.now(timezone.utc).isoformat(),
+            "version": "2.0"
         }
-    
+        
     async def import_settings(
         self, 
         db: AsyncSession, 
-        settings_data: Dict[str, Any]
+        data: Dict[str, Any], 
+        admin_id: int
     ) -> Dict[str, Any]:
-        """Import settings from backup."""
+        """Import settings overrides from backup."""
         results = {"success": [], "errors": []}
         
+        overrides = data.get("overrides", {})
+        if not overrides:
+            return {"success": [], "errors": ["No overrides found in import data"]}
+            
         try:
-            if "theme" in settings_data:
-                if await self.update_theme_preferences(db, settings_data["theme"]):
-                    results["success"].append("theme")
-                else:
-                    results["errors"].append("theme")
-            
-            if "collaboration" in settings_data:
-                if await self.update_collaboration_settings(db, settings_data["collaboration"]):
-                    results["success"].append("collaboration")
-                else:
-                    results["errors"].append("collaboration")
-            
-            if "notifications" in settings_data:
-                if await self.update_notification_settings(db, settings_data["notifications"]):
-                    results["success"].append("notifications")
-                else:
-                    results["errors"].append("notifications")
-            
-            if "security" in settings_data:
-                if await self.update_security_settings(db, settings_data["security"]):
-                    results["success"].append("security")
-                else:
-                    results["errors"].append("security")
-                    
+            for key, value in overrides.items():
+                # We don't have category info in the simple export mapping easily accessible,
+                # but we can look it up or default to "imported"
+                await self.set_override(db, key, value, "imported", admin_id)
+                results["success"].append(key)
         except Exception as e:
             logger.error(f"Error importing settings: {e}")
-            results["errors"].append("import_failed")
-        
+            results["errors"].append(str(e))
+            
         return results
 
 # Global instance

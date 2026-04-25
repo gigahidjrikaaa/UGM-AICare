@@ -26,7 +26,7 @@ class NextCheckIn(BaseModel):
 
 
 class InterventionPlanData(BaseModel):
-    """Full intervention plan structure from SCA.
+    """Full intervention plan structure from TCA.
     
     All fields have defaults to handle legacy plans with empty/incomplete data.
     """

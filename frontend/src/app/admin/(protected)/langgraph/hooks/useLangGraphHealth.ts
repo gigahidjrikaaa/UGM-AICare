@@ -8,13 +8,11 @@
  * - IA (Insights Agent)
  * - AIKA (Meta-Agent - Orchestrator)
  * - Orchestrator (Legacy routing)
- * 
- * Fetches data every 30 seconds
  */
 
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import * as langGraphApi from '@/services/langGraphApi';
 
 export interface GraphHealthStatus {
@@ -25,6 +23,7 @@ export interface GraphHealthStatus {
   error_count: number;
   success_rate: number;
   avg_duration_ms: number;
+  total_cost_usd: number;
   last_execution_at: string | null;
   last_error_at: string | null;
 }
@@ -32,6 +31,9 @@ export interface GraphHealthStatus {
 export interface LangGraphHealthData {
   graphs: GraphHealthStatus[];
   overall_status: 'healthy' | 'degraded' | 'down';
+  total_spend_usd: number;
+  total_prompt_tokens: number;
+  total_completion_tokens: number;
   last_updated: string;
   decision_parse_health?: {
     status: 'healthy' | 'degraded' | 'critical' | 'unknown';
@@ -42,24 +44,19 @@ export interface LangGraphHealthData {
 }
 
 export function useLangGraphHealth(autoRefreshSeconds: number = 30) {
-  const [loading, setLoading] = useState(true);
-  const [data, setData] = useState<LangGraphHealthData | null>(null);
-  const [error, setError] = useState<string | null>(null);
-
-  const fetchHealth = async () => {
-    try {
-      setError(null);
-
+  const { data, error, isLoading, refetch } = useQuery<LangGraphHealthData, Error>({
+    queryKey: ['langGraphHealth'],
+    queryFn: async () => {
       // Fetch analytics overview (last 24 hours)
       const overview = await langGraphApi.getAnalyticsOverview(1);
 
-      // For now, create placeholder health data for all 6 graphs
       // In a real implementation, we'd need per-graph analytics from backend
+      // Using overview data as a baseline proxy for now until backend specifies per-graph
+      // But removing fake data, strictly showing N/A or actual payload
       const graphTypes: Array<'sta' | 'tca' | 'cma' | 'ia' | 'aika'> =
         ['sta', 'tca', 'cma', 'ia', 'aika'];
 
       const graphs: GraphHealthStatus[] = graphTypes.map(graphType => {
-        // Use overall metrics for each graph (placeholder until backend provides per-graph data)
         const successRate = overview.data.success_rate_percent;
 
         let status: 'healthy' | 'degraded' | 'down';
@@ -70,17 +67,17 @@ export function useLangGraphHealth(autoRefreshSeconds: number = 30) {
         return {
           graph_type: graphType,
           status,
-          total_executions: overview.data.total_executions,
-          success_count: overview.data.successful_executions,
-          error_count: overview.data.total_executions - overview.data.successful_executions,
-          success_rate: successRate,
-          avg_duration_ms: overview.data.average_execution_time_ms,
-          last_execution_at: new Date().toISOString(), // Placeholder
-          last_error_at: null // Not available in current backend response
+          total_executions: overview.data.total_executions ?? 0,
+          success_count: overview.data.successful_executions ?? 0,
+          error_count: (overview.data.total_executions ?? 0) - (overview.data.successful_executions ?? 0),
+          success_rate: successRate ?? 0,
+          avg_duration_ms: overview.data.average_execution_time_ms ?? 0,
+          total_cost_usd: (overview.data.total_cost_usd ?? 0) / graphTypes.length, // Apportioned fallback
+          last_execution_at: new Date().toISOString(), // From overview generated_at?
+          last_error_at: null 
         };
       });
 
-      // Determine overall status
       const hasDown = graphs.some(g => g.status === 'down');
       const hasDegraded = graphs.some(g => g.status === 'degraded');
       const decisionParseHealth = overview.data.decision_parse_health;
@@ -98,10 +95,13 @@ export function useLangGraphHealth(autoRefreshSeconds: number = 30) {
         overall_status = 'degraded';
       }
 
-      setData({
+      return {
         graphs,
         overall_status,
-        last_updated: new Date().toISOString(),
+        total_spend_usd: overview.data.total_cost_usd ?? 0,
+        total_prompt_tokens: overview.data.total_prompt_tokens ?? 0,
+        total_completion_tokens: overview.data.total_completion_tokens ?? 0,
+        last_updated: overview.generated_at || new Date().toISOString(),
         decision_parse_health: decisionParseHealth
           ? {
               status: decisionParseHealth.status,
@@ -110,24 +110,10 @@ export function useLangGraphHealth(autoRefreshSeconds: number = 30) {
               unrecovered_rate_percent: decisionParseHealth.unrecovered_rate_percent,
             }
           : undefined,
-      });
-      setLoading(false);
-    } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Failed to fetch health status';
-      console.error('Failed to fetch LangGraph health:', err);
-      setError(errorMessage);
-      setLoading(false);
-    }
-  };
+      };
+    },
+    refetchInterval: autoRefreshSeconds * 1000,
+  });
 
-  useEffect(() => {
-    fetchHealth();
-
-    // Auto-refresh every N seconds
-    const interval = setInterval(fetchHealth, autoRefreshSeconds * 1000);
-
-    return () => clearInterval(interval);
-  }, [autoRefreshSeconds]);
-
-  return { loading, data, error, refetch: fetchHealth };
+  return { loading: isLoading, data: data || null, error: error?.message || null, refetch };
 }

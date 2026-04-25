@@ -175,7 +175,7 @@ async def create_intervention_plan(
     Create a new intervention plan record.
     
     This endpoint is typically called by the agent integration service
-    when SCA generates a new intervention plan.
+    when TCA generates a new intervention plan.
     """
     # Ensure the plan is being created for the current user
     if plan_create.user_id != current_user.id:

@@ -3,7 +3,7 @@
 This assessment is generated ONCE at the end of each conversation,
 analyzing the full conversation history for risk patterns and trends.
 
-Now also includes SCREENING EXTRACTION (merged from SCA) to capture
+Now also includes SCREENING EXTRACTION (merged from TCA) to capture
 mental health dimension scores in a single LLM call.
 """
 from typing import Dict, List, Any, Literal, Optional
@@ -28,7 +28,7 @@ class ScreeningDimensionScore(BaseModel):
 
 
 class ScreeningExtraction(BaseModel):
-    """Screening data extracted from conversation (merged from SCA).
+    """Screening data extracted from conversation (merged from TCA).
     
     Maps to validated instruments:
     - depression: PHQ-9 domains (mood, anhedonia, hopelessness)
@@ -64,7 +64,7 @@ class ConversationAssessment(BaseModel):
     Generated at conversation end to provide comprehensive risk assessment
     based on the entire conversation context.
     
-    Now also includes screening extraction (merged from SCA) to capture
+    Now also includes screening extraction (merged from TCA) to capture
     mental health dimension scores in the same analysis call.
     """
     
@@ -145,7 +145,7 @@ class ConversationAssessment(BaseModel):
     )
     
     # =========================================================================
-    # SCREENING EXTRACTION (Merged from SCA)
+    # SCREENING EXTRACTION (Merged from TCA)
     # =========================================================================
     screening: Optional[ScreeningExtraction] = Field(
         default=None,

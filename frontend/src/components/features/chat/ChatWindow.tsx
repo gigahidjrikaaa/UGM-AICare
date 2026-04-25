@@ -47,14 +47,12 @@ export function ChatWindow({
     maskImage: 'linear-gradient(to bottom, transparent 0px, black 24px)',
   };
 
-  // Auto-scroll to bottom when messages change or loading state changes
   useEffect(() => {
     const scrollToBottom = () => {
       if (bottomRef.current) {
         bottomRef.current.scrollIntoView({ behavior: 'smooth', block: 'end' });
       }
     };
-    // Small delay to ensure DOM is updated
     const timeoutId = setTimeout(scrollToBottom, 50);
     return () => clearTimeout(timeoutId);
   }, [messages, isLoading]);
@@ -99,19 +97,13 @@ export function ChatWindow({
           );
         })}
 
-        {/* Loading Indicator inside the centered column */}
-        {isLoading && (
-          <>
-            <AgentThinkingBubble
-              steps={thinkingSteps ?? []}
-              activeAgents={activeAgents}
-              isActive={true}
-              elapsedSeconds={elapsedSeconds ?? 0}
-            />
-            {/* Fallback AikaLoadingBubble:
-              <AikaLoadingBubble activeAgents={activeAgents} currentThinking={currentThinking} />
-            */}
-          </>
+        {isLoading && !messages.some((m) => m.role === 'assistant' && m.isLoading && m.content.length > 0) && (
+          <AgentThinkingBubble
+            steps={thinkingSteps ?? []}
+            activeAgents={activeAgents}
+            isActive={true}
+            elapsedSeconds={elapsedSeconds ?? 0}
+          />
         )}
       </div>
 

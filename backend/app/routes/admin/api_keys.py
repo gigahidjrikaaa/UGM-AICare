@@ -1,9 +1,9 @@
-"""Admin endpoints for Gemini API key monitoring and management."""
+"""Admin endpoints for API key monitoring and active AI model management."""
 from __future__ import annotations
 
 from typing import Any, Dict, List
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
 from app.core.gemini_key_tracker import gemini_tracker, KeyUsageSnapshot
@@ -97,6 +97,23 @@ class ApiKeyStatusResponse(BaseModel):
     fallback_chain: List[str]
     circuit_breakers: CircuitBreakerPayload
     model_history: ModelHistoryPayload
+    active_chat_model: str
+    active_chat_provider: str
+    supported_chat_models: List[str]
+
+
+class ActiveModelStatusResponse(BaseModel):
+    """Current runtime chat model and supported options."""
+
+    active_chat_model: str
+    active_chat_provider: str
+    supported_chat_models: List[str]
+
+
+class UpdateActiveModelRequest(BaseModel):
+    """Request payload to update runtime active chat model."""
+
+    model: str = Field(..., min_length=3, description="gemini:auto, gemini-*, glm-* or z-ai/* model ID")
 
 
 class AddKeyRequest(BaseModel):
@@ -125,6 +142,9 @@ async def get_api_key_status(
         GEMINI_FALLBACK_CHAIN,
         _gemini_key_cooldowns,
         get_gemini_circuit_breaker_status,
+        get_active_chat_model,
+        get_active_chat_provider,
+        get_supported_chat_models,
     )
 
     snapshots = gemini_tracker.get_all_snapshots(GEMINI_API_KEYS, _gemini_key_cooldowns)
@@ -159,6 +179,51 @@ async def get_api_key_status(
             models=[CircuitBreakerModelStatus(**m) for m in breaker_models],
         ),
         model_history=ModelHistoryPayload(**model_history),
+        active_chat_model=get_active_chat_model(),
+        active_chat_provider=get_active_chat_provider(),
+        supported_chat_models=get_supported_chat_models(),
+    )
+
+
+@router.get("/active-model", response_model=ActiveModelStatusResponse)
+async def get_active_chat_model_status(
+    admin_user: Any = Depends(get_admin_user),
+) -> ActiveModelStatusResponse:
+    """Return current runtime active chat model used as default when no per-request override is provided."""
+    from app.core.llm import (
+        get_active_chat_model,
+        get_active_chat_provider,
+        get_supported_chat_models,
+    )
+
+    return ActiveModelStatusResponse(
+        active_chat_model=get_active_chat_model(),
+        active_chat_provider=get_active_chat_provider(),
+        supported_chat_models=get_supported_chat_models(),
+    )
+
+
+@router.put("/active-model", response_model=ActiveModelStatusResponse)
+async def update_active_chat_model(
+    body: UpdateActiveModelRequest,
+    admin_user: Any = Depends(get_admin_user),
+) -> ActiveModelStatusResponse:
+    """Update runtime active chat model. This change applies immediately and is not persisted across restart."""
+    from app.core.llm import (
+        get_active_chat_provider,
+        get_supported_chat_models,
+        set_active_chat_model,
+    )
+
+    try:
+        normalized_model = set_active_chat_model(body.model.strip())
+    except ValueError as exc:
+        raise HTTPException(status_code=422, detail=str(exc)) from exc
+
+    return ActiveModelStatusResponse(
+        active_chat_model=normalized_model,
+        active_chat_provider=get_active_chat_provider(),
+        supported_chat_models=get_supported_chat_models(),
     )
 
 

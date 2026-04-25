@@ -195,6 +195,10 @@ async def generate_with_tools(
             has_tools=True,
             preferred_model=None,
         )
+    zai_openrouter_requested = llm.is_zai_model_name(model_name)
+    zai_direct_requested = llm.is_zai_direct_model_name(model_name)
+    zai_requested = zai_openrouter_requested or zai_direct_requested
+    zai_provider = "zai_openrouter" if zai_openrouter_requested else "zai_direct"
     
     conversation_history = list(history)
     iterations = 0
@@ -204,17 +208,48 @@ async def generate_with_tools(
 
     if not _should_use_tools(latest_message, user_role):
         logger.info("Tool calling skipped: request does not require tools")
-        response = await llm.generate_gemini_response_with_fallback(
+        if zai_requested:
+            response = await llm.generate_response(
+                history=conversation_history,
+                model=zai_provider,
+                max_tokens=request.max_tokens,
+                temperature=request.temperature,
+                system_prompt=system_prompt,
+                preferred_gemini_model=model_name,
+            )
+        else:
+            response = await llm.generate_gemini_response_with_fallback(
+                history=conversation_history,
+                model=model_name,
+                max_tokens=request.max_tokens,
+                temperature=request.temperature,
+                system_prompt=system_prompt,
+                tools=None,
+                allow_retry_sleep=False,
+                return_full_response=False,
+            )
+        response_text = cast(str, response)
+
+        if stream_callback:
+            for char in response_text:
+                await stream_callback(char)
+
+        return response_text, tool_calls_executed
+
+    if zai_requested:
+        logger.info(
+            "Tool calling bypassed for model '%s': using direct Z.AI response path (%s).",
+            model_name,
+            zai_provider,
+        )
+        response_text = await llm.generate_response(
             history=conversation_history,
-            model=model_name,
+            model=zai_provider,
             max_tokens=request.max_tokens,
             temperature=request.temperature,
             system_prompt=system_prompt,
-            tools=None,
-            allow_retry_sleep=False,
-            return_full_response=False,
+            preferred_gemini_model=model_name,
         )
-        response_text = cast(str, response)
 
         if stream_callback:
             for char in response_text:

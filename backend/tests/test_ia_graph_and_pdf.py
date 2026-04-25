@@ -11,24 +11,28 @@ def test_ingest_query_node_validates_range() -> None:
     from app.agents.ia.ia_graph import ingest_query_node
 
     state = {
-        "question_id": "crisis_trend",
-        "start_date": datetime(2025, 1, 1),
-        "end_date": datetime(2025, 1, 2),
+        "ia_context": {
+            "question_id": "crisis_trend",
+            "start_date": datetime(2025, 1, 1),
+            "end_date": datetime(2025, 1, 2),
+        },
         "errors": [],
         "execution_path": [],
     }
 
     out = ingest_query_node(state)
-    assert out.get("query_validated") is True
+    assert out.get("ia_context", {}).get("query_validated") is True
 
 
 def test_ingest_query_node_rejects_large_range() -> None:
     from app.agents.ia.ia_graph import ingest_query_node
 
     state = {
-        "question_id": "crisis_trend",
-        "start_date": datetime(2020, 1, 1),
-        "end_date": datetime(2025, 1, 1),
+        "ia_context": {
+            "question_id": "crisis_trend",
+            "start_date": datetime(2020, 1, 1),
+            "end_date": datetime(2025, 1, 1),
+        },
         "errors": [],
         "execution_path": [],
     }
@@ -40,9 +44,9 @@ def test_ingest_query_node_rejects_large_range() -> None:
 def test_validate_consent_node_sets_flag() -> None:
     from app.agents.ia.ia_graph import validate_consent_node
 
-    state = {"question_id": "crisis_trend", "errors": [], "execution_path": []}
+    state = {"ia_context": {"question_id": "crisis_trend"}, "errors": [], "execution_path": []}
     out = validate_consent_node(state)
-    assert out.get("consent_validated") is True
+    assert out.get("ia_context", {}).get("consent_validated") is True
 
 
 def test_apply_k_anonymity_node_sets_k() -> None:
@@ -50,7 +54,7 @@ def test_apply_k_anonymity_node_sets_k() -> None:
 
     state = {"errors": [], "execution_path": []}
     out = apply_k_anonymity_node(state)
-    assert out.get("k_threshold") == 5
+    assert out.get("ia_context", {}).get("k_threshold") == 5
 
 
 @pytest.mark.asyncio
@@ -64,17 +68,20 @@ async def test_execute_analytics_node_uses_service(monkeypatch: pytest.MonkeyPat
     monkeypatch.setattr(module, "InsightsAgentService", lambda _db: FakeService())
 
     state = {
-        "question_id": "crisis_trend",
-        "start_date": datetime(2025, 1, 1),
-        "end_date": datetime(2025, 1, 2),
+        "ia_context": {
+            "question_id": "crisis_trend",
+            "start_date": datetime(2025, 1, 1),
+            "end_date": datetime(2025, 1, 2),
+        },
         "errors": [],
         "execution_path": [],
         "execution_id": None,
     }
 
-    out = await module.execute_analytics_node(state, db=AsyncMock())
-    assert out.get("query_completed") is True
-    assert out.get("analytics_result")
+    config = {"configurable": {"db": AsyncMock()}}
+    out = await module.execute_analytics_node(state, config=config)
+    assert out.get("ia_context", {}).get("query_completed") is True
+    assert out.get("ia_context", {}).get("analytics_result")
 
 
 @pytest.mark.asyncio
@@ -88,19 +95,21 @@ async def test_interpret_results_node_calls_interpreter(monkeypatch: pytest.Monk
     monkeypatch.setattr(module, "InsightsInterpreter", lambda: FakeInterpreter())
 
     state = {
-        "question_id": "crisis_trend",
-        "start_date": datetime(2025, 1, 1),
-        "end_date": datetime(2025, 1, 2),
-        "query_completed": True,
-        "analytics_result": {"data": [{"x": 1}], "chart": {}, "notes": []},
+        "ia_context": {
+            "question_id": "crisis_trend",
+            "start_date": datetime(2025, 1, 1),
+            "end_date": datetime(2025, 1, 2),
+            "query_completed": True,
+            "analytics_result": {"data": [{"x": 1}], "chart": {}, "notes": []},
+        },
         "errors": [],
         "execution_path": [],
         "execution_id": None,
     }
 
     out = await module.interpret_results_node(state)
-    assert out.get("interpretation_completed") is True
-    assert out.get("interpretation") == "i"
+    assert out.get("ia_context", {}).get("interpretation_completed") is True
+    assert out.get("ia_context", {}).get("interpretation") == "i"
 
 
 @pytest.mark.asyncio
@@ -112,7 +121,7 @@ async def test_export_pdf_node_calls_generator(monkeypatch: pytest.MonkeyPatch) 
     state = {"errors": [], "execution_path": [], "execution_id": None}
     out = await module.export_pdf_node(state)
 
-    assert out.get("pdf_url") == "/static/reports/x.pdf"
+    assert out.get("ia_context", {}).get("pdf_url") == "/static/reports/x.pdf"
 
 
 def test_generate_pdf_report_writes_file(tmp_path, monkeypatch: pytest.MonkeyPatch) -> None:
@@ -131,8 +140,8 @@ def test_generate_pdf_report_writes_file(tmp_path, monkeypatch: pytest.MonkeyPat
 async def test_ia_graph_service_execute(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.agents.ia import ia_graph_service as module
 
-    graph = SimpleNamespace(ainvoke=AsyncMock(return_value={"errors": [], "execution_path": ["x"], "query_completed": True}))
-    monkeypatch.setattr(module, "create_ia_graph", lambda _db: graph)
+    graph = SimpleNamespace(ainvoke=AsyncMock(return_value={"errors": [], "execution_path": ["x"], "ia_context": {"query_completed": True}}))
+    monkeypatch.setattr(module, "get_ia_graph", lambda: graph)
 
     tracker = SimpleNamespace(
         start_execution=lambda **_kwargs: "exec-1",

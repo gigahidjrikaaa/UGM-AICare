@@ -13,7 +13,7 @@ from google.genai import types
 
 from app.models.user import User as AppUser
 
-from app.agents.graph_state import SDAState
+from app.agents.graph_state import CMAState
 from app.agents.execution_tracker import execution_tracker
 from app.core.settings import get_settings
 from app.core.llm import get_gemini_client, GEMINI_FLASH_MODEL
@@ -28,7 +28,7 @@ settings = get_settings()
 
 
 @trace_agent("CMA_Ingest")
-async def ingest_escalation_node(state: SDAState) -> SDAState:
+async def ingest_escalation_node(state: CMAState) -> CMAState:
     """Node: Ingest escalation signal from STA.
     
     Validates that this is a high/critical severity case requiring
@@ -45,7 +45,7 @@ async def ingest_escalation_node(state: SDAState) -> SDAState:
         execution_tracker.start_node(execution_id, "cma::ingest_escalation", "cma")
     
     # Validate this should be escalated
-    severity = state.get("severity", "low")
+    severity = state.get("sta_context", {}).get("severity", "low")
     if severity not in ("high", "critical"):
         errors = state.get("errors", [])
         errors.append(
@@ -75,7 +75,7 @@ async def ingest_escalation_node(state: SDAState) -> SDAState:
 
 
 @trace_agent("CMA_CreateCase")
-async def create_case_node(state: SDAState, config: RunnableConfig) -> SDAState:
+async def create_case_node(state: CMAState, config: RunnableConfig) -> CMAState:
     """Node: Create case record for manual intervention.
     
     Creates Case in database with appropriate severity and metadata.
@@ -101,16 +101,16 @@ async def create_case_node(state: SDAState, config: RunnableConfig) -> SDAState:
             "critical": CaseSeverityEnum.critical
         }
         case_severity = severity_map.get(
-            state.get("severity", "high").lower(),
+            state.get("sta_context", {}).get("severity", "high").lower(),
             CaseSeverityEnum.high
         )
         
         # Generate case summary
-        risk_score = state.get("risk_score", 0.0)
-        intent = state.get("intent", "unknown")
+        risk_score = state.get("sta_context", {}).get("risk_score", 0.0)
+        intent = state.get("sta_context", {}).get("intent", "unknown")
         summary_redacted = (
             f"Risk score: {risk_score:.2f}, Intent: {intent}, "
-            f"Severity: {state.get('severity', 'unknown')}"
+            f"Severity: {state.get("sta_context", {}).get("severity", 'unknown')}"
         )
         
         # Create case
@@ -129,9 +129,9 @@ async def create_case_node(state: SDAState, config: RunnableConfig) -> SDAState:
         await db.flush()  # Get case.id
         await db.refresh(case)  # Ensure id is loaded
         
-        state["case_id"] = str(case.id)  # Cast UUID to string for state
-        state["case_severity"] = case_severity.value
-        state["case_created"] = True
+        state.setdefault("cma_context", {})["case_id"] = str(case.id)  # Cast UUID to string for state
+        state.setdefault("cma_context", {})["case_severity"] = case_severity.value
+        state.setdefault("cma_context", {})["case_created"] = True
         execution_path = state.get("execution_path", [])
         execution_path.append("create_case")
         state["execution_path"] = execution_path
@@ -162,7 +162,7 @@ async def create_case_node(state: SDAState, config: RunnableConfig) -> SDAState:
 
 
 @trace_agent("CMA_CalculateSLA")
-async def calculate_sla_node(state: SDAState, config: RunnableConfig) -> SDAState:
+async def calculate_sla_node(state: CMAState, config: RunnableConfig) -> CMAState:
     """Node: Calculate SLA breach time based on severity.
     
     Critical cases: 30 minutes (default from settings)
@@ -181,10 +181,10 @@ async def calculate_sla_node(state: SDAState, config: RunnableConfig) -> SDAStat
         execution_tracker.start_node(execution_id, "cma::calculate_sla", "cma")
     
     try:
-        if not state.get("case_id"):
+        if not state.get("cma_context", {}).get("case_id"):
             raise ValueError("No case_id found")
         
-        severity = state.get("case_severity", "high")
+        severity = state.get("cma_context", {}).get("case_severity", "high")
         
         # Calculate SLA based on severity
         if severity == "critical":
@@ -195,7 +195,7 @@ async def calculate_sla_node(state: SDAState, config: RunnableConfig) -> SDAStat
         sla_breach_at = datetime.now() + timedelta(minutes=sla_minutes)
         
         # Update case in DB
-        case_id = state.get("case_id")
+        case_id = state.get("cma_context", {}).get("case_id")
         if case_id:
             case = await db.get(Case, case_id)
             if case:
@@ -204,7 +204,7 @@ async def calculate_sla_node(state: SDAState, config: RunnableConfig) -> SDAStat
                 db.add(case)
                 await db.flush()
         
-        state["sla_breach_at"] = sla_breach_at.isoformat()
+        state.setdefault("cma_context", {})["sla_breach_at"] = sla_breach_at.isoformat()
         execution_path = state.get("execution_path", [])
         execution_path.append("calculate_sla")
         state["execution_path"] = execution_path
@@ -232,7 +232,7 @@ async def calculate_sla_node(state: SDAState, config: RunnableConfig) -> SDAStat
 
 
 @trace_agent("CMA_AutoAssign")
-async def auto_assign_node(state: SDAState, config: RunnableConfig) -> SDAState:
+async def auto_assign_node(state: CMAState, config: RunnableConfig) -> CMAState:
     """Node: Auto-assign case to available counsellor with workload balancing.
     
     Assignment algorithm:
@@ -257,7 +257,7 @@ async def auto_assign_node(state: SDAState, config: RunnableConfig) -> SDAState:
         execution_tracker.start_node(execution_id, "cma::auto_assign", "cma")
     
     try:
-        case_id = state.get("case_id")
+        case_id = state.get("cma_context", {}).get("case_id")
         if not case_id:
             raise ValueError("No case_id found for assignment")
         
@@ -284,8 +284,8 @@ async def auto_assign_node(state: SDAState, config: RunnableConfig) -> SDAState:
             execution_path = state.get("execution_path", [])
             execution_path.append("auto_assign")
             state["execution_path"] = execution_path
-            state["assigned_to"] = None
-            state["assignment_reason"] = "no_counsellors_available"
+            state.setdefault("cma_context", {})["assigned_to"] = None
+            state.setdefault("cma_context", {})["assignment_reason"] = "no_counsellors_available"
             
             if execution_id:
                 execution_tracker.complete_node(
@@ -361,10 +361,10 @@ async def auto_assign_node(state: SDAState, config: RunnableConfig) -> SDAState:
                 await db.flush()
         
         # Update state
-        state["assigned_to"] = assigned_counsellor_id_str
-        state["assignment_id"] = str(assignment.id)
-        state["assignment_reason"] = "auto_assigned_lowest_workload"
-        state["assigned_workload"] = assigned_workload
+        state.setdefault("cma_context", {})["assigned_to"] = assigned_counsellor_id_str
+        state.setdefault("cma_context", {})["assignment_id"] = str(assignment.id)
+        state.setdefault("cma_context", {})["assignment_reason"] = "auto_assigned_lowest_workload"
+        state.setdefault("cma_context", {})["assigned_workload"] = assigned_workload
 
         await publish_event(
             event_type=EventType.CASE_ASSIGNED,
@@ -395,7 +395,7 @@ async def auto_assign_node(state: SDAState, config: RunnableConfig) -> SDAState:
                 AutopilotActionType,
             )
 
-            severity_val = state.get("case_severity", "high")
+            severity_val = state.get("cma_context", {}).get("case_severity", "high")
             att_payload: dict = {
                 "schema": "aicare.case.auto_assignment.v1",
                 "attestation_type": "case_auto_assignment",
@@ -500,7 +500,7 @@ async def auto_assign_node(state: SDAState, config: RunnableConfig) -> SDAState:
 
 
 @trace_agent("CMA_NotifyCounsellor")
-async def notify_counsellor_node(state: SDAState) -> SDAState:
+async def notify_counsellor_node(state: CMAState) -> CMAState:
     """Node: Emit event to notify counsellors of new case.
     
     Publishes event to event bus for real-time dashboard updates.
@@ -516,11 +516,11 @@ async def notify_counsellor_node(state: SDAState) -> SDAState:
         execution_tracker.start_node(execution_id, "cma::notify_counsellor", "cma")
     
     try:
-        if not state.get("case_id"):
+        if not state.get("cma_context", {}).get("case_id"):
             raise ValueError("No case_id found")
         
         # Publish event for counsellor dashboard
-        severity = state.get("case_severity", "high")
+        severity = state.get("cma_context", {}).get("case_severity", "high")
         event_type = (
             EventType.CRITICAL_RISK_DETECTED 
             if severity == "critical" 
@@ -531,13 +531,13 @@ async def notify_counsellor_node(state: SDAState) -> SDAState:
             event_type=event_type,
             source_agent="cma",
             data={
-                "case_id": str(state.get("case_id")),
-                "assigned_to": state.get("assigned_to"),
+                "case_id": str(state.get("cma_context", {}).get("case_id")),
+                "assigned_to": state.get("cma_context", {}).get("assigned_to"),
                 "severity": severity,
                 "user_hash": state.get("user_hash"),
                 "session_id": state.get("session_id"),
-                "sla_breach_at": state.get("sla_breach_at"),
-                "triage_assessment_id": state.get("triage_assessment_id")
+                "sla_breach_at": state.get("cma_context", {}).get("sla_breach_at"),
+                "triage_assessment_id": state.get("sta_context", {}).get("triage_assessment_id")
             }
         )
         
@@ -548,7 +548,7 @@ async def notify_counsellor_node(state: SDAState) -> SDAState:
         if execution_id:
             execution_tracker.complete_node(execution_id, "cma::notify_counsellor")
         
-        logger.info(f"CMA notified counsellors of case {state.get('case_id')}")
+        logger.info(f"CMA notified counsellors of case {state.get("cma_context", {}).get("case_id")}")
         
     except Exception as e:
         error_msg = f"Counsellor notification failed: {str(e)}"
@@ -564,7 +564,7 @@ async def notify_counsellor_node(state: SDAState) -> SDAState:
 
 
 @trace_agent("CMA_ScheduleAppointment")
-async def schedule_appointment_node(state: SDAState, config: RunnableConfig) -> SDAState:
+async def schedule_appointment_node(state: CMAState, config: RunnableConfig) -> CMAState:
     """Node: Schedule appointment with counselor (LLM-powered).
     
     This node uses Gemini 2.5 Flash to intelligently schedule appointments
@@ -593,29 +593,29 @@ async def schedule_appointment_node(state: SDAState, config: RunnableConfig) -> 
     
     try:
         # Check if scheduling is requested
-        if not state.get("schedule_appointment", False):
+        if not state.get("cma_context", {}).get("schedule_appointment", False):
             logger.info("Scheduling not requested, skipping appointment node")
             if execution_id:
                 execution_tracker.complete_node(execution_id, "cma::schedule_appointment")
             return state
         
         user_id = state.get("user_id")
-        assigned_counsellor_id = state.get("assigned_counsellor_id")
-        severity = state.get("severity", "high")
-        preferred_time = state.get("preferred_time")
-        scheduling_context = state.get("scheduling_context", {})
+        assigned_counsellor_id = state.get("cma_context", {}).get("assigned_counsellor_id")
+        severity = state.get("sta_context", {}).get("severity", "high")
+        preferred_time = state.get("cma_context", {}).get("preferred_time")
+        scheduling_context = state.get("cma_context", {}).get("scheduling_context", {})
         
         if not user_id:
             raise ValueError("user_id required for scheduling")
         
         # Step 1: Determine which psychologist to book with
         # Priority: assigned counselor > LLM-selected based on availability
-        psychologist_id = state.get("psychologist_id")
+        psychologist_id = state.get("cma_context", {}).get("psychologist_id")
         
         if not psychologist_id and assigned_counsellor_id:
             # Try to find psychologist profile for assigned counselor
             counselor_result = await db.execute(
-                select(AgentUser).where(AgentUser.id == assigned_counsellor_id)
+                select(AppUser).where(AppUser.id == assigned_counsellor_id)
             )
             counselor = counselor_result.scalar_one_or_none()
             
@@ -670,7 +670,7 @@ async def schedule_appointment_node(state: SDAState, config: RunnableConfig) -> 
             psychologist_id=psychologist_id,
             appointment_type_id=appointment_type_id,
             appointment_datetime=appointment_datetime,
-            notes=f"Auto-scheduled by CMA. Case severity: {severity}. Case ID: {state.get('case_id')}",
+            notes=f"Auto-scheduled by CMA. Case severity: {severity}. Case ID: {state.get("cma_context", {}).get("case_id")}",
             status="scheduled"
         )
         
@@ -679,10 +679,10 @@ async def schedule_appointment_node(state: SDAState, config: RunnableConfig) -> 
         await db.refresh(new_appointment)
         
         # Update state
-        state["appointment_id"] = new_appointment.id
-        state["appointment_datetime"] = appointment_datetime.isoformat()
-        state["appointment_confirmed"] = True
-        state["psychologist_id"] = psychologist_id
+        state.setdefault("cma_context", {})["appointment_id"] = new_appointment.id
+        state.setdefault("cma_context", {})["appointment_datetime"] = appointment_datetime.isoformat()
+        state.setdefault("cma_context", {})["appointment_confirmed"] = True
+        state.setdefault("cma_context", {})["psychologist_id"] = psychologist_id
         execution_path = state.get("execution_path", [])
         execution_path.append("schedule_appointment")
         state["execution_path"] = execution_path
@@ -700,7 +700,7 @@ async def schedule_appointment_node(state: SDAState, config: RunnableConfig) -> 
         errors = state.get("errors", [])
         errors.append(error_msg)
         state["errors"] = errors
-        state["appointment_confirmed"] = False
+        state.setdefault("cma_context", {})["appointment_confirmed"] = False
         logger.error(error_msg, exc_info=True)
         
         if execution_id:
@@ -727,7 +727,7 @@ async def _select_optimal_psychologist(
     try:
         # Get available psychologists
         result = await db.execute(
-            select(Psychologist).where(Psychologist.is_available == True)
+            select(Psychologist).where(Psychologist.is_available)
         )
         psychologists = result.scalars().all()
         
@@ -739,7 +739,7 @@ async def _select_optimal_psychologist(
             return psychologists[0].id
         
         # Use LLM to select best match
-        client = get_gemini_client()
+        client = await get_gemini_client()
         
         psych_profiles = []
         for p in psychologists:
@@ -798,7 +798,7 @@ Return HANYA psychologist ID (integer) dari pilihan kamu.
         logger.error(f"Error selecting psychologist: {e}")
         # Fallback to first available psychologist
         result = await db.execute(
-            select(Psychologist).where(Psychologist.is_available == True).limit(1)
+            select(Psychologist).where(Psychologist.is_available).limit(1)
         )
         psych = result.scalar_one_or_none()
         return psych.id if psych else None
@@ -876,7 +876,7 @@ async def _find_optimal_appointment_time(
             return None
         
         # Use LLM to select best slot
-        client = get_gemini_client()
+        client = await get_gemini_client()
         
         slots_text = "\n".join([
             f"{i+1}. {slot['display']} ({slot['datetime']})"
@@ -960,7 +960,7 @@ def _build_cma_graph() -> CompiledStateGraph:
     Returns:
         Compiled StateGraph ready for execution
     """
-    workflow = StateGraph(SDAState)
+    workflow = StateGraph(CMAState)
 
     # Add nodes (no wrappers needed — nodes read db from config)
     workflow.add_node("ingest_escalation", ingest_escalation_node)

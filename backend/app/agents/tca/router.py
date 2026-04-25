@@ -4,8 +4,8 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.tca.schemas import (
-    SCAFollowUpRequest,
-    SCAFollowUpResponse,
+    TCAFollowUpRequest,
+    TCAFollowUpResponse,
     TCAInterveneRequest,
     TCAInterveneResponse,
 )
@@ -44,9 +44,9 @@ async def intervene(
     )
 
 
-@router.post("/followup", response_model=SCAFollowUpResponse)
+@router.post("/followup", response_model=TCAFollowUpResponse)
 async def followup(
-    payload: SCAFollowUpRequest,
+    payload: TCAFollowUpRequest,
     service: TherapeuticCoachService = Depends(get_therapeutic_coach_service),
-) -> SCAFollowUpResponse:
+) -> TCAFollowUpResponse:
     return await service.followup(payload)

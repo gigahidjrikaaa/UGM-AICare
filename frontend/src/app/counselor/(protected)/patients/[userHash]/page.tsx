@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import {
   FiArrowLeft,
@@ -74,6 +74,8 @@ interface BackendAppointmentType {
 }
 
 interface BackendAppointmentUser {
+  id?: number;
+  email?: string | null;
   name?: string | null;
 }
 
@@ -108,6 +110,10 @@ interface PatientProfile {
   total_cases: number;
   active_cases: number;
   first_seen: string | null;
+}
+
+interface PatientIdentityScope {
+  trustedEmails: string[];
 }
 
 const severityColors: Record<string, string> = {
@@ -153,6 +159,50 @@ const aptTypeIcons = {
 
 type TabId = 'cases' | 'notes' | 'plans' | 'appointments';
 
+type ScopeNoticeTone = 'neutral' | 'warning';
+
+function ErrorState({ message }: { message: string }) {
+  return (
+    <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
+      <FiAlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
+      <p className="text-red-300 text-sm">{message}</p>
+    </div>
+  );
+}
+
+function LoadingState() {
+  return (
+    <div className="space-y-4">
+      {[1, 2, 3].map((index) => (
+        <div
+          key={index}
+          className="h-24 bg-white/5 animate-pulse rounded-xl border border-white/5"
+        ></div>
+      ))}
+    </div>
+  );
+}
+
+function ScopeNotice({
+  message,
+  tone = 'neutral',
+}: {
+  message: string;
+  tone?: ScopeNoticeTone;
+}) {
+  return (
+    <div
+      className={`mb-4 rounded-xl border px-4 py-3 text-xs ${
+        tone === 'warning'
+          ? 'border-amber-400/30 bg-amber-500/10 text-amber-100'
+          : 'border-white/10 bg-white/5 text-white/65'
+      }`}
+    >
+      {message}
+    </div>
+  );
+}
+
 export default function PatientDetailPage() {
   const router = useRouter();
   const params = useParams();
@@ -165,6 +215,7 @@ export default function PatientDetailPage() {
   const [notesState, setNotesState] = useState<{ loading: boolean; error: string | null; data: CaseNote[] }>({ loading: true, error: null, data: [] });
   const [plansState, setPlansState] = useState<{ loading: boolean; error: string | null; data: TreatmentPlan[] }>({ loading: true, error: null, data: [] });
   const [aptsState, setAptsState] = useState<{ loading: boolean; error: string | null; data: Appointment[] }>({ loading: true, error: null, data: [] });
+  const [identityScope, setIdentityScope] = useState<PatientIdentityScope>({ trustedEmails: [] });
 
   const [patientProfile, setPatientProfile] = useState<PatientProfile | null>(null);
 
@@ -186,11 +237,17 @@ export default function PatientDetailPage() {
 
       // 1. Process Cases
       let patientCases: CaseItem[] = [];
-      let profileEmail: string | undefined;
+      let trustedEmailSet = new Set<string>();
 
       if (casesRes.status === 'fulfilled') {
         const allCases: CaseItem[] = casesRes.value.data?.cases ?? casesRes.value.data ?? [];
         patientCases = allCases.filter(c => c.user_hash === patientHash);
+        trustedEmailSet = new Set(
+          patientCases
+            .map((caseItem) => caseItem.user_email?.trim().toLowerCase())
+            .filter((email): email is string => Boolean(email))
+        );
+        setIdentityScope({ trustedEmails: Array.from(trustedEmailSet) });
         
         // Derive patient profile
         if (patientCases.length > 0) {
@@ -207,8 +264,6 @@ export default function PatientDetailPage() {
           const severityRank: Record<string, number> = { critical: 4, high: 3, med: 2, low: 1 };
           const relevantCases = activeCases.length > 0 ? activeCases : patientCases;
           const highestSev = relevantCases.reduce((max, c) => ((severityRank[c.severity] || 0) > (severityRank[max] || 0) ? c.severity : max), 'low');
-
-          profileEmail = latest.user_email;
 
           setPatientProfile({
             user_hash: patientHash,
@@ -233,6 +288,7 @@ export default function PatientDetailPage() {
         }
         setCasesState({ loading: false, error: null, data: patientCases });
       } else {
+        setIdentityScope({ trustedEmails: [] });
         setCasesState({ loading: false, error: 'Failed to load cases', data: [] });
       }
 
@@ -241,7 +297,7 @@ export default function PatientDetailPage() {
         const allNotes: CaseNote[] = notesRes.value.data?.items ?? [];
         // Only notes that belong to one of the patient's cases
         const caseIds = new Set(patientCases.map(c => c.id));
-        const filteredNotes = allNotes.filter(n => caseIds.has(n.case_id) || n.user_hash === patientHash);
+        const filteredNotes = allNotes.filter(n => caseIds.has(n.case_id));
         setNotesState({ loading: false, error: null, data: filteredNotes });
       } else {
         setNotesState({ loading: false, error: 'Failed to load notes', data: [] });
@@ -250,10 +306,10 @@ export default function PatientDetailPage() {
       // 3. Process Treatment Plans
       if (plansRes.status === 'fulfilled') {
         const allPlans: TreatmentPlan[] = plansRes.value.data?.items ?? [];
-        // Filter by user_email if available, else show all (as fallback logic, though showing all might be noisy, we'll try to match)
-        const filteredPlans = profileEmail 
-          ? allPlans.filter(p => p.user_email === profileEmail)
-          : allPlans;
+        const filteredPlans = allPlans.filter((plan) => {
+          const planEmail = plan.user_email?.trim().toLowerCase();
+          return Boolean(planEmail) && trustedEmailSet.has(planEmail);
+        });
         setPlansState({ loading: false, error: null, data: filteredPlans });
       } else {
         setPlansState({ loading: false, error: 'Failed to load treatment plans', data: [] });
@@ -262,8 +318,12 @@ export default function PatientDetailPage() {
       // 4. Process Appointments
       if (aptsRes.status === 'fulfilled') {
         const allApts: BackendAppointment[] = aptsRes.value.data ?? [];
-        // Server-side filtered already, but we show them all as per instructions
-        const mappedApts: Appointment[] = allApts.map(apt => {
+        const patientApts = allApts.filter((appointment) => {
+          const appointmentEmail = appointment.user?.email?.trim().toLowerCase();
+          return Boolean(appointmentEmail) && trustedEmailSet.has(appointmentEmail);
+        });
+
+        const mappedApts: Appointment[] = patientApts.map(apt => {
           const dt = new Date(apt.appointment_datetime);
           
           const typeStr = (apt.appointment_type?.name || '').toLowerCase();
@@ -307,21 +367,7 @@ export default function PatientDetailPage() {
     return new Date(ds).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' });
   };
 
-  // Subcomponents for error and empty states
-  const ErrorState = ({ message }: { message: string }) => (
-    <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-6 text-center">
-      <FiAlertTriangle className="w-8 h-8 text-red-400 mx-auto mb-2" />
-      <p className="text-red-300 text-sm">{message}</p>
-    </div>
-  );
-
-  const LoadingState = () => (
-    <div className="space-y-4">
-      {[1, 2, 3].map(i => (
-        <div key={i} className="h-24 bg-white/5 animate-pulse rounded-xl border border-white/5"></div>
-      ))}
-    </div>
-  );
+  const hasTrustedEmailIdentity = identityScope.trustedEmails.length > 0;
 
   return (
     <div className="space-y-6 pb-12">
@@ -448,10 +494,11 @@ export default function PatientDetailPage() {
       </div>
 
       {/* Tab Contents */}
-      <div className="min-h-[400px]">
+      <div className="min-h-100">
         {/* CASES TAB */}
         {activeTab === 'cases' && (
           <div className="animate-in fade-in duration-300">
+            <ScopeNotice message="Source: counselor-assigned cases where user_hash matches the selected patient." />
             {casesState.loading ? <LoadingState /> : casesState.error ? <ErrorState message={casesState.error} /> : (
               casesState.data.length === 0 ? (
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-12 text-center">
@@ -492,7 +539,15 @@ export default function PatientDetailPage() {
                             <td className="px-4 py-4 whitespace-nowrap text-xs text-white/60">{formatDate(c.created_at)}</td>
                             <td className="px-4 py-4 whitespace-nowrap text-right">
                               <button 
-                                onClick={() => router.push(`/counselor/cases?search=${c.id}`)}
+                                onClick={() => {
+                                  const params = new URLSearchParams({
+                                    search: c.id,
+                                    highlight: c.id,
+                                    status: c.status,
+                                    source: 'patient-detail',
+                                  });
+                                  router.push(`/counselor/cases?${params.toString()}`);
+                                }}
                                 className="px-3 py-1 bg-[#FFCA40]/10 hover:bg-[#FFCA40]/20 border border-[#FFCA40]/30 rounded text-xs font-medium text-[#FFCA40] transition-all flex items-center gap-1.5 ml-auto"
                               >
                                 <FiEye className="w-3 h-3" /> View in Cases
@@ -512,6 +567,7 @@ export default function PatientDetailPage() {
         {/* NOTES TAB */}
         {activeTab === 'notes' && (
           <div className="animate-in fade-in duration-300">
+            <ScopeNotice message="Source: notes linked to this patient’s case IDs only." />
             {notesState.loading ? <LoadingState /> : notesState.error ? <ErrorState message={notesState.error} /> : (
               notesState.data.length === 0 ? (
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-12 text-center">
@@ -548,11 +604,23 @@ export default function PatientDetailPage() {
         {/* PLANS TAB */}
         {activeTab === 'plans' && (
           <div className="animate-in fade-in duration-300">
+            <ScopeNotice
+              tone={hasTrustedEmailIdentity ? 'neutral' : 'warning'}
+              message={
+                hasTrustedEmailIdentity
+                  ? 'Source: treatment plans matched by verified patient email derived from assigned cases.'
+                  : 'Unavailable: no verified patient email from assigned cases, so treatment plans are intentionally hidden to prevent cross-patient leakage.'
+              }
+            />
             {plansState.loading ? <LoadingState /> : plansState.error ? <ErrorState message={plansState.error} /> : (
               plansState.data.length === 0 ? (
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-12 text-center">
                   <FiTarget className="w-10 h-10 text-white/20 mx-auto mb-3" />
-                  <p className="text-white/60">No treatment plans found for this patient.</p>
+                  <p className="text-white/60">
+                    {hasTrustedEmailIdentity
+                      ? 'No treatment plans found for this patient.'
+                      : 'Treatment plans are unavailable until this patient has a verified email in an assigned case record.'}
+                  </p>
                 </div>
               ) : (
                 <div className="space-y-4">
@@ -581,7 +649,7 @@ export default function PatientDetailPage() {
                             <span className="text-xs font-medium text-[#FFCA40]">{progressPct}%</span>
                           </div>
                           <div className="w-full h-1.5 bg-white/10 rounded-full overflow-hidden">
-                            <div className="h-full bg-gradient-to-r from-[#FFCA40] to-[#FFD55C] transition-all" style={{ width: `${progressPct}%` }}></div>
+                            <div className="h-full bg-linear-to-r from-[#FFCA40] to-[#FFD55C] transition-all" style={{ width: `${progressPct}%` }}></div>
                           </div>
                         </div>
 
@@ -613,11 +681,23 @@ export default function PatientDetailPage() {
         {/* APPOINTMENTS TAB */}
         {activeTab === 'appointments' && (
           <div className="animate-in fade-in duration-300">
+            <ScopeNotice
+              tone={hasTrustedEmailIdentity ? 'neutral' : 'warning'}
+              message={
+                hasTrustedEmailIdentity
+                  ? 'Source: appointments matched by verified patient email from counselor-owned records.'
+                  : 'Unavailable: no verified patient email from assigned cases, so appointments are intentionally hidden to avoid wrong-patient display.'
+              }
+            />
             {aptsState.loading ? <LoadingState /> : aptsState.error ? <ErrorState message={aptsState.error} /> : (
               aptsState.data.length === 0 ? (
                 <div className="bg-white/5 border border-white/10 rounded-2xl p-12 text-center">
                   <FiCalendar className="w-10 h-10 text-white/20 mx-auto mb-3" />
-                  <p className="text-white/60">No appointments scheduled.</p>
+                  <p className="text-white/60">
+                    {hasTrustedEmailIdentity
+                      ? 'No appointments scheduled.'
+                      : 'Appointments are unavailable until this patient has a verified email in an assigned case record.'}
+                  </p>
                 </div>
               ) : (
                 <div className="bg-white/5 border border-white/10 rounded-2xl overflow-hidden">
@@ -654,7 +734,7 @@ export default function PatientDetailPage() {
                             <td className="px-4 py-4 whitespace-nowrap text-center text-sm text-white/70">
                               {apt.duration_minutes}m
                             </td>
-                            <td className="px-4 py-4 max-w-[200px]">
+                            <td className="px-4 py-4 max-w-50">
                               <p className="text-sm text-white/60 truncate">{apt.notes || '—'}</p>
                             </td>
                           </tr>

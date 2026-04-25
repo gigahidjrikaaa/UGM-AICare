@@ -1,14 +1,17 @@
 """Counselor routes for self-management."""
 
+import csv
 import hashlib
-from datetime import datetime, timedelta
-from typing import Any, List, Optional
+import re
+from datetime import date, datetime, timedelta
+from io import StringIO
+from typing import Any, Dict, List, Optional
 
 from uuid import UUID as PyUUID
 
 from pydantic import BaseModel, Field
-from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import and_, func, select, or_
+from fastapi import APIRouter, Depends, HTTPException, Query, Response
+from sqlalchemy import and_, desc, func, select, or_
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -37,11 +40,21 @@ from app.domains.mental_health.services.autopilot_action_service import (
     enqueue_action,
     hash_payload,
 )
+from app.models import FlaggedSession
 from app.models.user import User
 from app.models.alerts import Alert
 from app.domains.mental_health.schemas.appointments import AppointmentWithUser
 from app.agents.cma.schemas import SDACase, SDAListCasesResponse
 from app.core.redaction import prelog_redact
+from app.routes.admin.utils import decrypt_user_email, hash_user_id
+from app.schemas.admin import (
+    ConversationDetailResponse,
+    ConversationStats,
+    SessionDetailResponse,
+    SessionListItem,
+    SessionListResponse,
+    SessionUser,
+)
 from app.services.compliance_service import record_audit_event
 from app.schemas.counselor import (
     CounselorAvailabilityToggle,
@@ -602,6 +615,66 @@ async def get_counselor_profile(user: User, db: AsyncSession) -> CounselorProfil
     return profile
 
 
+async def _get_counselor_conversation_scope(
+    profile: CounselorProfile,
+    db: AsyncSession,
+) -> tuple[set[str], set[int]]:
+    """Return accessible session IDs and user IDs for counselor-assigned cases."""
+    psychologist_id_str = str(profile.id)
+
+    case_rows = (
+        await db.execute(
+            select(Case.session_id, Case.conversation_id).where(Case.assigned_to == psychologist_id_str)
+        )
+    ).all()
+
+    session_ids: set[str] = {str(case_session_id) for case_session_id, _ in case_rows if case_session_id}
+    conversation_ids: set[int] = set()
+
+    for _, conversation_id in case_rows:
+        parsed_id = _to_int(conversation_id)
+        if parsed_id is not None:
+            conversation_ids.add(parsed_id)
+
+    if conversation_ids:
+        resolved_sessions = (
+            await db.execute(
+                select(Conversation.session_id).where(Conversation.id.in_(conversation_ids))
+            )
+        ).scalars().all()
+        for resolved_session_id in resolved_sessions:
+            if resolved_session_id:
+                session_ids.add(str(resolved_session_id))
+
+    if not session_ids:
+        return set(), set()
+
+    scoped_user_ids = (
+        await db.execute(
+            select(func.distinct(Conversation.user_id)).where(Conversation.session_id.in_(session_ids))
+        )
+    ).scalars().all()
+
+    user_ids = {int(user_id) for user_id in scoped_user_ids if user_id is not None}
+    return session_ids, user_ids
+
+
+def _resolve_user_ids_for_hash(
+    user_id_hash: Optional[str],
+    candidate_user_ids: set[int],
+) -> Optional[list[int]]:
+    """Resolve privacy-preserving user hash into scoped user IDs."""
+    if not user_id_hash:
+        return None
+
+    normalized_hash = user_id_hash.strip()
+    if not normalized_hash:
+        return None
+
+    matched_ids = [uid for uid in sorted(candidate_user_ids) if hash_user_id(uid) == normalized_hash]
+    return matched_ids
+
+
 # ========================================
 # Profile Management
 # ========================================
@@ -769,6 +842,515 @@ async def get_single_appointment(
         )
 
     return AppointmentWithUser.model_validate(appointment)
+
+
+# ========================================
+# Conversation Review (Counselor Scope)
+# ========================================
+
+@router.get("/conversation-sessions/stats", response_model=ConversationStats)
+async def get_counselor_conversation_stats(
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+) -> ConversationStats:
+    """Return counselor-scoped conversation statistics for assigned caseload."""
+    profile = await get_counselor_profile(current_user, db)
+    session_scope, _ = await _get_counselor_conversation_scope(profile, db)
+
+    if not session_scope:
+        return ConversationStats(
+            total_conversations=0,
+            total_sessions=0,
+            total_users_with_conversations=0,
+            avg_messages_per_session=0.0,
+            avg_message_length=0.0,
+            avg_response_length=0.0,
+            conversations_today=0,
+            conversations_this_week=0,
+            most_active_hour=0,
+        )
+
+    scope_filter = Conversation.session_id.in_(session_scope)
+
+    total_conversations = (
+        await db.execute(select(func.count(Conversation.id)).where(scope_filter))
+    ).scalar() or 0
+    total_sessions = (
+        await db.execute(select(func.count(func.distinct(Conversation.session_id))).where(scope_filter))
+    ).scalar() or 0
+    total_users_with_conversations = (
+        await db.execute(select(func.count(func.distinct(Conversation.user_id))).where(scope_filter))
+    ).scalar() or 0
+
+    avg_stats = (
+        await db.execute(
+            select(
+                func.avg(func.length(Conversation.message)).label("avg_message_length"),
+                func.avg(func.length(Conversation.response)).label("avg_response_length"),
+            ).where(scope_filter)
+        )
+    ).first()
+
+    session_counts_subq = (
+        select(Conversation.session_id, func.count(Conversation.id).label("count"))
+        .where(scope_filter)
+        .group_by(Conversation.session_id)
+        .subquery()
+    )
+    avg_messages_per_session = (
+        await db.execute(select(func.avg(session_counts_subq.c.count)))
+    ).scalar()
+
+    today = datetime.now().date()
+    week_ago = today - timedelta(days=7)
+
+    conversations_today = (
+        await db.execute(
+            select(func.count(Conversation.id)).where(
+                scope_filter,
+                func.date(Conversation.timestamp) == today,
+            )
+        )
+    ).scalar() or 0
+    conversations_this_week = (
+        await db.execute(
+            select(func.count(Conversation.id)).where(
+                scope_filter,
+                func.date(Conversation.timestamp) >= week_ago,
+            )
+        )
+    ).scalar() or 0
+
+    hour_stats = (
+        await db.execute(
+            select(
+                func.extract("hour", Conversation.timestamp).label("hour"),
+                func.count(Conversation.id).label("count"),
+            )
+            .where(scope_filter)
+            .group_by("hour")
+        )
+    ).all()
+    most_active_hour = int(max(hour_stats, key=lambda row: row[1])[0]) if hour_stats else 0
+
+    return ConversationStats(
+        total_conversations=int(total_conversations),
+        total_sessions=int(total_sessions),
+        total_users_with_conversations=int(total_users_with_conversations),
+        avg_messages_per_session=float(avg_messages_per_session or 0.0),
+        avg_message_length=float(avg_stats.avg_message_length) if avg_stats and avg_stats.avg_message_length else 0.0,
+        avg_response_length=float(avg_stats.avg_response_length) if avg_stats and avg_stats.avg_response_length else 0.0,
+        conversations_today=int(conversations_today),
+        conversations_this_week=int(conversations_this_week),
+        most_active_hour=most_active_hour,
+    )
+
+
+@router.get("/conversation-sessions", response_model=SessionListResponse)
+async def list_counselor_conversation_sessions(
+    page: int = Query(1, ge=1),
+    limit: int = Query(20, ge=1, le=100),
+    session_search: Optional[str] = Query(None),
+    user_id_hash: Optional[str] = Query(None, description="Filter by privacy-preserving user hash"),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+) -> SessionListResponse:
+    """List conversation sessions that belong to the counselor caseload."""
+    profile = await get_counselor_profile(current_user, db)
+    session_scope, user_scope = await _get_counselor_conversation_scope(profile, db)
+
+    if not session_scope:
+        return SessionListResponse(sessions=[], total_count=0)
+
+    base = select(
+        Conversation.session_id,
+        func.count(Conversation.id).label("message_count"),
+        func.min(Conversation.timestamp).label("first_time"),
+        func.max(Conversation.timestamp).label("last_time"),
+        func.max(Conversation.id).label("last_id"),
+        func.max(Conversation.user_id).label("user_id"),
+    ).where(Conversation.session_id.in_(session_scope))
+
+    if session_search:
+        base = base.where(Conversation.session_id.ilike(f"%{session_search}%"))
+
+    matched_user_ids = _resolve_user_ids_for_hash(user_id_hash, user_scope)
+    if matched_user_ids is not None:
+        if not matched_user_ids:
+            return SessionListResponse(sessions=[], total_count=0)
+        base = base.where(Conversation.user_id.in_(matched_user_ids))
+
+    if date_from:
+        base = base.where(func.date(Conversation.timestamp) >= date_from)
+    if date_to:
+        base = base.where(func.date(Conversation.timestamp) <= date_to)
+
+    grouped = base.group_by(Conversation.session_id)
+    total_count = (await db.execute(select(func.count()).select_from(grouped.subquery()))).scalar() or 0
+
+    offset = (page - 1) * limit
+    session_rows = (
+        await db.execute(grouped.order_by(desc("last_time")).offset(offset).limit(limit))
+    ).all()
+
+    if not session_rows:
+        return SessionListResponse(sessions=[], total_count=int(total_count))
+
+    session_ids = [str(row.session_id) for row in session_rows]
+    flags_q = (
+        select(FlaggedSession.session_id, func.count(FlaggedSession.id))
+        .where(
+            FlaggedSession.session_id.in_(session_ids),
+            FlaggedSession.status == "open",
+        )
+        .group_by(FlaggedSession.session_id)
+    )
+    open_flags_map = {
+        str(session_id): int(count)
+        for session_id, count in (await db.execute(flags_q)).all()
+    }
+
+    last_ids = [row.last_id for row in session_rows if row.last_id]
+    last_messages_map: Dict[int, Conversation] = {}
+    if last_ids:
+        last_messages = (
+            await db.execute(select(Conversation).where(Conversation.id.in_(last_ids)))
+        ).scalars().all()
+        last_messages_map = {message.id: message for message in last_messages}
+
+    sessions: list[SessionListItem] = []
+    for row in session_rows:
+        session_id_text = str(row.session_id)
+        last_conversation = last_messages_map.get(row.last_id)
+
+        last_preview = ""
+        last_role = None
+        last_text = None
+        if last_conversation:
+            last_preview = (last_conversation.message or last_conversation.response or "")[:200]
+            last_role = "assistant" if last_conversation.response else "user"
+            last_text = last_conversation.response or last_conversation.message or ""
+
+        sessions.append(
+            SessionListItem(
+                session_id=session_id_text,
+                user_id_hash=hash_user_id(int(row.user_id)) if row.user_id is not None else "unknown",
+                message_count=int(row.message_count or 0),
+                first_time=row.first_time,
+                last_time=row.last_time,
+                last_preview=last_preview,
+                last_role=last_role,
+                last_text=last_text,
+                open_flag_count=open_flags_map.get(session_id_text, 0),
+            )
+        )
+
+    return SessionListResponse(sessions=sessions, total_count=int(total_count))
+
+
+@router.get("/conversation-session/{session_id}", response_model=SessionDetailResponse)
+async def get_counselor_conversation_session_detail(
+    session_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+) -> SessionDetailResponse:
+    """Return a detailed transcript for a counselor-scoped conversation session."""
+    profile = await get_counselor_profile(current_user, db)
+    session_scope, _ = await _get_counselor_conversation_scope(profile, db)
+
+    if session_id not in session_scope:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    conversations = (
+        await db.execute(
+            select(Conversation)
+            .where(Conversation.session_id == session_id)
+            .order_by(Conversation.timestamp.asc())
+        )
+    ).scalars().all()
+
+    if not conversations:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    first_conversation = conversations[0]
+    last_conversation = conversations[-1]
+
+    duration_minutes = 0.0
+    if len(conversations) > 1 and first_conversation.timestamp and last_conversation.timestamp:
+        duration = last_conversation.timestamp - first_conversation.timestamp
+        duration_minutes = duration.total_seconds() / 60
+
+    details: list[ConversationDetailResponse] = []
+    for conversation in conversations:
+        sentiment_score = None
+        try:
+            text = f"{conversation.message or ''} {conversation.response or ''}".lower()
+            tokens = re.findall(r"[a-zà-öø-ÿ\-']+", text)
+            positive_words = {
+                "good",
+                "great",
+                "happy",
+                "calm",
+                "relief",
+                "thanks",
+                "helpful",
+                "better",
+                "improve",
+                "manage",
+            }
+            negative_words = {
+                "bad",
+                "sad",
+                "anxious",
+                "anxiety",
+                "panic",
+                "stress",
+                "stressed",
+                "overwhelmed",
+                "angry",
+                "depress",
+                "hopeless",
+            }
+            positive_count = sum(1 for token in tokens if token in positive_words)
+            negative_count = sum(1 for token in tokens if token in negative_words)
+            total_count = positive_count + negative_count
+            sentiment_score = (positive_count - negative_count) / total_count if total_count else None
+        except Exception:
+            sentiment_score = None
+
+        details.append(
+            ConversationDetailResponse(
+                id=int(conversation.id),
+                user_id_hash=hash_user_id(int(conversation.user_id)),
+                session_id=str(conversation.session_id),
+                conversation_id=str(conversation.conversation_id),
+                message=conversation.message or "",
+                response=conversation.response or "",
+                timestamp=conversation.timestamp,
+                sentiment_score=sentiment_score,
+            )
+        )
+
+    total_user_chars = sum(len(conversation.message or "") for conversation in conversations)
+    total_ai_chars = sum(len(conversation.response or "") for conversation in conversations)
+    message_count = len(conversations)
+
+    avg_user_len = total_user_chars / message_count if message_count else 0.0
+    avg_ai_len = total_ai_chars / message_count if message_count else 0.0
+
+    all_text = " ".join((conversation.message or "") + " " + (conversation.response or "") for conversation in conversations)
+    tokenized_words = re.findall(r"[A-Za-zÀ-ÖØ-öø-ÿ\-']{4,}", all_text.lower())
+    token_frequency: Dict[str, int] = {}
+    for token in tokenized_words:
+        token_frequency[token] = token_frequency.get(token, 0) + 1
+
+    analysis = {
+        "message_pairs": message_count,
+        "total_user_chars": total_user_chars,
+        "total_ai_chars": total_ai_chars,
+        "avg_user_message_length": round(avg_user_len, 2),
+        "avg_ai_message_length": round(avg_ai_len, 2),
+        "top_keywords": sorted(token_frequency.items(), key=lambda item: item[1], reverse=True)[:10],
+    }
+
+    user_row = (
+        await db.execute(
+            select(
+                User.id,
+                User.email,
+                User.role,
+                User.is_active,
+                User.created_at,
+                User.last_login,
+                User.sentiment_score,
+            ).where(User.id == first_conversation.user_id)
+        )
+    ).first()
+
+    session_user: Optional[SessionUser] = None
+    if user_row:
+        (
+            user_id,
+            user_email,
+            user_role,
+            user_is_active,
+            user_created_at,
+            user_last_login,
+            user_sentiment_score,
+        ) = user_row
+        session_user = SessionUser(
+            id=int(user_id),
+            email=decrypt_user_email(user_email),
+            role=user_role,
+            is_active=user_is_active,
+            created_at=user_created_at,
+            last_login=user_last_login,
+            sentiment_score=user_sentiment_score,
+        )
+
+    return SessionDetailResponse(
+        session_id=session_id,
+        user_id_hash=hash_user_id(int(first_conversation.user_id)),
+        user=session_user,
+        conversation_count=message_count,
+        first_message_time=first_conversation.timestamp,
+        last_message_time=last_conversation.timestamp,
+        total_duration_minutes=duration_minutes,
+        conversations=details,
+        analysis=analysis,
+    )
+
+
+@router.get("/conversation-sessions/export.csv")
+async def export_counselor_sessions_csv(
+    session_search: Optional[str] = Query(None),
+    user_id_hash: Optional[str] = Query(None, description="Optional user hash filter"),
+    date_from: Optional[date] = Query(None),
+    date_to: Optional[date] = Query(None),
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+) -> Response:
+    """Export counselor-scoped conversation sessions as CSV."""
+    profile = await get_counselor_profile(current_user, db)
+    session_scope, user_scope = await _get_counselor_conversation_scope(profile, db)
+
+    headers = {"Content-Disposition": "attachment; filename=counselor_sessions.csv"}
+    if not session_scope:
+        return Response(
+            content="session_id,user_hash,message_count,first_time,last_time\n",
+            media_type="text/csv",
+            headers=headers,
+        )
+
+    statement = (
+        select(
+            Conversation.session_id,
+            Conversation.user_id,
+            func.count(Conversation.id).label("message_count"),
+            func.min(Conversation.timestamp).label("first_time"),
+            func.max(Conversation.timestamp).label("last_time"),
+        )
+        .where(Conversation.session_id.in_(session_scope))
+    )
+
+    if session_search:
+        statement = statement.where(Conversation.session_id.ilike(f"%{session_search}%"))
+
+    matched_user_ids = _resolve_user_ids_for_hash(user_id_hash, user_scope)
+    if matched_user_ids is not None:
+        if not matched_user_ids:
+            return Response(
+                content="session_id,user_hash,message_count,first_time,last_time\n",
+                media_type="text/csv",
+                headers=headers,
+            )
+        statement = statement.where(Conversation.user_id.in_(matched_user_ids))
+
+    if date_from:
+        statement = statement.where(func.date(Conversation.timestamp) >= date_from)
+    if date_to:
+        statement = statement.where(func.date(Conversation.timestamp) <= date_to)
+
+    statement = statement.group_by(Conversation.session_id, Conversation.user_id)
+    rows = (await db.execute(statement)).all()
+
+    buffer = StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["session_id", "user_hash", "message_count", "first_time", "last_time"])
+    for row_session_id, row_user_id, message_count, first_time, last_time in rows:
+        writer.writerow(
+            [
+                str(row_session_id),
+                hash_user_id(int(row_user_id)) if row_user_id is not None else "unknown",
+                int(message_count),
+                first_time.isoformat() if first_time else "",
+                last_time.isoformat() if last_time else "",
+            ]
+        )
+
+    buffer.seek(0)
+    return Response(content=buffer.getvalue(), media_type="text/csv", headers=headers)
+
+
+@router.get("/conversation-session/{session_id}/export.csv")
+async def export_counselor_session_csv(
+    session_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+) -> Response:
+    """Export one counselor-scoped conversation session as CSV."""
+    profile = await get_counselor_profile(current_user, db)
+    session_scope, _ = await _get_counselor_conversation_scope(profile, db)
+
+    if session_id not in session_scope:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    conversations = (
+        await db.execute(
+            select(Conversation)
+            .where(Conversation.session_id == session_id)
+            .order_by(Conversation.timestamp.asc())
+        )
+    ).scalars().all()
+
+    if not conversations:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    buffer = StringIO()
+    writer = csv.writer(buffer)
+    writer.writerow(["timestamp", "role", "text"])
+
+    for conversation in conversations:
+        writer.writerow(
+            [
+                conversation.timestamp.isoformat() if conversation.timestamp else "",
+                "assistant" if conversation.response else "user",
+                (conversation.response or conversation.message or "").replace("\n", " "),
+            ]
+        )
+
+    buffer.seek(0)
+    headers = {"Content-Disposition": f"attachment; filename=session_{session_id}.csv"}
+    return Response(content=buffer.getvalue(), media_type="text/csv", headers=headers)
+
+
+@router.get("/conversation-session/{session_id}/export")
+async def export_counselor_session_text(
+    session_id: str,
+    db: AsyncSession = Depends(get_async_db),
+    current_user: User = Depends(require_counselor),
+) -> Response:
+    """Export one counselor-scoped conversation session as plain text."""
+    profile = await get_counselor_profile(current_user, db)
+    session_scope, _ = await _get_counselor_conversation_scope(profile, db)
+
+    if session_id not in session_scope:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    conversations = (
+        await db.execute(
+            select(Conversation)
+            .where(Conversation.session_id == session_id)
+            .order_by(Conversation.timestamp.asc())
+        )
+    ).scalars().all()
+
+    if not conversations:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    transcript_lines: list[str] = []
+    for conversation in conversations:
+        timestamp = conversation.timestamp.isoformat() if conversation.timestamp else ""
+        if conversation.message:
+            transcript_lines.append(f"[{timestamp}] USER: {conversation.message}")
+        if conversation.response:
+            transcript_lines.append(f"[{timestamp}] AI: {conversation.response}")
+        transcript_lines.append("")
+
+    headers = {"Content-Disposition": f"attachment; filename=session_{session_id}.txt"}
+    return Response(content="\n".join(transcript_lines), media_type="text/plain; charset=utf-8", headers=headers)
 
 
 # ========================================

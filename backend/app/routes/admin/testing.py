@@ -142,7 +142,7 @@ class SimulateRealChatRequest(BaseModel):
     user_id: int
     user_messages: List[str] = Field(..., min_length=1, max_length=20, description="List of user messages to send sequentially")
     enable_sta: bool = Field(default=True, description="Enable STA risk analysis in chat flow")
-    enable_sca: bool = Field(default=True, description="Enable SCA intervention generation")
+    enable_tca: bool = Field(default=True, description="Enable TCA intervention generation")
 
 
 class ConversationMessage(BaseModel):
@@ -181,7 +181,7 @@ class FullUserFlowSimulationRequest(BaseModel):
     user_id: int
     user_messages: List[str] = Field(..., min_length=1, max_length=20)
     enable_sta: bool = True
-    enable_sca: bool = True
+    enable_tca: bool = True
 
 
 class FullUserFlowSimulationResponse(BaseModel):
@@ -1087,7 +1087,7 @@ async def simulate_full_user_flow(
             user_id=request.user_id,
             user_messages=request.user_messages,
             enable_sta=request.enable_sta,
-            enable_sca=request.enable_sca,
+            enable_tca=request.enable_tca,
         ),
         db=db,
         admin_user=admin_user,
@@ -1681,7 +1681,7 @@ async def validate_orchestration(
                 actual_next_agent = "Aika"
                 if "CMA" in agents_invoked:
                     actual_next_agent = "CMA"
-                elif "TCA" in agents_invoked or "SCA" in agents_invoked:
+                elif "TCA" in agents_invoked or "TCA" in agents_invoked:
                     actual_next_agent = "TCA"
                 elif "STA" in agents_invoked and len(agents_invoked) == 1:
                      actual_next_agent = "Aika" # STA -> Aika

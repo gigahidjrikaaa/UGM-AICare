@@ -124,8 +124,8 @@ class STAGraphService:
             
             logger.info(
                 f"STA graph execution completed: "
-                f"severity={final_state.get('severity', 'unknown')}, "
-                f"next_step={final_state.get('next_step', 'unknown')}, "
+                f"severity={final_state.get("sta_context", {}).get("severity", 'unknown')}, "
+                f"next_step={final_state.get("sta_context", {}).get("next_step", 'unknown')}, "
                 f"errors={len(final_state.get('errors', []))}"
             )
             
@@ -138,7 +138,7 @@ class STAGraphService:
             # Return state with error
             initial_state["errors"].append(f"Graph execution failed: {str(e)}")
             initial_state["completed_at"] = datetime.now()
-            initial_state["next_step"] = "end"  # Safe fallback
+            initial_state.setdefault("sta_context", {})["next_step"] = "end"  # Safe fallback
             
             raise
 

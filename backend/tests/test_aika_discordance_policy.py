@@ -25,7 +25,7 @@ def test_high_discordance_with_concerning_context_escalates_to_tca() -> None:
     assert patch["discordance_concerning_context"] is True
     assert patch["discordance_escalated"] is True
     assert patch["needs_agents"] is True
-    assert patch["next_step"] == "tca"
+    assert patch["sta_context"]["next_step"] == "tca"
 
 
 @pytest.mark.agents
@@ -44,7 +44,7 @@ def test_high_discordance_without_concerning_context_keeps_direct_response() -> 
     assert patch["discordance_concerning_context"] is False
     assert patch["discordance_escalated"] is False
     assert "needs_agents" not in patch
-    assert "next_step" not in patch
+    assert "sta_context" not in patch
 
 
 @pytest.mark.agents
@@ -63,7 +63,7 @@ def test_high_discordance_does_not_override_explicit_high_risk_path() -> None:
     assert patch["discordance_concerning_context"] is True
     assert patch["discordance_escalated"] is False
     assert "needs_agents" not in patch
-    assert "next_step" not in patch
+    assert "sta_context" not in patch
 
 
 @pytest.mark.agents
@@ -82,7 +82,7 @@ def test_non_high_discordance_never_escalates() -> None:
     assert patch["discordance_concerning_context"] is False
     assert patch["discordance_escalated"] is False
     assert "needs_agents" not in patch
-    assert "next_step" not in patch
+    assert "sta_context" not in patch
 
 
 @pytest.mark.agents
@@ -109,11 +109,13 @@ async def test_apply_screening_discordance_policy_promotes_to_tca(monkeypatch: p
         "message": "aku merasa kosong dan putus asa",
         "session_id": "sess-1",
         "needs_agents": False,
-        "next_step": "none",
-        "intent": "emotional_support",
         "immediate_risk_level": "none",
         "crisis_keywords_detected": [],
         "agent_reasoning": "baseline",
+        "sta_context": {
+            "next_step": "none",
+            "intent": "emotional_support",
+        }
     }
 
     await _apply_screening_discordance_policy(
@@ -128,7 +130,7 @@ async def test_apply_screening_discordance_policy_promotes_to_tca(monkeypatch: p
     assert state["discordance_concerning_context"] is True
     assert state["discordance_escalated"] is True
     assert state["needs_agents"] is True
-    assert state["next_step"] == "tca"
+    assert state.get("sta_context", {}).get("next_step") == "tca"
     assert "deterministic escalation to TCA" in state["agent_reasoning"]
 
 
@@ -156,11 +158,13 @@ async def test_apply_screening_discordance_policy_keeps_explicit_high_risk_route
         "message": "aku panik dan takut",
         "session_id": "sess-2",
         "needs_agents": True,
-        "next_step": "cma",
-        "intent": "crisis",
         "immediate_risk_level": "high",
         "crisis_keywords_detected": ["panic"],
         "agent_reasoning": "explicit high-risk route",
+        "sta_context": {
+            "next_step": "cma",
+            "intent": "crisis",
+        }
     }
 
     await _apply_screening_discordance_policy(
@@ -171,5 +175,5 @@ async def test_apply_screening_discordance_policy_keeps_explicit_high_risk_route
 
     assert state["discordance_concerning_context"] is True
     assert state["discordance_escalated"] is False
-    assert state["next_step"] == "cma"
+    assert state.get("sta_context", {}).get("next_step") == "cma"
     assert state["needs_agents"] is True

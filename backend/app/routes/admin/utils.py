@@ -40,7 +40,7 @@ def build_avatar_url(email: Optional[str], user_id: int, size: int = 128) -> str
             return f"https://www.gravatar.com/avatar/{email_hash}?s={size}&d=identicon"
 
     seed = hash_user_id(user_id)
-    return f"https://api.dicebear.com/7.x/identicon/svg?seed={seed}&size={size}"
+    return f"https://api.dicebear.com/7.x/identicon/png?seed={seed}&size={size}"
 
 
 async def get_user_stats(db: AsyncSession) -> UserStats:

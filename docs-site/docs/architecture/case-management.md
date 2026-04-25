@@ -16,6 +16,60 @@ In clinical terms, the CMA handles **care coordination** - the logistical layer 
 
 ---
 
+## CMA LangGraph Flow
+
+The CMA is implemented as a compiled LangGraph for case management operations:
+
+```mermaid
+flowchart TD
+    START([CMA Invoked]) --> TRIGGER["Determine Trigger<br/>crisis path / student request<br/>/ STA recommendation"]
+    TRIGGER --> CASE_EXISTS{Active case<br/>exists?}
+    CASE_EXISTS --> |Yes| UPDATE_CASE["Update Existing Case<br/>Append risk data"]
+    CASE_EXISTS --> |No| CREATE_CASE["Create New Case<br/>Set status = OPEN<br/>Set SLA deadline"]
+
+    CREATE_CASE --> ASSIGNMENT["Run Assignment Algorithm"]
+    ASSIGNMENT --> SCORE["Score Counselors<br/>1. Specialty match<br/>2. Current caseload (ASC)<br/>3. Availability (next 72h)<br/>4. Language preference"]
+    SCORE --> RANK["Rank candidates"]
+    RANK --> PRESENT["Present top 2-3<br/>to student"]
+    PRESENT --> STUDENT_PICK{Student<br/>selects?}
+    STUDENT_PICK --> |Yes| BOOK["Book Appointment<br/>see flow below"]
+    STUDENT_PICK --> |No / Auto| AUTO_ASSIGN["Auto-assign top<br/>ranked counselor"]
+
+    BOOK --> NOTIFY["Notify Counselor<br/>Dashboard + optional email"]
+    AUTO_ASSIGN --> NOTIFY
+    UPDATE_CASE --> NOTIFY
+
+    NOTIFY --> PERSIST["Persist to DB<br/>Case + CaseAssignment<br/>+ Appointment records"]
+    PERSIST --> END([Return to Synthesis])
+
+    style ASSIGNMENT fill:#a855f7,color:#fff
+    style SCORE fill:#a855f7,color:#fff
+```
+
+---
+
+## SLA Enforcement Lifecycle
+
+```mermaid
+stateDiagram-v2
+    [*] --> CaseOpen: CMA creates case
+    CaseOpen --> SLARunning: SLA timer starts
+    SLARunning --> WithinSLA: Counselor accepts<br/>before deadline
+    SLARunning --> SLAWarning: 50% of SLA elapsed
+    SLAWarning --> WithinSLA: Counselor accepts
+    SLAWarning --> SLABreached: Deadline passed
+    SLABreached --> AlertAdmin: Admin dashboard alert
+    AlertAdmin --> Reassigned: Auto-reassign or<br/>admin intervention
+    WithinSLA --> Scheduled: Appointment booked
+    Reassigned --> SLARunning: New counselor assigned
+    Scheduled --> InSession: Session starts
+    InSession --> PendingAttestation: Session ends
+    PendingAttestation --> Closed: Attestation submitted
+    Closed --> [*]
+```
+
+---
+
 ## When Is the CMA Invoked?
 
 The CMA is triggered when:

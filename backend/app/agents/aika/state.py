@@ -63,7 +63,7 @@ class AikaState(BaseModel):
     )
     service_result: Optional[Dict] = Field(
         default=None,
-        description="Service Desk Agent actions"
+        description="Case Management Agent actions"
     )
     insights_result: Optional[Dict] = Field(
         default=None,

@@ -14,11 +14,10 @@ import {
   FiHeart,
   FiAlertTriangle,
   FiMessageSquare,
-  FiBarChart2,
+  FiFileText,
   FiBookOpen,
-  FiActivity,
   FiEye,
-  FiPhone,
+  FiActivity,
 } from 'react-icons/fi';
 import SidebarLink from '../admin/SidebarLink';
 
@@ -29,19 +28,19 @@ const navGroups = [
     label: 'Clinical Workflow',
     items: [
       { name: 'Dashboard', icon: <FiHome size={18}/>, href: '/counselor/dashboard' },
-      { name: 'My Cases', icon: <FiClipboard size={18}/>, href: '/counselor/cases' },
-      { name: 'Appointments', icon: <FiCalendar size={18}/>, href: '/counselor/appointments' },
       { name: 'Escalations', icon: <FiAlertTriangle size={18}/>, href: '/counselor/escalations' },
+      { name: 'My Cases', icon: <FiClipboard size={18}/>, href: '/counselor/cases' },
+      { name: 'Session Notes', icon: <FiFileText size={18}/>, href: '/counselor/notes' },
+      { name: 'Appointments', icon: <FiCalendar size={18}/>, href: '/counselor/appointments' },
       { name: 'Patients & Contacts', icon: <FiUsers size={18}/>, href: '/counselor/patients' },
     ]
   },
   {
-    label: 'Support Tools',
+    label: 'Care Intelligence',
     items: [
-      { name: 'Session Notes', icon: <FiMessageSquare size={18}/>, href: '/counselor/notes' },
+      { name: 'Conversations', icon: <FiMessageSquare size={18}/>, href: '/counselor/conversations' },
+      { name: 'Progress Tracking', icon: <FiActivity size={18}/>, href: '/counselor/progress' },
       { name: 'Treatment Plans', icon: <FiBookOpen size={18}/>, href: '/counselor/treatment-plans' },
-      { name: 'Progress Tracking', icon: <FiBarChart2 size={18}/>, href: '/counselor/progress' },
-      { name: 'Activities', icon: <FiActivity size={18}/>, href: '/counselor/activities' },
       { name: 'Agent Decisions', icon: <FiEye size={18}/>, href: '/counselor/agent-decisions' },
     ]
   }

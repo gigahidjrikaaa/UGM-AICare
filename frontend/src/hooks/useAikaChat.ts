@@ -428,36 +428,44 @@ export function useAikaChat({
       setIsLoading(false);
 
       hasPartialResponseRef.current = true;
-      const merged = `${partialResponseBufferRef.current}${text}`;
-      const { chunks, remainder } = consumePartialChunks(merged);
-      partialResponseBufferRef.current = remainder;
+      partialResponseBufferRef.current = `${partialResponseBufferRef.current}${text}`;
 
-      if (chunks.length === 0) {
-        return;
+      const conversationId = lastConversationIdRef.current || uuidv4();
+      lastConversationIdRef.current = conversationId;
+
+      if (!currentBubbleIdRef.current) {
+        currentBubbleIdRef.current = uuidv4();
+        bubbleCountRef.current = 1;
       }
 
+      const bubbleId = currentBubbleIdRef.current;
+      const accumulatedText = partialResponseBufferRef.current;
+
       setMessages((prev) => {
-        const conversationId = lastConversationIdRef.current || uuidv4();
-        const nextMessages: Message[] = chunks.map((chunk) => {
+        const index = prev.findIndex((m) => m.id === bubbleId);
+
+        if (index === -1) {
           const message: Message = {
-            id: uuidv4(),
+            id: bubbleId,
             role: 'assistant',
-            content: chunk,
+            content: accumulatedText,
             timestamp: new Date(),
             session_id: sessionId,
             conversation_id: conversationId,
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
-            isContinuation: bubbleCountRef.current > 0,
-            isLoading: false,
+            isLoading: true,
           };
+          return [...prev, message];
+        }
 
-          bubbleCountRef.current += 1;
-          currentBubbleIdRef.current = message.id;
-          return message;
-        });
-
-        return [...prev, ...nextMessages];
+        const updated = [...prev];
+        updated[index] = {
+          ...updated[index],
+          content: accumulatedText,
+          updated_at: new Date().toISOString(),
+        };
+        return updated;
       });
     },
   });
@@ -570,7 +578,6 @@ export function useAikaChat({
           setRetryCooldownMs(aikaResponse.metadata.retry_after_ms);
         }
 
-        // Fallback-message decoration helpers
         const fallbackProps: Partial<Message> = aikaResponse.isFallback
           ? {
               isError: true,
@@ -579,65 +586,73 @@ export function useAikaChat({
             }
           : {};
 
-        // Flush remaining partial buffer and attach metadata without rebuilding
-        // from the final full response when we already streamed chunks.
+        const hasStreamedPartials = hasPartialResponseRef.current;
+        const streamedBubbleId = currentBubbleIdRef.current;
+        const streamedAccumulatedText = partialResponseBufferRef.current;
+        const interventionPlan = latestInterventionPlanRef.current;
+        const appointment = latestAppointmentRef.current;
+        const agentActivity = latestAgentActivityRef.current;
+
         setMessages((prev) => {
-          const hasStreamedPartials = hasPartialResponseRef.current;
-          const trailingPartial = partialResponseBufferRef.current.trim();
-          const interventionPlan = latestInterventionPlanRef.current;
-          const appointment = latestAppointmentRef.current;
-          const agentActivity = latestAgentActivityRef.current;
-
           if (hasStreamedPartials) {
-            if (trailingPartial) {
-              const sanitizedTrailing = sanitizeAssistantResponse(
-                trailingPartial,
-                Boolean(interventionPlan),
-                Boolean(appointment)
-              );
+            const sanitizedContent = sanitizeAssistantResponse(
+              streamedAccumulatedText,
+              Boolean(interventionPlan),
+              Boolean(appointment)
+            );
 
-              if (!sanitizedTrailing && !interventionPlan && !appointment && !agentActivity) {
-                return prev;
+            let bubbleIndex = -1;
+            if (streamedBubbleId) {
+              bubbleIndex = prev.findIndex((m) => m.id === streamedBubbleId);
+            }
+
+            if (bubbleIndex === -1) {
+              for (let index = prev.length - 1; index >= 0; index -= 1) {
+                const item = prev[index];
+                if (item.role === 'assistant' && item.conversation_id === activeConversationId && item.isLoading) {
+                  bubbleIndex = index;
+                  break;
+                }
               }
+            }
 
-              const trailingMessage: Message = {
-                id: uuidv4(),
-                role: 'assistant',
-                content: sanitizedTrailing || 'Aku sudah menyiapkan detail dukungan untukmu.',
-                timestamp: new Date(),
-                session_id: sessionId,
-                conversation_id: activeConversationId,
-                created_at: new Date().toISOString(),
+            if (bubbleIndex !== -1) {
+              const next = [...prev];
+              next[bubbleIndex] = {
+                ...next[bubbleIndex],
+                content: sanitizedContent || 'Aku sudah menyiapkan detail dukungan untukmu.',
+                isLoading: false,
                 updated_at: new Date().toISOString(),
-                isContinuation: bubbleCountRef.current > 0,
                 aikaMetadata: aikaResponse.metadata,
                 interventionPlan: interventionPlan || undefined,
                 appointment: appointment || undefined,
                 agentActivity: agentActivity || undefined,
                 ...fallbackProps,
               };
-
-              bubbleCountRef.current += 1;
-              return [...prev, trailingMessage];
+              return next;
             }
 
-            if (bubbleCountRef.current > 0) {
-              for (let index = prev.length - 1; index >= 0; index -= 1) {
-                const item = prev[index];
-                if (item.role === 'assistant' && item.conversation_id === activeConversationId) {
-                  const next = [...prev];
-                  next[index] = {
-                    ...item,
-                    ...fallbackProps,
-                    aikaMetadata: aikaResponse.metadata,
-                    interventionPlan: interventionPlan || item.interventionPlan,
-                    appointment: appointment || item.appointment,
-                    agentActivity: agentActivity || item.agentActivity,
-                  };
-                  return next;
-                }
-              }
+            if (!sanitizedContent && !interventionPlan && !appointment && !agentActivity) {
+              return prev;
             }
+
+            const finalMessage: Message = {
+              id: uuidv4(),
+              role: 'assistant',
+              content: sanitizedContent || 'Aku sudah menyiapkan detail dukungan untukmu.',
+              timestamp: new Date(),
+              session_id: sessionId,
+              conversation_id: activeConversationId,
+              created_at: new Date().toISOString(),
+              updated_at: new Date().toISOString(),
+              aikaMetadata: aikaResponse.metadata,
+              interventionPlan: interventionPlan || undefined,
+              appointment: appointment || undefined,
+              agentActivity: agentActivity || undefined,
+              ...fallbackProps,
+            };
+
+            return [...prev, finalMessage];
           }
 
           const cleanedResponse = sanitizeAssistantResponse(
@@ -681,20 +696,63 @@ export function useAikaChat({
       } catch (error) {
         console.error('Aika chat error:', error);
 
-        // Add error message
-        const errorMessage: Message = {
-          id: uuidv4(),
-          role: 'assistant',
-          content: 'Maaf, terjadi kesalahan. Silakan coba lagi.',
-          timestamp: new Date(),
-          session_id: sessionId,
-          conversation_id: activeConversationId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          isError: true,
-        };
+        const streamedBubbleId = currentBubbleIdRef.current;
+        const streamedAccumulatedText = partialResponseBufferRef.current;
+        const interventionPlan = latestInterventionPlanRef.current;
+        const appointment = latestAppointmentRef.current;
+        const agentActivity = latestAgentActivityRef.current;
 
-        setMessages((prev) => [...prev, errorMessage]);
+        setMessages((prev) => {
+          let bubbleIndex = -1;
+
+          if (streamedBubbleId) {
+            bubbleIndex = prev.findIndex((m) => m.id === streamedBubbleId);
+          }
+
+          if (bubbleIndex === -1) {
+            for (let index = prev.length - 1; index >= 0; index -= 1) {
+              const item = prev[index];
+              if (item.role === 'assistant' && item.conversation_id === activeConversationId && item.isLoading) {
+                bubbleIndex = index;
+                break;
+              }
+            }
+          }
+
+          if (bubbleIndex !== -1) {
+            const sanitizedContent = sanitizeAssistantResponse(
+              streamedAccumulatedText,
+              Boolean(interventionPlan),
+              Boolean(appointment)
+            );
+            const next = [...prev];
+            next[bubbleIndex] = {
+              ...next[bubbleIndex],
+              content: sanitizedContent || 'Maaf, terjadi kesalahan. Silakan coba lagi.',
+              isLoading: false,
+              isError: true,
+              updated_at: new Date().toISOString(),
+              interventionPlan: interventionPlan || next[bubbleIndex].interventionPlan,
+              appointment: appointment || next[bubbleIndex].appointment,
+              agentActivity: agentActivity || next[bubbleIndex].agentActivity,
+            };
+            return next;
+          }
+
+          const errorMessage: Message = {
+            id: uuidv4(),
+            role: 'assistant',
+            content: 'Maaf, terjadi kesalahan. Silakan coba lagi.',
+            timestamp: new Date(),
+            session_id: sessionId,
+            conversation_id: activeConversationId,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            isError: true,
+          };
+
+          return [...prev, errorMessage];
+        });
       } finally {
         setIsLoading(false);
         setActiveAgents([]); // Clear active agents when done

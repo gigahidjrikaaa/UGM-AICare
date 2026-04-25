@@ -230,8 +230,8 @@ class GeminiSTAClassifier:
             next_step=risk_data["next_step"],
             handoff=risk_data["handoff"],
             diagnostic_notes=diagnostic_notes,
-            needs_support_coach_plan=needs_support_plan,
-            support_plan_type=plan_type,
+            needs_therapeutic_coach_plan=needs_support_plan,
+            therapeutic_plan_type=plan_type,
         )
     
     async def _gemini_chain_of_thought_assessment(
@@ -386,8 +386,8 @@ Return as JSON:
                 diagnostic_notes = " | ".join(diagnostic_parts)
                 
                 # Map support needs to boolean and type
-                needs_support_coach_plan = support_needs != "none"
-                support_plan_type = support_needs if needs_support_coach_plan else "none"
+                needs_therapeutic_coach_plan = support_needs != "none"
+                therapeutic_plan_type = support_needs if needs_therapeutic_coach_plan else "none"
                 
                 return STAClassifyResponse(
                     risk_level=classification["risk_level"],
@@ -395,8 +395,8 @@ Return as JSON:
                     next_step=classification["next_step"],
                     handoff=classification["next_step"] == "human",
                     diagnostic_notes=diagnostic_notes,
-                    needs_support_coach_plan=needs_support_coach_plan,
-                    support_plan_type=support_plan_type,
+                    needs_therapeutic_coach_plan=needs_therapeutic_coach_plan,
+                    therapeutic_plan_type=therapeutic_plan_type,
                     confidence=classification.get("confidence", 0.8)
                 )
                 
@@ -412,7 +412,7 @@ Return as JSON:
                         next_step="human",
                         handoff=True,
                         diagnostic_notes="Gemini classification failed (JSON error). Defaulting to high risk.",
-                        needs_support_coach_plan=False
+                        needs_therapeutic_coach_plan=False
                     )
             except Exception as e:
                 logger.error(f"Gemini assessment failed (attempt {attempt+1}/{max_retries}): {e}")
@@ -424,8 +424,8 @@ Return as JSON:
                         next_step="tca",
                         handoff=False,
                         diagnostic_notes=f"Gemini error (fallback to moderate): {str(e)}",
-                        needs_support_coach_plan=False,
-                        support_plan_type="none",
+                        needs_therapeutic_coach_plan=False,
+                        therapeutic_plan_type="none",
                     )
     
     async def _get_cached_assessment(
@@ -497,8 +497,8 @@ Return as JSON:
                 next_step="resource",
                 handoff=False,
                 diagnostic_notes=f"Cached low-risk (recent assessment {messages_since_assessment} messages ago)",
-                needs_support_coach_plan=False,
-                support_plan_type="none"
+                needs_therapeutic_coach_plan=False,
+                therapeutic_plan_type="none"
             )
         
         return None

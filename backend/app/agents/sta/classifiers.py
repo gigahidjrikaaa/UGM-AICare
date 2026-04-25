@@ -260,7 +260,7 @@ class SafetyTriageClassifier:
                 intent = "financial_pressure"
                 risk_score = max(risk_score, 1)
 
-        # Detect need for Support Coach Plan (independent of risk level)
+        # Detect need for Therapeutic Coach Plan (independent of risk level)
         # Check for calm down indicators
         has_calm_keywords = any(keyword in text for keyword in _CALM_DOWN_KEYWORDS)
         if has_calm_keywords:
@@ -275,7 +275,7 @@ class SafetyTriageClassifier:
             plan_type = "break_down_problem"
             diagnostic_notes.append("User overwhelmed by problem complexity - recommend breaking down approach")
         
-        # If moderate/high risk and next_step is SCA, also recommend support plan
+        # If moderate/high risk and next_step is TCA, also recommend support plan
         if risk_score >= 1 and next_step == "tca" and not needs_support_plan:
             needs_support_plan = True
             plan_type = "general_coping"
@@ -290,6 +290,6 @@ class SafetyTriageClassifier:
             next_step=next_step,
             handoff=handoff,
             diagnostic_notes=notes,
-            needs_support_coach_plan=needs_support_plan,
-            support_plan_type=plan_type,
+            needs_therapeutic_coach_plan=needs_support_plan,
+            therapeutic_plan_type=plan_type,
         )

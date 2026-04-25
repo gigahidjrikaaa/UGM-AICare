@@ -5,7 +5,7 @@ This module encompasses all mental health-related functionality for UGM-AICare:
 - User authentication and profile management
 - Therapeutic chat and messaging
 - CBT (Cognitive Behavioral Therapy) modules
-- AI agents for mental health support (STA, SCA, SDA, IA)
+- AI agents for mental health support (STA, TCA, CMA, IA)
 - Clinical operations (interventions, appointments, counseling)
 - Wellness tracking (journals, check-ins, summaries)
 - Mental health assessments and surveys

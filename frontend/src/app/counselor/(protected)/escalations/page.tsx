@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   FiAlertTriangle,
@@ -55,12 +55,26 @@ const severityConfig = {
   },
 };
 
+const statusPriority: Record<Escalation['status'], number> = {
+  new: 0,
+  waiting: 1,
+  in_progress: 2,
+  closed: 3,
+};
+
+const severityPriority: Record<Escalation['severity'], number> = {
+  critical: 0,
+  high: 1,
+  med: 2,
+  low: 3,
+};
+
 export default function CounselorEscalationsPage() {
   const router = useRouter();
   const [escalations, setEscalations] = useState<Escalation[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<'all' | 'new' | 'in_progress'>('new');
+  const [filter, setFilter] = useState<'all' | 'new' | 'waiting'>('all');
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
   const loadEscalations = useCallback(async () => {
@@ -69,8 +83,8 @@ export default function CounselorEscalationsPage() {
       setError(null);
       const response = await apiClient.get<{ cases: Escalation[] }>('/counselor/cases');
       const allCases = response.data.cases || [];
-      // Only show escalation-relevant cases (not closed)
-      const escalationCases = allCases.filter((c) => c.status !== 'closed');
+      // Escalations queue is intake-only; active handling belongs in My Cases.
+      const escalationCases = allCases.filter((c) => c.status === 'new' || c.status === 'waiting');
       setEscalations(escalationCases);
     } catch (err) {
       console.error('Failed to load escalations:', err);
@@ -93,10 +107,14 @@ export default function CounselorEscalationsPage() {
         note: 'Case accepted by counselor',
       });
       toast.success('Case accepted successfully');
-      // Update local state
-      setEscalations((prev) =>
-        prev.map((e) => (e.id === escalationId ? { ...e, status: 'in_progress' as const } : e))
-      );
+      setEscalations((prev) => prev.filter((e) => e.id !== escalationId));
+
+      const params = new URLSearchParams({
+        highlight: escalationId,
+        status: 'in_progress',
+        source: 'escalations',
+      });
+      router.push(`/counselor/cases?${params.toString()}`);
     } catch (err) {
       console.error('Failed to accept case:', err);
       toast.error('Failed to accept case');
@@ -105,8 +123,13 @@ export default function CounselorEscalationsPage() {
     }
   };
 
-  const handleViewCase = (escalationId: string) => {
-    router.push(`/counselor/cases?highlight=${escalationId}`);
+  const handleViewCase = (escalation: Escalation) => {
+    const params = new URLSearchParams({
+      highlight: escalation.id,
+      status: escalation.status,
+      source: 'escalations',
+    });
+    router.push(`/counselor/cases?${params.toString()}`);
   };
 
   const formatDate = (dateString: string) => {
@@ -125,15 +148,42 @@ export default function CounselorEscalationsPage() {
     });
   };
 
-  const filteredEscalations = escalations.filter((e) => {
+  const sortedEscalations = useMemo(
+    () =>
+      [...escalations].sort((left, right) => {
+        const byStatus = statusPriority[left.status] - statusPriority[right.status];
+        if (byStatus !== 0) {
+          return byStatus;
+        }
+
+        const bySeverity = severityPriority[left.severity] - severityPriority[right.severity];
+        if (bySeverity !== 0) {
+          return bySeverity;
+        }
+
+        const leftSla = left.sla_breach_at
+          ? new Date(left.sla_breach_at).getTime()
+          : Number.POSITIVE_INFINITY;
+        const rightSla = right.sla_breach_at
+          ? new Date(right.sla_breach_at).getTime()
+          : Number.POSITIVE_INFINITY;
+        if (leftSla !== rightSla) {
+          return leftSla - rightSla;
+        }
+
+        return new Date(left.created_at).getTime() - new Date(right.created_at).getTime();
+      }),
+    [escalations],
+  );
+
+  const filteredEscalations = sortedEscalations.filter((e) => {
     if (filter === 'all') return true;
     return e.status === filter;
   });
 
   const newCount = escalations.filter((e) => e.status === 'new').length;
-  const criticalCount = escalations.filter(
-    (e) => e.severity === 'critical' && e.status !== 'closed'
-  ).length;
+  const waitingCount = escalations.filter((e) => e.status === 'waiting').length;
+  const criticalCount = escalations.filter((e) => e.severity === 'critical').length;
 
   if (loading) {
     return (
@@ -176,7 +226,7 @@ export default function CounselorEscalationsPage() {
             Escalations
           </h1>
           <p className="text-white/60">
-            Priority queue of AI-escalated cases requiring attention
+            Risk-first intake queue of newly escalated cases awaiting counselor acceptance
           </p>
         </div>
         <button
@@ -210,18 +260,16 @@ export default function CounselorEscalationsPage() {
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
+          <div className="text-2xl font-bold text-white">{escalations.length}</div>
+          <div className="text-xs text-white/60 mt-1">Total In Intake Queue</div>
+        </div>
+        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
           <div className="text-2xl font-bold text-white">{newCount}</div>
-          <div className="text-xs text-white/60 mt-1">Pending Review</div>
+          <div className="text-xs text-white/60 mt-1">New</div>
         </div>
         <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
           <div className="text-2xl font-bold text-red-400">{criticalCount}</div>
           <div className="text-xs text-white/60 mt-1">Critical Priority</div>
-        </div>
-        <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
-          <div className="text-2xl font-bold text-white">
-            {escalations.filter((e) => e.status === 'in_progress').length}
-          </div>
-          <div className="text-xs text-white/60 mt-1">In Progress</div>
         </div>
       </div>
 
@@ -238,15 +286,14 @@ export default function CounselorEscalationsPage() {
           New ({newCount})
         </button>
         <button
-          onClick={() => setFilter('in_progress')}
+          onClick={() => setFilter('waiting')}
           className={`px-4 py-2 font-medium text-sm transition-all ${
-            filter === 'in_progress'
+            filter === 'waiting'
               ? 'text-[#FFCA40] border-b-2 border-[#FFCA40]'
               : 'text-white/60 hover:text-white/80'
           }`}
         >
-          In Progress (
-          {escalations.filter((e) => e.status === 'in_progress').length})
+          Waiting ({waitingCount})
         </button>
         <button
           onClick={() => setFilter('all')}
@@ -267,7 +314,7 @@ export default function CounselorEscalationsPage() {
             <FiCheckCircle className="w-12 h-12 text-white/20 mx-auto mb-3" />
             <p className="text-white/60">
               {escalations.length === 0
-                ? 'No escalations. Cases assigned to you by the AI agent will appear here.'
+                ? 'No escalations in intake queue. Newly escalated cases will appear here.'
                 : 'No escalations match the current filter'}
             </p>
           </div>
@@ -306,12 +353,12 @@ export default function CounselorEscalationsPage() {
                       className={`px-2 py-0.5 rounded text-xs font-medium ${
                         escalation.status === 'new'
                           ? 'bg-yellow-500/20 text-yellow-300'
-                          : escalation.status === 'in_progress'
-                            ? 'bg-blue-500/20 text-blue-300'
+                          : escalation.status === 'waiting'
+                            ? 'bg-orange-500/20 text-orange-300'
                             : 'bg-gray-500/20 text-gray-300'
                       }`}
                     >
-                      {escalation.status === 'in_progress' ? 'In Progress' : escalation.status}
+                      {escalation.status === 'waiting' ? 'Waiting' : escalation.status}
                     </span>
                     <div className="flex items-center gap-1.5 text-xs text-white/50">
                       <FiClock className="w-3 h-3" />
@@ -374,7 +421,7 @@ export default function CounselorEscalationsPage() {
 
                 {/* Right: Actions */}
                 <div className="shrink-0 flex flex-col gap-2">
-                  {escalation.status === 'new' && (
+                  {(escalation.status === 'new' || escalation.status === 'waiting') && (
                     <button
                       onClick={() => handleAccept(escalation.id)}
                       disabled={acceptingId === escalation.id}
@@ -385,7 +432,7 @@ export default function CounselorEscalationsPage() {
                     </button>
                   )}
                   <button
-                    onClick={() => handleViewCase(escalation.id)}
+                    onClick={() => handleViewCase(escalation)}
                     className="px-4 py-2 bg-white/5 hover:bg-white/10 border border-white/20 rounded-lg text-sm text-white/70 hover:text-white transition-all flex items-center gap-2 whitespace-nowrap"
                   >
                     <FiArrowRight className="w-4 h-4" />

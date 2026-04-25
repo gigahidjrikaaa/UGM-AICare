@@ -1,7 +1,7 @@
 """LangGraph agent execution endpoints.
 
 This module provides REST API endpoints for executing Safety Agent Suite workflows
-via LangGraph StateGraphs. Each agent (STA, SCA, SDA) and the master orchestrator
+via LangGraph StateGraphs. Each agent (STA, TCA, CMA) and the master orchestrator
 have dedicated execution endpoints.
 """
 from __future__ import annotations
@@ -79,8 +79,8 @@ async def execute_sta_graph(
     integrates with ExecutionStateTracker for real-time monitoring.
     
     **Routing Decisions:**
-    - `high`/`critical` severity → Routes to SDA (case creation)
-    - `moderate` + support needed → Routes to SCA (coaching)
+    - `high`/`critical` severity → Routes to CMA (case creation)
+    - `moderate` + support needed → Routes to TCA (coaching)
     - `low` → Ends normally (conversation continues)
     
     **Real-time Monitoring:**
@@ -171,11 +171,11 @@ async def sta_graph_health() -> Dict[str, Any]:
 
 
 # ============================================================================
-# SCA (Support Coach Agent) Graph Endpoints
+# TCA (Therapeutic Coach Agent) Graph Endpoints
 # ============================================================================
 
 class SCAGraphRequest(BaseModel):
-    """Request payload for SCA graph execution."""
+    """Request payload for TCA graph execution."""
     
     user_id: int = Field(..., description="User database ID")
     session_id: str = Field(..., description="Session identifier")
@@ -188,7 +188,7 @@ class SCAGraphRequest(BaseModel):
 
 
 class SCAGraphResponse(BaseModel):
-    """Response from SCA graph execution."""
+    """Response from TCA graph execution."""
     
     success: bool = Field(..., description="Whether execution succeeded without errors")
     execution_id: str = Field(..., description="Unique execution tracking ID")
@@ -207,9 +207,9 @@ async def execute_sca_graph(
     request: SCAGraphRequest,
     db: AsyncSession = Depends(get_async_db)
 ) -> SCAGraphResponse:
-    """Execute Support Coach Agent (SCA) workflow via LangGraph.
+    """Execute Therapeutic Coach Agent (TCA) workflow via LangGraph.
     
-    This endpoint runs the full SCA state machine:
+    This endpoint runs the full TCA state machine:
         ingest_triage_signal → determine_intervention_type → generate_plan → 
         safety_review → persist_plan
     
@@ -222,10 +222,10 @@ async def execute_sca_graph(
     - `general_coping`: For general stress
     
     **Input Requirements:**
-    SCA requires STA outputs (severity, intent) to determine appropriate coaching.
+    TCA requires STA outputs (severity, intent) to determine appropriate coaching.
     
     Args:
-        request: SCA graph execution request
+        request: TCA graph execution request
         db: Database session
         
     Returns:
@@ -285,16 +285,16 @@ async def execute_sca_graph(
         )
         
     except Exception as e:
-        logger.error(f"SCA graph execution failed: {e}", exc_info=True)
+        logger.error(f"TCA graph execution failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"SCA graph execution failed: {str(e)}"
+            detail=f"TCA graph execution failed: {str(e)}"
         )
 
 
 @router.get("/tca/health", status_code=status.HTTP_200_OK)
 async def sca_graph_health() -> Dict[str, Any]:
-    """Health check for SCA graph endpoint.
+    """Health check for TCA graph endpoint.
     
     Returns:
         Basic health status
@@ -302,7 +302,7 @@ async def sca_graph_health() -> Dict[str, Any]:
     return {
         "status": "healthy",
         "graph": "tca",
-        "name": "Support Coach Agent",
+        "name": "Therapeutic Coach Agent",
         "version": "1.0.0",
         "langgraph_enabled": True,
         "intervention_types": ["calm_down", "break_down_problem", "general_coping"]
@@ -310,11 +310,11 @@ async def sca_graph_health() -> Dict[str, Any]:
 
 
 # ============================================================================
-# SDA (Service Desk Agent) Graph Endpoints
+# CMA (Case Management Agent) Graph Endpoints
 # ============================================================================
 
 class SDAGraphRequest(BaseModel):
-    """Request payload for SDA graph execution."""
+    """Request payload for CMA graph execution."""
     
     user_id: int = Field(..., description="User database ID")
     session_id: str = Field(..., description="Session identifier")
@@ -328,7 +328,7 @@ class SDAGraphRequest(BaseModel):
 
 
 class SDAGraphResponse(BaseModel):
-    """Response from SDA graph execution."""
+    """Response from CMA graph execution."""
     
     success: bool = Field(..., description="Whether execution succeeded without errors")
     execution_id: str = Field(..., description="Unique execution tracking ID")
@@ -349,9 +349,9 @@ async def execute_sda_graph(
     request: SDAGraphRequest,
     db: AsyncSession = Depends(get_async_db)
 ) -> SDAGraphResponse:
-    """Execute Service Desk Agent (SDA) workflow via LangGraph.
+    """Execute Case Management Agent (CMA) workflow via LangGraph.
     
-    This endpoint runs the full SDA state machine:
+    This endpoint runs the full CMA state machine:
         ingest_escalation → create_case → calculate_sla → auto_assign → notify_counsellor
     
     The graph handles high/critical severity cases requiring manual intervention
@@ -362,10 +362,10 @@ async def execute_sda_graph(
     - High: 4 hours response time
     
     **Requirements:**
-    SDA only handles high/critical severity cases. Will return error for low/moderate.
+    CMA only handles high/critical severity cases. Will return error for low/moderate.
     
     Args:
-        request: SDA graph execution request
+        request: CMA graph execution request
         db: Database session
         
     Returns:
@@ -430,22 +430,22 @@ async def execute_sda_graph(
         
     except ValueError as e:
         # Handle severity validation error
-        logger.warning(f"Invalid SDA request: {e}")
+        logger.warning(f"Invalid CMA request: {e}")
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
     except Exception as e:
-        logger.error(f"SDA graph execution failed: {e}", exc_info=True)
+        logger.error(f"CMA graph execution failed: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"SDA graph execution failed: {str(e)}"
+            detail=f"CMA graph execution failed: {str(e)}"
         )
 
 
 @router.get("/cma/health", status_code=status.HTTP_200_OK)
 async def sda_graph_health() -> Dict[str, Any]:
-    """Health check for SDA graph endpoint.
+    """Health check for CMA graph endpoint.
     
     Returns:
         Basic health status
@@ -453,7 +453,7 @@ async def sda_graph_health() -> Dict[str, Any]:
     return {
         "status": "healthy",
         "graph": "cma",
-        "name": "Service Desk Agent",
+        "name": "Case Management Agent",
         "version": "1.0.0",
         "langgraph_enabled": True,
         "supported_severities": ["high", "critical"],

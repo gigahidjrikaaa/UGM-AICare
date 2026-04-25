@@ -1,4 +1,4 @@
-"""Campaign execution service for automated message delivery via SCA."""
+"""Campaign execution service for automated message delivery via TCA."""
 
 from __future__ import annotations
 
@@ -83,14 +83,14 @@ class CampaignExecutionService:
                 "execution_time_seconds": execution_time,
             }
         
-        # Step 2: Send messages via SCA
+        # Step 2: Send messages via TCA
         messages_sent = 0
         messages_failed = 0
         users_targeted = set()
         
         for user in target_users:
             try:
-                # Send message to user via SCA
+                # Send message to user via TCA
                 success = await CampaignExecutionService._send_campaign_message(
                     db, campaign, user
                 )
@@ -245,7 +245,7 @@ class CampaignExecutionService:
         campaign: Campaign,
         user: User,
     ) -> bool:
-        """Send campaign message to a user via SCA email.
+        """Send campaign message to a user via TCA email.
         
         Sends a personalized HTML email to the target user. The message template
         supports the following variables:

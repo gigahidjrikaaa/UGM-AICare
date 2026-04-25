@@ -3,7 +3,6 @@
  *
  * Floating left panel with vertical tabs:
  * - Activity timeline
- * - Intervention plans
  * - Technical details (metadata)
  */
 
@@ -13,17 +12,14 @@ import React, { useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'framer-motion';
 import {
   Activity,
-  AlertCircle,
   AlertTriangle,
   CheckCircle,
   ChevronRight,
   Clock,
   Cpu,
   Info,
-  ListChecks,
   Maximize2,
   Minimize2,
-  RefreshCw,
   Sparkles,
   X,
   XCircle,
@@ -33,20 +29,19 @@ import {
 import type { ActivityLog, ActivityType } from '@/types/activity';
 import type { AikaMetadata } from '@/hooks/useAika';
 import type { InterventionPlanListResponse } from '@/services/interventionPlanApi';
-import { PlanCard } from '@/components/resources/PlanCard';
 import { MetadataDisplay } from '@/components/features/aika/AikaComponents';
 import { AgentActivityIndicator } from '@/components/features/aika/AgentActivityIndicator';
 
 export type ViewMode = 'expanded' | 'compact' | 'minimized';
 
-type TabKey = 'activity' | 'plans' | 'details';
+type TabKey = 'activity' | 'details';
 
 export interface ActivityLogPanelProps {
   activities: ActivityLog[];
   metadata: AikaMetadata | null;
-  interventionPlans: InterventionPlanListResponse | null;
-  interventionPlansLoading: boolean;
-  interventionPlansError: Error | null;
+  interventionPlans?: InterventionPlanListResponse | null;
+  interventionPlansLoading?: boolean;
+  interventionPlansError?: Error | null;
   onRefreshInterventionPlans?: () => void;
 
   /** Render as an in-layout sidebar (not a fixed floating panel) */
@@ -239,7 +234,6 @@ export function ActivityLogPanel({
 
   const viewMode = viewModeInternal;
   const shouldShow = embedded ? true : (alwaysVisible || isOpen);
-  const totalPlans = interventionPlans?.total ?? 0;
 
   const orderedActivities = useMemo(() => {
     return [...activities].reverse();
@@ -322,13 +316,6 @@ export function ActivityLogPanel({
                   </div>
                 )}
 
-                {totalPlans > 0 && (
-                  <div className="flex flex-col items-center gap-1">
-                    <span className="text-xs font-bold text-ugm-gold">{totalPlans}</span>
-                    <span className="text-[9px] text-white/40">Plans</span>
-                  </div>
-                )}
-
                 {!alwaysVisible && (
                   <button
                     type="button"
@@ -354,19 +341,6 @@ export function ActivityLogPanel({
                   </div>
 
                   <div className="flex items-center gap-1">
-                    {activeTab === 'plans' && (
-                      <button
-                        type="button"
-                        onClick={() => onRefreshInterventionPlans?.()}
-                        disabled={interventionPlansLoading}
-                        className="p-1.5 rounded-lg text-white/40 hover:text-white/60 hover:bg-white/5 transition-colors disabled:opacity-50"
-                        title="Refresh"
-                      >
-                        <RefreshCw
-                          className={`h-3 w-3 ${interventionPlansLoading ? 'animate-spin' : ''}`}
-                        />
-                      </button>
-                    )}
                     {!embedded && (
                       <button
                         type="button"
@@ -413,12 +387,6 @@ export function ActivityLogPanel({
                       icon={Zap}
                     />
                     <TabButton
-                      active={activeTab === 'plans'}
-                      onClick={() => setActiveTab('plans')}
-                      title="Plans"
-                      icon={ListChecks}
-                    />
-                    <TabButton
                       active={activeTab === 'details'}
                       onClick={() => setActiveTab('details')}
                       title="Details"
@@ -444,39 +412,6 @@ export function ActivityLogPanel({
                               />
                             ))
                           )}
-                        </>
-                      )}
-
-                      {activeTab === 'plans' && (
-                        <>
-                          {interventionPlansLoading && (
-                            <div className="text-xs text-white/50 flex items-center gap-2">
-                              <RefreshCw className="w-4 h-4 animate-spin" />
-                              Memuat rencana...
-                            </div>
-                          )}
-
-                          {interventionPlansError && (
-                            <div className="text-xs text-red-300/80 flex items-center gap-2">
-                              <AlertCircle className="w-4 h-4" />
-                              Gagal memuat rencana.
-                            </div>
-                          )}
-
-                          {!interventionPlansLoading &&
-                            !interventionPlansError &&
-                            (interventionPlans?.plans?.length ?? 0) === 0 && (
-                              <div className="text-xs text-white/50 flex items-center gap-2">
-                                <ListChecks className="w-4 h-4" />
-                                Belum ada rencana intervensi aktif.
-                              </div>
-                            )}
-
-                          {!interventionPlansLoading &&
-                            !interventionPlansError &&
-                            (interventionPlans?.plans ?? []).map((plan) => (
-                              <PlanCard key={plan.id} plan={plan} compact />
-                            ))}
                         </>
                       )}
 

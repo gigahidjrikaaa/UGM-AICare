@@ -112,7 +112,7 @@ class ManualInterventionCreate(BaseModel):
     scheduled_at: Optional[datetime] = None
     notes: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = None
-    intent: Optional[str] = Field(default=None, description="Optional intent identifier for SCA preview")
+    intent: Optional[str] = Field(default=None, description="Optional intent identifier for TCA preview")
     options: Optional[Dict[str, Any]] = Field(default=None, description="Optional intervention tuning options")
     consent_followup: Optional[bool] = Field(default=None, description="Whether the user consented to follow-up")
 

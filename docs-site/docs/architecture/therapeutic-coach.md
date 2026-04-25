@@ -27,6 +27,86 @@ The TCA is *never* invoked for casual conversation or simple information queries
 
 ---
 
+## TCA LangGraph Flow
+
+The TCA is implemented as a compiled LangGraph with structured nodes:
+
+```mermaid
+flowchart TD
+    START([TCA Invoked]) --> LOAD["Load Context<br/>User profile + history<br/>+ previous plans"]
+    LOAD --> CLASSIFY["Classify Intent<br/>academic_stress, anxiety,<br/>depression, panic, etc."]
+    CLASSIFY --> SELECT_PROMPT["Select CBT Prompt Template<br/>calm_down, cognitive_restructuring,<br/>behavioral_activation, general_coping"]
+    SELECT_PROMPT --> GEN["Generate Plan via Gemini<br/>Structured JSON output"]
+    GEN --> REPAIR{JSON valid?}
+    REPAIR --> |No| FIX["Repair truncated JSON<br/>_repair_truncated_json()"]
+    FIX --> REPAIR
+    REPAIR --> |Yes| SAFETY["Safety Review Gate<br/>Check for harmful content<br/>+ clinical boundaries"]
+    SAFETY --> SAFE{Plan safe?}
+    SAFE --> |No| REVISE["Revise plan<br/>Remove unsafe content"]
+    REVISE --> SAFETY
+    SAFE --> |Yes| PERSONALIZE["Personalize Plan<br/>Check previous strategies<br/>Avoid repetition"]
+    PERSONALIZE --> ACTIVITIES["Attach Wellness Activities<br/>From curated catalog"]
+    ACTIVITIES --> RESOURCES["Attach Resource Cards<br/>Relevant to intent"]
+    RESOURCES --> WRITE["Write to State<br/>intervention_plan +<br/>coping_strategies"]
+    WRITE --> PERSIST["Persist to DB<br/>InterventionPlan table"]
+    PERSIST --> END([Return to Synthesis])
+
+    style SAFETY fill:#ff6b6b,color:#fff
+    style PERSONALIZE fill:#a855f7,color:#fff
+```
+
+---
+
+## Safety Review Gate
+
+Every generated plan passes through a safety review before delivery:
+
+```mermaid
+flowchart LR
+    PLAN["Generated Plan"] --> CHECK1{"Contains<br/>diagnosis?"}
+    CHECK1 --> |Yes| REJECT1["Remove diagnostic<br/>language"]
+    CHECK1 --> |No| CHECK2{"Recommends<br/>medication?"}
+    CHECK2 --> |Yes| REJECT2["Remove medication<br/>references"]
+    CHECK2 --> |No| CHECK3{"Appropriate for<br/>risk level?"}
+    CHECK3 --> |No| REJECT3["Downgrade to<br/>lower-intensity plan"]
+    CHECK3 --> |Yes| CHECK4{"Includes<br/>disclaimer?"}
+    CHECK4 --> |No| ADD_DISCLAIMER["Add supportive<br/>guidance disclaimer"]
+    CHECK4 --> |Yes| APPROVED["✅ Plan Approved"]
+    REJECT1 --> RERUN["Re-generate plan"]
+    REJECT2 --> RERUN
+    REJECT3 --> RERUN
+    ADD_DISCLAIMER --> APPROVED
+    RERUN --> CHECK1
+
+    style APPROVED fill:#51cf66,color:#fff
+    style REJECT1 fill:#ff6b6b,color:#fff
+    style REJECT2 fill:#ff6b6b,color:#fff
+    style REJECT3 fill:#ff6b6b,color:#fff
+```
+
+---
+
+## CBT Prompt Templates
+
+The TCA uses five specialized prompt templates selected by intent:
+
+| Template | Trigger Intent | Approach |
+|----------|---------------|----------|
+| `CALM_DOWN` | Acute anxiety, panic | Immediate grounding + breathing techniques |
+| `COGNITIVE_RESTRUCTURING` | Depression, negative thinking | Thought record + cognitive distortion identification |
+| `BEHAVIORAL_ACTIVATION` | Low mood, anhedonia | Activity scheduling + graded exposure |
+| `BREAK_DOWN_PROBLEM` | Academic stress, overwhelm | Problem decomposition + prioritization |
+| `GENERAL_COPING` | General distress | Mixed CBT techniques + psychoeducation |
+
+Each template produces a structured `TCAInterveneResponse` with:
+- `coping_strategies`: Ordered list of actionable steps
+- `psychoeducation`: Brief explanation of the psychological mechanism
+- `homework`: Optional between-session exercise
+- `resource_cards`: Relevant resources from the catalog
+- `follow_up_trigger`: Recommended time until next check-in
+
+---
+
 ## What the TCA Produces
 
 The TCA produces an intervention plan, which is a structured object integrated into Aika's response and maintained in the database. The personalization process is critical. The TCA reviews previously suggested coping strategies to avoid redundancy, ensuring the agent remains effective and engaging over long-term use.

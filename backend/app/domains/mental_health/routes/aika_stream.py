@@ -44,15 +44,15 @@ router = APIRouter()
 AGENT_STATUS_MESSAGES = {
     "aika_decision": "🤔 Aika sedang menganalisis permintaanmu...",
     "sta_subgraph": "🧠 Menilai keamanan emosional...",
-    "sca_subgraph": "🤝 Menyusun rencana dukungan...",
-    "sda_subgraph": "🚨 Mengatur jadwal dan dokumentasi...",
+    "tca_subgraph": "🤝 Menyusun rencana dukungan...",
+    "cma_subgraph": "🚨 Mengatur jadwal dan dokumentasi...",
     "synthesize_response": "✨ Menyusun respons akhir...",
 }
 
 AGENT_NAMES = {
     "STA": {"name": "🧠 Suicide & Threat Assessment", "desc": "Menilai risiko dan keamanan emosional"},
-    "SCA": {"name": "🤝 Support & Care Agent", "desc": "Menyusun rencana dukungan"},
-    "SDA": {"name": "🚨 Scheduling & Documentation Agent", "desc": "Mengatur appointment"},
+    "TCA": {"name": "🤝 Support & Care Agent", "desc": "Menyusun rencana dukungan"},
+    "CMA": {"name": "🚨 Scheduling & Documentation Agent", "desc": "Mengatur appointment"},
 }
 
 
@@ -69,9 +69,9 @@ def _build_reasoning_payload(node_name: str, node_state: Dict[str, Any]) -> Dict
     stage_map = {
         "aika_decision": "intent_assessment",
         "sta_subgraph": "risk_assessment",
-        "sca_subgraph": "support_planning",
         "tca_subgraph": "support_planning",
-        "sda_subgraph": "resource_coordination",
+        "tca_subgraph": "support_planning",
+        "cma_subgraph": "resource_coordination",
         "cma_subgraph": "resource_coordination",
         "ia_subgraph": "insight_analysis",
         "synthesize_response": "response_synthesis",
@@ -90,7 +90,7 @@ def _build_reasoning_payload(node_name: str, node_state: Dict[str, Any]) -> Dict
             summary = (
                 f"Menilai intent '{intent}' dan memutuskan {'perlu' if needs_agents else 'tidak perlu'} agen tambahan."
             )
-    elif node_name in {"sta_subgraph", "sca_subgraph", "tca_subgraph", "sda_subgraph", "cma_subgraph", "ia_subgraph"}:
+    elif node_name in {"sta_subgraph", "tca_subgraph", "tca_subgraph", "cma_subgraph", "cma_subgraph", "ia_subgraph"}:
         summary = AGENT_STATUS_MESSAGES.get(node_name, "Menjalankan langkah agen khusus.")
     elif node_name == "synthesize_response":
         summary = "Menggabungkan hasil analisis menjadi respons akhir yang konsisten."
@@ -125,11 +125,37 @@ def _build_reasoning_payload(node_name: str, node_state: Dict[str, Any]) -> Dict
     return payload
 
 
+async def _chunk_response_text(text: str, chunk_size: int = 3) -> AsyncGenerator[str, None]:
+    """Simulate token streaming by yielding small chunks of pre-computed text.
+
+    Yields ~``chunk_size`` characters per iteration with a tiny sleep so the
+    client can render progressive message bubbles.  Word boundaries are
+    respected when possible to avoid splitting mid-word.
+    """
+    if not text:
+        return
+
+    i = 0
+    while i < len(text):
+        end = min(i + chunk_size, len(text))
+
+        # Extend to the next word boundary if we're in the middle of a word
+        if end < len(text) and text[end - 1].isalpha() and text[end].isalpha():
+            next_space = text.find(' ', end)
+            if next_space != -1 and next_space - i <= chunk_size * 3:
+                end = next_space + 1
+
+        yield text[i:end]
+        await asyncio.sleep(0.02)
+        i = end
+
+
 async def stream_aika_execution(
     request: AikaRequest,
     current_user: User,
     db: AsyncSession,
     request_id: str | None,
+    http_request: Request,
 ) -> AsyncGenerator[str, None]:
     """
     Stream progressive updates during Aika agent execution.
@@ -210,6 +236,7 @@ async def stream_aika_execution(
         
         # Track what we've already sent
         sent_agents = set()
+        sent_tools: set[str] = set()
         sent_reasoning_nodes: set[str] = set()
         current_node = None
         current_node_started = None
@@ -235,9 +262,22 @@ async def stream_aika_execution(
         except Exception as e:
             logger.warning(f"Failed to persist run_started event: {e}")
         
-        # Use astream to get progressive updates
-        async for event in aika_agent.astream(initial_state, config):  # type: ignore
-            # event is a dict with node_name as key
+        ASTREAM_TIMEOUT_SECONDS = 300
+        astream_gen = aika_agent.astream(initial_state, config)  # type: ignore
+
+        while True:
+            if await http_request.is_disconnected():
+                logger.info("Client disconnected during Aika streaming for user %s, aborting.", current_user.id)
+                break
+            try:
+                event = await asyncio.wait_for(astream_gen.__anext__(), timeout=ASTREAM_TIMEOUT_SECONDS)
+            except StopAsyncIteration:
+                break
+            except asyncio.TimeoutError:
+                logger.error("Aika astream timed out after %ds for user %s", ASTREAM_TIMEOUT_SECONDS, current_user.id)
+                yield f"data: {json.dumps({'type': 'error', 'message': 'Response generation timed out.'})}\n\n"
+                break
+
             for node_name, node_state in event.items():
                 # Skip __start__ and __end__ nodes
                 if node_name.startswith("__"):
@@ -323,6 +363,17 @@ async def stream_aika_execution(
                             }
                             yield f"data: {json.dumps(agent_data)}\n\n"
                             await asyncio.sleep(0.05)
+
+                if isinstance(node_state, dict):
+                    current_actions = node_state.get("actions_taken", [])
+                    if isinstance(current_actions, list):
+                        for action in current_actions:
+                            if isinstance(action, str) and action not in sent_tools:
+                                sent_tools.add(action)
+                                yield f"data: {json.dumps({'type': 'tool_start', 'tool': action})}\n\n"
+                                await asyncio.sleep(0.02)
+                                yield f"data: {json.dumps({'type': 'tool_end', 'tool': action})}\n\n"
+                                await asyncio.sleep(0.02)
         
         # Use accumulated state from astream instead of calling ainvoke again
         result = final_state
@@ -346,7 +397,7 @@ async def stream_aika_execution(
                 pass
         
         # Send intervention plan if available (check both old and new keys)
-        intervention_plan = result.get("sca_intervention_plan") or result.get("intervention_plan")
+        intervention_plan = result.get("tca_intervention_plan") or result.get("intervention_plan")
         if intervention_plan:
             plan_data = {
                 'type': 'intervention_plan',
@@ -356,7 +407,7 @@ async def stream_aika_execution(
             await asyncio.sleep(0.05)
         
         # Send appointment if available (check multiple keys and fetch from DB if needed)
-        appointment = result.get("sda_appointment")
+        appointment = result.get("cma_appointment")
         appointment_id = result.get("appointment_id")
         
         if appointment:
@@ -505,6 +556,14 @@ async def stream_aika_execution(
             metadata_dict['risk_level'] = result.get('severity')
         if metadata_dict.get('risk_score') is None:
             metadata_dict['risk_score'] = result.get('risk_score')
+
+        # Stream the pre-computed final response as progressive text_chunk events
+        try:
+            async for chunk in _chunk_response_text(final_response):
+                yield f"data: {json.dumps({'type': 'text_chunk', 'text': chunk})}\n\n"
+        except Exception as stream_err:
+            logger.warning("text_chunk streaming failed, falling back to single complete event: %s", stream_err)
+
         yield f"data: {json.dumps({'type': 'complete', 'response': final_response, 'metadata': metadata_dict})}\n\n"
         
         # Save conversation to database
@@ -741,13 +800,12 @@ async def aika_stream_endpoint(
     request_id = getattr(http_request.state, "request_id", None)
 
     return StreamingResponse(
-        stream_aika_execution(request, current_user, db, request_id),
+        stream_aika_execution(request, current_user, db, request_id, http_request),
         media_type="text/event-stream",
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
-            "X-Accel-Buffering": "no",  # Disable nginx buffering
-            "Access-Control-Allow-Origin": "*",  # CORS for SSE
+            "X-Accel-Buffering": "no",
             "X-Request-ID": request_id or "",
         }
     )

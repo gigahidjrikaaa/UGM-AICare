@@ -166,7 +166,7 @@ class UserClinicalRecord(Base):
     )
     
     # =====================================================================
-    # CASE MANAGEMENT (SDA Agent uses these)
+    # CASE MANAGEMENT (CMA Agent uses these)
     # =====================================================================
     flagged_for_review = Column(
         Boolean,

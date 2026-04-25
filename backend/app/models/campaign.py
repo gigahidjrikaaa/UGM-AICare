@@ -1,4 +1,4 @@
-"""Campaign management models for proactive outreach (SCA control)."""
+"""Campaign management models for proactive outreach (TCA control)."""
 
 from __future__ import annotations
 
@@ -20,7 +20,7 @@ class Campaign(Base):
     """Proactive outreach campaigns managed by admins.
     
     Campaigns can be triggered manually or automatically based on IA insights.
-    Each campaign targets a specific audience with customized messages via SCA.
+    Each campaign targets a specific audience with customized messages via TCA.
     """
     __tablename__ = "campaigns"
 
@@ -122,9 +122,9 @@ class CampaignMetrics(Base):
 
 
 class SCACampaignExecution(Base):
-    """Detailed execution history for SCA campaign sends.
+    """Detailed execution history for TCA campaign sends.
     
-    Tracks each SCA campaign execution with target users and message content
+    Tracks each TCA campaign execution with target users and message content
     for audit trail and history review.
     """
     __tablename__ = "sca_campaign_executions"

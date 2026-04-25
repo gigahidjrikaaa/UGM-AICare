@@ -15,115 +15,100 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
+// ── Brutalist Base Node ──────────────────────────────────────────────────────
+const BaseNodeWrapper = ({ children, status, isConnectable, dashed }: any) => (
+    <div className={`px-4 py-3 bg-black border ${dashed ? 'border-dashed' : ''} ${
+        status === 'healthy'  ? 'border-emerald-500 text-emerald-500' :
+        status === 'degraded' ? 'border-yellow-500 text-yellow-500'  :
+        status === 'down'     ? 'border-red-500 text-red-500'  :
+                                'border-white/50 text-white'
+    } min-w-40 font-mono`}>
+        <Handle type="target" position={Position.Top} isConnectable={isConnectable} className="opacity-0 w-0 h-0" />
+        {children}
+        <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} className="opacity-0 w-0 h-0" />
+    </div>
+);
+
 // ── Standard agent node (Aika, TCA, CMA, IA) ─────────────────────────────────
 const AgentNode = ({ data, isConnectable }: NodeProps) => (
-    <div className={`px-4 py-3 rounded-xl border backdrop-blur-md shadow-lg min-w-40 transition-all duration-300 ${
-        data.status === 'healthy'  ? 'bg-emerald-500/10 border-emerald-500/30 shadow-[0_0_15px_rgba(16,185,129,0.1)]' :
-        data.status === 'degraded' ? 'bg-yellow-500/10  border-yellow-500/30  shadow-[0_0_15px_rgba(234,179,8,0.1)]'  :
-        data.status === 'down'     ? 'bg-red-500/10     border-red-500/30     shadow-[0_0_15px_rgba(239,68,68,0.1)]'  :
-                                     'bg-[#00153a]/80   border-white/10'
-    }`}>
-        <Handle type="target" position={Position.Top}    isConnectable={isConnectable} className="bg-white/20! w-3! h-3!" />
-        <div className="flex items-center gap-3 mb-1">
-            <div className="text-2xl">{data.icon}</div>
-            <div>
-                <div className="text-sm font-bold text-white tracking-wide">{data.label}</div>
-                <div className={`text-[10px] font-bold uppercase tracking-wider ${
-                    data.status === 'healthy'  ? 'text-emerald-400' :
-                    data.status === 'degraded' ? 'text-yellow-400'  :
-                    data.status === 'down'     ? 'text-red-400'     : 'text-white/50'
-                }`}>
-                    {data.statusLabel ?? data.status ?? 'Unknown'}
-                </div>
+    <BaseNodeWrapper status={data.status} isConnectable={isConnectable}>
+        <div className="flex flex-col gap-1 mb-1">
+            <div className="text-xs font-bold uppercase tracking-widest">{data.label}</div>
+            <div className="text-[10px] uppercase tracking-wider opacity-70">
+                STATUS:{data.statusLabel ?? data.status ?? 'UNKNOWN'}
             </div>
         </div>
         {data.metrics && (
-            <div className="pt-2 border-t border-white/10 flex justify-between items-center">
-                <span className="text-[10px] text-white/50 uppercase tracking-wider">Success Rate</span>
-                <span className={`text-xs font-bold ${
-                    Number(data.metrics.successRate) >= 95 ? 'text-emerald-400' :
-                    Number(data.metrics.successRate) >= 70 ? 'text-yellow-400'  : 'text-red-400'
-                }`}>{data.metrics.successRate}%</span>
+            <div className="pt-2 mt-2 border-t border-current/30 flex justify-between items-center">
+                <span className="text-[10px] uppercase tracking-wider">SRATE</span>
+                <span className="text-xs font-bold">{data.metrics.successRate}%</span>
             </div>
         )}
-        <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} className="bg-white/20! w-3! h-3!" />
-    </div>
+    </BaseNodeWrapper>
 );
 
 // ── Parallel crisis "fan-out" node (TCA ∥ CMA) ───────────────────────────────
 const ParallelCrisisNode = ({ data, isConnectable }: NodeProps) => (
-    <div className="px-5 py-4 rounded-2xl border-2 border-red-500/40 bg-red-500/10 backdrop-blur-md shadow-[0_0_24px_rgba(239,68,68,0.18)] min-w-56">
-        <Handle type="target" position={Position.Top}    isConnectable={isConnectable} className="bg-red-400! w-3! h-3!" />
-        <div className="flex items-center gap-3 mb-3">
-            <span className="text-2xl">⚡</span>
-            <div>
-                <div className="text-sm font-bold text-red-200 tracking-wide">Parallel Crisis</div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-red-400">asyncio.gather fan-out</div>
-            </div>
+    <div className="px-5 py-4 border border-red-500 bg-black text-red-500 min-w-56 font-mono">
+        <Handle type="target" position={Position.Top} isConnectable={isConnectable} className="opacity-0 w-0 h-0" />
+        <div className="flex flex-col gap-1 mb-3">
+            <div className="text-xs font-bold uppercase tracking-widest">PARALLEL CRISIS</div>
+            <div className="text-[10px] uppercase tracking-wider opacity-70">asyncio.gather</div>
         </div>
-        {/* Internal sub-agents shown side-by-side */}
         <div className="flex gap-2">
-            <div className="flex-1 bg-white/5 border border-yellow-500/20 rounded-xl px-3 py-2 text-center">
-                <div className="text-base mb-0.5">🧠</div>
-                <div className="text-[11px] font-bold text-yellow-300">TCA</div>
-                <div className="text-[9px] text-white/40">CBT Plan</div>
+            <div className="flex-1 border border-yellow-500 text-yellow-500 px-3 py-2 text-center uppercase text-[10px]">
+                <div className="font-bold mb-1">TCA</div>
+                <div>CBT Plan</div>
             </div>
-            <div className="flex items-center text-white/30 text-xs font-bold">∥</div>
-            <div className="flex-1 bg-white/5 border border-red-500/20 rounded-xl px-3 py-2 text-center">
-                <div className="text-base mb-0.5">📋</div>
-                <div className="text-[11px] font-bold text-red-300">CMA</div>
-                <div className="text-[9px] text-white/40">Escalate</div>
+            <div className="flex-1 border border-red-500 text-red-500 px-3 py-2 text-center uppercase text-[10px]">
+                <div className="font-bold mb-1">CMA</div>
+                <div>Escalate</div>
             </div>
         </div>
-        <div className="mt-2 text-[9px] text-white/30 text-center tracking-wide uppercase">
-            max(TCA_time, CMA_time) latency
+        <div className="mt-2 text-[9px] text-center tracking-wide uppercase opacity-70">
+            LATENCY:max(TCA, CMA)
         </div>
-        <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} className="bg-red-400! w-3! h-3!" />
+        <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} className="opacity-0 w-0 h-0" />
     </div>
 );
 
 // ── Synthesize node ───────────────────────────────────────────────────────────
 const SynthesizeNode = ({ data, isConnectable }: NodeProps) => (
-    <div className="px-4 py-3 rounded-xl border border-blue-400/30 bg-blue-500/10 backdrop-blur-md shadow-[0_0_15px_rgba(96,165,250,0.15)] min-w-40 text-center">
-        <Handle type="target" position={Position.Top}    isConnectable={isConnectable} className="bg-blue-400! w-3! h-3!" />
-        <div className="text-xl mb-1">✨</div>
-        <div className="text-sm font-bold text-blue-200">Synthesize</div>
-        <div className="text-[9px] text-white/40 uppercase tracking-wider mt-0.5">Final Response</div>
-        <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} className="bg-blue-400! w-3! h-3!" />
+    <div className="px-4 py-3 border border-white/50 bg-black min-w-40 text-center font-mono">
+        <Handle type="target" position={Position.Top} isConnectable={isConnectable} className="opacity-0 w-0 h-0" />
+        <div className="text-xs font-bold text-white uppercase tracking-widest">SYNTHESIZE</div>
+        <div className="text-[9px] text-white/50 uppercase tracking-wider mt-1">FINAL RESPONSE</div>
+        <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} className="opacity-0 w-0 h-0" />
     </div>
 );
 
 // ── END terminal node ─────────────────────────────────────────────────────────
 const EndNode = ({ isConnectable }: NodeProps) => (
-    <div className="px-6 py-3 rounded-full border border-white/20 bg-white/5 backdrop-blur-md text-center">
-        <Handle type="target" position={Position.Top} isConnectable={isConnectable} className="bg-white/30! w-3! h-3!" />
-        <div className="text-xs font-bold text-white/50 uppercase tracking-widest">END</div>
+    <div className="px-6 py-2 border border-white/30 bg-black text-center font-mono">
+        <Handle type="target" position={Position.Top} isConnectable={isConnectable} className="opacity-0 w-0 h-0" />
+        <div className="text-xs font-bold text-white uppercase tracking-widest">END</div>
     </div>
 );
 
-// ── Background STA node (fire-and-forget, not in live graph) ──────────────────
+// ── Background STA node (fire-and-forget) ────────────────────────────────────
 const BackgroundNode = ({ data, isConnectable }: NodeProps) => (
-    <div className="px-4 py-3 rounded-xl border border-dashed border-purple-400/30 bg-purple-500/5 backdrop-blur-md min-w-44">
-        <Handle type="target" position={Position.Left}   isConnectable={isConnectable} className="bg-purple-400! w-3! h-3!" id="target-left" />
-        <div className="flex items-center gap-2 mb-1">
-            <span className="text-xl">🔍</span>
-            <div>
-                <div className="text-sm font-bold text-purple-200">{data.label}</div>
-                <div className="text-[10px] font-bold uppercase tracking-wider text-purple-400">Background Task</div>
-            </div>
+    <div className="px-4 py-3 border border-dashed border-white/30 bg-black min-w-44 font-mono">
+        <Handle type="target" position={Position.Left} isConnectable={isConnectable} className="opacity-0 w-0 h-0" id="target-left" />
+        <div className="flex flex-col gap-1 mb-1">
+            <div className="text-xs font-bold text-white uppercase tracking-widest">{data.label}</div>
+            <div className="text-[10px] uppercase tracking-wider text-white/50">BACKGROUND TASK</div>
         </div>
-        <div className="text-[9px] text-white/30 leading-relaxed">
-            PHQ-9 · GAD-7 · DASS-21<br />Post-conversation analysis
+        <div className="text-[9px] text-white/40 leading-relaxed uppercase">
+            PHQ-9 · GAD-7 · DASS-21<br />POST-CONVERSATION
         </div>
     </div>
 );
 
 // ── User node ─────────────────────────────────────────────────────────────────
 const UserNode = ({ data, isConnectable }: NodeProps) => (
-    <div className="px-6 py-4 rounded-full bg-blue-500/20 border border-blue-500/30 backdrop-blur-md shadow-[0_0_20px_rgba(59,130,246,0.2)] text-center">
-        <div className="text-3xl mb-1">👤</div>
-        <div className="text-sm font-bold text-blue-200">User</div>
-        <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} className="bg-blue-400! w-3! h-3!" />
+    <div className="px-6 py-3 border border-white text-white bg-black text-center font-mono">
+        <div className="text-xs font-bold uppercase tracking-widest">USER</div>
+        <Handle type="source" position={Position.Bottom} isConnectable={isConnectable} className="opacity-0 w-0 h-0" />
     </div>
 );
 
@@ -152,184 +137,46 @@ export function AgenticArchitectureGraph({ onNodeClick, healthData }: AgenticArc
         };
     };
 
-    // ── Nodes: mirrors create_aika_unified_graph() exactly ───────────────────
     const initialNodes: Node[] = [
-        {
-            id: 'user',
-            type: 'user',
-            position: { x: 370, y: 0 },
-            data: { label: 'User' },
-        },
-        {
-            id: 'aika',
-            type: 'agent',
-            position: { x: 340, y: 130 },
-            data: {
-                label: 'AIKA Decision',
-                icon: '🤖',
-                statusLabel: 'Orchestrator',
-                ...getGraphData('orchestrator'),
-            },
-        },
-        // ── Three live routing targets ───────────────────────────────────────
-        {
-            id: 'tca',
-            type: 'agent',
-            position: { x: 60, y: 320 },
-            data: {
-                label: 'TCA (execute_sca)',
-                icon: '🧠',
-                statusLabel: 'Moderate Risk',
-                ...getGraphData('tca'),
-            },
-        },
-        {
-            id: 'parallel_crisis',
-            type: 'parallelCrisis',
-            position: { x: 290, y: 300 },
-            data: {},
-        },
-        {
-            id: 'ia',
-            type: 'agent',
-            position: { x: 620, y: 320 },
-            data: {
-                label: 'Insights Agent (IA)',
-                icon: '📊',
-                statusLabel: 'Analytics',
-                ...getGraphData('ia'),
-            },
-        },
-        // ── Synthesize and END ───────────────────────────────────────────────
-        {
-            id: 'synthesize',
-            type: 'synthesize',
-            position: { x: 340, y: 510 },
-            data: {},
-        },
-        {
-            id: 'end',
-            type: 'endNode',
-            position: { x: 358, y: 610 },
-            data: {},
-        },
-        // ── STA background task (NOT a live graph node) ──────────────────────
-        {
-            id: 'sta_bg',
-            type: 'background',
-            position: { x: 700, y: 480 },
-            data: {
-                label: 'STA Analysis',
-                ...getGraphData('sta'),
-            },
-        },
+        { id: 'user', type: 'user', position: { x: 370, y: 0 }, data: { label: 'User' } },
+        { id: 'aika', type: 'agent', position: { x: 340, y: 110 }, data: { label: 'AIKA', statusLabel: 'ORCHESTRATOR', ...getGraphData('orchestrator') } },
+        { id: 'tca', type: 'agent', position: { x: 60, y: 300 }, data: { label: 'TCA', statusLabel: 'MODERATE', ...getGraphData('tca') } },
+        { id: 'parallel_crisis', type: 'parallelCrisis', position: { x: 290, y: 280 }, data: {} },
+        { id: 'ia', type: 'agent', position: { x: 620, y: 300 }, data: { label: 'IA (ANALYTICS)', statusLabel: 'DATA', ...getGraphData('ia') } },
+        { id: 'synthesize', type: 'synthesize', position: { x: 340, y: 470 }, data: {} },
+        { id: 'end', type: 'endNode', position: { x: 372, y: 570 }, data: {} },
+        { id: 'sta_bg', type: 'background', position: { x: 650, y: 440 }, data: { label: 'STA PROCESS', ...getGraphData('sta') } },
     ];
 
-    // ── Edges: mirror the final add_conditional_edges / add_edge calls ────────
+    const createBrutalistEdge = (id: string, source: string, target: string, color: string, label: string, dashed = false) => ({
+        id, source, target,
+        type: 'step',
+        animated: !dashed,
+        label,
+        labelStyle: { fill: color, fontSize: 10, fontFamily: 'monospace', fontWeight: 600, letterSpacing: '0.05em' },
+        labelBgStyle: { fill: '#000', stroke: color, strokeWidth: 1 },
+        labelBgPadding: [4, 2],
+        labelBgBorderRadius: 0,
+        style: { stroke: color, strokeWidth: 1, strokeDasharray: dashed ? '4,4' : undefined },
+        markerEnd: { type: MarkerType.ArrowClosed, color },
+    });
+
     const initialEdges: Edge[] = [
-        // User → Aika
-        {
-            id: 'e-user-aika',
-            source: 'user', target: 'aika',
-            animated: true,
-            style: { stroke: '#60A5FA', strokeWidth: 2 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#60A5FA' },
-        },
-        // Aika → TCA (moderate)
-        {
-            id: 'e-aika-tca',
-            source: 'aika', target: 'tca',
-            animated: true,
-            label: 'Moderate',
-            labelStyle: { fill: '#fde68a', fontSize: 10, fontWeight: 700 },
-            labelBgStyle: { fill: 'rgba(0,0,0,0.4)' },
-            style: { stroke: '#fde68a', strokeWidth: 2 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#fde68a' },
-        },
-        // Aika → Parallel Crisis (high/critical)
-        {
-            id: 'e-aika-pc',
-            source: 'aika', target: 'parallel_crisis',
-            animated: true,
-            label: 'High / Critical',
-            labelStyle: { fill: '#fca5a5', fontSize: 10, fontWeight: 700 },
-            labelBgStyle: { fill: 'rgba(0,0,0,0.4)' },
-            style: { stroke: '#f87171', strokeWidth: 2 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#f87171' },
-        },
-        // Aika → IA (analytics)
-        {
-            id: 'e-aika-ia',
-            source: 'aika', target: 'ia',
-            animated: true,
-            label: 'Analytics',
-            labelStyle: { fill: '#c4b5fd', fontSize: 10, fontWeight: 700 },
-            labelBgStyle: { fill: 'rgba(0,0,0,0.4)' },
-            style: { stroke: '#a78bfa', strokeWidth: 2 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#a78bfa' },
-        },
-        // Aika → END (direct / none)
-        {
-            id: 'e-aika-end',
-            source: 'aika', target: 'end',
-            animated: false,
-            label: 'Direct Resp.',
-            labelStyle: { fill: '#94a3b8', fontSize: 10 },
-            labelBgStyle: { fill: 'rgba(0,0,0,0.4)' },
-            style: { stroke: '#475569', strokeWidth: 1.5, strokeDasharray: '5,4' },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#475569' },
-        },
-        // TCA → Synthesize
-        {
-            id: 'e-tca-synth',
-            source: 'tca', target: 'synthesize',
-            animated: true,
-            style: { stroke: '#fde68a', strokeWidth: 1.5 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#fde68a' },
-        },
-        // Parallel Crisis → Synthesize
-        {
-            id: 'e-pc-synth',
-            source: 'parallel_crisis', target: 'synthesize',
-            animated: true,
-            style: { stroke: '#f87171', strokeWidth: 1.5 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#f87171' },
-        },
-        // IA → Synthesize
-        {
-            id: 'e-ia-synth',
-            source: 'ia', target: 'synthesize',
-            animated: true,
-            style: { stroke: '#a78bfa', strokeWidth: 1.5 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#a78bfa' },
-        },
-        // Synthesize → END
-        {
-            id: 'e-synth-end',
-            source: 'synthesize', target: 'end',
-            animated: true,
-            style: { stroke: '#60A5FA', strokeWidth: 2 },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#60A5FA' },
-        },
-        // Aika → STA Background (dashed, fire-and-forget)
-        {
-            id: 'e-aika-sta-bg',
-            source: 'aika', target: 'sta_bg',
-            animated: false,
-            label: 'Conversation End (bg)',
-            labelStyle: { fill: '#c084fc', fontSize: 9 },
-            labelBgStyle: { fill: 'rgba(0,0,0,0.4)' },
-            style: { stroke: '#7e22ce', strokeWidth: 1.5, strokeDasharray: '6,4' },
-            markerEnd: { type: MarkerType.ArrowClosed, color: '#7e22ce' },
-            // Custom target handle on left side of the background node
-            targetHandle: 'target-left',
-        },
+        createBrutalistEdge('e-u-a', 'user', 'aika', '#fff', 'INPUT'),
+        createBrutalistEdge('e-a-t', 'aika', 'tca', '#eab308', 'MODERATE'),
+        createBrutalistEdge('e-a-p', 'aika', 'parallel_crisis', '#ef4444', 'CRITICAL'),
+        createBrutalistEdge('e-a-i', 'aika', 'ia', '#a855f7', 'ANALYTICS'),
+        createBrutalistEdge('e-a-e', 'aika', 'end', '#fff', 'DIRECT', true),
+        createBrutalistEdge('e-t-s', 'tca', 'synthesize', '#fff', 'OUTPUT'),
+        createBrutalistEdge('e-p-s', 'parallel_crisis', 'synthesize', '#fff', 'MERGE'),
+        createBrutalistEdge('e-i-s', 'ia', 'synthesize', '#fff', 'OUTPUT'),
+        createBrutalistEdge('e-s-e', 'synthesize', 'end', '#fff', 'DONE'),
+        { ...createBrutalistEdge('e-a-b', 'aika', 'sta_bg', '#fff', 'ASYNC', true), targetHandle: 'target-left' },
     ];
 
     const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
     const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 
-    // Sync live health metrics into node data when healthData updates
     useMemo(() => {
         setNodes((nds) =>
             nds.map((node) => {
@@ -338,36 +185,29 @@ export function AgenticArchitectureGraph({ onNodeClick, healthData }: AgenticArc
                 return { ...node, data: { ...node.data, ...getGraphData(graphName) } };
             })
         );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [healthData]);
 
     return (
-        <div className="h-[680px] w-full bg-[#00153a]/20 backdrop-blur-sm border border-white/5 rounded-3xl shadow-2xl overflow-hidden relative group">
+        <div className="h-[680px] w-full bg-black border border-white/20 overflow-hidden relative font-mono">
             {/* Legend */}
-            <div className="absolute top-4 left-4 z-10 flex flex-col gap-1.5 bg-black/30 backdrop-blur-sm border border-white/5 rounded-xl p-3">
-                <div className="text-[9px] font-bold text-white/30 uppercase tracking-widest mb-1">Routing Legend</div>
+            <div className="absolute top-4 left-4 z-10 flex flex-col gap-2 bg-black border border-white/20 p-3">
+                <div className="text-[10px] font-bold text-white/50 uppercase tracking-widest mb-1 border-b border-white/20 pb-1">Topology Legend</div>
                 {[
-                    { color: '#60A5FA', label: 'User / Response' },
-                    { color: '#fde68a', label: 'Moderate risk → TCA' },
-                    { color: '#f87171', label: 'High/Critical → TCA ∥ CMA' },
-                    { color: '#a78bfa', label: 'Analytics → IA' },
-                    { color: '#475569', dash: true, label: 'Direct response (no agents)' },
-                    { color: '#7e22ce', dash: true, label: 'Background STA (fire-and-forget)' },
+                    { color: '#fff', label: 'STANDARD FLOW' },
+                    { color: '#eab308', label: 'MODERATE (TCA)' },
+                    { color: '#ef4444', label: 'CRITICAL (TCA||CMA)' },
+                    { color: '#a855f7', label: 'ANALYTICS (IA)' },
+                    { color: '#fff', dash: true, label: 'ASYNC / DIRECT' },
                 ].map((item) => (
                     <div key={item.label} className="flex items-center gap-2">
-                        <svg width="22" height="8">
-                            <line x1="0" y1="4" x2="22" y2="4"
-                                stroke={item.color}
-                                strokeWidth="2"
-                                strokeDasharray={item.dash ? '4,3' : undefined}
-                            />
+                        <svg width="24" height="8">
+                            <line x1="0" y1="4" x2="24" y2="4" stroke={item.color} strokeWidth="1" strokeDasharray={item.dash ? '4,4' : undefined} />
                         </svg>
-                        <span className="text-[9px] text-white/50">{item.label}</span>
+                        <span className="text-[9px] text-white uppercase">{item.label}</span>
                     </div>
                 ))}
             </div>
 
-            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-[#00153a]/40 pointer-events-none" />
             <ReactFlow
                 nodes={nodes}
                 edges={edges}
@@ -378,10 +218,12 @@ export function AgenticArchitectureGraph({ onNodeClick, healthData }: AgenticArc
                 fitView
                 fitViewOptions={{ padding: 0.2 }}
                 attributionPosition="bottom-right"
-                className="!bg-transparent"
+                className="bg-black"
+                minZoom={0.5}
+                maxZoom={1.5}
             >
-                <Background color="#ffffff" gap={24} size={1} style={{ opacity: 0.03 }} />
-                <Controls className="!bg-white/5 !border-white/5 !m-4 !rounded-xl overflow-hidden [&>button]:!fill-white/60 [&>button:hover]:!bg-white/10 [&>button]:!border-b-white/5" />
+                <Background color="#333" gap={20} size={1} />
+                <Controls className="!bg-black !border-[0.5px] !border-white/20 [&>button]:!border-b-[0.5px] [&>button]:!border-white/20 [&>button]:!fill-white hover:[&>button]:!bg-white/10" />
             </ReactFlow>
         </div>
     );

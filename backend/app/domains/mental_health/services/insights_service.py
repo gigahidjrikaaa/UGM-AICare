@@ -42,11 +42,11 @@ class InsightsService:
         self.db = db
         self._gemini_client = None
     
-    def _get_gemini_client(self):
+    async def _get_gemini_client(self):
         """Lazy initialization of Gemini client."""
         if self._gemini_client is None:
             from app.core.llm import get_gemini_client
-            self._gemini_client = get_gemini_client()
+            self._gemini_client = await get_gemini_client()
         return self._gemini_client
     
     async def generate_weekly_report(
@@ -220,8 +220,6 @@ class InsightsService:
         Returns:
             Dict with 'summary', 'patterns', and 'recommendations'
         """
-        client = self._get_gemini_client()
-        
         # Prepare k-anonymized data summary for LLM
         high_risk_pct = (high_risk_count / total_count * 100) if total_count > 0 else 0
         avg_sentiment = sentiment_data.get('avg_sentiment', 0.0)

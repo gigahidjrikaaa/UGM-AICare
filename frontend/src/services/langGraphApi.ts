@@ -199,6 +199,9 @@ export interface AnalyticsOverviewResponse {
     successful_executions: number;
     success_rate_percent: number;
     average_execution_time_ms: number;
+    total_cost_usd: number;
+    total_prompt_tokens: number;
+    total_completion_tokens: number;
     decision_parse_health?: {
       period_days: number;
       total_attempts: number;
@@ -245,6 +248,12 @@ export interface ExecutionHistoryItem {
   total_nodes_executed: number;
   failed_nodes: number;
   success_rate: number;
+  tokens: {
+    prompt: number;
+    completion: number;
+    total: number;
+  };
+  cost_usd: number;
   agent_run_id?: string;
   error_message?: string;
 }
@@ -383,7 +392,7 @@ export const executeSTA = async (request: STAGraphRequest): Promise<STAGraphResp
  * 3. Auto-assign to available counselor
  * 4. Create case record with metadata
  * 
- * **UX Context:** Called from Service Desk dashboard when creating new cases
+ * **UX Context:** Called from Case Management dashboard when creating new cases
  */
 export const executeCMA = async (request: CMAGraphRequest): Promise<CMAGraphResponse> => {
   const response = await apiClient.post<CMAGraphResponse>(

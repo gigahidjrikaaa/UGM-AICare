@@ -9,598 +9,182 @@ from typing import TypedDict, Optional, List, Dict, Any, Literal
 from typing_extensions import NotRequired
 from datetime import datetime
 
+class TCAContext(TypedDict, total=False):
+    """TCA-specific context."""
+    intervention_plan: Optional[Dict[str, Any]]
+    intervention_type: Optional[str]
+    should_intervene: bool
+    intervention_plan_id: Optional[int]
+    safety_approved: Optional[bool]
+
+class CMAContext(TypedDict, total=False):
+    """CMA-specific context."""
+    case_id: Optional[str]
+    case_created: bool
+    case_severity: Optional[str]
+    assigned_counsellor_id: Optional[int]
+    sla_breach_at: Optional[datetime]
+    sla_hours: Optional[int]
+    assigned_to: Optional[str]
+    assignment_id: Optional[str]
+    assignment_reason: Optional[str]
+    assigned_workload: Optional[int]
+    schedule_appointment: bool
+    appointment_id: Optional[int]
+    appointment_datetime: Optional[str]
+    appointment_confirmed: bool
+    psychologist_id: Optional[int]
+    preferred_time: Optional[str]
+    scheduling_context: Optional[Dict[str, Any]]
+    notification_sent: Optional[bool]
+
+class STAContext(TypedDict, total=False):
+    """STA-specific context."""
+    risk_level: Optional[int]
+    risk_score: Optional[float]
+    severity: Optional[Literal["low", "moderate", "high", "critical"]]
+    intent: Optional[str]
+    next_step: Optional[str]
+    redacted_message: Optional[str]
+    triage_assessment_id: Optional[int]
+
+class IAContext(TypedDict, total=False):
+    """IA-specific context."""
+    question_id: Optional[str]
+    start_date: Optional[datetime]
+    end_date: Optional[datetime]
+    user_hash: str
+    query_validated: bool
+    consent_validated: bool
+    privacy_enforced: bool
+    k_threshold: int
+    query_completed: bool
+    analytics_result: Optional[Dict[str, Any]]
+    interpretation: str
+    trends: List[Dict[str, Any]]
+    summary: str
+    recommendations: List[Dict[str, Any]]
+    interpretation_completed: bool
+    pdf_url: Optional[str]
+    ia_report: Optional[str]
+    query_type: Optional[str]
+    execution_id: str
+    execution_path: List[str]
+    errors: List[str]
+    started_at: datetime
+    completed_at: datetime
+
 
 class SafetyAgentState(TypedDict, total=False):
-    """Shared state across STA, TCA, CMA, and IA agents.
-    
-    This state flows through the LangGraph workflow, with each agent
-    reading and writing relevant fields. All fields are optional to support
-    incremental state building.
-    
-    Workflow:
-        STA → populates risk assessment fields
-        TCA → populates intervention plan fields (if needed)
-        CMA → populates case management fields (if escalated)
-        IA → consumes anonymized data for analytics
-    """
-    
-    # ============================================================================
-    # INPUT CONTEXT (Provided at workflow start)
-    # ============================================================================
+    """Shared state across STA, TCA, CMA, and IA agents."""
     user_id: int
-    """User ID from database."""
-    
     session_id: str
-    """Session identifier for tracking user interactions."""
-    
     user_hash: str
-    """Anonymized user identifier for privacy."""
-    
     message: str
-    """Original user message content."""
-    
     conversation_id: int
-    """Conversation ID linking messages together."""
-    
-    # ============================================================================
-    # STA (Safety Triage Agent) OUTPUTS
-    # ============================================================================
-    risk_level: int
-    """Risk level from 0-3 (0=low, 1=moderate, 2=high, 3=critical)."""
-    
-    risk_score: float
-    """Normalized risk score from 0.0 to 1.0."""
-    
-    severity: Literal["low", "moderate", "high", "critical"]
-    """Human-readable severity classification."""
-    
-    intent: str
-    """Detected user intent (e.g., 'general_chat', 'crisis', 'academic_stress')."""
-    
-    next_step: str
-    """Routing decision: 'tca' (Therapeutic Coach), 'cma' (Case Management), or 'end'."""
-    
-    redacted_message: Optional[str]
-    """Message with PII redacted for safe storage and analytics."""
-    
-    triage_assessment_id: Optional[int]
-    """Database ID of created TriageAssessment record."""
-    
-    # ============================================================================
-    # TCA (Therapeutic Coach Agent) OUTPUTS
-    # ============================================================================
-    intervention_plan: Optional[Dict[str, Any]]
-    """Generated intervention plan with steps and resources.
-    
-    Structure:
-        {
-            "plan_steps": [{"id": "step1", "label": "...", "duration_min": 5}],
-            "resource_cards": [{"resource_id": "...", "title": "...", "url": "..."}]
-        }
-    """
-    
-    intervention_type: Optional[str]
-    """Type of intervention: 'calm_down', 'break_down_problem', 'general_coping'."""
-    
-    should_intervene: bool
-    """Flag indicating if SCA should create intervention (default False)."""
-    
-    intervention_plan_id: Optional[int]
-    """Database ID of created InterventionPlan record."""
-    
-    # ============================================================================
-    # CMA (Case Management Agent) OUTPUTS
-    # ============================================================================
-    case_id: Optional[str]
-    """Database ID (UUID string) of created Case record (for high/critical escalations)."""
-    
-    case_created: bool
-    """Flag indicating if a new case was created (default False)."""
-    
-    case_severity: Optional[str]
-    """Case severity level if case was created."""
-    
-    assigned_counsellor_id: Optional[int]
-    """ID of counsellor assigned to case (if auto-assigned)."""
-    
-    sla_breach_at: Optional[str]
-    """ISO timestamp of SLA breach deadline."""
-    
-    # ============================================================================
-    # EXECUTION METADATA (Used by ExecutionStateTracker)
-    # ============================================================================
+    parallel_crisis_mode: bool
     execution_id: str
-    """Unique ID for this graph execution (for tracking and monitoring)."""
-    
     errors: List[str]
-    """List of error messages encountered during execution."""
-    
     execution_path: List[str]
-    """List of node IDs that have executed (for debugging and analytics)."""
-    
     started_at: Optional[datetime]
-    """Timestamp when graph execution started."""
-    
     completed_at: Optional[datetime]
-    """Timestamp when graph execution completed."""
+    
+    tca_context: TCAContext
+    cma_context: CMAContext
+    sta_context: STAContext
+    ia_context: IAContext
 
-
-class STAState(SafetyAgentState):
-    """STA-specific state extension.
-    
-    Used by the Safety Triage Agent subgraph. Inherits all fields from
-    SafetyAgentState but can be extended with STA-specific fields if needed.
-    """
-    pass
-
-
-class TCAState(SafetyAgentState):
-    """TCA-specific state extension.
-    
-    Used by the Therapeutic Coach Agent subgraph. Inherits all fields from
-    SafetyAgentState but can be extended with TCA-specific fields if needed.
-    """
-    pass
-
-
-# Backward compatibility aliases (SCA→TCA and SDA→CMA rename was incomplete)
-SCAState = TCAState
-"""Alias for TCAState. Support Coach Agent (SCA) was renamed to Therapeutic Coach Agent (TCA)."""
-
-
-class CMAState(SafetyAgentState):
-    """CMA-specific state extension.
-    
-    Used by the Case Management Agent subgraph. Extends SafetyAgentState with
-    auto-assignment tracking fields and appointment scheduling fields.
-    """
-    # Assignment tracking (from auto_assign_node)
-    assigned_to: NotRequired[Optional[str]]
-    """Counsellor ID (agent_users.id) assigned to this case."""
-    
-    assignment_id: NotRequired[Optional[str]]
-    """UUID of CaseAssignment record for audit trail."""
-    
-    assignment_reason: NotRequired[Optional[str]]
-    """Reason for assignment (e.g., 'auto_assigned_lowest_workload', 'no_counsellors_available')."""
-    
-    assigned_workload: NotRequired[Optional[int]]
-    """Number of active cases the assigned counsellor has (for load balancing metrics)."""
-    
-    # ============================================================================
-    # APPOINTMENT SCHEDULING FIELDS (NEW)
-    # ============================================================================
-    schedule_appointment: NotRequired[bool]
-    """Flag indicating if student wants to schedule appointment (default False)."""
-    
-    appointment_id: NotRequired[Optional[int]]
-    """Database ID of created Appointment record (if scheduled)."""
-    
-    appointment_datetime: NotRequired[Optional[str]]
-    """ISO timestamp of scheduled appointment."""
-    
-    appointment_confirmed: NotRequired[bool]
-    """Flag indicating if appointment was successfully booked."""
-    
-    psychologist_id: NotRequired[Optional[int]]
-    """ID of psychologist/counselor for appointment."""
-    
-    preferred_time: NotRequired[Optional[str]]
-    """Student's preferred time for appointment (natural language or structured)."""
-    
-    scheduling_context: NotRequired[Optional[Dict[str, Any]]]
-    """Additional scheduling context (preferences, constraints, etc.)."""
-
-
-# Backward compatibility alias (SDA→CMA rename was incomplete)
-SDAState = CMAState
-"""Alias for CMAState. Service Desk Agent (SDA) was renamed to Case Management Agent (CMA)."""
-
-
-class OrchestratorState(SafetyAgentState):
-    """Orchestrator-specific state extension.
-    
-    Used by the master orchestrator graph that coordinates STA→TCA→CMA flows.
-    Inherits all fields from SafetyAgentState.
-    """
-    pass
-
+class STAState(SafetyAgentState): pass
+class TCAState(SafetyAgentState): pass
+class CMAState(SafetyAgentState): pass
+class OrchestratorState(SafetyAgentState): pass
 
 class IAState(TypedDict, total=False):
     """IA (Insights Agent) specific state for analytics queries.
-    
+
     This state is separate from SafetyAgentState because IA performs
     privacy-preserving analytics aggregation, not individual user support.
-    
-    Privacy Safeguards:
-    - K-anonymity enforcement (k ≥ 5)
-    - Allow-listed queries only
-    - Consent validation
-    - Differential privacy budget tracking
-    - LLM only receives k-anonymized aggregated data
     """
-    
-    # Query parameters
     question_id: str
-    """ID of allow-listed analytics question (e.g., 'crisis_trend')."""
-    
     start_date: datetime
-    """Query start date for analytics aggregation."""
-    
     end_date: datetime
-    """Query end date for analytics aggregation."""
-    
     user_hash: str
-    """Anonymized identifier of analyst requesting query."""
-    
-    # Privacy enforcement flags
     query_validated: bool
-    """Whether query parameters passed validation."""
-    
     consent_validated: bool
-    """Whether data access consent was validated."""
-    
     privacy_enforced: bool
-    """Whether k-anonymity/differential privacy was applied."""
-    
     k_threshold: int
-    """K-anonymity threshold (minimum group size for results)."""
-    
     query_completed: bool
-    """Whether analytics query completed successfully."""
-    
-    # Phase 1: Raw analytics results
     analytics_result: Dict[str, Any]
-    """Analytics query results (chart, table, notes)."""
-    
-    # Phase 2: LLM-generated insights
     interpretation: str
-    """Natural language interpretation of analytics results."""
-    
     trends: List[Dict[str, Any]]
-    """Identified patterns and trends in the data."""
-    
     summary: str
-    """Executive summary of key findings."""
-    
     recommendations: List[Dict[str, Any]]
-    """Actionable recommendations for administrators."""
-    
     interpretation_completed: bool
-    """Whether LLM interpretation completed successfully."""
-    
     pdf_url: Optional[str]
-    """URL to downloadable PDF report (if generated)."""
-    
-    # Execution tracking
+    ia_report: Optional[str]
+    query_type: Optional[str]
     execution_id: str
-    """Unique identifier for this graph execution."""
-    
     execution_path: List[str]
-    """List of node names executed in order."""
-    
     errors: List[str]
-    """List of error messages encountered during execution."""
-    
     started_at: datetime
-    """Timestamp when execution started."""
-    
     completed_at: datetime
-    """Timestamp when execution completed."""
-
 
 class AikaOrchestratorState(TypedDict, total=False):
-    """State for the unified Aika orchestrator graph.
-    
-    This state flows through the new LangGraph workflow where Aika is the
-    first decision node that determines if specialized agents are needed.
-    
-    Workflow:
-        START → aika_decision_node → [needs_agents?]
-                                       ↓           ↓
-                                  [YES: STA]   [NO: END]
-                                       ↓
-                                  [Conditional: TCA/CMA]
-                                       ↓
-                                     END
-    """
-    
-    # ============================================================================
-    # INPUT CONTEXT (Provided at workflow start)
-    # ============================================================================
+    """State for the unified Aika orchestrator graph."""
     user_id: int
-    """User ID from database."""
-    
     user_role: Literal["user", "counselor", "admin"]
-    """User's role for role-aware routing."""
-    
     session_id: str
-    """Session identifier for tracking user interactions."""
-    
     user_hash: str
-    """Anonymized user identifier for privacy."""
-    
     message: str
-    """Original user message content."""
-    
     conversation_id: Optional[str]
-    """Conversation ID for tracking multi-turn conversations."""
-    
     conversation_history: List[Dict[str, str]]
-    """Previous conversation turns for context."""
     
-    # ============================================================================
-    # AIKA DECISION NODE OUTPUTS
-    # ============================================================================
     intent: Optional[str]
-    """Detected user intent (e.g., 'emotional_support', 'crisis', 'analytics_query')."""
-    
     intent_confidence: Optional[float]
-    """Confidence score for intent classification (0.0-1.0)."""
-    
     needs_agents: bool
-    """Decision flag: True = invoke specialized agents, False = direct response."""
-    
     aika_direct_response: Optional[str]
-    """Direct conversational response from Aika (when needs_agents=False)."""
-    
     agent_reasoning: Optional[str]
-    """Explanation of why agents are/aren't needed."""
     
-    # ============================================================================
-    # INHERITED FROM SafetyAgentState (for agent execution)
-    # ============================================================================
-    # STA outputs
-    risk_level: Optional[int]
-    """Risk level from 0-3 (0=low, 1=moderate, 2=high, 3=critical)."""
+    tca_context: TCAContext
+    cma_context: CMAContext
+    sta_context: STAContext
+    ia_context: IAContext
     
-    risk_score: Optional[float]
-    """Normalized risk score from 0.0 to 1.0."""
-    
-    severity: Optional[Literal["low", "moderate", "high", "critical"]]
-    """Human-readable severity classification."""
-    
-    next_step: Optional[str]
-    """Routing decision: 'tca' (Therapeutic Coach), 'cma' (Case Management), or 'end'."""
-    
-    redacted_message: Optional[str]
-    """Message with PII redacted for safe storage."""
-    
-    triage_assessment_id: Optional[int]
-    """Database ID of created TriageAssessment record."""
-    
-    # TCA outputs
-    intervention_plan: Optional[Dict[str, Any]]
-    """Generated intervention plan with steps and resources."""
-    
-    intervention_type: Optional[str]
-    """Type of intervention: 'calm_down', 'break_down_problem', 'general_coping'."""
-    
-    should_intervene: bool
-    """Flag indicating if TCA should create intervention (default False)."""
-    
-    intervention_plan_id: Optional[int]
-    """Database ID of created InterventionPlan record."""
-    
-    safety_approved: Optional[bool]
-    """Whether TCA plan passed safety review."""
-    
-    # CMA outputs
-    case_id: Optional[int]
-    """Database ID of created Case record (for high/critical escalations)."""
-    
-    case_created: bool
-    """Flag indicating if a new case was created (default False)."""
-    
-    sla_hours: Optional[int]
-    """SLA response time in hours based on severity."""
-    
-    sla_breach_at: Optional[datetime]
-    """Timestamp when SLA will be breached."""
-    
-    assigned_counsellor_id: Optional[int]
-    """ID of counselor auto-assigned to case."""
-    
-    notification_sent: Optional[bool]
-    """Whether notification was sent to assigned counselor."""
-    
-    # ============================================================================
-    # IA (Insights Agent) OUTPUTS
-    # ============================================================================
-    ia_report: Optional[str]
-    """Synthesized report from IA (interpretation + summary)."""
-    
-    query_type: Optional[str]
-    """Type of analytics query executed."""
-    
-    analytics_result: Optional[Dict[str, Any]]
-    """Raw analytics data (chart, table)."""
-    
-    pdf_url: Optional[str]
-    """URL to downloadable PDF report."""
-    
-    # Analytics Query Params (parsed by Aika)
-    question_id: Optional[str]
-    """ID of allow-listed analytics question."""
-    
-    start_date: Optional[datetime]
-    """Query start date."""
-    
-    end_date: Optional[datetime]
-    """Query end date."""
-    
-    # ============================================================================
-    # TOOL CALLING & CONTEXT
-    # ============================================================================
     tool_calls: Optional[List[Dict[str, Any]]]
-    """List of tool calls generated by Aika."""
-    
     preferred_model: Optional[str]
-    """User's preferred LLM model."""
-    
     personal_context: Optional[Dict[str, Any]]
-    """User's personal context (profile, history) for analysis."""
-    
     force_sta_reanalysis: Optional[bool]
-    """Force re-analysis of conversation by STA."""
-
-    # ============================================================================
-    # TWO-TIER RISK MONITORING FIELDS
-    # ============================================================================
-    
-    # Tier 1: Per-message immediate risk screening (from Aika's JSON)
     immediate_risk_level: Optional[Literal["none", "low", "moderate", "high", "critical"]]
-    """Immediate risk detected by Aika in current message via JSON output."""
-    
     crisis_keywords_detected: List[str]
-    """Crisis keywords found in current message (e.g., ['suicide', 'self-harm'])."""
-    
     risk_reasoning: Optional[str]
-    """Brief explanation from Aika about why this risk level was assigned."""
-    
-    # Tier 2: Conversation-level analysis (from STA at conversation end)
     conversation_ended: bool
-    """Flag indicating conversation has ended (inactive, new convo, or explicit goodbye)."""
-    
     conversation_assessment: Optional[Dict[str, Any]]
-    """Full STA conversation-level assessment (runs on conversation end)."""
-    
     sta_analysis_completed: bool
-    """Flag indicating STA conversation analysis has been performed."""
-    
-    # Crisis management escalation
     needs_cma_escalation: bool
-    """Flag indicating CMA should be invoked for immediate crisis management."""
-    
-    # Conversation timing
     last_message_timestamp: Optional[float]
-    """Unix timestamp of last message for inactivity detection."""
-    
     previous_conversation_id: Optional[str]
-    """Previous conversation ID to detect new conversation starts."""
-    
-    # ============================================================================
-    # COVERT SCREENING (Conversational Intelligence Extraction)
-    # ============================================================================
     screening_profile: Optional[Dict[str, Any]]
-    """User's accumulated screening profile from CIE analysis."""
-    
     intervention_suggestion: Optional[Dict[str, Any]]
-    """Suggested proactive intervention if screening warrants it.
-    
-    Structure:
-        {
-            "type": str (e.g., "gentle_check_in", "coping_strategy"),
-            "priority": int (1-5),
-            "trigger": str (dimension that triggered it),
-            "approach": str (suggested approach),
-            "talking_points": List[str],
-            "execute_now": bool
-        }
-    """
-    
     screening_enhanced_response: Optional[str]
-    """Response enhanced with intervention if applicable."""
-
     screening_prompt_addition: Optional[str]
-    """Cached internal screening-awareness prompt addition for this turn."""
-
     discordance_level: Optional[Literal["none", "low", "medium", "high"]]
-    """Latest affective discordance level from self-report vs detected PAD."""
-
     discordance_reason: Optional[str]
-    """Human-readable explanation of the latest discordance level."""
-
     discordance_concerning_context: Optional[bool]
-    """True when high discordance appears alongside concerning conversational context."""
-
     discordance_escalated: Optional[bool]
-    """True when deterministic discordance policy promoted routing to TCA."""
-
-    # ============================================================================
-    # AUTOPILOT FIELDS
-    # ============================================================================
     autopilot_action_id: Optional[int]
-    """Database ID of created autopilot action when policy allows creation."""
-
     autopilot_action_type: Optional[str]
-    """Autopilot action type selected from intervention and risk context."""
-
     autopilot_policy_decision: Optional[str]
-    """Policy decision for autopilot action (allow or deny)."""
-
     decision_event_id: Optional[int]
-    """Database ID of recorded decision audit event for this message turn."""
-
     attestation_record_id: Optional[int]
-    """Optional linked attestation record id when decision is tied to attestation flow."""
-    
-    # ============================================================================
-    # FINAL RESPONSE
-    # ============================================================================
     final_response: Optional[str]
-    """Final synthesized response to user (either from Aika or agents)."""
-    
     response_source: Optional[Literal["aika_direct", "agents", "aika_react_tools"]]
-    """Source of final response: 'aika_direct', 'agents', or 'aika_react_tools'."""
-
-    # ============================================================================
-    # FALLBACK / DEGRADED-MODE SIGNALLING
-    # ============================================================================
     is_fallback: Optional[bool]
-    """True when the response was produced by an error-recovery branch (rate-limit or
-    model error), not by normal orchestration.  Used by the frontend to render the
-    message with a distinct warning style and offer a retry action."""
-
     fallback_type: Optional[Literal["rate_limit", "model_error"]]
-    """Reason for the fallback.
-    
-    - ``rate_limit``: All Gemini API keys were exhausted (HTTP 429 / RESOURCE_EXHAUSTED).
-    - ``model_error``: An unexpected LLM or graph error occurred.
-    """
-
     retry_after_ms: Optional[int]
-    """Suggested client-side cooldown before retrying, in milliseconds.  Derived from
-    the ``Retry-After`` header when available; defaults to 60 000 ms (60 s) for
-    rate-limit fallbacks and 0 for model errors."""
-    
-    # ============================================================================
-    # METADATA & EXECUTION TRACKING
-    # ============================================================================
     execution_id: Optional[str]
-    """Unique identifier for this graph execution."""
-    
     execution_path: List[str]
-    """List of node names executed in order.
-
-    Design note: intentionally plain List without an ``operator.add`` reducer.
-    All nodes receive the full accumulated state, mutate it, and return the
-    full dict.  A reducer would double-count entries on every sequential
-    update (current + full-mutated = duplicate).  Parallel fan-out (TCA ∥
-    CMA) happens inside a *single* LangGraph node (``parallel_crisis_node``)
-    via ``asyncio.gather`` with a hand-written merge loop, so LangGraph's
-    native reducer is not required here.
-    """
-
     agents_invoked: List[str]
-    """List of agents that were invoked (e.g., ['STA', 'TCA']).
-
-    See ``execution_path`` design note — same rationale applies.
-    """
-
     errors: List[str]
-    """List of error messages encountered during execution.
-
-    See ``execution_path`` design note — same rationale applies.
-    """
-    
     started_at: Optional[datetime]
-    """Timestamp when execution started."""
-    
     completed_at: Optional[datetime]
-    """Timestamp when execution completed."""
-    
     processing_time_ms: Optional[float]
-    """Total processing time in milliseconds."""
-
-

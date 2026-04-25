@@ -8,7 +8,7 @@ All tools use the @register_tool decorator pattern for zero-redundancy architect
 
 Architecture:
 - registry.py: Core decorator pattern and tool registry
-- agent_tools.py: Agent orchestration tools (STA, SCA, SDA, IA, general_query)
+- agent_tools.py: Agent orchestration tools (STA, TCA, CMA, IA, general_query)
 - scheduling_tools.py: Appointment scheduling tools
 - Tool registry: Global _TOOL_REGISTRY dict with auto-generated Gemini schemas
 
@@ -42,7 +42,7 @@ from .registry import (
 # These imports MUST happen after registry is imported
 try:
     from . import agent_tools  # noqa: F401
-    logger.info("✅ Loaded agent_tools (STA, SCA, SDA, IA, general_query)")
+    logger.info("✅ Loaded agent_tools (STA, TCA, CMA, IA, general_query)")
 except ImportError as e:
     logger.error(f"❌ Could not load agent_tools: {e}")
 

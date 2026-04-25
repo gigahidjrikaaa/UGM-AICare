@@ -96,8 +96,8 @@ def get_aika_tools(
         # Tools to exclude (agent runners that conflict with LangGraph routing)
         excluded_tools = {
             "run_safety_triage_agent",
-            "run_support_coach_agent",
-            "run_service_desk_agent",
+            "run_therapeutic_coach_agent",
+            "run_case_management_agent",
             "run_insights_agent",
             "general_query",
         }

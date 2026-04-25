@@ -89,19 +89,21 @@ class IAGraphService:
             }
         )
         
-        # Initialize state
+        # Initialize state with nested ia_context
         initial_state: Dict[str, Any] = {
-            "question_id": question_id,
-            "start_date": start_date,
-            "end_date": end_date,
-            "user_hash": user_hash,
+            "ia_context": {
+                "question_id": question_id,
+                "start_date": start_date,
+                "end_date": end_date,
+                "user_hash": user_hash,
+                "query_validated": False,
+                "consent_validated": False,
+                "privacy_enforced": False,
+                "query_completed": False,
+            },
             "execution_id": execution_id,
             "errors": [],
             "execution_path": [],
-            "query_validated": False,
-            "consent_validated": False,
-            "privacy_enforced": False,
-            "query_completed": False,
             "started_at": datetime.now()
         }
         
@@ -129,8 +131,8 @@ class IAGraphService:
             
             logger.info(
                 f"IA graph execution completed: "
-                f"question_id={final_state.get('question_id')}, "
-                f"query_completed={final_state.get('query_completed', False)}, "
+                f"question_id={final_state.get('ia_context', {}).get('question_id')}, "
+                f"query_completed={final_state.get('ia_context', {}).get('query_completed', False)}, "
                 f"errors={len(final_state.get('errors', []))}"
             )
             

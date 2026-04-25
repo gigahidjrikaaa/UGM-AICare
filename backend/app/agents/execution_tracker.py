@@ -8,6 +8,7 @@ from typing import Dict, List, Optional, Set, Callable, Any
 from uuid import uuid4
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
+from sqlalchemy.dialects.postgresql import insert
 
 from app.domains.mental_health.schemas.enhanced_agents import (
     GraphExecutionState,
@@ -42,16 +43,9 @@ async def _ensure_langgraph_execution_row(
     before the execution-start task commits, which would violate the FK from
     `langgraph_node_executions.execution_id` to `langgraph_executions.execution_id`.
 
-    This helper removes that race by creating the execution row on-demand.
+    This helper removes that race by creating the execution row on-demand atomically.
     """
-
-    existing = await db.execute(
-        select(LangGraphExecution).where(LangGraphExecution.execution_id == execution_id)
-    )
-    if existing.scalar_one_or_none() is not None:
-        return
-
-    db_execution = LangGraphExecution(
+    stmt = insert(LangGraphExecution).values(
         execution_id=execution_id,
         agent_run_id=agent_run_id,
         graph_name=graph_name,
@@ -59,9 +53,9 @@ async def _ensure_langgraph_execution_row(
         status="running",
         input_data=input_data,
         execution_context={"agent_name": agent_name} if agent_name else None,
-    )
-    db.add(db_execution)
-    # Flush within the caller's transaction so dependent inserts can proceed.
+    ).on_conflict_do_nothing(index_elements=["execution_id"])
+
+    await db.execute(stmt)
     await db.flush()
 
 class ExecutionStateTracker:
@@ -84,6 +78,20 @@ class ExecutionStateTracker:
         }
         self._decision_parse_alert_cooldown_s: int = 900  # 15 minutes
         self._last_decision_parse_alert_ts: float = 0.0
+        self._pending_tasks: Set[asyncio.Task] = set()
+        
+    def _fire_task(self, coro) -> asyncio.Task:
+        """Safely track background tasks to ensure they complete on shutdown."""
+        task = asyncio.create_task(coro)
+        self._pending_tasks.add(task)
+        task.add_done_callback(self._pending_tasks.discard)
+        return task
+
+    async def shutdown(self) -> None:
+        """Gracefully await all pending tracking operations."""
+        if self._pending_tasks:
+            await asyncio.gather(*self._pending_tasks, return_exceptions=True)
+
         
     def start_execution(self, graph_id: str, agent_name: str, agent_run_id: Optional[int] = None, 
                        input_data: Optional[Dict] = None) -> str:
@@ -100,7 +108,7 @@ class ExecutionStateTracker:
         
         # Persist to database (Phase 2 enhancement)
         if self._persist_to_db:
-            asyncio.create_task(self._persist_execution_start(
+            self._fire_task(self._persist_execution_start(
                 execution_id, graph_id, agent_name, agent_run_id, input_data
             ))
         
@@ -139,7 +147,7 @@ class ExecutionStateTracker:
         
         # Persist to database (Phase 2 enhancement)
         if self._persist_to_db:
-            asyncio.create_task(self._persist_node_execution(
+            self._fire_task(self._persist_node_execution(
                 execution_id, node_id, "running", agent_id, input_data,
                 node_type=node_type, retry_count=retry_count
             ))
@@ -168,14 +176,14 @@ class ExecutionStateTracker:
                 
                 # Persist to database (Phase 2 enhancement)
                 if self._persist_to_db:
-                    asyncio.create_task(self._persist_node_execution(
+                    self._fire_task(self._persist_node_execution(
                         execution_id, node_id, "completed", None, None, output_data, 
                         None, node.execution_time_ms
                     ))
                     
                     # Record performance metrics
                     if node.execution_time_ms:
-                        asyncio.create_task(self._persist_performance_metric(
+                        self._fire_task(self._persist_performance_metric(
                             execution_id, "node_execution_time", node.execution_time_ms, 
                             "milliseconds", "performance", node_id
                         ))
@@ -204,13 +212,13 @@ class ExecutionStateTracker:
                 
                 # Persist to database (Phase 2 enhancement)
                 if self._persist_to_db:
-                    asyncio.create_task(self._persist_node_execution(
+                    self._fire_task(self._persist_node_execution(
                         execution_id, node_id, "failed", None, None, None, error, 
                         node.execution_time_ms
                     ))
                     
                     # Create failure alert
-                    asyncio.create_task(self._create_alert(
+                    self._fire_task(self._create_alert(
                         alert_type="error",
                         severity="high",
                         title=f"Node Execution Failed: {node_id}",
@@ -272,7 +280,7 @@ class ExecutionStateTracker:
             
         # Persist to database (Phase 2 enhancement)
         if self._persist_to_db:
-            asyncio.create_task(self._persist_execution_completion(
+            self._fire_task(self._persist_execution_completion(
                 execution_id, success, error, output_data
             ))
             
@@ -321,7 +329,7 @@ class ExecutionStateTracker:
         for callback in self._subscribers:
             try:
                 if asyncio.iscoroutinefunction(callback):
-                    asyncio.create_task(callback(event_type, execution))
+                    self._fire_task(callback(event_type, execution))
                 else:
                     callback(event_type, execution)
             except Exception as e:
@@ -492,7 +500,7 @@ class ExecutionStateTracker:
         """Record a custom LangGraph metric when an execution_id is available."""
         if not execution_id:
             return
-        asyncio.create_task(
+        self._fire_task(
             self._persist_performance_metric(
                 execution_id=execution_id,
                 metric_name=metric_name,
@@ -550,7 +558,7 @@ class ExecutionStateTracker:
                 node_id="aika_decision",
             )
 
-        asyncio.create_task(self._check_decision_parse_failure_threshold(days=1))
+        self._fire_task(self._check_decision_parse_failure_threshold(days=1))
 
     async def _check_decision_parse_failure_threshold(self, *, days: int = 1) -> None:
         """Create warning/critical alerts when parse-failure rate breaches thresholds."""
@@ -638,7 +646,7 @@ class ExecutionStateTracker:
                 for callback in self._subscribers:
                     try:
                         if asyncio.iscoroutinefunction(callback):
-                            asyncio.create_task(callback("alert_created", {
+                            self._fire_task(callback("alert_created", {
                                 "alert_type": alert_type,
                                 "severity": severity,
                                 "title": title,
@@ -661,7 +669,7 @@ class ExecutionStateTracker:
     def _check_performance_thresholds(self, execution_id: str, execution_time_ms: float) -> None:
         """Check performance thresholds and create alerts if needed."""
         if execution_time_ms > self._alert_thresholds["execution_time_critical_ms"]:
-            asyncio.create_task(self._create_alert(
+            self._fire_task(self._create_alert(
                 alert_type="performance",
                 severity="critical",
                 title="Critical Execution Time",
@@ -672,7 +680,7 @@ class ExecutionStateTracker:
                 metric_name="execution_time_ms"
             ))
         elif execution_time_ms > self._alert_thresholds["execution_time_warning_ms"]:
-            asyncio.create_task(self._create_alert(
+            self._fire_task(self._create_alert(
                 alert_type="performance",
                 severity="medium",
                 title="Slow Execution Warning",

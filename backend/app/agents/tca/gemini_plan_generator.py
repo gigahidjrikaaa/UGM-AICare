@@ -1,5 +1,5 @@
 """
-Gemini-powered Support Coach Plan Generator
+Gemini-powered Therapeutic Coach Plan Generator
 
 This module uses Gemini AI to generate hyper-personalized support plans
 based on user context, intent, and support plan type.
@@ -320,10 +320,10 @@ async def generate_personalized_plan(
         
         logger.debug(f"User prompt: {user_prompt[:200]}...")
         
-        # Call Gemini API - Use Gemini Pro for TCA (complex reasoning) with fallback on quota/rate limits
+        # Call Google SDK model - use Gemma 4 31B for complex reasoning with fallback on quota/rate limits
         response_text = await generate_gemini_response(
             history=[{"role": "user", "content": user_prompt}],
-            model=getattr(llm, "GEMINI_PRO_MODEL", "gemini-3-pro-preview"),
+            model=getattr(llm, "GEMINI_PRO_MODEL", "gemma-4-31b-it"),
             max_tokens=2048,
             temperature=0.7,  # Balance between creativity and consistency
             system_prompt=system_prompt,

@@ -2,7 +2,7 @@
 Intervention Tools - CBT and Treatment Plans
 
 This module provides tools for managing intervention plans, CBT modules,
-and treatment recommendations. Used primarily by SCA agent.
+and treatment recommendations. Used primarily by TCA agent.
 
 Tools:
 - get_available_cbt_modules: List available CBT modules

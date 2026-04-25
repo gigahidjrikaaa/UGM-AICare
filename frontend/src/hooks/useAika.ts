@@ -110,7 +110,7 @@ type AikaStreamEventType =
   | 'tool_start'
   | 'tool_end'
   | 'tool_use'
-  | 'partial_response'
+  | 'text_chunk'
   | 'status'
   | 'thinking'
   | 'reasoning'
@@ -288,16 +288,21 @@ export function useAika(options: UseAikaOptions = {}) {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = '';
+      const MAX_BUFFER_SIZE = 2 * 1024 * 1024; // 2 MB
 
       let finalResponse = '';
       let finalMetadata: AikaMetadata | null = null;
       const invokedAgents = new Set<string>();
+      let receivedStreamChunks = false;
 
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
 
-        buffer += decoder.decode(value, { stream: true });
+        const decoded = decoder.decode(value, { stream: true });
+        if (buffer.length + decoded.length <= MAX_BUFFER_SIZE) {
+          buffer += decoded;
+        }
         const { frames, remainder } = splitSseFrames(buffer);
         buffer = remainder;
 
@@ -335,8 +340,9 @@ export function useAika(options: UseAikaOptions = {}) {
                 onToolEvent?.({ type: 'tool_use', tools: event.tools, timestamp: new Date().toISOString() });
                 break;
 
-              case 'partial_response':
+              case 'text_chunk':
                 if (typeof event.text === 'string') {
+                  receivedStreamChunks = true;
                   onPartialResponse?.(event.text);
                 }
                 break;
@@ -379,7 +385,7 @@ export function useAika(options: UseAikaOptions = {}) {
                 break;
 
               case 'complete': {
-                finalResponse = event.response || '';
+                finalResponse = event.response || finalResponse;
                 const mapped = buildAikaMetadataFromComplete(event.metadata, invokedAgents);
                 if (mapped) {
                   finalMetadata = mapped;

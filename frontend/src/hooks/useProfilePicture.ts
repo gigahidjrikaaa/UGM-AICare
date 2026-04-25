@@ -12,6 +12,20 @@ interface UseProfilePictureResult {
   isLoading: boolean;
 }
 
+function normalizeAvatarUrl(url: string | null | undefined): string | null {
+  if (!url) {
+    return null;
+  }
+
+  // Next/Image blocks remote SVG optimization by default.
+  // DiceBear supports PNG endpoints, so normalize legacy SVG URLs to PNG.
+  if (url.includes("api.dicebear.com")) {
+    return url.replace(/\/svg(\?|$)/, "/png$1");
+  }
+
+  return url;
+}
+
 /**
  * Canonical hook for resolving the current user's profile picture.
  *
@@ -39,7 +53,7 @@ export function useProfilePicture(): UseProfilePictureResult {
         const overview = await fetchUserProfileOverview();
         if (!cancelled) {
           const resolved =
-            overview.header.avatar_url ||
+            normalizeAvatarUrl(overview.header.avatar_url) ||
             session?.user?.image ||
             DEFAULT_AVATAR;
           setSrc(resolved);

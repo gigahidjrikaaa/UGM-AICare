@@ -9,12 +9,12 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.agents.cma.schemas import (
-    SDAAssignRequest,
-    SDAAssignResponse,
-    SDACase,
-    SDACloseRequest,
-    SDACloseResponse,
-    SDAListCasesResponse,
+    CMAAssignRequest,
+    CMAAssignResponse,
+    CMACase,
+    CMACloseRequest,
+    CMACloseResponse,
+    CMAListCasesResponse,
 )
 from app.database import get_async_db
 from app.models import CaseAssignment  # Core infrastructure model
@@ -29,7 +29,7 @@ class CaseManagementService:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def list_cases(self, status_filter: str | None = None) -> SDAListCasesResponse:
+    async def list_cases(self, status_filter: str | None = None) -> CMAListCasesResponse:
         query = select(Case).order_by(Case.created_at.desc())
         if status_filter:
             try:
@@ -41,9 +41,9 @@ class CaseManagementService:
         result = await self._session.execute(query)
         cases = result.scalars().all()
         payload = [self._to_schema(case) for case in cases]
-        return SDAListCasesResponse(cases=payload)
+        return CMAListCasesResponse(cases=payload)
 
-    async def assign_case(self, payload: SDAAssignRequest) -> SDAAssignResponse:
+    async def assign_case(self, payload: CMAAssignRequest) -> CMAAssignResponse:
         case = await self._get_case_or_404(payload.case_id)
 
         previous_assignee = cast(str | None, getattr(case, "assigned_to", None))
@@ -94,9 +94,9 @@ class CaseManagementService:
             },
         )
 
-        return SDAAssignResponse(case_id=str(case.id), assigned_to=assignee.id)
+        return CMAAssignResponse(case_id=str(case.id), assigned_to=assignee.id)
 
-    async def close_case(self, payload: SDACloseRequest) -> SDACloseResponse:
+    async def close_case(self, payload: CMACloseRequest) -> CMACloseResponse:
         case = await self._get_case_or_404(payload.case_id)
         case.status = CaseStatusEnum.closed  # type: ignore[assignment]
         case.closure_reason = payload.closure_reason  # type: ignore[assignment]
@@ -105,7 +105,7 @@ class CaseManagementService:
         await self._session.refresh(case)
         status_value = case.status.value if isinstance(case.status, CaseStatusEnum) else CaseStatusEnum.new.value
         closed_at = cast(datetime, case.updated_at)
-        return SDACloseResponse(case_id=str(case.id), status=status_value, closed_at=closed_at)
+        return CMACloseResponse(case_id=str(case.id), status=status_value, closed_at=closed_at)
 
     async def _get_case_or_404(self, case_id: str) -> Case:
         try:
@@ -120,7 +120,7 @@ class CaseManagementService:
         return case
 
     @staticmethod
-    def _to_schema(case: Case) -> SDACase:
+    def _to_schema(case: Case) -> CMACase:
         created_at = cast(datetime, case.created_at)
         updated_at = cast(datetime, case.updated_at)
         status_value = case.status.value if isinstance(case.status, CaseStatusEnum) else CaseStatusEnum.new.value
@@ -131,7 +131,7 @@ class CaseManagementService:
         summary_redacted = cast(str | None, getattr(case, "summary_redacted", None))
         sla_breach_at = cast(datetime | None, getattr(case, "sla_breach_at", None))
 
-        return SDACase(
+        return CMACase(
             id=str(case.id),
             created_at=created_at,
             updated_at=updated_at,

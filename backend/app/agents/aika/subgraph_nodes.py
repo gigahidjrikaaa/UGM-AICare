@@ -9,8 +9,8 @@ Each node wraps one specialist sub-agent (TCA, CMA, IA) with consistent:
 
 Public API used in the LangGraph graph:
     parallel_crisis_node      Fan-out: TCA ∥ CMA concurrently (high/critical risk).
-    execute_sca_subgraph      TCA only (moderate risk path).
-    execute_sda_subgraph      CMA only (called internally by parallel_crisis_node).
+    execute_tca_subgraph      TCA only (moderate risk path).
+    execute_cma_subgraph      CMA only (called internally by parallel_crisis_node).
     execute_ia_subgraph       Insights Agent (analytics queries).
     synthesize_final_response  Compose the final Aika reply from agent outputs.
 
@@ -58,13 +58,13 @@ class _AsyncInvokable(Protocol):
 def _build_tca_direct_response(state: AikaOrchestratorState) -> str:
     """Build the warm holding response for the TCA-only (moderate-risk) path.
 
-    Called from ``execute_sca_subgraph`` when ``aika_direct_response`` is not
+    Called from ``execute_tca_subgraph`` when ``aika_direct_response`` is not
     yet set.  Keeps the user informed while the plan is stored.
 
     Pure function — depends only on state fields.
     """
-    plan_id = state.get("intervention_plan_id")
-    intent = state.get("intent", "emotional_support")
+    plan_id = state.get("tca_context", {}).get("intervention_plan_id")
+    intent = state.get("sta_context", {}).get("intent", "emotional_support")
 
     plan_mention = (
         "Aku sudah buatkan rencana dukungan yang disesuaikan buat kamu — "
@@ -73,7 +73,7 @@ def _build_tca_direct_response(state: AikaOrchestratorState) -> str:
         else ""
     )
 
-    if state.get("should_intervene"):
+    if state.get("tca_context", {}).get("should_intervene"):
         return (
             "Makasih banget udah mau cerita ke aku. "
             "Aku dengerin dan peduli sama kamu. "
@@ -120,32 +120,32 @@ def _build_synthesis_prompt(
     if "STA" in agents_invoked:
         sections.append(
             "- Safety Triage (STA):\n"
-            f"  * Risk Level: {state.get('severity', 'unknown')}\n"
-            f"  * Intent: {state.get('intent', 'unknown')}\n"
-            f"  * Risk Score: {state.get('risk_score', 0.0)}"
+            f"  * Risk Level: {state.get("sta_context", {}).get("severity", 'unknown')}\n"
+            f"  * Intent: {state.get("sta_context", {}).get("intent", 'unknown')}\n"
+            f"  * Risk Score: {state.get("sta_context", {}).get("risk_score", 0.0)}"
         )
 
     if "TCA" in agents_invoked:
         sections.append(
             "- Support Coach (TCA):\n"
-            f"  * Intervention Created: {state.get('should_intervene', False)}\n"
-            f"  * Intervention Type: {state.get('intervention_type', 'none')}\n"
-            f"  * Plan ID: {state.get('intervention_plan_id', 'none')}"
+            f"  * Intervention Created: {state.get("tca_context", {}).get("should_intervene", False)}\n"
+            f"  * Intervention Type: {state.get("tca_context", {}).get("intervention_type", 'none')}\n"
+            f"  * Plan ID: {state.get("tca_context", {}).get("intervention_plan_id", 'none')}"
         )
 
     if "CMA" in agents_invoked:
         sections.append(
             "- Service Desk (CMA):\n"
-            f"  * Case Created: {state.get('case_created', False)}\n"
-            f"  * Case ID: {state.get('case_id', 'none')}\n"
-            f"  * Assigned Counselor: {state.get('assigned_counsellor_id', 'none')}"
+            f"  * Case Created: {state.get("cma_context", {}).get("case_created", False)}\n"
+            f"  * Case ID: {state.get("cma_context", {}).get("case_id", 'none')}\n"
+            f"  * Assigned Counselor: {state.get("cma_context", {}).get("assigned_counsellor_id", 'none')}"
         )
 
     if "IA" in agents_invoked:
         sections.append(
             "- Insights Agent (IA):\n"
-            f"  * Report: {state.get('ia_report', 'No report generated')}\n"
-            f"  * Query Type: {state.get('query_type', 'unknown')}"
+            f"  * Report: {state.get("ia_context", {}).get("ia_report", 'No report generated')}\n"
+            f"  * Query Type: {state.get("ia_context", {}).get("query_type", 'unknown')}"
         )
 
     sections.append(
@@ -170,7 +170,7 @@ def _build_synthesis_prompt(
 # ===========================================================================
 
 @trace_agent("TCA_Subgraph")
-async def execute_sca_subgraph(
+async def execute_tca_subgraph(
     state: AikaOrchestratorState,
     config: RunnableConfig,
 ) -> AikaOrchestratorState:
@@ -194,17 +194,17 @@ async def execute_sca_subgraph(
     db: AsyncSession = config["configurable"]["db"]
     execution_id = state.get("execution_id")
     if execution_id:
-        execution_tracker.start_node(execution_id, "aika::sca", "aika")
+        execution_tracker.start_node(execution_id, "aika::tca", "aika")
 
     try:
         from app.agents.tca.tca_graph import get_tca_graph
 
         tca_graph = cast(_AsyncInvokable, get_tca_graph())
-        sca_result = cast(dict[str, Any], await tca_graph.ainvoke(cast(dict[str, Any], state), config={"configurable": {"db": db}}))
+        tca_result = cast(dict[str, Any], await tca_graph.ainvoke(cast(dict[str, Any], state), config={"configurable": {"db": db}}))
 
-        cast(dict[str, Any], state).update(sca_result)
+        cast(dict[str, Any], state).update(tca_result)
         state.setdefault("agents_invoked", []).append("TCA")
-        state.setdefault("execution_path", []).append("sca_subgraph")
+        state.setdefault("execution_path", []).append("tca_subgraph")
 
         # Pre-build a holding response for the moderate path to avoid an extra
         # LLM call in synthesize_final_response for this common case.
@@ -219,17 +219,17 @@ async def execute_sca_subgraph(
         if execution_id:
             execution_tracker.complete_node(
                 execution_id,
-                "aika::sca",
+                "aika::tca",
                 metrics={
-                    "should_intervene": sca_result.get("should_intervene", False),
-                    "plan_id": sca_result.get("intervention_plan_id"),
+                    "should_intervene": tca_result.get("should_intervene", False),
+                    "plan_id": tca_result.get("intervention_plan_id"),
                 },
             )
 
         logger.info(
             "TCA completed: should_intervene=%s, plan_id=%s",
-            sca_result.get("should_intervene"),
-            sca_result.get("intervention_plan_id"),
+            tca_result.get("should_intervene"),
+            tca_result.get("intervention_plan_id"),
         )
 
     except Exception as exc:
@@ -237,13 +237,13 @@ async def execute_sca_subgraph(
         logger.error(error_msg, exc_info=True)
         state.setdefault("errors", []).append(error_msg)
         if execution_id:
-            execution_tracker.fail_node(execution_id, "aika::sca", str(exc))
+            execution_tracker.fail_node(execution_id, "aika::tca", str(exc))
 
     return state
 
 
 @trace_agent("CMA_Subgraph")
-async def execute_sda_subgraph(
+async def execute_cma_subgraph(
     state: AikaOrchestratorState,
     db: AsyncSession,
 ) -> AikaOrchestratorState:
@@ -262,32 +262,32 @@ async def execute_sda_subgraph(
     """
     execution_id = state.get("execution_id")
     if execution_id:
-        execution_tracker.start_node(execution_id, "aika::sda", "aika")
+        execution_tracker.start_node(execution_id, "aika::cma", "aika")
 
     try:
         from app.agents.cma.cma_graph import get_cma_graph
 
         cma_graph = cast(_AsyncInvokable, get_cma_graph())
-        sda_result = cast(dict[str, Any], await cma_graph.ainvoke(cast(dict[str, Any], state), config={"configurable": {"db": db}}))
+        cma_result = cast(dict[str, Any], await cma_graph.ainvoke(cast(dict[str, Any], state), config={"configurable": {"db": db}}))
 
-        cast(dict[str, Any], state).update(sda_result)
+        cast(dict[str, Any], state).update(cma_result)
         state.setdefault("agents_invoked", []).append("CMA")
-        state.setdefault("execution_path", []).append("sda_subgraph")
+        state.setdefault("execution_path", []).append("cma_subgraph")
 
         if execution_id:
             execution_tracker.complete_node(
                 execution_id,
-                "aika::sda",
+                "aika::cma",
                 metrics={
-                    "case_created": sda_result.get("case_created", False),
-                    "case_id": str(sda_result.get("case_id")) if sda_result.get("case_id") else None,
+                    "case_created": cma_result.get("case_created", False),
+                    "case_id": str(cma_result.get("case_id")) if cma_result.get("case_id") else None,
                 },
             )
 
         logger.info(
             "CMA completed: case_id=%s, case_created=%s",
-            sda_result.get("case_id"),
-            sda_result.get("case_created"),
+            cma_result.get("case_id"),
+            cma_result.get("case_created"),
         )
 
     except Exception as exc:
@@ -295,7 +295,7 @@ async def execute_sda_subgraph(
         logger.error(error_msg, exc_info=True)
         state.setdefault("errors", []).append(error_msg)
         if execution_id:
-            execution_tracker.fail_node(execution_id, "aika::sda", str(exc))
+            execution_tracker.fail_node(execution_id, "aika::cma", str(exc))
 
     return state
 
@@ -345,9 +345,14 @@ async def parallel_crisis_node(
         tca_input = cast(dict[str, Any], state).copy()
         cma_input = cast(dict[str, Any], state).copy()
 
+        # Flag TCA that it is running in parallel crisis mode so that its
+        # safety_review_node does NOT block plan persistence for high/critical
+        # severity — CMA handles the escalation, TCA provides coping support.
+        tca_input["parallel_crisis_mode"] = True
+
         tca_result, cma_result = await asyncio.gather(
-            execute_sca_subgraph(cast(AikaOrchestratorState, tca_input), config),
-            execute_sda_subgraph(cast(AikaOrchestratorState, cma_input), db),
+            execute_tca_subgraph(cast(AikaOrchestratorState, tca_input), config),
+            execute_cma_subgraph(cast(AikaOrchestratorState, cma_input), db),
             return_exceptions=True,
         )
 
@@ -379,15 +384,15 @@ async def parallel_crisis_node(
                 metrics={
                     "tca_success": not isinstance(tca_result, Exception),
                     "cma_success": not isinstance(cma_result, Exception),
-                    "case_created": state.get("case_created", False),
-                    "plan_created": state.get("should_intervene", False),
+                    "case_created": state.get("cma_context", {}).get("case_created", False),
+                    "plan_created": state.get("tca_context", {}).get("should_intervene", False),
                 },
             )
 
         logger.warning(
             "Parallel Crisis complete: case_created=%s, plan_created=%s",
-            state.get("case_created"),
-            state.get("should_intervene"),
+            state.get("cma_context", {}).get("case_created"),
+            state.get("tca_context", {}).get("should_intervene"),
         )
 
     except Exception as exc:
@@ -434,9 +439,9 @@ async def execute_ia_subgraph(
 
         now = datetime.utcnow()
         ia_input: IAState = {
-            "question_id": state.get("question_id") or "crisis_trend",
-            "start_date": state.get("start_date") or (now - timedelta(days=30)),
-            "end_date": state.get("end_date") or now,
+            "question_id": state.get("ia_context", {}).get("question_id") or "crisis_trend",
+            "start_date": state.get("ia_context", {}).get("start_date") or (now - timedelta(days=30)),
+            "end_date": state.get("ia_context", {}).get("end_date") or now,
             "user_hash": state.get("user_hash") or "user_%s" % state.get("user_id", "unknown"),
         }
         ia_result = cast(dict[str, Any], await ia_graph.ainvoke(ia_input, config={"configurable": {"db": db}}))
@@ -521,7 +526,7 @@ async def synthesize_final_response(
         # Choose the synthesis model based on intent and role so that high-stakes
         # paths (crisis/analytics) get the pro model while routine paths stay fast.
         synthesis_model = select_gemini_model(
-            intent=state.get("intent"),
+            intent=state.get("sta_context", {}).get("intent"),
             role=normalized_role,
             has_tools=False,
             preferred_model=state.get("preferred_model"),
@@ -618,7 +623,7 @@ async def execute_sta_subgraph(
         error_msg = "STA subgraph failed: %s" % exc
         logger.error(error_msg, exc_info=True)
         state.setdefault("errors", []).append(error_msg)
-        state["next_step"] = "end"  # Safe fallback — prevents graph from hanging.
+        state.setdefault("sta_context", {})["next_step"] = "end"  # Safe fallback — prevents graph from hanging.
         if execution_id:
             execution_tracker.fail_node(execution_id, "aika::sta", str(exc))
 

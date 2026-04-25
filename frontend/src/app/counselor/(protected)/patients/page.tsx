@@ -355,7 +355,7 @@ export default function CounselorPatientsPage() {
                           <div className="text-sm font-semibold text-white truncate">
                             {patient.user_email || 'Anonymous User'}
                           </div>
-                          <div className="text-xs text-white/50 font-mono mt-1 truncate max-w-[200px]" title={patient.user_hash}>
+                          <div className="text-xs text-white/50 font-mono mt-1 truncate max-w-50" title={patient.user_hash}>
                             {patient.user_hash}
                           </div>
                         </div>
@@ -466,7 +466,14 @@ export default function CounselorPatientsPage() {
                     <td className="px-6 py-5 whitespace-nowrap text-right">
                       <div className="flex items-center justify-end gap-2">
                         <button
-                          onClick={() => router.push(`/counselor/cases?search=${encodeURIComponent(patient.user_hash)}`)}
+                          onClick={() => {
+                            const params = new URLSearchParams({
+                              search: patient.user_hash,
+                              status: 'all',
+                              source: 'patients',
+                            });
+                            router.push(`/counselor/cases?${params.toString()}`);
+                          }}
                           className="px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 rounded-lg text-xs font-medium text-white/80 hover:text-white transition-all shadow-sm flex items-center gap-1.5"
                         >
                           <FiCalendar className="w-3.5 h-3.5" />

@@ -3,9 +3,11 @@ from __future__ import annotations
 
 import hashlib
 import logging
+import time
 from typing import Optional
 
 from fastapi import Cookie, Depends, Header, HTTPException, Request, status  # type: ignore
+from app.core.cache import get_cache_service
 from sqlalchemy import select
 from sqlalchemy.exc import DBAPIError
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -17,6 +19,13 @@ from app.database import get_async_db
 from app.models import User
 
 logger = logging.getLogger(__name__)
+
+_AUTH_CACHE: dict[int, tuple[float, User]] = {}
+_AUTH_CACHE_TTL = 60  # seconds
+
+def invalidate_auth_cache(user_id: int) -> None:
+    """Remove cached auth data for a user. Call on profile/role changes."""
+    _AUTH_CACHE.pop(user_id, None)
 
 
 def get_token_from_request(
@@ -114,7 +123,15 @@ def _build_auth_user_query(user_id: int, eager_normalized_relations: bool):
         select(User)
         .options(
             lazyload("*"),
-            load_only(User.id, User.is_active, User.role, User.google_sub),
+            load_only(
+                User.id,
+                User.is_active,
+                User.role,
+                User.google_sub,
+                User.preferred_name,
+                User.first_name,
+                User.name,
+            ),
         )
         .where(User.id == user_id)
     )
@@ -139,31 +156,48 @@ async def _resolve_current_active_user(
             headers={"WWW-Authenticate": 'Bearer error="invalid_token"'},
         )
 
-    auth_user_query = _build_auth_user_query(
-        user_id=user_id,
-        eager_normalized_relations=eager_normalized_relations,
-    )
+    user = None
 
-    try:
-        result = await db.execute(auth_user_query)
-        user = result.unique().scalar_one_or_none()
-    except DBAPIError as exc:
-        logger.warning(
-            "Transient DB error while resolving current user id=%s; retrying once: %s",
-            user_id,
-            exc,
-        )
-        await db.rollback()
-        result = await db.execute(auth_user_query)
-        user = result.unique().scalar_one_or_none()
+    # Only use cache for standard (non-eager) auth lookups
+    if not eager_normalized_relations:
+        now = time.monotonic()
+        cached_entry = _AUTH_CACHE.get(user_id)
+        if cached_entry is not None:
+            cached_at, cached_user = cached_entry
+            if now - cached_at < _AUTH_CACHE_TTL and cached_user.is_active:
+                user = cached_user
+            else:
+                _AUTH_CACHE.pop(user_id, None)
 
-    if not user:
-        logger.warning("JWT resolved to missing user id=%s", user_id)
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="Could not validate credentials",
-            headers={"WWW-Authenticate": 'Bearer error="invalid_token"'},
+    if user is None:
+        auth_user_query = _build_auth_user_query(
+            user_id=user_id,
+            eager_normalized_relations=eager_normalized_relations,
         )
+
+        try:
+            result = await db.execute(auth_user_query)
+            user = result.unique().scalar_one_or_none()
+        except DBAPIError as exc:
+            logger.warning(
+                "Transient DB error while resolving current user id=%s; retrying once: %s",
+                user_id,
+                exc,
+            )
+            await db.rollback()
+            result = await db.execute(auth_user_query)
+            user = result.unique().scalar_one_or_none()
+
+        if not user:
+            logger.warning("JWT resolved to missing user id=%s", user_id)
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Could not validate credentials",
+                headers={"WWW-Authenticate": 'Bearer error="invalid_token"'},
+            )
+
+        if not eager_normalized_relations:
+            _AUTH_CACHE[user_id] = (time.monotonic(), user)
 
     if not user.is_active:
         logger.warning("Inactive user %s attempted to access protected route", user_id)

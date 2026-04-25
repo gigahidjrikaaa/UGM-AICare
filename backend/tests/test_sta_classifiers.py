@@ -49,8 +49,8 @@ async def test_safety_triage_classifier_classify_academic_intent_routes_to_tca()
 
     assert result.intent == "academic_stress"
     assert result.next_step == "tca"
-    assert result.needs_support_coach_plan is True
-    assert result.support_plan_type in {"general_coping", "calm_down", "break_down_problem"}
+    assert result.needs_therapeutic_coach_plan is True
+    assert result.therapeutic_plan_type in {"general_coping", "calm_down", "break_down_problem"}
 
 
 @pytest.mark.asyncio
@@ -62,5 +62,5 @@ async def test_safety_triage_classifier_support_plan_break_down_problem_has_prio
     )
     result = await classifier.classify(payload)
 
-    assert result.needs_support_coach_plan is True
-    assert result.support_plan_type == "break_down_problem"
+    assert result.needs_therapeutic_coach_plan is True
+    assert result.therapeutic_plan_type == "break_down_problem"

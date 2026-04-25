@@ -37,6 +37,119 @@ These two mechanisms together mean the IA can honestly say: **no individual stud
 
 ---
 
+## IA LangGraph Flow
+
+The IA is implemented as a privacy-preserving LangGraph pipeline with four sequential nodes:
+
+```mermaid
+flowchart TD
+    START([Analytics Query<br/>from Admin/Counselor]) --> INGEST["ingest_query_node<br/>Parse NL query → SQL template<br/>+ parameters"]
+    INGEST --> CONSENT["validate_consent_node<br/>Check UserConsentLedger<br/>for all affected users"]
+    CONSENT --> CONSENT_OK{Consent<br/>coverage ≥ threshold?}
+    CONSENT_OK --> |No| DENIED["Query Denied<br/>Insufficient consent<br/>Log audit event"]
+    CONSENT_OK --> |Yes| K_ANON["apply_k_anonymity_node<br/>Add GROUP BY + HAVING COUNT ≥ 5<br/>Suppress small cells"]
+    K_ANON --> EXECUTE["Execute Parameterized Query<br/>Against PostgreSQL"]
+    EXECUTE --> DP["Apply Differential Privacy<br/>Laplace noise injection<br/>(if aggregate stats)"]
+    DP --> INTERPRET["LLM Interpretation<br/>Natural language summary<br/>of results"]
+    INTERPRET --> FORMAT["Format Output<br/>Structured JSON + text<br/>for dashboard rendering"]
+    FORMAT --> PDF_CHECK{PDF requested?}
+    PDF_CHECK --> |Yes| PDF["Generate PDF Report<br/>via pdf_generator"]
+    PDF_CHECK --> |No| DELIVER
+    PDF --> DELIVER["Deliver to Dashboard<br/>+ Persist InsightsReport"]
+    DELIVER --> END([Return to Synthesis])
+
+    style DENIED fill:#ff6b6b,color:#fff
+    style K_ANON fill:#51cf66,color:#fff
+    style CONSENT fill:#ffd93d,color:#333
+```
+
+### IA Node Details
+
+| Node | Function | Privacy Control |
+|------|----------|-----------------|
+| `ingest_query_node` | Parse natural language to SQL template | Parameterized queries only — no raw SQL |
+| `validate_consent_node` | Check consent coverage for affected users | Rejects queries without sufficient consent |
+| `apply_k_anonymity_node` | Enforce minimum group size in results | Suppresses cells with count < k |
+| LLM Interpreter | Generate natural language summary | Operates on already-anonymized data |
+
+---
+
+## Privacy Enforcement Pipeline
+
+```mermaid
+flowchart LR
+    subgraph "Input"
+        Q["Raw Analytics Query<br/>'Show PHQ-9 trends<br/>by faculty'"]
+    end
+
+    subgraph "Step 1: Consent Check"
+        C1["Query UserConsentLedger"]
+        C2["Filter to<br/>consented users only"]
+    end
+
+    subgraph "Step 2: Pseudonymization"
+        P1["Replace user_id<br/>with user_hash"]
+        P2["Use only redacted<br/>conversation text"]
+    end
+
+    subgraph "Step 3: k-Anonymity"
+        K1["GROUP BY on<br/>quasi-identifiers"]
+        K2["HAVING COUNT ≥ 5"]
+        K3["Suppress cells<br/>below threshold"]
+    end
+
+    subgraph "Step 4: Differential Privacy"
+        D1["Calculate<br/>query sensitivity"]
+        D2["Generate Laplace<br/>noise (ε budget)"]
+        D3["Add noise to<br/>aggregate values"]
+    end
+
+    subgraph "Output"
+        R["Privacy-preserving<br/>analytics result"]
+    end
+
+    Q --> C1 --> C2 --> P1 --> P2 --> K1 --> K2 --> K3 --> D1 --> D2 --> D3 --> R
+
+    style K2 fill:#51cf66,color:#fff
+    style D3 fill:#51cf66,color:#fff
+```
+
+---
+
+## Dashboard Data Delivery
+
+```mermaid
+sequenceDiagram
+    participant ADM as Admin/Counselor
+    participant FE as Frontend Dashboard
+    participant API as Backend API
+    participant IA as IA Graph
+    participant DB as PostgreSQL
+
+    ADM->>FE: Navigate to Insights
+    FE->>API: GET /api/v1/admin/insights
+    API->>IA: Execute allow-listed query
+    IA->>IA: validate_consent_node
+    IA->>IA: apply_k_anonymity_node
+    IA->>DB: Execute parameterized SQL
+    DB-->>IA: Raw results
+    IA->>IA: Apply DP noise
+    IA-->>API: Privacy-preserving results
+    API-->>FE: JSON data payload
+    FE->>FE: Render charts<br/>Heatmap, trend lines, funnel
+    FE-->>ADM: Visual analytics dashboard
+
+    Note over ADM,FE: Alternative: Ask Aika
+    ADM->>FE: "Show me risk trends by faculty"
+    FE->>API: POST /api/v1/aika (message)
+    API->>IA: Natural language → SQL
+    IA-->>API: NL summary + structured data
+    API-->>FE: Stream via SSE
+    FE-->>ADM: Chart + text explanation
+```
+
+---
+
 ## What the IA Can Answer
 
 The IA is invoked when an administrator or counsellor asks a question through Aika that requires population-level data. Representative queries:

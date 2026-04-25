@@ -2,7 +2,7 @@
 Safety Tools - Risk Assessment and Crisis Management
 
 This module provides tools for monitoring user safety, tracking risk levels,
-and accessing crisis intervention resources. Used primarily by STA and SCA agents.
+and accessing crisis intervention resources. Used primarily by STA and TCA agents.
 
 Tools:
 - get_risk_assessment_history: Get user's past risk assessments from STA
@@ -146,7 +146,7 @@ async def get_risk_assessment_history(
 
 @register_tool(
     name="get_active_safety_cases",
-    description="Get user's active crisis cases managed by Service Desk Agent. Returns open cases requiring follow-up. HIGHLY SENSITIVE.",
+    description="Get user's active crisis cases managed by Case Management Agent. Returns open cases requiring follow-up. HIGHLY SENSITIVE.",
     parameters={
         "type": "object",
         "properties": {
@@ -173,7 +173,7 @@ async def get_active_safety_cases(
     **kwargs
 ) -> Dict[str, Any]:
     """
-    Get user's active crisis cases managed by Service Desk Agent.
+    Get user's active crisis cases managed by Case Management Agent.
     
     Returns open cases requiring follow-up or intervention.
     HIGHLY SENSITIVE - safety-critical data.
@@ -469,21 +469,21 @@ async def get_escalation_protocol(
                     "Monitor for escalation to HIGH risk"
                 ],
                 "response_time": "Within 24 hours",
-                "escalate_to": "Support Coach Agent (SCA)",
+                "escalate_to": "Therapeutic Coach Agent (TCA)",
                 "resources_needed": ["CBT exercises", "Professional referral list"]
             },
             "HIGH": {
                 "risk_level": "HIGH",
                 "description": "User shows significant risk indicators",
                 "actions": [
-                    "Immediately create safety case (SDA)",
+                    "Immediately create safety case (CMA)",
                     "Provide crisis resources",
                     "Strongly recommend professional help",
                     "Notify counselor if consent given",
                     "Daily check-ins required"
                 ],
                 "response_time": "Within 2 hours",
-                "escalate_to": "Service Desk Agent (SDA)",
+                "escalate_to": "Case Management Agent (CMA)",
                 "resources_needed": ["Crisis hotlines", "Emergency contacts", "Counseling services"]
             },
             "CRITICAL": {
@@ -491,7 +491,7 @@ async def get_escalation_protocol(
                 "description": "User shows immediate danger signs",
                 "actions": [
                     "IMMEDIATE escalation to human counselor",
-                    "Create urgent safety case (SDA)",
+                    "Create urgent safety case (CMA)",
                     "Provide emergency hotline numbers",
                     "Consider emergency contact notification",
                     "Continuous monitoring required"

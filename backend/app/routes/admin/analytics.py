@@ -27,7 +27,7 @@ router = APIRouter(prefix="/api/v1/admin/analytics", tags=["admin-analytics"])
 # ============================================================================
 
 class SCAAnalytics(BaseModel):
-    """Analytics for SCA/TCA effectiveness."""
+    """Analytics for TCA/TCA effectiveness."""
     # Overview
     total_plans: int
     active_plans: int
