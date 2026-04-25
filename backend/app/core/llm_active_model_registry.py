@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import threading
 from typing import Callable, List, Optional, Sequence
 
 
@@ -11,16 +10,13 @@ class ActiveChatModelRegistry:
 
     def __init__(self, initial_model: str) -> None:
         self._active_model = initial_model
-        self._lock = threading.Lock()
 
     def get(self) -> str:
-        with self._lock:
-            return self._active_model
+        return self._active_model
 
     def set(self, model_name: str) -> str:
-        with self._lock:
-            self._active_model = model_name
-            return self._active_model
+        self._active_model = model_name
+        return self._active_model
 
 
 def normalize_openrouter_model_alias(model_name: str, default_model: str) -> str:

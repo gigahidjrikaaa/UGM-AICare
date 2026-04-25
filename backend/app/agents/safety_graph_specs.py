@@ -71,7 +71,7 @@ STA_GRAPH_SPEC: GraphSpec = {
         {
             "id": "escalate_sca",
             "label": "Escalate to Coaching",
-            "description": "Forward context to SCA for guided outreach when human follow-up is needed.",
+            "description": "Forward context to TCA for guided outreach when human follow-up is needed.",
             "column": 4,
             "row": -1,
         },
@@ -157,7 +157,7 @@ SCA_GRAPH_SPEC = {
         {
             "id": "sync_case",
             "label": "Sync Case State",
-            "description": "Update case ledger so SDA can track execution and SLA timers.",
+            "description": "Update case ledger so CMA can track execution and SLA timers.",
             "column": 5,
             "row": 0,
         },
@@ -176,7 +176,7 @@ SCA_GRAPH_SPEC = {
             "source": "safety_review",
             "target": "sync_case",
             "condition": "requires_manual_review",
-            "label": "Flag for SDA",
+            "label": "Flag for CMA",
         },
         {"source": "schedule_followup", "target": "sync_case"},
     ],
@@ -189,7 +189,7 @@ SDA_GRAPH_SPEC = {
         {
             "id": "ingest_case",
             "label": "Ingest Case",
-            "description": "Create or update a case when STA/SCA escalations arrive or counsellors intervene.",
+            "description": "Create or update a case when STA/TCA escalations arrive or counsellors intervene.",
             "column": 0,
             "row": 0,
         },
@@ -217,7 +217,7 @@ SDA_GRAPH_SPEC = {
         {
             "id": "resolve_case",
             "label": "Resolve Case",
-            "description": "Close the case once SLA satisfied and feedback loop to STA/SCA recorded.",
+            "description": "Close the case once SLA satisfied and feedback loop to STA/TCA recorded.",
             "column": 4,
             "row": 0,
         },
@@ -271,7 +271,7 @@ IA_GRAPH_SPEC = {
         {
             "id": "feedback_loop",
             "label": "Feedback Loop",
-            "description": "Publish signals to STA/SCA for threshold tuning and content updates.",
+            "description": "Publish signals to STA/TCA for threshold tuning and content updates.",
             "column": 4,
             "row": 0,
         },

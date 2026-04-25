@@ -1,5 +1,5 @@
 """
-Gemini-powered Support Coach Plan Generator
+Gemini-powered Therapeutic Coach Plan Generator
 
 This module uses Gemini AI to generate hyper-personalized support plans
 based on user context, intent, and support plan type.

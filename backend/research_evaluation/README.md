@@ -32,7 +32,7 @@ research_evaluation/
 │   ├── rq2_orchestration_flows.json   # Flow definitions
 │   └── README.md
 │
-├── rq3_coaching_quality/              # RQ3: SCA intervention quality
+├── rq3_coaching_quality/              # RQ3: TCA intervention quality
 │   ├── coaching_scenarios.py          # 10 coaching scenarios
 │   ├── rq3_coaching_scenarios.json    # Scenarios + rubric
 │   ├── rq3_coaching_scenarios.csv     # CSV export
@@ -107,10 +107,10 @@ LANGFUSE_SECRET_KEY=sk-lf-...
 ```bash
 cd research_evaluation/rq3_coaching_quality
 
-# 1. Generate SCA responses (manual or scripted)
+# 1. Generate TCA responses (manual or scripted)
 # For each scenario in rq3_coaching_scenarios.json:
 #   - Send user_message to /api/v1/aika
-#   - Capture SCA response
+#   - Capture TCA response
 
 # 2. Dual-rater assessment
 # - Researcher rates using rq3_rating_template.json
@@ -169,7 +169,7 @@ pytest test_ia_k_anonymity.py -v
 - Workflow completion confirmed
 
 **Flows**:
-- F1-F4: Agent routing (STA→SCA, STA→SDA, etc.)
+- F1-F4: Agent routing (STA→TCA, STA→CMA, etc.)
 - F5: Analytics query (IA)
 - F6: Multi-turn conversation
 - F7-F8: Edge cases (non-crisis, boundary refusal)
@@ -180,7 +180,7 @@ pytest test_ia_k_anonymity.py -v
 ---
 
 ### RQ3: Coaching Quality Assessment
-**Question**: How effective are the SCA's CBT-based interventions?
+**Question**: How effective are the TCA's CBT-based interventions?
 
 **Method**: Dual-rater assessment (researcher + GPT-4) using structured rubric
 
@@ -302,9 +302,9 @@ cat .env | grep LANGFUSE
 curl http://localhost:8262
 ```
 
-### RQ3 SCA Responses Missing
+### RQ3 TCA Responses Missing
 ```bash
-# Verify SCA implementation
+# Verify TCA implementation
 pytest backend/tests/agents/test_sca.py -v
 
 # Check LangGraph StateGraph

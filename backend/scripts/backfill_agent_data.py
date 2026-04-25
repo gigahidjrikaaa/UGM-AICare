@@ -146,12 +146,12 @@ def _map_agent_name(agent_name: str) -> AgentNameEnum:
     alternatives = {
         "TRIAGE": AgentNameEnum.STA,
         "STA": AgentNameEnum.STA,
-        "INTERVENTION": AgentNameEnum.SCA,
-        "SCA": AgentNameEnum.SCA,
+        "INTERVENTION": AgentNameEnum.TCA,
+        "TCA": AgentNameEnum.TCA,
         "ANALYTICS": AgentNameEnum.IA,
         "IA": AgentNameEnum.IA,
-        "SAFETY_DESK": AgentNameEnum.SDA,
-        "SDA": AgentNameEnum.SDA,
+        "SAFETY_DESK": AgentNameEnum.CMA,
+        "CMA": AgentNameEnum.CMA,
     }
     return alternatives.get(agent_name.upper(), AgentNameEnum.STA)
 

@@ -4,7 +4,6 @@ import os
 import httpx
 import asyncio
 import time
-import threading
 from typing import Any, AsyncIterator, cast
 
 # NEW SDK imports
@@ -14,7 +13,7 @@ from dotenv import load_dotenv, find_dotenv
 import logging
 
 from app.core.gemini_key_tracker import gemini_tracker
-from typing import List, Dict, Literal, Optional, Tuple
+from typing import List, Dict, Literal, Optional
 
 # Langfuse Tracing
 from app.core.langfuse_config import trace_llm_call
@@ -130,7 +129,7 @@ _gemini_client: Optional[genai.Client] = None
 _gemini_client_by_key: dict[int, genai.Client] = {}
 _gemini_key_cooldowns: dict[int, float] = {}
 _current_key_index: int = 0
-_gemini_client_lock = threading.Lock()
+_gemini_client_lock = asyncio.Lock()
 
 
 def _select_gemini_key_index(force_rotate: bool) -> int:
@@ -243,7 +242,7 @@ def get_gemini_circuit_breaker_status(models: Optional[list[str]] = None) -> lis
     return _gemini_circuit_breaker.get_status(models)
 
 
-def _mark_gemini_key_cooldown(retry_after_s: float | None) -> None:
+async def _mark_gemini_key_cooldown(retry_after_s: float | None) -> None:
     if not GEMINI_API_KEYS:
         return
 
@@ -253,7 +252,7 @@ def _mark_gemini_key_cooldown(retry_after_s: float | None) -> None:
     cooldown_s = max(min_cooldown_s, min(cooldown_s, max_cooldown_s))
     key_idx, key_last4 = _current_gemini_key_fingerprint()
 
-    with _gemini_client_lock:
+    async with _gemini_client_lock:
         _gemini_key_cooldowns[key_idx] = time.monotonic() + cooldown_s
 
     logger.warning(
@@ -264,7 +263,7 @@ def _mark_gemini_key_cooldown(retry_after_s: float | None) -> None:
     )
 
 
-def get_gemini_client(force_rotate: bool = False) -> genai.Client:
+async def get_gemini_client(force_rotate: bool = False) -> genai.Client:
     """Get Gemini client, optionally rotating to the next API key.
     
     Args:
@@ -278,7 +277,7 @@ def get_gemini_client(force_rotate: bool = False) -> genai.Client:
     """
     global _gemini_client
 
-    with _gemini_client_lock:
+    async with _gemini_client_lock:
         prev_idx = _current_key_index
         selected_idx = _select_gemini_key_index(force_rotate)
 
@@ -734,7 +733,7 @@ async def generate_gemini_response(
     """
     try:
         call_index = llm_request_tracking.increment_request(model=model)
-        client = get_gemini_client()
+        client = await get_gemini_client()
         logger.info(
             f"Sending request to Gemini API (Model: {model}, Tools: {bool(tools)}, JSON: {json_mode}, Schema: {bool(json_schema)})",
             extra={
@@ -821,7 +820,7 @@ async def generate_gemini_response(
                 return response.text.strip()
             
             # If we get here, response.text is None or empty, or doesn't exist
-            logger.warning(f"Gemini response text is missing or empty.")
+            logger.warning("Gemini response text is missing or empty.")
 
             # Try to provide a more specific error when available.
             if hasattr(response, 'prompt_feedback') and response.prompt_feedback:
@@ -872,7 +871,7 @@ async def generate_gemini_response(
                         logger.warning(f"Gemini generation stopped unexpectedly. Reason: {reason}")
                         return f"Error: Generation stopped ({reason})."
             
-            logger.warning(f"Gemini returned empty or invalid response.")
+            logger.warning("Gemini returned empty or invalid response.")
             return "Error: Received an empty or invalid response from Gemini."
         
     except ValueError as e:
@@ -919,7 +918,7 @@ async def generate_gemini_content(
     """
     try:
         call_index = llm_request_tracking.increment_request(model=model)
-        client = get_gemini_client()
+        client = await get_gemini_client()
         loop = asyncio.get_running_loop()
 
         logger.info(
@@ -1111,7 +1110,7 @@ async def stream_gemini_response(
     """
     try:
         call_index = llm_request_tracking.increment_request(model=model)
-        client = get_gemini_client()
+        client = await get_gemini_client()
 
         logger.info(
             "Sending streaming request to Gemini API",

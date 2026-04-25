@@ -36,6 +36,7 @@ import {
   AikaPoweredBadge,
 } from '@/components/features/aika/AikaComponents';
 import { ActivityLogPanel, ActivityIndicator } from '@/components/features/aika/ActivityLogPanel';
+import { InterventionPlansSidebar } from '@/components/features/chat/InterventionPlansSidebar';
 import { useActivityLog } from '@/hooks/useActivityLog';
 
 // Loading Component
@@ -60,7 +61,7 @@ export default function AikaEnhancedPage() {
   const router = useRouter();
   const chatContainerRef = useRef<HTMLDivElement>(null);
 
-  const [isAikaPanelOpen, setIsAikaPanelOpen] = useState(true);
+  const [isAikaPanelOpen, setIsAikaPanelOpen] = useState(false);
   const [showThinkingTrace, setShowThinkingTrace] = useState(true);
 
   // Fetch intervention plans
@@ -541,12 +542,8 @@ export default function AikaEnhancedPage() {
                   <ActivityLogPanel
                     activities={showThinkingTrace ? activities : activities.filter((a) => a.activity_type !== 'reasoning_trace')}
                     metadata={lastMetadata ?? null}
-                    interventionPlans={plansData}
-                    interventionPlansLoading={interventionPlansLoading}
-                    interventionPlansError={interventionPlansError}
-                    onRefreshInterventionPlans={refetchPlans}
                     embedded={true}
-                    onClose={() => setIsAikaPanelOpen(false)}
+                    onClose={() => setIsAikaPanelOpen(true)}
                   />
                 </div>
 
@@ -582,6 +579,8 @@ export default function AikaEnhancedPage() {
             )}
           </AnimatePresence>
         </div>
+
+        <InterventionPlansSidebar alwaysVisible={true} />
 
       </div>
     </>

@@ -615,7 +615,7 @@ async def schedule_appointment_node(state: SDAState, config: RunnableConfig) -> 
         if not psychologist_id and assigned_counsellor_id:
             # Try to find psychologist profile for assigned counselor
             counselor_result = await db.execute(
-                select(AgentUser).where(AgentUser.id == assigned_counsellor_id)
+                select(AppUser).where(AppUser.id == assigned_counsellor_id)
             )
             counselor = counselor_result.scalar_one_or_none()
             
@@ -727,7 +727,7 @@ async def _select_optimal_psychologist(
     try:
         # Get available psychologists
         result = await db.execute(
-            select(Psychologist).where(Psychologist.is_available == True)
+            select(Psychologist).where(Psychologist.is_available)
         )
         psychologists = result.scalars().all()
         
@@ -739,7 +739,7 @@ async def _select_optimal_psychologist(
             return psychologists[0].id
         
         # Use LLM to select best match
-        client = get_gemini_client()
+        client = await get_gemini_client()
         
         psych_profiles = []
         for p in psychologists:
@@ -798,7 +798,7 @@ Return HANYA psychologist ID (integer) dari pilihan kamu.
         logger.error(f"Error selecting psychologist: {e}")
         # Fallback to first available psychologist
         result = await db.execute(
-            select(Psychologist).where(Psychologist.is_available == True).limit(1)
+            select(Psychologist).where(Psychologist.is_available).limit(1)
         )
         psych = result.scalar_one_or_none()
         return psych.id if psych else None
@@ -876,7 +876,7 @@ async def _find_optimal_appointment_time(
             return None
         
         # Use LLM to select best slot
-        client = get_gemini_client()
+        client = await get_gemini_client()
         
         slots_text = "\n".join([
             f"{i+1}. {slot['display']} ({slot['datetime']})"

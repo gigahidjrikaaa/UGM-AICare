@@ -342,13 +342,13 @@ def compute_rq2_metrics(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
 
 
 def compute_rq2b_metrics_from_tca_rows(rows: Sequence[Mapping[str, Any]]) -> dict[str, Any]:
-    """RQ2B structural metrics from TCA/SCA response JSON.
+    """RQ2B structural metrics from TCA/TCA response JSON.
 
     Expects runner-style rows:
       - scenario_id
       - category
       - prompt
-      - sca_response: dict with keys plan_steps/resource_cards/next_check_in
+      - tca_response: dict with keys plan_steps/resource_cards/next_check_in
     """
 
     plan_steps_counts: list[float] = []
@@ -365,7 +365,7 @@ def compute_rq2b_metrics_from_tca_rows(rows: Sequence[Mapping[str, Any]]) -> dic
 
     for row in rows:
         total += 1
-        resp = row.get("sca_response")
+        resp = row.get("tca_response")
         if not isinstance(resp, Mapping):
             continue
 

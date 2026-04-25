@@ -14,6 +14,7 @@ const sidebars: SidebarsConfig = {
       items: [
         'research/problem-statement',
         'research/methodology',
+        'research/evaluation-framework',
         'research/evaluation',
         'research/ethics',
       ],
@@ -25,6 +26,14 @@ const sidebars: SidebarsConfig = {
       items: [
         'architecture/system-overview',
         'architecture/agentic-framework',
+        'architecture/use-cases',
+        'architecture/business-processes',
+        'architecture/user-journeys',
+        'architecture/component-architecture',
+        'architecture/database-schema',
+        'architecture/data-flow',
+        'architecture/security-architecture',
+        'architecture/deployment-topology',
         'architecture/meta-agent-aika',
         'architecture/safety-triage-agent',
         'architecture/therapeutic-coach-agent',
@@ -38,6 +47,7 @@ const sidebars: SidebarsConfig = {
       collapsed: true,
       items: [
         'passive-screening/methodology',
+        'passive-screening/screening-pipeline',
         'passive-screening/validated-instruments',
         'passive-screening/data-safety',
       ],
@@ -47,6 +57,7 @@ const sidebars: SidebarsConfig = {
       label: 'Aika Autopilot & MLOps',
       collapsed: true,
       items: [
+        'aika-autopilot/autopilot-architecture',
         'aika-autopilot/policy-governed-autonomy',
         'aika-autopilot/implementation-plan',
       ],
@@ -67,6 +78,7 @@ const sidebars: SidebarsConfig = {
       collapsed: true,
       items: [
         'analytics/privacy-first-data',
+        'analytics/data-privacy-lifecycle',
         'analytics/database-best-practices',
       ],
     },
@@ -76,8 +88,10 @@ const sidebars: SidebarsConfig = {
       collapsed: true,
       items: [
         'engineering/tech-stack',
+        'engineering/tech-stack-layers',
         'engineering/development-workflow',
         'engineering/api-reference',
+        'engineering/api-data-contracts',
         'engineering/frontend-overview',
       ],
     },
@@ -87,7 +101,9 @@ const sidebars: SidebarsConfig = {
       collapsed: true,
       items: [
         'deployment/infrastructure-map',
+        'deployment/ci-cd-pipeline',
         'deployment/ci-cd-flow',
+        'deployment/observability',
         'deployment/monitoring',
         'deployment/setup',
       ],

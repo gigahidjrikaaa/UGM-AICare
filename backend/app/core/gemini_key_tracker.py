@@ -7,6 +7,7 @@ visibility into key health and quota proximity.
 
 from __future__ import annotations
 
+import asyncio
 import threading
 import time
 from dataclasses import dataclass, field
@@ -74,7 +75,7 @@ class GeminiKeyUsageTracker:
         if self._initialized:
             return
         self._stats: Dict[int, _KeyStats] = {}
-        self._data_lock = threading.Lock()
+        self._data_lock = asyncio.Lock()
         self._boot_time = time.time()
         self._initialized = True
 
@@ -83,7 +84,7 @@ class GeminiKeyUsageTracker:
             self._stats[key_index] = _KeyStats()
         return self._stats[key_index]
 
-    def record_request(
+    async def record_request(
         self,
         key_index: int,
         model: str,
@@ -95,7 +96,7 @@ class GeminiKeyUsageTracker:
         now_mono = time.monotonic()
         now_epoch = time.time()
 
-        with self._data_lock:
+        async with self._data_lock:
             stats = self._ensure_key(key_index)
             stats.total_requests += 1
             stats.last_used_at = now_epoch
@@ -133,7 +134,7 @@ class GeminiKeyUsageTracker:
                 if not stats.model_timestamps[model_name]:
                     stats.model_timestamps.pop(model_name, None)
 
-    def get_all_snapshots(
+    async def get_all_snapshots(
         self,
         api_keys: List[str],
         cooldowns: Dict[int, float],
@@ -143,7 +144,7 @@ class GeminiKeyUsageTracker:
         one_hour_ago = now_mono - 3600
         snapshots: List[KeyUsageSnapshot] = []
 
-        with self._data_lock:
+        async with self._data_lock:
             for idx in range(len(api_keys)):
                 key = api_keys[idx]
                 label = f"Key {idx + 1} (..{key[-4:]})" if len(key) >= 4 else f"Key {idx + 1}"
@@ -191,13 +192,13 @@ class GeminiKeyUsageTracker:
 
         return snapshots
 
-    def get_summary(
+    async def get_summary(
         self,
         api_keys: List[str],
         cooldowns: Dict[int, float],
     ) -> Dict:
         """High-level summary for the dashboard header."""
-        snapshots = self.get_all_snapshots(api_keys, cooldowns)
+        snapshots = await self.get_all_snapshots(api_keys, cooldowns)
         total_reqs = sum(s.total_requests for s in snapshots)
         total_errors = sum(s.failed_requests for s in snapshots)
         total_rate_limits = sum(s.rate_limited_hits for s in snapshots)
@@ -216,7 +217,7 @@ class GeminiKeyUsageTracker:
             "uptime_seconds": round(time.time() - self._boot_time, 0),
         }
 
-    def get_model_timeseries(
+    async def get_model_timeseries(
         self,
         api_keys: List[str],
         window_seconds: int = 3600,
@@ -236,7 +237,7 @@ class GeminiKeyUsageTracker:
 
         series_map: Dict[str, List[int]] = {}
 
-        with self._data_lock:
+        async with self._data_lock:
             for idx in range(len(api_keys)):
                 stats = self._ensure_key(idx)
                 for model_name, timestamps in stats.model_timestamps.items():

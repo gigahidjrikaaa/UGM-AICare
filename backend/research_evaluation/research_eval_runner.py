@@ -307,7 +307,7 @@ async def run_rq2b_generate_coaching(
         )
         if resp.status_code >= 400:
             raise EvaluationHttpError(
-                f"SCA intervene failed for {scenario_id} ({resp.status_code}): {resp.text[:500]}"
+                f"TCA intervene failed for {scenario_id} ({resp.status_code}): {resp.text[:500]}"
             )
 
         results.append(
@@ -315,7 +315,7 @@ async def run_rq2b_generate_coaching(
                 "scenario_id": scenario_id,
                 "category": item.get("category"),
                 "prompt": prompt,
-                "sca_response": resp.json(),
+                "tca_response": resp.json(),
             }
         )
 

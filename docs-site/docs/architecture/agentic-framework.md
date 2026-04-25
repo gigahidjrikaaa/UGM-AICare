@@ -172,6 +172,105 @@ The results are stored in `ConversationRiskAssessment` and `ScreeningProfile` ta
 
 ---
 
+## Agent Communication Patterns
+
+Agents do not call each other directly. All communication flows through the shared `AikaOrchestratorState`, which acts as a blackboard pattern.
+
+```mermaid
+graph TD
+    subgraph "Communication Mechanisms"
+        STATE["Shared Graph State<br/>AikaOrchestratorState<br/>(blackboard pattern)"]
+        TOOLS["Tool Registry<br/>Function-calling API"]
+        DB["PostgreSQL<br/>Persistent state + checkpointing"]
+        SSE["SSE Event Bus<br/>Real-time frontend updates"]
+        TRACK["Execution Tracker<br/>Node-level telemetry"]
+    end
+
+    subgraph "Agents"
+        AIKA["Aika<br/>Orchestrator"]
+        TCA_A["TCA<br/>Therapeutic Coach"]
+        CMA_A["CMA<br/>Case Manager"]
+        IA_A["IA<br/>Insights"]
+        STA_A["STA<br/>Safety Triage"]
+    end
+
+    AIKA --> |"writes routing decision"| STATE
+    AIKA --> |"reads user profile"| TOOLS
+    TCA_A --> |"writes intervention_plan"| STATE
+    CMA_A --> |"writes case_id, appointment"| STATE
+    IA_A --> |"writes analytics_result"| STATE
+    STA_A --> |"writes risk_level, screening"| STATE
+
+    AIKA --> |"persists checkpoint"| DB
+    STA_A --> |"persists assessment"| DB
+    CMA_A --> |"persists case + appointment"| DB
+
+    AIKA --> |"broadcasts events"| SSE
+    AIKA --> |"logs execution"| TRACK
+```
+
+---
+
+## Agent State Lifecycle
+
+Each agent invocation follows a predictable lifecycle tracked by the execution tracker.
+
+```mermaid
+stateDiagram-v2
+    [*] --> Idle
+    Idle --> Invoked: Aika routes to agent
+    Invoked --> Running: Agent graph starts
+    Running --> ToolCall: Agent needs data
+    ToolCall --> Running: Tool result returned
+    Running --> Completed: Output written to state
+    Running --> Failed: Error or timeout
+    Failed --> Retried: Retryable error
+    Retried --> Running: Retry attempt
+    Failed --> Fallback: Max retries exceeded
+    Fallback --> Completed: Default response provided
+    Completed --> [*]
+
+    note right of Running: Tracked in LangGraphNodeExecution
+    note right of Failed: Logged in LangGraphAlert
+```
+
+---
+
+## Error Handling & Fallback Strategy
+
+```mermaid
+flowchart TD
+    START([Agent invocation]) --> RUN["Execute agent graph"]
+    RUN --> CHECK{Success?}
+    CHECK --> |Yes| OUTPUT["Write output to shared state"]
+    CHECK --> |No| ERROR_TYPE{Error type?}
+
+    ERROR_TYPE --> |"Rate limit<br/>(429)"| RATE_LIMIT["Build rate-limit<br/>fallback response"]
+    ERROR_TYPE --> |"Model error<br/>(500/503)"| MODEL_FALLBACK["Try next model<br/>in fallback chain"]
+    ERROR_TYPE --> |"JSON parse failure"| JSON_FIX["Attempt JSON repair<br/>with _repair_truncated_json"]
+    ERROR_TYPE --> |"Tool execution failure"| TOOL_FAIL["Log error, continue<br/>with partial result"]
+    ERROR_TYPE --> |"Timeout"| TIMEOUT["Return cached/default<br/>response"]
+
+    RATE_LIMIT --> OUTPUT
+    MODEL_FALLBACK --> CHECK2{Fallback succeeded?}
+    CHECK2 --> |Yes| OUTPUT
+    CHECK2 --> |No| FALLBACK_RESPONSE["Generate safe<br/>fallback response"]
+    JSON_FIX --> CHECK3{Repair succeeded?}
+    CHECK3 --> |Yes| OUTPUT
+    CHECK3 --> |No| FALLBACK_RESPONSE
+    TOOL_FAIL --> OUTPUT
+    TIMEOUT --> FALLBACK_RESPONSE
+    FALLBACK_RESPONSE --> OUTPUT
+    OUTPUT --> END([Continue to synthesis])
+
+    style FALLBACK_RESPONSE fill:#ffd93d,color:#333
+    style ERROR_TYPE fill:#ff6b6b,color:#fff
+```
+
+Every agent has a fallback path that ensures the system never leaves a student without a response, even when LLM providers experience outages.
+
+---
+
 ## Why This Design Avoids Common AI Pitfalls
 
 | Common Problem | How This System Addresses It |
@@ -181,3 +280,5 @@ The results are stored in `ConversationRiskAssessment` and `ScreeningProfile` ta
 | **Opaque AI decisions** | Langfuse traces every agent node invocation, every tool call, and every LLM prompt - full auditability |
 | **Privacy leakage in analytics** | IA queries enforce k-anonymity at the query layer; PII is redacted before any data enters the analytics pipeline |
 | **Single point of failure** | Sub-agents are invoked asynchronously. If TCA fails, CMA can still respond independently |
+| **LLM provider outage** | Multi-key rotation, model fallback chains, and circuit breaker prevent single-provider dependency |
+| **Runaway tool loops** | Per-intent iteration caps prevent infinite tool-calling cycles |

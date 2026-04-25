@@ -11,7 +11,7 @@ This domain handles:
 - **User Management**: Authentication, profiles, user data
 - **Therapeutic Chat**: AI-powered mental health conversations
 - **CBT Modules**: Cognitive Behavioral Therapy interventions
-- **AI Agents**: Safety Triage (STA), Support Coach (SCA), Service Desk (SDA), Insights (IA)
+- **AI Agents**: Safety Triage (STA), Therapeutic Coach (TCA), Case Management (CMA), Insights (IA)
 - **Clinical Operations**: Interventions, appointments, counseling
 - **Wellness Tracking**: Journals, daily check-ins, activity summaries
 - **Assessments**: Mental health surveys and screenings
@@ -55,8 +55,8 @@ backend/app/routes/
 ```
 backend/app/agents/
 ├── sta/                             # Safety Triage Agent
-├── sca/                             # Support Coach Agent
-├── sda/                             # Service Desk Agent
+├── sca/                             # Therapeutic Coach Agent
+├── sda/                             # Case Management Agent
 └── ia/                              # Insights Agent
 ```
 
@@ -104,8 +104,8 @@ backend/app/domains/mental_health/
 │   ├── __init__.py
 │   ├── routes.py                    # Agent endpoints
 │   ├── sta/                         # Safety Triage Agent
-│   ├── sca/                         # Support Coach Agent
-│   ├── sda/                         # Service Desk Agent
+│   ├── sca/                         # Therapeutic Coach Agent
+│   ├── sda/                         # Case Management Agent
 │   └── ia/                          # Insights Agent
 ├── clinical/                        # Clinical operations subdomain
 │   ├── __init__.py

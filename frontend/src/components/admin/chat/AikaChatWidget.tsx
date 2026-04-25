@@ -42,8 +42,8 @@ const pillColor: Record<string, string> = {
     intervention: "bg-green-500/20 text-green-300 border border-green-400/40",
     aika: "bg-purple-500/20 text-purple-300 border border-purple-400/40",
     STA: "bg-red-500/20 text-red-300 border border-red-400/40",
-    SCA: "bg-green-500/20 text-green-300 border border-green-400/40",
-    SDA: "bg-blue-500/20 text-blue-300 border border-blue-400/40",
+    TCA: "bg-green-500/20 text-green-300 border border-green-400/40",
+    CMA: "bg-blue-500/20 text-blue-300 border border-blue-400/40",
     IA: "bg-yellow-500/20 text-yellow-300 border border-yellow-400/40",
 };
 

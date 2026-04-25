@@ -11,7 +11,7 @@ Route Categories:
 - AI Agents: agents, agents_command, agents_graph, safety_triage, langgraph, langgraph_analytics
 - Features: quests, surveys
 
-Note: CBT modules have been deprecated and integrated into SCA (Support Coach Agent).
+Note: CBT modules have been deprecated and integrated into TCA (Therapeutic Coach Agent).
 See app/agents/sca/ for CBT-based intervention plans (cognitive_restructuring, behavioral_activation).
 """
 
@@ -43,7 +43,7 @@ from . import aika_stream
 # Feature routes
 from . import quests
 from . import surveys
-# cbt_modules removed - use SCA intervention plans instead
+# cbt_modules removed - use TCA intervention plans instead
 
 __all__ = [
     # Core

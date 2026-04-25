@@ -29,7 +29,7 @@ async def trigger_sta_conversation_analysis_background(
     Runs as a background task (fire-and-forget) so it never blocks the
     response that was already delivered to the user.  Also updates the
     screening profile using dimensions extracted by the STA model, replacing
-    a separate SCA pass to avoid redundant LLM calls.
+    a separate TCA pass to avoid redundant LLM calls.
 
     Args:
         state: A *copy* of the orchestrator state at conversation end.

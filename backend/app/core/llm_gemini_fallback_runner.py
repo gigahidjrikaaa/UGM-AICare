@@ -22,15 +22,15 @@ async def run_gemini_fallback_chain(
     is_model_open: Callable[[str], bool],
     record_model_success: Callable[[str], None],
     record_model_failure: Callable[[str], None],
-    record_request: Callable[..., None],
+    record_request: Callable[..., Awaitable[Any]],
     current_key_fingerprint: Callable[[], tuple[int, str]],
     parse_retry_after_s: Callable[[str], float | None],
     extract_error_code: Callable[[Exception], int],
     is_invalid_model_error: Callable[[int, str], bool],
     is_resource_exhausted_error: Callable[[int, str], bool],
     should_fallback_on_error: Callable[[int, str], bool],
-    mark_key_cooldown: Callable[[float | None], None],
-    rotate_key: Callable[[], Any],
+    mark_key_cooldown: Callable[[float | None], Awaitable[Any]],
+    rotate_key: Callable[[], Awaitable[Any]],
     exhausted_error_factory: Callable[..., Exception],
     logger: logging.Logger,
 ) -> T:
@@ -83,7 +83,7 @@ async def run_gemini_fallback_chain(
                 response = await call_model(current_model)
 
                 key_idx, _ = current_key_fingerprint()
-                record_request(key_index=key_idx, model=current_model, success=True)
+                await record_request(key_index=key_idx, model=current_model, success=True)
                 record_model_success(current_model)
 
                 if model_idx > 0 or retry_attempt > 0:
@@ -103,7 +103,7 @@ async def run_gemini_fallback_chain(
 
                 key_idx_err, _ = current_key_fingerprint()
                 is_rate_limited = error_code == 429 or "RESOURCE_EXHAUSTED" in error_msg
-                record_request(
+                await record_request(
                     key_index=key_idx_err,
                     model=current_model,
                     success=False,
@@ -120,7 +120,7 @@ async def run_gemini_fallback_chain(
                     break
 
                 if should_fallback_on_error(error_code, error_msg):
-                    mark_key_cooldown(last_error_retry_after_s)
+                    await mark_key_cooldown(last_error_retry_after_s)
                     key_idx, key_last4 = current_key_fingerprint()
                     log_suffix = " contents_mode=True" if contents_mode else ""
                     logger.warning(
@@ -136,7 +136,7 @@ async def run_gemini_fallback_chain(
 
                     if key_count > 1 and retry_attempt < key_count - 1:
                         logger.warning("🔑 Rotating Gemini API key and retrying immediately...")
-                        rotate_key()
+                        await rotate_key()
                         continue
 
                     retry_after_s = parse_retry_after_s(error_msg)

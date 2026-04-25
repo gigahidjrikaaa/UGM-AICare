@@ -16,7 +16,7 @@ class CampaignBase(BaseModel):
     
     name: str = Field(..., min_length=1, max_length=255, description="Campaign name")
     description: Optional[str] = Field(None, description="Campaign description")
-    message_template: str = Field(..., min_length=1, description="Message template for SCA")
+    message_template: str = Field(..., min_length=1, description="Message template for TCA")
     trigger_rules: Optional[Dict[str, Any]] = Field(None, description="JSON trigger configuration")
     target_audience: Optional[Dict[str, Any]] = Field(None, description="JSON audience targeting")
     status: str = Field("draft", description="Campaign status (draft, active, paused, completed)")

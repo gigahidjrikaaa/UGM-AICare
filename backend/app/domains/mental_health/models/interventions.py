@@ -60,7 +60,7 @@ class CampaignExecution(Base):
     user: Mapped["User"] = relationship("User")
 
 class InterventionPlanRecord(Base):
-    """Stores SCA-generated intervention plans for users."""
+    """Stores TCA-generated intervention plans for users."""
     __tablename__ = "intervention_plan_records"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
@@ -72,7 +72,7 @@ class InterventionPlanRecord(Base):
     plan_title: Mapped[str] = mapped_column(String(500), nullable=False)
     risk_level: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # From STA (0-3)
     
-    # Full plan data from SCA (JSON structure)
+    # Full plan data from TCA (JSON structure)
     plan_data: Mapped[dict] = mapped_column(JSON, nullable=False)
     # Structure: {
     #   "plan_steps": [{"title": str, "description": str, "completed": bool}],

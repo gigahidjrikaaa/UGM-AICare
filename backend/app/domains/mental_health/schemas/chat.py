@@ -111,7 +111,7 @@ class ChatRequest(BaseModel):
 
 #? --- Response Body Model ---
 class InterventionPlan(BaseModel):
-    """SCA-generated intervention plan for user support."""
+    """TCA-generated intervention plan for user support."""
     plan_steps: List[Dict[str, Any]] = Field(..., description="Step-by-step action plan")
     resource_cards: List[Dict[str, Any]] = Field(..., description="Supportive resources")
     next_check_in: Optional[str] = Field(None, description="ISO datetime for next check-in")
@@ -124,7 +124,7 @@ class ChatResponse(BaseModel):
     model_used: str = Field(..., description="The specific model that generated the response")
     history: List[Dict[str, str]] = Field(..., description="The updated conversation history")
     module_completed_id: Optional[str] = Field(None, description="If a module was just completed, this will be its ID.")
-    intervention_plan: Optional[InterventionPlan] = Field(None, description="SCA intervention plan if triggered")
+    intervention_plan: Optional[InterventionPlan] = Field(None, description="TCA intervention plan if triggered")
 
     model_config = {
         "protected_namespaces": ()

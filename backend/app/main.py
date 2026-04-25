@@ -41,7 +41,7 @@ from app.domains.mental_health.routes import (
     agents_command,
     agents_graph,
     surveys,
-    # cbt_modules - DEPRECATED: Use SCA intervention plans instead
+    # cbt_modules - DEPRECATED: Use TCA intervention plans instead
     safety_triage,
     clinical_analytics_routes,
     intervention_plans,

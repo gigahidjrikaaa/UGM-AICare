@@ -4,7 +4,7 @@ User Audit Log Model
 **APPEND-ONLY** - Tracks all changes to user-related tables.
 
 Enables compliance, debugging, and accountability.
-Used by SDA agent for case management.
+Used by CMA agent for case management.
 
 Industry Best Practices Applied:
 - JSONB for changed_fields (flexible, queryable)

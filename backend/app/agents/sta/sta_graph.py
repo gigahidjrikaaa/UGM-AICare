@@ -217,11 +217,11 @@ def decide_routing(state: STAState) -> str:
     
     logger.info(f"STA routing decision: {next_step} (severity: {severity})")
     
-    # High/critical always escalate to SDA
+    # High/critical always escalate to CMA
     if severity in ("high", "critical"):
         return "escalate_sda"
     
-    # Moderate routes to SCA if needed
+    # Moderate routes to TCA if needed
     if next_step == "tca":
         return "route_sca"
     

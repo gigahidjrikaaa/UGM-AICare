@@ -45,7 +45,7 @@ def trace_agent(agent_name: str):
             pass
     
     Args:
-        agent_name: Name of the agent (STA, SCA, SDA, IA)
+        agent_name: Name of the agent (STA, TCA, CMA, IA)
     """
     def decorator(func):
         if not langfuse_client:

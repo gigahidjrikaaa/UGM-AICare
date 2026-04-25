@@ -31,7 +31,7 @@ class AgentOrchestrator:
     """Orchestrates agent actions and workflows.
     
     Primary responsibilities:
-    - Auto-create SDA cases from high/critical STA classifications
+    - Auto-create CMA cases from high/critical STA classifications
     - Link triage assessments to cases
     - Calculate SLA breach times
     - Emit events for monitoring and coordination

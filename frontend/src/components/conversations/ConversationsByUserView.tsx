@@ -76,7 +76,7 @@ interface FetchSessionsParams {
 const OVERVIEW_PAGE_SIZE = 100;
 const USER_SESSIONS_PAGE_SIZE = 20;
 
-const fetchSessions = async (params: FetchSessionsParams) => {
+const buildSessionsQuery = (params: FetchSessionsParams) => {
   const query = new URLSearchParams({
     page: String(params.page),
     limit: String(params.limit),
@@ -86,12 +86,7 @@ const fetchSessions = async (params: FetchSessionsParams) => {
   if (params.date_to) query.append('date_to', params.date_to);
   if (params.user_id_hash) query.append('user_id_hash', params.user_id_hash);
 
-  return apiCall<SessionsResponse>(`/api/v1/admin/conversation-sessions?${query.toString()}`);
-};
-
-const fetchStats = async () => {
-  const response = await apiCall<ConversationsResponse>('/api/v1/admin/conversations?page=1&limit=1');
-  return response.stats;
+  return query.toString();
 };
 
 function formatAgo(timestamp: string): string {
@@ -139,6 +134,25 @@ export function ConversationsByUserView({
   onOpenSession,
   allowFlagging = false,
 }: ConversationsByUserViewProps) {
+  const apiPrefix = portal === 'counselor' ? '/api/v1/counselor' : '/api/v1/admin';
+
+  const fetchSessions = useCallback(
+    async (params: FetchSessionsParams) => {
+      const query = buildSessionsQuery(params);
+      return apiCall<SessionsResponse>(`${apiPrefix}/conversation-sessions?${query}`);
+    },
+    [apiPrefix],
+  );
+
+  const fetchStats = useCallback(async () => {
+    if (portal === 'counselor') {
+      return apiCall<ConversationStats>(`${apiPrefix}/conversation-sessions/stats`);
+    }
+
+    const response = await apiCall<ConversationsResponse>(`${apiPrefix}/conversations?page=1&limit=1`);
+    return response.stats;
+  }, [apiPrefix, portal]);
+
   const [stats, setStats] = useState<ConversationStats | null>(null);
 
   const [overviewSessions, setOverviewSessions] = useState<ConversationSession[]>([]);
@@ -190,7 +204,7 @@ export function ConversationsByUserView({
     } finally {
       setLoadingOverview(false);
     }
-  }, [overviewPage, sessionSearch, dateFrom, dateTo]);
+  }, [dateFrom, dateTo, fetchSessions, fetchStats, overviewPage, sessionSearch]);
 
   const loadSelectedUserSessions = useCallback(async () => {
     if (!selectedUserHash) {
@@ -218,7 +232,7 @@ export function ConversationsByUserView({
     } finally {
       setLoadingUserSessions(false);
     }
-  }, [selectedUserHash, selectedUserPage, sessionSearch, dateFrom, dateTo]);
+  }, [dateFrom, dateTo, fetchSessions, selectedUserHash, selectedUserPage, sessionSearch]);
 
   useEffect(() => {
     loadOverview();
@@ -311,7 +325,7 @@ export function ConversationsByUserView({
         .map((tag) => tag.trim())
         .filter(Boolean);
 
-      await apiCall(`/api/v1/admin/conversations/session/${flagSessionId}/flag`, {
+      await apiCall(`${apiPrefix}/conversations/session/${flagSessionId}/flag`, {
         method: 'POST',
         body: JSON.stringify({
           reason: flagReason || undefined,
@@ -340,7 +354,7 @@ export function ConversationsByUserView({
       if (selectedUserHash) query.append('user_id_hash', selectedUserHash);
 
       const response = await authenticatedFetch(
-        `${base}/api/v1/admin/conversation-sessions/export.csv?${query.toString()}`,
+        `${base}${apiPrefix}/conversation-sessions/export.csv?${query.toString()}`,
       );
 
       const text = await response.text();

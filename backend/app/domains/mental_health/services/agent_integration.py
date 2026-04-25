@@ -3,7 +3,7 @@ Agent Integration Service
 
 This module orchestrates interaction between Aika's chat flow and specialized AI agents:
 - STA (Safety Triage Agent): Background risk assessment
-- SCA (Support Coach Agent): User-facing intervention plans
+- TCA (Therapeutic Coach Agent): User-facing intervention plans
 
 Design Principles:
 - Modular: Each agent integration is independent
@@ -49,7 +49,7 @@ class AgentInterventionResult:
     
     Attributes:
         should_intervene: Whether an intervention should be presented to user
-        intervention_plan: The SCA-generated plan (if should_intervene is True)
+        intervention_plan: The TCA-generated plan (if should_intervene is True)
         risk_assessment: The STA classification result
         intervention_reason: Human-readable reason for intervention
     """
@@ -86,8 +86,8 @@ class AgentIntegrationService:
             classifier=classifier,
             session=db,
         )
-        # Initialize SCA service
-        self.sca_service = TherapeuticCoachService()
+        # Initialize TCA service
+        self.tca_service = TherapeuticCoachService()
     
     async def analyze_and_intervene(
         self,
@@ -96,15 +96,15 @@ class AgentIntegrationService:
         user_message: str,
         consent_followup: bool = True,
         enable_sta: bool = True,
-        enable_sca: bool = True,
+        enable_tca: bool = True,
     ) -> AgentInterventionResult:
         """Analyze user message and generate intervention if needed.
         
         Flow:
         1. STA analyzes message for risk level (0-3) and intent
-        2. If risk is moderate (1) or high (2), trigger SCA intervention
-        3. If risk is critical (3), flag for human escalation (no SCA)
-        4. SCA generates personalized action plan based on intent
+        2. If risk is moderate (1) or high (2), trigger TCA intervention
+        3. If risk is critical (3), flag for human escalation (no TCA)
+        4. TCA generates personalized action plan based on intent
         
         Args:
             user_id: User's database ID
@@ -112,7 +112,7 @@ class AgentIntegrationService:
             user_message: The user's latest message
             consent_followup: Whether user consents to follow-up check-ins
             enable_sta: Whether to run safety triage (default: True)
-            enable_sca: Whether to generate interventions (default: True)
+            enable_tca: Whether to generate interventions (default: True)
             
         Returns:
             AgentInterventionResult with intervention plan if applicable
@@ -151,7 +151,7 @@ class AgentIntegrationService:
         intent = sta_response.intent
         next_step = sta_response.next_step
         
-        # Critical risk (3) -> Human escalation, no SCA intervention
+        # Critical risk (3) -> Human escalation, no TCA intervention
         if risk_level == 3:
             logger.warning(
                 "Critical risk detected for user %s, session %s - flagging for human review",
@@ -167,34 +167,34 @@ class AgentIntegrationService:
             logger.debug("Low risk, no intervention needed for user %s", user_id)
             return result
         
-        # Moderate (1) or High (2) risk -> SCA intervention if recommended
+        # Moderate (1) or High (2) risk -> TCA intervention if recommended
         if next_step != "tca":
             logger.debug(
-                "STA recommends '%s' instead of SCA for user %s",
+                "STA recommends '%s' instead of TCA for user %s",
                 next_step,
                 user_id,
             )
             return result
         
-        # Step 3: Generate SCA intervention (if enabled)
-        if not enable_sca:
-            logger.debug("SCA disabled, skipping intervention generation for user %s", user_id)
+        # Step 3: Generate TCA intervention (if enabled)
+        if not enable_tca:
+            logger.debug("TCA disabled, skipping intervention generation for user %s", user_id)
             return result
         
         try:
             # Generate user_hash for event tracking (same logic as STA)
             user_hash = self._generate_user_hash(user_id, session_id)
             
-            # Check if STA recommends using Support Coach Plan
-            use_gemini_plan = sta_response.needs_support_coach_plan
-            plan_type = sta_response.support_plan_type if use_gemini_plan else None
+            # Check if STA recommends using Therapeutic Coach Plan
+            use_gemini_plan = sta_response.needs_therapeutic_coach_plan
+            plan_type = sta_response.therapeutic_plan_type if use_gemini_plan else None
             
             if use_gemini_plan:
                 logger.info(
-                    f"STA flagged need for Support Coach Plan: type={plan_type}, user={user_id}"
+                    f"STA flagged need for Therapeutic Coach Plan: type={plan_type}, user={user_id}"
                 )
             
-            sca_request = SCAInterveneRequest(
+            tca_request = SCAInterveneRequest(
                 session_id=session_id,
                 intent=intent,
                 options={
@@ -205,8 +205,8 @@ class AgentIntegrationService:
             )
             
             # Generate intervention - use Gemini if flagged by STA
-            sca_response = await self.sca_service.intervene(
-                payload=sca_request,
+            tca_response = await self.tca_service.intervene(
+                payload=tca_request,
                 use_gemini_plan=use_gemini_plan,
                 plan_type=plan_type,
                 user_message=user_message if use_gemini_plan else None,
@@ -214,7 +214,7 @@ class AgentIntegrationService:
             )
             
             result.should_intervene = True
-            result.intervention_plan = sca_response
+            result.intervention_plan = tca_response
             result.intervention_reason = f"risk_level_{risk_level}_{intent}"
             if use_gemini_plan:
                 result.intervention_reason += f"_gemini_{plan_type}"
@@ -223,21 +223,21 @@ class AgentIntegrationService:
             await self._store_intervention_plan(
                 user_id=user_id,
                 session_id=session_id,
-                sca_response=sca_response,
+                tca_response=tca_response,
                 risk_level=risk_level,
                 conversation_id=None  # TODO: Pass conversation_id from chat service if available
             )
             
             logger.info(
-                "SCA Intervention Generated - User: %s, Intent: %s, Steps: %s, Resources: %s, Gemini: %s",
+                "TCA Intervention Generated - User: %s, Intent: %s, Steps: %s, Resources: %s, Gemini: %s",
                 user_id,
                 intent,
-                len(sca_response.plan_steps),
-                len(sca_response.resource_cards),
+                len(tca_response.plan_steps),
+                len(tca_response.resource_cards),
                 use_gemini_plan,
             )
-        except Exception as sca_error:
-            logger.error("SCA intervention failed for user %s: %s", user_id, sca_error, exc_info=True)
+        except Exception as tca_error:
+            logger.error("TCA intervention failed for user %s: %s", user_id, tca_error, exc_info=True)
             # Continue without intervention - don't block chat flow
             result.should_intervene = False
         
@@ -249,7 +249,7 @@ class AgentIntegrationService:
         user_message: str,
         user_id: Optional[int] = None,
     ) -> Optional[STAClassifyResponse]:
-        """Run STA analysis without triggering SCA intervention.
+        """Run STA analysis without triggering TCA intervention.
         
         Useful for:
         - Background risk monitoring
@@ -305,50 +305,50 @@ class AgentIntegrationService:
         self,
         user_id: int,
         session_id: str,
-        sca_response: SCAInterveneResponse,
+        tca_response: SCAInterveneResponse,
         risk_level: int,
         conversation_id: Optional[int] = None
     ) -> None:
-        """Store SCA-generated intervention plan in database.
+        """Store TCA-generated intervention plan in database.
         
         Args:
             user_id: User's database ID
             session_id: Current session ID
-            sca_response: The SCA intervention response
+            tca_response: The TCA intervention response
             risk_level: Risk level from STA (0-3)
             conversation_id: Optional conversation ID from chat
         """
         try:
-            # Convert SCA response objects to intervention plan schema format
+            # Convert TCA response objects to intervention plan schema format
             from app.domains.mental_health.schemas.intervention_plans import PlanStep as InterventionPlanStep
             from app.domains.mental_health.schemas.intervention_plans import ResourceCard as InterventionResourceCard
             from app.domains.mental_health.schemas.intervention_plans import NextCheckIn as InterventionNextCheckIn
             
-            # Convert plan steps (SCA uses id/label, we use title/description)
+            # Convert plan steps (TCA uses id/label, we use title/description)
             plan_steps = [
                 InterventionPlanStep(
-                    title=step.label,  # SCA uses 'label'
+                    title=step.label,  # TCA uses 'label'
                     description=f"{step.label} ({step.duration_min} min)" if step.duration_min else step.label,
                     completed=False
                 )
-                for step in sca_response.plan_steps
+                for step in tca_response.plan_steps
             ]
             
-            # Convert resource cards (SCA uses resource_id/summary, we use title/url/description)
+            # Convert resource cards (TCA uses resource_id/summary, we use title/url/description)
             resource_cards = [
                 InterventionResourceCard(
                     title=card.title,
                     url=card.url or "",
                     description=card.summary
                 )
-                for card in sca_response.resource_cards
+                for card in tca_response.resource_cards
             ]
             
-            # Convert next_check_in (SCA uses datetime, we use timeframe/method)
-            if sca_response.next_check_in:
+            # Convert next_check_in (TCA uses datetime, we use timeframe/method)
+            if tca_response.next_check_in:
                 # Calculate timeframe from datetime
                 from datetime import datetime
-                time_diff = sca_response.next_check_in - datetime.now()
+                time_diff = tca_response.next_check_in - datetime.now()
                 hours = int(time_diff.total_seconds() / 3600)
                 if hours < 24:
                     timeframe = f"{hours} hours"

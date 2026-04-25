@@ -99,12 +99,110 @@ The iteration budget is capped per intent type to prevent runaway tool-calling l
 
 ---
 
-## Memory and Context
+## Decision Tree Detail
+
+The full decision flow inside `aika_decision_node`:
+
+```mermaid
+flowchart TD
+    MSG["Incoming Message"] --> KW_SCAN["Tier 1: Crisis Keyword Scan<br/>&lt; 1ms regex match"]
+    KW_SCAN --> KW_HIT{Keyword<br/>detected?}
+    KW_HIT --> |Yes| FORCE_RISK["Force risk = HIGH<br/>Skip LLM classification"]
+    KW_HIT --> |No| SMALLTALK["Small-talk Detection<br/>Lookup table match"]
+    SMALLTALK --> ST_HIT{Small-talk?}
+    ST_HIT --> |Yes| WARM_REPLY["Generate warm<br/>direct response"]
+    ST_HIT --> |No| LLM_CALL["LLM Decision Call<br/>Structured JSON output"]
+
+    LLM_CALL --> PARSE{JSON parsed<br/>successfully?}
+    PARSE --> |Yes| ROUTING
+    PARSE --> |No| REPAIR["Attempt JSON repair<br/>_repair_decision_json_once"]
+    REPAIR --> REPAIR_OK{Repair<br/>succeeded?}
+    REPAIR_OK --> |Yes| ROUTING
+    REPAIR_OK --> |No| SAFE_FALLBACK["Safe fallback:<br/>direct response with<br/>low-risk default"]
+
+    FORCE_RISK --> ROUTING["Compute Routing<br/>_compute_routing()"]
+    ROUTING --> SCREENING["Apply Screening<br/>Discordance Policy"]
+    SCREENING --> AUTOPILOT["Evaluate Autopilot<br/>Policy"]
+    AUTOPILOT --> FINAL_ROUTE{Final Route}
+
+    FINAL_ROUTE --> |"risk HIGH/CRITICAL"| CRISIS_PATH["parallel_crisis_node"]
+    FINAL_ROUTE --> |"risk MODERATE"| TCA_PATH["execute_sca_subgraph"]
+    FINAL_ROUTE --> |"analytics query"| IA_PATH["execute_ia_subgraph"]
+    FINAL_ROUTE --> |"direct response"| DIRECT_PATH["generate_direct_response"]
+
+    style FORCE_RISK fill:#ff6b6b,color:#fff
+    style SAFE_FALLBACK fill:#ffd93d,color:#333
+```
+
+---
+
+## Memory and Context Architecture
+
+```mermaid
+sequenceDiagram
+    participant REQ as HTTP Request
+    participant GRAPH as Aika Graph
+    participant CP as Postgres Checkpointer
+    participant TOOLS as Tool Registry
+    participant DB as PostgreSQL
+
+    REQ->>GRAPH: Invoke with message + thread_id
+    GRAPH->>CP: Load thread state<br/>(last 10 turns)
+    CP-->>GRAPH: conversation_history + metadata
+
+    GRAPH->>GRAPH: Build context for LLM<br/>(profile summary + history + screening gaps)
+
+    alt Tool calling needed
+        GRAPH->>TOOLS: get_user_profile(user_id)
+        TOOLS->>DB: SELECT from UserProfile
+        DB-->>TOOLS: User data
+        TOOLS-->>GRAPH: Profile context
+        GRAPH->>TOOLS: get_journal_entries(user_id)
+        TOOLS->>DB: SELECT recent entries
+        DB-->>TOOLS: Journal data
+        TOOLS-->>GRAPH: Journal context
+    end
+
+    GRAPH->>GRAPH: Generate response with full context
+    GRAPH->>CP: Save updated thread state
+    GRAPH-->>REQ: Response + state updates
+```
 
 Aika maintains conversational memory through LangGraph's native checkpointer:
 
 1. **Short-term Conversational Memory:** The state (including `conversation_history`) is durably saved via `AsyncPostgresSaver` after every graph iteration. This maintains strict continuity across the session. To cap input token costs, the history sent to the LLM is typically bounded to the last 10 turns (20 messages).
 2. **Long-term Context (Database):** The student's profile, journal entries, past interventions, and screening history reside in PostgreSQL. These are not eagerly loaded - Aika uses tools like `get_user_profile()` or `get_journal_entries()` to fetch them only when relevant.
+
+---
+
+## Screening Awareness Injection
+
+Aika includes a screening awareness module that identifies gaps in the student's screening profile and subtly steers conversations toward uncovering indicators.
+
+```mermaid
+flowchart LR
+    subgraph "Before Response"
+        GAPS["Screening Gap Analysis<br/>Which instruments have<br/>missing/old scores?"]
+        PROBE["Probe Selection<br/>Natural conversation<br/>steering prompts"]
+        INJECT["Injection into Response<br/>Subtle follow-up<br/>questions"]
+    end
+
+    GAPS --> PROBE --> INJECT
+
+    subgraph "Example"
+        EX_IN["Student: 'I've been<br/>having trouble sleeping'"]
+        EX_OUT["Aika: 'That sounds tough.<br/>How has it been affecting<br/>your focus during the day?'"]
+    end
+
+    EX_IN --> EX_OUT
+
+    style INJECT fill:#a855f7,color:#fff
+    style EX_OUT fill:#a855f7,color:#fff
+```
+
+This ensures that screening profiles are progressively enriched without the student ever feeling like they are being assessed.
+
+---
 
 ## Screening - The Covert Layer
 

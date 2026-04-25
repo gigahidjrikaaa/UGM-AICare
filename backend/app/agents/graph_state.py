@@ -83,7 +83,7 @@ class SafetyAgentState(TypedDict, total=False):
     """Type of intervention: 'calm_down', 'break_down_problem', 'general_coping'."""
     
     should_intervene: bool
-    """Flag indicating if SCA should create intervention (default False)."""
+    """Flag indicating if TCA should create intervention (default False)."""
     
     intervention_plan_id: Optional[int]
     """Database ID of created InterventionPlan record."""
@@ -154,9 +154,9 @@ class TCAState(SafetyAgentState):
     pass
 
 
-# Backward compatibility aliases (SCA→TCA and SDA→CMA rename was incomplete)
+# Backward compatibility aliases (TCA→TCA and CMA→CMA rename was incomplete)
 SCAState = TCAState
-"""Alias for TCAState. Support Coach Agent (SCA) was renamed to Therapeutic Coach Agent (TCA)."""
+"""Alias for TCAState. Therapeutic Coach Agent (TCA) was renamed to Therapeutic Coach Agent (TCA)."""
 
 
 class CMAState(SafetyAgentState):
@@ -203,9 +203,9 @@ class CMAState(SafetyAgentState):
     """Additional scheduling context (preferences, constraints, etc.)."""
 
 
-# Backward compatibility alias (SDA→CMA rename was incomplete)
+# Backward compatibility alias (CMA→CMA rename was incomplete)
 SDAState = CMAState
-"""Alias for CMAState. Service Desk Agent (SDA) was renamed to Case Management Agent (CMA)."""
+"""Alias for CMAState. Case Management Agent (CMA) was renamed to Case Management Agent (CMA)."""
 
 
 class OrchestratorState(SafetyAgentState):

@@ -28,20 +28,20 @@ User Message → Aika Decision Node → [needs_agents?]
                                      ↓
                                 [severity check]
                                  ↓    ↓    ↓
-                               SDA  SCA  Synthesize → END
+                               CMA  TCA  Synthesize → END
 ```
 
 **Key Innovation**: Aika decides if specialized agents are needed:
 - **Casual chat** ("hi", "how are you?") → Direct response (~1.2s)
-- **Emotional distress** → STA → SCA (intervention plan)
-- **Crisis signals** → STA → SDA (case creation)
+- **Emotional distress** → STA → TCA (intervention plan)
+- **Crisis signals** → STA → CMA (case creation)
 
 | Agent | Scope | Highlights | Status |
 |-------|-------|------------|--------|
 | 🤖 **Aika Meta-Agent** | Intelligent decision node | Intent classification, conditional routing, direct responses, conversation memory | ✅ **Complete** |
 | 🛡️ **Safety Triage Agent (STA)** | Real-time risk scoring | Crisis detection (Level 0-3), PII redaction, risk assessment | ✅ **Complete** |
-| 💬 **Support Coach Agent (SCA)** | CBT-informed coaching | Intervention plans, therapeutic exercises, progress tracking | ✅ **Complete** |
-| 🗂️ **Service Desk Agent (SDA)** | Clinical case management | Case creation, SLA tracking, auto-assignment | ✅ **Complete** |
+| 💬 **Therapeutic Coach Agent (TCA)** | CBT-informed coaching | Intervention plans, therapeutic exercises, progress tracking | ✅ **Complete** |
+| 🗂️ **Case Management Agent (CMA)** | Clinical case management | Case creation, SLA tracking, auto-assignment | ✅ **Complete** |
 | 🔍 **Insights Agent (IA)** | Privacy-preserving analytics | k-anonymity (k≥5), differential privacy | ✅ **Complete** |
 
 **Usage Example (Agentic Pattern):**
@@ -83,9 +83,9 @@ Refer to `AIKA_META_AGENT_ARCHITECTURE.md`, `PROJECT_SINGLE_SOURCE_OF_TRUTH.md`,
 ## Core Capabilities
 
 - **Safety-first chat** with Gemini 2.5 API responses, real-time risk monitoring, and STA crisis detection
-- **CBT-informed coaching** via SCA with evidence-based therapeutic interventions and progress tracking
+- **CBT-informed coaching** via TCA with evidence-based therapeutic interventions and progress tracking
 - **User & consent management** via JWT-secured APIs and append-only consent ledgers
-- **Clinical case management** with SDA scaffolding for case oversight and SLA enforcement
+- **Clinical case management** with CMA scaffolding for case oversight and SLA enforcement
 - **Privacy-preserving insights** with IA differential privacy queries and audit-ready reporting
 - **Observability hooks** for structured logging, monitoring, and privacy budget events
 
@@ -101,10 +101,10 @@ backend/
 │   │   │   ├── sta_graph.py           # LangGraph StateGraph definition
 │   │   │   ├── sta_graph_service.py   # Service wrapper with execution tracking
 │   │   │   └── service.py             # Core triage logic
-│   │   ├── sca/            # Support Coach Agent (CBT coaching)
+│   │   ├── sca/            # Therapeutic Coach Agent (CBT coaching)
 │   │   │   ├── sca_graph.py           # LangGraph StateGraph definition
 │   │   │   └── service.py             # Intervention plan generation
-│   │   ├── sda/            # Service Desk Agent (case management)
+│   │   ├── sda/            # Case Management Agent (case management)
 │   │   │   ├── sda_graph.py           # LangGraph StateGraph definition
 │   │   │   └── service.py             # Case creation and SLA tracking
 │   │   ├── ia/             # Insights Agent (privacy-preserving analytics)
@@ -112,7 +112,7 @@ backend/
 │   │   │   ├── ia_graph_service.py    # Service wrapper
 │   │   │   └── service.py             # Analytics query execution
 │   │   ├── graph_state.py             # Shared TypedDict state schemas
-│   │   ├── orchestrator_graph.py      # Master orchestrator (STA→SCA/SDA routing)
+│   │   ├── orchestrator_graph.py      # Master orchestrator (STA→TCA/CMA routing)
 │   │   ├── orchestrator_graph_service.py  # Orchestrator service wrapper
 │   │   └── execution_tracker.py       # Real-time execution monitoring
 │   ├── core/
@@ -143,7 +143,7 @@ backend/
 - **LLM Providers:** Google Gemini (hosted) and optional Gemma 3 runtime wired through `core/llm.py`
 - **Authentication & Sessions:** JWT validation, NextAuth sync endpoints, Redis for sessions
 - **Messaging & Tasks:** Redis queues, APScheduler for background tasks, email/SMS connectors
-- **Feature Flags & Config:** Runtime toggles for STA/SCA/SDA/IA activation and environment-driven configs
+- **Feature Flags & Config:** Runtime toggles for STA/TCA/CMA/IA activation and environment-driven configs
 - **Observability:** Structured logging (JSON), Prometheus instrumentation, optional Sentry integration
 - **Security:** JWT auth, parameterised queries, configurable CORS, consent & redaction guardrails
 
@@ -247,7 +247,7 @@ During development, run `python -m app.utils.env_check` (or import `check_env()`
   flake8 app tests
   ```
 
-Ensure tests cover new Safety Agent flows (STA/SCA/SDA/IA) before enabling related feature flags.
+Ensure tests cover new Safety Agent flows (STA/TCA/CMA/IA) before enabling related feature flags.
 
 ---
 

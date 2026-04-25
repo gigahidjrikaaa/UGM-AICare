@@ -54,7 +54,7 @@ export default function CounselorProfilePage() {
   const loadProfile = async () => {
     try {
       setLoading(true);
-      const data = await apiCall<CounselorProfile>('/api/counselor/profile');
+      const data = await apiCall<CounselorProfile>('/api/v1/counselor/profile');
       
       if (!data) {
         throw new Error('No profile data returned');
@@ -80,7 +80,7 @@ export default function CounselorProfilePage() {
         bio: editedProfile.bio,
       };
       
-      const updated = await apiCall<CounselorProfile>('/api/counselor/profile', {
+      const updated = await apiCall<CounselorProfile>('/api/v1/counselor/profile', {
         method: 'PUT',
         body: JSON.stringify(payload),
       });

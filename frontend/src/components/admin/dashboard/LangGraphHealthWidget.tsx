@@ -33,8 +33,8 @@ const GRAPH_NAMES: Record<string, string> = {
   tca: 'TCA',
   cma: 'CMA',
   ia: 'IA',
-  sca: 'SCA',
-  sda: 'SDA',
+  sca: 'TCA',
+  sda: 'CMA',
   orchestrator: 'Orch',
 };
 
@@ -44,7 +44,7 @@ const GRAPH_FULL_NAMES: Record<string, string> = {
   cma: 'Case Management Agent',
   ia: 'Insights Agent',
   sca: 'Student Communication Agent',
-  sda: 'Service Desk Agent',
+  sda: 'Case Management Agent',
   orchestrator: 'Orchestrator',
 };
 

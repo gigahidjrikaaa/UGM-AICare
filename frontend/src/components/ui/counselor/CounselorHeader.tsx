@@ -1,11 +1,10 @@
 "use client";
 
 import Link from 'next/link';
-import { getSession, signOut, useSession } from 'next-auth/react';
+import { signOut, useSession } from 'next-auth/react';
 import { FiBell, FiMenu, FiSearch, FiChevronDown, FiUser, FiSettings, FiLogOut, FiAlertTriangle, FiClipboard } from 'react-icons/fi';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { formatDistanceToNow } from 'date-fns';
 
 type CounselorAlertItem = {
   id: string;
@@ -44,6 +43,7 @@ type CounselorUnreadStatsResponse = {
 
 const API_BASE = (process.env.NEXT_PUBLIC_API_URL || '').replace(/\/$/, '');
 const MAX_ALERTS = 10;
+const RELATIVE_TIME_FORMATTER = new Intl.RelativeTimeFormat('en', { numeric: 'auto' });
 
 const severityDotClass: Record<CounselorAlertItem['severity'], string> = {
   critical: 'bg-red-500',
@@ -58,13 +58,23 @@ const formatAlertTime = (value: string): string => {
   if (Number.isNaN(date.getTime())) {
     return 'Just now';
   }
-  return formatDistanceToNow(date, { addSuffix: true });
+
+  const diffInSeconds = Math.round((date.getTime() - Date.now()) / 1000);
+  const absSeconds = Math.abs(diffInSeconds);
+
+  if (absSeconds < 60) {
+    return RELATIVE_TIME_FORMATTER.format(diffInSeconds, 'second');
+  }
+  if (absSeconds < 3600) {
+    return RELATIVE_TIME_FORMATTER.format(Math.round(diffInSeconds / 60), 'minute');
+  }
+  if (absSeconds < 86400) {
+    return RELATIVE_TIME_FORMATTER.format(Math.round(diffInSeconds / 3600), 'hour');
+  }
+  return RELATIVE_TIME_FORMATTER.format(Math.round(diffInSeconds / 86400), 'day');
 };
 
-async function counselorApiCall<T>(path: string, options: RequestInit = {}): Promise<T> {
-  const session = await getSession();
-  const accessToken = (session as { accessToken?: string } | null)?.accessToken;
-
+async function counselorApiCall<T>(path: string, accessToken?: string, options: RequestInit = {}): Promise<T> {
   const headers: Record<string, string> = {
     ...(options.body ? { 'Content-Type': 'application/json' } : {}),
     ...(options.headers as Record<string, string> ?? {}),
@@ -90,6 +100,7 @@ export default function CounselorHeader({ onMenuToggle }: { onMenuToggle?: () =>
   const { data: session } = useSession();
   const router = useRouter();
   const pathname = usePathname();
+  const accessToken = (session as { accessToken?: string } | null)?.accessToken;
 
   const [searchQuery, setSearchQuery] = useState('');
   const [notificationCount, setNotificationCount] = useState(0);
@@ -97,7 +108,6 @@ export default function CounselorHeader({ onMenuToggle }: { onMenuToggle?: () =>
   const [isProfileOpen, setIsProfileOpen] = useState(false);
   const [counselorAlerts, setCounselorAlerts] = useState<CounselorAlertItem[]>([]);
   const [isLoadingAlerts, setIsLoadingAlerts] = useState(false);
-  const [hasLoadedAlerts, setHasLoadedAlerts] = useState(false);
   const pendingSeenRef = useRef(new Set<string>());
 
   const closeMenus = useCallback(() => {
@@ -107,18 +117,22 @@ export default function CounselorHeader({ onMenuToggle }: { onMenuToggle?: () =>
 
   const fetchUnreadStats = useCallback(async () => {
     try {
-      const stats = await counselorApiCall<CounselorUnreadStatsResponse>('/api/v1/counselor/alerts/stats/unread');
+      const stats = await counselorApiCall<CounselorUnreadStatsResponse>(
+        '/api/v1/counselor/alerts/stats/unread',
+        accessToken
+      );
       setNotificationCount(Math.max(0, Number(stats.total_unread || 0)));
     } catch (error) {
       console.error('Failed to fetch counselor alert stats:', error);
     }
-  }, []);
+  }, [accessToken]);
 
   const fetchAlerts = useCallback(async () => {
     setIsLoadingAlerts(true);
     try {
       const response = await counselorApiCall<CounselorAlertsListResponse>(
-        `/api/v1/counselor/alerts?limit=${MAX_ALERTS}&offset=0`
+        `/api/v1/counselor/alerts?limit=${MAX_ALERTS}&offset=0`,
+        accessToken
       );
 
       const mapped: CounselorAlertItem[] = response.alerts.map((alert) => ({
@@ -127,20 +141,19 @@ export default function CounselorHeader({ onMenuToggle }: { onMenuToggle?: () =>
         severity: alert.severity,
         title: alert.title,
         message: alert.message,
-        href: alert.link ?? '/counselor/cases',
+        href: alert.link ?? '/counselor/cases?source=header',
         created_at: alert.created_at,
         is_seen: alert.is_seen,
       }));
 
       setCounselorAlerts(mapped);
       setNotificationCount(Math.max(response.unread_count, mapped.filter((item) => !item.is_seen).length));
-      setHasLoadedAlerts(true);
     } catch (error) {
       console.error('Failed to fetch counselor alerts:', error);
     } finally {
       setIsLoadingAlerts(false);
     }
-  }, []);
+  }, [accessToken]);
 
   const markAlertSeen = useCallback(async (alert: CounselorAlertItem) => {
     if (alert.is_seen || pendingSeenRef.current.has(alert.id)) {
@@ -149,7 +162,7 @@ export default function CounselorHeader({ onMenuToggle }: { onMenuToggle?: () =>
 
     pendingSeenRef.current.add(alert.id);
     try {
-      await counselorApiCall(`/api/v1/counselor/alerts/${alert.id}/seen`, { method: 'PUT' });
+      await counselorApiCall(`/api/v1/counselor/alerts/${alert.id}/seen`, accessToken, { method: 'PUT' });
       setCounselorAlerts((prev) => prev.map((item) => (
         item.id === alert.id ? { ...item, is_seen: true } : item
       )));
@@ -159,31 +172,62 @@ export default function CounselorHeader({ onMenuToggle }: { onMenuToggle?: () =>
     } finally {
       pendingSeenRef.current.delete(alert.id);
     }
+  }, [accessToken]);
+
+  const addSourceToCasesHref = useCallback((href: string, source: string) => {
+    if (!href.startsWith('/counselor/cases')) {
+      return href;
+    }
+
+    const [pathAndQuery, hashPart = ''] = href.split('#');
+    const [path, rawQuery = ''] = pathAndQuery.split('?');
+    const params = new URLSearchParams(rawQuery);
+    if (!params.get('source')) {
+      params.set('source', source);
+    }
+
+    const queryString = params.toString();
+    return `${path}${queryString ? `?${queryString}` : ''}${hashPart ? `#${hashPart}` : ''}`;
   }, []);
 
   const handleAlertOpen = useCallback(async (alert: CounselorAlertItem) => {
     await markAlertSeen(alert);
     closeMenus();
-    router.push(alert.href);
-  }, [closeMenus, markAlertSeen, router]);
+    router.push(addSourceToCasesHref(alert.href, 'header'));
+  }, [addSourceToCasesHref, closeMenus, markAlertSeen, router]);
 
   useEffect(() => {
-    fetchUnreadStats();
+    void fetchUnreadStats();
+
     const interval = setInterval(() => {
-      fetchUnreadStats();
-      if (hasLoadedAlerts) {
-        fetchAlerts();
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+
+      void fetchUnreadStats();
+      if (isAlertsOpen) {
+        void fetchAlerts();
       }
     }, 30000);
 
-    return () => clearInterval(interval);
-  }, [fetchAlerts, fetchUnreadStats, hasLoadedAlerts]);
+    const onVisibilityChange = () => {
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
 
-  useEffect(() => {
-    if (isAlertsOpen && !hasLoadedAlerts) {
-      fetchAlerts();
-    }
-  }, [fetchAlerts, hasLoadedAlerts, isAlertsOpen]);
+      void fetchUnreadStats();
+      if (isAlertsOpen) {
+        void fetchAlerts();
+      }
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [fetchAlerts, fetchUnreadStats, isAlertsOpen]);
 
   const counselorAlertsSummary = useMemo(() => {
     if (isLoadingAlerts && counselorAlerts.length === 0) {
@@ -200,7 +244,12 @@ export default function CounselorHeader({ onMenuToggle }: { onMenuToggle?: () =>
     if (!trimmed) {
       return;
     }
-    router.push(`/counselor/cases?search=${encodeURIComponent(trimmed)}`);
+    const params = new URLSearchParams({
+      search: trimmed,
+      status: 'all',
+      source: 'header',
+    });
+    router.push(`/counselor/cases?${params.toString()}`);
   };
 
   const onSearchKeyDown: React.KeyboardEventHandler<HTMLInputElement> = (event) => {
@@ -252,9 +301,10 @@ export default function CounselorHeader({ onMenuToggle }: { onMenuToggle?: () =>
         <button
           type="button"
           onClick={() => {
-            setIsAlertsOpen((open) => !open);
+            const nextOpen = !isAlertsOpen;
+            setIsAlertsOpen(nextOpen);
             setIsProfileOpen(false);
-            if (!hasLoadedAlerts) {
+            if (nextOpen) {
               void fetchAlerts();
             }
           }}

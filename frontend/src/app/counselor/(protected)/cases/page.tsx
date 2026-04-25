@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   FiClock,
   FiUser,
@@ -11,6 +12,7 @@ import {
   FiMail,
   FiPhone,
   FiSend,
+  FiSearch,
   FiX,
   FiXCircle,
 } from 'react-icons/fi';
@@ -30,15 +32,6 @@ interface Case {
   user_email?: string;
   user_phone?: string;
   telegram_username?: string;
-}
-
-interface CaseStats {
-  total_cases: number;
-  open_cases: number;
-  in_progress_cases: number;
-  closed_cases: number;
-  critical_cases: number;
-  high_priority_cases: number;
 }
 
 interface CaseAssessmentsResponse {
@@ -109,13 +102,60 @@ const statusColors = {
   closed: 'bg-gray-500/20 text-gray-300',
 };
 
+const STATUS_PRIORITY: Record<Case['status'], number> = {
+  in_progress: 0,
+  waiting: 1,
+  new: 2,
+  resolved: 3,
+  closed: 4,
+};
+
+const SEVERITY_PRIORITY: Record<Case['severity'], number> = {
+  critical: 0,
+  high: 1,
+  med: 2,
+  low: 3,
+};
+
+const SOURCE_LABELS: Record<string, string> = {
+  header: 'Quick search',
+  patients: 'Patients & Contacts',
+  'patient-detail': 'Patient Detail',
+  escalations: 'Escalations Queue',
+  dashboard: 'Dashboard quick action',
+};
+
+const VALID_STATUS_FILTERS = new Set(['all', 'new', 'in_progress', 'waiting', 'closed', 'resolved']);
+const VALID_SEVERITY_FILTERS = new Set(['all', 'low', 'med', 'high', 'critical']);
+
+const resolveDefaultStatusFilter = (
+  sourceParam: string | null,
+  searchParam: string | null,
+  highlightParam: string | null,
+) => {
+  if (searchParam || highlightParam) {
+    return 'all';
+  }
+
+  if (sourceParam === 'patients' || sourceParam === 'patient-detail' || sourceParam === 'header') {
+    return 'all';
+  }
+
+  return 'in_progress';
+};
+
 export default function CounselorCasesPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const highlightedRowRef = useRef<HTMLTableRowElement | null>(null);
   const [cases, setCases] = useState<Case[]>([]);
-  const [stats, setStats] = useState<CaseStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterStatus, setFilterStatus] = useState<string>('in_progress');
   const [filterSeverity, setFilterSeverity] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [highlightCaseId, setHighlightCaseId] = useState<string | null>(null);
+  const [contextSource, setContextSource] = useState<string | null>(null);
   const [assessmentsByCaseId, setAssessmentsByCaseId] = useState<Record<string, CaseAssessmentsResponse | null>>({});
   const [loadingAssessments, setLoadingAssessments] = useState<string | null>(null);
   const [selectedCaseId, setSelectedCaseId] = useState<string | null>(null);
@@ -127,8 +167,22 @@ export default function CounselorCasesPage() {
 
   useEffect(() => {
     loadCases();
-    loadStats();
   }, []);
+
+  useEffect(() => {
+    const statusParam = searchParams.get('status');
+    const severityParam = searchParams.get('severity');
+    const searchParam = searchParams.get('search');
+    const highlightParam = searchParams.get('highlight');
+    const sourceParam = searchParams.get('source');
+    const fallbackStatus = resolveDefaultStatusFilter(sourceParam, searchParam, highlightParam);
+
+    setFilterStatus(statusParam && VALID_STATUS_FILTERS.has(statusParam) ? statusParam : fallbackStatus);
+    setFilterSeverity(severityParam && VALID_SEVERITY_FILTERS.has(severityParam) ? severityParam : 'all');
+    setSearchQuery(searchParam ?? '');
+    setHighlightCaseId(highlightParam);
+    setContextSource(sourceParam);
+  }, [searchParams]);
 
   const loadCases = async () => {
     try {
@@ -144,15 +198,6 @@ export default function CounselorCasesPage() {
     }
   };
 
-  const loadStats = async () => {
-    try {
-      const response = await apiClient.get<CaseStats>('/counselor/cases/stats');
-      setStats(response.data);
-    } catch (err) {
-      console.error('Failed to load case stats:', err);
-    }
-  };
-
   const formatDate = (dateString: string) => {
     return new Date(dateString).toLocaleDateString('en-US', {
       month: 'short',
@@ -162,11 +207,78 @@ export default function CounselorCasesPage() {
     });
   };
 
-  const filteredCases = useMemo(() => cases.filter((c) => {
+  const normalizedSearchQuery = searchQuery.trim().toLowerCase();
+
+  const sortedCases = useMemo(
+    () =>
+      [...cases].sort((left, right) => {
+        const statusGap = STATUS_PRIORITY[left.status] - STATUS_PRIORITY[right.status];
+        if (statusGap !== 0) {
+          return statusGap;
+        }
+
+        const severityGap = SEVERITY_PRIORITY[left.severity] - SEVERITY_PRIORITY[right.severity];
+        if (severityGap !== 0) {
+          return severityGap;
+        }
+
+        return new Date(right.updated_at).getTime() - new Date(left.updated_at).getTime();
+      }),
+    [cases],
+  );
+
+  const filteredCases = useMemo(() => sortedCases.filter((c) => {
     const statusMatch = filterStatus === 'all' || c.status === filterStatus;
     const severityMatch = filterSeverity === 'all' || c.severity === filterSeverity;
-    return statusMatch && severityMatch;
-  }), [cases, filterStatus, filterSeverity]);
+    const searchableText = [
+      c.id,
+      c.session_id,
+      c.user_hash,
+      c.summary_redacted,
+      c.user_email,
+      c.user_phone,
+      c.telegram_username,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .toLowerCase();
+    const searchMatch =
+      normalizedSearchQuery.length === 0 || searchableText.includes(normalizedSearchQuery);
+
+    return statusMatch && severityMatch && searchMatch;
+  }), [filterSeverity, filterStatus, normalizedSearchQuery, sortedCases]);
+
+  const queueCounts = useMemo(
+    () => ({
+      intake: cases.filter((caseItem) => caseItem.status === 'new').length,
+      active: cases.filter((caseItem) => caseItem.status === 'in_progress').length,
+      waiting: cases.filter((caseItem) => caseItem.status === 'waiting').length,
+      closed: cases.filter((caseItem) => caseItem.status === 'closed' || caseItem.status === 'resolved').length,
+      highRiskActive: cases.filter(
+        (caseItem) =>
+          ['new', 'in_progress', 'waiting'].includes(caseItem.status) &&
+          ['critical', 'high'].includes(caseItem.severity),
+      ).length,
+    }),
+    [cases],
+  );
+
+  const highlightedCaseVisible = useMemo(
+    () => !!highlightCaseId && filteredCases.some((caseItem) => caseItem.id === highlightCaseId),
+    [filteredCases, highlightCaseId],
+  );
+
+  useEffect(() => {
+    if (!highlightedCaseVisible || loading) {
+      return;
+    }
+
+    const timer = window.setTimeout(() => {
+      highlightedRowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 150);
+
+    return () => window.clearTimeout(timer);
+  }, [highlightedCaseVisible, loading]);
 
   const selectedCase = useMemo(
     () => (selectedCaseId ? cases.find((caseItem) => caseItem.id === selectedCaseId) ?? null : null),
@@ -211,6 +323,7 @@ export default function CounselorCasesPage() {
   };
 
   const isReceivable = (caseItem: Case) => ['new', 'waiting'].includes(caseItem.status);
+  const isClosable = (caseItem: Case) => ['new', 'waiting', 'in_progress'].includes(caseItem.status);
 
   const updateCaseStatus = async (caseItem: Case, status: 'in_progress' | 'closed', note?: string) => {
     try {
@@ -226,7 +339,7 @@ export default function CounselorCasesPage() {
           : existing
       )));
 
-      await loadStats();
+      await loadCases();
       toast.success(response.data.message || 'Case updated');
 
       if (response.data.case_attestation) {
@@ -249,14 +362,22 @@ export default function CounselorCasesPage() {
     await updateCaseStatus(selectedCase, 'in_progress', 'Accepted by counselor');
   };
 
-  const onRejectCase = async () => {
+  const onCloseCase = async () => {
     if (!selectedCase) return;
     const note = rejectNote.trim();
     if (!note) {
-      toast.error('Rejecting a case requires justification');
+      toast.error('Closing a case requires justification');
       return;
     }
     await updateCaseStatus(selectedCase, 'closed', note);
+  };
+
+  const clearContext = () => {
+    setSearchQuery('');
+    setHighlightCaseId(null);
+    setContextSource(null);
+    setFilterStatus('in_progress');
+    setFilterSeverity('all');
   };
 
   useEffect(() => {
@@ -337,11 +458,21 @@ export default function CounselorCasesPage() {
       <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">My Cases</h1>
-          <p className="text-white/60">Manage escalated cases and patient care</p>
+          <p className="text-white/60">Owned work queue for accepted cases; new intake is handled in Escalations</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="w-full md:w-auto flex flex-col md:flex-row items-stretch md:items-center gap-3">
+          <div className="flex items-center gap-2 px-3 py-2 bg-white/10 border border-white/20 rounded-lg min-w-65">
+            <FiSearch className="w-4 h-4 text-white/60" />
+            <input
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search case ID, session ID, patient hash, summary"
+              className="w-full bg-transparent text-sm text-white placeholder:text-white/50 focus:outline-none"
+              aria-label="Search cases"
+            />
+          </div>
           <button
-            onClick={() => { loadCases(); loadStats(); }}
+            onClick={() => { loadCases(); }}
             className="px-3 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-sm text-white transition-all flex items-center gap-2"
           >
             <FiRefreshCw className="w-4 h-4" />
@@ -369,28 +500,60 @@ export default function CounselorCasesPage() {
             <option value="new" className="bg-[#001d58]">New</option>
             <option value="in_progress" className="bg-[#001d58]">In Progress</option>
             <option value="waiting" className="bg-[#001d58]">Waiting</option>
+            <option value="resolved" className="bg-[#001d58]">Resolved</option>
             <option value="closed" className="bg-[#001d58]">Closed</option>
           </select>
         </div>
       </div>
 
+      {(contextSource || highlightCaseId) && (
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-xl border border-[#FFCA40]/30 bg-[#FFCA40]/10 p-3">
+          <div className="text-sm text-[#FFE9A6]">
+            Arrived from {SOURCE_LABELS[contextSource || ''] || 'another workspace'}
+            {highlightCaseId && (
+              <span className="text-white/80">. Highlighting case #{highlightCaseId.substring(0, 8)}.</span>
+            )}
+          </div>
+          <button
+            onClick={clearContext}
+            className="self-start md:self-auto px-3 py-1.5 text-xs font-medium rounded-md border border-white/20 text-white/80 hover:bg-white/10"
+          >
+            Clear context
+          </button>
+        </div>
+      )}
+
+      {queueCounts.intake > 0 && (
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2 rounded-xl border border-orange-400/30 bg-orange-500/10 p-3">
+          <p className="text-sm text-orange-100">
+            {queueCounts.intake} intake case{queueCounts.intake === 1 ? '' : 's'} still marked as new. Accept them from Escalations to keep ownership explicit.
+          </p>
+          <button
+            onClick={() => router.push('/counselor/escalations')}
+            className="self-start md:self-auto px-3 py-1.5 text-xs font-medium rounded-md border border-orange-300/40 text-orange-100 hover:bg-orange-400/10"
+          >
+            Open Escalations
+          </button>
+        </div>
+      )}
+
       {/* Stats Summary */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
-          <div className="text-2xl font-bold text-white">{stats?.open_cases ?? 0}</div>
-          <div className="text-xs text-white/60 mt-1">New Cases</div>
+          <div className="text-2xl font-bold text-white">{queueCounts.active}</div>
+          <div className="text-xs text-white/60 mt-1">Active Handling</div>
         </div>
         <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
-          <div className="text-2xl font-bold text-white">{stats?.in_progress_cases ?? 0}</div>
-          <div className="text-xs text-white/60 mt-1">In Progress</div>
+          <div className="text-2xl font-bold text-white">{queueCounts.waiting}</div>
+          <div className="text-xs text-white/60 mt-1">Waiting Follow-up</div>
         </div>
         <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
-          <div className="text-2xl font-bold text-red-400">{(stats?.critical_cases ?? 0) + (stats?.high_priority_cases ?? 0)}</div>
-          <div className="text-xs text-white/60 mt-1">High Priority</div>
+          <div className="text-2xl font-bold text-red-400">{queueCounts.highRiskActive}</div>
+          <div className="text-xs text-white/60 mt-1">High Risk Active</div>
         </div>
         <div className="bg-white/5 backdrop-blur border border-white/10 rounded-xl p-4">
-          <div className="text-2xl font-bold text-white">{stats?.closed_cases ?? 0}</div>
-          <div className="text-xs text-white/60 mt-1">Resolved</div>
+          <div className="text-2xl font-bold text-white">{queueCounts.closed}</div>
+          <div className="text-xs text-white/60 mt-1">Closed Cases</div>
         </div>
       </div>
 
@@ -432,15 +595,27 @@ export default function CounselorCasesPage() {
                   <td colSpan={8} className="px-4 py-12 text-center">
                     <FiCheckCircle className="w-12 h-12 text-white/20 mx-auto mb-3" />
                     <p className="text-white/60">No cases found</p>
-                    <p className="text-white/40 text-sm mt-1">Cases assigned to you will appear here</p>
+                    <p className="text-white/40 text-sm mt-1">
+                      {searchQuery || filterStatus !== 'all' || filterSeverity !== 'all'
+                        ? 'Try adjusting search or filters'
+                        : 'Cases assigned to you will appear here'}
+                    </p>
                   </td>
                 </tr>
               ) : (
-                filteredCases.map((caseItem) => (
-                  <tr 
-                    key={caseItem.id}
-                    className="hover:bg-white/5 transition-colors"
-                  >
+                filteredCases.map((caseItem) => {
+                  const isHighlighted = highlightCaseId === caseItem.id;
+
+                  return (
+                    <tr
+                      key={caseItem.id}
+                      ref={isHighlighted ? highlightedRowRef : null}
+                      className={`transition-colors ${
+                        isHighlighted
+                          ? 'bg-[#FFCA40]/15 ring-1 ring-inset ring-[#FFCA40]/50'
+                          : 'hover:bg-white/5'
+                      }`}
+                    >
                     <td className="px-4 py-4 whitespace-nowrap">
                       <span className="text-sm font-mono text-white/90">{caseItem.id.substring(0, 8)}...</span>
                     </td>
@@ -511,7 +686,7 @@ export default function CounselorCasesPage() {
                             disabled={actingCaseId === caseItem.id}
                             className="px-3 py-1 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/30 rounded text-xs font-medium text-emerald-300 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                           >
-                            Receive
+                            Accept
                           </button>
                         )}
                         <button
@@ -520,12 +695,13 @@ export default function CounselorCasesPage() {
                           title="View risk assessment transparency"
                         >
                           <FiEye className="w-3 h-3" />
-                          View
+                          {caseItem.status === 'in_progress' || caseItem.status === 'waiting' ? 'Resume' : 'View'}
                         </button>
                       </div>
                     </td>
-                  </tr>
-                ))
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
@@ -694,10 +870,14 @@ export default function CounselorCasesPage() {
                 })()}
               </div>
 
-              {isReceivable(selectedCase) && (
+              {isClosable(selectedCase) && (
                 <div className="rounded-xl border border-white/10 bg-white/5 p-4 space-y-3">
                   <h3 className="text-sm font-semibold text-white">Decision</h3>
-                  <p className="text-xs text-white/60">Accept receives this case into active handling. Reject closes the case and requires justification.</p>
+                  <p className="text-xs text-white/60">
+                    {isReceivable(selectedCase)
+                      ? 'Accept receives this case into active handling. Close requires justification and ends counselor ownership.'
+                      : 'Close requires justification and ends active counselor ownership for this case.'}
+                  </p>
                   <textarea
                     value={rejectNote}
                     onChange={(event) => setRejectNote(event.target.value)}
@@ -706,19 +886,21 @@ export default function CounselorCasesPage() {
                     className="w-full rounded-lg border border-white/20 bg-[#001D58] px-3 py-2 text-sm text-white"
                   />
                   <div className="flex flex-wrap gap-2">
+                    {isReceivable(selectedCase) && (
+                      <button
+                        onClick={onAcceptCase}
+                        disabled={actingCaseId === selectedCase.id}
+                        className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/20 px-3 py-2 text-sm text-emerald-300 border border-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <FiCheckCircle className="h-4 w-4" /> Accept Case
+                      </button>
+                    )}
                     <button
-                      onClick={onAcceptCase}
-                      disabled={actingCaseId === selectedCase.id}
-                      className="inline-flex items-center gap-2 rounded-lg bg-emerald-500/20 px-3 py-2 text-sm text-emerald-300 border border-emerald-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <FiCheckCircle className="h-4 w-4" /> Accept Case
-                    </button>
-                    <button
-                      onClick={onRejectCase}
+                      onClick={onCloseCase}
                       disabled={actingCaseId === selectedCase.id}
                       className="inline-flex items-center gap-2 rounded-lg bg-red-500/20 px-3 py-2 text-sm text-red-300 border border-red-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <FiXCircle className="h-4 w-4" /> Reject Case
+                      <FiXCircle className="h-4 w-4" /> Close Case
                     </button>
                   </div>
                 </div>

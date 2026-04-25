@@ -22,11 +22,11 @@ class STAClassifyResponse(BaseModel):
     next_step: NextStep
     handoff: bool = False
     diagnostic_notes: Optional[str] = Field(default=None, exclude=True)
-    needs_support_coach_plan: bool = Field(
+    needs_therapeutic_coach_plan: bool = Field(
         default=False,
-        description="Flag indicating if user could benefit from SCA Support Coach Plan"
+        description="Flag indicating if user could benefit from TCA Therapeutic Coach Plan"
     )
-    support_plan_type: SupportPlanType = Field(
+    therapeutic_plan_type: SupportPlanType = Field(
         default='none',
         description="Type of support plan recommended: calm_down, break_down_problem, general_coping, or none"
     )
@@ -38,7 +38,7 @@ class STAClassifyResponse(BaseModel):
                 "intent": "academic_stress",
                 "next_step": "tca",
                 "handoff": False,
-                "needs_support_coach_plan": True,
-                "support_plan_type": "break_down_problem"
+                "needs_therapeutic_coach_plan": True,
+                "therapeutic_plan_type": "break_down_problem"
             }
         }

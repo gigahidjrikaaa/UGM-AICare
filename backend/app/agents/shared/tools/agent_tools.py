@@ -1,13 +1,13 @@
 """
 Agent Orchestration Tools
 
-Tools that coordinate with LangGraph agents (STA, SCA, SDA, IA).
+Tools that coordinate with LangGraph agents (STA, TCA, CMA, IA).
 These tools allow Aika to delegate specialized tasks to expert agents.
 
 Registered Tools:
 - run_safety_triage_agent: Crisis detection and risk assessment
-- run_support_coach_agent: CBT-informed intervention planning
-- run_service_desk_agent: Case management and counselor escalation
+- run_therapeutic_coach_agent: CBT-informed intervention planning
+- run_case_management_agent: Case management and counselor escalation
 - run_insights_agent: Privacy-preserving analytics queries
 - general_query: General knowledge and UGM information
 """
@@ -139,12 +139,12 @@ async def run_safety_triage_agent(
 
 
 # ============================================================================
-# AGENT TOOL: Support Coach Agent (SCA)
+# AGENT TOOL: Therapeutic Coach Agent (TCA)
 # ============================================================================
 
 @register_tool(
-    name="run_support_coach_agent",
-    description="""Execute the Support Coach Agent (SCA) LangGraph pipeline to generate a personalized CBT-informed intervention plan.
+    name="run_therapeutic_coach_agent",
+    description="""Execute the Therapeutic Coach Agent (TCA) LangGraph pipeline to generate a personalized CBT-informed intervention plan.
 
 ✅ CALL WHEN USER:
 - Shows moderate anxiety, stress, or emotional distress
@@ -163,7 +163,7 @@ Examples:
 - For general conversation without clear concern
 - If user just wants to talk without needing structured support
 
-The SCA agent creates intervention plans with:
+The TCA agent creates intervention plans with:
 - Evidence-based coping strategies (CBT, mindfulness, behavioral activation)
 - Actionable steps tailored to user's concern
 - Resource cards with links
@@ -192,7 +192,7 @@ CRITICAL: Always create plans proactively when user needs structured support!"""
     requires_db=True,
     requires_user_id=True
 )
-async def run_support_coach_agent(
+async def run_therapeutic_coach_agent(
     db: Any,
     user_id: int,
     message: str,
@@ -200,25 +200,25 @@ async def run_support_coach_agent(
     plan_title: str,
     concern_type: str,
     severity: str = "moderate",
-    sca_service: Optional[Any] = None,
+    tca_service: Optional[Any] = None,
     activity_logger: Optional[Any] = None,
     **kwargs
 ) -> Dict[str, Any]:
-    """Execute SCA graph to create intervention plan."""
+    """Execute TCA graph to create intervention plan."""
     from app.agents.tca.tca_graph_service import TCAGraphService
     
     try:
-        if sca_service is None:
-            sca_service = TCAGraphService(db=db)
+        if tca_service is None:
+            tca_service = TCAGraphService(db=db)
         
         if activity_logger:
             activity_logger.log_info(
-                "SCA",
+                "TCA",
                 f"💙 Creating intervention plan: {plan_title}",
                 {"concern": concern_type, "severity": severity}
             )
         
-        result = await sca_service.execute(
+        result = await tca_service.execute(
             user_id=user_id,
             session_id=session_id,
             user_hash=f"user_{user_id}",
@@ -233,14 +233,14 @@ async def run_support_coach_agent(
         
         if activity_logger:
             activity_logger.log_info(
-                "SCA",
+                "TCA",
                 f"✅ Plan created: {plan_id}",
                 {"total_steps": plan_data.get("total_steps", 0)}
             )
         
         return {
             "status": "completed",
-            "agent": "SCA",
+            "agent": "TCA",
             "plan_id": plan_id,
             "plan_title": plan_title,
             "intervention_plan": plan_data,
@@ -249,22 +249,22 @@ async def run_support_coach_agent(
         }
     
     except Exception as e:
-        logger.error(f"❌ SCA execution failed: {e}", exc_info=True)
+        logger.error(f"❌ TCA execution failed: {e}", exc_info=True)
         return {
             "status": "failed",
-            "agent": "SCA",
+            "agent": "TCA",
             "error": str(e),
             "resources": [],
         }
 
 
 # ============================================================================
-# AGENT TOOL: Service Desk Agent (SDA)
+# AGENT TOOL: Case Management Agent (CMA)
 # ============================================================================
 
 @register_tool(
-    name="run_service_desk_agent",
-    description="""Execute the Service Desk Agent (SDA) LangGraph pipeline to create a counselor case and auto-assign.
+    name="run_case_management_agent",
+    description="""Execute the Case Management Agent (CMA) LangGraph pipeline to create a counselor case and auto-assign.
 
 ✅ CALL WHEN:
 - User explicitly requests to speak with human counselor
@@ -277,7 +277,7 @@ Examples:
 - "Bisa hubungin psikolog?"
 - "Aku butuh bantuan professional"
 
-The SDA agent:
+The CMA agent:
 - Creates formal case in ticketing system
 - Auto-assigns counselor based on workload
 - Sets SLA deadline (2 hours for critical, 24 hours for high)
@@ -311,7 +311,7 @@ The SDA agent:
     requires_db=True,
     requires_user_id=True
 )
-async def run_service_desk_agent(
+async def run_case_management_agent(
     db: Any,
     user_id: int,
     message: str,
@@ -319,25 +319,25 @@ async def run_service_desk_agent(
     case_title: str,
     severity: str,
     reason: str,
-    sda_service: Optional[Any] = None,
+    cma_service: Optional[Any] = None,
     activity_logger: Optional[Any] = None,
     **kwargs
 ) -> Dict[str, Any]:
-    """Execute SDA graph to create case and assign counselor."""
+    """Execute CMA graph to create case and assign counselor."""
     from app.agents.cma.cma_graph_service import CMAGraphService
     
     try:
-        if sda_service is None:
-            sda_service = CMAGraphService(db=db)
+        if cma_service is None:
+            cma_service = CMAGraphService(db=db)
         
         if activity_logger:
             activity_logger.log_info(
-                "SDA",
+                "CMA",
                 f"📋 Creating service desk case: {case_title}",
                 {"severity": severity}
             )
         
-        result = await sda_service.execute(
+        result = await cma_service.execute(
             user_id=user_id,
             session_id=session_id,
             user_hash=f"user_{user_id}",
@@ -352,14 +352,14 @@ async def run_service_desk_agent(
         
         if activity_logger:
             activity_logger.log_info(
-                "SDA",
+                "CMA",
                 f"✅ Case created: {case_id}",
                 {"status": status}
             )
         
         return {
             "status": "completed",
-            "agent": "SDA",
+            "agent": "CMA",
             "case_id": case_id,
             "case_title": case_title,
             "case_status": status,
@@ -368,10 +368,10 @@ async def run_service_desk_agent(
         }
     
     except Exception as e:
-        logger.error(f"❌ SDA execution failed: {e}", exc_info=True)
+        logger.error(f"❌ CMA execution failed: {e}", exc_info=True)
         return {
             "status": "failed",
-            "agent": "SDA",
+            "agent": "CMA",
             "error": str(e)
         }
 

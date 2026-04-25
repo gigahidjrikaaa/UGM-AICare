@@ -36,7 +36,7 @@ class CampaignService:
         Args:
             db: Database session
             name: Campaign name
-            message_template: Message template for SCA
+            message_template: Message template for TCA
             created_by: User ID of campaign creator
             description: Optional campaign description
             trigger_rules: Optional JSON trigger configuration
