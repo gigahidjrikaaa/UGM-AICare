@@ -70,6 +70,7 @@ async def request_chat_completion(
     rate_limit_prefix: str,
     unexpected_failed_prefix: str,
     accept_language: Optional[str] = None,
+    json_schema: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Call an OpenAI-compatible chat-completions endpoint and return text."""
     messages = convert_history_to_chat_messages(history, system_prompt)
@@ -80,7 +81,12 @@ async def request_chat_completion(
         "max_tokens": max_tokens,
         "temperature": temperature,
     }
-    if json_mode:
+    if json_schema is not None:
+        payload["response_format"] = {
+            "type": "json_schema",
+            "json_schema": {"name": "decision", "schema": json_schema}
+        }
+    elif json_mode:
         payload["response_format"] = {"type": "json_object"}
 
     headers = {
