@@ -82,8 +82,8 @@ export default function CounselorDashboard() {
     try {
       setLoading(true);
       const [statsData, appointmentsData] = await Promise.all([
-        apiCall<DashboardStats>('/api/counselor/stats'),
-        apiCall<TodayAppointment[]>('/api/counselor/upcoming-today'),
+        apiCall<DashboardStats>('/api/v1/counselor/stats'),
+        apiCall<TodayAppointment[]>('/api/v1/counselor/upcoming-today'),
       ]);
       
       setStats(statsData);

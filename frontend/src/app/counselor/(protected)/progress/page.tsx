@@ -62,7 +62,7 @@ export default function CounselorProgressPage() {
     try {
       setLoading(true);
       // TODO: Replace with actual API endpoint
-      // const data = await apiCall<ProgressData[]>('/api/counselor/progress');
+      // const data = await apiCall<ProgressData[]>('/api/v1/counselor/progress');
       
       // Mock data
       const mockData: ProgressData[] = [
