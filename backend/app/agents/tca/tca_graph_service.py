@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.graph_state import SCAState
+from app.agents.graph_state import TCAState
 from app.agents.tca.tca_graph import get_tca_graph
 from app.agents.execution_tracker import execution_tracker
 
@@ -63,7 +63,7 @@ class TCAGraphService:
         severity: str = "moderate",
         intent: str = "general",
         triage_assessment_id: int | None = None
-    ) -> SCAState:
+    ) -> TCAState:
         """Execute TCA graph workflow.
         
         This method:
@@ -102,8 +102,8 @@ class TCAGraphService:
             }
         )
         
-        # Initialize state with STA outputs
-        initial_state: SCAState = {
+        # Initialize state with STA and TCA contexts
+        initial_state: TCAState = {
             "user_id": user_id,
             "session_id": session_id,
             "user_hash": user_hash,
@@ -112,13 +112,15 @@ class TCAGraphService:
             "execution_id": execution_id,
             "errors": [],
             "execution_path": [],
-            "should_intervene": True,  # TCA is invoked because intervention is needed
-            "case_created": False,
             "started_at": datetime.now(),
-            # STA outputs
-            "severity": severity,
-            "intent": intent,
-            "triage_assessment_id": triage_assessment_id
+            "sta_context": {
+                "severity": severity,
+                "intent": intent,
+            },
+            "tca_context": {
+                "triage_assessment_id": triage_assessment_id,
+                "should_intervene": True,
+            }
         }
         
         try:
@@ -140,8 +142,8 @@ class TCAGraphService:
             
             logger.info(
                 f"TCA graph execution completed: "
-                f"intervention_type={final_state.get('intervention_type', 'unknown')}, "
-                f"plan_id={final_state.get('intervention_plan_id', 'none')}, "
+                f"intervention_type={final_state.get('tca_context', {}).get('intervention_type', 'unknown')}, "
+                f"plan_id={final_state.get('tca_context', {}).get('intervention_plan_id', 'none')}, "
                 f"errors={len(final_state.get('errors', []))}"
             )
             

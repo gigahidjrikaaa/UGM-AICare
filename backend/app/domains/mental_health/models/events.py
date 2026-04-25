@@ -17,8 +17,6 @@ class AgentNameEnum(str, enum.Enum):
     IA = "IA"
     # Aika orchestrator and subgraphs used by the streaming endpoint
     AIKA = "AIKA"
-    TCA = "TCA"
-    CMA = "CMA"
 
 
 class Event(Base):

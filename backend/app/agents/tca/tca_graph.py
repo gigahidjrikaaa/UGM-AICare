@@ -17,9 +17,9 @@ from langgraph.graph.state import CompiledStateGraph
 from langchain_core.runnables import RunnableConfig
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.graph_state import SCAState
+from app.agents.graph_state import TCAState
 from app.agents.tca.service import TherapeuticCoachService
-from app.agents.tca.schemas import SCAInterveneRequest
+from app.agents.tca.schemas import TCAInterveneRequest
 from app.agents.execution_tracker import execution_tracker
 from app.domains.mental_health.models import InterventionPlanRecord
 from app.domains.mental_health.schemas.intervention_plans import (
@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 
 
 @trace_agent("TCA_Ingest")
-async def ingest_triage_signal_node(state: SCAState) -> SCAState:
+async def ingest_triage_signal_node(state: TCAState) -> TCAState:
     """Node: Ingest triage signal from STA.
     
     Validates that STA has provided necessary risk assessment data
@@ -51,7 +51,7 @@ async def ingest_triage_signal_node(state: SCAState) -> SCAState:
         execution_tracker.start_node(execution_id, "tca::ingest_triage_signal", "tca")
     
     # Validate STA outputs are present
-    if not state.get("severity") or not state.get("intent"):
+    if not state.get("sta_context", {}).get("severity") or not state.get("sta_context", {}).get("intent"):
         state["errors"].append("Missing STA risk assessment data")
         if execution_id:
             execution_tracker.fail_node(
@@ -67,14 +67,14 @@ async def ingest_triage_signal_node(state: SCAState) -> SCAState:
         execution_tracker.complete_node(execution_id, "tca::ingest_triage_signal")
     
     logger.info(
-        f"TCA ingested triage signal: severity={state.get('severity')}, "
-        f"intent={state.get('intent')}"
+        f"TCA ingested triage signal: severity={state.get("sta_context", {}).get("severity")}, "
+        f"intent={state.get("sta_context", {}).get("intent")}"
     )
     return state
 
 
 @trace_agent("TCA_DetermineType")
-async def determine_intervention_type_node(state: SCAState) -> SCAState:
+async def determine_intervention_type_node(state: TCAState) -> TCAState:
     """Node: Determine appropriate intervention type.
     
     Maps intent and severity to intervention plan type:
@@ -93,8 +93,8 @@ async def determine_intervention_type_node(state: SCAState) -> SCAState:
         execution_tracker.start_node(execution_id, "tca::determine_intervention_type", "tca")
     
     try:
-        intent = state.get("intent", "").lower()
-        severity = state.get("severity", "low").lower()
+        intent = state.get("sta_context", {}).get("intent", "").lower()
+        severity = state.get("sta_context", {}).get("severity", "low").lower()
         
         # Map intent to intervention type
         if intent in ("crisis", "panic", "anxiety", "acute_stress"):
@@ -104,8 +104,8 @@ async def determine_intervention_type_node(state: SCAState) -> SCAState:
         else:
             intervention_type = "general_coping"
         
-        state["intervention_type"] = intervention_type
-        state["should_intervene"] = True
+        state.setdefault("tca_context", {})["intervention_type"] = intervention_type
+        state.setdefault("tca_context", {})["should_intervene"] = True
         state["execution_path"].append("determine_intervention_type")
         
         if execution_id:
@@ -133,7 +133,7 @@ async def determine_intervention_type_node(state: SCAState) -> SCAState:
 
 
 @trace_agent("TCA_GeneratePlan")
-async def generate_plan_node(state: SCAState) -> SCAState:
+async def generate_plan_node(state: TCAState) -> TCAState:
     """Node: Generate personalized intervention plan using Gemini AI.
     
     Uses TherapeuticCoachService with Gemini-powered plan generation to create
@@ -154,13 +154,13 @@ async def generate_plan_node(state: SCAState) -> SCAState:
         sca_service = TherapeuticCoachService()
         
         # Build intervention request
-        request = SCAInterveneRequest(
-            intent=state.get("intent", "general_support"),
+        request = TCAInterveneRequest(
+            intent=state.get("sta_context", {}).get("intent", "general_support"),
             user_hash=state["user_hash"],
             session_id=state["session_id"],
             options={
-                "risk_level": state.get("severity", "moderate"),  # Use severity from STA
-                "severity": state.get("severity", "moderate")
+                "risk_level": state.get("sta_context", {}).get("severity", "moderate"),  # Use severity from STA
+                "severity": state.get("sta_context", {}).get("severity", "moderate")
             }
         )
         
@@ -168,17 +168,17 @@ async def generate_plan_node(state: SCAState) -> SCAState:
         response = await sca_service.intervene(
             payload=request,
             use_gemini_plan=True,
-            plan_type=state.get("intervention_type", "general_coping"),
+            plan_type=state.get("tca_context", {}).get("intervention_type", "general_coping"),
             user_message=state.get("message", ""),
             sta_context={
-                "risk_level": state.get("risk_level"),
-                "severity": state.get("severity"),
-                "risk_score": state.get("risk_score")
+                "risk_level": state.get("sta_context", {}).get("risk_level"),
+                "severity": state.get("sta_context", {}).get("severity"),
+                "risk_score": state.get("sta_context", {}).get("risk_score")
             }
         )
         
         # Store plan in state
-        state["intervention_plan"] = {
+        state.setdefault("tca_context", {})["intervention_plan"] = {
             "plan_steps": [
                 {
                     "id": getattr(step, "id", None),
@@ -228,7 +228,7 @@ async def generate_plan_node(state: SCAState) -> SCAState:
 
 
 @trace_agent("TCA_SafetyReview")
-async def safety_review_node(state: SCAState) -> SCAState:
+async def safety_review_node(state: TCAState) -> TCAState:
     """Node: Apply safety checks before plan activation.
     
     Ensures plans are appropriate for user's risk level and applies
@@ -245,14 +245,14 @@ async def safety_review_node(state: SCAState) -> SCAState:
         execution_tracker.start_node(execution_id, "tca::safety_review", "tca")
     
     try:
-        severity = state.get("severity", "low")
+        severity = state.get("sta_context", {}).get("severity", "low")
         
         # Safety check: High/critical severity should not use TCA *alone*.
         # However, when running inside parallel_crisis_node alongside CMA,
         # TCA is still needed for immediate coping support — CMA handles the
         # crisis escalation, so TCA should persist its plan in that context.
         if severity in ("high", "critical") and not state.get("parallel_crisis_mode"):
-            state["should_intervene"] = False
+            state.setdefault("tca_context", {})["should_intervene"] = False
             state["errors"].append(
                 "Safety review: High/critical severity should route to CMA, not TCA alone"
             )
@@ -266,10 +266,10 @@ async def safety_review_node(state: SCAState) -> SCAState:
             execution_tracker.complete_node(
                 execution_id, 
                 "tca::safety_review",
-                metrics={"should_intervene": state.get("should_intervene", False)}
+                metrics={"should_intervene": state.get("tca_context", {}).get("should_intervene", False)}
             )
         
-        logger.info(f"TCA safety review passed: should_intervene={state.get('should_intervene')}")
+        logger.info(f"TCA safety review passed: should_intervene={state.get("tca_context", {}).get("should_intervene")}")
         
     except Exception as e:
         error_msg = f"Safety review failed: {str(e)}"
@@ -283,7 +283,7 @@ async def safety_review_node(state: SCAState) -> SCAState:
 
 
 @trace_agent("TCA_PersistPlan")
-async def persist_plan_node(state: SCAState, config: RunnableConfig) -> SCAState:
+async def persist_plan_node(state: TCAState, config: RunnableConfig) -> TCAState:
     """Node: Persist intervention plan to database.
     
     Creates InterventionPlan record for tracking and follow-up.
@@ -302,7 +302,7 @@ async def persist_plan_node(state: SCAState, config: RunnableConfig) -> SCAState
     
     try:
         # Only persist if intervention should proceed
-        if not state.get("should_intervene"):
+        if not state.get("tca_context", {}).get("should_intervene"):
             logger.info("TCA skipping plan persistence (should_intervene=False)")
             state["execution_path"].append("persist_plan")
             if execution_id:
@@ -310,8 +310,8 @@ async def persist_plan_node(state: SCAState, config: RunnableConfig) -> SCAState
             return state
         
         # Get intervention_type string and raw plan data from state
-        intervention_type = state.get("intervention_type", "general_coping")
-        raw_plan_data = state.get("intervention_plan", {})
+        intervention_type = state.get("tca_context", {}).get("intervention_type", "general_coping")
+        raw_plan_data = state.get("tca_context", {}).get("intervention_plan", {})
         
         # Validate and ensure proper structure using schema models
         plan_steps_raw = raw_plan_data.get("plan_steps", []) if raw_plan_data else []
@@ -369,7 +369,7 @@ async def persist_plan_node(state: SCAState, config: RunnableConfig) -> SCAState
             session_id=state.get("session_id"),
             conversation_id=conv_id,
             plan_title=f"{intervention_type.replace('_', ' ').title() if intervention_type else 'General'} Intervention Plan",
-            risk_level=state.get("risk_level", 0),
+            risk_level=state.get("sta_context", {}).get("risk_level", 0),
             plan_data=plan_data_dict,
             total_steps=total_steps,
             completed_steps=0,
@@ -386,7 +386,7 @@ async def persist_plan_node(state: SCAState, config: RunnableConfig) -> SCAState
         # DEBUG: Log plan creation details
         logger.info(f"TCA persisted intervention plan: ID={plan.id}, user_id={plan.user_id}, is_active={plan.is_active}, status={plan.status}")
         
-        state["intervention_plan_id"] = plan.id
+        state.setdefault("tca_context", {})["intervention_plan_id"] = plan.id
         state["execution_path"].append("persist_plan")
         
         if execution_id:
@@ -419,7 +419,7 @@ def _build_tca_graph() -> CompiledStateGraph:
     Returns:
         Compiled StateGraph ready for execution
     """
-    workflow = StateGraph(SCAState)
+    workflow = StateGraph(TCAState)
 
     # Add nodes
     workflow.add_node("ingest_triage_signal", ingest_triage_signal_node)

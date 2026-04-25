@@ -33,8 +33,7 @@ ROUTE_TCA = "invoke_tca"
 ROUTE_IA = "invoke_ia"
 ROUTE_END = "end"
 
-ROUTE_SDA = "route_sda"
-ROUTE_SCA = "invoke_sca"
+ROUTE_CMA = "route_cma"
 ROUTE_SYNTHESIZE = "synthesize"
 
 
@@ -62,7 +61,7 @@ def should_invoke_agents(state: AikaOrchestratorState) -> str:
         One of the ROUTE_* string constants defined at the top of this module.
     """
     execution_id = state.get("execution_id")
-    next_step = str(state.get("next_step") or "end").lower()
+    next_step = str(state.get("sta_context", {}).get("next_step") or "end").lower()
     needs_agents: bool = bool(state.get("needs_agents", False))
 
     def _trace(edge: str) -> None:
@@ -104,7 +103,7 @@ def should_invoke_agents(state: AikaOrchestratorState) -> str:
 
         user_role = str(state.get("user_role", "")).lower()
         if (
-            state.get("intent") == "analytics_query"
+            state.get("sta_context", {}).get("intent") == "analytics_query"
             and user_role in {"admin", "counselor"}
         ):
             _trace("aika::decision->ia")
@@ -137,13 +136,13 @@ def should_route_to_sca(state: AikaOrchestratorState) -> str:
         public API surface clean.
 
     Returns:
-        ROUTE_SDA:        High/critical severity — escalate to CMA.
-        ROUTE_SCA:        Moderate with TCA recommendation.
+        ROUTE_CMA:        High/critical severity — escalate to CMA.
+        ROUTE_TCA:        Moderate with TCA recommendation.
         ROUTE_SYNTHESIZE: Low/moderate without intervention — go to synthesis.
     """
     execution_id = state.get("execution_id")
-    severity = str(state.get("severity") or "low")
-    next_step = str(state.get("next_step") or "end")
+    severity = str(state.get("sta_context", {}).get("severity") or "low")
+    next_step = str(state.get("sta_context", {}).get("next_step") or "end")
 
     def _trace(edge: str) -> None:
         if execution_id:
@@ -156,14 +155,14 @@ def should_route_to_sca(state: AikaOrchestratorState) -> str:
         logger.info(
             "STA routing: severity=%s → CMA (crisis escalation)", severity
         )
-        return ROUTE_SDA
+        return ROUTE_CMA
 
     if next_step == "tca":
         _trace("aika::sta->sca")
         logger.info(
             "STA routing: severity=%s, next_step=tca → TCA (support)", severity
         )
-        return ROUTE_SCA
+        return ROUTE_TCA
 
     _trace("aika::sta->synthesize")
     logger.info(

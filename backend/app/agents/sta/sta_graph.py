@@ -81,7 +81,7 @@ async def apply_redaction_node(state: STAState, db: AsyncSession) -> STAState:
         
         # Use existing redaction service (returns tuple of redacted_text, counts)
         redacted_message, redaction_counts = redact_pii_regex(original_message)
-        state["redacted_message"] = redacted_message
+        state.setdefault("sta_context", {})["redacted_message"] = redacted_message
         state["execution_path"].append("apply_redaction")
         
         if execution_id:
@@ -135,7 +135,7 @@ async def assess_risk_node(state: STAState, db: AsyncSession) -> STAState:
         
         # Build classification request
         request = STAClassifyRequest(
-            text=state.get("redacted_message") or state["message"],
+            text=state.get("sta_context", {}).get("redacted_message") or state["message"],
             session_id=state["session_id"],
             meta=meta if meta else None
         )
@@ -151,11 +151,11 @@ async def assess_risk_node(state: STAState, db: AsyncSession) -> STAState:
         risk_score = response.risk_level / 3.0 if response.risk_level > 0 else 0.0
         
         # Update state with STA outputs
-        state["risk_level"] = response.risk_level
-        state["risk_score"] = risk_score
-        state["severity"] = severity
-        state["intent"] = response.intent
-        state["next_step"] = response.next_step
+        state.setdefault("sta_context", {})["risk_level"] = response.risk_level
+        state.setdefault("sta_context", {})["risk_score"] = risk_score
+        state.setdefault("sta_context", {})["severity"] = severity
+        state.setdefault("sta_context", {})["intent"] = response.intent
+        state.setdefault("sta_context", {})["next_step"] = response.next_step
         # Note: triage_assessment_id is created by the service in the DB, but not returned
         
         state["execution_path"].append("assess_risk")
@@ -179,7 +179,7 @@ async def assess_risk_node(state: STAState, db: AsyncSession) -> STAState:
     except Exception as e:
         error_msg = f"Risk assessment failed: {str(e)}"
         state["errors"].append(error_msg)
-        state["next_step"] = "end"  # Safe fallback
+        state.setdefault("sta_context", {})["next_step"] = "end"  # Safe fallback
         logger.error(error_msg, exc_info=True)
         
         if execution_id:
@@ -204,8 +204,8 @@ def decide_routing(state: STAState) -> str:
     """
     execution_id = state.get("execution_id")
     
-    next_step = state.get("next_step", "end")
-    severity = state.get("severity", "low")
+    next_step = state.get("sta_context", {}).get("next_step", "end")
+    severity = state.get("sta_context", {}).get("severity", "low")
     
     # Track edge decision
     if execution_id:

@@ -37,19 +37,19 @@ class TCAInterveneResponse(BaseModel):
 
 
 # Backward compatibility aliases (TCA→TCA rename was incomplete)
-SCAInterveneRequest = TCAInterveneRequest
+TCAInterveneRequest = TCAInterveneRequest
 """Alias for TCAInterveneRequest. Therapeutic Coach Agent (TCA) was renamed to Therapeutic Coach Agent (TCA)."""
 
-SCAInterveneResponse = TCAInterveneResponse
+TCAInterveneResponse = TCAInterveneResponse
 """Alias for TCAInterveneResponse. Therapeutic Coach Agent (TCA) was renamed to Therapeutic Coach Agent (TCA)."""
 
 
-class SCAFollowUpRequest(BaseModel):
+class TCAFollowUpRequest(BaseModel):
     session_id: str
     last_plan_id: str
     check_in: dict[str, int | str]
 
 
-class SCAFollowUpResponse(BaseModel):
+class TCAFollowUpResponse(BaseModel):
     acknowledged: bool = True
     next_check_in: Optional[datetime] = None

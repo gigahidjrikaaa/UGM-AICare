@@ -9,7 +9,7 @@ CaseStatus = Literal['new', 'in_progress', 'waiting', 'closed']
 CaseSeverity = Literal['low', 'med', 'high', 'critical']
 
 
-class SDACase(BaseModel):
+class CMACase(BaseModel):
     id: str
     created_at: datetime
     updated_at: datetime
@@ -25,26 +25,26 @@ class SDACase(BaseModel):
     telegram_username: Optional[str] = None
 
 
-class SDAListCasesResponse(BaseModel):
-    cases: list[SDACase]
+class CMAListCasesResponse(BaseModel):
+    cases: list[CMACase]
 
 
-class SDAAssignRequest(BaseModel):
+class CMAAssignRequest(BaseModel):
     case_id: str = Field(..., min_length=1)
     assignee_id: str = Field(..., min_length=1)
 
 
-class SDAAssignResponse(BaseModel):
+class CMAAssignResponse(BaseModel):
     case_id: str
     assigned_to: str
 
 
-class SDACloseRequest(BaseModel):
+class CMACloseRequest(BaseModel):
     case_id: str
     closure_reason: Optional[str] = None
 
 
-class SDACloseResponse(BaseModel):
+class CMACloseResponse(BaseModel):
     case_id: str
     status: CaseStatus
     closed_at: datetime

@@ -39,7 +39,7 @@ def generate_pdf_report(state: Dict[str, Any]) -> str:
         
         # Generate filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        question_id = state.get("question_id", "analytics")
+        question_id = state.get("ia_context", {}).get("question_id", "analytics")
         filename = f"IA_Report_{question_id}_{timestamp}.pdf"
         filepath = os.path.join(reports_dir, filename)
         
@@ -79,19 +79,19 @@ def generate_pdf_report(state: Dict[str, Any]) -> str:
         elements.append(Spacer(1, 0.25 * inch))
         
         # Executive Summary
-        if state.get("summary"):
+        if state.get("ia_context", {}).get("summary"):
             elements.append(Paragraph("Executive Summary", h2_style))
             elements.append(Paragraph(state["summary"], normal_style))
             elements.append(Spacer(1, 0.2 * inch))
             
         # Interpretation
-        if state.get("interpretation"):
+        if state.get("ia_context", {}).get("interpretation"):
             elements.append(Paragraph("Analysis & Interpretation", h2_style))
             elements.append(Paragraph(state["interpretation"], normal_style))
             elements.append(Spacer(1, 0.2 * inch))
             
         # Key Trends
-        trends = state.get("trends", [])
+        trends = state.get("ia_context", {}).get("trends", [])
         if trends:
             elements.append(Paragraph("Key Trends Identified", h2_style))
             for trend in trends:
@@ -101,7 +101,7 @@ def generate_pdf_report(state: Dict[str, Any]) -> str:
             elements.append(Spacer(1, 0.2 * inch))
             
         # Recommendations
-        recs = state.get("recommendations", [])
+        recs = state.get("ia_context", {}).get("recommendations", [])
         if recs:
             elements.append(Paragraph("Strategic Recommendations", h2_style))
             for rec in recs:

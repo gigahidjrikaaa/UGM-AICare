@@ -11,7 +11,7 @@ Real-time Graph Architecture:
                  |
                  |--[high/critical]--> parallel_crisis (TCA || CMA, async fan-out)
                  |                           |
-                 |--[moderate]-----> execute_sca (TCA only)
+                 |--[moderate]-----> execute_tca (TCA only)
                  |                           |
                  |--[analytics]----> execute_ia  |
                  |                      |       |
@@ -61,8 +61,8 @@ from app.agents.aika.prompt_builder import (
 from app.agents.aika.subgraph_nodes import (
     _AsyncInvokable,
     parallel_crisis_node,
-    execute_sca_subgraph,
-    execute_sda_subgraph,
+    execute_tca_subgraph,
+    execute_cma_subgraph,
     execute_ia_subgraph,
     synthesize_final_response,
     execute_sta_subgraph,
@@ -133,14 +133,14 @@ def create_aika_unified_graph() -> StateGraph:
         START
           |
           +-- aika_decision --+-- [cma]   --> parallel_crisis --> synthesize --> END
-                              |-- [tca]   --> execute_sca     --> synthesize --> END
+                              |-- [tca]   --> execute_tca     --> synthesize --> END
                               |-- [ia]    --> execute_ia       --> synthesize --> END
                               '--[direct]                                     --> END
 
     STA is NOT a node in this graph.  It runs as a fire-and-forget background
     task (trigger_sta_conversation_analysis_background) when a conversation
     ends, or can be triggered manually via the trigger_conversation_analysis
-    tool.  execute_sda (CMA) is not registered as a standalone node; it is
+    tool.  execute_cma (CMA) is not registered as a standalone node; it is
     invoked exclusively inside parallel_crisis_node via asyncio.gather.
 
     ``db`` is no longer bound at compile time.  Each node receives it at
@@ -156,7 +156,7 @@ def create_aika_unified_graph() -> StateGraph:
     # so no functools.partial binding is needed here.
     workflow.add_node("aika_decision", aika_decision_node)
     workflow.add_node("parallel_crisis", parallel_crisis_node)
-    workflow.add_node("execute_sca", execute_sca_subgraph)
+    workflow.add_node("execute_tca", execute_tca_subgraph)
     workflow.add_node("execute_ia", execute_ia_subgraph)
     workflow.add_node("synthesize", synthesize_final_response)
 
@@ -169,14 +169,14 @@ def create_aika_unified_graph() -> StateGraph:
         should_invoke_agents,
         {
             ROUTE_CRISIS_PARALLEL: "parallel_crisis",
-            ROUTE_TCA: "execute_sca",
+            ROUTE_TCA: "execute_tca",
             ROUTE_IA: "execute_ia",
             ROUTE_END: END,
         },
     )
 
     # All non-direct paths converge at synthesize, then exit.
-    workflow.add_edge("execute_sca", "synthesize")
+    workflow.add_edge("execute_tca", "synthesize")
     workflow.add_edge("parallel_crisis", "synthesize")
     workflow.add_edge("execute_ia", "synthesize")
     workflow.add_edge("synthesize", END)

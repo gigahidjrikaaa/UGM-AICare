@@ -12,7 +12,7 @@ from uuid import uuid4
 
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.graph_state import SDAState
+from app.agents.graph_state import CMAState
 from app.agents.cma.cma_graph import get_cma_graph
 from app.agents.execution_tracker import execution_tracker
 
@@ -65,7 +65,7 @@ class CMAGraphService:
         intent: str = "crisis",
         risk_score: float = 0.8,
         triage_assessment_id: int | None = None
-    ) -> SDAState:
+    ) -> CMAState:
         """Execute CMA graph workflow for case creation.
         
         This method:
@@ -113,8 +113,8 @@ class CMAGraphService:
             }
         )
         
-        # Initialize state with STA outputs
-        initial_state: SDAState = {
+        # Initialize state with STA and CMA contexts
+        initial_state: CMAState = {
             "user_id": user_id,
             "session_id": session_id,
             "user_hash": user_hash,
@@ -123,14 +123,17 @@ class CMAGraphService:
             "execution_id": execution_id,
             "errors": [],
             "execution_path": [],
-            "should_intervene": False,  # Not TCA intervention - case escalation
-            "case_created": False,
             "started_at": datetime.now(),
-            # STA outputs
-            "severity": severity,  # type: ignore[typeddict-item]
-            "intent": intent,
-            "risk_score": risk_score,
-            "triage_assessment_id": triage_assessment_id
+            "sta_context": {
+                "severity": severity,  # type: ignore[typeddict-item]
+                "intent": intent,
+                "risk_score": risk_score,
+            },
+            "cma_context": {
+                "triage_assessment_id": triage_assessment_id,
+                "case_created": False,
+                "should_intervene": False,
+            }
         }
         
         try:
@@ -159,8 +162,8 @@ class CMAGraphService:
             
             logger.info(
                 f"CMA graph execution completed: "
-                f"case_created={final_state.get('case_created', False)}, "
-                f"case_id={final_state.get('case_id', 'none')}, "
+                f"case_created={final_state.get('cma_context', {}).get('case_created', False)}, "
+                f"case_id={final_state.get('cma_context', {}).get('case_id', 'none')}, "
                 f"errors={len(final_state.get('errors', []))}"
             )
             

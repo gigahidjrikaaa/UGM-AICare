@@ -52,13 +52,13 @@ def test_format_personal_memory_block_caps_at_20_and_strips() -> None:
 @pytest.mark.unit
 def test_should_invoke_agents_routes_by_next_step() -> None:
     # High/critical risk: fan-out TCA ∥ CMA
-    assert should_invoke_agents({"next_step": "cma", "needs_agents": True}) == "invoke_crisis_parallel"
+    assert should_invoke_agents({"sta_context": {"next_step": "cma"}, "needs_agents": True}) == "invoke_crisis_parallel"
     # Moderate risk: TCA only
-    assert should_invoke_agents({"next_step": "tca", "needs_agents": True}) == "invoke_tca"
+    assert should_invoke_agents({"sta_context": {"next_step": "tca"}, "needs_agents": True}) == "invoke_tca"
     # Analytics
-    assert should_invoke_agents({"next_step": "ia", "needs_agents": True}) == "invoke_ia"
+    assert should_invoke_agents({"sta_context": {"next_step": "ia"}, "needs_agents": True}) == "invoke_ia"
     # STA no longer routes synchronously — next_step="sta" falls through to end
-    assert should_invoke_agents({"next_step": "sta", "needs_agents": True}) == "end"
+    assert should_invoke_agents({"sta_context": {"next_step": "sta"}, "needs_agents": True}) == "end"
 
 
 @pytest.mark.agents
@@ -81,7 +81,7 @@ def test_should_invoke_agents_fallback_uses_admin_analytics_context() -> None:
     result = should_invoke_agents(
         {
             "needs_agents": True,
-            "intent": "analytics_query",
+            "sta_context": {"intent": "analytics_query"},
             "user_role": "admin",
             "immediate_risk_level": "none",
         }

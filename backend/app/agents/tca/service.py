@@ -9,8 +9,8 @@ from app.agents.tca.resources import get_default_resources
 from app.agents.tca.schemas import (
     PlanStep,
     ResourceCard,
-    SCAFollowUpRequest,
-    SCAFollowUpResponse,
+    TCAFollowUpRequest,
+    TCAFollowUpResponse,
     TCAInterveneRequest,
     TCAInterveneResponse,
 )
@@ -293,7 +293,7 @@ class TherapeuticCoachService:
 
         return response
 
-    async def followup(self, payload: SCAFollowUpRequest) -> SCAFollowUpResponse:
+    async def followup(self, payload: TCAFollowUpRequest) -> TCAFollowUpResponse:
         sentiment = str(payload.check_in.get("mood", "")).lower()
         stress = str(payload.check_in.get("stress", "")).lower()
 
@@ -305,7 +305,7 @@ class TherapeuticCoachService:
             hours = 24
 
         next_check_in = datetime.utcnow() + timedelta(hours=hours)
-        response = SCAFollowUpResponse(acknowledged=True, next_check_in=next_check_in)
+        response = TCAFollowUpResponse(acknowledged=True, next_check_in=next_check_in)
 
         await self._emit_event(
             AgentEvent(

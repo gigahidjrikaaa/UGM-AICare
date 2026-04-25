@@ -15,7 +15,7 @@ async def test_ingest_triage_signal_node_missing_sta_data(monkeypatch: pytest.Mo
 
     monkeypatch.setattr(module, "execution_tracker", SimpleNamespace(start_node=lambda *_a, **_k: None, complete_node=lambda *_a, **_k: None, fail_node=lambda *_a, **_k: None))
 
-    state = {"errors": [], "execution_path": [], "severity": None, "intent": None}
+    state = {"errors": [], "execution_path": [], "sta_context": {"severity": None, "intent": None}}
     out = await module.ingest_triage_signal_node(state)
 
     assert out["errors"]
@@ -27,9 +27,9 @@ async def test_determine_intervention_type_node_maps_intent(monkeypatch: pytest.
 
     monkeypatch.setattr(module, "execution_tracker", SimpleNamespace(start_node=lambda *_a, **_k: None, complete_node=lambda *_a, **_k: None, fail_node=lambda *_a, **_k: None))
 
-    state = {"errors": [], "execution_path": [], "intent": "panic", "severity": "low"}
+    state = {"errors": [], "execution_path": [], "sta_context": {"intent": "panic", "severity": "low"}}
     out = await module.determine_intervention_type_node(state)
-    assert out["intervention_type"] == "calm_down"
+    assert out["tca_context"]["intervention_type"] == "calm_down"
 
 
 @pytest.mark.asyncio
@@ -50,16 +50,15 @@ async def test_generate_plan_node_calls_service(monkeypatch: pytest.MonkeyPatch)
     state = {
         "errors": [],
         "execution_path": [],
-        "intent": "general_support",
-        "severity": "low",
+        "sta_context": {"intent": "general_support", "severity": "low"},
         "user_hash": "u",
         "session_id": "s",
         "message": "m",
     }
 
     out = await module.generate_plan_node(state)
-    assert out["intervention_plan"]["plan_steps"][0]["title"] == "A"
-    assert out["intervention_plan"]["resource_cards"][0]["resource_id"] == "r1"
+    assert out["tca_context"]["intervention_plan"]["plan_steps"][0]["title"] == "A"
+    assert out["tca_context"]["intervention_plan"]["resource_cards"][0]["resource_id"] == "r1"
 
 
 @pytest.mark.asyncio
@@ -68,10 +67,10 @@ async def test_safety_review_blocks_high_severity(monkeypatch: pytest.MonkeyPatc
 
     monkeypatch.setattr(module, "execution_tracker", SimpleNamespace(start_node=lambda *_a, **_k: None, complete_node=lambda *_a, **_k: None, fail_node=lambda *_a, **_k: None))
 
-    state = {"errors": [], "execution_path": [], "severity": "high", "should_intervene": True}
+    state = {"errors": [], "execution_path": [], "sta_context": {"severity": "high"}, "tca_context": {"should_intervene": True}}
     out = await module.safety_review_node(state)
 
-    assert out["should_intervene"] is False
+    assert out["tca_context"]["should_intervene"] is False
     assert out["errors"]
 
 
@@ -82,9 +81,9 @@ async def test_persist_plan_node_skips_when_should_not_intervene(monkeypatch: py
     monkeypatch.setattr(module, "execution_tracker", SimpleNamespace(start_node=lambda *_a, **_k: None, complete_node=lambda *_a, **_k: None, fail_node=lambda *_a, **_k: None))
 
     db = AsyncMock()
-    state = {"errors": [], "execution_path": [], "should_intervene": False}
+    state = {"errors": [], "execution_path": [], "tca_context": {"should_intervene": False}}
 
-    out = await module.persist_plan_node(state, db=db)
+    out = await module.persist_plan_node(state, config={"configurable": {"db": db}})
 
     assert "persist_plan" in out["execution_path"]
     db.flush.assert_not_awaited()
@@ -94,8 +93,8 @@ async def test_persist_plan_node_skips_when_should_not_intervene(monkeypatch: py
 async def test_tca_graph_service_execute(monkeypatch: pytest.MonkeyPatch) -> None:
     from app.agents.tca import tca_graph_service as module
 
-    graph = SimpleNamespace(ainvoke=AsyncMock(return_value={"errors": [], "execution_path": ["x"], "intervention_type": "general_coping"}))
-    monkeypatch.setattr(module, "create_tca_graph", lambda _db: graph)
+    graph = SimpleNamespace(ainvoke=AsyncMock(return_value={"errors": [], "execution_path": ["x"], "tca_context": {"intervention_type": "general_coping"}}))
+    monkeypatch.setattr(module, "get_tca_graph", lambda: graph)
 
     tracker = SimpleNamespace(
         start_execution=lambda **_kwargs: "exec-1",

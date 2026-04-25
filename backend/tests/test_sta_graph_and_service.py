@@ -19,22 +19,21 @@ async def test_ingest_message_node_adds_execution_path() -> None:
     }
 
     result = await ingest_message_node(state)
-
     assert result["execution_path"] == ["ingest_message"]
 
 
 def test_decide_routing_routes_human_for_high_severity() -> None:
-    state = {"severity": "high"}
+    state = {"sta_context": {"severity": "high"}}
     assert decide_routing(state) == "escalate_sda"
 
 
 def test_decide_routing_routes_sca_for_tca_next_step() -> None:
-    state = {"severity": "low", "next_step": "tca"}
+    state = {"sta_context": {"severity": "low", "next_step": "tca"}}
     assert decide_routing(state) == "route_sca"
 
 
 def test_decide_routing_routes_resources_by_default() -> None:
-    state = {"severity": "low", "next_step": "resource"}
+    state = {"sta_context": {"severity": "low", "next_step": "resource"}}
     assert decide_routing(state) == "end"
 
 
@@ -57,7 +56,7 @@ async def test_apply_redaction_node_uses_redaction(monkeypatch: pytest.MonkeyPat
 
     result = await module.apply_redaction_node(state, db=AsyncMock())
 
-    assert result["redacted_message"] == "my [REDACTED]"
+    assert result.get("sta_context", {}).get("redacted_message") == "my [REDACTED]"
     assert "apply_redaction" in result["execution_path"]
 
 
@@ -75,8 +74,8 @@ async def test_assess_risk_node_calls_service(monkeypatch: pytest.MonkeyPatch) -
                 next_step="tca",
                 handoff=True,
                 diagnostic_notes="x",
-                needs_support_coach_plan=False,
-                support_plan_type="none",
+                needs_therapeutic_coach_plan=False,
+                therapeutic_plan_type="none",
             )
 
     monkeypatch.setattr(module, "get_safety_triage_service", lambda _db: FakeService())
@@ -93,8 +92,8 @@ async def test_assess_risk_node_calls_service(monkeypatch: pytest.MonkeyPatch) -
 
     result = await module.assess_risk_node(state, db=AsyncMock())
 
-    assert result["severity"] in {"high", "critical"}
-    assert result["intent"] == "acute_distress"
+    assert result.get("sta_context", {}).get("severity") in {"high", "critical"}
+    assert result.get("sta_context", {}).get("intent") == "acute_distress"
     assert "assess_risk" in result["execution_path"]
 
 
@@ -110,8 +109,8 @@ async def test_sta_router_classify_calls_service(monkeypatch: pytest.MonkeyPatch
                 next_step="resource",
                 handoff=False,
                 diagnostic_notes=None,
-                needs_support_coach_plan=False,
-                support_plan_type="none",
+                needs_therapeutic_coach_plan=False,
+                therapeutic_plan_type="none",
             )
         )
     )
