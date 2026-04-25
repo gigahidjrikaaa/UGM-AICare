@@ -522,6 +522,7 @@ async def _call_decision_llm(
         system_prompt=system_instruction,
         preferred_gemini_model=preferred_model,
         json_mode=True,
+        json_schema=_DECISION_JSON_SCHEMA,
     )
 
 
@@ -551,6 +552,7 @@ async def _repair_decision_json_once(
         max_tokens=512,
         preferred_gemini_model=preferred_model,
         json_mode=True,
+        json_schema=_DECISION_JSON_SCHEMA,
     )
 
 

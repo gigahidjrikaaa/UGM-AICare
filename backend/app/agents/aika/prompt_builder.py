@@ -176,40 +176,54 @@ def build_decision_prompt(
     """
     memory_section = f"\n\n{personal_memory_block}" if personal_memory_block else ""
 
+    normalized = normalize_role(user_role)
+    routing_rules = ""
+
+    if normalized == "user":
+        routing_rules = (
+            f"FOR REGULAR USERS (role=user — students, lecturers, and staff):\n"
+            f"- ASSESS AND ROUTE DIRECTLY:\n"
+            f"  * Aika is the primary responder for ALL user interactions.\n"
+            f"  * Aika handles emotional support, crisis de-escalation, and appointment booking via tools.\n"
+            f"  * Route to TCA or CMA directly if needed. DO NOT route to STA synchronously.\n"
+            f"  * Background processes handle deep risk analysis after the conversation.\n\n"
+        )
+    elif normalized == "admin":
+        routing_rules = (
+            f"FOR ADMINS:\n"
+            f"- NEEDS AGENTS (invoke IA for analytics):\n"
+            f'  * Requests complex data/analytics ("trending topics", "case statistics")\n'
+            f"  * Aggregated reports requiring specialised processing\n"
+            f"  * Questions about system usage, user engagement, or mental health trends\n"
+            f"- NO AGENTS NEEDED (handle directly with tools):\n"
+            f'  * Simple status checks ("is system healthy?")\n'
+            f"  * General platform questions\n"
+            f"  * Specific user lookups (Aika can use tools for this)\n"
+            f"  * Requests to analyse a conversation or user: use trigger_conversation_analysis tool\n\n"
+        )
+    elif normalized == "counselor":
+        routing_rules = (
+            f"FOR COUNSELORS:\n"
+            f"- NEEDS AGENTS (invoke CMA for case management):\n"
+            f"  * Requests to CREATE or MODIFY cases\n"
+            f"  * Clinical insights requiring deep analysis\n"
+            f"- NEEDS AGENTS (invoke IA for analytics):\n"
+            f"  * Requests for population-level insights or trends\n"
+            f'  * "How many users are stressed this week?"\n'
+            f"- NO AGENTS NEEDED (handle directly with tools):\n"
+            f"  * General clinical questions\n"
+            f"  * Viewing patient data (Aika can use tools)\n"
+            f"  * Requests to analyse a conversation or risk assessment:\n"
+            f"    use trigger_conversation_analysis tool directly\n\n"
+        )
+
     return (
         f"Analyze this message and determine the next step.\n\n"
         f"User Role: {user_role}\n"
         f"{tail_context_block}"
         f"Message: {current_message}\n\n"
         f"Decision Criteria:\n\n"
-        f"FOR REGULAR USERS (role=user — students, lecturers, and staff):\n"
-        f"- ASSESS AND ROUTE DIRECTLY:\n"
-        f"  * Aika is the primary responder for ALL user interactions.\n"
-        f"  * Aika handles emotional support, crisis de-escalation, and appointment booking via tools.\n"
-        f"  * Route to TCA or CMA directly if needed. DO NOT route to STA synchronously.\n"
-        f"  * Background processes handle deep risk analysis after the conversation.\n\n"
-        f"FOR ADMINS:\n"
-        f"- NEEDS AGENTS (invoke IA for analytics):\n"
-        f'  * Requests complex data/analytics ("trending topics", "case statistics")\n'
-        f"  * Aggregated reports requiring specialised processing\n"
-        f"  * Questions about system usage, user engagement, or mental health trends\n"
-        f"- NO AGENTS NEEDED (handle directly with tools):\n"
-        f'  * Simple status checks ("is system healthy?")\n'
-        f"  * General platform questions\n"
-        f"  * Specific user lookups (Aika can use tools for this)\n"
-        f"  * Requests to analyse a conversation or user: use trigger_conversation_analysis tool\n\n"
-        f"FOR COUNSELORS:\n"
-        f"- NEEDS AGENTS (invoke CMA for case management):\n"
-        f"  * Requests to CREATE or MODIFY cases\n"
-        f"  * Clinical insights requiring deep analysis\n"
-        f"- NEEDS AGENTS (invoke IA for analytics):\n"
-        f"  * Requests for population-level insights or trends\n"
-        f'  * "How many users are stressed this week?"\n'
-        f"- NO AGENTS NEEDED (handle directly with tools):\n"
-        f"  * General clinical questions\n"
-        f"  * Viewing patient data (Aika can use tools)\n"
-        f"  * Requests to analyse a conversation or risk assessment:\n"
-        f"    use trigger_conversation_analysis tool directly\n\n"
+        f"{routing_rules}"
         f"Return JSON with:\n"
         f"{{\n"
         f'  "intent": "string (MUST be one of: \'casual_chat\', \'emotional_support\', \'crisis_intervention\', \'information_inquiry\', \'appointment_scheduling\', \'emergency_escalation\', \'analytics_query\')",\n'

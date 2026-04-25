@@ -423,6 +423,7 @@ async def generate_openrouter_response(
     temperature: float = 0.7,
     system_prompt: Optional[str] = None,
     json_mode: bool = False,
+    json_schema: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Generate a response via OpenRouter (Z.AI model family)."""
     if not OPENROUTER_API_KEY:
@@ -445,6 +446,7 @@ async def generate_openrouter_response(
         connection_failed_prefix="Failed to connect to OpenRouter",
         rate_limit_prefix="OpenRouter rate limit",
         unexpected_failed_prefix="Z.AI request failed",
+        json_schema=json_schema,
     )
 
 
@@ -456,6 +458,7 @@ async def generate_zai_direct_response(
     temperature: float = 0.7,
     system_prompt: Optional[str] = None,
     json_mode: bool = False,
+    json_schema: Optional[Dict[str, Any]] = None,
 ) -> str:
     """Generate a response via direct Z.AI Coding endpoint."""
     if not ZAI_API_KEY:
@@ -1298,6 +1301,7 @@ async def generate_response(
     system_prompt: Optional[str] = None, # Pass system prompt through
     preferred_gemini_model: Optional[str] = None,  # Allow specifying exact Gemini model
     json_mode: bool = False,
+    json_schema: Optional[Dict[str, Any]] = None,
 ) -> str:
     """
     Generates a response using the specified LLM provider with automatic fallback.
@@ -1363,6 +1367,7 @@ async def generate_response(
             temperature=temperature,
             system_prompt=system_prompt,
             json_mode=json_mode,
+            json_schema=json_schema,
         )
 
     if is_zai_openrouter_requested:
