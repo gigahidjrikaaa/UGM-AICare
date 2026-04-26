@@ -109,7 +109,7 @@ export default function AdminRetentionPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] p-6 flex items-center justify-center">
+      <div className="flex items-center justify-center space-y-6">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-white/20 border-t-[#FFCA40] rounded-full animate-spin mx-auto" />
           <p className="text-white/60">{t('admin.retention.loading', 'Loading retention analytics...')}</p>
@@ -120,7 +120,7 @@ export default function AdminRetentionPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-linear-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] p-6 flex items-center justify-center">
+      <div className="flex items-center justify-center space-y-6">
         <div className="max-w-md w-full bg-white/5 backdrop-blur-sm border border-white/10 rounded-2xl p-6">
           <div className="flex items-start gap-3">
             <div className="p-2 rounded-lg bg-red-500/10 border border-red-500/20">
@@ -159,7 +159,7 @@ export default function AdminRetentionPage() {
   }
 
   return (
-    <div className="min-h-screen bg-linear-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] p-6">
+    <div className="space-y-6">
       <div className="max-w-400 mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">

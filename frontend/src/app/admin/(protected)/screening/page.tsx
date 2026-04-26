@@ -151,7 +151,7 @@ export default function AdminScreeningPage() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[70vh] p-6">
+      <div className="flex items-center justify-center space-y-6">
         <div className="text-center space-y-4">
           <div className="w-12 h-12 border-4 border-white/10 border-t-[#FFCA40] rounded-full animate-spin mx-auto shadow-[0_0_15px_rgba(255,202,64,0.3)]" />
           <p className="text-white/60 font-medium animate-pulse">Loading clinical screening data...</p>
@@ -162,7 +162,7 @@ export default function AdminScreeningPage() {
 
   if (error) {
     return (
-      <div className="flex items-center justify-center min-h-[70vh] p-6">
+      <div className="flex items-center justify-center space-y-6">
         <div className="text-center space-y-4 bg-white/5 border border-red-500/20 p-8 rounded-2xl backdrop-blur-md max-w-md shadow-2xl">
           <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20">
             <ExclamationTriangleIcon className="w-8 h-8 text-red-400" />
@@ -181,7 +181,7 @@ export default function AdminScreeningPage() {
   }
 
   return (
-    <div className="max-w-[1600px] mx-auto p-4 md:p-6 lg:p-8 space-y-6 lg:space-y-8">
+    <div className="mx-auto max-w-[1600px] space-y-6 lg:space-y-8">
       {/* Header Card */}
       <motion.div
          initial={{ opacity: 0, y: -20 }}

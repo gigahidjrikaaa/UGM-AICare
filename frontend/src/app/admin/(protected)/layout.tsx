@@ -52,11 +52,12 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
   }
 
   // Pages that handle their own padding/layout
-  const isFullWidthPage = pathname?.includes('/langgraph') ||
-    pathname?.includes('/insights') ||
-    pathname?.includes('/dashboard') ||
-    pathname?.includes('/screening') ||
-    pathname?.includes('/retention');
+  const isFullWidthPage = false;
+  // const isFullWidthPage = pathname?.includes('/langgraph') ||
+    // pathname?.includes('/insights') ||
+    // pathname?.includes('/dashboard') ||
+    // pathname?.includes('/screening') ||
+    // pathname?.includes('/retention');
 
   // Render layout if authenticated as admin
   return (

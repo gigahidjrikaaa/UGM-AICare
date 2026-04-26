@@ -209,7 +209,7 @@ export default function AdminDashboardPage() {
 
   if (loading) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex items-center justify-center space-y-6">
         <div className="space-y-4 text-center">
           <div className="mx-auto h-12 w-12 animate-spin rounded-full border-4 border-white/20 border-t-[#FFCA40]" />
           <p className="text-white/60">Loading dashboard...</p>
@@ -220,7 +220,7 @@ export default function AdminDashboardPage() {
 
   if (error) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center">
+      <div className="flex items-center justify-center space-y-6">
         <div className="max-w-md space-y-4 text-center">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-red-500/10">
             <ExclamationTriangleIcon className="h-8 w-8 text-red-400" />
@@ -246,7 +246,7 @@ export default function AdminDashboardPage() {
   const { insights, alerts } = overview;
 
   return (
-    <div className="space-y-6 p-4 md:p-6 lg:p-8">
+    <div className="space-y-6">
       {/* ── Page Header ───────────────────────────────────────── */}
       <motion.header
         initial={{ opacity: 0, y: -16 }}
