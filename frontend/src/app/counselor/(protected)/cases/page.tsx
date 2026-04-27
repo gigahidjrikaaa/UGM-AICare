@@ -232,7 +232,6 @@ export default function CounselorCasesPage() {
     const severityMatch = filterSeverity === 'all' || c.severity === filterSeverity;
     const searchableText = [
       c.id,
-      c.session_id,
       c.user_hash,
       c.summary_redacted,
       c.user_email,

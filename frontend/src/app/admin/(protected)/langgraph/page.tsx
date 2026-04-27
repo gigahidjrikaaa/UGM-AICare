@@ -21,7 +21,7 @@ export default function LangGraphMonitoringPage() {
   const { data, error, refetch } = useLangGraphHealth(30);
 
   return (
-    <div className="min-h-screen bg-black p-4 font-mono text-white selection:bg-white/30">
+    <div className="space-y-6 font-mono text-white selection:bg-white/30">
       
       <div className="max-w-7xl mx-auto space-y-6">
         

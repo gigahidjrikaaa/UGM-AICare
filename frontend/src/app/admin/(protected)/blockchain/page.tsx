@@ -305,7 +305,7 @@ function ContractHealthTab() {
   const degradedContracts = (data?.contracts ?? []).filter((item) => item.is_configured && !item.is_ready).length;
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6">
       <div className="rounded-2xl border border-white/10 bg-linear-to-r from-[#FFCA40]/15 via-[#00153A] to-transparent p-5 shadow-lg shadow-black/20">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -609,7 +609,7 @@ function AttestationMonitorTab() {
   }, [data]);
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500">
+    <div className="space-y-6">
       <div className="rounded-2xl border border-white/10 bg-linear-to-r from-white/10 via-[#00153A] to-transparent p-5">
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>

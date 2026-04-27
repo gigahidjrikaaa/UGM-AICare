@@ -322,7 +322,7 @@ export default function AdminAutopilotPage() {
   );
 
   return (
-    <div className="space-y-6 pb-20">
+    <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col gap-6">
         <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">

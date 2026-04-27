@@ -249,7 +249,7 @@ export default function ConversationsPage() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] p-6 flex items-center justify-center">
+      <div className="flex items-center justify-center space-y-6">
         <div className="bg-red-500/10 border border-red-500/30 rounded-2xl p-6 max-w-md text-center">
           <FiAlertTriangle className="w-12 h-12 text-red-400 mx-auto mb-4" />
           <h2 className="text-lg font-semibold text-white mb-2">Error Loading Data</h2>
@@ -266,7 +266,7 @@ export default function ConversationsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#001d58] via-[#0a2a6e] to-[#173a7a] p-6 text-white">
+    <div className="space-y-6 text-white">
       <div className="max-w-[1800px] mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
