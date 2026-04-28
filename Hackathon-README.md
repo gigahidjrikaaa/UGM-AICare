@@ -2,7 +2,33 @@
 
 **Live Demo:** https://aicare.sumbu.xyz &nbsp;|&nbsp; **Proof Timeline:** https://aicare.sumbu.xyz/proof &nbsp;|&nbsp; **Admin Panel:** https://aicare.sumbu.xyz/admin
 
+Welcome to the hackathon showcase of UGM-AICare! This document highlights the specific innovations built for the competition, particularly our policy-gated autonomous actions and on-chain verification ledger.
+
 ---
+
+
+
+## Deep Dive: System Workflows
+
+To understand the practical impact of UGM-AICare, it is essential to look at how the system handles the nuances of mental health support.
+
+### 1. Grading Case Severity
+Every message sent to Aika is intercepted by the STA (Safety Triage Agent). The grading is two-tiered:
+- Immediate regex matching for severe crisis keywords.
+- Deep semantic analysis via Gemini 2.5 evaluating emotional tone, urgency signals, and protective factors.
+This results in a firm risk level (0-3) that dictates all subsequent system behavior.
+
+### 2. Mapping Psychological Instruments
+We bypass the friction of traditional forms. As a student talks about their day, the system passively maps natural conversational phrases to the sub-domains of 9 validated instruments. For example, expressions of worthlessness are mapped directly to the RSES (Rosenberg Self-Esteem Scale) and PHQ-9 without the student ever checking a box.
+
+### 3. Redirecting to Psychologists
+Safety is paramount. If a Level 3 (Crisis) is triggered, Aika's generative capabilities are instantly locked down. The Case Management Agent (CMA) takes over, notifying the student that professional help is needed, and instantly queues a high-priority ticket for the human counseling team.
+
+### 4. Empowering Counselors and Admins
+The system is not designed to replace counselors, but to give them superpowers:
+- **Zero-Context Handoffs:** When a counselor picks up an escalated Level 3 case, they receive a synthesized brief containing the student's screening history, risk triggers, and recent context.
+- **Signal in the Noise:** Counselors focus strictly on high-risk students rather than drowning in a queue of low-risk administrative messages.
+- **Macro Analytics:** Admins use the IA (Insights Agent) to view k-anonymized population trends, allowing the university to deploy targeted resources (e.g., stress-management workshops) exactly when and where they are needed.
 
 ## The Problem
 
@@ -10,20 +36,20 @@ University counseling services are structurally reactive. Students must recogniz
 
 The counselor-to-student ratio at most universities sits around 1:1000. No amount of hiring closes that gap. The tools need to change.
 
-UGM-AICare reframes the problem: instead of waiting for students to ask for help, the system proactively identifies distress signals, intervenes early, and hands off to human counselors only when it matters most.
+**UGM-AICare reframes the problem:** instead of waiting for students to ask for help, the system proactively identifies distress signals, intervenes early, and hands off to human counselors only when it matters most.
 
 ---
 
-## What Was Built
+## What We Built
 
-A full-stack, production-deployed system consisting of:
+We developed a full-stack, production-deployed ecosystem that bridges advanced AI orchestration with secure blockchain verification:
 
-- A **multi-agent AI orchestration layer** built on LangGraph, coordinating four specialized agents under a meta-agent (Aika)
-- A **covert mental health screening engine** that passively maps natural conversation to nine clinically validated instruments (PHQ-9, GAD-7, DASS-21, C-SSRS, and five others)
-- A **policy-gated autopilot** that governs when Aika can act autonomously versus when a human must approve
-- An **onchain attestation ledger** recording every consequential AI action as a verifiable proof with transaction hashes
-- An **NFT achievement system** (ERC1155) that gives students tamper-proof ownership of their wellness milestones
-- A **counselor and admin dashboard** for case management, agent decision auditing, and population-level insights
+- A **multi-agent AI orchestration layer** built on LangGraph, coordinating four specialized agents under a meta-agent (Aika).
+- A **covert mental health screening engine** that passively maps natural conversation to nine clinically validated instruments (PHQ-9, GAD-7, DASS-21, C-SSRS, and five others).
+- A **policy-gated autopilot** that governs when AI agents can act autonomously versus when a human must approve.
+- An **on-chain attestation ledger** recording every consequential AI action as a verifiable proof with transaction hashes.
+- An **NFT achievement system** (ERC1155) that gives students tamper-proof ownership of their wellness milestones.
+- A comprehensive **counselor and admin dashboard** for case management, agent decision auditing, and population-level insights.
 
 Everything is live. The backend serves real users at [api.aicare.sumbu.xyz](https://api.aicare.sumbu.xyz). Smart contracts are deployed on BSC Testnet. The proof timeline at `/proof` shows actual transaction hashes.
 
@@ -56,6 +82,83 @@ Everything is live. The backend serves real users at [api.aicare.sumbu.xyz](http
 ```
 
 ---
+
+
+
+### C4 Architecture Model
+
+The following diagrams provide a formal C4 model representation of the system.
+
+#### C4 Context Diagram
+
+Illustrates the high-level boundaries of the UGM-AICare ecosystem, demonstrating how students and counselors interact with the main system, and how the system delegates data persistence, caching, reasoning (LLM), and blockchain attestations to external providers.
+
+```mermaid
+C4Context
+title System Context diagram for UGM-AICare
+Person(student, "Student", "A university student seeking mental health support.")
+Person(counselor, "Counselor / Admin", "University staff managing cases and system operations.")
+System(aicare, "UGM-AICare", "Proactive agentic mental health support ecosystem.")
+System_Ext(db, "PostgreSQL", "Stores user profiles, screening history, cases, and logs.")
+System_Ext(cache, "Redis", "Session cache and background task queue.")
+System_Ext(genai, "Google GenAI (Gemini)", "Provides LLM capabilities for semantic analysis and reasoning.")
+System_Ext(educhain, "EDU Chain", "Blockchain for storing verifiable wellness achievement badges.")
+
+Rel(student, aicare, "Seeks support, chats with agents, views badges")
+Rel(counselor, aicare, "Manages escalations, views insights, approves actions")
+Rel(aicare, db, "Reads and writes relational data")
+Rel(aicare, cache, "Stores transient state and queues background tasks")
+Rel(aicare, genai, "Sends prompts, receives generated responses")
+Rel(aicare, educhain, "Mints badges (ERC1155), writes attestations")
+```
+
+#### C4 Container Diagram
+
+Drills down into the specific application containers and components. It emphasizes the Multi-Agent LangGraph orchestration layer, showing the routing dynamics between the Aika Meta-Agent and the specialized STA, TCA, CMA, and IA sub-agents.
+
+```mermaid
+C4Container
+title Container diagram for UGM-AICare
+Person(student, "Student", "A university student.")
+Person(counselor, "Counselor / Admin", "Staff managing operations.")
+
+System_Boundary(c1, "UGM-AICare") {
+    Container(frontend, "Frontend App", "Next.js 15, React", "Provides the user interface for students and counselors.")
+    Container(backend, "Backend API", "FastAPI, Python", "Handles API requests, orchestrates AI agents, manages system state.")
+
+    Container_Boundary(ai, "Multi-Agent System (LangGraph)") {
+        Component(aika, "Aika (Meta-Agent)", "Agent", "Intent recognition, routing, and conversation state management.")
+        Component(sta, "STA (Safety Triage Agent)", "Agent", "Risk assessment and covert mental health screening extraction.")
+        Component(tca, "TCA (Therapeutic Coach Agent)", "Agent", "Provides evidence-based therapeutic support (CBT).")
+        Component(cma, "CMA (Case Management Agent)", "Agent", "Handles human escalation and resource coordination.")
+        Component(ia, "IA (Insights Agent)", "Agent", "Provides privacy-preserving population analytics.")
+    }
+
+    Container(autopilot, "Policy Engine & Worker", "Python", "Governs onchain actions, queues pending tasks, and executes them.")
+}
+
+System_Ext(db, "PostgreSQL", "Relational Database")
+System_Ext(cache, "Redis", "In-Memory Store")
+System_Ext(genai, "Google GenAI", "LLM Provider")
+System_Ext(educhain, "EDU Chain", "Blockchain Network")
+
+Rel(student, frontend, "Visits aicare.sumbu.xyz", "HTTPS")
+Rel(counselor, frontend, "Visits /admin dashboard", "HTTPS")
+Rel(frontend, backend, "Makes API calls to", "JSON/HTTPS")
+
+Rel(backend, aika, "Routes user messages to")
+Rel(aika, sta, "Delegates safety check to")
+Rel(aika, tca, "Delegates coaching to")
+Rel(aika, cma, "Delegates escalation to")
+Rel(aika, ia, "Delegates analytics queries to")
+
+Rel(backend, autopilot, "Sends proposed actions to")
+Rel(autopilot, educhain, "Submits transactions (minting/attestations)")
+
+Rel(backend, db, "Reads/writes data", "SQL/TCP")
+Rel(backend, cache, "Caches state/queues", "TCP")
+Rel(backend, genai, "Performs inference via", "HTTPS")
+```
 
 ## Aika and the Agent Network
 
