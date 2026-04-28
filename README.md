@@ -14,7 +14,7 @@
 
 - Next.js: **16.0.7** (was 16.0.0)
 
-## 🐳 Docker Compose
+### 🐳 Docker Compose
 
 This repository uses an **app-only** Docker Compose setup (backend + frontend). Database/Redis/S3 are treated as **external managed services** configured via `.env`.
 
@@ -31,7 +31,7 @@ docker compose --env-file .env -f docker-compose.base.yml -f docker-compose.prod
 
 If you prefer scripts, `./dev.sh` wraps the common local commands.
 
-## Development and split-subdomain deployment
+### Development and split-subdomain deployment
 
 The repository is commonly deployed with distinct subdomains:
 
@@ -68,7 +68,84 @@ Unlike traditional chatbots, UGM-AICare uses a **Multi-Agent System (MAS)** base
 - **Desire (Goal):** What the agent wants to achieve (Ensure Safety, Reduce Anxiety).
 - **Intention (Action):** What the agent decides to do (Execute Triage, Generate Plan).
 
-### 2.2 Agent Orchestration with Aika
+
+
+### 2.2 System Architecture (C4 Model)
+
+The UGM-AICare architecture is designed to orchestrate complex agentic interactions while maintaining strict data flow control and external service integration. Below are the Context and Container level diagrams of the system.
+
+#### C4 Context Diagram
+
+The Context diagram shows the high-level interactions between the users (Students and Counselors) and the UGM-AICare system, as well as the external dependencies like databases, caching, LLM providers, and blockchain networks for secure attestations.
+
+```mermaid
+C4Context
+title System Context diagram for UGM-AICare
+Person(student, "Student", "A university student seeking mental health support.")
+Person(counselor, "Counselor / Admin", "University staff managing cases and system operations.")
+System(aicare, "UGM-AICare", "Proactive agentic mental health support ecosystem.")
+System_Ext(db, "PostgreSQL", "Stores user profiles, screening history, cases, and logs.")
+System_Ext(cache, "Redis", "Session cache and background task queue.")
+System_Ext(genai, "Google GenAI (Gemini)", "Provides LLM capabilities for semantic analysis and reasoning.")
+System_Ext(educhain, "EDU Chain", "Blockchain for storing verifiable wellness achievement badges.")
+
+Rel(student, aicare, "Seeks support, chats with agents, views badges")
+Rel(counselor, aicare, "Manages escalations, views insights, approves actions")
+Rel(aicare, db, "Reads and writes relational data")
+Rel(aicare, cache, "Stores transient state and queues background tasks")
+Rel(aicare, genai, "Sends prompts, receives generated responses")
+Rel(aicare, educhain, "Mints badges (ERC1155), writes attestations")
+```
+
+#### C4 Container Diagram
+
+The Container diagram drills down into the internal components of UGM-AICare, showing how the Frontend Next.js app communicates with the Python FastAPI Backend. Crucially, it maps out the internal Multi-Agent System orchestration, detailing how the Meta-Agent (Aika) routes traffic to specialized sub-agents. It also illustrates the Autopilot Policy Engine which governs on-chain actions.
+
+```mermaid
+C4Container
+title Container diagram for UGM-AICare
+Person(student, "Student", "A university student.")
+Person(counselor, "Counselor / Admin", "Staff managing operations.")
+
+System_Boundary(c1, "UGM-AICare") {
+    Container(frontend, "Frontend App", "Next.js 15, React", "Provides the user interface for students and counselors.")
+    Container(backend, "Backend API", "FastAPI, Python", "Handles API requests, orchestrates AI agents, manages system state.")
+
+    Container_Boundary(ai, "Multi-Agent System (LangGraph)") {
+        Component(aika, "Aika (Meta-Agent)", "Agent", "Intent recognition, routing, and conversation state management.")
+        Component(sta, "STA (Safety Triage Agent)", "Agent", "Risk assessment and covert mental health screening extraction.")
+        Component(tca, "TCA (Therapeutic Coach Agent)", "Agent", "Provides evidence-based therapeutic support (CBT).")
+        Component(cma, "CMA (Case Management Agent)", "Agent", "Handles human escalation and resource coordination.")
+        Component(ia, "IA (Insights Agent)", "Agent", "Provides privacy-preserving population analytics.")
+    }
+
+    Container(autopilot, "Policy Engine & Worker", "Python", "Governs onchain actions, queues pending tasks, and executes them.")
+}
+
+System_Ext(db, "PostgreSQL", "Relational Database")
+System_Ext(cache, "Redis", "In-Memory Store")
+System_Ext(genai, "Google GenAI", "LLM Provider")
+System_Ext(educhain, "EDU Chain", "Blockchain Network")
+
+Rel(student, frontend, "Visits aicare.sumbu.xyz", "HTTPS")
+Rel(counselor, frontend, "Visits /admin dashboard", "HTTPS")
+Rel(frontend, backend, "Makes API calls to", "JSON/HTTPS")
+
+Rel(backend, aika, "Routes user messages to")
+Rel(aika, sta, "Delegates safety check to")
+Rel(aika, tca, "Delegates coaching to")
+Rel(aika, cma, "Delegates escalation to")
+Rel(aika, ia, "Delegates analytics queries to")
+
+Rel(backend, autopilot, "Sends proposed actions to")
+Rel(autopilot, educhain, "Submits transactions (minting/attestations)")
+
+Rel(backend, db, "Reads/writes data", "SQL/TCP")
+Rel(backend, cache, "Caches state/queues", "TCP")
+Rel(backend, genai, "Performs inference via", "HTTPS")
+```
+
+### 2.3 Agent Orchestration with Aika
 
 The system is orchestrated by **Aika**, a Meta-Agent that coordinates four specialized sub-agents using LangGraph. Each agent has a distinct responsibility, ensuring separation of concerns and efficient resource utilization.
 
@@ -96,7 +173,7 @@ The system is orchestrated by **Aika**, a Meta-Agent that coordinates four speci
     └─────────────┘           └─────────────┘  └─────────────┘        └─────────────┘
 ```
 
-### 2.3 Specialized Agent Roles & Responsibilities
+### 2.4 Specialized Agent Roles & Responsibilities
 
 | Agent | Full Name | Primary Responsibility | Key Functions |
 |-------|-----------|------------------------|---------------|
@@ -106,7 +183,7 @@ The system is orchestrated by **Aika**, a Meta-Agent that coordinates four speci
 | **📋 CMA** | Case Management Agent | Human escalation and resource coordination | Case creation, counselor assignment, appointment scheduling, follow-up tracking |
 | **📊 IA** | Insights Agent | Privacy-preserving analytics | K-anonymous queries, trend analysis, population health dashboards |
 
-### 2.4 Agent Workflow Details
+### 2.5 Agent Workflow Details
 
 #### 🛡️ STA (Safety Triage Agent)
 
