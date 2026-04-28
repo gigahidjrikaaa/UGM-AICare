@@ -198,7 +198,7 @@ The final severity label determines routing: Level 0-1 stays with Aika, Level 2 
 
 The first line of defense, STA analyzes every incoming message for risk indicators:
 
-1. **Tier 1 - Rule-based Pre-screening (0-5ms):** Immediate keyword detection for clear crisis terms or safe short responses.
+1. **Tier 1 - Rule-based Pre-screening (0-5ms):** Immediate regex pattern matching (e.g., `_CRISIS_PATTERNS` in `classifiers.py`) for clear crisis terms or safe short responses.
 2. **Tier 2 - Gemini Assessment (200-500ms):** Deep context understanding and chain-of-thought reasoning using Gemini 2.5 for ambiguous messages.
 3. **Tier 3 - Conversation Caching:** Smart optimization leveraging recent low-risk assessments to reduce redundant API calls.
 3. **Screening Extraction:** Covertly extracts mental health indicators based on validated instruments.

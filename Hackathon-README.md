@@ -14,7 +14,7 @@ To understand the practical impact of UGM-AICare, it is essential to look at how
 
 ### 1. Grading Case Severity
 Every message sent to Aika is intercepted by the STA (Safety Triage Agent). The grading is three-tiered:
-- **Tier 1 (Rule-based Pre-screening):** Immediate regex matching for clear crisis keywords or safe short acknowledgments.
+- **Tier 1 (Rule-based Pre-screening):** Immediate regex pattern matching (implemented in `classifiers.py` / `gemini_classifier.py`) for clear crisis keywords or safe short acknowledgments.
 - **Tier 2 (Gemini Assessment):** Deep chain-of-thought semantic analysis via Gemini 2.5 evaluating emotional tone, urgency signals, and protective factors.
 - **Tier 3 (Conversation Caching):** Fast-path optimization leveraging recent low-risk assessments to avoid redundant processing.
 This results in a firm risk level (0-3) that dictates all subsequent system behavior.
