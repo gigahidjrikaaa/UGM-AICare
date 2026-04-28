@@ -79,6 +79,7 @@ The UGM-AICare architecture is designed to orchestrate complex agentic interacti
 The Context diagram shows the high-level interactions between the users (Students and Counselors) and the UGM-AICare system, as well as the external dependencies like databases, caching, LLM providers, and blockchain networks for secure attestations.
 
 ```mermaid
+%%{init: {'theme': 'default', 'themeVariables': { 'background': '#ffffff' }}}%%
 C4Context
 title System Context diagram for UGM-AICare
 Person(student, "Student", "A university student seeking mental health support.")
@@ -102,6 +103,7 @@ Rel(aicare, educhain, "Mints badges (ERC1155), writes attestations")
 The Container diagram drills down into the internal components of UGM-AICare, showing how the Frontend Next.js app communicates with the Python FastAPI Backend. Crucially, it maps out the internal Multi-Agent System orchestration, detailing how the Meta-Agent (Aika) routes traffic to specialized sub-agents. It also illustrates the Autopilot Policy Engine which governs on-chain actions.
 
 ```mermaid
+%%{init: {'theme': 'default', 'themeVariables': { 'background': '#ffffff' }}}%%
 C4Container
 title Container diagram for UGM-AICare
 Person(student, "Student", "A university student.")
@@ -188,15 +190,17 @@ The system is orchestrated by **Aika**, a Meta-Agent that coordinates four speci
 #### 🛡️ STA (Safety Triage Agent)
 
 **How Aika & STA Grade Severity:**
-The grading process is continuous. As a student converses with Aika, the STA (Safety Triage Agent) analyzes every message. It assigns a discrete Risk Level (0 to 3) based on two tiers:
-- **Tier 1 (Regex):** Instant matching of high-risk keywords (e.g., suicide, self-harm) immediately triggers Level 3.
-- **Tier 2 (Semantic):** If Tier 1 passes, the LLM evaluates the emotional tone, protective factors, and urgency.
+The grading process is continuous. As a student converses with Aika, the STA (Safety Triage Agent) analyzes every message. It assigns a discrete Risk Level (0 to 3) based on a tiered system:
+- **Tier 1 (Rule-based pre-screening):** Instant regex matching (0-5ms) for clear crisis keywords or safe short acknowledgments.
+- **Tier 2 (Gemini Assessment):** For ambiguous cases, Gemini 2.5 performs a chain-of-thought semantic analysis evaluating emotional tone, urgency signals, and protective factors.
+- **Tier 3 (Conversation Caching):** Reduces redundant LLM calls by leveraging recent low-risk assessments.
 The final severity label determines routing: Level 0-1 stays with Aika, Level 2 activates therapeutic coaching (TCA), and Level 3 forces immediate human escalation.
 
 The first line of defense, STA analyzes every incoming message for risk indicators:
 
-1. **Tier 1 - Regex Rules (0-5ms):** Immediate keyword detection for crisis terms.
-2. **Tier 2 - LLM Semantic Analysis (200ms):** Deep context understanding using Gemini 2.5.
+1. **Tier 1 - Rule-based Pre-screening (0-5ms):** Immediate keyword detection for clear crisis terms or safe short responses.
+2. **Tier 2 - Gemini Assessment (200-500ms):** Deep context understanding and chain-of-thought reasoning using Gemini 2.5 for ambiguous messages.
+3. **Tier 3 - Conversation Caching:** Smart optimization leveraging recent low-risk assessments to reduce redundant API calls.
 3. **Screening Extraction:** Covertly extracts mental health indicators based on validated instruments.
 
 **Risk Levels:**

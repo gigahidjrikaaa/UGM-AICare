@@ -13,9 +13,10 @@ Welcome to the hackathon showcase of UGM-AICare! This document highlights the sp
 To understand the practical impact of UGM-AICare, it is essential to look at how the system handles the nuances of mental health support.
 
 ### 1. Grading Case Severity
-Every message sent to Aika is intercepted by the STA (Safety Triage Agent). The grading is two-tiered:
-- Immediate regex matching for severe crisis keywords.
-- Deep semantic analysis via Gemini 2.5 evaluating emotional tone, urgency signals, and protective factors.
+Every message sent to Aika is intercepted by the STA (Safety Triage Agent). The grading is three-tiered:
+- **Tier 1 (Rule-based Pre-screening):** Immediate regex matching for clear crisis keywords or safe short acknowledgments.
+- **Tier 2 (Gemini Assessment):** Deep chain-of-thought semantic analysis via Gemini 2.5 evaluating emotional tone, urgency signals, and protective factors.
+- **Tier 3 (Conversation Caching):** Fast-path optimization leveraging recent low-risk assessments to avoid redundant processing.
 This results in a firm risk level (0-3) that dictates all subsequent system behavior.
 
 ### 2. Mapping Psychological Instruments
@@ -94,6 +95,7 @@ The following diagrams provide a formal C4 model representation of the system.
 Illustrates the high-level boundaries of the UGM-AICare ecosystem, demonstrating how students and counselors interact with the main system, and how the system delegates data persistence, caching, reasoning (LLM), and blockchain attestations to external providers.
 
 ```mermaid
+%%{init: {'theme': 'default', 'themeVariables': { 'background': '#ffffff' }}}%%
 C4Context
 title System Context diagram for UGM-AICare
 Person(student, "Student", "A university student seeking mental health support.")
@@ -117,6 +119,7 @@ Rel(aicare, educhain, "Mints badges (ERC1155), writes attestations")
 Drills down into the specific application containers and components. It emphasizes the Multi-Agent LangGraph orchestration layer, showing the routing dynamics between the Aika Meta-Agent and the specialized STA, TCA, CMA, and IA sub-agents.
 
 ```mermaid
+%%{init: {'theme': 'default', 'themeVariables': { 'background': '#ffffff' }}}%%
 C4Container
 title Container diagram for UGM-AICare
 Person(student, "Student", "A university student.")
@@ -167,7 +170,7 @@ Aika is not a chatbot. She is a **meta-agent orchestrator** that classifies ever
 | Agent | Role | What it actually does |
 |-------|------|-----------------------|
 | **Aika** | Meta-Agent Orchestrator | Intent classification, agent routing, response synthesis, longitudinal profile updates |
-| **STA** | Safety Triage Agent | Two-tier risk scoring (regex in <5ms, then Gemini 2.5 semantic analysis). Outputs risk levels 0–3. |
+| **STA** | Safety Triage Agent | Three-tier risk scoring (rule-based pre-screening, Gemini assessment, and conversation caching). Outputs risk levels 0–3. |
 | **TCA** | Therapeutic Coach Agent | CBT-based interventions — cognitive restructuring, behavioral activation, guided relaxation |
 | **CMA** | Case Management Agent | Creates escalation cases, routes to counselors by specialty and workload, schedules follow-ups |
 | **IA** | Insights Agent | k-anonymous population analytics with differential privacy guarantees |

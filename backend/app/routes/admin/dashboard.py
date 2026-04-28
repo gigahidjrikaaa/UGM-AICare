@@ -6,7 +6,7 @@ from datetime import datetime, timedelta, date
 from typing import List, Optional
 
 from fastapi import APIRouter, Depends, Query
-from sqlalchemy import and_, func, select, text, desc, bindparam
+from sqlalchemy import and_, func, select, text, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
@@ -365,33 +365,21 @@ async def get_trends(
     # ===== Sentiment Trends =====
     sentiment_data: List[HistoricalDataPoint] = []
     
-    # Optimized: Fetch all relevant risk scores in one query to avoid N+1
-    sentiment_stmt = (
-        select(TriageAssessment.created_at, TriageAssessment.risk_score)
-        .where(TriageAssessment.created_at >= start)
-        .where(TriageAssessment.created_at < now)
-        .order_by(TriageAssessment.created_at.asc())
-    )
-    sentiment_rows = (await db.execute(sentiment_stmt)).all()
-
-    # Group into buckets in memory
+    # Group by date buckets and calculate average sentiment
     current_date = start
-    row_idx = 0
-    num_rows = len(sentiment_rows)
-
     while current_date < now:
         bucket_end = current_date + timedelta(days=bucket_size_days)
         
-        bucket_risks = []
-        while row_idx < num_rows and sentiment_rows[row_idx].created_at < bucket_end:
-            if sentiment_rows[row_idx].risk_score is not None:
-                bucket_risks.append(float(sentiment_rows[row_idx].risk_score))
-            row_idx += 1
+        avg_risk_stmt = (
+            select(func.avg(TriageAssessment.risk_score))
+            .where(TriageAssessment.created_at >= current_date)
+            .where(TriageAssessment.created_at < bucket_end)
+        )
+        avg_risk = (await db.execute(avg_risk_stmt)).scalar()
         
         sentiment_score = None
-        if bucket_risks:
-            avg_risk = sum(bucket_risks) / len(bucket_risks)
-            sentiment_score = round(max(0.0, min(1.0, 1.0 - avg_risk)) * 100, 2)
+        if avg_risk is not None:
+            sentiment_score = round(max(0.0, min(1.0, 1.0 - float(avg_risk))) * 100, 2)
         
         sentiment_data.append(
             HistoricalDataPoint(
@@ -406,41 +394,28 @@ async def get_trends(
     cases_opened_data: List[HistoricalDataPoint] = []
     cases_closed_data: List[HistoricalDataPoint] = []
     
-    # Optimized: Fetch all relevant case timestamps in two queries to avoid 2N queries
-    opened_stmt = (
-        select(Case.created_at)
-        .where(Case.created_at >= start)
-        .where(Case.created_at < now)
-        .order_by(Case.created_at.asc())
-    )
-    closed_stmt = (
-        select(Case.updated_at)
-        .where(Case.status == CaseStatusEnum.closed)
-        .where(Case.updated_at >= start)
-        .where(Case.updated_at < now)
-        .order_by(Case.updated_at.asc())
-    )
-
-    opened_rows = (await db.execute(opened_stmt)).scalars().all()
-    closed_rows = (await db.execute(closed_stmt)).scalars().all()
-
-    # Group into buckets in memory
     current_date = start
-    o_idx, c_idx = 0, 0
-    num_opened, num_closed = len(opened_rows), len(closed_rows)
-
     while current_date < now:
         bucket_end = current_date + timedelta(days=bucket_size_days)
         
-        opened_count = 0
-        while o_idx < num_opened and opened_rows[o_idx] < bucket_end:
-            opened_count += 1
-            o_idx += 1
+        # Cases opened in this bucket
+        opened_stmt = (
+            select(func.count())
+            .select_from(Case)
+            .where(Case.created_at >= current_date)
+            .where(Case.created_at < bucket_end)
+        )
+        opened_count = int((await db.execute(opened_stmt)).scalar() or 0)
 
-        closed_count = 0
-        while c_idx < num_closed and closed_rows[c_idx] < bucket_end:
-            closed_count += 1
-            c_idx += 1
+        # Cases closed in this bucket
+        closed_stmt = (
+            select(func.count())
+            .select_from(Case)
+            .where(Case.status == CaseStatusEnum.closed)
+            .where(Case.updated_at >= current_date)
+            .where(Case.updated_at < bucket_end)
+        )
+        closed_count = int((await db.execute(closed_stmt)).scalar() or 0)
 
         cases_opened_data.append(
             HistoricalDataPoint(date=current_date.date(), value=opened_count)
@@ -490,102 +465,54 @@ async def get_trends(
             logger.warning(f"Failed to extract top topics: {e}")
             await db.rollback()
     
-    # Now get counts for each topic over time (Optimized: single query for PostgreSQL, efficient fallback)
-    topic_trends = {topic: [] for topic in top_topics}
-
-    if dialect_name == "postgresql" and top_topics:
-        # Optimized for PostgreSQL: Fetch all topic counts per bucket in one query
-        # We group by date_trunc and topic
-        interval = f"{bucket_size_days} days"
-        sql = text(
-            f"""
-            SELECT
-                date_trunc('day', created_at) - (CAST(EXTRACT(day FROM created_at - :start) AS integer) % :bucket_size) * interval '1 day' AS bucket_start,
-                lower(trim(elem)) AS topic,
-                COUNT(*) AS cnt
-            FROM (
-              SELECT
-                created_at,
-                jsonb_array_elements_text(
-                  CASE
-                    WHEN jsonb_typeof(triage_assessments.risk_factors::jsonb) = 'array'
-                    THEN triage_assessments.risk_factors::jsonb
-                    ELSE '[]'::jsonb
-                  END
-                ) AS elem
-              FROM triage_assessments
-              WHERE triage_assessments.created_at >= :start
-                AND triage_assessments.created_at < :now
-                AND triage_assessments.risk_factors IS NOT NULL
-            ) t
-            WHERE lower(trim(elem)) IN :top_topics
-            GROUP BY bucket_start, topic
-            ORDER BY bucket_start ASC
-            """
-        ).bindparams(bindparam("top_topics", expanding=True))
-        try:
-            rows = (await db.execute(sql, {
-                "start": start,
-                "now": now,
-                "bucket_size": bucket_size_days,
-                "top_topics": tuple(top_topics)
-            })).all()
-
-            # Map results back to topic_trends
-            results_map = {(r.bucket_start.date(), r.topic): r.cnt for r in rows}
-
-            for topic in top_topics:
-                current_date = start
-                while current_date < now:
-                    count = results_map.get((current_date.date(), topic), 0)
-                    topic_trends[topic].append(
-                        HistoricalDataPoint(date=current_date.date(), value=count)
-                    )
-                    current_date = current_date + timedelta(days=bucket_size_days)
-        except Exception as e:
-            logger.warning(f"Failed to fetch optimized topic trends: {e}")
-            await db.rollback()
-            # Fallback: ensure data contract is satisfied with zero-valued points
-            for topic in top_topics:
-                topic_trends[topic] = []
-                current_date = start
-                while current_date < now:
-                    topic_trends[topic].append(HistoricalDataPoint(date=current_date.date(), value=0))
-                    current_date = current_date + timedelta(days=bucket_size_days)
-
-    elif top_topics:
-        # Fallback for non-PostgreSQL (efficient in-memory processing)
-        assessments_stmt = (
-            select(TriageAssessment.created_at, TriageAssessment.risk_factors)
-            .where(TriageAssessment.created_at >= start)
-            .where(TriageAssessment.created_at < now)
-            .where(TriageAssessment.risk_factors.is_not(None))
-            .order_by(TriageAssessment.created_at.asc())
-        )
-        rows = (await db.execute(assessments_stmt)).all()
-
+    # Now get counts for each topic over time (simplified for MVP)
+    topic_trends = {}
+    for topic in top_topics:
+        topic_data: List[HistoricalDataPoint] = []
         current_date = start
-        row_idx = 0
-        num_rows = len(rows)
         
         while current_date < now:
             bucket_end = current_date + timedelta(days=bucket_size_days)
-            bucket_topic_counts = {topic: 0 for topic in top_topics}
             
-            while row_idx < num_rows and rows[row_idx].created_at < bucket_end:
-                factors = rows[row_idx].risk_factors
-                if isinstance(factors, list):
-                    for factor in factors:
-                        normalized = str(factor).strip().lower()
-                        if normalized in bucket_topic_counts:
-                            bucket_topic_counts[normalized] += 1
-                row_idx += 1
-
-            for topic in top_topics:
-                topic_trends[topic].append(
-                    HistoricalDataPoint(date=current_date.date(), value=bucket_topic_counts[topic])
+            # Count occurrences of this topic in this time bucket
+            if dialect_name == "postgresql":
+                sql = text(
+                    """
+                    SELECT COUNT(*) AS cnt
+                    FROM (
+                      SELECT jsonb_array_elements_text(
+                        CASE
+                          WHEN jsonb_typeof(triage_assessments.risk_factors::jsonb) = 'array'
+                          THEN triage_assessments.risk_factors::jsonb
+                          ELSE '[]'::jsonb
+                        END
+                      ) AS elem
+                      FROM triage_assessments
+                      WHERE triage_assessments.created_at >= :start_date
+                        AND triage_assessments.created_at < :end_date
+                        AND triage_assessments.risk_factors IS NOT NULL
+                    ) t
+                    WHERE lower(trim(elem)) = :topic
+                    """
                 )
+                try:
+                    count_result = (await db.execute(
+                        sql,
+                        {"start_date": current_date, "end_date": bucket_end, "topic": topic}
+                    )).scalar()
+                    count = int(count_result or 0)
+                except Exception:
+                    count = 0
+            else:
+                count = 0
+
+            topic_data.append(
+                HistoricalDataPoint(date=current_date.date(), value=count)
+            )
+
             current_date = bucket_end
+
+        topic_trends[topic] = topic_data
     
     return TrendsResponse(
         sentiment_trend=sentiment_data,
