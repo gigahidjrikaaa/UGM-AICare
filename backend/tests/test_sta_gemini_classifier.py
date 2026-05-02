@@ -43,8 +43,8 @@ async def test_gemini_sta_classifier_uses_cached_assessment(monkeypatch: pytest.
         next_step="resource",
         handoff=False,
         diagnostic_notes="cached",
-        needs_support_coach_plan=False,
-        support_plan_type="none",
+        needs_therapeutic_coach_plan=False,
+        therapeutic_plan_type="none",
     )
 
     monkeypatch.setattr(classifier, "_rule_based_prescreen", lambda _t: {"skip_gemini": False})
@@ -69,8 +69,8 @@ async def test_gemini_sta_classifier_calls_gemini_and_caches_low_risk(monkeypatc
         next_step="tca",
         handoff=False,
         diagnostic_notes="gemini",
-        needs_support_coach_plan=False,
-        support_plan_type="none",
+        needs_therapeutic_coach_plan=False,
+        therapeutic_plan_type="none",
     )
     monkeypatch.setattr(classifier, "_gemini_chain_of_thought_assessment", AsyncMock(return_value=gemini_result))
     cache_spy = AsyncMock()
@@ -112,8 +112,8 @@ async def test_gemini_chain_of_thought_parses_json_code_block(monkeypatch: pytes
     result = await classifier._gemini_chain_of_thought_assessment("hello", context={})
 
     assert result.risk_level == 1
-    assert result.needs_support_coach_plan is True
-    assert result.support_plan_type == "calm_down"
+    assert result.needs_therapeutic_coach_plan is True
+    assert result.therapeutic_plan_type == "calm_down"
 
 
 @pytest.mark.asyncio
@@ -156,8 +156,8 @@ async def test_get_cached_assessment_redis_hit(monkeypatch: pytest.MonkeyPatch) 
         next_step="resource",
         handoff=False,
         diagnostic_notes="cached",
-        needs_support_coach_plan=False,
-        support_plan_type="none",
+        needs_therapeutic_coach_plan=False,
+        therapeutic_plan_type="none",
     )
 
     class FakeRedis:
@@ -225,8 +225,8 @@ async def test_cache_assessment_only_caches_low_risk(monkeypatch: pytest.MonkeyP
         next_step="human",
         handoff=True,
         diagnostic_notes="",
-        needs_support_coach_plan=False,
-        support_plan_type="none",
+        needs_therapeutic_coach_plan=False,
+        therapeutic_plan_type="none",
     )
 
     await classifier._cache_assessment(payload, high, context={})
@@ -238,8 +238,8 @@ async def test_cache_assessment_only_caches_low_risk(monkeypatch: pytest.MonkeyP
         next_step="tca",
         handoff=False,
         diagnostic_notes="",
-        needs_support_coach_plan=False,
-        support_plan_type="none",
+        needs_therapeutic_coach_plan=False,
+        therapeutic_plan_type="none",
     )
 
     await classifier._cache_assessment(payload, low, context={})
