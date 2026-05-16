@@ -926,7 +926,8 @@ Return HANYA datetime string dalam ISO format (YYYY-MM-DDTHH:MM:SS) dari list di
         selected_datetime = datetime.fromisoformat(selected_datetime_str)
         
         # Verify it's in our available slots
-        if any(slot["datetime"] == selected_datetime_str for slot in available_slots):
+        valid_datetimes = {slot["datetime"] for slot in available_slots}
+        if selected_datetime_str in valid_datetimes:
             logger.info(f"LLM selected appointment time: {selected_datetime}")
             return selected_datetime
         
