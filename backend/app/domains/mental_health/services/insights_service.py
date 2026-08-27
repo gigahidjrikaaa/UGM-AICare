@@ -428,8 +428,8 @@ Generate a comprehensive analysis in JSON format with three components:
         report_type: str | None = None,
         limit: int = 10,
         offset: int = 0
-    ) -> list[InsightsReport]:
-        """List reports with pagination.
+    ) -> tuple[list[InsightsReport], int]:
+        """List reports with pagination and total count.
         
         Args:
             report_type: Optional filter by report type
@@ -437,19 +437,27 @@ Generate a comprehensive analysis in JSON format with three components:
             offset: Offset for pagination
             
         Returns:
-            List of InsightsReport objects
+            Tuple of (List of InsightsReport objects, total count)
         """
-        stmt = select(InsightsReport).order_by(
-            InsightsReport.generated_at.desc()
-        )
+        # Base query for filtering
+        base_stmt = select(InsightsReport)
         
         if report_type:
-            stmt = stmt.where(InsightsReport.report_type == report_type)
+            base_stmt = base_stmt.where(InsightsReport.report_type == report_type)
+
+        # Count query
+        count_stmt = select(func.count()).select_from(base_stmt.subquery())
+        count_result = await self.db.execute(count_stmt)
+        total_count = count_result.scalar_one()
         
+        # Paginated items query
+        stmt = base_stmt.order_by(InsightsReport.generated_at.desc())
         stmt = stmt.limit(limit).offset(offset)
         
         result = await self.db.execute(stmt)
-        return list(result.scalars().all())
+        items = list(result.scalars().all())
+
+        return items, total_count
     
     async def _extract_trending_topics(
         self,
