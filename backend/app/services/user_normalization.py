@@ -1,16 +1,13 @@
 """User normalization helpers.
 
-The codebase currently contains both:
-- legacy columns on `users`
-- normalized tables: `user_profiles`, `user_preferences`, `user_clinical_records`
+The normalized tables (`user_profiles`, `user_preferences`,
+`user_clinical_records`, `user_emergency_contacts`) are the single source of
+truth for profile, preference, clinical, and emergency-contact data. The
+legacy denormalized PII/PHI columns on `users` have been dropped.
 
 This module provides:
-- runtime best-effort migration from legacy -> normalized (no secrets needed)
-- centralized accessors so callers stop reaching into legacy `users.*` fields
-
-This enables a safe 2-phase migration:
-1) Backfill + refactor callers
-2) Drop legacy columns from `users`
+- centralized accessors so callers stop reaching into `users.*` fields
+- `ensure_user_normalized_tables` to guarantee 1:1 rows exist for a user
 """
 
 from __future__ import annotations
@@ -24,30 +21,11 @@ from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models import User
-from app.models.user_clinical_record import UserClinicalRecord
-from app.models.user_emergency_contact import UserEmergencyContact
 from app.models.user_preferences import UserPreferences
 from app.models.user_profile import UserProfile
 
 
 _JAKARTA_DEFAULT_COUNTRY = "Indonesia"
-
-
-def _split_primary_concerns(value: Optional[str]) -> list[str]:
-    if not value:
-        return []
-    # Common formats seen in legacy text fields: comma-separated or newline-separated
-    candidates = [part.strip() for part in value.replace("\n", ",").split(",")]
-    return [c for c in candidates if c]
-
-
-def _join_primary_concerns(value: Optional[Iterable[str]]) -> Optional[str]:
-    if not value:
-        return None
-    normalized = [str(v).strip() for v in value if str(v).strip()]
-    if not normalized:
-        return None
-    return ", ".join(normalized)
 
 
 def display_name(user: User) -> str:
@@ -80,8 +58,7 @@ def check_in_code(user: User) -> Optional[str]:
 def current_risk_level(user: User) -> Optional[str]:
     if user.clinical_record and user.clinical_record.current_risk_level:
         return str(user.clinical_record.current_risk_level)
-    # Legacy field fallback (during migration)
-    return getattr(user, "risk_level", None)
+    return None
 
 
 @dataclass(frozen=True)
@@ -94,27 +71,33 @@ class ClinicalSnapshot:
 
 def clinical_snapshot(user: User) -> ClinicalSnapshot:
     if user.clinical_record:
+        concerns = user.clinical_record.primary_concerns
+        joined: Optional[str] = None
+        if concerns:
+            normalized = [str(v).strip() for v in concerns if str(v).strip()]
+            joined = ", ".join(normalized) if normalized else None
         return ClinicalSnapshot(
             risk_level=current_risk_level(user),
             clinical_summary=user.clinical_record.clinical_summary,
-            primary_concerns=_join_primary_concerns(user.clinical_record.primary_concerns),
+            primary_concerns=joined,
             safety_plan_notes=user.clinical_record.safety_plan_notes,
         )
 
     return ClinicalSnapshot(
-        risk_level=getattr(user, "risk_level", None),
-        clinical_summary=getattr(user, "clinical_summary", None),
-        primary_concerns=getattr(user, "primary_concerns", None),
-        safety_plan_notes=getattr(user, "safety_plan_notes", None),
+        risk_level=None,
+        clinical_summary=None,
+        primary_concerns=None,
+        safety_plan_notes=None,
     )
 
 
 async def ensure_user_normalized_tables(db: AsyncSession, user: User) -> User:
-    """Ensure normalized 1:1 rows exist and are populated (best-effort).
+    """Ensure normalized 1:1 rows exist (best-effort).
 
-    This function is intentionally conservative:
-    - It only copies legacy -> normalized if the normalized field is missing.
-    - It avoids overwriting non-empty normalized fields.
+    - Creates missing `user_profiles` / `user_preferences` rows with defaults.
+    - Copies remaining shared `users` columns (names, contact, demographics,
+      engagement) into the profile when the profile field is empty.
+    - Never overwrites non-empty normalized fields.
     """
 
     changed = False
@@ -250,115 +233,6 @@ async def ensure_user_normalized_tables(db: AsyncSession, user: User) -> User:
         legacy_checkin_code = getattr(user, "check_in_code", None)
         if not preferences.check_in_code and legacy_checkin_code:
             preferences.check_in_code = str(legacy_checkin_code)
-            changed = True
-
-        # Localization
-        for attr in ("preferred_language", "preferred_timezone"):
-            if not getattr(preferences, attr, None) and getattr(user, attr, None):
-                setattr(preferences, attr, getattr(user, attr))
-                changed = True
-
-        # Accessibility needs: legacy uses `accessibility_needs`, preferences uses `accessibility_notes`
-        if not preferences.accessibility_notes and getattr(user, "accessibility_needs", None):
-            preferences.accessibility_notes = user.accessibility_needs
-            changed = True
-
-        # Legacy free-text blobs
-        if not getattr(preferences, "communication_preferences", None) and getattr(user, "communication_preferences", None):
-            preferences.communication_preferences = user.communication_preferences
-            changed = True
-        if not getattr(preferences, "interface_preferences", None) and getattr(user, "interface_preferences", None):
-            preferences.interface_preferences = user.interface_preferences
-            changed = True
-
-        # Analytics consent (already exists on preferences)
-        # If unset in preferences, keep its default.
-
-    # ---------------------------------------------------------------------
-    # user_clinical_records
-    # ---------------------------------------------------------------------
-    if user.clinical_record is None:
-        # Only create if there is legacy clinical data to migrate.
-        has_legacy_clinical = any(
-            getattr(user, attr, None)
-            for attr in (
-                "risk_level",
-                "clinical_summary",
-                "primary_concerns",
-                "safety_plan_notes",
-                "therapy_modality",
-                "therapy_frequency",
-                "therapy_notes",
-                "current_therapist_name",
-                "current_therapist_contact",
-                "aicare_team_notes",
-            )
-        )
-        if has_legacy_clinical:
-            user.clinical_record = UserClinicalRecord(user_id=user.id)
-            db.add(user.clinical_record)
-            changed = True
-
-    clinical = user.clinical_record
-    if clinical is not None:
-        if not clinical.current_risk_level and getattr(user, "risk_level", None):
-            clinical.current_risk_level = user.risk_level
-            changed = True
-
-        if not clinical.clinical_summary and getattr(user, "clinical_summary", None):
-            clinical.clinical_summary = user.clinical_summary
-            changed = True
-
-        if not clinical.primary_concerns and getattr(user, "primary_concerns", None):
-            clinical.primary_concerns = _split_primary_concerns(user.primary_concerns)
-            changed = True
-
-        if not clinical.safety_plan_notes and getattr(user, "safety_plan_notes", None):
-            clinical.safety_plan_notes = user.safety_plan_notes
-            changed = True
-
-        # Map legacy "current therapist" fields to external therapist fields.
-        if not clinical.external_therapist_name and getattr(user, "current_therapist_name", None):
-            clinical.external_therapist_name = user.current_therapist_name
-            changed = True
-        if not clinical.external_therapist_contact and getattr(user, "current_therapist_contact", None):
-            clinical.external_therapist_contact = user.current_therapist_contact
-            changed = True
-
-        if not clinical.therapy_modality and getattr(user, "therapy_modality", None):
-            clinical.therapy_modality = user.therapy_modality
-            changed = True
-        if not clinical.therapy_frequency and getattr(user, "therapy_frequency", None):
-            clinical.therapy_frequency = user.therapy_frequency
-            changed = True
-
-        if not getattr(clinical, "therapy_notes", None) and getattr(user, "therapy_notes", None):
-            clinical.therapy_notes = user.therapy_notes
-            changed = True
-
-        if not clinical.aicare_team_notes and getattr(user, "aicare_team_notes", None):
-            clinical.aicare_team_notes = user.aicare_team_notes
-            changed = True
-
-    # ---------------------------------------------------------------------
-    # user_emergency_contacts (best-effort single primary contact)
-    # ---------------------------------------------------------------------
-    if not getattr(user, "emergency_contacts", None):
-        legacy_name = getattr(user, "emergency_contact_name", None)
-        legacy_rel = getattr(user, "emergency_contact_relationship", None)
-        legacy_phone = getattr(user, "emergency_contact_phone", None)
-        legacy_email = getattr(user, "emergency_contact_email", None)
-        if any([legacy_name, legacy_rel, legacy_phone, legacy_email]):
-            contact = UserEmergencyContact(user_id=user.id)
-            if legacy_name:
-                setattr(contact, "full_name", str(legacy_name))
-            if legacy_rel:
-                setattr(contact, "relationship_to_user", str(legacy_rel))
-            if legacy_phone:
-                setattr(contact, "phone", str(legacy_phone))
-            if legacy_email:
-                setattr(contact, "email", str(legacy_email))
-            db.add(contact)
             changed = True
 
     if changed:

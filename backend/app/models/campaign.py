@@ -6,7 +6,10 @@ import uuid
 from datetime import date, datetime
 from typing import TYPE_CHECKING, Optional
 
-from sqlalchemy import Column, Date, DateTime, Float, ForeignKey, Integer, String, Text, Boolean
+from sqlalchemy import (
+    CheckConstraint, Column, Date, DateTime, Float, ForeignKey, Integer,
+    String, Text, Boolean, UniqueConstraint, func,
+)
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -45,8 +48,10 @@ class Campaign(Base):
     
     # Ownership and timestamps
     created_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default='now()')
-    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default='now()', onupdate=datetime.utcnow)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, server_default=func.now(), onupdate=func.now()
+    )
     last_executed_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     
     # Relationships
@@ -54,6 +59,17 @@ class Campaign(Base):
     triggers: Mapped[list["CampaignTrigger"]] = relationship("CampaignTrigger", back_populates="campaign", cascade="all, delete-orphan")
     metrics: Mapped[list["CampaignMetrics"]] = relationship("CampaignMetrics", back_populates="campaign", cascade="all, delete-orphan")
     executions: Mapped[list["SCACampaignExecution"]] = relationship("SCACampaignExecution", back_populates="campaign", cascade="all, delete-orphan")
+
+    __table_args__ = (
+        CheckConstraint(
+            "status IN ('draft', 'active', 'paused', 'completed')",
+            name="ck_campaigns_status",
+        ),
+        CheckConstraint(
+            "priority IN ('low', 'medium', 'high')",
+            name="ck_campaigns_priority",
+        ),
+    )
 
     def __repr__(self) -> str:
         return f"<Campaign(id={self.id}, name={self.name}, status={self.status})>"
@@ -117,6 +133,11 @@ class CampaignMetrics(Base):
     # Relationships
     campaign: Mapped["Campaign"] = relationship("Campaign", back_populates="metrics")
 
+    __table_args__ = (
+        # One metrics row per campaign per day (prevents duplicate daily rows)
+        UniqueConstraint("campaign_id", "execution_date", name="uq_campaign_metrics_campaign_date"),
+    )
+
     def __repr__(self) -> str:
         return f"<CampaignMetrics(id={self.id}, campaign_id={self.campaign_id}, date={self.execution_date})>"
 
@@ -133,7 +154,7 @@ class SCACampaignExecution(Base):
     campaign_id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), ForeignKey('campaigns.id', ondelete='CASCADE'), nullable=False, index=True)
     
     # Execution details
-    executed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default='now()', index=True)
+    executed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=func.now(), index=True)
     executed_by: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('users.id', ondelete='SET NULL'), nullable=True)
     
     # Campaign snapshot (capture current state at execution time)

@@ -11,7 +11,7 @@ Industry Best Practices Applied:
 - AI personality customization (aika_personality, aika_response_length)
 """
 
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Time, Text
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, Time, Text, DateTime
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -225,14 +225,14 @@ class UserPreferences(Base):
     # TIMESTAMPS
     # =====================================================================
     created_at = Column(
-        Integer,
-        server_default=func.extract('epoch', func.now()),
+        DateTime(timezone=True),
+        server_default=func.now(),
         nullable=False
     )
     updated_at = Column(
-        Integer,
-        server_default=func.extract('epoch', func.now()),
-        onupdate=func.extract('epoch', func.now()),
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
         nullable=False
     )
     

@@ -121,7 +121,7 @@ class UserProfile(Base):
         comment="Whether profile was verified via SIMASTER import"
     )
     simaster_verified_at = Column(
-        DateTime,
+        DateTime(timezone=True),
         comment="Timestamp when SIMASTER verification occurred"
     )
     
@@ -141,11 +141,8 @@ class UserProfile(Base):
     longest_streak = Column(Integer, default=0)
     last_activity_date = Column(Date)
     sentiment_score = Column(Float, default=0.0)  # Average mood over time
-    total_care_tokens = Column(
-        Integer, 
-        default=0,
-        comment="Total CARE tokens earned (token economy integration)"
-    )
+    # NOTE: total_care_tokens was removed — the on-chain CARE token contract
+    # (balanceOf) is the single source of truth for token balances.
     
     # =====================================================================
     # SOCIAL FEATURES
@@ -163,14 +160,14 @@ class UserProfile(Base):
     # TIMESTAMPS
     # =====================================================================
     created_at = Column(
-        Date,
-        server_default=func.current_date(),
+        DateTime(timezone=True),
+        server_default=func.now(),
         nullable=False
     )
     updated_at = Column(
-        Date,
-        server_default=func.current_date(),
-        onupdate=func.current_date(),
+        DateTime(timezone=True),
+        server_default=func.now(),
+        onupdate=func.now(),
         nullable=False
     )
     

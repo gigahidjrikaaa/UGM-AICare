@@ -2,10 +2,10 @@ from __future__ import annotations
 
 import enum
 import uuid
-from datetime import datetime
 
 from sqlalchemy import Column, DateTime, Enum, Index, String, Text
 from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy.sql import func
 
 from app.database import Base
 from app.database.types import JSONBCompat
@@ -26,7 +26,7 @@ class Message(Base):
     content_redacted = Column(Text, nullable=False)
     tools_used = Column(JSONBCompat, nullable=True)
     trace_id = Column(String, nullable=True)
-    ts = Column(DateTime(timezone=True), default=datetime.utcnow, nullable=False, index=True)
+    ts = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
 
     __table_args__ = (
         Index("ix_messages_tools_used", tools_used, postgresql_using="gin"),

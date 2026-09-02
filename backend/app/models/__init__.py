@@ -39,7 +39,7 @@ from .user_ai_memory_fact import UserAIMemoryFact
 from .user_activity import UserDailyActivity, UserEvent, RetentionCohortDaily
 
 # Revenue reporting - imported directly from models file to avoid loading blockchain dependencies
-from app.domains.finance.models import RevenueReport, RevenueApproval, ReportStatus
+from app.domains.finance.models import RevenueReport, RevenueApproval, ReportStatus, CareTokenMint
 
 # Social features
 from .social import Tweet, UserBadge, PendingBadgeGrant
@@ -106,6 +106,7 @@ __all__ = [
     "RevenueReport",
     "RevenueApproval",
     "ReportStatus",
+    "CareTokenMint",
     
     # Social Models
     "Tweet",

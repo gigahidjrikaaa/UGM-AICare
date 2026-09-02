@@ -36,10 +36,11 @@ class UserConsentLedger(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(
         Integer, 
-        ForeignKey("users.id", ondelete="CASCADE"), 
+        ForeignKey("users.id", ondelete="RESTRICT"), 
         nullable=False,
         index=True,
-        comment="FK to users table (one-to-many relationship)"
+        comment="FK to users table. RESTRICT (not CASCADE): this ledger is "
+                "append-only compliance data and must never be deleted with the user."
     )
     
     # =====================================================================
@@ -69,6 +70,7 @@ class UserConsentLedger(Base):
     consent_version = Column(
         String(50),
         nullable=False,
+        server_default="v1.0",
         comment="Version of consent document (e.g., 'v1.0', 'v2.1')"
     )
     consent_document_url = Column(

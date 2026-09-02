@@ -600,20 +600,21 @@ async def stream_aika_execution(
                         f"{session_id}:{user_msg}:{asst_msg}".encode()
                     ).hexdigest()[:32]
                     if stable_id not in existing_conv_ids:
+                        # Persist PII-redacted content only (never store raw text)
+                        hist_user_redacted, _ = sanitize_text(user_msg)
+                        hist_asst_redacted, _ = sanitize_text(asst_msg)
                         db.add(Conversation(
                             user_id=current_user.id,
                             session_id=session_id,
                             conversation_id=stable_id,
-                            message=user_msg,
-                            response=asst_msg,
+                            message=hist_user_redacted,
+                            response=hist_asst_redacted,
                             timestamp=datetime.now(),
                             llm_prompt_id=None,
                             llm_request_count=None,
                             llm_requests_by_model=None,
                         ))
                         # Persist PII-redacted Message rows for history pair
-                        hist_user_redacted, _ = sanitize_text(user_msg)
-                        hist_asst_redacted, _ = sanitize_text(asst_msg)
                         db.add(Message(
                             session_id=session_id,
                             role=MessageRoleEnum.user,
@@ -634,12 +635,14 @@ async def stream_aika_execution(
 
             # 4. Persist current turn
             current_conv_id = str(uuid.uuid4())
+            cur_user_redacted, _ = sanitize_text(request.message)
+            cur_asst_redacted, _ = sanitize_text(final_response)
             conversation_entry = Conversation(
                 user_id=current_user.id,
                 session_id=session_id,
                 conversation_id=current_conv_id,
-                message=request.message,
-                response=final_response,
+                message=cur_user_redacted,
+                response=cur_asst_redacted,
                 timestamp=datetime.now(),
                 llm_prompt_id=prompt_id,
                 llm_request_count=llm_stats.total_requests,
@@ -648,8 +651,6 @@ async def stream_aika_execution(
             db.add(conversation_entry)
 
             # 5. Persist PII-redacted Message rows for current turn
-            cur_user_redacted, _ = sanitize_text(request.message)
-            cur_asst_redacted, _ = sanitize_text(final_response)
             db.add(Message(
                 session_id=session_id,
                 role=MessageRoleEnum.user,

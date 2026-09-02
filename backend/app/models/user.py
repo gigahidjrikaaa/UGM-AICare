@@ -1,7 +1,7 @@
 ﻿"""User authentication and profile models."""
 
 from typing import Optional, List, TYPE_CHECKING
-from sqlalchemy import Column, Integer, String, DateTime, Boolean, Date, Float, Text
+from sqlalchemy import Column, Integer, String, DateTime, Boolean, Date, Float, Text, func
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
@@ -38,17 +38,21 @@ class User(Base):
     role: Mapped[str] = mapped_column(String, default="user", nullable=False)
     password_hash: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     password_reset_token: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    password_reset_expires: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    password_reset_expires: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     email_verified: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    created_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.now, nullable=True)
-    updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=True)
-    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=True
+    )
+    updated_at: Mapped[Optional[datetime]] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=True
+    )
+    last_login: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     current_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     longest_streak: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     last_activity_date: Mapped[Optional[Date]] = mapped_column(Date, nullable=True)
     allow_email_checkins: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
-    last_checkin_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    last_checkin_sent_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     checkin_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
 
     # Extended profile fields
@@ -57,36 +61,20 @@ class User(Base):
     pronouns: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     alternate_phone: Mapped[Optional[str]] = mapped_column(String, nullable=True)
     check_in_code: Mapped[Optional[str]] = mapped_column(String(64), unique=True, nullable=True)
-    emergency_contact_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    emergency_contact_relationship: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    emergency_contact_phone: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    emergency_contact_email: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    risk_level: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    
-    # Extended clinical fields
-    clinical_summary: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    primary_concerns: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    safety_plan_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    current_therapist_name: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    current_therapist_contact: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    therapy_modality: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    therapy_frequency: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    therapy_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    
-    # Consent fields
+
+    # NOTE: Legacy denormalized PII/PHI columns (emergency_contact_*, risk_level,
+    # clinical_summary, therapy_*, preferred_language, accessibility_needs, etc.)
+    # were removed — the normalized tables (user_profiles, user_clinical_records,
+    # user_preferences, user_emergency_contacts) are the single source of truth.
+    # Consent booleans below are a current-state cache; the append-only
+    # user_consent_ledger records the full grant/withdrawal history.
+
+    # Consent fields (current-state cache; history lives in user_consent_ledger)
     consent_data_sharing: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     consent_research: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     consent_emergency_contact: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     consent_marketing: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     consent_ai_memory: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
-    
-    # Preferences
-    preferred_language: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    preferred_timezone: Mapped[Optional[str]] = mapped_column(String, nullable=True)
-    accessibility_needs: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    communication_preferences: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    interface_preferences: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
-    aicare_team_notes: Mapped[Optional[str]] = mapped_column(Text, nullable=True)
 
     # Relationships - use string references to avoid circular imports
     conversations: Mapped[List["Conversation"]] = relationship("Conversation", back_populates="user")
@@ -133,14 +121,14 @@ class User(Base):
         "UserConsentLedger",
         back_populates="user",
         lazy="selectin",
-        cascade="all, delete-orphan"
+        passive_deletes=True,  # APPEND-ONLY: never cascade-delete compliance records
     )
     audit_log: Mapped[List["UserAuditLog"]] = relationship(
         "UserAuditLog",
         back_populates="user",
         foreign_keys="[UserAuditLog.user_id]",  # Specify primary FK (not performed_by)
         lazy="noload",  # Don't load by default (only for admin/compliance)
-        cascade="all, delete-orphan"
+        passive_deletes=True,  # APPEND-ONLY: never cascade-delete compliance records
     )
     sessions: Mapped[List["UserSession"]] = relationship(
         "UserSession",

@@ -77,3 +77,6 @@ backend/research_evaluation/runs/
 # These are automatically rebuilt from HuggingFace during Docker build
 # See: backend/scripts/ensure_onnx_model.py
 backend/models/onnx/
+
+# Point-in-time database backups (contain user data; never commit)
+backups/

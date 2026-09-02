@@ -1,7 +1,10 @@
 """Journal and reflection models."""
 
 from typing import Optional, List, TYPE_CHECKING
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Text, Boolean, Date, UniqueConstraint, Float
+from sqlalchemy import (
+    CheckConstraint, Column, Integer, String, DateTime, ForeignKey, Text,
+    Boolean, Date, UniqueConstraint, Float, func,
+)
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 from datetime import datetime
@@ -25,12 +28,20 @@ class JournalEntry(Base):
     __tablename__ = "journal_entries"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     entry_date: Mapped[Date] = mapped_column(Date, nullable=False, index=True)
     content: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now, nullable=False)
-    prompt_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("journal_prompts.id"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    prompt_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("journal_prompts.id", ondelete="SET NULL"), nullable=True
+    )
     mood: Mapped[Optional[int]] = mapped_column(Integer, nullable=True) # 1-5 scale (1: very negative, 5: very positive)
     word_count: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     
@@ -44,16 +55,23 @@ class JournalEntry(Base):
     reflection_points: Mapped[List["JournalReflectionPoint"]] = relationship("JournalReflectionPoint", back_populates="journal_entry", cascade="all, delete-orphan")
     tags: Mapped[List["JournalTag"]] = relationship("JournalTag", back_populates="journal_entry", cascade="all, delete-orphan")
 
-    __table_args__ = (UniqueConstraint('user_id', 'entry_date', name='_user_entry_date_uc'),)
+    __table_args__ = (
+        UniqueConstraint('user_id', 'entry_date', name='_user_entry_date_uc'),
+        CheckConstraint("mood IS NULL OR (mood >= 1 AND mood <= 5)", name="ck_journal_mood_range"),
+    )
 
 class JournalTag(Base):
     """Custom tags for journal entries."""
     __tablename__ = "journal_tags"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    journal_entry_id: Mapped[int] = mapped_column(Integer, ForeignKey("journal_entries.id"), nullable=False, index=True)
+    journal_entry_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("journal_entries.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     tag_name: Mapped[str] = mapped_column(String(50), nullable=False, index=True)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     journal_entry: Mapped["JournalEntry"] = relationship("JournalEntry", back_populates="tags")
 
@@ -62,10 +80,16 @@ class JournalReflectionPoint(Base):
     __tablename__ = "journal_reflection_points"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    journal_entry_id: Mapped[int] = mapped_column(Integer, ForeignKey("journal_entries.id"), nullable=False, index=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    journal_entry_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("journal_entries.id", ondelete="CASCADE"), nullable=False, index=True
+    )
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     reflection_text: Mapped[str] = mapped_column(Text, nullable=False)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     journal_entry: Mapped["JournalEntry"] = relationship("JournalEntry", back_populates="reflection_points")
     user: Mapped["User"] = relationship("User")

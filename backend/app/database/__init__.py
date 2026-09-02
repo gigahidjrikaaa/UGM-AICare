@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import AsyncGenerator, Optional
 import asyncio
 
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from sqlalchemy.orm import declarative_base
 import os
@@ -188,11 +190,24 @@ except Exception:
 Base = declarative_base()
 
 async def init_db():
-    """Initialize database tables asynchronously"""
-    async with async_engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    """Initialize database connectivity and seed data.
 
-    logger.debug(f"Database initialized with asyncpg: {_redact_database_url(DATABASE_URL)}")
+    Schema management is owned by Alembic exclusively — this function must
+    NEVER call ``Base.metadata.create_all``. Tables/enums created outside the
+    migration chain silently diverge from it and break ``alembic upgrade``.
+    Run ``alembic upgrade head`` in the deploy path before starting the app.
+    """
+    if not DATABASE_URL.startswith("postgresql"):
+        logger.warning(
+            "DATABASE_URL is not PostgreSQL (%s). The schema uses PostgreSQL-only "
+            "types (ARRAY, JSONB, UUID, native enums) that SQLite cannot render; "
+            "use PostgreSQL for anything beyond unit tests.",
+            _redact_database_url(DATABASE_URL),
+        )
+
+    await _verify_alembic_schema()
+
+    logger.debug(f"Database initialized: {_redact_database_url(DATABASE_URL)}")
 
     from app.services.admin_bootstrap import ensure_default_admin, ensure_default_counselor
 
@@ -214,6 +229,40 @@ async def init_db():
         except Exception as exc:
             await session.rollback()
             logger.error(f"Failed to seed default quest templates: {exc}")
+
+
+async def _verify_alembic_schema() -> None:
+    """Warn loudly when the live schema is not at the Alembic head revision."""
+    from alembic.config import Config
+    from alembic.script import ScriptDirectory
+
+    try:
+        alembic_cfg = Config(str(Path(__file__).resolve().parents[1] / "alembic.ini"))
+        script = ScriptDirectory.from_config(alembic_cfg)
+        head_revision = script.get_current_head()
+    except Exception:
+        logger.debug("Unable to resolve Alembic head revision", exc_info=True)
+        return
+
+    try:
+        async with async_engine.begin() as conn:
+            result = await conn.execute(text("SELECT version_num FROM alembic_version"))
+            row = result.first()
+    except Exception:
+        logger.warning(
+            "alembic_version table not found — the database was likely created "
+            "outside Alembic. Run `alembic upgrade head` before serving traffic."
+        )
+        return
+
+    db_revision = row[0] if row else None
+    if db_revision != head_revision:
+        logger.warning(
+            "Database schema revision (%s) does not match Alembic head (%s). "
+            "Run `alembic upgrade head`.",
+            db_revision,
+            head_revision,
+        )
 
 async def get_async_db() -> AsyncGenerator[AsyncSession, None]:
     """Async database dependency for FastAPI"""

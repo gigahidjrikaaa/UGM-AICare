@@ -259,7 +259,7 @@ async def get_profile_overview(
     phone = user.profile.phone if user.profile else None
     alternate_phone = user.profile.alternate_phone if user.profile else None
 
-    # Emergency contact - read from UserEmergencyContact table with fallback to legacy User columns
+    # Emergency contact - read from UserEmergencyContact table (canonical)
     emergency_contact = None
     if user.emergency_contacts:
         # Use first emergency contact from normalized table
@@ -270,17 +270,6 @@ async def get_profile_overview(
             phone=primary_contact.phone,
             email=primary_contact.email,
         )
-    else:
-        # Fallback to legacy User columns
-        legacy_emergency_contact = EmergencyContact(
-            name=user.emergency_contact_name,
-            relationship=user.emergency_contact_relationship,
-            phone=user.emergency_contact_phone,
-            email=user.emergency_contact_email,
-        )
-        if any([legacy_emergency_contact.name, legacy_emergency_contact.relationship, 
-                legacy_emergency_contact.phone, legacy_emergency_contact.email]):
-            emergency_contact = legacy_emergency_contact
 
     # Name fields (canonical: UserProfile)
     first_name = user.profile.first_name if user.profile else None
@@ -477,15 +466,9 @@ async def update_profile_overview(
                     except Exception:
                         normalized_int = None
                     user.profile.year_of_study = normalized_int
-                    # Keep legacy users.year_of_study in sync during the migration window.
-                    if hasattr(user, "year_of_study"):
-                        user.year_of_study = str(normalized_int) if normalized_int is not None else None
                 else:
                     normalized = _normalize_optional_string(data.get(field))
                     setattr(user.profile, field, normalized)
-                    # Dual-write to legacy User column for backward compatibility
-                    if hasattr(user, field):
-                        setattr(user, field, normalized)
                 updated = True
 
         # Update UserPreferences fields
@@ -508,12 +491,6 @@ async def update_profile_overview(
                 # Map accessibility_needs to accessibility_notes for UserPreferences
                 prefs_field = "accessibility_notes" if field == "accessibility_needs" else field
                 setattr(user.preferences, prefs_field, normalized)
-                # Dual-write to legacy User column for backward compatibility
-                # (communication/interface blobs live on users historically)
-                if prefs_field == "accessibility_notes" and hasattr(user, "accessibility_needs"):
-                    user.accessibility_needs = normalized
-                elif hasattr(user, field):
-                    setattr(user, field, normalized)
                 updated = True
 
         # Update emergency contact in UserEmergencyContact table
@@ -545,11 +522,6 @@ async def update_profile_overview(
                     if normalized_value is not None:
                         setattr(new_contact, field, normalized_value)
                 db.add(new_contact)
-            
-            # Dual-write to legacy User columns for backward compatibility
-            for legacy_field, value in emergency_data.items():
-                normalized_value = _normalize_optional_string(value)
-                setattr(user, legacy_field, normalized_value)
             updated = True
 
         # Update consent settings (append to UserConsentLedger for audit trail)
@@ -566,8 +538,7 @@ async def update_profile_overview(
                     granted=data[field],
                     consent_version="v1.0",
                     consent_language=(
-                        user.preferences.preferred_language if user.preferences 
-                        else user.preferred_language or "id"
+                        user.preferences.preferred_language if user.preferences else "id"
                     ),
                     consent_method="profile_update",
                     timestamp=datetime.utcnow(),
@@ -585,15 +556,10 @@ async def update_profile_overview(
 
             if "risk_level" in clinical_data:
                 user.clinical_record.current_risk_level = _normalize_optional_string(clinical_data.get("risk_level"))
-                # Keep legacy users.risk_level in sync during migration window.
-                if hasattr(user, "risk_level"):
-                    user.risk_level = user.clinical_record.current_risk_level
                 updated = True
 
             if "clinical_summary" in clinical_data:
                 user.clinical_record.clinical_summary = _normalize_optional_string(clinical_data.get("clinical_summary"))
-                if hasattr(user, "clinical_summary"):
-                    user.clinical_summary = user.clinical_record.clinical_summary
                 updated = True
 
             if "primary_concerns" in clinical_data:
@@ -603,43 +569,29 @@ async def update_profile_overview(
                 else:
                     parts = [p.strip() for p in raw.replace("\n", ",").split(",")]
                     user.clinical_record.primary_concerns = [p for p in parts if p]
-                if hasattr(user, "primary_concerns"):
-                    user.primary_concerns = raw
                 updated = True
 
             if "safety_plan_notes" in clinical_data:
                 user.clinical_record.safety_plan_notes = _normalize_optional_string(clinical_data.get("safety_plan_notes"))
-                if hasattr(user, "safety_plan_notes"):
-                    user.safety_plan_notes = user.clinical_record.safety_plan_notes
                 updated = True
 
             # Map legacy “current therapist” fields -> external therapist columns
             if "current_therapist_name" in clinical_data:
                 user.clinical_record.external_therapist_name = _normalize_optional_string(clinical_data.get("current_therapist_name"))
-                if hasattr(user, "current_therapist_name"):
-                    user.current_therapist_name = user.clinical_record.external_therapist_name
                 updated = True
             if "current_therapist_contact" in clinical_data:
                 user.clinical_record.external_therapist_contact = _normalize_optional_string(clinical_data.get("current_therapist_contact"))
-                if hasattr(user, "current_therapist_contact"):
-                    user.current_therapist_contact = user.clinical_record.external_therapist_contact
                 updated = True
 
             if "therapy_modality" in clinical_data:
                 user.clinical_record.therapy_modality = _normalize_optional_string(clinical_data.get("therapy_modality"))
-                if hasattr(user, "therapy_modality"):
-                    user.therapy_modality = user.clinical_record.therapy_modality
                 updated = True
             if "therapy_frequency" in clinical_data:
                 user.clinical_record.therapy_frequency = _normalize_optional_string(clinical_data.get("therapy_frequency"))
-                if hasattr(user, "therapy_frequency"):
-                    user.therapy_frequency = user.clinical_record.therapy_frequency
                 updated = True
             if "therapy_notes" in clinical_data:
                 therapy_notes = _normalize_optional_string(clinical_data.get("therapy_notes"))
                 setattr(user.clinical_record, "therapy_notes", therapy_notes)
-                if hasattr(user, "therapy_notes"):
-                    user.therapy_notes = therapy_notes
                 updated = True
 
             if "aicare_team_notes" in clinical_data:

@@ -110,7 +110,12 @@ class RevenueReport(Base):
     # Audit fields
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
-    created_by = Column(Integer, nullable=True)  # User ID of creator
+    created_by = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="User ID of creator (SET NULL on user deletion)"
+    )
     
     # Relationships
     approvals = relationship("RevenueApproval", back_populates="report", cascade="all, delete-orphan")
@@ -289,3 +294,48 @@ class PartnerTransaction(Base):
     # Timestamps
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)
     completed_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class CareTokenMint(Base):
+    """Append-only off-chain receipt for every CARE token mint.
+
+    The on-chain contract is the source of truth for balances; this table
+    preserves an auditable local record of each mint (amount, reason, tx hash)
+    so mints can be reconciled and reported without scanning chain history.
+    """
+    
+    __tablename__ = "care_token_mints"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    
+    # Recipient
+    user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+        comment="Recipient user (NULL if wallet was not linked to a user)"
+    )
+    wallet_address = Column(String(64), nullable=False, index=True)
+    
+    # Mint details
+    amount = Column(Numeric(30, 0), nullable=False, comment="Amount in wei (18 decimals)")
+    reason = Column(String(200), nullable=False)
+    
+    # Chain result
+    chain_id = Column(Integer, nullable=True, index=True)
+    tx_hash = Column(String(128), nullable=False, unique=True, index=True)
+    block_number = Column(Integer, nullable=True)
+    gas_used = Column(Integer, nullable=True)
+    success = Column(Boolean, nullable=False, default=False)
+    
+    # Audit
+    requested_by_user_id = Column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Admin/system user who triggered the mint"
+    )
+    
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False, index=True)

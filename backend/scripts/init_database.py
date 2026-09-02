@@ -1,76 +1,43 @@
 """
-Initialize database schema from SQLAlchemy models.
-Run this ONCE on empty database, then use migrations going forward.
+Initialize database schema via Alembic.
 
-This script creates all tables defined in SQLAlchemy models.
-After running this, use `alembic stamp head` to mark database as current.
+Alembic is the single source of truth for the schema. This script shells out
+to `alembic upgrade head` so a fresh database is created through the migration
+chain (never via `Base.metadata.create_all`, which silently diverges from the
+migrations).
 """
-import asyncio
+import subprocess
 import sys
 from pathlib import Path
 
-# Add app to path
-sys.path.insert(0, str(Path(__file__).parent.parent))
+BACKEND_ROOT = Path(__file__).resolve().parent.parent
 
-from app.database import Base, async_engine
-import app.models  # Import all models to register them with Base
 
-async def init_db():
-    """Create all tables from SQLAlchemy models."""
+def main() -> None:
     print("=" * 80)
-    print("DATABASE INITIALIZATION FROM MODELS")
+    print("DATABASE INITIALIZATION VIA ALEMBIC")
     print("=" * 80)
     print()
-    print("This will create all tables defined in your SQLAlchemy models.")
-    print(f"Total models registered: {len(Base.metadata.tables)}")
-    print()
-    
-    try:
-        async with async_engine.begin() as conn:
-            # Create all tables
-            print("Creating database schema...")
-            await conn.run_sync(Base.metadata.create_all)
-        
+
+    result = subprocess.run(
+        [sys.executable, "-m", "alembic", "upgrade", "head"],
+        cwd=BACKEND_ROOT,
+    )
+
+    if result.returncode != 0:
         print()
         print("=" * 80)
-        print("✅ DATABASE SCHEMA CREATED SUCCESSFULLY!")
+        print("ERROR RUNNING MIGRATIONS")
         print("=" * 80)
-        print()
-        print(f"📊 Total tables created: {len(Base.metadata.tables)}")
-        print()
-        print("Tables:")
-        for table_name in sorted(Base.metadata.tables.keys()):
-            table = Base.metadata.tables[table_name]
-            column_count = len(table.columns)
-            print(f"  ✓ {table_name:40} ({column_count} columns)")
-        
-        print()
-        print("=" * 80)
-        print("NEXT STEPS:")
-        print("=" * 80)
-        print("1. Mark database as migrated:")
-        print("   docker exec ugm_aicare_migrate_dev alembic stamp head")
-        print()
-        print("2. Create baseline migration:")
-        print("   docker exec ugm_aicare_migrate_dev alembic revision \\")
-        print("     --autogenerate -m 'initial_schema_baseline'")
-        print()
-        print("3. Start all services:")
-        print("   ./dev.sh up")
-        print("=" * 80)
-        
-    except Exception as e:
-        print()
-        print("=" * 80)
-        print("❌ ERROR CREATING SCHEMA")
-        print("=" * 80)
-        print(f"Error: {e}")
-        print()
         print("This might happen if:")
-        print("- Database connection is not configured")
-        print("- Tables already exist")
-        print("- Database user lacks permissions")
-        sys.exit(1)
+        print("- DATABASE_URL is not configured")
+        print("- The database is unreachable")
+        print("- A migration failed mid-way (check alembic_version)")
+        sys.exit(result.returncode)
+
+    print()
+    print("Schema is at Alembic head. Start services with ./dev.sh up")
+
 
 if __name__ == "__main__":
-    asyncio.run(init_db())
+    main()

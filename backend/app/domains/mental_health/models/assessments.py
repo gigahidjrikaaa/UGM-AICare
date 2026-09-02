@@ -1,7 +1,7 @@
 """Assessment and triage models."""
 
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, Boolean, Text
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, Boolean, Text, func
 from sqlalchemy.types import JSON
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
@@ -16,8 +16,12 @@ class TriageAssessment(Base):
     __tablename__ = "triage_assessments"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    conversation_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("conversations.id"), nullable=True, index=True)
-    user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    conversation_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("conversations.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
     
     risk_score: Mapped[float] = mapped_column(Float, nullable=False)
     confidence_score: Mapped[float] = mapped_column(Float, nullable=False)
@@ -27,8 +31,12 @@ class TriageAssessment(Base):
     assessment_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
     processing_time_ms: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)
     
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, index=True)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
     conversation: Mapped["Conversation"] = relationship("Conversation")
     user: Mapped["User"] = relationship("User")
@@ -51,7 +59,9 @@ class UserScreeningProfile(Base):
     __tablename__ = "user_screening_profiles"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, unique=True, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, unique=True, index=True
+    )
     
     # Aggregated profile data (JSONB for flexible schema)
     profile_data: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
@@ -65,9 +75,13 @@ class UserScreeningProfile(Base):
     total_sessions_analyzed: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     
     # Timestamps
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
-    last_intervention_at: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
+    last_intervention_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
 
     # Relationship
     user: Mapped["User"] = relationship("User")
@@ -81,7 +95,9 @@ class ConversationRiskAssessment(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
     conversation_id: Mapped[Optional[str]] = mapped_column(String(255), index=True, nullable=True)
     session_id: Mapped[Optional[str]] = mapped_column(String(255), index=True, nullable=True)
-    user_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey("users.id"), nullable=True, index=True)
+    user_id: Mapped[Optional[int]] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
 
     overall_risk_level: Mapped[str] = mapped_column(String(32), nullable=False)
     risk_trend: Mapped[str] = mapped_column(String(32), nullable=False)
@@ -101,12 +117,18 @@ class ConversationRiskAssessment(Base):
     dominance: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
 
     message_count: Mapped[int] = mapped_column(Integer, nullable=False)
-    conversation_duration_seconds: Mapped[float] = mapped_column(Float, nullable=True)
-    analysis_timestamp: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
+    conversation_duration_seconds: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
+    analysis_timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     raw_assessment: Mapped[Optional[dict]] = mapped_column(JSON, nullable=True)
 
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, nullable=False)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
     user: Mapped["User"] = relationship("User")

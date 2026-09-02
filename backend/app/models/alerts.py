@@ -7,9 +7,10 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
-from sqlalchemy import Boolean, Column, DateTime, Integer, String, Text
+from sqlalchemy import Boolean, CheckConstraint, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.sql import func
 
 from app.database import Base
 
@@ -67,17 +68,29 @@ class Alert(Base):
     # Status tracking
     is_seen: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
     seen_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
-    seen_by: Mapped[Optional[int]] = mapped_column(Integer, nullable=True)  # FK to users.id
+    seen_by: Mapped[Optional[int]] = mapped_column(
+        Integer,
+        ForeignKey("users.id", ondelete="SET NULL"),
+        nullable=True,
+        comment="Admin who marked this alert as seen (SET NULL on user deletion)"
+    )
     
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), 
         nullable=False, 
-        default=datetime.utcnow,
+        server_default=func.now(),
         index=True
     )
     expires_at: Mapped[Optional[datetime]] = mapped_column(DateTime(timezone=True), nullable=True)
     # Auto-expire alerts after a certain time (e.g., 7 days)
+
+    __table_args__ = (
+        CheckConstraint(
+            "severity IN ('critical', 'high', 'medium', 'low', 'info')",
+            name="ck_alerts_severity",
+        ),
+    )
 
     def _ensure_context_data(self) -> dict:
         if not isinstance(self.context_data, dict):

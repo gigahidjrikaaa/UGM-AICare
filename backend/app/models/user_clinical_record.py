@@ -16,7 +16,10 @@ Industry Best Practices Applied:
 - Audit fields (updated_by, last_reviewed_at) for compliance
 """
 
-from sqlalchemy import Column, Integer, String, Date, DateTime, Boolean, ForeignKey, Text, ARRAY, Float
+from sqlalchemy import (
+    CheckConstraint, Column, Integer, String, Date, DateTime, Boolean,
+    ForeignKey, Text, ARRAY, Float,
+)
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.database import Base
@@ -102,7 +105,7 @@ class UserClinicalRecord(Base):
     safety_plan_reviewed_at = Column(DateTime(timezone=True))
     safety_plan_reviewed_by_user_id = Column(
         Integer,
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="SET NULL"),
         comment="Counselor who last reviewed the safety plan"
     )
     
@@ -178,7 +181,7 @@ class UserClinicalRecord(Base):
     flagged_at = Column(DateTime(timezone=True))
     flagged_by_user_id = Column(
         Integer,
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="SET NULL"),
         comment="Agent/counselor who flagged this case"
     )
     
@@ -211,7 +214,7 @@ class UserClinicalRecord(Base):
     )
     updated_by_user_id = Column(
         Integer,
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="SET NULL"),
         comment="Last counselor/admin who edited this record"
     )
     
@@ -221,7 +224,7 @@ class UserClinicalRecord(Base):
     )
     last_reviewed_by_user_id = Column(
         Integer,
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="SET NULL"),
         comment="Counselor who performed last review"
     )
     
@@ -229,6 +232,25 @@ class UserClinicalRecord(Base):
     # RELATIONSHIPS
     # =====================================================================
     user = relationship("User", back_populates="clinical_record", foreign_keys=[user_id])
+    
+    __table_args__ = (
+        CheckConstraint(
+            "current_risk_level IS NULL OR current_risk_level IN ('low', 'medium', 'high', 'critical')",
+            name="ck_clinical_risk_level",
+        ),
+        CheckConstraint(
+            "last_risk_score IS NULL OR (last_risk_score >= 0 AND last_risk_score <= 10)",
+            name="ck_clinical_risk_score",
+        ),
+        CheckConstraint(
+            "highest_risk_level_ever IS NULL OR highest_risk_level_ever IN ('low', 'medium', 'high', 'critical')",
+            name="ck_clinical_highest_risk_level",
+        ),
+        CheckConstraint(
+            "access_level IS NULL OR access_level IN ('counselor_only', 'clinical_team', 'research_anonymized')",
+            name="ck_clinical_access_level",
+        ),
+    )
     
     def __repr__(self):
         return f"<UserClinicalRecord(user_id={self.user_id}, risk_level='{self.current_risk_level}')>"

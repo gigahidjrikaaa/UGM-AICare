@@ -9,9 +9,12 @@ Endpoints for managing CARE token operations:
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
+from sqlalchemy.ext.asyncio import AsyncSession
 from typing import Optional
 from decimal import Decimal
 
+from app.database import get_async_db
+from app.domains.finance.models import CareTokenMint
 from app.domains.finance.services.care_token_service import get_care_token_service, CareTokenService
 from app.dependencies import get_current_active_user
 from app.models.user import User
@@ -118,7 +121,8 @@ async def get_token_info(
 async def mint_tokens(
     mint_request: MintRequest,
     current_user: User = Depends(get_current_active_user),
-    care_service: CareTokenService = Depends(get_care_token_service)
+    care_service: CareTokenService = Depends(get_care_token_service),
+    db: AsyncSession = Depends(get_async_db),
 ):
     """
     Mint CARE tokens to a user wallet
@@ -142,6 +146,31 @@ async def mint_tokens(
             raise HTTPException(
                 status_code=500,
                 detail="Minting transaction failed"
+            )
+        
+        # Persist an append-only off-chain receipt for audit/reconciliation.
+        try:
+            db.add(CareTokenMint(
+                user_id=mint_request.user_id,
+                wallet_address=mint_request.wallet_address,
+                amount=result["amount"] * 10**18,
+                reason=result["reason"],
+                chain_id=care_service.w3.eth.chain_id,
+                tx_hash=result["tx_hash"],
+                block_number=result.get("block_number"),
+                gas_used=result.get("gas_used"),
+                success=result["success"],
+                requested_by_user_id=current_user.id,
+            ))
+            await db.commit()
+        except Exception as receipt_error:
+            await db.rollback()
+            # Receipt persistence must never fail the mint itself.
+            import logging
+            logging.getLogger(__name__).error(
+                "Failed to persist CARE token mint receipt for tx %s: %s",
+                result["tx_hash"],
+                receipt_error,
             )
         
         # Generate explorer URL

@@ -36,10 +36,11 @@ class UserAuditLog(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(
         Integer, 
-        ForeignKey("users.id", ondelete="CASCADE"), 
+        ForeignKey("users.id", ondelete="RESTRICT"), 
         nullable=False,
         index=True,
-        comment="FK to users table (one-to-many relationship)"
+        comment="FK to users table. RESTRICT (not CASCADE): this log is "
+                "append-only compliance data and must never be deleted with the user."
     )
     
     # =====================================================================
@@ -79,9 +80,10 @@ class UserAuditLog(Base):
     # =====================================================================
     changed_by_user_id = Column(
         Integer,
-        ForeignKey("users.id"),
+        ForeignKey("users.id", ondelete="SET NULL"),
         index=True,
-        comment="User who made the change (NULL for system/agent changes)"
+        comment="User who made the change (NULL for system/agent changes; "
+                "SET NULL so actor deletion never blocks or destroys audit rows)"
     )
     changed_by_role = Column(
         String(50),

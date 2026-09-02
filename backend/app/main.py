@@ -76,8 +76,9 @@ from app.middleware.user_activity import UserActivityMiddleware
 
 load_dotenv(find_dotenv())
 
-# This call is being moved to the lifespan event handler to avoid race conditions.
-# init_db()
+# Database schema is owned by Alembic: `init_db()` (called in the lifespan
+# below) verifies connectivity + revision state and seeds defaults. It never
+# creates tables — run `alembic upgrade head` in the deploy path.
 
 import httpx
 import inspect

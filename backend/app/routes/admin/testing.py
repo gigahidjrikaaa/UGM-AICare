@@ -23,6 +23,7 @@ from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_async_db
+from app.core.redaction import sanitize_text
 from app.dependencies import get_admin_user
 from app.models import User  # Core model
 from app.domains.mental_health.models import Conversation, Message
@@ -629,7 +630,6 @@ async def seed_database(
             consent_data_sharing=True,
             consent_research=True,
             consent_emergency_contact=True,
-            preferred_language="Indonesian",
         )
         db.add(user)
         created_details.append(f"Student: {name} ({email})")
@@ -665,7 +665,6 @@ async def seed_database(
             pronouns="He/Him" if gender == "Male" else "She/Her",
             phone=f"+628{random.randint(1000000000, 9999999999)}",
             consent_data_sharing=True,
-            preferred_language="Indonesian",
         )
         db.add(user)
         await db.flush()  # Get user.id
@@ -710,7 +709,6 @@ async def seed_database(
             google_sub=f"test_{secrets.token_hex(16)}",
             city="Yogyakarta",
             profile_photo_url=f"https://api.dicebear.com/7.x/avataaars/svg?seed={email}",
-            preferred_language="Indonesian",
         )
         db.add(user)
         created_details.append(f"Admin: {name} ({email})")
@@ -1207,13 +1205,17 @@ async def simulate_conversation(
     for idx, user_message in enumerate(request.messages):
         # Generate AI response
         ai_response = f"Thank you for sharing that. I understand you're experiencing {user_message[:50]}... Let me help you with that."
-        
+
+        # Persist PII-redacted content only (never store raw text)
+        redacted_message, _ = sanitize_text(user_message)
+        redacted_response, _ = sanitize_text(ai_response)
+
         conversation = Conversation(
             user_id=request.user_id,
             session_id=session_id,
             conversation_id=conversation_id,
-            message=user_message,
-            response=ai_response,
+            message=redacted_message,
+            response=redacted_response,
             timestamp=datetime.now() - timedelta(minutes=len(request.messages) - idx)
         )
         db.add(conversation)
@@ -1223,11 +1225,12 @@ async def simulate_conversation(
     messages_created = 0
     for idx, user_message in enumerate(request.messages):
         # User message
+        user_redacted, _ = sanitize_text(user_message)
         user_msg = Message(
             id=uuid.uuid4(),
             session_id=session_id,
             role=MessageRoleEnum.user,
-            content_redacted=user_message,
+            content_redacted=user_redacted,
             ts=datetime.now() - timedelta(minutes=len(request.messages) - idx),
         )
         db.add(user_msg)

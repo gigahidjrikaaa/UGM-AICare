@@ -1,7 +1,7 @@
 """Social media and gamification models."""
 
 from typing import Optional, TYPE_CHECKING
-from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, UniqueConstraint
+from sqlalchemy import Column, Integer, String, DateTime, ForeignKey, Float, UniqueConstraint, func
 from sqlalchemy.orm import relationship, Mapped, mapped_column
 from app.database import Base
 from datetime import datetime
@@ -18,22 +18,36 @@ class Tweet(Base):
     tweet_id: Mapped[str] = mapped_column(String(255), unique=True, index=True)
     text: Mapped[str] = mapped_column(String, nullable=False)
     sentiment_score: Mapped[float] = mapped_column(Float, default=0.0)
-    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now)
-    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, onupdate=datetime.now)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False
+    )
 
 
 class UserBadge(Base):
-    """User achievements and badges (multi-chain aware)."""
+    """User achievements and badges (multi-chain aware).
+
+    Denormalized on-chain ownership record. ``badge_id`` stores the badge
+    *token_id* (not ``badge_templates.id``); the logical link to a template is
+    the composite (chain_id, contract_address, badge_id) which matches the
+    unique key ``uq_badge_templates_chain_contract_token`` on badge_templates.
+    A physical FK is intentionally omitted because legacy rows were minted
+    before badge_templates existed.
+    """
     __tablename__ = "user_badges"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    user_id: Mapped[int] = mapped_column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id: Mapped[int] = mapped_column(
+        Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
+    )
     badge_id: Mapped[int] = mapped_column(Integer, nullable=False, index=True)
     # Multi-chain: which blockchain this badge was minted on
     chain_id: Mapped[int] = mapped_column(Integer, nullable=False, server_default="656476", index=True)
     contract_address: Mapped[str] = mapped_column(String, nullable=False, index=True)
     transaction_hash: Mapped[str] = mapped_column(String, unique=True, nullable=False)
-    awarded_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+    awarded_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
 
     user: Mapped["User"] = relationship("User")
 
@@ -59,7 +73,9 @@ class PendingBadgeGrant(Base):
     badge_id: Mapped[int] = mapped_column(Integer, nullable=False)
     # Human-readable explanation stored for auditability (e.g. "7-day streak")
     reason: Mapped[str] = mapped_column(String, nullable=False)
-    qualified_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.now, nullable=False)
+    qualified_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), nullable=False
+    )
     # Which action triggered the eligibility evaluation
     action_context: Mapped[Optional[str]] = mapped_column(String(64), nullable=True)
 

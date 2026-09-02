@@ -17,7 +17,10 @@ from datetime import datetime
 from enum import Enum
 from typing import Optional, TYPE_CHECKING
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text, UniqueConstraint
+from sqlalchemy import (
+    Boolean, CheckConstraint, DateTime, ForeignKey, Index, Integer, String,
+    Text, UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 from sqlalchemy.types import JSON
@@ -100,6 +103,10 @@ class BadgeTemplate(Base):
         Index("ix_badge_templates_status", "status"),
         Index("ix_badge_templates_chain_id", "chain_id"),
         Index("ix_badge_templates_auto_award_action", "auto_award_action"),
+        CheckConstraint(
+            "status IN ('DRAFT', 'PUBLISHED', 'ARCHIVED')",
+            name="ck_badge_templates_status",
+        ),
     )
 
 
@@ -152,4 +159,8 @@ class BadgeIssuance(Base):
 
     __table_args__ = (
         UniqueConstraint("template_id", "user_id", name="uq_badge_issuances_template_user"),
+        CheckConstraint(
+            "status IN ('PENDING', 'SENT', 'CONFIRMED', 'FAILED')",
+            name="ck_badge_issuances_status",
+        ),
     )
