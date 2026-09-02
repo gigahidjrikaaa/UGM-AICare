@@ -308,7 +308,7 @@ export default function PatientDetailPage() {
         const allPlans: TreatmentPlan[] = plansRes.value.data?.items ?? [];
         const filteredPlans = allPlans.filter((plan) => {
           const planEmail = plan.user_email?.trim().toLowerCase();
-          return Boolean(planEmail) && trustedEmailSet.has(planEmail);
+          return planEmail !== undefined && planEmail !== '' && trustedEmailSet.has(planEmail);
         });
         setPlansState({ loading: false, error: null, data: filteredPlans });
       } else {
@@ -320,7 +320,7 @@ export default function PatientDetailPage() {
         const allApts: BackendAppointment[] = aptsRes.value.data ?? [];
         const patientApts = allApts.filter((appointment) => {
           const appointmentEmail = appointment.user?.email?.trim().toLowerCase();
-          return Boolean(appointmentEmail) && trustedEmailSet.has(appointmentEmail);
+          return appointmentEmail !== undefined && appointmentEmail !== '' && trustedEmailSet.has(appointmentEmail);
         });
 
         const mappedApts: Appointment[] = patientApts.map(apt => {

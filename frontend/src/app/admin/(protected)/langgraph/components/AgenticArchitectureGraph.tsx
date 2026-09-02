@@ -148,7 +148,7 @@ export function AgenticArchitectureGraph({ onNodeClick, healthData }: AgenticArc
         { id: 'sta_bg', type: 'background', position: { x: 650, y: 440 }, data: { label: 'STA PROCESS', ...getGraphData('sta') } },
     ];
 
-    const createBrutalistEdge = (id: string, source: string, target: string, color: string, label: string, dashed = false) => ({
+    const createBrutalistEdge = (id: string, source: string, target: string, color: string, label: string, dashed = false): Edge => ({
         id, source, target,
         type: 'step',
         animated: !dashed,

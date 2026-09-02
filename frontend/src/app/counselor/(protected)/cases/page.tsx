@@ -27,6 +27,7 @@ interface Case {
   created_at: string;
   updated_at: string;
   assigned_to?: string;
+  session_id?: string | null;
   summary_redacted?: string;
   sla_breach_at?: string;
   user_email?: string;
