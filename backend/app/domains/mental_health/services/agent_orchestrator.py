@@ -124,10 +124,12 @@ class AgentOrchestrator:
         Returns:
             Created Case object
         """
-        # Map severity level to CaseSeverityEnum
+        # Map severity level to CaseSeverityEnum — incoming values come from
+        # STA's severity vocabulary (low/moderate/high/critical, see
+        # sta/service.py); 'med' is the CaseSeverityEnum target, not an input.
         severity_map = {
             'low': CaseSeverityEnum.low,
-            'med': CaseSeverityEnum.med,
+            'moderate': CaseSeverityEnum.med,
             'high': CaseSeverityEnum.high,
             'critical': CaseSeverityEnum.critical
         }

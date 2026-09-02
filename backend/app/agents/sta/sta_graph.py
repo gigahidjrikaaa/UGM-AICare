@@ -143,8 +143,10 @@ async def assess_risk_node(state: STAState, db: AsyncSession) -> STAState:
         # Classify using existing service (which handles DB persistence)
         response = await sta_service.classify(request)
         
-        # Map risk_level (0-3) to severity (low/medium/high/critical)
-        severity_map = {0: "low", 1: "medium", 2: "high", 3: "critical"}
+        # Map risk_level (0-3) to severity — vocabulary matches the rest of the
+        # system: low/moderate/high/critical (see sta/service.py,
+        # conversation_assessment.py, and the decision JSON schema enum).
+        severity_map = {0: "low", 1: "moderate", 2: "high", 3: "critical"}
         severity = severity_map.get(response.risk_level, "low")
         
         # Normalize risk_level to risk_score (0.0-1.0)
