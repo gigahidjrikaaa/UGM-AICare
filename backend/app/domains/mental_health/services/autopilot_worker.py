@@ -5,7 +5,7 @@ import logging
 import os
 import asyncio
 import socket
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy import select
@@ -327,6 +327,50 @@ async def _handle_publish_attestation(action: AutopilotAction) -> dict[str, Any]
     }
 
 
+async def _handle_sta_conversation_analysis(action: AutopilotAction) -> dict[str, Any]:
+    """Execute a queued STA conversation-end analysis in its own DB session.
+
+    Rebuilds the minimal orchestrator-state view from the action payload and
+    delegates to ``trigger_sta_conversation_analysis_background``, which runs
+    the LLM risk analysis and persists the assessment + screening updates.
+    Runs durably via the autopilot queue: retries with backoff on failure and
+    dead-letters after max retries (a dropped crisis analysis is never silent).
+    """
+    from app.agents.aika.background_tasks import (
+        trigger_sta_conversation_analysis_background,
+    )
+
+    payload = action.payload_json or {}
+    state: dict[str, Any] = {
+        "conversation_id": payload.get("conversation_id"),
+        "user_id": payload.get("user_id"),
+        "session_id": payload.get("session_id"),
+        "message": payload.get("message") or "",
+        "conversation_history": payload.get("conversation_history") or [],
+        "personal_context": payload.get("personal_context") or {},
+        "preferred_model": payload.get("preferred_model"),
+        "force_sta_reanalysis": bool(payload.get("force_sta_reanalysis", False)),
+        "sta_analysis_completed": False,
+    }
+    started_at_ts = payload.get("started_at_ts")
+    if isinstance(started_at_ts, (int, float)):
+        state["started_at"] = datetime.fromtimestamp(
+            float(started_at_ts), tz=timezone.utc
+        )
+
+    async with AsyncSessionLocal() as db:
+        await trigger_sta_conversation_analysis_background(state, db)
+        await db.commit()
+
+    assessment = state.get("conversation_assessment") or {}
+    return {
+        "entity_type": "conversation_risk_assessment",
+        "entity_id": str(payload.get("conversation_id") or ""),
+        "risk_level": assessment.get("overall_risk_level"),
+        "cma_recommended": assessment.get("should_invoke_cma"),
+    }
+
+
 async def execute_autopilot_action(action: AutopilotAction) -> dict[str, Any]:
     if action.action_type == AutopilotActionType.create_case:
         return await _handle_create_case(action)
@@ -340,6 +384,8 @@ async def execute_autopilot_action(action: AutopilotAction) -> dict[str, Any]:
         if _is_onchain_placeholder_enabled():
             return await _handle_onchain_placeholder(action)
         return await _handle_publish_attestation(action)
+    if action.action_type == AutopilotActionType.sta_conversation_analysis:
+        return await _handle_sta_conversation_analysis(action)
     raise ValueError(f"Unsupported action type: {action.action_type.value}")
 
 

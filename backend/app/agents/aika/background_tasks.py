@@ -1,8 +1,15 @@
-"""Background tasks for the Aika orchestrator.
+"""STA conversation-end analysis task.
 
-Functions here are fire-and-forget coroutines launched via
-``asyncio.create_task()``.  They run after the user's response has been sent
-and MUST NOT block the real-time request path.
+``trigger_sta_conversation_analysis_background`` performs the LLM risk
+analysis and persists the assessment + screening-profile updates. It runs
+AFTER the user's response has been delivered and MUST NOT block the
+real-time request path.
+
+Execution model: the decision node enqueues this task as a durable
+``AutopilotAction`` (``sta_conversation_analysis``); the autopilot worker
+executes it in its own DB session with retry/backoff and dead-lettering.
+It must never be launched via ``asyncio.create_task`` on a request-scoped
+session — a crash or session close would silently drop a crisis analysis.
 
 All failures are caught and logged; they never propagate to the caller.
 """

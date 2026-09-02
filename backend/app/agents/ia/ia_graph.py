@@ -123,24 +123,30 @@ def validate_consent_node(state: IAState) -> IAState:
         execution_tracker.start_node(execution_id, "ia:validate_consent", "ia")
     
     try:
-        # Note: In production, this would query the consent ledger
-        # For now, we assume all queries are aggregate-only (no individual data)
-        # and therefore consent is implicitly satisfied for statistical aggregation
-        
-        # Check if query is in allow-listed analytics queries
-        # (Allow-listed queries are pre-approved to access aggregate data only)
+        # Consent posture: IA only ever executes queries from the reviewed
+        # allow-list registry (aggregate-only, k-anonymised, no individual
+        # records), so data-subject consent is satisfied by construction —
+        # but that property is VERIFIED here rather than assumed: any
+        # question_id outside the registry is rejected before execution.
+        from app.agents.ia.queries import ALLOWED_QUERIES
+
         question_id = state.get("ia_context", {}).get("question_id")
-        
-        # The IAQueryRequest will validate against ALLOWED_QUERIES
-        # This node adds an additional layer of consent checking
-        
+        if question_id not in ALLOWED_QUERIES:
+            raise ValueError(
+                "Consent validation failed: question_id %r is not in the "
+                "approved aggregate-only query registry" % question_id
+            )
+
         state.setdefault("execution_path", []).append("ia:validate_consent")
         state.setdefault("ia_context", {})["consent_validated"] = True
-        
+        state.setdefault("ia_context", {})["consent_basis"] = (
+            "aggregate_only_k_anonymized_allowlisted_query"
+        )
+
         if execution_id:
             execution_tracker.complete_node(execution_id, "ia:validate_consent")
-        
-        logger.info(f"IA consent validated for question_id={question_id}")
+
+        logger.info("IA consent validated for question_id=%s", question_id)
         
     except Exception as e:
         error_msg = f"Consent validation failed: {str(e)}"

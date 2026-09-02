@@ -28,7 +28,7 @@ Coordinator:
 """
 from __future__ import annotations
 
-import asyncio
+import hashlib
 import json
 import logging
 import os
@@ -1173,17 +1173,56 @@ async def aika_decision_node(
             state["decision_event_id"] = audit_id
 
         # -----------------------------------------------------------------
-        # 7. Background STA analysis on conversation end (fire-and-forget)
+        # 7. Queue durable STA analysis on conversation end
         # -----------------------------------------------------------------
-        if state.get("conversation_ended", False):
+        # Previously a fire-and-forget asyncio.create_task bound to the
+        # request-scoped DB session — a crash or session close before the task
+        # finished silently dropped the crisis analysis. The analysis is now
+        # enqueued as an autopilot action: executed by the worker in its own
+        # session with retry/backoff and dead-lettering.
+        if state.get("conversation_ended", False) and not state.get(
+            "sta_analysis_completed", False
+        ):
             logger.info(
-                "Conversation ended — triggering background STA analysis (includes screening)."
+                "Conversation ended — enqueueing durable STA analysis (includes screening)."
             )
-            from app.agents.aika.background_tasks import (
-                trigger_sta_conversation_analysis_background,
+            from app.domains.mental_health.models.autopilot_actions import (
+                AutopilotActionType,
             )
-            asyncio.create_task(
-                trigger_sta_conversation_analysis_background(state.copy(), db)
+            from app.domains.mental_health.services.autopilot_action_service import (
+                build_idempotency_key,
+                enqueue_action,
+            )
+
+            queue_key = (
+                state.get("conversation_id")
+                or state.get("session_id")
+                or f"msg:{hashlib.sha256(str(state.get('message') or '').encode('utf-8')).hexdigest()[:16]}"
+            )
+            started_at = state.get("started_at")
+            await enqueue_action(
+                db,
+                action_type=AutopilotActionType.sta_conversation_analysis,
+                risk_level=str(state.get("immediate_risk_level") or "none"),
+                idempotency_key=build_idempotency_key(
+                    f"sta-analysis:{queue_key}:{state.get('user_id')}"
+                ),
+                payload_json={
+                    "conversation_id": state.get("conversation_id"),
+                    "user_id": state.get("user_id"),
+                    "session_id": state.get("session_id"),
+                    "message": state.get("message"),
+                    # Bound payload growth — the analyzer only needs recent turns.
+                    "conversation_history": (state.get("conversation_history") or [])[-40:],
+                    "personal_context": state.get("personal_context") or {},
+                    "preferred_model": state.get("preferred_model"),
+                    "started_at_ts": (
+                        started_at.timestamp()
+                        if isinstance(started_at, datetime)
+                        else None
+                    ),
+                },
+                commit=True,
             )
 
     except Exception as exc:

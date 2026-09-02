@@ -173,6 +173,43 @@ def _build_synthesis_prompt(
 # ASYNC SUB-AGENT NODES
 # ===========================================================================
 
+# Keys managed by the orchestrator itself — subgraph results must never
+# overwrite them; they are appended via setdefault/extend instead.
+_STATE_BOOKKEEPING_KEYS: frozenset[str] = frozenset(
+    {"agents_invoked", "execution_path", "errors"}
+)
+
+
+def _merge_subgraph_state(
+    state: AikaOrchestratorState,
+    result: Any,
+    label: str,
+) -> None:
+    """Merge a sub-graph result into the orchestrator state.
+
+    Single merge semantics shared by the sequential and parallel paths:
+
+    - Exceptions become logged errors plus an ``errors`` entry — never raised.
+    - Bookkeeping lists (``agents_invoked``/``execution_path``/``errors``) are
+      appended, never overwritten by the subgraph's own copies.
+    - ``None`` values are skipped so an absent subgraph output cannot erase
+      orchestrator-populated fields (previously only the parallel crisis path
+      filtered ``None``; the sequential paths used a blind ``dict.update``).
+    """
+    if isinstance(result, Exception):
+        logger.error("%s subgraph failed: %s", label, result, exc_info=True)
+        state.setdefault("errors", []).append("%s subgraph failure: %s" % (label, result))
+        return
+
+    result_dict = cast(dict[str, Any], result)
+    target = cast(dict[str, Any], state)
+    for key, val in result_dict.items():
+        if key in _STATE_BOOKKEEPING_KEYS or val is None:
+            continue
+        target[key] = val
+    state.setdefault("agents_invoked", []).extend(result_dict.get("agents_invoked", []))
+
+
 @trace_agent("TCA_Subgraph")
 async def execute_tca_subgraph(
     state: AikaOrchestratorState,
@@ -206,7 +243,7 @@ async def execute_tca_subgraph(
         tca_graph = cast(_AsyncInvokable, get_tca_graph())
         tca_result = cast(dict[str, Any], await tca_graph.ainvoke(cast(dict[str, Any], state), config={"configurable": {"db": db}}))
 
-        cast(dict[str, Any], state).update(tca_result)
+        _merge_subgraph_state(state, tca_result, "TCA")
         state.setdefault("agents_invoked", []).append("TCA")
         state.setdefault("execution_path", []).append("tca_subgraph")
 
@@ -274,7 +311,7 @@ async def execute_cma_subgraph(
         cma_graph = cast(_AsyncInvokable, get_cma_graph())
         cma_result = cast(dict[str, Any], await cma_graph.ainvoke(cast(dict[str, Any], state), config={"configurable": {"db": db}}))
 
-        cast(dict[str, Any], state).update(cma_result)
+        _merge_subgraph_state(state, cma_result, "CMA")
         state.setdefault("agents_invoked", []).append("CMA")
         state.setdefault("execution_path", []).append("cma_subgraph")
 
@@ -360,24 +397,10 @@ async def parallel_crisis_node(
             return_exceptions=True,
         )
 
-        # Merge helpers — skip bookkeeping lists (handled by setdefault below).
-        _EXCLUDED_KEYS: frozenset[str] = frozenset({"agents_invoked", "execution_path", "errors"})
-
-        def _merge_result(result: Any, label: str) -> None:
-            if isinstance(result, Exception):
-                logger.error("%s failed in parallel crisis path: %s", label, result, exc_info=True)
-                state.setdefault("errors", []).append("%s parallel failure: %s" % (label, result))
-                return
-            result_dict = cast(dict[str, Any], result)
-            for key, val in result_dict.items():
-                if key not in _EXCLUDED_KEYS and val is not None:
-                    cast(dict[str, Any], state)[key] = val
-            state.setdefault("agents_invoked", []).extend(
-                result_dict.get("agents_invoked", [])
-            )
-
-        _merge_result(tca_result, "TCA")
-        _merge_result(cma_result, "CMA")
+        # Merge sub-graph outputs with the shared helper (exception-safe,
+        # None-filtering, bookkeeping keys appended rather than overwritten).
+        _merge_subgraph_state(state, tca_result, "TCA")
+        _merge_subgraph_state(state, cma_result, "CMA")
 
         state.setdefault("execution_path", []).append("parallel_crisis")
 
@@ -460,7 +483,7 @@ async def execute_ia_subgraph(
                 report_parts.append("\n\n[Download PDF Report](%s)" % ia_result["pdf_url"])
             ia_result["ia_report"] = "".join(report_parts)
 
-        cast(dict[str, Any], state).update(ia_result)
+        _merge_subgraph_state(state, ia_result, "IA")
         state.setdefault("agents_invoked", []).append("IA")
         state.setdefault("execution_path", []).append("ia_subgraph")
 

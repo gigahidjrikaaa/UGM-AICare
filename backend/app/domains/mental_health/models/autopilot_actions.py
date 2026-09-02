@@ -18,6 +18,10 @@ class AutopilotActionType(str, enum.Enum):
     create_case = "create_case"
     mint_badge = "mint_badge"
     publish_attestation = "publish_attestation"
+    # Internal monitoring task: durable STA conversation-end analysis.
+    # Enqueued directly (bypasses the allow/deny policy engine) because it is
+    # a safety analysis that must always run, never a user-facing action.
+    sta_conversation_analysis = "sta_conversation_analysis"
 
 
 class AutopilotPolicyDecision(str, enum.Enum):

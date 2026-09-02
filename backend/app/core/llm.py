@@ -125,6 +125,15 @@ SUPPORTED_ZAI_DIRECT_MODELS: tuple[str, ...] = (
 )
 
 # --- Client Management ---
+# NOTE (multi-worker limitation): key cooldowns and the circuit breaker below
+# are PROCESS-LOCAL. With multiple uvicorn workers each worker rotates keys
+# independently, so a rate-limited key can still be picked by other workers
+# until their own cooldowns trip. Production hardening (deferred — requires
+# restructuring these sync paths around an async Redis client):
+#   1. Move `_gemini_key_cooldowns` to Redis with TTL keys
+#      (`llm:key_cooldown:{key_fingerprint}`) written on RESOURCE_EXHAUSTED.
+#   2. Keep the per-model circuit breaker in-process (per-worker breakers trip
+#      fast for global model failures) or share `open_until` via Redis.
 _gemini_client: Optional[genai.Client] = None
 _gemini_client_by_key: dict[int, genai.Client] = {}
 _gemini_key_cooldowns: dict[int, float] = {}
