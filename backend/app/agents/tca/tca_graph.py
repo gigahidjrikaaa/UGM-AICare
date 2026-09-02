@@ -67,8 +67,9 @@ async def ingest_triage_signal_node(state: TCAState) -> TCAState:
         execution_tracker.complete_node(execution_id, "tca::ingest_triage_signal")
     
     logger.info(
-        f"TCA ingested triage signal: severity={state.get("sta_context", {}).get("severity")}, "
-        f"intent={state.get("sta_context", {}).get("intent")}"
+        "TCA ingested triage signal: severity=%s, intent=%s",
+        (state.get("sta_context") or {}).get("severity"),
+        (state.get("sta_context") or {}).get("intent"),
     )
     return state
 
@@ -269,7 +270,10 @@ async def safety_review_node(state: TCAState) -> TCAState:
                 metrics={"should_intervene": state.get("tca_context", {}).get("should_intervene", False)}
             )
         
-        logger.info(f"TCA safety review passed: should_intervene={state.get("tca_context", {}).get("should_intervene")}")
+        logger.info(
+            "TCA safety review passed: should_intervene=%s",
+            (state.get("tca_context") or {}).get("should_intervene"),
+        )
         
     except Exception as e:
         error_msg = f"Safety review failed: {str(e)}"

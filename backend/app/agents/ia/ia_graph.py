@@ -88,7 +88,11 @@ def ingest_query_node(state: IAState) -> IAState:
         if execution_id:
             execution_tracker.complete_node(execution_id, "ia:ingest_query")
         
-        logger.info(f"IA ingested query: question_id={state.get("ia_context", {}).get("question_id")}, range={delta.days} days")
+        logger.info(
+            "IA ingested query: question_id=%s, range=%s days",
+            (state.get("ia_context") or {}).get("question_id"),
+            delta.days,
+        )
         
     except Exception as e:
         error_msg = f"Query ingestion failed: {str(e)}"
@@ -263,8 +267,9 @@ async def execute_analytics_node(state: IAState, config: RunnableConfig) -> IASt
             execution_tracker.complete_node(execution_id, "ia:execute_analytics")
         
         logger.info(
-            f"IA query completed: question_id={state.get("ia_context", {}).get("question_id")}, "
-            f"rows={len(response.table) if response.table else 0}"
+            "IA query completed: question_id=%s, rows=%s",
+            (state.get("ia_context") or {}).get("question_id"),
+            len(response.table) if response.table else 0,
         )
         
     except Exception as e:

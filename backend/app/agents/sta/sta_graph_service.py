@@ -122,11 +122,13 @@ class STAGraphService:
             execution_success = len(final_state.get("errors", [])) == 0
             execution_tracker.complete_execution(execution_id, success=execution_success)
             
+            sta_context = final_state.get("sta_context") or {}
             logger.info(
-                f"STA graph execution completed: "
-                f"severity={final_state.get("sta_context", {}).get("severity", 'unknown')}, "
-                f"next_step={final_state.get("sta_context", {}).get("next_step", 'unknown')}, "
-                f"errors={len(final_state.get('errors', []))}"
+                "STA graph execution completed: "
+                "severity=%s, next_step=%s, errors=%s",
+                sta_context.get("severity", "unknown"),
+                sta_context.get("next_step", "unknown"),
+                len(final_state.get("errors", [])),
             )
             
             return final_state

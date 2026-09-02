@@ -108,9 +108,10 @@ async def create_case_node(state: CMAState, config: RunnableConfig) -> CMAState:
         # Generate case summary
         risk_score = state.get("sta_context", {}).get("risk_score", 0.0)
         intent = state.get("sta_context", {}).get("intent", "unknown")
+        severity = state.get("sta_context", {}).get("severity", "unknown")
         summary_redacted = (
             f"Risk score: {risk_score:.2f}, Intent: {intent}, "
-            f"Severity: {state.get("sta_context", {}).get("severity", 'unknown')}"
+            f"Severity: {severity}"
         )
         
         # Create case
@@ -548,7 +549,10 @@ async def notify_counsellor_node(state: CMAState) -> CMAState:
         if execution_id:
             execution_tracker.complete_node(execution_id, "cma::notify_counsellor")
         
-        logger.info(f"CMA notified counsellors of case {state.get("cma_context", {}).get("case_id")}")
+        logger.info(
+            "CMA notified counsellors of case %s",
+            (state.get("cma_context") or {}).get("case_id"),
+        )
         
     except Exception as e:
         error_msg = f"Counsellor notification failed: {str(e)}"
@@ -670,7 +674,9 @@ async def schedule_appointment_node(state: CMAState, config: RunnableConfig) -> 
             psychologist_id=psychologist_id,
             appointment_type_id=appointment_type_id,
             appointment_datetime=appointment_datetime,
-            notes=f"Auto-scheduled by CMA. Case severity: {severity}. Case ID: {state.get("cma_context", {}).get("case_id")}",
+            notes="Auto-scheduled by CMA. Case severity: {}. Case ID: {}".format(
+                severity, (state.get("cma_context") or {}).get("case_id")
+            ),
             status="scheduled"
         )
         

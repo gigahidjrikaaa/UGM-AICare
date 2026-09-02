@@ -118,34 +118,38 @@ def _build_synthesis_prompt(
     sections.append("\nAgent Results:")
 
     if "STA" in agents_invoked:
+        sta_context = state.get("sta_context") or {}
         sections.append(
             "- Safety Triage (STA):\n"
-            f"  * Risk Level: {state.get("sta_context", {}).get("severity", 'unknown')}\n"
-            f"  * Intent: {state.get("sta_context", {}).get("intent", 'unknown')}\n"
-            f"  * Risk Score: {state.get("sta_context", {}).get("risk_score", 0.0)}"
+            f"  * Risk Level: {sta_context.get('severity', 'unknown')}\n"
+            f"  * Intent: {sta_context.get('intent', 'unknown')}\n"
+            f"  * Risk Score: {sta_context.get('risk_score', 0.0)}"
         )
 
     if "TCA" in agents_invoked:
+        tca_context = state.get("tca_context") or {}
         sections.append(
             "- Support Coach (TCA):\n"
-            f"  * Intervention Created: {state.get("tca_context", {}).get("should_intervene", False)}\n"
-            f"  * Intervention Type: {state.get("tca_context", {}).get("intervention_type", 'none')}\n"
-            f"  * Plan ID: {state.get("tca_context", {}).get("intervention_plan_id", 'none')}"
+            f"  * Intervention Created: {tca_context.get('should_intervene', False)}\n"
+            f"  * Intervention Type: {tca_context.get('intervention_type', 'none')}\n"
+            f"  * Plan ID: {tca_context.get('intervention_plan_id', 'none')}"
         )
 
     if "CMA" in agents_invoked:
+        cma_context = state.get("cma_context") or {}
         sections.append(
             "- Service Desk (CMA):\n"
-            f"  * Case Created: {state.get("cma_context", {}).get("case_created", False)}\n"
-            f"  * Case ID: {state.get("cma_context", {}).get("case_id", 'none')}\n"
-            f"  * Assigned Counselor: {state.get("cma_context", {}).get("assigned_counsellor_id", 'none')}"
+            f"  * Case Created: {cma_context.get('case_created', False)}\n"
+            f"  * Case ID: {cma_context.get('case_id', 'none')}\n"
+            f"  * Assigned Counselor: {cma_context.get('assigned_counsellor_id', 'none')}"
         )
 
     if "IA" in agents_invoked:
+        ia_context = state.get("ia_context") or {}
         sections.append(
             "- Insights Agent (IA):\n"
-            f"  * Report: {state.get("ia_context", {}).get("ia_report", 'No report generated')}\n"
-            f"  * Query Type: {state.get("ia_context", {}).get("query_type", 'unknown')}"
+            f"  * Report: {ia_context.get('ia_report', 'No report generated')}\n"
+            f"  * Query Type: {ia_context.get('query_type', 'unknown')}"
         )
 
     sections.append(
